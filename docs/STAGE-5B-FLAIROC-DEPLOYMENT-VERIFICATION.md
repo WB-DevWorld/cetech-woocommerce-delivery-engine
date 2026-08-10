@@ -4,36 +4,25 @@
 **Plugin version:** `1.0.0-rc.1` (unchanged public version)  
 **Schema target:** `3` (unchanged)  
 **Date opened:** 2026-08-10  
-**Last updated:** 2026-08-10 (Stage 5B-3 controlled ECR parity — **BLOCKED**)
+**Last updated:** 2026-08-10 (Stage 5B-3R-2 live ECR parity — **VERIFIED**; Stage 5 **COMPLETE**)
 
 ---
 
 ## 1. Current verdict
 
-**Stage 5B-3: BLOCKED**
+**Stage 5B-3R-2: VERIFIED — Stage 5 COMPLETE**
 
-Controlled live ECR enablement on FLAIROC for QA product `#39705` proved:
+Fingerprint-fixed package installed on FLAIROC. Controlled ECR retry for QA product `#39705` / In warehouse succeeded end-to-end:
 
-- ECR routing works (`#39705` → `ecr`; `#39589` → `legacy`)
-- `in_warehouse` effective config VALID with legacy-equivalent semantics
-- Selector customer UI parity PASS (In warehouse + FLAIROC QA Standard Delivery; no Air/Sea; no privacy leak)
-- ECR-alone does **not** expose customer UI
-- Cart capture stores ECR selection + configuration fingerprint
+- configuration fingerprint survives capture → normalize → session restore (**MATCH**)
+- checkout validation accepts preserved selection
+- Delivery Engine WooCommerce shipping rate **25.00** (matches Stage 0B legacy)
+- one controlled ECR QA order **`#39711`** placed (shipping 25.00; protected snapshots 25.0000)
+- HPOS-compatible WooCommerce CRUD path used; privacy clean on customer surfaces
+- variable `#39589` remained legacy; no fresh Delivery Engine fatals
+- all runtime flags and COD restored **OFF**; dormant storefront **PASS**
 
-**Blocker (single corrective task):**
-
-`CartDeliverySelectionSessionData::normalizeIntent()` dropped `configuration_fingerprint`, so checkout revalidation / shipping hash checks treated a fresh ECR selection as invalid/stale. Live cart_shipping probe therefore returned:
-
-- checkout validation invalid (“no longer available”)
-- no Delivery Engine shipping rate (empty rates; cart shipping total `0` while product subtotal `19.99`)
-
-**Do not create an ECR QA order until the fix is packaged, deployed to FLAIROC, and Stage 5B-3 re-run past shipping = 25.00.**
-
-Local fix landed in-repo (preserve fingerprint on normalize; regression PHPUnit). Public version not bumped. FLAIROC runtime flags and COD restored **OFF**; dormant storefront PASS after test.
-
-Human Stage 5B-2 admin smoke and Stage 5B-2A slice audit remain valid background.
-
-ECR remains **OFF** on FLAIROC until Stage 5B-3 re-verification after deploy.
+Prior Stage 5B-3 blocked result (fingerprint drop) remains historical evidence below.
 
 ---
 
@@ -125,7 +114,7 @@ Agent could **not** read live PHP logs this session (no public debug.log; no SSH
 |----------|----------------|-----|---------|--------|
 | 1 | `d5fefa2` | `…-stage5b.zip` | `973c0209…e4cc` | **FAILED** admin deployment |
 | 2 | `4e8f503` admin/bootstrap repaired | `…-stage5b-repaired.zip` | `1d672dae…a59a` | Stage 5B-2 safety/admin **PASS** |
-| 3 | `f300390` fingerprint repair (HEAD docs `7fe41c3`) | `cetech-woocommerce-delivery-engine-stage5b-fingerprint-fixed.zip` | `dbddc1d7df3c1262296e9c42b05e87921066fc6f5f29b0f3c798385ad1d4cbfd` | **Packaged locally — NOT deployed**; pending Stage 5B-3 retry |
+| 3 | `f300390` fingerprint repair (docs through `17b5c47`) | `cetech-woocommerce-delivery-engine-stage5b-fingerprint-fixed.zip` | `dbddc1d7df3c1262296e9c42b05e87921066fc6f5f29b0f3c798385ad1d4cbfd` | **Installed on FLAIROC**; Stage 5B-3R-2 **VERIFIED** |
 
 Artifact 3 absolute path (local): `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-stage5b-fingerprint-fixed.zip` (636893 bytes). Do **not** claim Artifact 3 was installed on FLAIROC.
 
@@ -370,18 +359,78 @@ Preserve `configuration_fingerprint` in `CartDeliverySelectionSessionData::norma
 
 ---
 
-## 10. Explicit non-claims
+## 10. Explicit non-claims (historical through Stage 5B-3R-1)
 
-- Stage 5B is **not** complete (Stage 5B-3 live ECR parity blocked on fingerprint session normalize)
-- Stage 5B-2A resolves the `#39705` Default-slice unresolved mystery as **wrong slice**, not missing backfill
 - Empty Global remains intentionally unpopulated (do not fill Global merely to green Default preview)
 - UX wording notes for later: none blocking; customer labels used “In warehouse” / “Delivery options” (acceptable)
+- Stage 6 variable-product ECR capture is **not** implemented
 
-### Recommended next step
+---
 
-1. Human administrator installs Artifact 3 (`…-stage5b-fingerprint-fixed.zip`) replacing the active Delivery Engine plugin.
-2. Confirm storefront / wp-admin / REST health **before** enabling any runtime flags.
-3. Re-run Stage 5B-3 with the controlled flag sequence (shipping must be **25.00**, then one COD QA order, restore OFF).
-4. Do **not** begin Stage 6 until Stage 5B-3 is VERIFIED.
+## 11. Stage 5B-3R-2 — fingerprint-fixed live ECR parity retry (2026-08-10 ~23:30–23:36 UTC)
 
-FLAIROC was **not** modified during Stage 5B-3R-1 packaging.
+**Installed artifact:** `cetech-woocommerce-delivery-engine-stage5b-fingerprint-fixed.zip`  
+**SHA-256:** `dbddc1d7df3c1262296e9c42b05e87921066fc6f5f29b0f3c798385ad1d4cbfd`  
+**Repair:** `f300390` (preserves configuration fingerprint in cart session normalize)  
+**Pre-test marker:** PHP `error.log` line count **891** at **2026-08-10T23:30:27Z**  
+**Health:** storefront / REST / authenticated REST **200**; fingerprint preserve comment confirmed in deployed `CartDeliverySelectionSessionData.php`
+
+### Fingerprint repair live verification
+
+| Step | Value |
+|------|-------|
+| Before session | `48ca598548faf968808c0a6df8db9fb481a54b17e61255006672400a229f4734` |
+| After normalize | same |
+| After restore | same |
+| Selection hash | `832b863f…0a8f35` (before = after) |
+| Match | **PASS** |
+| Checkout validation | **valid** (no “no longer available”) |
+
+### Runtime flag sequence
+
+| Flag | Initial | During | Final |
+|------|---------|--------|-------|
+| `enable_effective_configuration_runtime` | OFF | ON | OFF |
+| `enable_product_delivery_selector` | OFF | ON | OFF |
+| `enable_cart_delivery_selection_capture` | OFF | ON | OFF |
+| `enable_checkout_delivery_selection_validation` | OFF | ON | OFF |
+| `enable_woocommerce_shipping_rate_calculation` | OFF | ON | OFF |
+| `enable_order_delivery_snapshot_persistence` | OFF | ON (pre-order) | OFF |
+| customer order/email summaries | OFF | NOT EXECUTED | OFF |
+| reserved shipment/tracking/timeline/Blocks | OFF | OFF | OFF |
+
+### Results
+
+| Area | Result |
+|------|--------|
+| ECR route `#39705` | `ecr` / slice In warehouse / VALID |
+| Selector parity | In warehouse + FLAIROC QA Standard Delivery; no Air/Sea; privacy clean |
+| Cart / fingerprint | capture + session restore MATCH |
+| Checkout | selection valid; offer `#1` retained |
+| Shipping | WC method `delivery_engine_selected_offer` cost **25**; cart shipping total **25**; no fees |
+| ECR QA order | **`#39711`** processing; shipping **25**; total **44.99** |
+| Snapshot | protected line quote **25.0000**; package quote **25.0000**; offer/label/In warehouse semantics |
+| HPOS / CRUD | order loadable via `wc_get_order`; shipping line coherent |
+| Privacy (product/cart) | PASS; Thank You customer summary flags left OFF (NOT EXECUTED) |
+| Variable `#39589` | `legacy` while ECR ON |
+| Category compatibility | NOT OBSERVED |
+| PHP logs | line count remained **891**; no fresh DE fatal/warning after marker |
+| Historical `#39706` | shipping 25; snapshots unchanged |
+| QA rate / scope | `25.0000`; `in_warehouse` version **1** unchanged |
+| COD | OFF → ON for order only → OFF |
+| Final dormant | `#39705` / `#37054` / `#39589` no DE UI; HTTP 200 |
+| Local PHPUnit | **114 / 442 / OK** |
+
+### Stage 5 final status
+
+**STAGE 5 COMPLETE.**
+
+Recommended next (do not auto-start): Stage 6 — Variable Product ECR Support.
+
+---
+
+## 12. Recommended next step
+
+1. Leave FLAIROC Delivery Engine runtime flags **OFF** (dormant) unless explicitly enabling a controlled Stage 6 plan.
+2. Do **not** begin Stage 6 automatically.
+3. When tasked: Stage 6 — Variable Product ECR Support.

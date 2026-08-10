@@ -5,7 +5,7 @@
 **Last updated:** 2026-08-10  
 **Plugin version:** `1.0.0-rc.1`  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `master` — Stage 5B-3 **BLOCKED**; fingerprint repair `f300390`; Stage 5B-3R-1 fingerprint-fixed package **READY** (local only, not deployed)  
+**Git:** `master` — Stages 0B–5 **COMPLETE**; Stage 5B-3R-2 **VERIFIED** (ECR QA order `#39711`, shipping 25.00); runtime flags OFF on FLAIROC  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
@@ -27,23 +27,25 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 5B admin false-product repair | **DONE** — `4e8f503`; repaired ZIP SHA-256 `1d672dae…a59a` |
 | Stage 5B-2 deployment safety verification | **PASS (human + agent)** — repaired package active; dormant storefront PASS; COD OFF; `#39706` intact; human admin/schema/preview smoke PASS; no fresh DE fatals |
 | Stage 5B-2A QA migration/slice audit | **READY — WRONG SLICE SELECTED** — legacy rule `#1` migrated to v3 scope `slice_key=in_warehouse`; Default preview unresolved is expected; see `docs/STAGE-5B-FLAIROC-DEPLOYMENT-VERIFICATION.md` §8 |
-| Stage 5B-3 ECR live parity | **BLOCKED** — ECR routing + selector parity PASS on `#39705`; cart/checkout/shipping fail closed because session `normalizeIntent()` dropped `configuration_fingerprint`; no QA order placed; flags/COD restored OFF; local fix `f300390` |
-| Stage 5B-3R-1 fingerprint package | **READY (local)** — `cetech-woocommerce-delivery-engine-stage5b-fingerprint-fixed.zip` SHA-256 `dbddc1d7…cbfd`; **not** uploaded/installed on FLAIROC |
+| Stage 5B-3 ECR live parity | **BLOCKED (historical)** — first live attempt; fingerprint dropped in session normalize; no order |
+| Stage 5B-3R-1 fingerprint package | **DONE** — Artifact 3 SHA-256 `dbddc1d7…cbfd` built and installed on FLAIROC |
+| Stage 5B-3R-2 ECR live parity retry | **VERIFIED** — fingerprint session MATCH; checkout valid; shipping **25.00**; ECR QA order **`#39711`**; snapshots PASS; flags/COD restored OFF; dormant PASS |
+| Stage 5 overall | **COMPLETE** |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |
 | New admin UX | Global/Product/Variation scoped editors + effective preview; pre-cutover notice |
-| Runtime cutover flag | `enable_effective_configuration_runtime` **defaults OFF** — keep OFF on FLAIROC until Stage 5B-3 VERIFIED |
+| Runtime cutover flag | `enable_effective_configuration_runtime` **defaults OFF** — FLAIROC currently OFF after Stage 5B-3R-2 |
 | Legacy storage | `product_delivery_rules` remains default authoritative path while cutover flag OFF |
-| Runtime on FLAIROC | Repaired DE **active** `1.0.0-rc.1`; all runtime flags OFF after 5B-3; ECR OFF; COD OFF; dormant storefront PASS; shipping 25.00 ECR parity **not** live-proven |
+| Runtime on FLAIROC | Fingerprint-fixed DE **active** `1.0.0-rc.1`; all runtime flags OFF; ECR OFF; COD OFF; dormant storefront PASS; ECR simple-product parity **proven** (order `#39711` / 25.00) |
 | Variable runtime capture | **Not implemented** (Stage 6) |
 | Shipments / tracking / timeline | **Not implemented** |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Stage 5 **compatibility route** (category winners stay on legacy source); `#39705` is **not** category-routed |
-| Next stage | Human install fingerprint-fixed package → health smoke → re-run Stage 5B-3 → only then Stage 6 |
+| Next stage | Stage 6 — Variable Product ECR Support (**do not auto-start**) |
 | Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual |
 | Stage 1 HPOS debt | **DEFERRED** (`countOrderSnapshotReferences` postmeta); non-numeric rate→0 **FIXED** in Stage 5A |
 
-Do **not** begin Stage 6 unless explicitly tasked. Do **not** leave FLAIROC ECR runtime ON. Re-run Stage 5B-3 after deploying the fingerprint session fix.
+Do **not** begin Stage 6 unless explicitly tasked. Keep FLAIROC Delivery Engine runtime flags **OFF** (dormant) unless a controlled Stage 6 enablement plan is approved.
 
 
 
