@@ -5,13 +5,13 @@
 **Last updated:** 2026-08-10  
 **Plugin version:** `1.0.0-rc.1`  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `master` — Stage 0B verified at `31fc016`; Stage 1 COMPLETE at `2f0be59`; Stage 2 COMPLETE at `2a3b07b`; Stage 3 EffectiveConfigurationResolver follows  
+**Git:** `master` — Stage 0B verified at `31fc016`; Stage 1 COMPLETE at `2f0be59`; Stage 2 COMPLETE at `2a3b07b`; Stage 3 COMPLETE at `6549b97`; Stage 4 Admin Inheritance UX follows  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
 This handoff remains the **product vision and domain source of truth**. Much of the document describes the full intended engine (including shipment records and customer tracking). **Only the V1 RC scope below is implemented in code today.** Do not assume later sections are already built.
 
-### Stage 0B / Stage 1 / Stage 2 / Stage 3 status
+### Stage 0B / Stage 1 / Stage 2 / Stage 3 / Stage 4 status
 
 | Item | Status |
 |------|--------|
@@ -19,18 +19,21 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 1 architecture gap analysis | **COMPLETE** — `docs/POST-RC-ARCHITECTURE-GAP-ANALYSIS.md` |
 | Stage 2 scoped configuration storage | **COMPLETE** — schema target `3`; artifact `docs/STAGE-2-SCOPED-CONFIGURATION-STORAGE.md` |
 | Stage 3 EffectiveConfigurationResolver | **COMPLETE** — artifact `docs/STAGE-3-EFFECTIVE-CONFIGURATION-RESOLVER.md` |
+| Stage 4 Admin inheritance UX + preview | **COMPLETE** — artifact `docs/STAGE-4-ADMIN-INHERITANCE-UX.md` |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; harness/PHPUnit only |
+| New admin UX | Global/Product/Variation scoped editors + effective preview; pre-cutover notice; no storefront cutover |
 | Legacy storage | `product_delivery_rules` **remains authoritative for runtime** |
-| Runtime on FLAIROC | Still **OFF** (flags default off; no Stage 3 cutover) |
+| Runtime on FLAIROC | Still **OFF** (flags default off; no Stage 4/5 cutover) |
 | Variable runtime capture | **Not implemented** |
 | Shipments / tracking / timeline | **Not implemented** |
-| Next stage | **Stage 4** — Admin inheritance UX + effective configuration preview (no storefront cutover) |
+| Hard constraints | Still **passthrough** |
+| Category legacy parity | **DEFERRED to Stage 5 cutover** |
+| Next stage | **Stage 5** — Migrate verified simple-product runtime to EffectiveConfigurationResolver |
 | Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual warning on FLAIROC |
 | Stage 1 rate/HPOS debt | **DEFERRED** (non-numeric rate→0; base_amount 0; HPOS postmeta refcount) |
-| Category legacy parity | **DEFERRED to Stage 5 cutover** |
 
-Do **not** begin Stage 4 unless explicitly tasked. Do **not** rewrite verified shipping/snapshot/simple-product runtime while adding admin inheritance UX.
+Do **not** begin Stage 5 unless explicitly tasked. Do **not** rewrite verified shipping/snapshot behavior while cutting over without parity gates.
 
 ### Companion docs (implementation)
 
@@ -49,6 +52,7 @@ Do **not** begin Stage 4 unless explicitly tasked. Do **not** rewrite verified s
 | `docs/POST-RC-ARCHITECTURE-GAP-ANALYSIS.md` | Stage 1 post-RC architecture gap analysis (authoritative) |
 | `docs/STAGE-2-SCOPED-CONFIGURATION-STORAGE.md` | Stage 2 scoped configuration storage completion record |
 | `docs/STAGE-3-EFFECTIVE-CONFIGURATION-RESOLVER.md` | Stage 3 effective configuration resolver completion record |
+| `docs/STAGE-4-ADMIN-INHERITANCE-UX.md` | Stage 4 admin inheritance UX + effective preview completion record |
 | `docs/Delivery Shipping Plugin Up-To-Date Design and Expectations.md` | Latest intended product / end-state design |
 
 ### What has been accomplished
@@ -62,6 +66,7 @@ V1 RC delivers a **feature-flagged** path from admin configuration through paid-
 | Product delivery rules + resolver (variation → product → category) | Done (Phases 2C1–2C3); **legacy runtime path** |
 | Stage 2 scoped Global→Product→Variation **storage** (schema 3) | Done; dormant foundation; not runtime-wired |
 | Stage 3 EffectiveConfigurationResolver | Done; PHPUnit/harness only; not runtime-wired |
+| Stage 4 Admin inheritance UX + effective preview | Done; admin-only; pre-cutover; legacy RC runtime still authoritative |
 | Product-page delivery selector (public-safe; simple products) | Done (Phases 2D1–2D3) |
 | Cart selection capture + session/revalidation hardening | Done (Phases 2E1–2E2) |
 | Checkout delivery selection validation | Done (Phase 2F1) |
@@ -109,7 +114,7 @@ Blocks checkout adapter flag exists but is off / unwired. Code: `src/Bootstrap/F
 - WooCommerce Blocks checkout support
 - Variable-product delivery **capture** (deferred; simple products first)
 - Real WPML / WCML / WoodMart / WCFM / VitePOS adapters (detection / Null stubs only)
-- EffectiveConfigurationResolver implemented for harness/PHPUnit; storefront cutover is Stage 5
+- EffectiveConfigurationResolver implemented for harness/PHPUnit; admin inheritance UX in Stage 4; storefront cutover is Stage 5
 
 ### Hard invariants (already enforced in V1 code — preserve them)
 
@@ -133,7 +138,7 @@ Blocks checkout adapter flag exists but is off / unwired. Code: `src/Bootstrap/F
 2. ~~Post-RC architecture gap analysis (Stage 1)~~ — **DONE**
 3. ~~Stage 2: Global configuration + scoped inheritance storage~~ — **DONE**
 4. ~~Stage 3: EffectiveConfigurationResolver~~ — **DONE** (harness/PHPUnit only; no storefront cutover)
-5. **Stage 4:** Admin inheritance UX + effective configuration preview
+5. ~~Stage 4: Admin inheritance UX + effective configuration preview~~ — **DONE**
 6. Later: simple-product cutover → variable capture → packages → shipments → integrations/Blocks → quality RC
 7. Do not skip foundations to reach shipments or variable UX early
 

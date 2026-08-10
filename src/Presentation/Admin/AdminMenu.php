@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Admin;
 
 /**
- * Registers Delivery Engine admin menus for Phase 2B5.
+ * Registers Delivery Engine admin menus for Phase 2B5 + Stage 4 scoped configuration.
  */
 final class AdminMenu {
 
@@ -22,7 +22,10 @@ final class AdminMenu {
 		private PickupLocationsPage $pickup_locations_page,
 		private SuppliersOriginsPage $suppliers_origins_page,
 		private RateCardsPage $rate_cards_page,
-		private ProductDeliveryRulesPage $product_delivery_rules_page
+		private ProductDeliveryRulesPage $product_delivery_rules_page,
+		private ScopedConfigurationPage $scoped_configuration_page,
+		private EffectiveConfigurationPreviewPage $effective_configuration_preview_page,
+		private ScopedConfigurationAdminAssets $scoped_configuration_admin_assets
 	) {
 	}
 
@@ -37,6 +40,9 @@ final class AdminMenu {
 		add_action( 'admin_init', [ $this->suppliers_origins_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->rate_cards_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->product_delivery_rules_page, 'handle_actions' ] );
+		add_action( 'admin_init', [ $this->scoped_configuration_page, 'handle_actions' ] );
+		add_action( 'admin_init', [ $this->effective_configuration_preview_page, 'handle_actions' ] );
+		$this->scoped_configuration_admin_assets->register();
 	}
 
 	public function add_menus(): void {
@@ -71,6 +77,15 @@ final class AdminMenu {
 				'manage_delivery_settings',
 				DeliverySettingsPage::SLUG,
 				[ $this->delivery_settings_page, 'render' ]
+			);
+
+			add_submenu_page(
+				self::PARENT_SLUG,
+				__( 'Scoped Configuration', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Scoped Configuration', 'cetech-woocommerce-delivery-engine' ),
+				'manage_delivery_settings',
+				ScopedConfigurationPage::SLUG,
+				[ $this->scoped_configuration_page, 'render' ]
 			);
 		}
 
@@ -142,10 +157,31 @@ final class AdminMenu {
 			add_submenu_page(
 				self::PARENT_SLUG,
 				__( 'Product Rules', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Product Rules', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Product Rules (Legacy RC)', 'cetech-woocommerce-delivery-engine' ),
 				'manage_product_delivery_rules',
 				ProductDeliveryRulesPage::SLUG,
 				[ $this->product_delivery_rules_page, 'render' ]
+			);
+
+			add_submenu_page(
+				self::PARENT_SLUG,
+				__( 'Effective Configuration Preview', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Effective Preview', 'cetech-woocommerce-delivery-engine' ),
+				'manage_product_delivery_rules',
+				EffectiveConfigurationPreviewPage::SLUG,
+				[ $this->effective_configuration_preview_page, 'render' ]
+			);
+		}
+
+		// Product/Variation scoped editor also reachable for product-rule managers.
+		if ( current_user_can( 'manage_product_delivery_rules' ) && ! current_user_can( 'manage_delivery_settings' ) ) {
+			add_submenu_page(
+				self::PARENT_SLUG,
+				__( 'Scoped Configuration', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Scoped Configuration', 'cetech-woocommerce-delivery-engine' ),
+				'manage_product_delivery_rules',
+				ScopedConfigurationPage::SLUG,
+				[ $this->scoped_configuration_page, 'render' ]
 			);
 		}
 

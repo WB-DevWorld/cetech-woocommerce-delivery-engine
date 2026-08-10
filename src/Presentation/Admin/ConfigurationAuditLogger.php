@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Domain\Audit\AuditLogRepositoryInterface;
 use CetechDeliveryEngine\Support\Logger;
+use CetechDeliveryEngine\Application\Configuration\Admin\ConfigurationChangeAuditorInterface;
 
 /**
  * Writes configuration audit entries without sensitive operational data.
@@ -13,7 +14,7 @@ use CetechDeliveryEngine\Support\Logger;
  * internal_notes are omitted from all audit payloads. Supplier and origin
  * audit entries remain wp-admin private operational history only.
  */
-final class ConfigurationAuditLogger {
+final class ConfigurationAuditLogger implements ConfigurationChangeAuditorInterface {
 
 	public function __construct(
 		private AuditLogRepositoryInterface $audit_log_repository,

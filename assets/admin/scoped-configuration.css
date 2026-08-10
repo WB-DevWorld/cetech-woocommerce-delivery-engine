@@ -1,0 +1,93 @@
+.wrap.cetech-de-admin-page .cetech-de-scoped-tabs {
+	margin: 0 0 1.25rem;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-scoped-tab-list {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-scoped-tab-list a {
+	display: inline-block;
+	padding: 0.4rem 0.85rem;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	background: #fff;
+	text-decoration: none;
+	color: #1d2327;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-scoped-tab-list li.is-active a,
+.wrap.cetech-de-admin-page .cetech-de-scoped-tab-list a:focus {
+	border-color: #2271b1;
+	box-shadow: 0 0 0 1px #2271b1;
+	outline: 2px solid transparent;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-field-editor {
+	margin: 0 0 1.5rem;
+	padding: 1rem 1.1rem;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+	background: #fff;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-mode-option {
+	display: inline-block;
+	margin: 0 0.75rem 0.5rem 0;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-state {
+	display: inline-block;
+	padding: 0.1rem 0.45rem;
+	border-radius: 3px;
+	font-weight: 600;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-state--success {
+	background: #edfaef;
+	color: #0a5c2d;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-state--warning {
+	background: #fcf0e3;
+	color: #8a5100;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-state--error {
+	background: #fcf0f1;
+	color: #8a2424;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-state--neutral {
+	background: #f0f0f1;
+	color: #2c3338;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-mode-panel[hidden] {
+	display: none;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-technical-details {
+	margin: 1rem 0;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-validation-messages {
+	color: #8a5100;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-preview-table th,
+.wrap.cetech-de-admin-page .cetech-de-preview-table td {
+	vertical-align: top;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-slice-controls {
+	margin: 0 0 1.25rem;
+	padding: 0.85rem 1rem;
+	border: 1px solid #dcdcde;
+	border-radius: 6px;
+}

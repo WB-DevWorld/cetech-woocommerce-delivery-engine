@@ -23,6 +23,12 @@ use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotReader;
 use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingIntegration;
 use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingRateCalculator;
 use CetechDeliveryEngine\Application\Shipping\ShippingRateCalculationGate;
+use CetechDeliveryEngine\Application\Configuration\Admin\EntityLabelResolver;
+use CetechDeliveryEngine\Application\Configuration\Admin\LegacyCategoryConfigurationInspector;
+use CetechDeliveryEngine\Application\Configuration\Admin\ProductVariationScopeGuard;
+use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationAdminService;
+use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationAuthorization;
+use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationSubmissionParser;
 use CetechDeliveryEngine\Application\Configuration\ConfigurationFingerprintBuilder;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationValidator;
@@ -68,12 +74,15 @@ use CetechDeliveryEngine\Presentation\Admin\ConfigurationAuditLogger;
 use CetechDeliveryEngine\Presentation\Admin\DeliveryOffersPage;
 use CetechDeliveryEngine\Presentation\Admin\DestinationZoneTestMatcher;
 use CetechDeliveryEngine\Presentation\Admin\DestinationZonesPage;
+use CetechDeliveryEngine\Presentation\Admin\EffectiveConfigurationPreviewPage;
 use CetechDeliveryEngine\Presentation\Admin\LogisticsProfilesPage;
 use CetechDeliveryEngine\Presentation\Admin\PickupLocationsPage;
 use CetechDeliveryEngine\Presentation\Admin\OrderDeliverySnapshotAdminDisplay;
 use CetechDeliveryEngine\Presentation\Admin\ProductDeliveryRulesPage;
 use CetechDeliveryEngine\Presentation\Admin\ProductTargetResolver;
 use CetechDeliveryEngine\Presentation\Admin\RateCardsPage;
+use CetechDeliveryEngine\Presentation\Admin\ScopedConfigurationAdminAssets;
+use CetechDeliveryEngine\Presentation\Admin\ScopedConfigurationPage;
 use CetechDeliveryEngine\Presentation\Admin\SuppliersOriginsPage;
 use CetechDeliveryEngine\Presentation\Admin\DeliverySettingsPage;
 use CetechDeliveryEngine\Presentation\Admin\SystemStatusPage;
@@ -664,6 +673,78 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			ScopedConfigurationSubmissionParser::class,
+			static fn (): ScopedConfigurationSubmissionParser => new ScopedConfigurationSubmissionParser()
+		);
+
+		$this->container->singleton(
+			ProductVariationScopeGuard::class,
+			static fn ( ServiceContainer $container ): ProductVariationScopeGuard => new ProductVariationScopeGuard(
+				$container->get( ProductTargetResolver::class )
+			)
+		);
+
+		$this->container->singleton(
+			EntityLabelResolver::class,
+			static fn ( ServiceContainer $container ): EntityLabelResolver => new EntityLabelResolver(
+				$container->get( DeliveryOfferRepositoryInterface::class ),
+				$container->get( LogisticsProfileRepositoryInterface::class ),
+				$container->get( SupplierRepositoryInterface::class ),
+				$container->get( OriginRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			LegacyCategoryConfigurationInspector::class,
+			static fn ( ServiceContainer $container ): LegacyCategoryConfigurationInspector => new LegacyCategoryConfigurationInspector(
+				$container->get( ProductDeliveryRuleRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			ScopedConfigurationAuthorization::class,
+			static fn (): ScopedConfigurationAuthorization => new ScopedConfigurationAuthorization()
+		);
+
+		$this->container->singleton(
+			ScopedConfigurationAdminService::class,
+			static fn ( ServiceContainer $container ): ScopedConfigurationAdminService => new ScopedConfigurationAdminService(
+				$container->get( ScopedConfigurationRepositoryInterface::class ),
+				$container->get( EffectiveConfigurationResolver::class ),
+				$container->get( ScopedConfigurationSubmissionParser::class ),
+				$container->get( ProductVariationScopeGuard::class ),
+				$container->get( EntityLabelResolver::class ),
+				$container->get( LegacyCategoryConfigurationInspector::class ),
+				$container->get( ConfigurationAuditLogger::class )
+			)
+		);
+
+		$this->container->singleton(
+			ScopedConfigurationAdminAssets::class,
+			static fn (): ScopedConfigurationAdminAssets => new ScopedConfigurationAdminAssets()
+		);
+
+		$this->container->singleton(
+			ScopedConfigurationPage::class,
+			static fn ( ServiceContainer $container ): ScopedConfigurationPage => new ScopedConfigurationPage(
+				$container->get( ScopedConfigurationAdminService::class ),
+				$container->get( ProductTargetResolver::class ),
+				$container->get( AdminActionHandler::class ),
+				$container->get( ScopedConfigurationAuthorization::class )
+			)
+		);
+
+		$this->container->singleton(
+			EffectiveConfigurationPreviewPage::class,
+			static fn ( ServiceContainer $container ): EffectiveConfigurationPreviewPage => new EffectiveConfigurationPreviewPage(
+				$container->get( ScopedConfigurationAdminService::class ),
+				$container->get( ProductTargetResolver::class ),
+				$container->get( AdminActionHandler::class ),
+				$container->get( ScopedConfigurationAuthorization::class )
+			)
+		);
+
+		$this->container->singleton(
 			DeliverySettingsPage::class,
 			static fn ( ServiceContainer $container ): DeliverySettingsPage => new DeliverySettingsPage(
 				$container->get( FeatureFlags::class ),
@@ -708,7 +789,10 @@ final class Plugin {
 				$container->get( PickupLocationsPage::class ),
 				$container->get( SuppliersOriginsPage::class ),
 				$container->get( RateCardsPage::class ),
-				$container->get( ProductDeliveryRulesPage::class )
+				$container->get( ProductDeliveryRulesPage::class ),
+				$container->get( ScopedConfigurationPage::class ),
+				$container->get( EffectiveConfigurationPreviewPage::class ),
+				$container->get( ScopedConfigurationAdminAssets::class )
 			)
 		);
 	}
