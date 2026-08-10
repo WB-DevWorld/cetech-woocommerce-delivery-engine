@@ -1,0 +1,77 @@
+---
+
+## alwaysApply: true
+
+# CETECH Delivery Engine — Mandatory Project Governance
+
+For every task in this repository, you MUST treat `docs/PROJECT-GOVERNANCE.md` as mandatory project governance.
+
+Before making code, schema, architecture, configuration, UI, integration, migration, test, or documentation changes:
+
+1. Read `docs/PROJECT-GOVERNANCE.md`.
+2. Read `docs/PROJECT-RULES.md`.
+3. Read the current implementation-status section of `docs/AI-HANDOFF.md`.
+4. Read `docs/ARCHITECTURE-PLAN.md` when architecture or module boundaries are relevant.
+5. Read the latest `Delivery Shipping Plugin Up-To-Date Design and Expectations.md` specification when intended product behavior is relevant.
+6. Read the matching `docs/PHASE-*-IMPLEMENTATION.md` files for any existing area you will modify.
+7. Inspect the actual current repository implementation before proposing changes.
+
+Source-of-truth rule:
+
+* Latest Design and Expectations specification = intended product/end-state authority.
+* Repository code + latest completed phase documentation = current implementation authority.
+* `docs/PROJECT-GOVERNANCE.md` = mandatory development/process/invariant authority.
+* `docs/PROJECT-RULES.md` = existing hard engineering rules.
+* Never assume visionary/future functionality already exists.
+
+Mandatory engineering behavior:
+
+* WooCommerce remains authoritative for native commerce data and workflows.
+* Use native WordPress/WooCommerce capabilities before creating duplicates.
+* Preserve Global → Product → Variation field-level inheritance.
+* Use explicit inheritance/override/disable semantics.
+* Hard domain and operational constraints outrank ordinary overrides.
+* Converge configuration resolution on one authoritative EffectiveConfigurationResolver.
+* Server is authoritative for eligibility, rates, pricing, ETA and transactional decisions.
+* Never trust browser-submitted authoritative delivery prices.
+* Never silently replace a customer's selected delivery option.
+* Missing configuration must never silently become free/$0 shipping.
+* Suppliers, origins, internal cost and private logistics remain private.
+* Historical order delivery snapshots must remain immutable.
+* Use WooCommerce CRUD for order operations and remain HPOS-compatible.
+* Core functionality must not depend on WoodMart or other optional integrations.
+* Use standard WooCommerce APIs/hooks first and adapters for optional/theme-specific integrations.
+* Do not edit WoodMart parent-theme files.
+* Preserve performance, SEO, accessibility, security and customer/admin UX.
+* Avoid unrelated refactoring.
+* Do not automatically implement future roadmap phases.
+
+For every substantial task use:
+
+READ
+→ AUDIT
+→ PLAN
+→ IMPLEMENT
+→ TEST
+→ DOCUMENT
+→ REVIEW
+→ STOP
+
+At completion, report:
+
+* summary;
+* scope intentionally excluded;
+* files changed;
+* schema/migration impact;
+* runtime behavior;
+* security/privacy review;
+* shipping-integrity review;
+* compatibility review;
+* performance implications;
+* tests and results;
+* documentation updated;
+* staging checks required;
+* known limitations;
+* recommended next phase.
+
+Do not continue into the next development phase unless explicitly instructed.
