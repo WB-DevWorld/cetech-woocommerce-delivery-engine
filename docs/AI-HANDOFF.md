@@ -22,6 +22,8 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | `docs/V1-RC-FLAG-MATRIX.md` | Feature-flag defaults and enablement order |
 | `docs/V1-RC-SMOKE-TEST-CHECKLIST.md` | Staging gate before promoting RC |
 | `docs/V1-RC-PACKAGING-GUIDE.md` | Private ZIP build (`scripts/build-v1-rc-package.ps1`) |
+| `docs/DEVELOPMENT-ENVIRONMENT.md` | Canonical development/staging target (non-secret) |
+| `docs/POST-RC-BASELINE-VERIFICATION.md` | Stage 0 / Stage 0A baseline verification report |
 
 ### What has been accomplished
 

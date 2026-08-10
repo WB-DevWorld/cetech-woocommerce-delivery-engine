@@ -239,8 +239,136 @@ All live storefront/admin/order/email rows are **BLOCKED** by staging HTTPS 525.
 
 **Reason:** Repository identity, schema, flags, pipeline mapping, Composer/PHP integrity, and code-level invariant review are consistent with the documented `1.0.0-rc.1` / schema `2` RC at runtime commit `8951adb`. However, the mandatory V1 RC staging smoke checklist could not be executed: `https://training.cetechbpa.com` returns Cloudflare **HTTP 525** (origin SSL failure). Without a completed staging smoke pass, the baseline is not indisputable.
 
-## Required next action
+## Required next action (historical — superseded by Stage 0A)
 
-Restore staging HTTPS reachability for `https://training.cetechbpa.com` (fix origin SSL / Cloudflare 525), then re-run `docs/V1-RC-SMOKE-TEST-CHECKLIST.md` end-to-end and update this report to VERIFIED before Stage 1.
+~~Restore staging HTTPS reachability for `https://training.cetechbpa.com` (fix origin SSL / Cloudflare 525), then re-run `docs/V1-RC-SMOKE-TEST-CHECKLIST.md` end-to-end and update this report to VERIFIED before Stage 1.~~
 
-Do not begin Stage 1 architecture gap analysis until smoke sign-off passes.
+**Superseded 2026-08-10 (Stage 0A):** Project owner designated `https://flairoc.com/intl/` as the canonical development/staging target. See **Stage 0A re-verification** below. The training-site HTTP 525 must not by itself block post-RC development.
+
+Do not begin Stage 1 architecture gap analysis until smoke sign-off passes on the current development target.
+
+---
+
+# Stage 0A re-verification — FLAIROC development target
+
+## Date
+
+2026-08-10 (same calendar day as Stage 0; Stage 0A follow-up)
+
+## Project decision
+
+Canonical development/staging environment changed from the unavailable training site to:
+
+**`https://flairoc.com/intl/`**
+
+Tracked non-secret documentation: `docs/DEVELOPMENT-ENVIRONMENT.md`.
+
+Local gitignored `.env.local` `WP_SITE_URL` / `WP_ADMIN_URL` updated to the FLAIROC `/intl/` URLs (secrets not committed).
+
+**Portability:** No `flairoc.com` hostname was introduced into plugin runtime/business logic.
+
+## Governance rule correction
+
+| Item | Result |
+|------|--------|
+| Previous issue | `.cursor/rules/project-governance.mdc` used invalid metadata (`## alwaysApply: true` inside an opened `---` block) instead of YAML frontmatter |
+| Correction | Valid Cursor MDC frontmatter: opening `---`, `alwaysApply: true`, closing `---`, then existing governance body retained |
+| Single always-apply rule | Confirmed — only `.cursor/rules/project-governance.mdc` |
+| References `docs/PROJECT-GOVERNANCE.md` | Confirmed |
+| Final validation | File begins with valid YAML frontmatter; substantive instructions unchanged |
+
+## FLAIROC environment inventory (observed)
+
+| Area | Observed value |
+|------|----------------|
+| Site / home URL | `https://flairoc.com/intl` |
+| WordPress | Asset path evidence `wp-includes` **7.0.3** under WP Rocket cache; WC `system_status.environment.version` reports `11.0.0` (appears to reflect WooCommerce, not WP — treat WP as **7.0.3** from assets) |
+| WooCommerce | **11.0.0** (plugin + `wc_database_version`) |
+| PHP | **8.5.5** |
+| MySQL | **8.4.8** |
+| Table prefix | `flagh_` |
+| HPOS | **Enabled** (`OrdersTableDataStore`; sync disabled) |
+| Currency | USD |
+| Theme | **Woodmart Child** 1.0.0 (child); parent **Woodmart** **8.5.7** |
+| WoodMart Core plugin | 1.1.8 |
+| Checkout type | Classic WooCommerce checkout page (`/checkout/` page id 909 → rendered `<div class="woocommerce"></div>` when cart empty; WoodMart overrides `checkout/form-checkout.php`). **Not** Blocks markup. V1 classic path is the applicable baseline. |
+| Cart page | Classic cart page id 12 |
+| Caching | **WP Rocket** 3.23.1.1; **Redis Object Cache** 2.8.0 (`external_object_cache=true`); Cloudflare / CDN in front (CF challenge on `wp-login.php`) |
+| Optional integrations present | WPML CMS 4.9.6 + String Translation 3.5.3 + other WPML add-ons; WCML 5.5.7; WCFM + marketplace + membership; WoodMart + child; WP Rocket; Redis; Jetpack; Wordfence; Really Simple Security; `wc/pos` REST namespace present (POS surface) |
+| Template warnings | `has_outdated_templates=true` — e.g. WoodMart `cart/cart.php` 10.8.0 vs core 11.0.0; `mini-cart.php`; `single-product/add-to-cart/grouped.php`. Variable ATC override present at 10.9.0 / core 10.9.0 |
+| Safety profile | **Production-active catalogue**: ~171 products, **~1707 customers**; WC API `orders` total header **0** (may be permission-scoped or truly empty). Payment gateways **bacs/cheque/cod all disabled**. Treat as live customer site — non-destructive until isolated QA path + admin access |
+
+## Delivery Engine on FLAIROC
+
+| Item | Result |
+|------|--------|
+| Installed | Yes — `cetech-woocommerce-delivery-engine/` present; `readme.txt` Stable tag **1.0.0-rc.1**; `vendor/autoload.php` present |
+| Active | Yes (listed in WC system status active plugins) |
+| Schema / flags via admin | **Not readable** — no Delivery Engine REST API; wp-admin blocked |
+| Storefront evidence | `enable_product_delivery_selector` **ON**; `enable_cart_delivery_selection_capture` **ON** (variable products show capture-mode notice). Sample simple products with resolved rules but empty options show public notice: “Delivery options are not available for this product.” No supplier/origin/logistics/rate-card strings observed in sampled customer HTML |
+| Dedicated QA product | **Not created** — blocked pending admin CRUD access for Delivery Engine configuration |
+| Minimum V1 config (zones/offers/rates/rules) | **Not completed** — requires Delivery Engine admin screens |
+| Flag matrix enablement order | **Not controlled** this session — cannot read/write `cetech_de_*` options without WP admin/Application Password |
+
+## Access limitations (blocker)
+
+| Path | Result |
+|------|--------|
+| WooCommerce REST (`wc/v3`) with local consumer key/secret | **Works** — system status, products, gateways, shipping zones |
+| WordPress REST (`wp/v2/users/me`) with admin password | **403 Forbidden** |
+| WordPress cookie login (`wp-login.php`) | **Cloudflare managed JS challenge** (403) — cannot establish admin session from agent automation |
+| `WP_ADMIN_APP_PASSWORD` in `.env.local` | **Empty** |
+| Delivery Engine REST | **None** (by design for V1) |
+
+Without wp-admin (or an Application Password that can reach Delivery Engine admin / options), Stage 0A cannot configure offers/zones/rate cards/product rules, cannot safely sequence remaining flags, cannot place a classic checkout QA order with snapshots, and cannot complete the smoke checklist.
+
+## Automated verification (re-run)
+
+| Test / check | Result |
+|--------------|--------|
+| `composer validate --no-check-publish` | **PASS** |
+| `composer dump-autoload -o` | **PASS** (132 classes) |
+| PHP syntax lint `src/` + `database/` | **PASS** (133 OK / 0 FAIL) |
+| PHPUnit / PHPCS / PHPStan / CI / JS | **NOT APPLICABLE** — still absent (documented gap; not built in Stage 0A) |
+
+## Smoke-test results (FLAIROC)
+
+Authoritative checklist: `docs/V1-RC-SMOKE-TEST-CHECKLIST.md`.
+
+| Checklist section | Result | Notes |
+|-------------------|--------|-------|
+| Baseline — all flags off | **FAIL / not met** | Selector + capture already ON on live catalogue; not a clean flags-off baseline |
+| Plugin present / no fatal on sampled storefront | **PASS** (partial) | Public product pages load; Delivery Engine markup renders notices |
+| Admin CRUD / System Status | **BLOCKED** | No admin session |
+| Selector only / capture / cart / checkout / rates / snapshots / email | **BLOCKED** | No admin config + no payment gateway + no admin order inspection |
+| Privacy scan (sampled product HTML) | **PASS** (partial) | No supplier/origin/LP/rate-card/hash in sampled selector HTML; full cart/checkout/email/order surfaces not exercised |
+| HPOS | **PASS** (environment) | HPOS enabled; order snapshot path not live-proven |
+| Sign-off | **Fail / incomplete** | Admin access blocker |
+
+**Counts (Stage 0A):** PASS `limited storefront/environment rows` · FAIL `1` (flags-off baseline already violated) · BLOCKED `majority of checklist rows requiring admin/checkout/order` · NOT APPLICABLE `automated PHPUnit suite`
+
+## Hard-invariant verification (Stage 0A update)
+
+| Invariant | Verdict | Evidence |
+|-----------|---------|----------|
+| **A. Server authority** | **PASS** | Unchanged code review; no live checkout contradiction found |
+| **B. No silent Delivery Offer replacement** | **PASS** | Code paths unchanged; live path not fully exercised |
+| **C. No accidental free shipping** | **PASS** | Code paths unchanged; live missing-rate case not fully exercised (no configured rate card path completed) |
+| **D. Customer privacy** | **PARTIAL → improved evidence** | Live sampled product HTML: public notice only, no private ops strings. Residual code notes remain: offer `display_key` may encode offer id in interactive mode; no `is_protected_meta` / `woocommerce_hidden_order_itemmeta` registration found. Full thank-you/email/order privacy still **not live-verified** → remain **PARTIAL** until QA order path completes |
+| **E. HPOS** | **PASS** | Environment HPOS on; CRUD code paths unchanged |
+| **F. Protected snapshot metadata** | **PARTIAL** | Still not live-proven on FLAIROC (no QA order). Code uses `_cetech_de_*`; protection filters still not registered |
+| **G. Feature-flag safety** | **PARTIAL** | Defaults in code remain off, but **this deployment already has selector+capture enabled** on a customer-facing catalogue without completed V1 offer configuration (customers see “not available” notices) |
+
+## Baseline verdict (Stage 0A)
+
+**BASELINE NOT VERIFIED — POST-RC DEVELOPMENT BLOCKED**
+
+**Reason:** Governance rule fixed; canonical development target documented and reachable; repository automated checks green; plugin `1.0.0-rc.1` is installed/active on FLAIROC with Composer `vendor/`. However, the mandatory V1 RC smoke checklist cannot be completed because **WordPress admin access is unavailable to the coding agent** (Cloudflare login challenge + empty Application Password + WP REST 403). Delivery Engine admin configuration, controlled flag sequencing, payment/test checkout, and protected snapshot verification remain outstanding. Additionally, selector+capture are already enabled on live products without a completed simple-product offer path.
+
+## Required next action (Stage 0A)
+
+1. Provide a working **WordPress Application Password** (or equivalent non-interactive admin API access) for the FLAIROC `/intl/` development site that can reach Delivery Engine admin screens / options — and/or allowlist agent automation past Cloudflare for `wp-login` / admin AJAX.
+2. Then: create dedicated **FLAIROC Delivery Engine QA Product** (simple), configure minimum V1 offers/zones/rate cards/rules, enable remaining flags **only** per `docs/V1-RC-FLAG-MATRIX.md`, enable a **safe test payment** (e.g. COD for QA only), and re-run `docs/V1-RC-SMOKE-TEST-CHECKLIST.md` end-to-end.
+3. Update this document to **VERIFIED** only after that pass.
+
+Do **not** begin Stage 1 until smoke sign-off passes.
