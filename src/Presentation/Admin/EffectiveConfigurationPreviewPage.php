@@ -112,25 +112,32 @@ final class EffectiveConfigurationPreviewPage {
 		$product_id = isset( $_GET['product_id'] ) ? absint( wp_unslash( $_GET['product_id'] ) ) : 0;
 
 		if ( $do_preview && $product_id > 0 ) {
-			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			$variation_id = isset( $_GET['variation_id'] ) ? absint( wp_unslash( $_GET['variation_id'] ) ) : 0;
-			$variation_id = $variation_id > 0 ? $variation_id : null;
-			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			$slice_key = isset( $_GET['slice_key'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['slice_key'] ) ) : ConfigurationScope::DEFAULT_SLICE_KEY;
-			// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-			$parent_product_id = isset( $_GET['parent_product_id'] ) ? absint( wp_unslash( $_GET['parent_product_id'] ) ) : 0;
-			$parent_product_id = $parent_product_id > 0 ? $parent_product_id : ( null !== $variation_id ? $product_id : null );
+			if ( ! $this->product_exists( $product_id ) ) {
+				AdminPageLayout::render_warning(
+					__( 'Invalid product', 'cetech-woocommerce-delivery-engine' ),
+					__( 'Select a valid product. The supplied product ID could not be loaded in WooCommerce.', 'cetech-woocommerce-delivery-engine' )
+				);
+			} else {
+				// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				$variation_id = isset( $_GET['variation_id'] ) ? absint( wp_unslash( $_GET['variation_id'] ) ) : 0;
+				$variation_id = $variation_id > 0 ? $variation_id : null;
+				// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				$slice_key = isset( $_GET['slice_key'] ) ? sanitize_text_field( wp_unslash( (string) $_GET['slice_key'] ) ) : ConfigurationScope::DEFAULT_SLICE_KEY;
+				// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+				$parent_product_id = isset( $_GET['parent_product_id'] ) ? absint( wp_unslash( $_GET['parent_product_id'] ) ) : 0;
+				$parent_product_id = $parent_product_id > 0 ? $parent_product_id : ( null !== $variation_id ? $product_id : null );
 
-			$category_ids = $this->resolve_product_category_ids( $product_id );
-			$model        = $this->admin_service->preview(
-				$product_id,
-				$variation_id,
-				$slice_key,
-				$parent_product_id,
-				$category_ids
-			);
+				$category_ids = $this->resolve_product_category_ids( $product_id );
+				$model        = $this->admin_service->preview(
+					$product_id,
+					$variation_id,
+					$slice_key,
+					$parent_product_id,
+					$category_ids
+				);
 
-			$this->render_preview_results( $model );
+				$this->render_preview_results( $model );
+			}
 		}
 
 		AdminPageLayout::close_page();
@@ -292,16 +299,26 @@ final class EffectiveConfigurationPreviewPage {
 		AdminPageLayout::close_section();
 	}
 
+	private function product_exists( int $product_id ): bool {
+		if ( $product_id <= 0 || ! function_exists( 'wc_get_product' ) ) {
+			return false;
+		}
+
+		$product = wc_get_product( $product_id );
+
+		return $product instanceof \WC_Product;
+	}
+
 	/**
 	 * @return list<int>
 	 */
 	private function resolve_product_category_ids( int $product_id ): array {
-		if ( ! function_exists( 'wc_get_product' ) ) {
+		if ( $product_id <= 0 || ! function_exists( 'wc_get_product' ) ) {
 			return [];
 		}
 
 		$product = wc_get_product( $product_id );
-		if ( null === $product ) {
+		if ( ! $product instanceof \WC_Product ) {
 			return [];
 		}
 

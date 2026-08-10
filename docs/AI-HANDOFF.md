@@ -5,7 +5,7 @@
 **Last updated:** 2026-08-10  
 **Plugin version:** `1.0.0-rc.1`  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `master` — Stage 0B verified at `31fc016`; Stage 1 COMPLETE at `2f0be59`; Stage 2 COMPLETE at `2a3b07b`; Stage 3 COMPLETE at `6549b97`; Stage 4 COMPLETE at `0063b09`; Stage 5A COMPLETE; Stage 5B blocked then locally repaired for bootstrap wiring  
+**Git:** `master` — Stage 0B verified at `31fc016`; Stage 1 COMPLETE at `2f0be59`; Stage 2 COMPLETE at `2a3b07b`; Stage 3 COMPLETE at `6549b97`; Stage 4 COMPLETE at `0063b09`; Stage 5A COMPLETE; Stage 5B initial deploy failed; bootstrap repair `325e252`; admin false-product harden repair pending redeploy  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
@@ -21,26 +21,28 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 3 EffectiveConfigurationResolver | **COMPLETE** — artifact `docs/STAGE-3-EFFECTIVE-CONFIGURATION-RESOLVER.md` |
 | Stage 4 Admin inheritance UX + preview | **COMPLETE** — artifact `docs/STAGE-4-ADMIN-INHERITANCE-UX.md` |
 | Stage 5A Simple-product ECR runtime integration | **COMPLETE** — artifact `docs/STAGE-5A-SIMPLE-RUNTIME-ECR-INTEGRATION.md` (local only; flag default OFF) |
-| Stage 5B-1 original package | **FAILED** real WordPress boot — SHA-256 `973c0209…e4cc`; fatal `Bootstrap\ConfigurationHealthChecker` not found |
-| Stage 5B FLAIROC recovery | Plugin renamed to `…stage5b-disabled`; wp-admin recovered; later replaced with fixed package |
-| Stage 5B bootstrap repair | **DONE** locally — `325e252`; fixed ZIP SHA-256 `b21398ee…b3cf3f` |
-| Stage 5B-2 deployment safety verification | **BLOCKED** — repaired package boots, but `#37054` proves selector + cart-capture flags ON (dormant storefront FAIL); schema/admin smoke not agent-verifiable under Cloudflare |
+| Stage 5B-1 original package | **FAILED** real WordPress boot — SHA-256 `973c0209…e4cc`; fatal `Bootstrap\ConfigurationHealthChecker` not found (`d5fefa2`) |
+| Stage 5B FLAIROC recovery | Plugin filesystem-disabled (`…stage5b-disabled`); wp-admin recovered; ECR **never** enabled |
+| Stage 5B bootstrap repair | **DONE** locally — `325e252` (HealthChecker Diagnostics import); intermediate fixed ZIP `b21398ee…b3cf3f` |
+| Stage 5B admin false-product repair | **DONE** locally — `wc_get_product()` false-vs-null guards + validator `error_code` contract + regression tests; replacement ZIP `cetech-woocommerce-delivery-engine-stage5b-repaired.zip` |
+| Stage 5B-2 deployment safety verification | **NOT COMPLETE** — must restart from beginning after human redeploys repaired ZIP with all runtime flags OFF |
 | Stage 5B-3 ECR live parity | **NOT STARTED** — do not enable ECR until Stage 5B-2 passes |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |
 | New admin UX | Global/Product/Variation scoped editors + effective preview; pre-cutover notice |
 | Runtime cutover flag | `enable_effective_configuration_runtime` **defaults OFF** — keep OFF on redeploy until Stage 5B-2 |
 | Legacy storage | `product_delivery_rules` remains default authoritative path while cutover flag OFF |
-| Runtime on FLAIROC | Fixed package installed/active `1.0.0-rc.1`; **runtime flags not all OFF** (storefront selector on `#37054`); ECR **not** live-tested |
+| Runtime on FLAIROC | Failed Stage 5B engine remains filesystem-disabled pending repaired redeploy; ECR **not** live-tested |
 | Variable runtime capture | **Not implemented** (Stage 6) |
 | Shipments / tracking / timeline | **Not implemented** |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Stage 5 **compatibility route** (category winners stay on legacy source) |
-| Next stage | **Unblock Stage 5B-2**: human turns ALL runtime flags OFF in Delivery Settings → re-verify dormant storefront + schema/admin checklist |
-| Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual; `ProductDeliverySelectionValidator` undefined `error_code` warning (secondary; no Stage 5B-2 recurrence observed) |
+| Next stage | **Human redeploy repaired Stage 5B ZIP** → resume Stage 5B-2 safety verification (flags OFF first; do not enable ECR) |
+| Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual |
 | Stage 1 HPOS debt | **DEFERRED** (`countOrderSnapshotReferences` postmeta); non-numeric rate→0 **FIXED** in Stage 5A |
 
 Do **not** begin Stage 5B-3 or Stage 6 unless explicitly tasked. Do **not** enable FLAIROC ECR runtime until Stage 5B-2 passes with all runtime flags controlled OFF first.
+
 
 ### Companion docs (implementation)
 

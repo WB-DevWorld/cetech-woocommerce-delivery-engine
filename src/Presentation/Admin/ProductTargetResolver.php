@@ -90,7 +90,7 @@ final class ProductTargetResolver {
 	private function product_target_exists( int $target_id ): bool {
 		$product = wc_get_product( $target_id );
 
-		if ( null === $product ) {
+		if ( ! $product instanceof \WC_Product ) {
 			return false;
 		}
 
@@ -100,7 +100,7 @@ final class ProductTargetResolver {
 	private function variation_target_exists( int $target_id ): bool {
 		$product = wc_get_product( $target_id );
 
-		return null !== $product && $product->is_type( 'variation' );
+		return $product instanceof \WC_Product && $product->is_type( 'variation' );
 	}
 
 	private function category_target_exists( int $target_id ): bool {
@@ -112,7 +112,7 @@ final class ProductTargetResolver {
 	private function resolve_product_label( string $target_type, int $target_id ): ?string {
 		$product = wc_get_product( $target_id );
 
-		if ( null === $product ) {
+		if ( ! $product instanceof \WC_Product ) {
 			return null;
 		}
 

@@ -650,12 +650,12 @@ final class ScopedConfigurationPage {
 	 * @return list<int>
 	 */
 	private function resolve_product_category_ids( int $product_id ): array {
-		if ( ! function_exists( 'wc_get_product' ) ) {
+		if ( $product_id <= 0 || ! function_exists( 'wc_get_product' ) ) {
 			return [];
 		}
 
 		$product = wc_get_product( $product_id );
-		if ( null === $product ) {
+		if ( ! $product instanceof \WC_Product ) {
 			return [];
 		}
 

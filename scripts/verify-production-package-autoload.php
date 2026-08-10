@@ -63,11 +63,29 @@ $required_classes = [
 	'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion',
 	'CetechDeliveryEngine\\Presentation\\Admin\\AdminMenu',
 	'CetechDeliveryEngine\\Presentation\\Admin\\SystemStatusPage',
+	'CetechDeliveryEngine\\Presentation\\Admin\\ScopedConfigurationPage',
+	'CetechDeliveryEngine\\Presentation\\Admin\\EffectiveConfigurationPreviewPage',
+	'CetechDeliveryEngine\\Presentation\\Admin\\ProductTargetResolver',
+	'CetechDeliveryEngine\\Application\\Configuration\\Admin\\ProductVariationScopeGuard',
+	'CetechDeliveryEngine\\Application\\Selector\\ProductDeliverySelectionValidator',
 ];
 
 foreach ( $required_classes as $class ) {
 	if ( ! class_exists( $class ) ) {
 		$failures[] = "Autoload failed for required runtime class: {$class}";
+	}
+}
+
+$preview_php = $package_root . '/src/Presentation/Admin/EffectiveConfigurationPreviewPage.php';
+if ( ! is_readable( $preview_php ) ) {
+	$failures[] = 'Missing EffectiveConfigurationPreviewPage.php';
+} else {
+	$preview_source = (string) file_get_contents( $preview_php );
+	if ( ! str_contains( $preview_source, 'instanceof \\WC_Product' ) && ! str_contains( $preview_source, 'instanceof WC_Product' ) ) {
+		$failures[] = 'EffectiveConfigurationPreviewPage missing WC_Product instanceof guard (false-vs-null risk).';
+	}
+	if ( str_contains( $preview_source, 'null === $product' ) ) {
+		$failures[] = 'EffectiveConfigurationPreviewPage still uses null-only product absence check.';
 	}
 }
 

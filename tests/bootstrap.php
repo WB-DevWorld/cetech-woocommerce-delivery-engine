@@ -87,4 +87,6 @@ if ( ! function_exists( 'plugin_basename' ) ) {
 	}
 }
 
+require_once __DIR__ . '/stubs/woocommerce-product-stub.php';
+
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';

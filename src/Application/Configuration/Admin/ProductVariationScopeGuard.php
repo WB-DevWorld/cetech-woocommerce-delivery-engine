@@ -108,7 +108,7 @@ final class ProductVariationScopeGuard {
 		}
 
 		$variation = wc_get_product( $variation_id );
-		if ( null === $variation || ! $variation->is_type( 'variation' ) ) {
+		if ( ! $variation instanceof \WC_Product || ! $variation->is_type( 'variation' ) ) {
 			return 'The selected variation does not exist.';
 		}
 

@@ -17,7 +17,9 @@ use CetechDeliveryEngine\Core\Health\HealthCheckRegistry;
 use CetechDeliveryEngine\Core\Versioning\MigrationRunner;
 use CetechDeliveryEngine\Integrations\Registry\IntegrationRegistry;
 use CetechDeliveryEngine\Presentation\Admin\AdminMenu;
+use CetechDeliveryEngine\Presentation\Admin\EffectiveConfigurationPreviewPage;
 use CetechDeliveryEngine\Presentation\Admin\OrderDeliverySnapshotAdminDisplay;
+use CetechDeliveryEngine\Presentation\Admin\ScopedConfigurationPage;
 use CetechDeliveryEngine\Presentation\Admin\SystemStatusPage;
 use CetechDeliveryEngine\Presentation\Email\CustomerOrderDeliveryEmailSummaryRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\CustomerOrderDeliverySummaryRenderer;
@@ -97,6 +99,9 @@ final class PluginBootServiceGraphTest extends TestCase {
 			CustomerOrderDeliveryEmailSummaryRenderer::class,
 			OrderDeliverySnapshotAdminDisplay::class,
 			ConfigurationHealthChecker::class,
+			EffectiveConfigurationPreviewPage::class,
+			ScopedConfigurationPage::class,
+			SystemStatusPage::class,
 		];
 
 		foreach ( $eager_ids as $id ) {

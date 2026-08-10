@@ -438,7 +438,7 @@ final class ProductDeliveryRuleResolver {
 
 		$product = wc_get_product( $variation_id );
 
-		if ( null === $product || ! $product->is_type( 'variation' ) ) {
+		if ( ! $product instanceof \WC_Product || ! $product->is_type( 'variation' ) ) {
 			return 0;
 		}
 
@@ -455,7 +455,7 @@ final class ProductDeliveryRuleResolver {
 
 		$product = wc_get_product( $product_id );
 
-		if ( null === $product ) {
+		if ( ! $product instanceof \WC_Product ) {
 			return [];
 		}
 

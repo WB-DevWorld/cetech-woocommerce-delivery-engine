@@ -14,11 +14,15 @@
             "CetechDeliveryEngine\\": "src/"
         }
     },
-    "autoload-dev": {
-        "psr-4": {
-            "CetechDeliveryEngine\\Tests\\": "tests/"
-        }
-    },
+	"autoload-dev": {
+		"psr-4": {
+			"CetechDeliveryEngine\\Tests\\": "tests/"
+		},
+		"exclude-from-classmap": [
+			"/tests/bootstrap.php",
+			"/tests/stubs/"
+		]
+	},
     "scripts": {
         "test": "phpunit"
     },

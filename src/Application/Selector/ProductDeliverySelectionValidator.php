@@ -69,10 +69,10 @@ final class ProductDeliverySelectionValidator {
 
 		$context = $this->resolve_product_context( $product_id, $variation_id );
 
-		if ( null !== $context['error_code'] ) {
+		if ( null !== ( $context['error_code'] ?? null ) ) {
 			return ProductDeliverySelectionValidationResult::invalid(
 				(string) $context['error_code'],
-				(string) $context['error_message'],
+				(string) ( $context['error_message'] ?? '' ),
 				$warnings
 			);
 		}
@@ -144,7 +144,13 @@ final class ProductDeliverySelectionValidator {
 	}
 
 	/**
-	 * @return array{product?: WC_Product, target_type?: string, target_id?: int, error_code?: string, error_message?: string}
+	 * @return array{
+	 *     product?: WC_Product,
+	 *     target_type?: string,
+	 *     target_id?: int,
+	 *     error_code: string|null,
+	 *     error_message: string|null
+	 * }
 	 */
 	private function resolve_product_context( int $product_id, ?int $variation_id ): array {
 		if ( null !== $variation_id && $variation_id > 0 ) {
@@ -167,9 +173,11 @@ final class ProductDeliverySelectionValidator {
 			}
 
 			return [
-				'product'     => $variation,
-				'target_type' => ProductTargetType::Variation->value,
-				'target_id'   => $variation_id,
+				'product'        => $variation,
+				'target_type'    => ProductTargetType::Variation->value,
+				'target_id'      => $variation_id,
+				'error_code'     => null,
+				'error_message'  => null,
 			];
 		}
 
@@ -201,9 +209,11 @@ final class ProductDeliverySelectionValidator {
 			: ProductTargetType::Product->value;
 
 		return [
-			'product'     => $product,
-			'target_type' => $target_type,
-			'target_id'   => (int) $product->get_id(),
+			'product'       => $product,
+			'target_type'   => $target_type,
+			'target_id'     => (int) $product->get_id(),
+			'error_code'    => null,
+			'error_message' => null,
 		];
 	}
 
