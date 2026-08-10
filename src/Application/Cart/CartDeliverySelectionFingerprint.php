@@ -31,7 +31,7 @@ final class CartDeliverySelectionFingerprint {
 	public static function fingerprintParts( array $intent ): array {
 		$normalized = self::normalizeIntentFields( $intent );
 
-		return [
+		$parts = [
 			(string) $normalized['product_id'],
 			(string) $normalized['variation_id'],
 			(string) $normalized['display_key'],
@@ -40,6 +40,13 @@ final class CartDeliverySelectionFingerprint {
 			(string) $normalized['delivery_offer_id'],
 			(string) $normalized['rule_id'],
 		];
+
+		// Additive ECR config component: only present when non-empty so legacy hashes stay stable.
+		if ( '' !== (string) $normalized['configuration_fingerprint'] ) {
+			$parts[] = (string) $normalized['configuration_fingerprint'];
+		}
+
+		return $parts;
 	}
 
 	/**
@@ -60,7 +67,8 @@ final class CartDeliverySelectionFingerprint {
 	 *     fulfilment_availability: string,
 	 *     fulfilment_choice: string,
 	 *     delivery_offer_id: string,
-	 *     rule_id: string
+	 *     rule_id: string,
+	 *     configuration_fingerprint: string
 	 * }
 	 */
 	public static function normalizeIntentFields( array $intent ): array {
@@ -79,6 +87,9 @@ final class CartDeliverySelectionFingerprint {
 				: '',
 			'rule_id'                 => ( null !== ( $intent['rule_id'] ?? null ) && '' !== ( $intent['rule_id'] ?? '' ) )
 				? (string) max( 0, (int) $intent['rule_id'] )
+				: '',
+			'configuration_fingerprint' => isset( $intent['configuration_fingerprint'] )
+				? sanitize_text_field( (string) $intent['configuration_fingerprint'] )
 				: '',
 		];
 	}

@@ -45,9 +45,19 @@ V1 RC includes configuration, product delivery selection, cart capture, checkout
 
 | Flag | Default | V1 notes |
 |------|---------|----------|
+| `enable_effective_configuration_runtime` | **false** | Stage 5A ECR source cutover for **simple products only**. Independent of selector/cart/checkout/shipping flags. OFF = exact legacy path. Does not create customer UI by itself. Keep OFF on FLAIROC until Stage 5B. |
 | `enable_blocks_adapter` | false | WooCommerce Blocks checkout not supported in V1 |
 | `enable_classic_checkout_adapter` | true | Placeholder; classic checkout is the de facto path |
 | Integration adapters (WPML, WCML, WoodMart, WCFM, VitePOS) | false | Detection only; no hard dependency |
+
+### Safe Stage 5B sequencing (future; do not run in Stage 5A)
+
+1. Deploy Stage 2–5A build with **all** customer flags and `enable_effective_configuration_runtime` OFF
+2. Schema 2→3 + admin smoke
+3. Enable existing customer flags in V1 order above
+4. Only then enable `enable_effective_configuration_runtime` for controlled simple-product QA
+5. Verify 25.00 quote parity, category-compatibility path, variable unchanged
+6. Return ECR source flag OFF unless explicitly approved to leave on
 
 ---
 

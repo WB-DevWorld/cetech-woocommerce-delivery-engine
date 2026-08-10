@@ -13,6 +13,8 @@ final class ConfigurationReasonCode {
 	public const INVALID_SCOPE_RELATIONSHIP   = 'INVALID_SCOPE_RELATIONSHIP';
 	public const INVALID_REFERENCE            = 'INVALID_REFERENCE';
 	public const INVALID_REQUEST              = 'INVALID_REQUEST';
+	public const CONSTRAINT_CHOICE_PROHIBITED = 'CONSTRAINT_CHOICE_PROHIBITED';
+	public const CONSTRAINT_ROUTE_FILTERED    = 'CONSTRAINT_ROUTE_FILTERED';
 
 	private function __construct() {
 	}

@@ -26,7 +26,8 @@ final class ProductDeliverySelectionIntent {
 		public readonly string $fulfilment_choice,
 		public readonly ?int $delivery_offer_id,
 		public readonly ?int $rule_id,
-		public readonly string $issued_at
+		public readonly string $issued_at,
+		public readonly ?string $configuration_fingerprint = null
 	) {
 	}
 
@@ -36,7 +37,8 @@ final class ProductDeliverySelectionIntent {
 		string $target_type,
 		int $target_id,
 		ProductDeliveryOption $option,
-		?int $rule_id
+		?int $rule_id,
+		?string $configuration_fingerprint = null
 	): self {
 		return new self(
 			self::CONTRACT_VERSION,
@@ -49,7 +51,8 @@ final class ProductDeliverySelectionIntent {
 			$option->fulfilment_choice,
 			$option->delivery_offer_id,
 			$rule_id,
-			gmdate( 'c' )
+			gmdate( 'c' ),
+			$configuration_fingerprint
 		);
 	}
 
@@ -61,7 +64,7 @@ final class ProductDeliverySelectionIntent {
 	 * @return array<string, mixed>
 	 */
 	public function toArray(): array {
-		return [
+		$data = [
 			'contract_version'        => $this->contract_version,
 			'product_id'              => $this->product_id,
 			'variation_id'            => $this->variation_id,
@@ -74,12 +77,22 @@ final class ProductDeliverySelectionIntent {
 			'rule_id'                 => $this->rule_id,
 			'issued_at'               => $this->issued_at,
 		];
+
+		if ( null !== $this->configuration_fingerprint && '' !== $this->configuration_fingerprint ) {
+			$data['configuration_fingerprint'] = $this->configuration_fingerprint;
+		}
+
+		return $data;
 	}
 
 	/**
 	 * @param array<string, mixed> $data
 	 */
 	public static function fromArray( array $data ): self {
+		$fingerprint = isset( $data['configuration_fingerprint'] ) && '' !== $data['configuration_fingerprint']
+			? (string) $data['configuration_fingerprint']
+			: null;
+
 		return new self(
 			(string) ( $data['contract_version'] ?? self::CONTRACT_VERSION ),
 			(int) ( $data['product_id'] ?? 0 ),
@@ -91,7 +104,8 @@ final class ProductDeliverySelectionIntent {
 			(string) ( $data['fulfilment_choice'] ?? '' ),
 			isset( $data['delivery_offer_id'] ) && '' !== $data['delivery_offer_id'] ? (int) $data['delivery_offer_id'] : null,
 			isset( $data['rule_id'] ) && '' !== $data['rule_id'] ? (int) $data['rule_id'] : null,
-			(string) ( $data['issued_at'] ?? '' )
+			(string) ( $data['issued_at'] ?? '' ),
+			$fingerprint
 		);
 	}
 }

@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Infrastructure\Persistence;
 
 use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshot;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
+use CetechDeliveryEngine\Domain\RateCard\RateCardAmountFormatter;
 use CetechDeliveryEngine\Domain\RateCard\RateCardRepositoryInterface;
 
 /**
@@ -40,7 +41,7 @@ final class WpdbRateCardRepository extends AbstractWpdbRepository implements Rat
 			'supplier_id'          => $this->nullable_positive_int( $data['supplier_id'] ?? null ),
 			'origin_id'            => $this->nullable_positive_int( $data['origin_id'] ?? null ),
 			'charge_type'          => (string) ( $data['charge_type'] ?? '' ),
-			'base_amount'          => $this->format_decimal( $data['base_amount'] ?? '0' ),
+			'base_amount'          => RateCardAmountFormatter::format( $this->require_base_amount( $data ) ),
 			'base_currency'        => strtoupper( trim( (string) ( $data['base_currency'] ?? '' ) ) ),
 			'priority'             => (int) ( $data['priority'] ?? 100 ),
 			'effective_from'       => $this->nullable_datetime( $data['effective_from'] ?? null ),
@@ -183,11 +184,14 @@ final class WpdbRateCardRepository extends AbstractWpdbRepository implements Rat
 		return gmdate( 'Y-m-d H:i:s', $timestamp );
 	}
 
-	private function format_decimal( mixed $value ): string {
-		if ( is_numeric( $value ) ) {
-			return number_format( (float) $value, 4, '.', '' );
+	/**
+	 * @param array<string, mixed> $data
+	 */
+	private function require_base_amount( array $data ): mixed {
+		if ( ! array_key_exists( 'base_amount', $data ) ) {
+			throw new \InvalidArgumentException( 'Rate card base_amount is required and must be numeric.' );
 		}
 
-		return '0.0000';
+		return $data['base_amount'];
 	}
 }

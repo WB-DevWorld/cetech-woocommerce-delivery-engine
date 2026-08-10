@@ -12,6 +12,8 @@ use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionSessionData;
 use CetechDeliveryEngine\Application\Destination\PackageDestinationZoneResolver;
 use CetechDeliveryEngine\Application\RateQuote\RateQuoteEngine;
 use CetechDeliveryEngine\Application\RateQuote\RateQuoteRequest;
+use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
+use CetechDeliveryEngine\Application\Runtime\RuntimeConfigurationSource;
 use CetechDeliveryEngine\Domain\ProductRule\ProductDeliveryRuleRepositoryInterface;
 use CetechDeliveryEngine\Support\Logger;
 
@@ -41,7 +43,8 @@ final class SelectedOfferShippingRateCalculator {
 		private CartDeliverySelectionRevalidator $cart_revalidator,
 		private RateQuoteEngine $quote_engine,
 		private ProductDeliveryRuleRepositoryInterface $product_rule_repository,
-		private Logger $logger
+		private Logger $logger,
+		private ?ProductDeliveryConfigurationSourceInterface $configuration_source = null
 	) {
 	}
 
@@ -225,9 +228,7 @@ final class SelectedOfferShippingRateCalculator {
 			return null;
 		}
 
-		$rule_dimensions = $this->rule_dimensions(
-			isset( $intent['rule_id'] ) ? (int) $intent['rule_id'] : null
-		);
+		$rule_dimensions = $this->rule_dimensions( $intent );
 
 		try {
 			return RateQuoteRequest::fromArray(
@@ -254,20 +255,36 @@ final class SelectedOfferShippingRateCalculator {
 	}
 
 	/**
+	 * @param array<string, mixed> $intent
+	 *
 	 * @return array{
 	 *     logistics_profile_id: int|null,
 	 *     supplier_id: int|null,
 	 *     origin_id: int|null
 	 * }
 	 */
-	private function rule_dimensions( ?int $rule_id ): array {
+	private function rule_dimensions( array $intent ): array {
 		$empty = [
 			'logistics_profile_id' => null,
 			'supplier_id'          => null,
 			'origin_id'            => null,
 		];
 
-		if ( null === $rule_id || $rule_id <= 0 ) {
+		$availability = sanitize_key( (string) ( $intent['fulfilment_availability'] ?? '' ) );
+		$target_type  = sanitize_key( (string) ( $intent['target_type'] ?? '' ) );
+		$target_id    = (int) ( $intent['target_id'] ?? 0 );
+
+		if ( null !== $this->configuration_source && '' !== $target_type && $target_id > 0 ) {
+			$runtime = $this->configuration_source->resolve( $target_type, $target_id );
+
+			if ( RuntimeConfigurationSource::ECR === $runtime->source && '' !== $availability ) {
+				return $runtime->quote_dimensions_for( $availability );
+			}
+		}
+
+		$rule_id = isset( $intent['rule_id'] ) ? (int) $intent['rule_id'] : 0;
+
+		if ( $rule_id <= 0 ) {
 			return $empty;
 		}
 

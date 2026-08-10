@@ -19,6 +19,8 @@ final class RateQuoteEngine {
 
 	public const ERROR_NEGATIVE_AMOUNT = 'negative_amount';
 
+	public const ERROR_INVALID_AMOUNT = 'invalid_amount';
+
 	public const ERROR_UNSUPPORTED_CHARGE_TYPE = 'unsupported_charge_type';
 
 	public function __construct(
@@ -96,9 +98,24 @@ final class RateQuoteEngine {
 
 		$winner      = $candidates[0]['card'];
 		$charge_type = (string) ( $winner['charge_type'] ?? '' );
-		$base_amount = (string) ( $winner['base_amount'] ?? '0' );
 
-		if ( ! is_numeric( $base_amount ) || (float) $base_amount < 0 ) {
+		if ( ! array_key_exists( 'base_amount', $winner ) || null === $winner['base_amount'] || '' === $winner['base_amount'] ) {
+			return RateQuoteResult::failure(
+				self::ERROR_INVALID_AMOUNT,
+				__( 'Matched rate card is missing a monetary base amount. Delivery cannot be priced.', 'cetech-woocommerce-delivery-engine' )
+			);
+		}
+
+		$base_amount = (string) $winner['base_amount'];
+
+		if ( ! is_numeric( $base_amount ) ) {
+			return RateQuoteResult::failure(
+				self::ERROR_INVALID_AMOUNT,
+				__( 'Matched rate card has a non-numeric base amount. Delivery cannot be priced as free.', 'cetech-woocommerce-delivery-engine' )
+			);
+		}
+
+		if ( (float) $base_amount < 0 ) {
 			return RateQuoteResult::failure(
 				self::ERROR_NEGATIVE_AMOUNT,
 				__( 'Matched rate card has an invalid or negative base amount.', 'cetech-woocommerce-delivery-engine' )

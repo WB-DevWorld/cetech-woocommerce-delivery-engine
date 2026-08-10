@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Cart;
 
-use CetechDeliveryEngine\Application\ProductRule\ProductDeliveryRuleResolver;
+use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidator;
@@ -31,7 +31,7 @@ final class CartDeliverySelectionCapture {
 	public function __construct(
 		private FeatureFlags $feature_flags,
 		private Requirements $requirements,
-		private ProductDeliveryRuleResolver $rule_resolver,
+		private ProductDeliveryConfigurationSourceInterface $configuration_source,
 		private ProductDeliveryOptionsBuilder $options_builder,
 		private ProductDeliverySelectionValidator $selection_validator
 	) {
@@ -248,7 +248,8 @@ final class CartDeliverySelectionCapture {
 			return $empty;
 		}
 
-		$result = $this->rule_resolver->resolve( $context['target_type'], $context['target_id'] );
+		$runtime = $this->configuration_source->resolve( $context['target_type'], $context['target_id'] );
+		$result  = $runtime->result;
 
 		if ( ! $result->success || [] === $result->chosen_rules ) {
 			return $empty;

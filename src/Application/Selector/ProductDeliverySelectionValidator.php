@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Selector;
 
-use CetechDeliveryEngine\Application\ProductRule\ProductDeliveryRuleResolver;
 use CetechDeliveryEngine\Application\ProductRule\ProductRuleResolutionResult;
 use CetechDeliveryEngine\Application\ProductRule\ResolvedProductDeliveryRule;
+use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\Enum\ProductTargetType;
@@ -22,7 +22,7 @@ final class ProductDeliverySelectionValidator {
 	public function __construct(
 		private FeatureFlags $feature_flags,
 		private Requirements $requirements,
-		private ProductDeliveryRuleResolver $rule_resolver,
+		private ProductDeliveryConfigurationSourceInterface $configuration_source,
 		private ProductDeliveryOptionsBuilder $options_builder
 	) {
 	}
@@ -82,7 +82,8 @@ final class ProductDeliverySelectionValidator {
 		$target_type = (string) $context['target_type'];
 		$target_id   = (int) $context['target_id'];
 
-		$result = $this->rule_resolver->resolve( $target_type, $target_id );
+		$runtime = $this->configuration_source->resolve( $target_type, $target_id );
+		$result  = $runtime->result;
 
 		if ( ! $result->success ) {
 			return ProductDeliverySelectionValidationResult::invalid(
@@ -121,7 +122,7 @@ final class ProductDeliverySelectionValidator {
 
 		$rule_id = $this->find_rule_id( $result, $matched );
 
-		if ( null === $rule_id ) {
+		if ( null === $rule_id && ! $runtime->is_ecr() ) {
 			$warnings[] = __(
 				'Matched option could not be linked to a resolved product rule ID.',
 				'cetech-woocommerce-delivery-engine'
@@ -135,7 +136,8 @@ final class ProductDeliverySelectionValidator {
 			$target_type,
 			$target_id,
 			$matched,
-			$rule_id
+			$rule_id,
+			$runtime->configuration_fingerprint
 		);
 
 		return ProductDeliverySelectionValidationResult::valid( $matched, $intent, $warnings );

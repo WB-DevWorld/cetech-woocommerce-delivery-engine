@@ -33,8 +33,18 @@ use CetechDeliveryEngine\Application\Configuration\ConfigurationFingerprintBuild
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationValidator;
 use CetechDeliveryEngine\Application\Configuration\FulfilmentConstraintServiceInterface;
+use CetechDeliveryEngine\Application\Configuration\HardFulfilmentConstraintService;
 use CetechDeliveryEngine\Application\Configuration\LegacyConfigurationMigrator;
-use CetechDeliveryEngine\Application\Configuration\PassthroughFulfilmentConstraintService;
+use CetechDeliveryEngine\Application\Runtime\EcrProductDeliveryConfigurationSource;
+use CetechDeliveryEngine\Application\Runtime\EcrToRuntimeConfigurationAdapter;
+use CetechDeliveryEngine\Application\Runtime\LegacyCategoryRuntimeCompatibilityGuard;
+use CetechDeliveryEngine\Application\Runtime\LegacyCategoryRuntimeCompatibilityGuardInterface;
+use CetechDeliveryEngine\Application\Runtime\LegacyProductDeliveryConfigurationSource;
+use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
+use CetechDeliveryEngine\Application\Runtime\ProductDeliveryRuntimeConfigurationRouter;
+use CetechDeliveryEngine\Application\Runtime\ProductTypeInspectorInterface;
+use CetechDeliveryEngine\Application\Runtime\RuntimeConfigurationSource;
+use CetechDeliveryEngine\Application\Runtime\WooCommerceProductTypeInspector;
 use CetechDeliveryEngine\Domain\Configuration\LegacyProductRuleMigrationMapper;
 use CetechDeliveryEngine\Domain\Configuration\ScopedConfigurationRepositoryInterface;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbScopedConfigurationRepository;
@@ -430,7 +440,7 @@ final class Plugin {
 			static fn ( ServiceContainer $container ): ProductDeliverySelectionValidator => new ProductDeliverySelectionValidator(
 				$container->get( FeatureFlags::class ),
 				$container->get( Requirements::class ),
-				$container->get( ProductDeliveryRuleResolver::class ),
+				$container->get( ProductDeliveryConfigurationSourceInterface::class ),
 				$container->get( ProductDeliveryOptionsBuilder::class )
 			)
 		);
@@ -440,7 +450,7 @@ final class Plugin {
 			static fn ( ServiceContainer $container ): CartDeliverySelectionCapture => new CartDeliverySelectionCapture(
 				$container->get( FeatureFlags::class ),
 				$container->get( Requirements::class ),
-				$container->get( ProductDeliveryRuleResolver::class ),
+				$container->get( ProductDeliveryConfigurationSourceInterface::class ),
 				$container->get( ProductDeliveryOptionsBuilder::class ),
 				$container->get( ProductDeliverySelectionValidator::class )
 			)
@@ -482,7 +492,8 @@ final class Plugin {
 				$container->get( CartDeliverySelectionRevalidator::class ),
 				$container->get( RateQuoteEngine::class ),
 				$container->get( ProductDeliveryRuleRepositoryInterface::class ),
-				$container->get( Logger::class )
+				$container->get( Logger::class ),
+				$container->get( ProductDeliveryConfigurationSourceInterface::class )
 			)
 		);
 
@@ -571,7 +582,7 @@ final class Plugin {
 			static fn ( ServiceContainer $container ): ProductDeliverySelectorRenderer => new ProductDeliverySelectorRenderer(
 				$container->get( FeatureFlags::class ),
 				$container->get( Requirements::class ),
-				$container->get( ProductDeliveryRuleResolver::class ),
+				$container->get( ProductDeliveryConfigurationSourceInterface::class ),
 				$container->get( ProductDeliveryOptionsBuilder::class )
 			)
 		);
@@ -865,7 +876,9 @@ final class Plugin {
 
 		$this->container->singleton(
 			FulfilmentConstraintServiceInterface::class,
-			static fn (): FulfilmentConstraintServiceInterface => new PassthroughFulfilmentConstraintService()
+			static fn ( ServiceContainer $container ): FulfilmentConstraintServiceInterface => new HardFulfilmentConstraintService(
+				$container->get( DeliveryOfferRepositoryInterface::class )
+			)
 		);
 
 		$this->container->singleton(
@@ -874,6 +887,44 @@ final class Plugin {
 				$container->get( ScopedConfigurationRepositoryInterface::class ),
 				$container->get( EffectiveConfigurationValidator::class ),
 				$container->get( FulfilmentConstraintServiceInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			EcrToRuntimeConfigurationAdapter::class,
+			static fn (): EcrToRuntimeConfigurationAdapter => new EcrToRuntimeConfigurationAdapter()
+		);
+
+		$this->container->singleton(
+			LegacyCategoryRuntimeCompatibilityGuardInterface::class,
+			static fn ( ServiceContainer $container ): LegacyCategoryRuntimeCompatibilityGuardInterface => new LegacyCategoryRuntimeCompatibilityGuard(
+				$container->get( ProductDeliveryRuleResolver::class )
+			)
+		);
+
+		$this->container->singleton(
+			ProductTypeInspectorInterface::class,
+			static fn (): ProductTypeInspectorInterface => new WooCommerceProductTypeInspector()
+		);
+
+		$this->container->singleton(
+			ProductDeliveryConfigurationSourceInterface::class,
+			static fn ( ServiceContainer $container ): ProductDeliveryConfigurationSourceInterface => new ProductDeliveryRuntimeConfigurationRouter(
+				$container->get( FeatureFlags::class ),
+				new LegacyProductDeliveryConfigurationSource(
+					$container->get( ProductDeliveryRuleResolver::class ),
+					RuntimeConfigurationSource::LEGACY
+				),
+				new EcrProductDeliveryConfigurationSource(
+					$container->get( EffectiveConfigurationResolver::class ),
+					$container->get( EcrToRuntimeConfigurationAdapter::class )
+				),
+				$container->get( LegacyCategoryRuntimeCompatibilityGuardInterface::class ),
+				$container->get( ProductTypeInspectorInterface::class ),
+				new LegacyProductDeliveryConfigurationSource(
+					$container->get( ProductDeliveryRuleResolver::class ),
+					RuntimeConfigurationSource::LEGACY_CATEGORY_COMPATIBILITY
+				)
 			)
 		);
 
