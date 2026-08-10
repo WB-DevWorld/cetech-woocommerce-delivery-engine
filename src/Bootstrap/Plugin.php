@@ -23,7 +23,12 @@ use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotReader;
 use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingIntegration;
 use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingRateCalculator;
 use CetechDeliveryEngine\Application\Shipping\ShippingRateCalculationGate;
+use CetechDeliveryEngine\Application\Configuration\ConfigurationFingerprintBuilder;
+use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver;
+use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationValidator;
+use CetechDeliveryEngine\Application\Configuration\FulfilmentConstraintServiceInterface;
 use CetechDeliveryEngine\Application\Configuration\LegacyConfigurationMigrator;
+use CetechDeliveryEngine\Application\Configuration\PassthroughFulfilmentConstraintService;
 use CetechDeliveryEngine\Domain\Configuration\LegacyProductRuleMigrationMapper;
 use CetechDeliveryEngine\Domain\Configuration\ScopedConfigurationRepositoryInterface;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbScopedConfigurationRepository;
@@ -762,6 +767,30 @@ final class Plugin {
 		$this->container->singleton(
 			ScopedConfigurationRepositoryInterface::class,
 			static fn (): ScopedConfigurationRepositoryInterface => new WpdbScopedConfigurationRepository()
+		);
+
+		$this->container->singleton(
+			EffectiveConfigurationValidator::class,
+			static fn (): EffectiveConfigurationValidator => new EffectiveConfigurationValidator()
+		);
+
+		$this->container->singleton(
+			ConfigurationFingerprintBuilder::class,
+			static fn (): ConfigurationFingerprintBuilder => new ConfigurationFingerprintBuilder()
+		);
+
+		$this->container->singleton(
+			FulfilmentConstraintServiceInterface::class,
+			static fn (): FulfilmentConstraintServiceInterface => new PassthroughFulfilmentConstraintService()
+		);
+
+		$this->container->singleton(
+			EffectiveConfigurationResolver::class,
+			static fn ( ServiceContainer $container ): EffectiveConfigurationResolver => new EffectiveConfigurationResolver(
+				$container->get( ScopedConfigurationRepositoryInterface::class ),
+				$container->get( EffectiveConfigurationValidator::class ),
+				$container->get( FulfilmentConstraintServiceInterface::class )
+			)
 		);
 
 		$this->container->singleton(

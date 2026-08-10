@@ -27,12 +27,27 @@ final class InMemoryScopedConfigurationRepository implements ScopedConfiguration
 
 	private int $global_version = 0;
 
+	/** @var array<string, int> */
+	private array $call_counts = [];
+
+	private int $write_calls = 0;
+
 	public function getGlobalConfiguration(): ?ScopedConfiguration {
-		return $this->findByScopeAndSlice(
-			ConfigurationScopeType::Global,
-			ConfigurationScope::GLOBAL_SCOPE_ID,
-			ConfigurationScope::DEFAULT_SLICE_KEY
-		);
+		$this->increment_call_count( __FUNCTION__ );
+
+		foreach ( $this->by_id as $configuration ) {
+			$scope = $configuration->scope;
+
+			if (
+				ConfigurationScopeType::Global === $scope->scope_type
+				&& ConfigurationScope::GLOBAL_SCOPE_ID === $scope->scope_id
+				&& ConfigurationScope::DEFAULT_SLICE_KEY === $scope->slice_key
+			) {
+				return $configuration;
+			}
+		}
+
+		return null;
 	}
 
 	public function ensureGlobalScope(): ScopedConfiguration {
@@ -52,6 +67,8 @@ final class InMemoryScopedConfigurationRepository implements ScopedConfiguration
 	}
 
 	public function findByScope( ConfigurationScopeType $scope_type, int $scope_id ): array {
+		$this->increment_call_count( __FUNCTION__ );
+
 		$matches = [];
 
 		foreach ( $this->by_id as $configuration ) {
@@ -64,6 +81,8 @@ final class InMemoryScopedConfigurationRepository implements ScopedConfiguration
 	}
 
 	public function findByScopeAndSlice( ConfigurationScopeType $scope_type, int $scope_id, string $slice_key ): ?ScopedConfiguration {
+		$this->increment_call_count( __FUNCTION__ );
+
 		foreach ( $this->by_id as $configuration ) {
 			$scope = $configuration->scope;
 
@@ -80,6 +99,8 @@ final class InMemoryScopedConfigurationRepository implements ScopedConfiguration
 	}
 
 	public function findByLegacyRuleId( int $legacy_rule_id ): ?ScopedConfiguration {
+		$this->increment_call_count( __FUNCTION__ );
+
 		if ( $legacy_rule_id <= 0 ) {
 			return null;
 		}
@@ -94,6 +115,8 @@ final class InMemoryScopedConfigurationRepository implements ScopedConfiguration
 	}
 
 	public function findByParentProductId( int $parent_product_id ): array {
+		$this->increment_call_count( __FUNCTION__ );
+
 		$matches = [];
 
 		foreach ( $this->by_id as $configuration ) {
@@ -106,6 +129,9 @@ final class InMemoryScopedConfigurationRepository implements ScopedConfiguration
 	}
 
 	public function saveScopedConfiguration( ScopedConfiguration $configuration ): ScopedConfiguration {
+		$this->increment_call_count( __FUNCTION__ );
+		++$this->write_calls;
+
 		$scope = $configuration->scope;
 
 		if ( ConfigurationScopeType::Global !== $scope->scope_type && $scope->scope_id <= 0 ) {
@@ -208,6 +234,9 @@ final class InMemoryScopedConfigurationRepository implements ScopedConfiguration
 	}
 
 	public function deleteScope( ConfigurationScopeType $scope_type, int $scope_id, string $slice_key = ConfigurationScope::DEFAULT_SLICE_KEY ): bool {
+		$this->increment_call_count( __FUNCTION__ );
+		++$this->write_calls;
+
 		if ( ConfigurationScopeType::Global === $scope_type ) {
 			throw new InvalidConfigurationException( 'Global scope cannot be deleted.' );
 		}
@@ -224,6 +253,8 @@ final class InMemoryScopedConfigurationRepository implements ScopedConfiguration
 	}
 
 	public function getVersionInfo( ConfigurationScopeType $scope_type, int $scope_id, string $slice_key = ConfigurationScope::DEFAULT_SLICE_KEY ): ?ConfigurationVersionInfo {
+		$this->increment_call_count( __FUNCTION__ );
+
 		$existing = $this->findByScopeAndSlice( $scope_type, $scope_id, $slice_key );
 
 		if ( null === $existing || null === $existing->scope->id ) {
@@ -240,8 +271,33 @@ final class InMemoryScopedConfigurationRepository implements ScopedConfiguration
 	}
 
 	public function getGlobalVersion(): int {
+		$this->increment_call_count( __FUNCTION__ );
+
 		$global = $this->getGlobalConfiguration();
 
 		return null === $global ? $this->global_version : $global->scope->config_version;
+	}
+
+	/**
+	 * @return array<string, int>
+	 */
+	public function getReadCallCounts(): array {
+		return $this->call_counts;
+	}
+
+	public function getWriteCalls(): int {
+		return $this->write_calls;
+	}
+
+	public function resetReadCallCounts(): void {
+		$this->call_counts = [];
+	}
+
+	public function resetWriteCalls(): void {
+		$this->write_calls = 0;
+	}
+
+	private function increment_call_count( string $method_name ): void {
+		$this->call_counts[ $method_name ] = ( $this->call_counts[ $method_name ] ?? 0 ) + 1;
 	}
 }
