@@ -22,24 +22,25 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 4 Admin inheritance UX + preview | **COMPLETE** — artifact `docs/STAGE-4-ADMIN-INHERITANCE-UX.md` |
 | Stage 5A Simple-product ECR runtime integration | **COMPLETE** — artifact `docs/STAGE-5A-SIMPLE-RUNTIME-ECR-INTEGRATION.md` (local only; flag default OFF) |
 | Stage 5B-1 original package | **FAILED** real WordPress boot — SHA-256 `973c0209…e4cc`; fatal `Bootstrap\ConfigurationHealthChecker` not found |
-| Stage 5B FLAIROC recovery | Plugin renamed to `…stage5b-disabled`; wp-admin recovered; Delivery Engine not executing |
-| Stage 5B bootstrap repair | **LOCAL FIX** — missing Diagnostics import in `Plugin.php`; boot-graph + package autoload gates added |
-| Stage 5B-2 deployment safety verification | **NOT STARTED** |
+| Stage 5B FLAIROC recovery | Plugin renamed to `…stage5b-disabled`; wp-admin recovered; later replaced with fixed package |
+| Stage 5B bootstrap repair | **DONE** locally — `325e252`; fixed ZIP SHA-256 `b21398ee…b3cf3f` |
+| Stage 5B-2 deployment safety verification | **BLOCKED** — repaired package boots, but `#37054` proves selector + cart-capture flags ON (dormant storefront FAIL); schema/admin smoke not agent-verifiable under Cloudflare |
+| Stage 5B-3 ECR live parity | **NOT STARTED** — do not enable ECR until Stage 5B-2 passes |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |
 | New admin UX | Global/Product/Variation scoped editors + effective preview; pre-cutover notice |
 | Runtime cutover flag | `enable_effective_configuration_runtime` **defaults OFF** — keep OFF on redeploy until Stage 5B-2 |
 | Legacy storage | `product_delivery_rules` remains default authoritative path while cutover flag OFF |
-| Runtime on FLAIROC | Delivery Engine currently filesystem-disabled after failed Stage 5B package; ECR **not** live-tested |
+| Runtime on FLAIROC | Fixed package installed/active `1.0.0-rc.1`; **runtime flags not all OFF** (storefront selector on `#37054`); ECR **not** live-tested |
 | Variable runtime capture | **Not implemented** (Stage 6) |
 | Shipments / tracking / timeline | **Not implemented** |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Stage 5 **compatibility route** (category winners stay on legacy source) |
-| Next stage | Human redeploy **fixed** Stage 5B package with all runtime flags OFF → restart Stage 5B-2 |
-| Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual; `ProductDeliverySelectionValidator` undefined `error_code` warning (secondary) |
+| Next stage | **Unblock Stage 5B-2**: human turns ALL runtime flags OFF in Delivery Settings → re-verify dormant storefront + schema/admin checklist |
+| Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual; `ProductDeliverySelectionValidator` undefined `error_code` warning (secondary; no Stage 5B-2 recurrence observed) |
 | Stage 1 HPOS debt | **DEFERRED** (`countOrderSnapshotReferences` postmeta); non-numeric rate→0 **FIXED** in Stage 5A |
 
-Do **not** begin Stage 6 unless explicitly tasked. Do **not** enable FLAIROC ECR runtime until Stage 5B-2 passes with flags controlled.
+Do **not** begin Stage 5B-3 or Stage 6 unless explicitly tasked. Do **not** enable FLAIROC ECR runtime until Stage 5B-2 passes with all runtime flags controlled OFF first.
 
 ### Companion docs (implementation)
 
