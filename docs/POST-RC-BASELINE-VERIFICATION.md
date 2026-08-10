@@ -372,3 +372,70 @@ Authoritative checklist: `docs/V1-RC-SMOKE-TEST-CHECKLIST.md`.
 3. Update this document to **VERIFIED** only after that pass.
 
 Do **not** begin Stage 1 until smoke sign-off passes.
+
+---
+
+# Stage 0B — resume after REST access remediation (BLOCKED)
+
+## Date
+
+2026-08-10
+
+## Intent
+
+Complete V1 RC baseline verification on `https://flairoc.com/intl/` after Nginx REST user-enumeration remediation and creation of a dedicated WordPress Application Password for development automation.
+
+## Credential handling
+
+| Check | Result |
+|-------|--------|
+| `.env.local` present | Yes |
+| `git check-ignore .env.local` | Ignored (`.gitignore`) |
+| Tracked in Git | No |
+| Secrets printed/committed | No |
+| Env var names used | `WP_SITE_URL`, `WP_ADMIN_USER`, `WP_ADMIN_APP_PASSWORD` (equivalent to requested `FLAIROC_*` set); also existing WC consumer key/secret |
+| `WP_ADMIN_APP_PASSWORD` | Set (non-empty) after remediation |
+
+## Application Password verification
+
+Preferred probe: `GET /wp-json/wp/v2/users/me?context=edit` with HTTP Basic (username + Application Password).
+
+| Probe | HTTP | Classification | Notes |
+|-------|------|----------------|-------|
+| `/wp-json/wp/v2/users/me` (+ auth) | **403** | **Nginx** | HTML `403 Forbidden` from nginx — user-enumeration rule still blocks the entire `/wp-json/wp/v2/users…` JSON pretty-permalink path (not only anonymous listing) |
+| `/?rest_route=/wp/v2/users/me&context=edit` (+ auth) | **401** | **Auth not applied** | Reaches WordPress; unauthorized |
+| `/wp-json/wp/v2/users/me/application-passwords` (+ valid App Password) | **401** | **Auth not applied** | Body: `rest_not_logged_in` — endpoint **does** reach WordPress (remediation helped this subtree) |
+| Same endpoint (+ deliberately wrong password) | **401** | **Auth not applied** | Identical `rest_not_logged_in` |
+| Same endpoint (no Authorization) | **401** | **Auth not applied** | Identical `rest_not_logged_in` |
+| `/wp-json/wp/v2/posts?context=edit` (+ App Password) | **401** | **Auth not applied** | `rest_forbidden_context` |
+| `/wp-json/wc/v3/*` (+ App Password) | **401** | **Auth not applied** | `woocommerce_rest_cannot_view` |
+| `/wp-json/wc/v3/*` (+ WC consumer key/secret) | **200** | OK | Commerce API still works; insufficient for Delivery Engine admin/flags/config |
+| `/xmlrpc.php` | **403** | **Cloudflare** | Challenge page; not usable |
+
+**Conclusion:** Application Password creation path can reach WordPress, but **authenticated REST using the Application Password does not succeed**. Valid, invalid, and missing Basic credentials produce the same `rest_not_logged_in` response, which indicates WordPress is **not receiving/evaluating the HTTP Authorization header** (typical PHP-FPM/`HTTP_AUTHORIZATION` forwarding gap and/or a security layer stripping Authorization). Empty `WWW-Authenticate` on the challenge response is consistent with auth not being engaged.
+
+Per Stage 0B instructions: **STOP** before mutable REST/admin operations until authentication is proven.
+
+## Work not started (blocked)
+
+- Exact WP version via authenticated system APIs
+- Remote feature-flag read/write via admin
+- Safe-off flag remediation
+- Schema introspection beyond prior WC system_status
+- QA product / Delivery Engine QA configuration
+- Flag-by-flag smoke, checkout, order, snapshot, privacy completion
+- Final runtime restore
+
+Delivery Engine still has **no** first-party REST API for flags/config (admin UI + `wp_options` `cetech_de_*` only). Without working Application Password (or cookie admin session), Stage 0B cannot proceed.
+
+## Baseline verdict (Stage 0B)
+
+**BASELINE NOT VERIFIED — POST-RC DEVELOPMENT BLOCKED**
+
+## Required next action (Stage 0B)
+
+1. Ensure PHP/Nginx forwards the Authorization header to WordPress (e.g. FastCGI `HTTP_AUTHORIZATION` / equivalent) **and/or** stop security plugins from stripping Basic auth for REST — without weakening the intentional user-enumeration block more than necessary.
+2. Narrow/adjust the Nginx users rule so authenticated `GET /wp-json/wp/v2/users/me` can succeed (or document `rest_route` as the supported alternative once auth works).
+3. Re-run Stage 0B from Application Password verification (`users/me` → 200) before any QA configuration.
+
+Do **not** begin Stage 1 until smoke sign-off passes.
