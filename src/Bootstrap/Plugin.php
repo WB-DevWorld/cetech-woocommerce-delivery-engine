@@ -23,7 +23,10 @@ use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotReader;
 use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingIntegration;
 use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingRateCalculator;
 use CetechDeliveryEngine\Application\Shipping\ShippingRateCalculationGate;
-use CetechDeliveryEngine\Application\Diagnostics\ConfigurationHealthChecker;
+use CetechDeliveryEngine\Application\Configuration\LegacyConfigurationMigrator;
+use CetechDeliveryEngine\Domain\Configuration\LegacyProductRuleMigrationMapper;
+use CetechDeliveryEngine\Domain\Configuration\ScopedConfigurationRepositoryInterface;
+use CetechDeliveryEngine\Infrastructure\Persistence\WpdbScopedConfigurationRepository;
 use CetechDeliveryEngine\Core\AdminNoticeManager;
 use CetechDeliveryEngine\Core\Capabilities\Capabilities;
 use CetechDeliveryEngine\Core\FeaturesCompatibility;
@@ -754,6 +757,26 @@ final class Plugin {
 		$this->container->singleton(
 			AuditLogRepositoryInterface::class,
 			static fn (): AuditLogRepositoryInterface => new WpdbAuditLogRepository()
+		);
+
+		$this->container->singleton(
+			ScopedConfigurationRepositoryInterface::class,
+			static fn (): ScopedConfigurationRepositoryInterface => new WpdbScopedConfigurationRepository()
+		);
+
+		$this->container->singleton(
+			LegacyProductRuleMigrationMapper::class,
+			static fn (): LegacyProductRuleMigrationMapper => new LegacyProductRuleMigrationMapper()
+		);
+
+		$this->container->singleton(
+			LegacyConfigurationMigrator::class,
+			static fn ( ServiceContainer $container ): LegacyConfigurationMigrator => new LegacyConfigurationMigrator(
+				$container->get( ProductDeliveryRuleRepositoryInterface::class ),
+				$container->get( ScopedConfigurationRepositoryInterface::class ),
+				$container->get( LegacyProductRuleMigrationMapper::class ),
+				$container->get( Logger::class )
+			)
 		);
 	}
 

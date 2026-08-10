@@ -99,6 +99,8 @@ foreach ( $feature_flag_options as $flag ) {
 delete_option( 'cetech_de_db_version' );
 delete_option( 'cetech_de_last_migration_status' );
 delete_option( 'cetech_de_delete_data_on_uninstall' );
+delete_option( 'cetech_de_global_configuration_version' );
+delete_option( 'cetech_de_v3_config_migration_report' );
 
 global $wpdb;
 
@@ -117,6 +119,9 @@ $table_suffixes = [
 	'rate_card_rules',
 	'audit_log',
 	'product_delivery_rules',
+	'configuration_scopes',
+	'configuration_fields',
+	'configuration_collections',
 ];
 
 foreach ( $table_suffixes as $suffix ) {

@@ -6,7 +6,7 @@
 **Repository namespace:** `CetechDeliveryEngine\`
 **WooCommerce dependency:** Required
 **PHP minimum:** 8.1+
-**Current known implementation baseline:** `1.0.0-rc.1`, schema target `2`
+**Current known implementation baseline:** `1.0.0-rc.1`, schema target `3`
 
 ---
 
@@ -126,7 +126,7 @@ Document the conflict and resolve it deliberately.
 At the current known baseline:
 
 * plugin version is `1.0.0-rc.1`;
-* schema target is `2`;
+* schema target is `3`;
 * the simple-product customer path through order delivery snapshots is implemented;
 * runtime customer-facing flags default off;
 * WooCommerce is the only hard dependency;

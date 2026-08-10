@@ -28,11 +28,18 @@ final class ConfigurationTables {
 		'product_delivery_rules',
 	];
 
+	/** @var list<string> Stage 2 scoped configuration table suffixes. */
+	public const SCOPED_CONFIGURATION_SUFFIXES = ScopedConfigurationSchema::SUFFIXES;
+
 	/**
 	 * @return list<string>
 	 */
 	public static function all_suffixes(): array {
-		return array_merge( self::SUFFIXES, self::PRODUCT_RULE_SUFFIXES );
+		return array_merge(
+			self::SUFFIXES,
+			self::PRODUCT_RULE_SUFFIXES,
+			self::SCOPED_CONFIGURATION_SUFFIXES
+		);
 	}
 
 	/**

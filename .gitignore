@@ -6,6 +6,11 @@ composer.lock
 /build/
 *.zip
 
+# Tests / coverage
+tests/.phpunit.cache/
+.phpunit.result.cache
+coverage/
+
 # Local / secrets
 *.log
 .env

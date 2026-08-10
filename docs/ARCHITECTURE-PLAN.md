@@ -1311,7 +1311,7 @@ Per-product enablement: product rule `active` + global selector flag + optional 
 
 ## 61. Migration/upgrade strategy
 
-- Schema version option: `cetech_de_db_version`
+- Schema version option: `cetech_de_db_version` (current target: `3` — scoped configuration storage; see `docs/STAGE-2-SCOPED-CONFIGURATION-STORAGE.md`)
 - Migrations in `database/migrations/` named `YYYYMMDDHHMMSS_description.php`
 - Each migration: `up()`, `idempotent check`, logged result
 - Properties: versioned, non-destructive default, batch-capable for large tables, no long locks during peak checkout

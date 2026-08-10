@@ -4,25 +4,31 @@
 
 **Last updated:** 2026-08-10  
 **Plugin version:** `1.0.0-rc.1`  
-**Schema target:** `2` (`cetech_de_db_version`)  
-**Git:** `master` — Stage 0B verified at `31fc016`; Stage 1 docs follow  
+**Schema target:** `3` (`cetech_de_db_version`)  
+**Git:** `master` — Stage 0B verified at `31fc016`; Stage 1 COMPLETE at `2f0be59`; Stage 2 scoped storage follows  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
 This handoff remains the **product vision and domain source of truth**. Much of the document describes the full intended engine (including shipment records and customer tracking). **Only the V1 RC scope below is implemented in code today.** Do not assume later sections are already built.
 
-### Stage 1 — Post-RC architecture gap analysis (COMPLETE)
+### Stage 0B / Stage 1 / Stage 2 status
 
 | Item | Status |
 |------|--------|
-| Stage 0B FLAIROC RC baseline | **VERIFIED** (`31fc016` — `docs: complete FLAIROC RC baseline verification`) |
-| Architecture gap analysis | **COMPLETE** — authoritative artifact: `docs/POST-RC-ARCHITECTURE-GAP-ANALYSIS.md` |
-| Target direction | Evolve verified RC toward Global → Product → Variation **field-level** inheritance + one `EffectiveConfigurationResolver`; layered offer/rate services (not a god-object) |
-| Next stage | **Stage 2** — Global configuration and scoped inheritance **storage** only |
-| Hard constraints to preserve | Server authority; no silent offer replacement; missing rate ≠ free shipping; snapshot immutability; HPOS CRUD; customer privacy; flags default OFF |
-| Explicitly deferred | ECR cutover; variable capture; WoodMart/WPML/WCML/WCFM/POS/Blocks adapters; package consolidation; shipments/tracking; admin inheritance UX polish; version bump; Stage 2+ implementation |
+| Stage 0B FLAIROC RC baseline | **VERIFIED** (`31fc016`) |
+| Stage 1 architecture gap analysis | **COMPLETE** — `docs/POST-RC-ARCHITECTURE-GAP-ANALYSIS.md` |
+| Stage 2 scoped configuration storage | **COMPLETE** — schema target `3`; artifact `docs/STAGE-2-SCOPED-CONFIGURATION-STORAGE.md` |
+| New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
+| Legacy storage | `product_delivery_rules` **remains authoritative for runtime** |
+| Runtime on FLAIROC | Still **OFF** (flags default off; no Stage 2 cutover) |
+| EffectiveConfigurationResolver | **Not implemented** — next stage |
+| Variable runtime capture | **Not implemented** |
+| Shipments / tracking / timeline | **Not implemented** |
+| Next stage | **Stage 3** — EffectiveConfigurationResolver (admin/test harness only; no storefront cutover) |
+| Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual warning on FLAIROC |
+| Stage 1 rate/HPOS debt | **DEFERRED** (non-numeric rate→0; base_amount 0; HPOS postmeta refcount) |
 
-Do **not** begin Stage 2 unless explicitly tasked. Do **not** rewrite verified shipping/snapshot/simple-product runtime while adding storage.
+Do **not** begin Stage 3 unless explicitly tasked. Do **not** rewrite verified shipping/snapshot/simple-product runtime while adding the resolver.
 
 ### Companion docs (implementation)
 
@@ -39,6 +45,7 @@ Do **not** begin Stage 2 unless explicitly tasked. Do **not** rewrite verified s
 | `docs/DEVELOPMENT-ENVIRONMENT.md` | Canonical development/staging target (non-secret) |
 | `docs/POST-RC-BASELINE-VERIFICATION.md` | Stage 0 / 0A / 0B baseline verification report |
 | `docs/POST-RC-ARCHITECTURE-GAP-ANALYSIS.md` | Stage 1 post-RC architecture gap analysis (authoritative) |
+| `docs/STAGE-2-SCOPED-CONFIGURATION-STORAGE.md` | Stage 2 scoped configuration storage completion record |
 | `docs/Delivery Shipping Plugin Up-To-Date Design and Expectations.md` | Latest intended product / end-state design |
 
 ### What has been accomplished
@@ -49,7 +56,8 @@ V1 RC delivers a **feature-flagged** path from admin configuration through paid-
 |------|--------|
 | Core bootstrap, migrations, System Status, capabilities, uninstall policy | Done (Phases 1A–1B) |
 | Config schema + admin CRUD (offers, zones/rules, logistics profiles, suppliers/origins, pickup locations, rate cards, audit log) | Done (Phases 2A–2B5) |
-| Product delivery rules + resolver (variation → product → category) | Done (Phases 2C1–2C3); schema target `2` |
+| Product delivery rules + resolver (variation → product → category) | Done (Phases 2C1–2C3); **legacy runtime path** |
+| Stage 2 scoped Global→Product→Variation **storage** (schema 3) | Done; dormant foundation; not runtime-wired |
 | Product-page delivery selector (public-safe; simple products) | Done (Phases 2D1–2D3) |
 | Cart selection capture + session/revalidation hardening | Done (Phases 2E1–2E2) |
 | Checkout delivery selection validation | Done (Phase 2F1) |
@@ -59,7 +67,7 @@ V1 RC delivers a **feature-flagged** path from admin configuration through paid-
 | Customer order email delivery summary | Done (Phase 2H4) |
 | V1 RC packaging, admin UX polish, guarded admin deletes | Done (post-2H4 RC commits) |
 
-**Canonical V1 runtime pipeline (implemented):**
+**Canonical V1 runtime pipeline (implemented; still legacy-config backed):**
 
 ```text
 Product rule → Delivery offers → Product selector → Cart capture
@@ -68,7 +76,7 @@ Product rule → Delivery offers → Product selector → Cart capture
 ```
 
 **Database tables present** (`{$wpdb->prefix}delivery_engine_*`):  
-`delivery_offers`, `destination_zones`, `destination_rules`, `logistics_profiles`, `suppliers`, `origins`, `pickup_locations`, `rate_cards`, `rate_card_rules`, `audit_log`, `product_delivery_rules`.
+`delivery_offers`, `destination_zones`, `destination_rules`, `logistics_profiles`, `suppliers`, `origins`, `pickup_locations`, `rate_cards`, `rate_card_rules`, `audit_log`, `product_delivery_rules`, `configuration_scopes`, `configuration_fields`, `configuration_collections`.
 
 **Not created yet:** `shipments`, `shipment_items`, `shipment_events`.
 
@@ -97,6 +105,7 @@ Blocks checkout adapter flag exists but is off / unwired. Code: `src/Bootstrap/F
 - WooCommerce Blocks checkout support
 - Variable-product delivery **capture** (deferred; simple products first)
 - Real WPML / WCML / WoodMart / WCFM / VitePOS adapters (detection / Null stubs only)
+- EffectiveConfigurationResolver / runtime inheritance cutover (Stage 3+)
 
 ### Hard invariants (already enforced in V1 code — preserve them)
 
@@ -117,10 +126,11 @@ Blocks checkout adapter flag exists but is off / unwired. Code: `src/Bootstrap/F
 ### Sensible next work after V1 RC
 
 1. ~~Complete staging smoke checklist / Stage 0B~~ — **DONE (VERIFIED)**
-2. ~~Post-RC architecture gap analysis (Stage 1)~~ — **DONE** — see `docs/POST-RC-ARCHITECTURE-GAP-ANALYSIS.md`
-3. **Stage 2:** Global configuration + scoped inheritance storage (no runtime cutover)
-4. Later: ECR → admin inheritance UX → simple-product cutover → variable capture → packages → shipments → integrations/Blocks → quality RC
-5. Do not skip foundations to reach shipments or variable UX early
+2. ~~Post-RC architecture gap analysis (Stage 1)~~ — **DONE**
+3. ~~Stage 2: Global configuration + scoped inheritance storage~~ — **DONE**
+4. **Stage 3:** EffectiveConfigurationResolver (harness only; no storefront cutover)
+5. Later: admin inheritance UX → simple-product cutover → variable capture → packages → shipments → integrations/Blocks → quality RC
+6. Do not skip foundations to reach shipments or variable UX early
 
 ### Agent orientation
 
