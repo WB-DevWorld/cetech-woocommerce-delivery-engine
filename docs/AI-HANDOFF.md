@@ -24,7 +24,7 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 5B-1 original package | **FAILED** real WordPress boot — SHA-256 `973c0209…e4cc`; fatal `Bootstrap\ConfigurationHealthChecker` not found (`d5fefa2`) |
 | Stage 5B FLAIROC recovery | Plugin filesystem-disabled (`…stage5b-disabled`); wp-admin recovered; ECR **never** enabled |
 | Stage 5B bootstrap repair | **DONE** locally — `325e252` (HealthChecker Diagnostics import); intermediate fixed ZIP `b21398ee…b3cf3f` |
-| Stage 5B admin false-product repair | **DONE** locally — `wc_get_product()` false-vs-null guards + validator `error_code` contract + regression tests; replacement ZIP `cetech-woocommerce-delivery-engine-stage5b-repaired.zip` |
+| Stage 5B admin false-product repair | **DONE** locally — `4e8f503`; replacement ZIP `cetech-woocommerce-delivery-engine-stage5b-repaired.zip` SHA-256 `1d672dae…a59a` (634795 bytes) |
 | Stage 5B-2 deployment safety verification | **NOT COMPLETE** — must restart from beginning after human redeploys repaired ZIP with all runtime flags OFF |
 | Stage 5B-3 ECR live parity | **NOT STARTED** — do not enable ECR until Stage 5B-2 passes |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |

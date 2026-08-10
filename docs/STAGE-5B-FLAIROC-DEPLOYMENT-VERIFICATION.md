@@ -128,7 +128,11 @@ Root cause: **MISSING IMPORT / WRONG NAMESPACE** — real class is `Application\
 | Validator | Always returns `error_code` / `error_message` (`null` on success) |
 | HealthChecker | Verified preserved from `325e252` (no competing rewrite) |
 | Claude shipping WIP | Explicitly **not** imported |
-| Replacement artifact | `cetech-woocommerce-delivery-engine-stage5b-repaired.zip` |
+| Repair commit | `4e8f5031030ec4064ca570e748f0f025aa19800c` |
+| Replacement artifact | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-stage5b-repaired.zip` |
+| Replacement bytes | `634795` |
+| Replacement SHA-256 | `1d672dae1743bc46c497fa4de2d1e44d3cce5df7faafe84df166efca058ca59a` |
+| Differs from failed `973c0209…e4cc` | **YES** |
 
 ---
 
