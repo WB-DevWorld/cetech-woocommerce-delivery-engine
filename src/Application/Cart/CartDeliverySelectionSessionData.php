@@ -79,7 +79,7 @@ final class CartDeliverySelectionSessionData {
 
 		$fields = CartDeliverySelectionFingerprint::normalizeIntentFields( $raw );
 
-		return [
+		$intent = [
 			'contract_version'        => (string) ( $raw['contract_version'] ?? '' ),
 			'product_id'              => $fields['product_id'],
 			'variation_id'            => '' !== $fields['variation_id'] ? (int) $fields['variation_id'] : null,
@@ -92,6 +92,14 @@ final class CartDeliverySelectionSessionData {
 			'rule_id'                 => '' !== $fields['rule_id'] ? (int) $fields['rule_id'] : null,
 			'issued_at'               => sanitize_text_field( (string) ( $raw['issued_at'] ?? '' ) ),
 		];
+
+		// Preserve additive ECR fingerprint so session restore / checkout revalidation
+		// hash checks match the hash captured at add-to-cart (legacy intents omit this key).
+		if ( '' !== (string) $fields['configuration_fingerprint'] ) {
+			$intent['configuration_fingerprint'] = (string) $fields['configuration_fingerprint'];
+		}
+
+		return $intent;
 	}
 
 	/**

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Tests\Unit\Runtime;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionFingerprint;
+use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionSessionData;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationValidator;
 use CetechDeliveryEngine\Application\Configuration\HardFulfilmentConstraintService;
@@ -190,6 +191,44 @@ final class EcrRuntimeParityAndFingerprintTest extends TestCase {
 
 		$intent['configuration_fingerprint'] = 'changed';
 		self::assertNotSame( $hash1, CartDeliverySelectionFingerprint::fromIntent( $intent ) );
+	}
+
+	public function test_session_normalize_preserves_ecr_configuration_fingerprint_for_hash_parity(): void {
+		$intent = [
+			'contract_version'          => '1',
+			'product_id'                => 39705,
+			'variation_id'              => null,
+			'target_type'               => 'product',
+			'target_id'                 => 39705,
+			'display_key'               => 'in_warehouse:delivery:1',
+			'fulfilment_availability'   => 'in_warehouse',
+			'fulfilment_choice'         => 'delivery',
+			'delivery_offer_id'         => 1,
+			'rule_id'                   => null,
+			'issued_at'                 => '2026-08-10T23:12:55+00:00',
+			'configuration_fingerprint' => '48ca598548faf968808c0a6df8db9fb481a54b17e61255006672400a229f4734',
+		];
+
+		$captured_hash = CartDeliverySelectionFingerprint::fromIntent( $intent );
+		$normalized    = CartDeliverySelectionSessionData::normalizeIntent( $intent );
+
+		self::assertNotNull( $normalized );
+		self::assertArrayHasKey( 'configuration_fingerprint', $normalized );
+		self::assertSame(
+			'48ca598548faf968808c0a6df8db9fb481a54b17e61255006672400a229f4734',
+			$normalized['configuration_fingerprint']
+		);
+		self::assertSame(
+			$captured_hash,
+			CartDeliverySelectionFingerprint::fromIntent( $normalized )
+		);
+
+		$legacy = $intent;
+		unset( $legacy['configuration_fingerprint'] );
+		$legacy_normalized = CartDeliverySelectionSessionData::normalizeIntent( $legacy );
+		self::assertNotNull( $legacy_normalized );
+		self::assertArrayNotHasKey( 'configuration_fingerprint', $legacy_normalized );
+		self::assertCount( 7, CartDeliverySelectionFingerprint::fingerprintParts( $legacy_normalized ) );
 	}
 
 	public function test_legacy_fingerprint_unchanged_without_ecr_component(): void {
