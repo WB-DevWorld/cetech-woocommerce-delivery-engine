@@ -146,6 +146,14 @@ cetech-woocommerce-delivery-engine/vendor/autoload.php
 ```
 
 3. Confirm **no** `.git` inside the archive.
+4. The build script runs `scripts/verify-production-package-autoload.php` against the staging copy after `composer install --no-dev`. That gate confirms:
+   - `ConfigurationHealthChecker` autoloads from `Application\Diagnostics`
+   - `Plugin.php` imports that class (prevents Bootstrap namespace collision)
+   - boot factory short-class references have imports
+   - schema target `3` and ECR cutover flag default OFF
+   - PHPUnit is **not** present in production `vendor/`
+
+Staging always rebuilds production `vendor/` (repo `vendor/` is not copied).
 
 ---
 

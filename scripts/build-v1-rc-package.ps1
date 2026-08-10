@@ -98,11 +98,12 @@ New-Item -ItemType Directory -Path $DistDir -Force | Out-Null
 
 $ExcludeDirNames = @(
     '.git', '.github', 'dist', 'build', 'node_modules', 'tests', 'coverage',
-    '.vscode', '.idea', '.cursor'
+    '.vscode', '.idea', '.cursor', 'vendor'
 )
 
 $ExcludeFilePatterns = @(
-    '*.zip', '*.log', '.env', '.env.local', '.DS_Store', 'Thumbs.db', 'desktop.ini'
+    '*.zip', '*.log', '.env', '.env.local', '.DS_Store', 'Thumbs.db', 'desktop.ini',
+    'phpunit.xml', 'phpunit-baseline.txt'
 )
 
 Write-Step 'Copying plugin files into staging folder'
@@ -134,29 +135,41 @@ if (Test-Path $WoodmartPath) {
 }
 
 $VendorAutoload = Join-Path $StagePluginDir 'vendor/autoload.php'
-if (-not (Test-Path $VendorAutoload)) {
-    if (-not (Test-Path (Join-Path $StagePluginDir 'composer.json'))) {
-        throw 'composer.json missing in staging copy.'
-    }
-    if (-not (Test-CommandExists 'composer')) {
-        throw 'vendor/autoload.php is required but Composer is not available. Install Composer and retry.'
-    }
+if (-not (Test-Path (Join-Path $StagePluginDir 'composer.json'))) {
+    throw 'composer.json missing in staging copy.'
+}
+if (-not (Test-CommandExists 'composer')) {
+    throw 'vendor/autoload.php is required but Composer is not available. Install Composer and retry.'
+}
 
-    Write-Step 'Running composer install in staging copy only (no dev, optimized autoload)'
-    Push-Location $StagePluginDir
-    try {
-        & composer install --no-dev --optimize-autoloader --no-interaction
-        if ($LASTEXITCODE -ne 0) {
-            throw 'composer install failed in staging copy'
-        }
+# Always rebuild production vendor in staging (never ship repo/dev vendor with PHPUnit).
+if (Test-Path (Join-Path $StagePluginDir 'vendor')) {
+    Remove-Item -LiteralPath (Join-Path $StagePluginDir 'vendor') -Recurse -Force
+}
+
+Write-Step 'Running composer install in staging copy only (no dev, optimized autoload)'
+Push-Location $StagePluginDir
+try {
+    & composer install --no-dev --optimize-autoloader --no-interaction
+    if ($LASTEXITCODE -ne 0) {
+        throw 'composer install failed in staging copy'
     }
-    finally {
-        Pop-Location
-    }
+}
+finally {
+    Pop-Location
 }
 
 if (-not (Test-Path $VendorAutoload)) {
     throw 'vendor/autoload.php still missing after composer install.'
+}
+
+$VerifyScript = Join-Path $RepoRoot 'scripts/verify-production-package-autoload.php'
+if (Test-Path $VerifyScript) {
+    Write-Step 'Running production package autoload/boot verification'
+    & php $VerifyScript $StagePluginDir
+    if ($LASTEXITCODE -ne 0) {
+        throw 'Production package verification failed.'
+    }
 }
 
 Write-Step 'Validating staged structure'

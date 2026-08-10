@@ -5,13 +5,13 @@
 **Last updated:** 2026-08-10  
 **Plugin version:** `1.0.0-rc.1`  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `master` — Stage 0B verified at `31fc016`; Stage 1 COMPLETE at `2f0be59`; Stage 2 COMPLETE at `2a3b07b`; Stage 3 COMPLETE at `6549b97`; Stage 4 COMPLETE at `0063b09`; Stage 5A Simple Runtime ECR Integration follows  
+**Git:** `master` — Stage 0B verified at `31fc016`; Stage 1 COMPLETE at `2f0be59`; Stage 2 COMPLETE at `2a3b07b`; Stage 3 COMPLETE at `6549b97`; Stage 4 COMPLETE at `0063b09`; Stage 5A COMPLETE; Stage 5B blocked then locally repaired for bootstrap wiring  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
 This handoff remains the **product vision and domain source of truth**. Much of the document describes the full intended engine (including shipment records and customer tracking). **Only the V1 RC scope below is implemented in code today.** Do not assume later sections are already built.
 
-### Stage 0B / Stage 1 / Stage 2 / Stage 3 / Stage 4 / Stage 5A status
+### Stage 0B / Stage 1 / Stage 2 / Stage 3 / Stage 4 / Stage 5A / Stage 5B status
 
 | Item | Status |
 |------|--------|
@@ -21,21 +21,25 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 3 EffectiveConfigurationResolver | **COMPLETE** — artifact `docs/STAGE-3-EFFECTIVE-CONFIGURATION-RESOLVER.md` |
 | Stage 4 Admin inheritance UX + preview | **COMPLETE** — artifact `docs/STAGE-4-ADMIN-INHERITANCE-UX.md` |
 | Stage 5A Simple-product ECR runtime integration | **COMPLETE** — artifact `docs/STAGE-5A-SIMPLE-RUNTIME-ECR-INTEGRATION.md` (local only; flag default OFF) |
+| Stage 5B-1 original package | **FAILED** real WordPress boot — SHA-256 `973c0209…e4cc`; fatal `Bootstrap\ConfigurationHealthChecker` not found |
+| Stage 5B FLAIROC recovery | Plugin renamed to `…stage5b-disabled`; wp-admin recovered; Delivery Engine not executing |
+| Stage 5B bootstrap repair | **LOCAL FIX** — missing Diagnostics import in `Plugin.php`; boot-graph + package autoload gates added |
+| Stage 5B-2 deployment safety verification | **NOT STARTED** |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |
 | New admin UX | Global/Product/Variation scoped editors + effective preview; pre-cutover notice |
-| Runtime cutover flag | `enable_effective_configuration_runtime` **defaults OFF** — storefront remains legacy unless explicitly enabled |
+| Runtime cutover flag | `enable_effective_configuration_runtime` **defaults OFF** — keep OFF on redeploy until Stage 5B-2 |
 | Legacy storage | `product_delivery_rules` remains default authoritative path while cutover flag OFF |
-| Runtime on FLAIROC | Still **OFF** / **not deployed** for Stages 2–5A |
+| Runtime on FLAIROC | Delivery Engine currently filesystem-disabled after failed Stage 5B package; ECR **not** live-tested |
 | Variable runtime capture | **Not implemented** (Stage 6) |
 | Shipments / tracking / timeline | **Not implemented** |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Stage 5 **compatibility route** (category winners stay on legacy source) |
-| Next stage | **Stage 5B** — Controlled FLAIROC deployment + simple-product ECR parity verification |
-| Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual warning on FLAIROC |
+| Next stage | Human redeploy **fixed** Stage 5B package with all runtime flags OFF → restart Stage 5B-2 |
+| Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual; `ProductDeliverySelectionValidator` undefined `error_code` warning (secondary) |
 | Stage 1 HPOS debt | **DEFERRED** (`countOrderSnapshotReferences` postmeta); non-numeric rate→0 **FIXED** in Stage 5A |
 
-Do **not** begin Stage 5B or Stage 6 unless explicitly tasked. Do **not** deploy FLAIROC without Stage 5B approval.
+Do **not** begin Stage 6 unless explicitly tasked. Do **not** enable FLAIROC ECR runtime until Stage 5B-2 passes with flags controlled.
 
 ### Companion docs (implementation)
 
@@ -56,6 +60,7 @@ Do **not** begin Stage 5B or Stage 6 unless explicitly tasked. Do **not** deploy
 | `docs/STAGE-3-EFFECTIVE-CONFIGURATION-RESOLVER.md` | Stage 3 effective configuration resolver completion record |
 | `docs/STAGE-4-ADMIN-INHERITANCE-UX.md` | Stage 4 admin inheritance UX + effective preview completion record |
 | `docs/STAGE-5A-SIMPLE-RUNTIME-ECR-INTEGRATION.md` | Stage 5A simple-product ECR runtime integration (local; flag default OFF) |
+| `docs/STAGE-5B-FLAIROC-DEPLOYMENT-VERIFICATION.md` | Stage 5B FLAIROC deployment incident + verification record |
 | `docs/Delivery Shipping Plugin Up-To-Date Design and Expectations.md` | Latest intended product / end-state design |
 
 ### What has been accomplished

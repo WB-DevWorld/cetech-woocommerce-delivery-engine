@@ -63,4 +63,28 @@ if ( ! function_exists( 'wp_json_encode' ) ) {
 	}
 }
 
+if ( ! function_exists( 'trailingslashit' ) ) {
+	function trailingslashit( string $value ): string {
+		return rtrim( $value, "/\\" ) . '/';
+	}
+}
+
+if ( ! function_exists( 'untrailingslashit' ) ) {
+	function untrailingslashit( string $value ): string {
+		return rtrim( $value, "/\\" );
+	}
+}
+
+if ( ! function_exists( 'plugin_dir_path' ) ) {
+	function plugin_dir_path( string $file ): string {
+		return trailingslashit( dirname( $file ) );
+	}
+}
+
+if ( ! function_exists( 'plugin_basename' ) ) {
+	function plugin_basename( string $file ): string {
+		return basename( dirname( $file ) ) . '/' . basename( $file );
+	}
+}
+
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
