@@ -1,5 +1,116 @@
 # Reusable WooCommerce Delivery & Fulfilment Engine
 
+## CURRENT IMPLEMENTATION STATUS — V1 RC (read first)
+
+**Last updated:** 2026-08-10  
+**Plugin version:** `1.0.0-rc.1`  
+**Schema target:** `2` (`cetech_de_db_version`)  
+**Git:** `master` — clean working tree; remote `origin/master`  
+**Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
+**Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
+
+This handoff remains the **product vision and domain source of truth**. Much of the document describes the full intended engine (including shipment records and customer tracking). **Only the V1 RC scope below is implemented in code today.** Do not assume later sections are already built.
+
+### Companion docs (implementation)
+
+| Doc | Role |
+|-----|------|
+| `docs/PROJECT-RULES.md` | Hard engineering rules derived from this handoff |
+| `docs/ARCHITECTURE-PLAN.md` | Modular-monolith architecture |
+| `docs/PHASE-1A-IMPLEMENTATION.md` … `docs/PHASE-2H4-IMPLEMENTATION.md` | Phase completion notes |
+| `docs/V1-RC-RELEASE-NOTES.md` | RC scope summary |
+| `docs/V1-RC-FLAG-MATRIX.md` | Feature-flag defaults and enablement order |
+| `docs/V1-RC-SMOKE-TEST-CHECKLIST.md` | Staging gate before promoting RC |
+| `docs/V1-RC-PACKAGING-GUIDE.md` | Private ZIP build (`scripts/build-v1-rc-package.ps1`) |
+
+### What has been accomplished
+
+V1 RC delivers a **feature-flagged** path from admin configuration through paid-order delivery visibility. All customer/runtime flags default **off**.
+
+| Area | Status |
+|------|--------|
+| Core bootstrap, migrations, System Status, capabilities, uninstall policy | Done (Phases 1A–1B) |
+| Config schema + admin CRUD (offers, zones/rules, logistics profiles, suppliers/origins, pickup locations, rate cards, audit log) | Done (Phases 2A–2B5) |
+| Product delivery rules + resolver (variation → product → category) | Done (Phases 2C1–2C3); schema target `2` |
+| Product-page delivery selector (public-safe; simple products) | Done (Phases 2D1–2D3) |
+| Cart selection capture + session/revalidation hardening | Done (Phases 2E1–2E2) |
+| Checkout delivery selection validation | Done (Phase 2F1) |
+| Rate quote engine + WC shipping method `delivery_engine_selected_offer` (label **Delivery**) | Done (Phases 2G1–2G2) |
+| Protected order delivery snapshots + admin order display | Done (Phases 2H1–2H2) |
+| Customer thank-you / My Account delivery summary | Done (Phase 2H3) |
+| Customer order email delivery summary | Done (Phase 2H4) |
+| V1 RC packaging, admin UX polish, guarded admin deletes | Done (post-2H4 RC commits) |
+
+**Canonical V1 runtime pipeline (implemented):**
+
+```text
+Product rule → Delivery offers → Product selector → Cart capture
+→ Checkout validation → Rate quote + WC shipping method
+→ Protected order snapshot → Admin display / customer summary / email
+```
+
+**Database tables present** (`{$wpdb->prefix}delivery_engine_*`):  
+`delivery_offers`, `destination_zones`, `destination_rules`, `logistics_profiles`, `suppliers`, `origins`, `pickup_locations`, `rate_cards`, `rate_card_rules`, `audit_log`, `product_delivery_rules`.
+
+**Not created yet:** `shipments`, `shipment_items`, `shipment_events`.
+
+### Runtime feature flags (defaults)
+
+Enable only after admin configuration is complete, in this order:
+
+1. `enable_product_delivery_selector`
+2. `enable_cart_delivery_selection_capture`
+3. `enable_checkout_delivery_selection_validation`
+4. `enable_woocommerce_shipping_rate_calculation`
+5. `enable_order_delivery_snapshot_persistence`
+6. `enable_customer_order_delivery_summary` (optional)
+7. `enable_customer_email_delivery_summary` (optional)
+
+Reserved flags with **no V1 runtime behaviour** (keep off): `enable_shipment_records`, `enable_tracking_links`, `enable_customer_timeline`.  
+Blocks checkout adapter flag exists but is off / unwired. Code: `src/Bootstrap/FeatureFlags.php`.
+
+### Explicitly not implemented in V1 RC
+
+- Shipment records, staff shipment workspace, tracking timelines / numbers
+- Carrier APIs / live freight quotes
+- Driver app, OTP, QR, GPS, proof-of-delivery
+- Automatic order completion from delivery events
+- Public REST / Store API exposure
+- WooCommerce Blocks checkout support
+- Variable-product delivery **capture** (deferred; simple products first)
+- Real WPML / WCML / WoodMart / WCFM / VitePOS adapters (detection / Null stubs only)
+
+### Hard invariants (already enforced in V1 code — preserve them)
+
+- Server-side authority; no silent offer replacement
+- Missing rate card or unresolved destination zone → **no free / $0 shipping**
+- Customer surfaces show public labels and estimates only — never supplier, origin, logistics profile names, rate-card IDs, or selection hashes
+- Snapshots use protected `_cetech_de_*` meta; HPOS via WooCommerce CRUD
+- Flags default off; activation must not take over the storefront
+- Deployments require Composer `vendor/` (or a packaged ZIP that includes it)
+
+### Known V1 limitations
+
+- Variable product capture deferred (selector may notice; test simple products first)
+- Mixed-cart line quotes may differ from WooCommerce shipping line total
+- Classic checkout only
+- Do not promote RC beyond staging until `docs/V1-RC-SMOKE-TEST-CHECKLIST.md` passes
+
+### Sensible next work after V1 RC
+
+1. Complete staging smoke checklist and promote / tag only after pass
+2. Variable-product delivery capture
+3. Post-V1: shipment records + staff updates + customer tracking (reserved flags)
+4. Optional real integration adapters; Blocks checkout if required later
+
+### Agent orientation
+
+- Prefer incremental, flag-gated changes matching existing `PHASE-*-IMPLEMENTATION.md` docs
+- When this status block and later visionary sections diverge, **code + phase docs win for what exists**; this handoff still wins for product rules and V1 exclusions
+- After coding: note changed files, privacy/shipping risks, and which smoke-checklist rows to re-run
+
+---
+
 ## Complete AI Handoff — Part 1: Purpose, Scope, Principles, Terminology, and Customer Experience
 
 ## 1. Project identity and operating boundary
@@ -8173,9 +8284,11 @@ Do not deploy directly to production without staging and pilot testing.
 
 ## 28. Final instruction to any AI or developer
 
+**First read:** [CURRENT IMPLEMENTATION STATUS — V1 RC](#current-implementation-status--v1-rc-read-first) at the top of this file. That block is the living map of what is already in code vs still future.
+
 Treat this as a delivery-domain project.
 
-Build this flow:
+Full intended flow (vision):
 
 ```text
 WooCommerce Product/Variation
@@ -8190,6 +8303,8 @@ WooCommerce Product/Variation
 → Staff Shipment Updates
 → Customer Shipment Timeline
 ```
+
+**As of `1.0.0-rc.1`:** the path through order delivery snapshot + customer/email summaries is implemented behind feature flags. Shipment records, staff shipment updates, and customer shipment timeline are **not** implemented yet.
 
 Keep operational logic private.
 
