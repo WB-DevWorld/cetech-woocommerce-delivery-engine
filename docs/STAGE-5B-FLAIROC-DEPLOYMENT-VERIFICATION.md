@@ -4,18 +4,21 @@
 **Plugin version:** `1.0.0-rc.1` (unchanged)  
 **Schema target:** `3` (unchanged)  
 **Date opened:** 2026-08-10  
-**Last updated:** 2026-08-10 (admin false-product / validator contract repair; replacement package prepared)
+**Last updated:** 2026-08-10 (Stage 5B-2 after repaired ZIP install — agent partial verification; BLOCKED on admin/schema)
 
 ---
 
 ## 1. Current verdict
 
-**Stage 5B-2: NOT COMPLETE — awaiting repaired ZIP redeploy**
+**Stage 5B-2: BLOCKED**
 
-Confirmed FLAIROC fatals from the original `d5fefa2` Stage 5B package and a subsequent admin preview fatal have been repaired **locally**.  
-FLAIROC was **not** modified during the repair session. The failed Delivery Engine remains filesystem-disabled. ECR was **never** enabled.
+Repaired package is **active** on FLAIROC (`1.0.0-rc.1`). Public/REST health is green. **Dormant storefront PASS** on `#39705` / `#37054` / `#39589` (no Delivery Engine customer UI). COD OFF. Order `#39706` shipping/snapshot unchanged at **25.00 / 25.0000**. Code Snippets not executing.
 
-Next human action: install `cetech-woocommerce-delivery-engine-stage5b-repaired.zip`, keep all runtime flags OFF, then restart Stage 5B-2 from the beginning.
+Agent **cannot** complete required schema / Stage 4 admin / Effective Preview / PHP-log / direct flag-option readback because Cloudflare returns **403** on all `wp-admin` HTML probes (Application Password does not unlock cookie admin HTML). No Delivery Engine options REST exists.
+
+ECR was **not** enabled. Stage 5B-3 was **not** started.
+
+**Single next corrective task:** Human administrator completes the Stage 4 admin + schema checklist in wp-admin (see §7) and reports results (or temporarily allowlists agent HTML access to `wp-admin`).
 
 ---
 
@@ -29,9 +32,8 @@ Class "CetechDeliveryEngine\Bootstrap\ConfigurationHealthChecker" not found
 in src/Bootstrap/Plugin.php:416
 ```
 
-- **Root cause:** missing `use Application\Diagnostics\ConfigurationHealthChecker` import → unqualified class resolved under `Bootstrap\`.
-- **Recovery:** administrator filesystem-disabled the plugin; wp-admin recovered.
-- **Local fix:** already landed in `325e252` (preserved; not reimplemented).
+- **Root cause:** missing Diagnostics import.
+- **Local fix:** `325e252` (preserved).
 
 ### Fatal #1 — Effective Configuration Preview (~21:05 UTC)
 
@@ -41,19 +43,16 @@ Call to a member function get_category_ids() on false
 in src/Presentation/Admin/EffectiveConfigurationPreviewPage.php:308
 ```
 
-- **Root cause:** `wc_get_product()` returns `false` on miss; code guarded only `null === $product`.
-- **Trigger:** preview with positive nonexistent/unavailable product ID.
-- **Claude comparison:** Claude tree identical for this file — **no Fatal #1 fix**. Claude HealthChecker import matched canonical `325e252` repair. Claude shipping/package-split WIP explicitly **rejected** from this repair.
+- **Root cause:** `wc_get_product()` returns `false`; null-only guard.
+- **Local fix:** `4e8f503`.
 
 ### Warning — selector validator (~14:55 UTC)
 
 ```text
 Undefined array key "error_code"
-in src/Application/Selector/ProductDeliverySelectionValidator.php:72
 ```
 
-- **Root cause:** success path of `resolve_product_context()` omitted `error_code` while caller assumed the key.
-- **Repair:** success now returns `error_code` / `error_message` as `null`.
+- **Local fix:** `4e8f503` (success context now includes `error_code => null`).
 
 ---
 
@@ -70,177 +69,113 @@ in src/Application/Selector/ProductDeliverySelectionValidator.php:72
 
 ---
 
-## 3. Failed deployment incident (authoritative history)
+## 3. Failed deployment + recovery (history)
 
-Approximate time: **10-Aug-2026 18:12:30 UTC**
-
-### Observed behavior
-
-1. Human administrator installed/replaced the Stage 5B-1 ZIP on FLAIROC.
-2. Frontend initially appeared to survive.
-3. **wp-admin entered WordPress critical error state** on every admin/plugin boot request.
-4. Administrator recovered wp-admin by renaming the plugin directory to:
-
-   `cetech-woocommerce-delivery-engine.stage5b-disabled`
-
-5. FLAIROC returned to healthy operation with Delivery Engine **not executing**.
-
-### Exact boot fatal (repaired later)
-
-```text
-PHP Fatal error: Uncaught Error:
-Class "CetechDeliveryEngine\Bootstrap\ConfigurationHealthChecker" not found
-in src/Bootstrap/Plugin.php:416
-```
-
-Root cause: **MISSING IMPORT / WRONG NAMESPACE** — real class is `Application\Diagnostics\ConfigurationHealthChecker`.
+1. Human installed Stage 5B-1 ZIP (`d5fefa2`).
+2. wp-admin critical error on plugin boot (Fatal #2).
+3. Plugin filesystem-disabled → wp-admin recovered.
+4. Later Fatal #1 observed on Effective Preview with invalid product.
+5. Local repairs: `325e252` then `4e8f503`.
+6. Human installed repaired ZIP `cetech-woocommerce-delivery-engine-stage5b-repaired.zip`.
 
 ---
 
-## 4. Historical log separation (do not misdiagnose)
+## 4. Historical log separation
 
 | Log cluster | Approx time | Nature | Stage 5B relevance |
 |-------------|-------------|--------|--------------------|
-| `RateCardRepositoryInterface` not registered | ~14:35 UTC | Code Snippets `eval()` path | Stage 0B history |
-| `ProductDeliverySelectionValidator.php:72` Undefined array key `error_code` | ~14:55 UTC | Success-path array key assumption | **Fixed in admin harden repair** |
-| `ConfigurationHealthChecker` class not found | ~18:12 UTC | Plugin boot / AdminMenu DI | Fixed by `325e252` |
-| `get_category_ids()` on false | ~21:05 UTC | Effective preview invalid product | **Fixed in admin harden repair** |
+| `RateCardRepositoryInterface` not registered | ~14:35 UTC | Code Snippets `eval()` | Stage 0B history |
+| `error_code` undefined key | ~14:55 UTC | Validator contract | Fixed in `4e8f503` |
+| `ConfigurationHealthChecker` not found | ~18:12 UTC | Boot DI | Fixed in `325e252` |
+| `get_category_ids()` on false | ~21:05 UTC | Preview invalid product | Fixed in `4e8f503` |
+
+Agent could **not** read live PHP logs this session (no public debug.log; no SSH). Fresh-log recurrence for admin fatals is therefore **NOT AGENT-VERIFIED** (requires human log check after admin smoke).
 
 ---
 
-## 5. Corrective repairs (local)
-
-### 5.1 Bootstrap HealthChecker (`325e252`)
+## 5. Repair artifacts
 
 | Item | Detail |
 |------|--------|
-| Fix | `use CetechDeliveryEngine\Application\Diagnostics\ConfigurationHealthChecker;` in `Plugin.php` |
-| Runtime repair commit | `325e25232e5551016fa9a076c064212bdeaa11d7` |
-| Intermediate fixed artifact | `cetech-woocommerce-delivery-engine-stage5b-fixed.zip` |
-| Intermediate SHA-256 | `b21398ee9e7a5780a2b7df3933492701f5f9aee340f2aca51f49f71564b3cf3f` |
-
-### 5.2 Admin false-product + validator contract (this repair)
-
-| Item | Detail |
-|------|--------|
-| Fatal #1 | `instanceof \WC_Product` guards; invalid product admin warning; no misleading preview |
-| Siblings | `ScopedConfigurationPage`, `ProductTargetResolver`, `ProductVariationScopeGuard`, related application helpers |
-| Validator | Always returns `error_code` / `error_message` (`null` on success) |
-| HealthChecker | Verified preserved from `325e252` (no competing rewrite) |
-| Claude shipping WIP | Explicitly **not** imported |
-| Repair commit | `4e8f5031030ec4064ca570e748f0f025aa19800c` |
-| Replacement artifact | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-stage5b-repaired.zip` |
-| Replacement bytes | `634795` |
-| Replacement SHA-256 | `1d672dae1743bc46c497fa4de2d1e44d3cce5df7faafe84df166efca058ca59a` |
-| Differs from failed `973c0209…e4cc` | **YES** |
+| Bootstrap repair | `325e252` |
+| Admin harden repair | `4e8f5031030ec4064ca570e748f0f025aa19800c` |
+| Docs checksum follow-up | `2a49dbd` |
+| Repaired ZIP | `cetech-woocommerce-delivery-engine-stage5b-repaired.zip` |
+| Repaired SHA-256 | `1d672dae1743bc46c497fa4de2d1e44d3cce5df7faafe84df166efca058ca59a` |
+| Bytes | `634795` |
 
 ---
 
-## 6. Stage 5B-2 repaired-deployment attempt (2026-08-10 ~20:30–20:35 UTC)
+## 6. Stage 5B-2 agent verification (2026-08-10 ~22:35–22:37 UTC)
 
-Human administrator installed the intermediate fixed package and confirmed storefront + wp-admin load.  
-Agent verification restarted from the beginning (read-only; no ECR enablement).
+Authenticated REST Application Password probe: **HTTP 200**.
 
-### 6.1 Repository / package identity
-
-| Item | Value |
-|------|-------|
-| Branch | `master` (clean) |
-| HEAD | `fb08e71` (docs follow-up); runtime repair ancestor `325e252` |
-| Fixed ZIP SHA-256 | **MATCH** expected `b21398ee…b3cf3f` |
-| Local PHPUnit | 10.5.64 — **104 tests / 398 assertions / 0 failures** |
-| Package verifier | OK against extracted fixed ZIP |
-
-### 6.2 Bootstrap repair live signals
+### 6.1 Site / plugin health
 
 | Check | Result |
-|-------|--------|
-| Storefront HTTP | **200** — no critical-error death page |
-| `wp-json` | **200** |
-| Authenticated REST `posts?context=edit` | **200** |
-| `ConfigurationHealthChecker` fatal recurrence | **NOT OBSERVED** on checked surfaces |
-| AdminMenu / SystemStatusPage | Human: wp-admin loads; agent cannot HTML-smoke admin (Cloudflare 403 on `wp-login.php`) |
-
-### 6.3 Site / plugin health
-
-| Check | Result |
-|-------|--------|
-| Delivery Engine active | **YES** — `cetech-woocommerce-delivery-engine/…` **active** `1.0.0-rc.1` |
+|------|--------|
+| Storefront `GET /intl/` | **200** |
+| `GET /intl/wp-json/` | **200** |
+| Authenticated `wp/v2/posts?context=edit` | **200** |
+| Delivery Engine plugin | **active** `cetech-woocommerce-delivery-engine/…` `1.0.0-rc.1` |
 | Active DE copies | **1** |
-| Residual failed copy | Earlier REST listing showed inactive `.stage5b-disabled`; later listing **no longer present** (human cleanup likely) |
-| Code Snippets | `code-snippets.disabled/code-snippets` **inactive** (not executing) |
-| Stage 0B bridge routes | **404 / absent** |
+| Code Snippets | `code-snippets.disabled/code-snippets` **inactive** |
 | COD | **DISABLED** |
+| Final recheck storefront/REST/auth | **200 / 200 / 200** |
 
-### 6.4 Historical order / commerce read-only
+### 6.2 Dormant storefront (PASS)
+
+| Product | HTTP | DE selector / unavailable notice | ATC / variations | Verdict |
+|---------|------|----------------------------------|------------------|---------|
+| `#39705` QA simple | 200 | Absent | Add to cart present | PASS |
+| `#37054` normal simple | 200 | Absent | Add to cart present | PASS |
+| `#39589` variable | 200 | Absent | Variations form present | PASS |
+
+Contrast with prior intermediate-fixed Stage 5B-2 attempt: `#37054` previously showed DE selector UI (flags ON). **No longer present.**
+
+### 6.3 Historical order / QA rate evidence
 
 | Check | Result |
-|-------|--------|
+|------|--------|
 | Order `#39706` shipping | **25.00** |
-| Protected snapshot amount | **25.0000** (`_cetech_de_delivery_quote_snapshot`) |
-| Order mutation | **NONE** |
+| Protected package snapshot amount | **25.0000** |
+| Line snapshot `rate_card_code` | `flairoc_qa_rate_card` |
+| Order mutation this session | **NONE** |
+| Live admin read of rate card row | **NOT AVAILABLE VIA REST** (shipping zone methods empty via WC REST; no DE rate-card endpoint) |
 
-### 6.5 Dormant storefront (mandatory)
+### 6.4 Runtime flags
 
-| Product | HTTP | DE selector UI | Verdict |
-|---------|------|----------------|---------|
-| `#39705` QA simple | 200 | Absent (resolution likely fail-closed silent) | PASS for UI absence |
-| `#37054` normal simple | 200 | **Present** — notice “Delivery options are not available for this product.” inside `form.cart` before quantity | **FAIL** |
-| `#39589` variable | 200 | Absent | PASS |
+| Flag | Agent-observed state |
+|------|----------------------|
+| `enable_product_delivery_selector` | **Inferred OFF** (no storefront selector UI) — direct option **NOT READABLE** |
+| `enable_cart_delivery_selection_capture` | **Inferred OFF** — direct option **NOT READABLE** |
+| `enable_effective_configuration_runtime` | **Not enabled by this task**; direct option **NOT READABLE**; source default remains false |
+| Other reserved/customer runtime flags | **NOT READABLE via REST** (`wp/v2/settings` has no `cetech_*` keys; no DE options API) |
 
-**Architectural implication of `#37054` markup:**
-
-- Hook location `woocommerce_before_add_to_cart_button` ⇒ `enable_cart_delivery_selection_capture` **ON**
-- Renderer registered ⇒ `enable_product_delivery_selector` **ON**
-- Notice-only (no radios) ⇒ resolution success with empty options
-
-**DORMANT STOREFRONT = FAIL**
-
-Cache headers on product HTML: Cloudflare `DYNAMIC` / `no-store` — not explained as a stale HTML cache hit.
-
-### 6.6 Runtime flags
-
-| Flag | State |
-|------|-------|
-| `enable_product_delivery_selector` | **ON** (proven by live storefront markup) |
-| `enable_cart_delivery_selection_capture` | **ON** (proven by hook placement inside cart form) |
-| `enable_effective_configuration_runtime` | Not directly readable via REST; **must remain OFF**; not enabled by this task |
-| Other customer/runtime/reserved flags | **NOT READABLE via REST** (no DE options API; Cloudflare blocks wp-admin settings HTML for agent) |
-
-Agent could **not** turn flags OFF: Application Password does not unlock wp-admin HTML; Cloudflare challenges `wp-login.php`.
-
-### 6.7 Schema / migration / Stage 4 admin / preview
+### 6.5 Schema / migration / Stage 4 admin / preview
 
 | Area | Agent result |
 |------|--------------|
-| `cetech_de_db_version` | **NOT VERIFIED** (no DE REST; CF blocks admin) |
-| v3 scoped tables | **NOT VERIFIED** |
+| `cetech_de_db_version` | **NOT VERIFIED** |
+| v3 tables | **NOT VERIFIED** |
 | Legacy `product_delivery_rules` | **NOT VERIFIED** live |
 | Shipment tables absent | **NOT VERIFIED** live |
 | `#39705` migration backfill | **NOT VERIFIED** live |
 | Category quarantine | **NOT OBSERVED** live |
-| Stage 4 Global/Product/Variation/Preview smoke | **NOT EXECUTED** (CF blocks wp-admin HTML) |
-| QA rate card `flairoc_qa_rate_card` admin value | **NOT AVAILABLE VIA REST** |
-| No-op save | **NOT EXECUTED** |
-| Audit read-only | **NOT EXECUTED** (admin) |
+| Stage 4 Global/Product/Variation/Preview | **NOT EXECUTED** — all `wp-admin/admin.php?page=cetech-*` probes **Cloudflare 403** |
+| Invalid product preview regression | **NOT EXECUTED** (same CF block) |
+| HealthChecker boot recurrence via logs | **NOT AGENT-VERIFIED** (no log access) |
+| Validator `error_code` warning live | **NOT RUNTIME-EXERCISED IN THIS FLAG-OFF STAGE** (local regression tests cover contract) |
+| No-op save | **NO-OP SAVE NOT EXECUTED — mutation risk avoided / admin unreachable** |
 
-Note: failed Stage 5B package likely ran `MigrationRunner` on boot before AdminMenu fatal; schema may already be `3`, but Stage 5B-2 still requires explicit verification after flags are corrected.
-
-### 6.8 Rate safety / privacy (static)
+### 6.6 Rate safety / privacy (static)
 
 | Check | Result |
-|-------|--------|
-| `RateCardAmountFormatter` + fail-closed quote path | Present in repaired package / source; package verifier OK |
-| Customer projection privacy (static) | Summary renderers remain flag-gated; no supplier/origin/fingerprint exposure in customer summary renderer surface reviewed |
-
-### 6.9 Secondary warning
-
-| Item | Result |
 |------|--------|
-| `ProductDeliverySelectionValidator` undefined `error_code` | Observed historically; **fixed in admin harden repair** |
-| Disposition | Closed by contract repair + regression tests |
+| `RateCardAmountFormatter` + fail-closed quote path | Present in repository/repair package source; local PHPUnit green |
+| Live ECR privacy | **N/A** — ECR OFF; deferred to Stage 5B-3 |
 
-### 6.10 What this task did NOT do
+### 6.7 What this task did NOT do
 
 - Did **not** enable ECR or any runtime flag
 - Did **not** place orders / alter `#39706` / alter QA rate / alter products
@@ -248,27 +183,28 @@ Note: failed Stage 5B package likely ran `MigrationRunner` on boot before AdminM
 - Did **not** modify Redis / Nginx / Cloudflare
 - Did **not** begin Stage 5B-3
 
+### 6.8 Local automated checks
+
+| Check | Result |
+|------|--------|
+| PHPUnit | **10.5.64** — **113 tests / 435 assertions / 0 failures** |
+| `composer validate --no-check-publish` | valid |
+| Production package verifier against repo `vendor/` | expected fail (dev PHPUnit present); repaired ZIP previously verified OK at build time |
+
 ---
 
 ## 7. Blocker (single corrective task)
 
-**Human administrator must:**
+**Human administrator must open wp-admin and complete the remaining Stage 5B-2 checklist**, then report back:
 
-1. Replace the disabled/failed Stage 5B build with **`cetech-woocommerce-delivery-engine-stage5b-repaired.zip`**.
-2. Open Delivery Engine → Settings and set **ALL** customer/runtime flags **OFF**, including at minimum:
+1. Confirm Delivery Engine → System Status / schema shows `cetech_de_db_version = 3` and v3 tables exist; legacy tables preserved; shipment tables absent.
+2. Confirm Delivery Settings flag table: **all** customer/runtime flags **OFF**, including `enable_effective_configuration_runtime`.
+3. Smoke Stage 4 pages: Global / Product `#39705` / Variation (if available) / Effective Preview — no fatal.
+4. Effective Preview regression: empty product (no fatal); nonexistent product ID → “Select a valid product” (no critical error); `#39705` preview loads.
+5. After those requests, confirm PHP log has **no fresh** `ConfigurationHealthChecker` / `get_category_ids() on false` fatals (historical ~18:12 / ~21:05 entries are old).
+6. Confirm QA rate card `flairoc_qa_rate_card` amount **25.00** in admin.
 
-- `enable_product_delivery_selector`
-- `enable_cart_delivery_selection_capture`
-- `enable_checkout_delivery_selection_validation`
-- `enable_woocommerce_shipping_rate_calculation`
-- `enable_order_delivery_snapshot_persistence`
-- `enable_customer_order_delivery_summary`
-- `enable_customer_email_delivery_summary`
-- `enable_effective_configuration_runtime`
-- shipment / tracking / timeline / blocks / other reserved runtime flags
-
-3. Confirm product `#37054` no longer renders `cetech-de-product-delivery-selector`.
-4. Re-run Stage 5B-2 from the beginning (schema 3, migration, Stage 4 admin smoke, **Effective Preview with valid + invalid product IDs**, flags table readback).
+Until that human evidence is captured, Stage 5B-2 cannot be marked READY FOR ECR LIVE VERIFICATION.
 
 **Do not enable ECR.**
 
@@ -277,8 +213,7 @@ Note: failed Stage 5B package likely ran `MigrationRunner` on boot before AdminM
 ## 8. Explicit non-claims
 
 - Stage 5B is **not** complete.
-- Stage 5B-2 is **not** passed.
+- Stage 5B-2 is **BLOCKED** (not passed).
 - Stage 5B-3 / live ECR parity has **not** started.
 - ECR runtime was **not** live-tested.
-- Agent could not complete schema/admin/migration verification under Cloudflare wp-admin HTML block.
-- FLAIROC was **not** modified during the local admin harden repair / package build.
+- Agent could not complete schema/admin/migration/preview verification under Cloudflare wp-admin HTML block.
