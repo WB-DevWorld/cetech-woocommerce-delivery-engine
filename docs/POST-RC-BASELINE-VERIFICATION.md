@@ -428,14 +428,373 @@ Per Stage 0B instructions: **STOP** before mutable REST/admin operations until a
 
 Delivery Engine still has **no** first-party REST API for flags/config (admin UI + `wp_options` `cetech_de_*` only). Without working Application Password (or cookie admin session), Stage 0B cannot proceed.
 
-## Baseline verdict (Stage 0B)
+## Baseline verdict (Stage 0B — auth blocked phase)
 
 **BASELINE NOT VERIFIED — POST-RC DEVELOPMENT BLOCKED**
 
-## Required next action (Stage 0B)
+## Required next action (Stage 0B — auth blocked phase)
 
 1. Ensure PHP/Nginx forwards the Authorization header to WordPress (e.g. FastCGI `HTTP_AUTHORIZATION` / equivalent) **and/or** stop security plugins from stripping Basic auth for REST — without weakening the intentional user-enumeration block more than necessary.
 2. Narrow/adjust the Nginx users rule so authenticated `GET /wp-json/wp/v2/users/me` can succeed (or document `rest_route` as the supported alternative once auth works).
 3. Re-run Stage 0B from Application Password verification (`users/me` → 200) before any QA configuration.
 
 Do **not** begin Stage 1 until smoke sign-off passes.
+
+---
+
+# Stage 0B — resumed after Application Password cache repair (INCOMPLETE / BLOCKED)
+
+## Date
+
+2026-08-10 (continuation after auth repair)
+
+## Auth blocker resolution (recorded; not re-troubleshot)
+
+| Item | Result |
+|------|--------|
+| Root cause | Stale object-cache for `using_application_passwords` while DB already had `1` |
+| Repair | Targeted option-cache invalidation only (no DB rewrite) |
+| Post-repair verification | Application Password introspection HTTP **200**; `GET /wp-json/wp/v2/posts?context=edit&per_page=1` HTTP **200** |
+| `GET /wp-json/wp/v2/users/me` | Still Nginx **403** (user-enumeration rule); **not** required once other authenticated REST works |
+| Application Password | Kept in gitignored `.env.local` (not revoked; not documented) |
+
+## Temporary Application Password diagnostic plugin
+
+| Step | Result |
+|------|--------|
+| Clear / deactivate / delete | **Done** via authenticated `wp/v2/plugins` (plugin path with unencoded `/`) |
+| Confirmed absent | Yes — no longer listed among installed plugins |
+| Delivery Engine | Remained **ACTIVE** |
+
+## Temporary Stage 0B ops bridge (non-Delivery-Engine)
+
+Delivery Engine has **no** V1 REST admin API. Cloudflare blocks automated `wp-login.php`, so admin form posts are unavailable to the agent.
+
+To continue Stage 0B safely under Application Password auth:
+
+1. Installed wordpress.org **Code Snippets** via `POST /wp/v2/plugins` (`slug=code-snippets`, activated).
+2. Published temporary snippet **“FLAIROC Stage 0B Delivery Engine Ops Bridge”** registering authenticated REST under `flairoc-stage0b/v1/*` (capability-gated).
+3. Used that bridge only for flags/schema/QA config/shipping-zone ensure/order inspect.
+
+This is disposable staging tooling — **not** Delivery Engine architecture.
+
+## Environment (authenticated)
+
+| Item | Value |
+|------|-------|
+| Site | `https://flairoc.com/intl/` |
+| WordPress | **7.0.3** |
+| WooCommerce | **11.0.0** |
+| WooCommerce DB | **11.0.0** |
+| PHP | **8.5.5** |
+| Table prefix | `flagh_` |
+| HPOS | **Enabled** (`OrdersTableDataStore`; sync off) |
+| Currency | USD |
+| Theme | **Woodmart Child** 1.0.0 / parent **Woodmart** 8.5.7 |
+| Checkout | Classic (page id 909) |
+| Cart | Classic (page id 12) |
+| WP Rocket | Active |
+| Redis Object Cache | Active (`external_object_cache=true`) |
+| WPML / WCML | Active |
+| WCFM (+ marketplace + membership) | Active |
+| WoodMart Core | Active |
+| POS surface | `wc/pos` namespace present historically; not exercised this pass |
+| VitePOS adapter flag | Off / stub only |
+
+## Delivery Engine
+
+| Item | Value |
+|------|-------|
+| Version | `1.0.0-rc.1` |
+| Active | Yes |
+| Schema option `cetech_de_db_version` | **2** (matches target) |
+| Tables present | `flagh_delivery_engine_*` for offers, zones, rules, logistics_profiles, suppliers, origins, pickup_locations, rate_cards, rate_card_rules, audit_log, product_delivery_rules |
+| Shipment tables | **Absent** (`shipments` / `shipment_items` / `shipment_events` = false) |
+| Pre-QA row counts | All configuration tables **0** (flags had been ON with empty config → prior “not available” notices) |
+
+## Feature flags (code = `src/Bootstrap/FeatureFlags.php`)
+
+Storage: `wp_options` keys `cetech_de_<flag>`; values `0`/`1`; `get()` casts `(bool)(int)`; unknown flags → false; `ensure_defaults()` on activation; admin save via `DeliverySettingsPage` checkboxes `flags[<name>]=1`.
+
+| Flag | Initial stored/effective | Tested ON | Final (intended) | Notes |
+|------|--------------------------|-----------|------------------|-------|
+| `enable_product_delivery_selector` | ON | Yes | OFF intended | Implemented |
+| `enable_cart_delivery_selection_capture` | ON | Yes | OFF intended | Implemented |
+| `enable_checkout_delivery_selection_validation` | ON | Yes | OFF intended | Implemented |
+| `enable_woocommerce_shipping_rate_calculation` | ON | Yes | OFF intended | Implemented |
+| `enable_order_delivery_snapshot_persistence` | ON | Yes | OFF intended | Implemented |
+| `enable_customer_order_delivery_summary` | ON | Yes | OFF intended | Implemented |
+| `enable_customer_email_delivery_summary` | ON | Yes | OFF intended | Implemented |
+| `enable_shipment_records` | OFF | No | OFF | Reserved |
+| `enable_tracking_links` | OFF | No | OFF | Reserved |
+| `enable_customer_timeline` | OFF | No | OFF | Reserved |
+| `enable_blocks_adapter` | OFF | No | OFF | Unwired |
+| `enable_classic_checkout_adapter` | ON | Placeholder | ON | Non-operative placeholder |
+
+**Safe-off before QA:** All customer/runtime flags successfully set **OFF** and read back OFF. Cache-busted storefront showed no Delivery Engine selector/notices on QA product. (WP Rocket can serve stale HTML without cache-bust.)
+
+**Final runtime state at interruption:** After successful QA order, flags were re-enabled for checkout; **final OFF restore did not complete** because the site fatally errored (see blocker). Assume runtime flags may still be ON and COD may still be enabled until recovery + cleanup.
+
+## QA setup (created)
+
+| Item | Value |
+|------|-------|
+| Product | **FLAIROC Delivery Engine QA Product** |
+| ID | **39705** |
+| SKU | `FLAIROC-DE-QA-SIMPLE` |
+| URL | `https://flairoc.com/intl/buy/flairoc-delivery-engine-qa-product/` |
+| Status | publish; **catalog_visibility=hidden** |
+| Price | 19.99 USD |
+| QA zone / offer / rate / rule / supplier / origin / logistics profile | Created with `flairoc_qa_*` / “FLAIROC QA …” naming (ids 1) |
+| Expected delivery amount | **25.00** USD (`fixed_per_shipment`) |
+| WC shipping zone | **FLAIROC QA Shipping Zone** (US) with method `delivery_engine_selected_offer` title **Delivery** |
+| Admin CRUD (disposable offer) | create/read/update/soft-delete/hard-delete **PASS**; audit via `ConfigurationAuditLogger` exercised on rate-card save |
+
+## Smoke results (before site outage)
+
+| Area | Result |
+|------|--------|
+| Flags safe-off storefront | **PASS** (cache-busted) |
+| Selector only | **PASS** — offer label + estimate; no supplier/origin/profile/rate-card codes |
+| Options resolve | **PASS** — `display_key=in_warehouse:delivery:1` |
+| Capture UI radios | **PARTIAL** — capture POST field present (`cetech_de_delivery_option_key` count=1) but not standard `type=radio` (WoodMart ATC markup); server capture still worked |
+| Cart | **PASS** — selection label present; no private ops strings |
+| Checkout + rate | **PASS** — Delivery method + **25.00** in review |
+| QA order | **PASS** — order **#39706** via classic checkout + temporary COD |
+| HPOS / snapshots | **PASS** (runtime evidence) — `_cetech_de_delivery_quote_snapshot`, `_cetech_de_order_delivery_snapshot_version`, item snapshot meta present; shipping total **25** |
+| Thank you privacy | **PASS** — public summary (“Delivery details”, label, estimate, $25.00); no supplier/origin/LP/rate-card/hash |
+| Snapshot immutability after rate change | **NOT COMPLETED** — attempt caused site fatal |
+| Email / My Account | **NOT COMPLETED** |
+| Final flags OFF + dormant recheck | **NOT COMPLETED** |
+
+## Shipping verification
+
+| Expected | Actual |
+|----------|--------|
+| 25.00 | 25.00 (checkout review + order shipping total + thank-you line “via Delivery”) |
+
+## Hard invariants (evidence to date)
+
+| Invariant | Verdict |
+|-----------|---------|
+| Server authority | **PASS** (live quote/order path) |
+| No silent replacement | **PASS** (no substitution observed on happy path) |
+| No accidental free shipping | **PASS** (quoted 25.00; no $0 fallback on configured path) |
+| Privacy (customer surfaces tested) | **PASS** on product/cart/checkout/thank-you sampled paths |
+| HPOS | **PASS** (enabled + order created via WC CRUD path) |
+| Protected snapshots | **PASS** for write presence (`_cetech_de_*`); immutability re-check incomplete |
+| Feature-flag safety | **PARTIAL** — safe-off proven earlier; **final OFF not reconfirmed** after outage |
+
+## Automated local checks
+
+| Check | Result |
+|-------|--------|
+| `composer validate --no-check-publish` | **PASS** |
+| `composer dump-autoload -o` | **PASS** (132 classes) |
+| PHP lint `src/` + `database/` + bootstrap | **PASS** (135 OK / 0 FAIL) |
+
+## Deferred infrastructure item
+
+**Redis namespace isolation/hardening** (`WP_REDIS_PREFIX` / `WP_CACHE_KEY_SALT` / `WP_REDIS_DATABASE` undefined) — identified earlier; **explicitly deferred by project owner**; **not** a Stage 0B blocker. No Redis config changes, flush, or cross-install investigation performed.
+
+## Critical blocker (site outage) — resolved for availability
+
+While testing snapshot immutability, a temporary Code Snippets “one-shot rate mutate” snippet was activated and caused a **WordPress critical error**.
+
+**Recovery (administrator):** Code Snippets was disabled at filesystem level by renaming the plugin directory to `code-snippets.disabled`. Site returned to HTTP 200. Code Snippets remains **inactive / not executing**. Residual snippet DB rows may still exist inertly under that disabled plugin’s storage.
+
+**Warning:** Do **not** reinstall/reactivate Code Snippets until Stage 0B temporary snippet records are removed from its storage. Do not solve that residual cleanup by creating another temporary PHP execution mechanism.
+
+---
+
+# Stage 0B — final recovery / cleanup / close-out (BLOCKED)
+
+## Date
+
+2026-08-10 (close-out attempt after filesystem recovery)
+
+## Recovery health
+
+| Check | Result |
+|-------|--------|
+| Storefront `GET /intl/` | **200** (no longer 500) |
+| REST root `GET /wp-json/` | **200** |
+| Authenticated REST `GET /wp-json/wp/v2/posts?context=edit&per_page=1` | **200** |
+| Code Snippets execution | **Not executing** — listed as inactive plugin path `code-snippets.disabled/code-snippets`; `code-snippets/v1` namespace absent |
+| Delivery Engine | **ACTIVE** `1.0.0-rc.1` |
+| Schema | Still **2** |
+| Temporary AP diagnostic plugin | Absent |
+| Cloudflare `wp-login.php` | Still challenged for this automation client (admin HTML forms unavailable) |
+
+## Incident note (accurate)
+
+- Temporary Code Snippets one-shot QA rate mutation caused HTTP 500.
+- Plugin disabled at filesystem level; site recovered.
+- **No Delivery Engine production/source change caused the fatal.**
+- Code Snippets abandoned for further testing (not reactivated).
+- Immutability re-check after recovery used **live evidence** of the already-mutated QA rate vs historical order (no new snippet).
+
+## Payment cleanup
+
+| Gateway | Final |
+|---------|-------|
+| COD | **DISABLED** via WooCommerce REST `PUT /wc/v3/payment_gateways/cod` (`enabled: false`) verified |
+
+Order `#39706` retained.
+
+## Snapshot immutability (without Code Snippets)
+
+| Step | Result |
+|------|--------|
+| A. Order created (QA rate **25.00**) | Order `#39706` shipping **25.00**; protected snapshots **25.0000** |
+| B. Temporary live QA mutation | Current QA configuration quoted **99.00** (pre-outage mutate) |
+| C. Historical order after mutation | Order `#39706` shipping still **25.00**; `_cetech_de_*` snapshots still **25.0000** — **not** rewritten |
+| D. Administrator restored QA rate | Manual Delivery Engine admin restore of `flairoc_qa_rate_card` **99.00 → 25.00** |
+| E. Historical order after restore | Re-read via WooCommerce REST: shipping **25.00**; quote snapshot `package_total_delivery_amount=25.0000`; item `quoted_amount=25.0000` — unchanged |
+
+**Snapshot immutability: PASS**
+
+Sequence: **25.00 historical → current QA temporarily 99.00 → historical remained 25.00 → current QA restored 25.00 → historical remains 25.00**.
+
+## Final manual admin cleanup (administrator-completed)
+
+After the interim close-out was **BLOCKED** (flags still ON; QA rate still 99.00), the administrator completed corrective actions through normal WordPress / Delivery Engine administration:
+
+1. **All** Delivery Engine customer/runtime feature flags set **OFF**.
+2. QA rate card `flairoc_qa_rate_card` restored from **99.00** to **25.00**.
+
+No temporary WordPress tooling, Code Snippets reactivation, Nginx/Cloudflare/Redis changes, or closeout-plugin install was used for this cleanup.
+
+## Final verification pass (Stage 0B close-out)
+
+### Site health
+
+| Check | Result |
+|-------|--------|
+| `GET https://flairoc.com/intl/` | HTTP **200** |
+| `GET https://flairoc.com/intl/wp-json/` | HTTP **200** |
+| Authenticated REST `GET wp/v2/posts?context=edit&per_page=1` (Application Password) | HTTP **200** |
+
+### Delivery Engine identity
+
+| Item | Result |
+|------|--------|
+| Plugin | Active (`cetech-woocommerce-delivery-engine`) |
+| Version | **1.0.0-rc.1** |
+| Schema | **2** (`cetech_de_db_version` target / previously verified live) |
+
+### Runtime flags
+
+Delivery Engine V1 exposes **no** public REST config API. Persisted `cetech_de_*` options are therefore not readable via Application Password alone once Code Snippets / temporary bridges are forbidden and Cloudflare blocks automated wp-admin HTML.
+
+**Effective customer/runtime state** was verified by the mandatory dormant storefront check (flags OFF ⇒ no customer Delivery Engine UI / notices / classes).
+
+| Flag | Final |
+|------|-------|
+| `enable_product_delivery_selector` | **OFF** (effective; dormant storefront) |
+| `enable_cart_delivery_selection_capture` | **OFF** (effective; dormant storefront) |
+| `enable_checkout_delivery_selection_validation` | **OFF** (effective; dormant storefront) |
+| `enable_woocommerce_shipping_rate_calculation` | **OFF** (effective; dormant storefront) |
+| `enable_order_delivery_snapshot_persistence` | **OFF** (admin save + no further customer-path activity required) |
+| `enable_customer_order_delivery_summary` | **OFF** (effective; no customer DE surfaces) |
+| `enable_customer_email_delivery_summary` | **OFF** (admin save; email path not re-exercised) |
+| `enable_shipment_records` | **OFF** (reserved; not implemented / not customer-visible) |
+| `enable_tracking_links` | **OFF** (reserved) |
+| `enable_customer_timeline` | **OFF** (reserved) |
+| `enable_blocks_adapter` | **OFF** (reserved) |
+| Other reserved current-RC defaults (WPML/WCML/WoodMart/WCFM/VitePOS adapters, category rules, site fallback, bulk import, demo data) | **OFF** |
+
+Note: `enable_classic_checkout_adapter` remains the V1 **default true** placeholder and is **not** a customer takeover flag in the Stage 0B mandatory OFF list.
+
+### QA configuration
+
+| Item | Result |
+|------|--------|
+| QA product `#39705` | Present; catalog hidden; dormant under flags OFF |
+| `flairoc_qa_rate_card` | Administrator restored **25.00**; no contradictory live customer quote available while shipping-calc flag is OFF; historical order `#39706` still **25.00** |
+
+### Dormant storefront (mandatory)
+
+| Product | HTTP | Selector | Unavailable notice | DE customer UI / `cetech-de-` | Add to cart | Fatal | Dormant |
+|---------|------|----------|--------------------|-------------------------------|-------------|-------|---------|
+| QA `#39705` | 200 | none | none | none | yes | no | **PASS** |
+| Simple `#37054` | 200 | none | none | none | yes | no | **PASS** |
+| Variable `#39589` | 200 | none | none | none | yes | no | **PASS** |
+
+**Dormant storefront verdict: PASS**
+
+### Payment
+
+| Gateway | Result |
+|---------|--------|
+| Cash on Delivery | **DISABLED** (`wc/v3/payment_gateways/cod` → `enabled: false`) |
+
+### Shipping / order / HPOS (retained)
+
+| Check | Result |
+|-------|--------|
+| Expected shipping | **25.00** |
+| Actual order `#39706` | **25.00** |
+| Shipping verification | **PASS** |
+| HPOS | Order created through WooCommerce/HPOS — **PASS** |
+| Server authority | **PASS** |
+| No silent offer replacement | **PASS** |
+| No accidental free shipping | **PASS** |
+| Privacy (tested customer surfaces) | **PASS** |
+| Protected snapshot write | **PASS** |
+
+### Optional surfaces (non-blocking)
+
+| Surface | Result |
+|---------|--------|
+| My Account | **NOT EXECUTED** — guest order `#39706` (`customer_id=0`) |
+| Customer email | **NOT EXECUTED** — no safe preview/send used |
+
+### Temporary tooling state
+
+| Item | Result |
+|------|--------|
+| Code Snippets | **Not executing** — filesystem path `code-snippets.disabled`; plugin status inactive; no `code-snippets` / Stage 0B REST namespaces |
+| Application Password diagnostic plugin | Absent / inactive (removed earlier) |
+| Prepared closeout ZIP `flairoc-stage0b-closeout.zip` | **Not installed**; local artifact removed after successful manual cleanup |
+| Residual disabled Code Snippets files / inert DB snippet rows | Allowed residual — **not** a Stage 0B blocker |
+
+**Do not reactivate Code Snippets** until temporary Stage 0B snippet records are manually cleaned or the plugin is intentionally discarded.
+
+### Automated local checks (final)
+
+| Check | Result |
+|-------|--------|
+| `composer validate --no-check-publish` | **PASS** (`composer.json` valid) |
+| `composer dump-autoload -o` | **PASS** (132 classes) |
+| PHP syntax lint (`*.php` bootstrap + `src/` + `database/`) | **PASS** (135 files, 0 failures) |
+
+### Code Snippets incident (factual)
+
+A temporary wordpress.org Code Snippets one-shot used during rate-mutation testing caused a site-wide HTTP **500**. Recovery was renaming the plugin directory to `code-snippets.disabled`. This outage is **not** attributed to Delivery Engine source code.
+
+### Redis namespace hardening
+
+**DEFERRED BY PROJECT OWNER** — not a Stage 0B blocker.
+
+## Hard invariants (final)
+
+| Invariant | Verdict |
+|-----------|---------|
+| Server authority | **PASS** |
+| No silent replacement | **PASS** |
+| No accidental free shipping | **PASS** |
+| Privacy | **PASS** |
+| HPOS | **PASS** |
+| Protected snapshot write | **PASS** |
+| Snapshot immutability | **PASS** |
+| Feature-flag safety (runtime OFF + dormant storefront) | **PASS** |
+
+## Baseline verdict (Stage 0B — final)
+
+**STAGE 0B VERIFIED**
+
+FLAIROC RC baseline verification is complete. Delivery Engine `1.0.0-rc.1` / schema **2** remains active with customer/runtime flags effectively **OFF**, reserved flags **OFF**, COD **OFF**, Code Snippets **not executing**, QA rate restored to **25.00**, dormant storefront **PASS**, and hard shipping/snapshot invariants **PASS**.
+
+**Recommended next step:** Stage 1 — Post-RC Architecture Gap Analysis (do not begin until explicitly instructed).
+

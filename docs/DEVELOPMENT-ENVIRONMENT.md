@@ -16,12 +16,29 @@ Former staging target. Stage 0 on 2026-08-10 was blocked by Cloudflare HTTP 525 
 **Credentials:**  
 Do not store passwords, application passwords, API keys, tokens, cookies, or other secrets in this document. Use a local gitignored `.env.local` (or equivalent) for agent/developer access.
 
-Typical local keys (names only): `WP_SITE_URL` / `WP_ADMIN_URL`, `WP_ADMIN_USER`, `WP_ADMIN_APP_PASSWORD`, optional WooCommerce `WC_CONSUMER_KEY` / `WC_CONSUMER_SECRET`.
+Typical local keys (names only): `FLAIROC_BASE_URL` / `FLAIROC_WP_ADMIN_URL`, `FLAIROC_WP_USERNAME`, `FLAIROC_WP_APP_PASSWORD`, optional WooCommerce `WC_CONSUMER_KEY` / `WC_CONSUMER_SECRET`.
+
+**Environment facts (Stage 0B final, 2026-08-10):**  
+- WordPress **7.0.3**; WooCommerce **11.0.0** (DB **11.0.0**); PHP **8.5.5**; table prefix `flagh_`  
+- HPOS enabled; classic checkout; Woodmart Child / Woodmart 8.5.7  
+- WP Rocket + Redis Object Cache active; WPML/WCML/WCFM/WoodMart present  
+- Delivery Engine `1.0.0-rc.1` active; schema `cetech_de_db_version=2`  
+- Stage 0B **VERIFIED**: customer/runtime flags OFF (dormant storefront), COD OFF, Code Snippets not executing  
+- Application Password authentication works for authenticated REST (except Nginx-blocked `users/me` path)  
+- Delivery Engine has no V1 public REST config API — prefer wp-admin for flag/config changes; do not reactivate Code Snippets for Stage 0B leftovers 
 
 **REST automation notes (non-secret):**  
-- WooCommerce REST with consumer keys works for commerce inventory.  
-- Delivery Engine admin/flags/config require authenticated WordPress admin capabilities (Application Password or equivalent); the plugin has no public REST configuration API in V1 RC.  
-- Stage 0B (2026-08-10): Application Password present locally, but Basic Authorization was not accepted by WordPress (`rest_not_logged_in` for valid/invalid/missing credentials). `/wp-json/wp/v2/users/me` still returned Nginx 403. Fix server Authorization forwarding / `users/me` allowlisting before resuming smoke verification.
+- WooCommerce REST with consumer keys works for commerce inventory and payment gateway toggles.  
+- WordPress Application Password Basic auth works for plugins/settings/posts and (when healthy) authenticated admin-capable routes.  
+- `/wp-json/wp/v2/users/me` may still return Nginx 403 under the user-enumeration rule; use other authenticated endpoints for health checks.  
+- Cloudflare managed challenge still blocks automated `wp-login.php` / wp-admin HTML for this agent.  
+- Delivery Engine has no V1 public REST config API — flag/config writes need wp-admin UI or a disposable capability-gated bridge (never Code Snippets after the Stage 0B outage).
+
+**Code Snippets (Stage 0B incident):**  
+Disabled at filesystem level as `code-snippets.disabled` after a temporary one-shot snippet caused HTTP 500. **Do not reactivate** until its residual Stage 0B snippet records are removed. Residual disabled files/DB rows are not a Stage 0B verification blocker while not executing.
+
+**Deferred infrastructure:**  
+Redis key namespace / prefix / database isolation hardening was observed as undefined (`WP_REDIS_PREFIX`, `WP_CACHE_KEY_SALT`, `WP_REDIS_DATABASE`) and is **deferred by project owner** — not a Stage 0B verification blocker unless cross-installation contamination is proven.
 
 **Related:**  
 See `docs/POST-RC-BASELINE-VERIFICATION.md` for Stage 0 / Stage 0A / Stage 0B verification results against this environment.
