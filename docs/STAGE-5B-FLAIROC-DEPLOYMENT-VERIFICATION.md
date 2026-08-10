@@ -116,6 +116,7 @@ Why local tests previously missed it:
 | Regression | `tests/Unit/Bootstrap/PluginBootServiceGraphTest.php` |
 | Package gate | `scripts/verify-production-package-autoload.php` + packaging always rebuilds `--no-dev` vendor |
 | Runtime semantics | Unchanged (flags, schema, ECR routing, rates, privacy) |
+| Corrective commit | `325e25232e5551016fa9a076c064212bdeaa11d7` — `fix: repair Stage 5B bootstrap service wiring` |
 | FLAIROC during repair | **NOT MODIFIED** |
 
 Failed package SHA-256 retained for audit:
@@ -124,8 +125,12 @@ Failed package SHA-256 retained for audit:
 
 Fixed package artifact (human redeploy only):
 
-`cetech-woocommerce-delivery-engine-stage5b-fixed.zip`  
-(see Desktop + SHA-256 after rebuild)
+| Item | Value |
+|------|-------|
+| Filename | `cetech-woocommerce-delivery-engine-stage5b-fixed.zip` |
+| Path | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-stage5b-fixed.zip` |
+| SHA-256 | `b21398ee9e7a5780a2b7df3933492701f5f9aee340f2aca51f49f71564b3cf3f` |
+| Size | 631990 bytes |
 
 ---
 
