@@ -5,7 +5,7 @@
 **Last updated:** 2026-08-10  
 **Plugin version:** `1.0.0-rc.1`  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `master` — Stage 0B verified; Stages 1–5A complete; Stage 5B repair `4e8f503`; Stage 5B-2 **BLOCKED** (admin/schema not agent-verifiable under Cloudflare)  
+**Git:** `master` — Stage 0B verified; Stages 1–5A complete; Stage 5B repair `4e8f503`; Stage 5B-2 PASS; Stage 5B-2A slice audit READY; Stage 5B-3 **BLOCKED** (ECR fingerprint session normalize)  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
@@ -22,26 +22,27 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 4 Admin inheritance UX + preview | **COMPLETE** — artifact `docs/STAGE-4-ADMIN-INHERITANCE-UX.md` |
 | Stage 5A Simple-product ECR runtime integration | **COMPLETE** — artifact `docs/STAGE-5A-SIMPLE-RUNTIME-ECR-INTEGRATION.md` (local only; flag default OFF) |
 | Stage 5B-1 original package | **FAILED** — SHA-256 `973c0209…e4cc`; fatals HealthChecker + preview `get_category_ids()` on false (`d5fefa2`) |
-| Stage 5B FLAIROC recovery | Filesystem-disable recovered wp-admin; ECR **never** enabled |
+| Stage 5B FLAIROC recovery | Filesystem-disable recovered wp-admin; ECR **never** left ON after 5B-3 restore |
 | Stage 5B bootstrap repair | **DONE** — `325e252` |
 | Stage 5B admin false-product repair | **DONE** — `4e8f503`; repaired ZIP SHA-256 `1d672dae…a59a` |
-| Stage 5B-2 deployment safety verification | **BLOCKED** — repaired package **active**; dormant storefront **PASS**; COD OFF; order `#39706` intact; Cloudflare blocks agent wp-admin HTML so schema/Stage 4 admin/preview/flags table/logs **not agent-verified** |
-| Stage 5B-3 ECR live parity | **NOT STARTED** — do not enable ECR until Stage 5B-2 passes |
+| Stage 5B-2 deployment safety verification | **PASS (human + agent)** — repaired package active; dormant storefront PASS; COD OFF; `#39706` intact; human admin/schema/preview smoke PASS; no fresh DE fatals |
+| Stage 5B-2A QA migration/slice audit | **READY — WRONG SLICE SELECTED** — legacy rule `#1` migrated to v3 scope `slice_key=in_warehouse`; Default preview unresolved is expected; see `docs/STAGE-5B-FLAIROC-DEPLOYMENT-VERIFICATION.md` §8 |
+| Stage 5B-3 ECR live parity | **BLOCKED** — ECR routing + selector parity PASS on `#39705`; cart/checkout/shipping fail closed because session `normalizeIntent()` dropped `configuration_fingerprint`; no QA order placed; flags/COD restored OFF; local fix in-repo (not deployed) |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |
 | New admin UX | Global/Product/Variation scoped editors + effective preview; pre-cutover notice |
-| Runtime cutover flag | `enable_effective_configuration_runtime` **defaults OFF** — keep OFF until Stage 5B-2 |
+| Runtime cutover flag | `enable_effective_configuration_runtime` **defaults OFF** — keep OFF on FLAIROC until Stage 5B-3 VERIFIED |
 | Legacy storage | `product_delivery_rules` remains default authoritative path while cutover flag OFF |
-| Runtime on FLAIROC | Repaired DE **active** `1.0.0-rc.1`; storefront shows **no** DE selector on `#37054`/`#39705`/`#39589` (inferred flags OFF); ECR **not** live-tested |
+| Runtime on FLAIROC | Repaired DE **active** `1.0.0-rc.1`; all runtime flags OFF after 5B-3; ECR OFF; COD OFF; dormant storefront PASS; shipping 25.00 ECR parity **not** live-proven |
 | Variable runtime capture | **Not implemented** (Stage 6) |
 | Shipments / tracking / timeline | **Not implemented** |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
-| Category legacy parity | Stage 5 **compatibility route** (category winners stay on legacy source) |
-| Next stage | **Human Stage 5B-2 admin/schema checklist** (see `docs/STAGE-5B-FLAIROC-DEPLOYMENT-VERIFICATION.md` §7) → then Stage 5B-3 only if READY |
+| Category legacy parity | Stage 5 **compatibility route** (category winners stay on legacy source); `#39705` is **not** category-routed |
+| Next stage | Deploy fingerprint-normalize fix → re-run Stage 5B-3 past shipping/order gate → only then Stage 6 |
 | Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual |
 | Stage 1 HPOS debt | **DEFERRED** (`countOrderSnapshotReferences` postmeta); non-numeric rate→0 **FIXED** in Stage 5A |
 
-Do **not** begin Stage 5B-3 or Stage 6 unless explicitly tasked. Do **not** enable FLAIROC ECR runtime until Stage 5B-2 passes with all runtime flags controlled OFF first.
+Do **not** begin Stage 6 unless explicitly tasked. Do **not** leave FLAIROC ECR runtime ON. Re-run Stage 5B-3 after deploying the fingerprint session fix.
 
 
 

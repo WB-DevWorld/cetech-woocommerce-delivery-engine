@@ -1,24 +1,39 @@
 # Stage 5B — FLAIROC Deployment Verification
 
 **Document status:** Living Stage 5B deployment record  
-**Plugin version:** `1.0.0-rc.1` (unchanged)  
+**Plugin version:** `1.0.0-rc.1` (unchanged public version)  
 **Schema target:** `3` (unchanged)  
 **Date opened:** 2026-08-10  
-**Last updated:** 2026-08-10 (Stage 5B-2 after repaired ZIP install — agent partial verification; BLOCKED on admin/schema)
+**Last updated:** 2026-08-10 (Stage 5B-3 controlled ECR parity — **BLOCKED**)
 
 ---
 
 ## 1. Current verdict
 
-**Stage 5B-2: BLOCKED**
+**Stage 5B-3: BLOCKED**
 
-Repaired package is **active** on FLAIROC (`1.0.0-rc.1`). Public/REST health is green. **Dormant storefront PASS** on `#39705` / `#37054` / `#39589` (no Delivery Engine customer UI). COD OFF. Order `#39706` shipping/snapshot unchanged at **25.00 / 25.0000**. Code Snippets not executing.
+Controlled live ECR enablement on FLAIROC for QA product `#39705` proved:
 
-Agent **cannot** complete required schema / Stage 4 admin / Effective Preview / PHP-log / direct flag-option readback because Cloudflare returns **403** on all `wp-admin` HTML probes (Application Password does not unlock cookie admin HTML). No Delivery Engine options REST exists.
+- ECR routing works (`#39705` → `ecr`; `#39589` → `legacy`)
+- `in_warehouse` effective config VALID with legacy-equivalent semantics
+- Selector customer UI parity PASS (In warehouse + FLAIROC QA Standard Delivery; no Air/Sea; no privacy leak)
+- ECR-alone does **not** expose customer UI
+- Cart capture stores ECR selection + configuration fingerprint
 
-ECR was **not** enabled. Stage 5B-3 was **not** started.
+**Blocker (single corrective task):**
 
-**Single next corrective task:** Human administrator completes the Stage 4 admin + schema checklist in wp-admin (see §7) and reports results (or temporarily allowlists agent HTML access to `wp-admin`).
+`CartDeliverySelectionSessionData::normalizeIntent()` dropped `configuration_fingerprint`, so checkout revalidation / shipping hash checks treated a fresh ECR selection as invalid/stale. Live cart_shipping probe therefore returned:
+
+- checkout validation invalid (“no longer available”)
+- no Delivery Engine shipping rate (empty rates; cart shipping total `0` while product subtotal `19.99`)
+
+**Do not create an ECR QA order until the fix is packaged, deployed to FLAIROC, and Stage 5B-3 re-run past shipping = 25.00.**
+
+Local fix landed in-repo (preserve fingerprint on normalize; regression PHPUnit). Public version not bumped. FLAIROC runtime flags and COD restored **OFF**; dormant storefront PASS after test.
+
+Human Stage 5B-2 admin smoke and Stage 5B-2A slice audit remain valid background.
+
+ECR remains **OFF** on FLAIROC until Stage 5B-3 re-verification after deploy.
 
 ---
 
@@ -193,27 +208,167 @@ Contrast with prior intermediate-fixed Stage 5B-2 attempt: `#37054` previously s
 
 ---
 
-## 7. Blocker (single corrective task)
+## 7. Blocker (single corrective task) — Stage 5B-2 human checklist (historical)
 
-**Human administrator must open wp-admin and complete the remaining Stage 5B-2 checklist**, then report back:
+**Human administrator completed** Stage 5B-2 wp-admin smoke after repaired package install (Global / Product / Variation / Effective Preview / invalid product). Schema `3` and flags OFF confirmed via Stage 5B-2A WP-CLI audit.
 
-1. Confirm Delivery Engine → System Status / schema shows `cetech_de_db_version = 3` and v3 tables exist; legacy tables preserved; shipment tables absent.
-2. Confirm Delivery Settings flag table: **all** customer/runtime flags **OFF**, including `enable_effective_configuration_runtime`.
-3. Smoke Stage 4 pages: Global / Product `#39705` / Variation (if available) / Effective Preview — no fatal.
-4. Effective Preview regression: empty product (no fatal); nonexistent product ID → “Select a valid product” (no critical error); `#39705` preview loads.
-5. After those requests, confirm PHP log has **no fresh** `ConfigurationHealthChecker` / `get_category_ids() on false` fatals (historical ~18:12 / ~21:05 entries are old).
-6. Confirm QA rate card `flairoc_qa_rate_card` amount **25.00** in admin.
-
-Until that human evidence is captured, Stage 5B-2 cannot be marked READY FOR ECR LIVE VERIFICATION.
-
-**Do not enable ECR.**
+**Do not enable ECR until Stage 5B-3 is explicitly started.**
 
 ---
 
-## 8. Explicit non-claims
+## 8. Stage 5B-2A — live QA migration / slice audit (read-only, 2026-08-10)
 
-- Stage 5B is **not** complete.
-- Stage 5B-2 is **BLOCKED** (not passed).
-- Stage 5B-3 / live ECR parity has **not** started.
-- ECR runtime was **not** live-tested.
-- Agent could not complete schema/admin/migration/preview verification under Cloudflare wp-admin HTML block.
+**Method:** SSH + WP-CLI `eval-file` against `/home/flaimainroc/htdocs/flairoc.com/intl`. No config writes, no flag changes, no DB mutation, no ECR enablement. Temp scripts removed after run.
+
+### Verdict
+
+**READY — WRONG SLICE SELECTED** (classification A / expected preview-selection issue — not a migration failure)
+
+### Schema
+
+| Item | Live result |
+|------|-------------|
+| Prefix | `flagh_` |
+| `cetech_de_db_version` | `3` |
+| Scoped tables | `flagh_delivery_engine_configuration_scopes` / `_fields` / `_collections` |
+| Legacy rules | `flagh_delivery_engine_product_delivery_rules` present |
+| Shipments | `shipments` / `shipment_items` / `shipment_events` **absent** |
+
+### Legacy `#39705`
+
+| Rule | Target | Slice/FA | Offers | LP | Supplier | Origin | Priority | Enabled |
+|------|--------|----------|--------|----|----------|--------|----------|---------|
+| 1 | product / 39705 | `in_warehouse` | `[1]` | 1 | 1 | 1 | 10 | active |
+
+**Winning rule:** legacy `#1` (sole product rule; category rules for product category `20`: **none**).
+
+### V3 `#39705` scopes
+
+| Scope ID | Slice Key | Version | Source | Legacy Rule |
+|----------|-----------|---------|--------|-------------|
+| 2 | `in_warehouse` | 1 | migrated | 1 |
+
+**No** product scope with `slice_key=''` for `#39705`.
+
+### V3 fields (scope 2)
+
+All OVERRIDE: `fulfilment_availability=in_warehouse`, `fulfilment_choice=delivery`, `logistics_profile_id=1`, `supplier_id=1`, `origin_id=1`, `priority=10`.
+
+### V3 collections (scope 2)
+
+`delivery_offer_ids` REPLACE `[1]`.
+
+### Migration traceability
+
+Option `cetech_de_v3_config_migration_report`: `completed_at=2026-08-10T18:12:27+00:00`; **migrated `[1]`**; quarantined/skipped/unchanged empty. Matches Stage 2 contract.
+
+### Global scope
+
+Scope id `1`, version `1`, source `native`, **no fields**, **no collections** — expected empty pre-cutover root created by `ensureGlobalScope()`.
+
+### Why Default preview is unresolved
+
+Preview defaulted to `slice_key=''` (“Default (native root slice)”). No product overrides exist on that slice; empty Global leaves required fields `UNRESOLVED_GLOBAL_VALUE` (“A required root (global) value is not configured.”). Read-only ECR resolve for `''`: unresolved; for `in_warehouse`: **valid** with legacy-equivalent values.
+
+### Correct preview slice
+
+**In warehouse** (`in_warehouse`).
+
+### Category compatibility
+
+Does **not** depend on a legacy category rule. With ECR ON (future), `#39705` is intended to route **ECR** (simple + non-category). Current router decide with flag OFF: `legacy`.
+
+### Runtime state (audit)
+
+All FeatureFlags defaults/options OFF; `enable_effective_configuration_runtime` raw option `null` → default **OFF**. No remote mutation.
+
+### Stage 5B-3
+
+**Not started in 5B-2A.** Ready for controlled Stage 5B-3 only after human confirms In-warehouse preview.
+
+---
+
+## 9. Stage 5B-3 — controlled live simple-product ECR parity (2026-08-10 ~23:04–23:15 UTC)
+
+**Method:** SSH + WP-CLI harness against `/home/flaimainroc/htdocs/flairoc.com/intl`; storefront HTTP probes; flags sequenced then restored OFF. Human confirmed Effective Preview `#39705` / In warehouse = VALID before start. Temp remote harness files removed after restore.
+
+**Pre-test marker:** PHP `error.log` line count **889** at **2026-08-10T23:09:14Z**. Site health: storefront/REST/auth REST **200**. COD **OFF**. All Delivery Engine runtime flags **OFF**.
+
+### Runtime flag sequence
+
+| Flag | Initial | During test | Final |
+|------|---------|-------------|-------|
+| `enable_effective_configuration_runtime` | OFF | ON (step 7) | OFF |
+| `enable_product_delivery_selector` | OFF | ON (step 9) | OFF |
+| `enable_cart_delivery_selection_capture` | OFF | ON (step 11) | OFF |
+| `enable_checkout_delivery_selection_validation` | OFF | ON (step 13) | OFF |
+| `enable_woocommerce_shipping_rate_calculation` | OFF | ON (step 14) | OFF |
+| `enable_order_delivery_snapshot_persistence` | OFF | never ON | OFF |
+| `enable_customer_order_delivery_summary` | OFF | NOT EXECUTED | OFF |
+| `enable_customer_email_delivery_summary` | OFF | NOT EXECUTED | OFF |
+| shipment/tracking/timeline/Blocks reserved | OFF | OFF | OFF |
+
+### What passed before the blocker
+
+| Area | Evidence | Result |
+|------|----------|--------|
+| Resolve `#39705` / `in_warehouse` | VALID; FA/choice/offers/LP/supplier/origin/priority match legacy | PASS |
+| ECR-only storefront | Selector absent; ATC present; HTTP 200 | PASS |
+| Routing | `#39705` → `ecr`; `#39589` → `legacy`; not category-compat | PASS |
+| Selector parity | Customer: In warehouse + Delivery + FLAIROC QA Standard Delivery; no Default/unresolved; no Air/Sea; no supplier/origin/LP/rate-card/fingerprint | PASS |
+| Cart capture | Selection retained; summary customer-safe; fingerprint part present in hash parts | PASS (capture) |
+| Hard constraint | In warehouse delivery-only; no Air/Sea | PASS |
+| Privacy (product/selector/cart summary) | No private internals in customer surfaces exercised | PASS (partial) |
+| Variable safety | `#39589` decide `legacy` with ECR ON | PASS |
+| Category compatibility | No live category-winning simple product | NOT OBSERVED |
+| PHP logs | Line count remained **889**; no fresh DE fatal/warning after marker | PASS |
+| Historical `#39706` | Shipping 25; snapshots unchanged | PASS |
+| QA rate / scope | `flairoc_qa_rate_card` **25.0000**; scope v1 `in_warehouse` unchanged | PASS |
+| Final dormant | `#39705`/`#37054`/`#39589` no DE UI; HTTP 200 | PASS |
+| COD | Initial OFF; never enabled (order not placed); final OFF | PASS |
+
+### Blocker detail
+
+Cart shipping probe after flags ON (ECR+selector+capture+checkout+shipping):
+
+- `source=ecr`, display_key `in_warehouse:delivery:1`, fingerprint `48ca5985…4734`
+- Checkout validation **invalid** (stale/unavailable customer message)
+- `de_shipping_rate=null`, `shipping_rates=[]`, `cart_shipping_total=0` (product 19.99 only; no fee line)
+- Root cause: session `normalizeIntent()` stripped `configuration_fingerprint`, so hash mismatch / stale compare failed closed
+
+**Pre-order gate failed → no ECR QA order created. Snapshot / HPOS order path NOT EXECUTED.**
+
+### Local fix (repo; not yet on FLAIROC)
+
+Preserve `configuration_fingerprint` in `CartDeliverySelectionSessionData::normalizeIntent()` + PHPUnit regression.
+
+### Local automated checks (post-fix)
+
+| Check | Result |
+|------|--------|
+| `composer validate --no-check-publish` | valid |
+| PHP lint (changed file) | clean |
+| PHPUnit | **114 tests / 442 assertions / OK** |
+
+### Explicit non-claims (Stage 5B-3)
+
+- Stage 5B-3 is **not** VERIFIED
+- Shipping **25.00** ECR parity **not** proven live (blocked before quote)
+- No new order; `#39706` untouched
+- Fingerprint fix **not** deployed to FLAIROC yet
+- Stage 6 not started
+
+---
+
+## 10. Explicit non-claims
+
+- Stage 5B is **not** complete (Stage 5B-3 live ECR parity blocked on fingerprint session normalize)
+- Stage 5B-2A resolves the `#39705` Default-slice unresolved mystery as **wrong slice**, not missing backfill
+- Empty Global remains intentionally unpopulated (do not fill Global merely to green Default preview)
+- UX wording notes for later: none blocking; customer labels used “In warehouse” / “Delivery options” (acceptable)
+
+### Recommended next step
+
+1. Package + deploy the fingerprint-normalize fix to FLAIROC (still `1.0.0-rc.1` unless release policy says otherwise).
+2. Re-run **only** Stage 5B-3 from cart/checkout/shipping onward (flags sequenced, shipping must be **25.00**, then one COD QA order, restore OFF).
+3. Do **not** begin Stage 6 until Stage 5B-3 is VERIFIED.

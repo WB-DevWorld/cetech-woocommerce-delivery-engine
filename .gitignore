@@ -22,6 +22,8 @@ desktop.ini
 
 # Local read-only FLAIROC verification scratch (may contain page HTML dumps)
 /tmp-stage5b2-verify/
+/tmp-stage5b2a-audit/
+/tmp-stage5b3/
 /tmp-read-only-compare/
 
 # Stage 3 disposable dry-run WordPress stubs (generated at runtime)
