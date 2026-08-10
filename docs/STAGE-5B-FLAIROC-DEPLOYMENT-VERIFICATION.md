@@ -116,7 +116,7 @@ Agent could **not** read live PHP logs this session (no public debug.log; no SSH
 | 2 | `4e8f503` admin/bootstrap repaired | `…-stage5b-repaired.zip` | `1d672dae…a59a` | Stage 5B-2 safety/admin **PASS** |
 | 3 | `f300390` fingerprint repair (docs through `17b5c47`) | `cetech-woocommerce-delivery-engine-stage5b-fingerprint-fixed.zip` | `dbddc1d7df3c1262296e9c42b05e87921066fc6f5f29b0f3c798385ad1d4cbfd` | **Installed on FLAIROC**; Stage 5B-3R-2 **VERIFIED** |
 
-Artifact 3 absolute path (local): `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-stage5b-fingerprint-fixed.zip` (636893 bytes). Do **not** claim Artifact 3 was installed on FLAIROC.
+Artifact 3 absolute path (local build copy): `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-stage5b-fingerprint-fixed.zip` (636893 bytes). Installed on FLAIROC for Stage 5B-3R-2.
 
 ---
 
