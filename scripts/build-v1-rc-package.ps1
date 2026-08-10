@@ -101,6 +101,10 @@ $ExcludeDirNames = @(
     '.vscode', '.idea', '.cursor', 'vendor'
 )
 
+$ExcludeDirPrefixes = @(
+    'tmp-'
+)
+
 $ExcludeFilePatterns = @(
     '*.zip', '*.log', '.env', '.env.local', '.DS_Store', 'Thumbs.db', 'desktop.ini',
     'phpunit.xml', 'phpunit-baseline.txt'
@@ -115,6 +119,11 @@ Get-ChildItem -LiteralPath $RepoRoot -Force | ForEach-Object {
     }
 
     if ($_.PSIsContainer) {
+        foreach ($prefix in $ExcludeDirPrefixes) {
+            if ($name.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
+                return
+            }
+        }
         Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $StagePluginDir $name) -Recurse -Force
         return
     }

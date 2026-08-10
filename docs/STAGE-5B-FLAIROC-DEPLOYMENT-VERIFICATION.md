@@ -119,6 +119,16 @@ Agent could **not** read live PHP logs this session (no public debug.log; no SSH
 | Repaired SHA-256 | `1d672dae1743bc46c497fa4de2d1e44d3cce5df7faafe84df166efca058ca59a` |
 | Bytes | `634795` |
 
+### Artifact traceability (Stage 5B packages)
+
+| Artifact | Commit / basis | ZIP | SHA-256 | Status |
+|----------|----------------|-----|---------|--------|
+| 1 | `d5fefa2` | `…-stage5b.zip` | `973c0209…e4cc` | **FAILED** admin deployment |
+| 2 | `4e8f503` admin/bootstrap repaired | `…-stage5b-repaired.zip` | `1d672dae…a59a` | Stage 5B-2 safety/admin **PASS** |
+| 3 | `f300390` fingerprint repair (HEAD docs `7fe41c3`) | `cetech-woocommerce-delivery-engine-stage5b-fingerprint-fixed.zip` | `dbddc1d7df3c1262296e9c42b05e87921066fc6f5f29b0f3c798385ad1d4cbfd` | **Packaged locally — NOT deployed**; pending Stage 5B-3 retry |
+
+Artifact 3 absolute path (local): `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-stage5b-fingerprint-fixed.zip` (636893 bytes). Do **not** claim Artifact 3 was installed on FLAIROC.
+
 ---
 
 ## 6. Stage 5B-2 agent verification (2026-08-10 ~22:35–22:37 UTC)
@@ -369,6 +379,9 @@ Preserve `configuration_fingerprint` in `CartDeliverySelectionSessionData::norma
 
 ### Recommended next step
 
-1. Package + deploy the fingerprint-normalize fix to FLAIROC (still `1.0.0-rc.1` unless release policy says otherwise).
-2. Re-run **only** Stage 5B-3 from cart/checkout/shipping onward (flags sequenced, shipping must be **25.00**, then one COD QA order, restore OFF).
-3. Do **not** begin Stage 6 until Stage 5B-3 is VERIFIED.
+1. Human administrator installs Artifact 3 (`…-stage5b-fingerprint-fixed.zip`) replacing the active Delivery Engine plugin.
+2. Confirm storefront / wp-admin / REST health **before** enabling any runtime flags.
+3. Re-run Stage 5B-3 with the controlled flag sequence (shipping must be **25.00**, then one COD QA order, restore OFF).
+4. Do **not** begin Stage 6 until Stage 5B-3 is VERIFIED.
+
+FLAIROC was **not** modified during Stage 5B-3R-1 packaging.

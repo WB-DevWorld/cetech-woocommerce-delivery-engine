@@ -5,7 +5,7 @@
 **Last updated:** 2026-08-10  
 **Plugin version:** `1.0.0-rc.1`  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `master` — Stage 0B verified; Stages 1–5A complete; Stage 5B repair `4e8f503`; Stage 5B-2 PASS; Stage 5B-2A slice audit READY; Stage 5B-3 **BLOCKED** (ECR fingerprint session normalize)  
+**Git:** `master` — Stage 5B-3 **BLOCKED**; fingerprint repair `f300390`; Stage 5B-3R-1 fingerprint-fixed package **READY** (local only, not deployed)  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
@@ -27,7 +27,8 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 5B admin false-product repair | **DONE** — `4e8f503`; repaired ZIP SHA-256 `1d672dae…a59a` |
 | Stage 5B-2 deployment safety verification | **PASS (human + agent)** — repaired package active; dormant storefront PASS; COD OFF; `#39706` intact; human admin/schema/preview smoke PASS; no fresh DE fatals |
 | Stage 5B-2A QA migration/slice audit | **READY — WRONG SLICE SELECTED** — legacy rule `#1` migrated to v3 scope `slice_key=in_warehouse`; Default preview unresolved is expected; see `docs/STAGE-5B-FLAIROC-DEPLOYMENT-VERIFICATION.md` §8 |
-| Stage 5B-3 ECR live parity | **BLOCKED** — ECR routing + selector parity PASS on `#39705`; cart/checkout/shipping fail closed because session `normalizeIntent()` dropped `configuration_fingerprint`; no QA order placed; flags/COD restored OFF; local fix in-repo (not deployed) |
+| Stage 5B-3 ECR live parity | **BLOCKED** — ECR routing + selector parity PASS on `#39705`; cart/checkout/shipping fail closed because session `normalizeIntent()` dropped `configuration_fingerprint`; no QA order placed; flags/COD restored OFF; local fix `f300390` |
+| Stage 5B-3R-1 fingerprint package | **READY (local)** — `cetech-woocommerce-delivery-engine-stage5b-fingerprint-fixed.zip` SHA-256 `dbddc1d7…cbfd`; **not** uploaded/installed on FLAIROC |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |
 | New admin UX | Global/Product/Variation scoped editors + effective preview; pre-cutover notice |
@@ -38,7 +39,7 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Shipments / tracking / timeline | **Not implemented** |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Stage 5 **compatibility route** (category winners stay on legacy source); `#39705` is **not** category-routed |
-| Next stage | Deploy fingerprint-normalize fix → re-run Stage 5B-3 past shipping/order gate → only then Stage 6 |
+| Next stage | Human install fingerprint-fixed package → health smoke → re-run Stage 5B-3 → only then Stage 6 |
 | Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual |
 | Stage 1 HPOS debt | **DEFERRED** (`countOrderSnapshotReferences` postmeta); non-numeric rate→0 **FIXED** in Stage 5A |
 
