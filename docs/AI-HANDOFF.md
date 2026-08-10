@@ -5,17 +5,31 @@
 **Last updated:** 2026-08-10  
 **Plugin version:** `1.0.0-rc.1`  
 **Schema target:** `2` (`cetech_de_db_version`)  
-**Git:** `master` — clean working tree; remote `origin/master`  
+**Git:** `master` — Stage 0B verified at `31fc016`; Stage 1 docs follow  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
 This handoff remains the **product vision and domain source of truth**. Much of the document describes the full intended engine (including shipment records and customer tracking). **Only the V1 RC scope below is implemented in code today.** Do not assume later sections are already built.
+
+### Stage 1 — Post-RC architecture gap analysis (COMPLETE)
+
+| Item | Status |
+|------|--------|
+| Stage 0B FLAIROC RC baseline | **VERIFIED** (`31fc016` — `docs: complete FLAIROC RC baseline verification`) |
+| Architecture gap analysis | **COMPLETE** — authoritative artifact: `docs/POST-RC-ARCHITECTURE-GAP-ANALYSIS.md` |
+| Target direction | Evolve verified RC toward Global → Product → Variation **field-level** inheritance + one `EffectiveConfigurationResolver`; layered offer/rate services (not a god-object) |
+| Next stage | **Stage 2** — Global configuration and scoped inheritance **storage** only |
+| Hard constraints to preserve | Server authority; no silent offer replacement; missing rate ≠ free shipping; snapshot immutability; HPOS CRUD; customer privacy; flags default OFF |
+| Explicitly deferred | ECR cutover; variable capture; WoodMart/WPML/WCML/WCFM/POS/Blocks adapters; package consolidation; shipments/tracking; admin inheritance UX polish; version bump; Stage 2+ implementation |
+
+Do **not** begin Stage 2 unless explicitly tasked. Do **not** rewrite verified shipping/snapshot/simple-product runtime while adding storage.
 
 ### Companion docs (implementation)
 
 | Doc | Role |
 |-----|------|
 | `docs/PROJECT-RULES.md` | Hard engineering rules derived from this handoff |
+| `docs/PROJECT-GOVERNANCE.md` | Mandatory process / invariant authority |
 | `docs/ARCHITECTURE-PLAN.md` | Modular-monolith architecture |
 | `docs/PHASE-1A-IMPLEMENTATION.md` … `docs/PHASE-2H4-IMPLEMENTATION.md` | Phase completion notes |
 | `docs/V1-RC-RELEASE-NOTES.md` | RC scope summary |
@@ -23,7 +37,9 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | `docs/V1-RC-SMOKE-TEST-CHECKLIST.md` | Staging gate before promoting RC |
 | `docs/V1-RC-PACKAGING-GUIDE.md` | Private ZIP build (`scripts/build-v1-rc-package.ps1`) |
 | `docs/DEVELOPMENT-ENVIRONMENT.md` | Canonical development/staging target (non-secret) |
-| `docs/POST-RC-BASELINE-VERIFICATION.md` | Stage 0 / Stage 0A baseline verification report |
+| `docs/POST-RC-BASELINE-VERIFICATION.md` | Stage 0 / 0A / 0B baseline verification report |
+| `docs/POST-RC-ARCHITECTURE-GAP-ANALYSIS.md` | Stage 1 post-RC architecture gap analysis (authoritative) |
+| `docs/Delivery Shipping Plugin Up-To-Date Design and Expectations.md` | Latest intended product / end-state design |
 
 ### What has been accomplished
 
@@ -100,10 +116,11 @@ Blocks checkout adapter flag exists but is off / unwired. Code: `src/Bootstrap/F
 
 ### Sensible next work after V1 RC
 
-1. Complete staging smoke checklist and promote / tag only after pass
-2. Variable-product delivery capture
-3. Post-V1: shipment records + staff updates + customer tracking (reserved flags)
-4. Optional real integration adapters; Blocks checkout if required later
+1. ~~Complete staging smoke checklist / Stage 0B~~ — **DONE (VERIFIED)**
+2. ~~Post-RC architecture gap analysis (Stage 1)~~ — **DONE** — see `docs/POST-RC-ARCHITECTURE-GAP-ANALYSIS.md`
+3. **Stage 2:** Global configuration + scoped inheritance storage (no runtime cutover)
+4. Later: ECR → admin inheritance UX → simple-product cutover → variable capture → packages → shipments → integrations/Blocks → quality RC
+5. Do not skip foundations to reach shipments or variable UX early
 
 ### Agent orientation
 
