@@ -70,16 +70,25 @@ $required_classes = [
 	'CetechDeliveryEngine\\Application\\Selector\\ProductDeliverySelectionValidator',
 	'CetechDeliveryEngine\\Application\\Runtime\\ProductDeliveryRuntimeConfigurationRouter',
 	'CetechDeliveryEngine\\Application\\Runtime\\WooCommerceVariationRelationshipInspector',
-	'CetechDeliveryEngine\\Application\\Runtime\\VariationRelationshipInspectorInterface',
 	'CetechDeliveryEngine\\Application\\Selector\\VariationDeliveryOptionsEndpoint',
 	'CetechDeliveryEngine\\Presentation\\Frontend\\VariableDeliverySelectorAssets',
 	'CetechDeliveryEngine\\Domain\\RateCard\\RateCardAmountFormatter',
 	'CetechDeliveryEngine\\Application\\Cart\\CartDeliverySelectionSessionData',
 ];
 
+$required_interfaces = [
+	'CetechDeliveryEngine\\Application\\Runtime\\VariationRelationshipInspectorInterface',
+];
+
 foreach ( $required_classes as $class ) {
 	if ( ! class_exists( $class ) ) {
 		$failures[] = "Autoload failed for required runtime class: {$class}";
+	}
+}
+
+foreach ( $required_interfaces as $interface ) {
+	if ( ! interface_exists( $interface ) ) {
+		$failures[] = "Autoload failed for required runtime interface: {$interface}";
 	}
 }
 
