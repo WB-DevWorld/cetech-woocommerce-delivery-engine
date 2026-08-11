@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 /**
- * Production-package autoload / boot-wiring verification for Stage 5B packaging.
+ * Production-package autoload / boot-wiring verification for Stage 5B/6B packaging.
  *
  * Usage:
  *   php scripts/verify-production-package-autoload.php /path/to/staged/plugin-root
@@ -68,6 +68,13 @@ $required_classes = [
 	'CetechDeliveryEngine\\Presentation\\Admin\\ProductTargetResolver',
 	'CetechDeliveryEngine\\Application\\Configuration\\Admin\\ProductVariationScopeGuard',
 	'CetechDeliveryEngine\\Application\\Selector\\ProductDeliverySelectionValidator',
+	'CetechDeliveryEngine\\Application\\Runtime\\ProductDeliveryRuntimeConfigurationRouter',
+	'CetechDeliveryEngine\\Application\\Runtime\\WooCommerceVariationRelationshipInspector',
+	'CetechDeliveryEngine\\Application\\Runtime\\VariationRelationshipInspectorInterface',
+	'CetechDeliveryEngine\\Application\\Selector\\VariationDeliveryOptionsEndpoint',
+	'CetechDeliveryEngine\\Presentation\\Frontend\\VariableDeliverySelectorAssets',
+	'CetechDeliveryEngine\\Domain\\RateCard\\RateCardAmountFormatter',
+	'CetechDeliveryEngine\\Application\\Cart\\CartDeliverySelectionSessionData',
 ];
 
 foreach ( $required_classes as $class ) {
@@ -105,6 +112,31 @@ if ( class_exists( 'CetechDeliveryEngine\\Bootstrap\\FeatureFlags' ) ) {
 	} elseif ( true === $defaults['enable_effective_configuration_runtime'] ) {
 		$failures[] = 'enable_effective_configuration_runtime default must be false.';
 	}
+	if ( ! is_array( $defaults ) || ! array_key_exists( 'enable_variable_product_ecr_runtime', $defaults ) ) {
+		$failures[] = 'FeatureFlags missing enable_variable_product_ecr_runtime default.';
+	} elseif ( true === $defaults['enable_variable_product_ecr_runtime'] ) {
+		$failures[] = 'enable_variable_product_ecr_runtime default must be false.';
+	}
+}
+
+$variable_js  = $package_root . '/assets/frontend/variable-delivery-selector.js';
+$variable_css = $package_root . '/assets/frontend/variable-delivery-selector.css';
+if ( ! is_readable( $variable_js ) ) {
+	$failures[] = 'Missing assets/frontend/variable-delivery-selector.js';
+} else {
+	$js_source = (string) file_get_contents( $variable_js );
+	if ( ! str_contains( $js_source, 'found_variation' ) ) {
+		$failures[] = 'variable-delivery-selector.js missing found_variation listener.';
+	}
+	if ( ! str_contains( $js_source, 'reset_data' ) ) {
+		$failures[] = 'variable-delivery-selector.js missing reset_data listener.';
+	}
+	if ( ! str_contains( $js_source, 'requestToken' ) ) {
+		$failures[] = 'variable-delivery-selector.js missing stale-request protection (requestToken).';
+	}
+}
+if ( ! is_readable( $variable_css ) ) {
+	$failures[] = 'Missing assets/frontend/variable-delivery-selector.css';
 }
 
 if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
@@ -156,6 +188,8 @@ fwrite( STDOUT, "Package verification OK\n" );
 fwrite( STDOUT, "- ConfigurationHealthChecker autoloads from Application\\Diagnostics\n" );
 fwrite( STDOUT, "- Plugin.php import present\n" );
 fwrite( STDOUT, "- Boot factory class references resolve\n" );
-fwrite( STDOUT, "- Schema target 3; ECR runtime flag default OFF\n" );
+fwrite( STDOUT, "- Schema target 3; main ECR + variable ECR flags default OFF\n" );
+fwrite( STDOUT, "- Stage 6 variation endpoint/router/inspector/assets present\n" );
+fwrite( STDOUT, "- Variable frontend JS/CSS present with found_variation/reset_data/requestToken\n" );
 fwrite( STDOUT, "- No PHPUnit in production vendor\n" );
 exit( 0 );
