@@ -10,6 +10,7 @@ use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceI
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryRuntimeConfigurationRouter;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryRuntimeResolution;
 use CetechDeliveryEngine\Application\Runtime\RuntimeConfigurationSource;
+use CetechDeliveryEngine\Application\Runtime\VariationRelationshipInspectorInterface;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Domain\Enum\ProductTargetType;
 use PHPUnit\Framework\TestCase;
@@ -37,7 +38,7 @@ final class ProductDeliveryRuntimeConfigurationRouterTest extends TestCase {
 		$this->flags->set( ProductDeliveryRuntimeConfigurationRouter::CUTOVER_FLAG, false );
 		$this->category_guard->dependent = true;
 
-		$router = $this->router();
+		$router     = $this->router();
 		$resolution = $router->resolve( ProductTargetType::Product->value, 101 );
 
 		self::assertSame( RuntimeConfigurationSource::LEGACY, $resolution->source );
@@ -84,6 +85,7 @@ final class ProductDeliveryRuntimeConfigurationRouterTest extends TestCase {
 
 	public function test_flag_on_variation_target_stays_legacy(): void {
 		$this->flags->set( ProductDeliveryRuntimeConfigurationRouter::CUTOVER_FLAG, true );
+		// VARIABLE_CUTOVER_FLAG not set → defaults false.
 
 		$router = $this->router();
 		self::assertSame( RuntimeConfigurationSource::LEGACY, $router->decide( ProductTargetType::Variation->value, 303 ) );
@@ -111,14 +113,104 @@ final class ProductDeliveryRuntimeConfigurationRouterTest extends TestCase {
 		self::assertFalse( $this->flags->defaults()[ ProductDeliveryRuntimeConfigurationRouter::CUTOVER_FLAG ] );
 	}
 
-	private function router(): ProductDeliveryRuntimeConfigurationRouter {
+	// --- Stage 6A: variable ECR flag tests ---
+
+	public function test_main_ecr_flag_off_variable_product_uses_legacy(): void {
+		$this->flags->set( ProductDeliveryRuntimeConfigurationRouter::CUTOVER_FLAG, false );
+		// Even with variable flag ON, main flag OFF → LEGACY.
+		$this->flags->set( ProductDeliveryRuntimeConfigurationRouter::VARIABLE_CUTOVER_FLAG, true );
+
+		$router = $this->router();
+		self::assertSame( RuntimeConfigurationSource::LEGACY, $router->decide( ProductTargetType::Product->value, 202 ) );
+	}
+
+	public function test_main_on_variable_flag_off_variation_uses_legacy(): void {
+		$this->flags->set( ProductDeliveryRuntimeConfigurationRouter::CUTOVER_FLAG, true );
+		$this->flags->set( ProductDeliveryRuntimeConfigurationRouter::VARIABLE_CUTOVER_FLAG, false );
+
+		$inspector = new FixedVariationRelationshipInspector( [ 303 => 202 ] );
+		$router    = $this->router( $inspector );
+
+		self::assertSame( RuntimeConfigurationSource::LEGACY, $router->decide( ProductTargetType::Variation->value, 303 ) );
+		self::assertSame( 0, $this->ecr->calls );
+	}
+
+	public function test_both_flags_on_valid_variation_uses_ecr(): void {
+		$this->flags->set( ProductDeliveryRuntimeConfigurationRouter::CUTOVER_FLAG, true );
+		$this->flags->set( ProductDeliveryRuntimeConfigurationRouter::VARIABLE_CUTOVER_FLAG, true );
+		$this->category_guard->variation_dependent = false;
+
+		$inspector = new FixedVariationRelationshipInspector( [ 303 => 202 ] );
+		$router    = $this->router( $inspector );
+
+		self::assertSame( RuntimeConfigurationSource::ECR, $router->decide( ProductTargetType::Variation->value, 303 ) );
+
+		$resolution = $router->resolve( ProductTargetType::Variation->value, 303 );
+		self::assertSame( RuntimeConfigurationSource::ECR, $resolution->source );
+		self::assertSame( 1, $this->ecr->calls );
+		self::assertSame( 0, $this->legacy->calls );
+	}
+
+	public function test_both_flags_on_invalid_variation_uses_ecr_fail_closed(): void {
+		$this->flags->set( ProductDeliveryRuntimeConfigurationRouter::CUTOVER_FLAG, true );
+		$this->flags->set( ProductDeliveryRuntimeConfigurationRouter::VARIABLE_CUTOVER_FLAG, true );
+
+		// Inspector does NOT know about variation 999 → inspect() returns ok=false.
+		$inspector = new FixedVariationRelationshipInspector( [] );
+		$router    = $this->router( $inspector );
+
+		// Fail-closed: routes to ECR so ECR can fail, not silently to legacy.
+		self::assertSame( RuntimeConfigurationSource::ECR, $router->decide( ProductTargetType::Variation->value, 999 ) );
+		self::assertSame( 0, $this->legacy->calls );
+	}
+
+	public function test_both_flags_on_category_winning_variation_uses_legacy_category_compat(): void {
+		$this->flags->set( ProductDeliveryRuntimeConfigurationRouter::CUTOVER_FLAG, true );
+		$this->flags->set( ProductDeliveryRuntimeConfigurationRouter::VARIABLE_CUTOVER_FLAG, true );
+		$this->category_guard->variation_dependent = true;
+
+		$inspector = new FixedVariationRelationshipInspector( [ 303 => 202 ] );
+		$router    = $this->router( $inspector );
+
+		self::assertSame(
+			RuntimeConfigurationSource::LEGACY_CATEGORY_COMPATIBILITY,
+			$router->decide( ProductTargetType::Variation->value, 303 )
+		);
+
+		$resolution = $router->resolve( ProductTargetType::Variation->value, 303 );
+		self::assertSame( RuntimeConfigurationSource::LEGACY_CATEGORY_COMPATIBILITY, $resolution->source );
+		self::assertSame( 1, $this->legacy_category->calls );
+		self::assertSame( 0, $this->ecr->calls );
+	}
+
+	public function test_simple_product_routing_unchanged_when_variable_flag_on(): void {
+		$this->flags->set( ProductDeliveryRuntimeConfigurationRouter::CUTOVER_FLAG, true );
+		$this->flags->set( ProductDeliveryRuntimeConfigurationRouter::VARIABLE_CUTOVER_FLAG, true );
+		$this->category_guard->dependent = false;
+
+		$router = $this->router();
+		// Simple product (id=101) still routes to ECR regardless of variable flag.
+		self::assertSame( RuntimeConfigurationSource::ECR, $router->decide( ProductTargetType::Product->value, 101 ) );
+	}
+
+	public function test_variable_cutover_flag_defaults_off(): void {
+		self::assertFalse( $this->flags->is_enabled( ProductDeliveryRuntimeConfigurationRouter::VARIABLE_CUTOVER_FLAG ) );
+		self::assertArrayHasKey(
+			ProductDeliveryRuntimeConfigurationRouter::VARIABLE_CUTOVER_FLAG,
+			$this->flags->defaults()
+		);
+		self::assertFalse( $this->flags->defaults()[ ProductDeliveryRuntimeConfigurationRouter::VARIABLE_CUTOVER_FLAG ] );
+	}
+
+	private function router( ?VariationRelationshipInspectorInterface $variation_inspector = null ): ProductDeliveryRuntimeConfigurationRouter {
 		return new ProductDeliveryRuntimeConfigurationRouter(
 			$this->flags,
 			$this->legacy,
 			$this->ecr,
 			$this->category_guard,
 			$this->types,
-			$this->legacy_category
+			$this->legacy_category,
+			$variation_inspector
 		);
 	}
 }
@@ -161,7 +253,13 @@ final class FixedCategoryGuard implements LegacyCategoryRuntimeCompatibilityGuar
 
 	public bool $dependent = false;
 
+	public bool $variation_dependent = false;
+
 	public function depends_on_legacy_category_rule( int $product_id ): bool {
 		return $this->dependent;
+	}
+
+	public function depends_on_legacy_category_rule_for_target( string $target_type, int $target_id ): bool {
+		return $this->variation_dependent;
 	}
 }

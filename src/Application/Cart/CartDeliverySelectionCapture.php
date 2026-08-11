@@ -22,6 +22,8 @@ final class CartDeliverySelectionCapture {
 
 	public const POST_FIELD = 'cetech_de_delivery_option_key';
 
+	public const POST_VARIATION_FIELD = 'cetech_de_delivery_variation_id';
+
 	public const CART_SELECTION_KEY = 'cetech_de_delivery_selection';
 
 	public const CART_SUMMARY_KEY = 'cetech_de_delivery_selection_summary';
@@ -89,6 +91,15 @@ final class CartDeliverySelectionCapture {
 		if ( '' === $display_key ) {
 			wc_add_notice(
 				__( 'Please select a delivery option for this product.', 'cetech-woocommerce-delivery-engine' ),
+				'error'
+			);
+
+			return false;
+		}
+
+		if ( $variation_id > 0 && ! $this->submitted_variation_matches( $variation_id ) ) {
+			wc_add_notice(
+				__( 'Your selected delivery option is no longer available. Please choose again.', 'cetech-woocommerce-delivery-engine' ),
 				'error'
 			);
 
@@ -362,7 +373,8 @@ final class CartDeliverySelectionCapture {
 	}
 
 	/**
-	 * Capture applies to simple products only in Phase 2E1 (variable forms deferred).
+	 * Capture applies to simple products always (when capture flags are on).
+	 * Variable products require both ECR flags and a selected variation.
 	 */
 	private function should_apply_capture( int $product_id, int $variation_id ): bool {
 		if ( $product_id <= 0 || ! function_exists( 'wc_get_product' ) ) {
@@ -375,15 +387,36 @@ final class CartDeliverySelectionCapture {
 			return false;
 		}
 
+		if ( $product->is_type( 'simple' ) ) {
+			return true;
+		}
+
 		if ( $product->is_type( 'variable' ) ) {
+			return $variation_id > 0 && $this->is_variable_ecr_enabled();
+		}
+
+		if ( $product->is_type( 'variation' ) && $variation_id <= 0 ) {
+			return true;
+		}
+
+		return false;
+	}
+
+	private function is_variable_ecr_enabled(): bool {
+		return $this->feature_flags->is_enabled( 'enable_effective_configuration_runtime' )
+			&& $this->feature_flags->is_enabled( 'enable_variable_product_ecr_runtime' );
+	}
+
+	private function submitted_variation_matches( int $variation_id ): bool {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce add-to-cart form; validated server-side.
+		if ( ! isset( $_POST[ self::POST_VARIATION_FIELD ] ) ) {
 			return false;
 		}
 
-		if ( $variation_id > 0 && ! $product->is_type( 'simple' ) ) {
-			return false;
-		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		$submitted = (int) wp_unslash( (string) $_POST[ self::POST_VARIATION_FIELD ] );
 
-		return $product->is_type( 'simple' ) || ( $product->is_type( 'variation' ) && $variation_id <= 0 );
+		return $submitted > 0 && $submitted === $variation_id;
 	}
 
 	/**

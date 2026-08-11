@@ -38,8 +38,11 @@ final class EcrToRuntimeConfigurationAdapter {
 	public function adapt(
 		int $product_id,
 		EffectiveConfigurationSet $set,
-		string $input_target_type = ProductTargetType::Product->value
+		string $input_target_type = ProductTargetType::Product->value,
+		?int $variation_id = null
 	): array {
+		$input_target_type   = sanitize_key( $input_target_type );
+		$result_target_id    = $this->result_target_id( $input_target_type, $product_id, $variation_id );
 		$chosen              = [];
 		$explanations        = [];
 		$matched             = [];
@@ -67,7 +70,7 @@ final class EcrToRuntimeConfigurationAdapter {
 			}
 
 			$has_unresolved_only = false;
-			$mapped              = $this->map_slice( $product_id, $configuration );
+			$mapped              = $this->map_slice( $product_id, $configuration, $input_target_type, $variation_id );
 
 			if ( null === $mapped ) {
 				continue;
@@ -83,7 +86,7 @@ final class EcrToRuntimeConfigurationAdapter {
 		if ( [] === $chosen && ( $has_invalid_slice || $has_unresolved_only ) ) {
 			$result = ProductRuleResolutionResult::failure(
 				$input_target_type,
-				$product_id,
+				$result_target_id,
 				__(
 					'Effective configuration is invalid or unresolved for this product.',
 					'cetech-woocommerce-delivery-engine'
@@ -104,24 +107,46 @@ final class EcrToRuntimeConfigurationAdapter {
 			)
 			: null;
 
+		$hierarchy = [
+			[
+				'target_type' => ProductTargetType::Product->value,
+				'target_id'   => $product_id,
+				'label'       => null,
+				'order'       => 1,
+			],
+		];
+
+		if (
+			ProductTargetType::Variation->value === $input_target_type
+			&& null !== $variation_id
+			&& $variation_id > 0
+		) {
+			$hierarchy[] = [
+				'target_type' => ProductTargetType::Variation->value,
+				'target_id'   => $variation_id,
+				'label'       => null,
+				'order'       => 2,
+			];
+		}
+
+		$explanation = ProductTargetType::Variation->value === $input_target_type
+			? __(
+				'Effective configuration resolver (GLOBAL → PRODUCT → VARIATION) supplied slice-aware runtime configuration.',
+				'cetech-woocommerce-delivery-engine'
+			)
+			: __(
+				'Effective configuration resolver (GLOBAL → PRODUCT) supplied slice-aware runtime configuration.',
+				'cetech-woocommerce-delivery-engine'
+			);
+
 		$result = new ProductRuleResolutionResult(
 			true,
 			null,
 			$input_target_type,
-			$product_id,
+			$result_target_id,
 			null,
-			[
-				[
-					'target_type' => ProductTargetType::Product->value,
-					'target_id'   => $product_id,
-					'label'       => null,
-					'order'       => 1,
-				],
-			],
-			__(
-				'Effective configuration resolver (GLOBAL → PRODUCT) supplied slice-aware runtime configuration.',
-				'cetech-woocommerce-delivery-engine'
-			),
+			$hierarchy,
+			$explanation,
 			$matched,
 			$chosen,
 			$explanations,
@@ -148,7 +173,12 @@ final class EcrToRuntimeConfigurationAdapter {
 	 *     }
 	 * }|null
 	 */
-	private function map_slice( int $product_id, EffectiveConfiguration $configuration ): ?array {
+	private function map_slice(
+		int $product_id,
+		EffectiveConfiguration $configuration,
+		string $input_target_type = ProductTargetType::Product->value,
+		?int $variation_id = null
+	): ?array {
 		$availability = $this->resolve_availability( $configuration );
 
 		if ( null === $availability ) {
@@ -193,12 +223,22 @@ final class EcrToRuntimeConfigurationAdapter {
 		$supplier  = $this->nullable_reference( $configuration, ConfigurationFieldKey::SUPPLIER_ID );
 		$origin    = $this->nullable_reference( $configuration, ConfigurationFieldKey::ORIGIN_ID );
 
+		$rule_target_type = ProductTargetType::Variation->value === $input_target_type
+			&& null !== $variation_id
+			&& $variation_id > 0
+			? ProductTargetType::Variation->value
+			: ProductTargetType::Product->value;
+		$rule_target_id   = ProductTargetType::Variation->value === $rule_target_type
+			? (int) $variation_id
+			: $product_id;
+		$specificity      = ProductTargetType::Variation->value === $rule_target_type ? 3 : 2;
+
 		$rule = new ResolvedProductDeliveryRule(
 			0,
-			ProductTargetType::Product->value,
-			$product_id,
+			$rule_target_type,
+			$rule_target_id,
 			null,
-			2,
+			$specificity,
 			$availability,
 			$choice,
 			$offer_ids,
@@ -279,6 +319,18 @@ final class EcrToRuntimeConfigurationAdapter {
 		}
 
 		return false;
+	}
+
+	private function result_target_id( string $input_target_type, int $product_id, ?int $variation_id ): int {
+		if (
+			ProductTargetType::Variation->value === $input_target_type
+			&& null !== $variation_id
+			&& $variation_id > 0
+		) {
+			return $variation_id;
+		}
+
+		return $product_id;
 	}
 
 	/**

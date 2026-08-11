@@ -1,0 +1,13 @@
+{
+  "name": "cetech-woocommerce-delivery-engine-frontend-tests",
+  "private": true,
+  "description": "Development-only JS tests for Stage 6 variable delivery selector. Not required at runtime.",
+  "scripts": {
+    "test:js": "vitest run",
+    "test:js:watch": "vitest"
+  },
+  "devDependencies": {
+    "jsdom": "^26.1.0",
+    "vitest": "^3.2.4"
+  }
+}

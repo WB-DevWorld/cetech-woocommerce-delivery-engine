@@ -5,13 +5,13 @@
 **Last updated:** 2026-08-10  
 **Plugin version:** `1.0.0-rc.1`  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `master` — Stages 0B–5 **COMPLETE**; Stage 5B-3R-2 **VERIFIED** (ECR QA order `#39711`, shipping 25.00); runtime flags OFF on FLAIROC  
+**Git:** `master` — Stages 0B–6A **COMPLETE**; Stage 5B-3R-2 **VERIFIED** (ECR QA order `#39711`, shipping 25.00); Stage 6A local-only variable ECR (flag default OFF); runtime flags OFF on FLAIROC  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
 This handoff remains the **product vision and domain source of truth**. Much of the document describes the full intended engine (including shipment records and customer tracking). **Only the V1 RC scope below is implemented in code today.** Do not assume later sections are already built.
 
-### Stage 0B / Stage 1 / Stage 2 / Stage 3 / Stage 4 / Stage 5A / Stage 5B status
+### Stage 0B / Stage 1 / Stage 2 / Stage 3 / Stage 4 / Stage 5A / Stage 5B / Stage 6A status
 
 | Item | Status |
 |------|--------|
@@ -31,21 +31,24 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 5B-3R-1 fingerprint package | **DONE** — Artifact 3 SHA-256 `dbddc1d7…cbfd` built and installed on FLAIROC |
 | Stage 5B-3R-2 ECR live parity retry | **VERIFIED** — fingerprint session MATCH; checkout valid; shipping **25.00**; ECR QA order **`#39711`**; snapshots PASS; flags/COD restored OFF; dormant PASS |
 | Stage 5 overall | **COMPLETE** |
+| Stage 6A Variable-product ECR support | **COMPLETE** — artifact `docs/STAGE-6A-VARIABLE-PRODUCT-ECR-SUPPORT.md` (local only; variable flag default OFF; no FLAIROC deploy) |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |
 | New admin UX | Global/Product/Variation scoped editors + effective preview; pre-cutover notice |
 | Runtime cutover flag | `enable_effective_configuration_runtime` **defaults OFF** — FLAIROC currently OFF after Stage 5B-3R-2 |
+| Variable ECR cutover flag | `enable_variable_product_ecr_runtime` **defaults OFF** — requires main ECR flag; does not affect simple-product Stage 5 path |
 | Legacy storage | `product_delivery_rules` remains default authoritative path while cutover flag OFF |
 | Runtime on FLAIROC | Fingerprint-fixed DE **active** `1.0.0-rc.1`; all runtime flags OFF; ECR OFF; COD OFF; dormant storefront PASS; ECR simple-product parity **proven** (order `#39711` / 25.00) |
-| Variable runtime capture | **Not implemented** (Stage 6) |
+| Variable runtime capture | **Implemented locally (Stage 6A)** behind dual flags; FLAIROC not cut over; WoodMart adapter still Stage 7 |
 | Shipments / tracking / timeline | **Not implemented** |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
-| Category legacy parity | Stage 5 **compatibility route** (category winners stay on legacy source); `#39705` is **not** category-routed |
-| Next stage | Stage 6 — Variable Product ECR Support (**do not auto-start**) |
+| Category legacy parity | Stage 5/6 **compatibility route** (category winners stay on legacy source); `#39705` is **not** category-routed |
+| Next stage | Stage 6B — Package and Controlled FLAIROC Variable-Product ECR Verification (**do not auto-start**) |
 | Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual |
+| Release-quality backlog | **Admin terminology simplification required before next RC** (Stage 4 still shows technical labels such as Effective Configuration Preview / Stage 3 / Unresolved) |
 | Stage 1 HPOS debt | **DEFERRED** (`countOrderSnapshotReferences` postmeta); non-numeric rate→0 **FIXED** in Stage 5A |
 
-Do **not** begin Stage 6 unless explicitly tasked. Keep FLAIROC Delivery Engine runtime flags **OFF** (dormant) unless a controlled Stage 6 enablement plan is approved.
+Do **not** begin Stage 6B or Stage 7 unless explicitly tasked. Keep FLAIROC Delivery Engine runtime flags **OFF** (dormant) unless a controlled Stage 6B enablement plan is approved.
 
 
 
@@ -69,6 +72,7 @@ Do **not** begin Stage 6 unless explicitly tasked. Keep FLAIROC Delivery Engine 
 | `docs/STAGE-4-ADMIN-INHERITANCE-UX.md` | Stage 4 admin inheritance UX + effective preview completion record |
 | `docs/STAGE-5A-SIMPLE-RUNTIME-ECR-INTEGRATION.md` | Stage 5A simple-product ECR runtime integration (local; flag default OFF) |
 | `docs/STAGE-5B-FLAIROC-DEPLOYMENT-VERIFICATION.md` | Stage 5B FLAIROC deployment incident + verification record |
+| `docs/STAGE-6A-VARIABLE-PRODUCT-ECR-SUPPORT.md` | Stage 6A variable-product ECR runtime (local; variable flag default OFF) |
 | `docs/Delivery Shipping Plugin Up-To-Date Design and Expectations.md` | Latest intended product / end-state design |
 
 ### What has been accomplished
@@ -83,8 +87,9 @@ V1 RC delivers a **feature-flagged** path from admin configuration through paid-
 | Stage 2 scoped Global→Product→Variation **storage** (schema 3) | Done; dormant foundation; not runtime-wired |
 | Stage 3 EffectiveConfigurationResolver | Done; PHPUnit/harness only; not runtime-wired |
 | Stage 4 Admin inheritance UX + effective preview | Done; admin-only; pre-cutover |
-| Stage 5A simple-product ECR runtime source | Done locally; cutover flag **defaults OFF**; FLAIROC not deployed |
-| Product-page delivery selector (public-safe; simple products) | Done (Phases 2D1–2D3) |
+| Stage 5A simple-product ECR runtime source | Done locally; cutover flag **defaults OFF**; FLAIROC verified then restored OFF |
+| Stage 6A variable-product ECR runtime | Done locally; `enable_variable_product_ecr_runtime` **defaults OFF**; requires main ECR flag; FLAIROC not cut over |
+| Product-page delivery selector (public-safe; simple + variable shell) | Done (Phases 2D1–2D3 + Stage 6A AJAX variation refresh) |
 | Cart selection capture + session/revalidation hardening | Done (Phases 2E1–2E2) |
 | Checkout delivery selection validation | Done (Phase 2F1) |
 | Rate quote engine + WC shipping method `delivery_engine_selected_offer` (label **Delivery**) | Done (Phases 2G1–2G2) |
@@ -120,7 +125,8 @@ Enable only after admin configuration is complete, in this order:
 
 Reserved flags with **no V1 runtime behaviour** (keep off): `enable_shipment_records`, `enable_tracking_links`, `enable_customer_timeline`.  
 Blocks checkout adapter flag exists but is off / unwired.  
-Stage 5A cutover flag (default **off**): `enable_effective_configuration_runtime` — when off, storefront uses legacy product rules; when on (tests/Stage 5B only), simple products without category dependency use ECR. Code: `src/Bootstrap/FeatureFlags.php`.
+Stage 5A cutover flag (default **off**): `enable_effective_configuration_runtime` — when off, storefront uses legacy product rules; when on (tests/Stage 5B only), simple products without category dependency use ECR.  
+Stage 6A variable cutover flag (default **off**): `enable_variable_product_ecr_runtime` — requires main ECR flag; enables variation AJAX selector + variable cart capture. Code: `src/Bootstrap/FeatureFlags.php`.
 
 ### Explicitly not implemented in V1 RC
 
@@ -130,9 +136,9 @@ Stage 5A cutover flag (default **off**): `enable_effective_configuration_runtime
 - Automatic order completion from delivery events
 - Public REST / Store API exposure
 - WooCommerce Blocks checkout support
-- Variable-product delivery **capture** (deferred; Stage 6)
-- Real WPML / WCML / WoodMart / WCFM / VitePOS adapters (detection / Null stubs only)
-- FLAIROC Stage 5B live ECR cutover (Stage 5A is local-only; cutover flag defaults off)
+- Variable-product delivery **FLAIROC cutover** (Stage 6A implemented locally; Stage 6B verification deferred)
+- Real WPML / WCML / WoodMart / WCFM / VitePOS adapters (detection / Null stubs only; WoodMart adapter = Stage 7)
+- FLAIROC Stage 6B variable ECR live verification (Stage 6A is local-only; both ECR flags default off)
 
 ### Hard invariants (already enforced in V1 code — preserve them)
 
@@ -145,9 +151,10 @@ Stage 5A cutover flag (default **off**): `enable_effective_configuration_runtime
 
 ### Known V1 limitations
 
-- Variable product capture deferred (selector may notice; test simple products first)
+- Variable product FLAIROC cutover / WoodMart verification deferred (Stage 6B / 7)
 - Mixed-cart line quotes may differ from WooCommerce shipping line total
 - Classic checkout only
+- Admin Stage 4 screens still contain technical wording (backlog before next RC)
 - Do not promote RC beyond staging until `docs/V1-RC-SMOKE-TEST-CHECKLIST.md` passes
 
 ### Sensible next work after V1 RC
@@ -155,11 +162,12 @@ Stage 5A cutover flag (default **off**): `enable_effective_configuration_runtime
 1. ~~Complete staging smoke checklist / Stage 0B~~ — **DONE (VERIFIED)**
 2. ~~Post-RC architecture gap analysis (Stage 1)~~ — **DONE**
 3. ~~Stage 2: Global configuration + scoped inheritance storage~~ — **DONE**
-4. ~~Stage 3: EffectiveConfigurationResolver~~ — **DONE** (harness/PHPUnit only; no storefront cutover)
+4. ~~Stage 3: EffectiveConfigurationResolver~~ — **DONE**
 5. ~~Stage 4: Admin inheritance UX + effective configuration preview~~ — **DONE**
-6. ~~Stage 5A: Simple-product ECR runtime integration (local; flag OFF)~~ — **DONE**
-7. Later: Stage 5B FLAIROC controlled cutover → variable capture → packages → shipments → integrations/Blocks → quality RC
-8. Do not skip foundations to reach shipments or variable UX early
+6. ~~Stage 5A/5B: Simple-product ECR runtime + FLAIROC verification~~ — **DONE**
+7. ~~Stage 6A: Variable-product ECR support (local; flags OFF)~~ — **DONE**
+8. Later: Stage 6B FLAIROC variable verification → WoodMart adapter → packages → shipments → integrations/Blocks → quality RC
+9. Do not skip foundations to reach shipments early
 
 ### Agent orientation
 

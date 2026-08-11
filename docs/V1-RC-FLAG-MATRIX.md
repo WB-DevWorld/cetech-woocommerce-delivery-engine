@@ -45,7 +45,8 @@ V1 RC includes configuration, product delivery selection, cart capture, checkout
 
 | Flag | Default | V1 notes |
 |------|---------|----------|
-| `enable_effective_configuration_runtime` | **false** | Stage 5A ECR source cutover for **simple products only**. Independent of selector/cart/checkout/shipping flags. OFF = exact legacy path. Does not create customer UI by itself. Keep OFF on FLAIROC until Stage 5B. |
+| `enable_effective_configuration_runtime` | **false** | Stage 5A ECR source cutover for **simple products**. Independent of selector/cart/checkout/shipping flags. OFF = exact legacy path. Does not create customer UI by itself. Keep OFF on FLAIROC until an approved cutover. |
+| `enable_variable_product_ecr_runtime` | **false** | Stage 6A variable/variation ECR cutover. Requires `enable_effective_configuration_runtime`. Defaults OFF; does not affect simple-product Stage 5 behaviour. Keep OFF on FLAIROC until Stage 6B. |
 | `enable_blocks_adapter` | false | WooCommerce Blocks checkout not supported in V1 |
 | `enable_classic_checkout_adapter` | true | Placeholder; classic checkout is the de facto path |
 | Integration adapters (WPML, WCML, WoodMart, WCFM, VitePOS) | false | Detection only; no hard dependency |

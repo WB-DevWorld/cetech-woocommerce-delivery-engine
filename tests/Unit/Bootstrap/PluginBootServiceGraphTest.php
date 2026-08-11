@@ -24,6 +24,8 @@ use CetechDeliveryEngine\Presentation\Admin\SystemStatusPage;
 use CetechDeliveryEngine\Presentation\Email\CustomerOrderDeliveryEmailSummaryRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\CustomerOrderDeliverySummaryRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\ProductDeliverySelectorRenderer;
+use CetechDeliveryEngine\Presentation\Frontend\VariableDeliverySelectorAssets;
+use CetechDeliveryEngine\Application\Selector\VariationDeliveryOptionsEndpoint;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
 
@@ -90,6 +92,8 @@ final class PluginBootServiceGraphTest extends TestCase {
 			IntegrationRegistry::class,
 			HealthCheckRegistry::class,
 			ProductDeliverySelectorRenderer::class,
+			VariableDeliverySelectorAssets::class,
+			VariationDeliveryOptionsEndpoint::class,
 			CartDeliverySelectionCapture::class,
 			CartDeliverySelectionRevalidator::class,
 			CheckoutDeliverySelectionValidator::class,

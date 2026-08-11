@@ -11,6 +11,10 @@ tests/.phpunit.cache/
 .phpunit.result.cache
 coverage/
 
+# Frontend JS test tooling (development-only; not required at runtime)
+/node_modules/
+npm-debug.log*
+
 # Local / secrets
 *.log
 .env
@@ -24,6 +28,7 @@ desktop.ini
 /tmp-stage5b2-verify/
 /tmp-stage5b2a-audit/
 /tmp-stage5b3/
+/tmp-stage5b3r2/
 /tmp-read-only-compare/
 
 # Stage 3 disposable dry-run WordPress stubs (generated at runtime)

@@ -107,7 +107,8 @@ $ExcludeDirPrefixes = @(
 
 $ExcludeFilePatterns = @(
     '*.zip', '*.log', '.env', '.env.local', '.DS_Store', 'Thumbs.db', 'desktop.ini',
-    'phpunit.xml', 'phpunit-baseline.txt'
+    'phpunit.xml', 'phpunit-baseline.txt', 'package.json', 'package-lock.json',
+    'vitest.config.js', 'vitest.config.ts', 'npm-debug.log*'
 )
 
 Write-Step 'Copying plugin files into staging folder'

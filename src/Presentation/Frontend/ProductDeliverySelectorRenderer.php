@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Presentation\Frontend;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
+use CetechDeliveryEngine\Application\Runtime\ProductDeliveryRuntimeConfigurationRouter;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
@@ -17,6 +18,7 @@ use WC_Product;
  * Product-page delivery selector (feature-flagged, off by default).
  *
  * Display-only when cart capture is disabled. Radio submission inside add-to-cart form when capture is enabled.
+ * Stage 6A: variable products render an AJAX-driven shell when variable ECR flags are enabled.
  * Does not calculate shipping prices or write order meta.
  */
 final class ProductDeliverySelectorRenderer {
@@ -48,6 +50,11 @@ final class ProductDeliverySelectorRenderer {
 
 	public function render_variable_notice(): void {
 		if ( ! $this->is_capture_enabled() ) {
+			return;
+		}
+
+		if ( $this->is_variable_ecr_enabled() ) {
+			// Interactive shell is rendered inside the add-to-cart form.
 			return;
 		}
 
@@ -85,6 +92,11 @@ final class ProductDeliverySelectorRenderer {
 		return $this->feature_flags->is_enabled( 'enable_cart_delivery_selection_capture' );
 	}
 
+	private function is_variable_ecr_enabled(): bool {
+		return $this->feature_flags->is_enabled( ProductDeliveryRuntimeConfigurationRouter::CUTOVER_FLAG )
+			&& $this->feature_flags->is_enabled( ProductDeliveryRuntimeConfigurationRouter::VARIABLE_CUTOVER_FLAG );
+	}
+
 	private function render_for_product( bool $interactive ): void {
 		if ( ! function_exists( 'is_product' ) || ! is_product() ) {
 			return;
@@ -97,6 +109,12 @@ final class ProductDeliverySelectorRenderer {
 		}
 
 		if ( $product->is_type( 'variable' ) ) {
+			if ( $interactive && $this->is_variable_ecr_enabled() ) {
+				$this->render_variable_shell();
+
+				return;
+			}
+
 			$this->render_notice(
 				__(
 					'Delivery options may update after selecting a product option.',
@@ -140,6 +158,22 @@ final class ProductDeliverySelectorRenderer {
 		} else {
 			$this->render_display_options( $options );
 		}
+	}
+
+	private function render_variable_shell(): void {
+		$product = $this->resolve_product();
+		$product_id = $product instanceof WC_Product ? (int) $product->get_id() : 0;
+
+		echo '<div class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--variable" data-cetech-de-variable-selector="1" data-product-id="' . esc_attr( (string) $product_id ) . '">';
+		echo '<fieldset class="cetech-de-delivery-selector__fieldset">';
+		echo '<legend class="cetech-de-delivery-selector__title">' . esc_html__( 'Delivery options', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
+		echo '<div class="cetech-de-delivery-selector__status" role="status" aria-live="polite" data-cetech-de-status>';
+		echo esc_html__( 'Select your product options to see delivery choices.', 'cetech-woocommerce-delivery-engine' );
+		echo '</div>';
+		echo '<div class="cetech-de-delivery-selector__options" data-cetech-de-options></div>';
+		echo '<input type="hidden" name="' . esc_attr( CartDeliverySelectionCapture::POST_VARIATION_FIELD ) . '" value="" data-cetech-de-variation-id disabled="disabled" />';
+		echo '</fieldset>';
+		echo '</div>';
 	}
 
 	private function resolve_product(): ?WC_Product {

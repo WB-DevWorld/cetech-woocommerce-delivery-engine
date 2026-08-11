@@ -6,8 +6,29 @@ namespace CetechDeliveryEngine\Application\Cart;
 
 /**
  * Normalizes and validates delivery selection data restored from WooCommerce session.
+ *
+ * Canonical intent fields that must survive capture → session → normalize → restore:
+ * contract_version, product_id, variation_id, target_type, target_id, display_key,
+ * fulfilment_availability, fulfilment_choice, delivery_offer_id, rule_id, issued_at,
+ * configuration_fingerprint (additive ECR; omit when empty for legacy hash stability).
  */
 final class CartDeliverySelectionSessionData {
+
+	/** @var list<string> */
+	public const CANONICAL_INTENT_KEYS = [
+		'contract_version',
+		'product_id',
+		'variation_id',
+		'target_type',
+		'target_id',
+		'display_key',
+		'fulfilment_availability',
+		'fulfilment_choice',
+		'delivery_offer_id',
+		'rule_id',
+		'issued_at',
+		'configuration_fingerprint',
+	];
 
 	private const SUMMARY_KEYS = [
 		'fulfilment_availability_label',

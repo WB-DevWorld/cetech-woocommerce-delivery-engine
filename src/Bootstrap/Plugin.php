@@ -100,6 +100,10 @@ use CetechDeliveryEngine\Presentation\Admin\SystemStatusPage;
 use CetechDeliveryEngine\Presentation\Email\CustomerOrderDeliveryEmailSummaryRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\CustomerOrderDeliverySummaryRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\ProductDeliverySelectorRenderer;
+use CetechDeliveryEngine\Presentation\Frontend\VariableDeliverySelectorAssets;
+use CetechDeliveryEngine\Application\Selector\VariationDeliveryOptionsEndpoint;
+use CetechDeliveryEngine\Application\Runtime\VariationRelationshipInspectorInterface;
+use CetechDeliveryEngine\Application\Runtime\WooCommerceVariationRelationshipInspector;
 use CetechDeliveryEngine\Presentation\Admin\Validation\DeliveryOfferValidator;
 use CetechDeliveryEngine\Presentation\Admin\Validation\DestinationRuleValidator;
 use CetechDeliveryEngine\Presentation\Admin\Validation\DestinationZoneValidator;
@@ -194,6 +198,8 @@ final class Plugin {
 		$health->run();
 
 		$this->container->get( ProductDeliverySelectorRenderer::class )->register();
+		$this->container->get( VariableDeliverySelectorAssets::class )->register();
+		$this->container->get( VariationDeliveryOptionsEndpoint::class )->register();
 		$this->container->get( CartDeliverySelectionCapture::class )->register();
 		$this->container->get( CartDeliverySelectionRevalidator::class )->register();
 		$this->container->get( CheckoutDeliverySelectionValidator::class )->register();
@@ -589,6 +595,25 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			VariableDeliverySelectorAssets::class,
+			static fn ( ServiceContainer $container ): VariableDeliverySelectorAssets => new VariableDeliverySelectorAssets(
+				$container->get( FeatureFlags::class ),
+				$container->get( Requirements::class )
+			)
+		);
+
+		$this->container->singleton(
+			VariationDeliveryOptionsEndpoint::class,
+			static fn ( ServiceContainer $container ): VariationDeliveryOptionsEndpoint => new VariationDeliveryOptionsEndpoint(
+				$container->get( FeatureFlags::class ),
+				$container->get( Requirements::class ),
+				$container->get( ProductDeliveryConfigurationSourceInterface::class ),
+				$container->get( ProductDeliveryOptionsBuilder::class ),
+				$container->get( VariationRelationshipInspectorInterface::class )
+			)
+		);
+
+		$this->container->singleton(
 			LogisticsProfilesPage::class,
 			static fn ( ServiceContainer $container ): LogisticsProfilesPage => new LogisticsProfilesPage(
 				$container->get( LogisticsProfileRepositoryInterface::class ),
@@ -909,6 +934,11 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			VariationRelationshipInspectorInterface::class,
+			static fn (): VariationRelationshipInspectorInterface => new WooCommerceVariationRelationshipInspector()
+		);
+
+		$this->container->singleton(
 			ProductDeliveryConfigurationSourceInterface::class,
 			static fn ( ServiceContainer $container ): ProductDeliveryConfigurationSourceInterface => new ProductDeliveryRuntimeConfigurationRouter(
 				$container->get( FeatureFlags::class ),
@@ -918,14 +948,16 @@ final class Plugin {
 				),
 				new EcrProductDeliveryConfigurationSource(
 					$container->get( EffectiveConfigurationResolver::class ),
-					$container->get( EcrToRuntimeConfigurationAdapter::class )
+					$container->get( EcrToRuntimeConfigurationAdapter::class ),
+					$container->get( VariationRelationshipInspectorInterface::class )
 				),
 				$container->get( LegacyCategoryRuntimeCompatibilityGuardInterface::class ),
 				$container->get( ProductTypeInspectorInterface::class ),
 				new LegacyProductDeliveryConfigurationSource(
 					$container->get( ProductDeliveryRuleResolver::class ),
 					RuntimeConfigurationSource::LEGACY_CATEGORY_COMPATIBILITY
-				)
+				),
+				$container->get( VariationRelationshipInspectorInterface::class )
 			)
 		);
 

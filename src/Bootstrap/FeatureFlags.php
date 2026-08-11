@@ -34,6 +34,7 @@ final class FeatureFlags {
 		'enable_category_rules'            => false,
 		'enable_site_fallback_rule'        => false,
 		'enable_effective_configuration_runtime' => false,
+		'enable_variable_product_ecr_runtime' => false,
 		'demo_data_on_activation'          => false,
 	];
 
