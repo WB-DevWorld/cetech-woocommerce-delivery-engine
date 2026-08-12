@@ -1,0 +1,17 @@
+{
+  "name": "cetech-de-training-playwright",
+  "private": true,
+  "description": "Documentation and staff-training walkthrough harness for CETECH Delivery Engine RC.2. Not required at runtime.",
+  "scripts": {
+    "test": "playwright test",
+    "test:smoke": "playwright test --grep @smoke",
+    "test:capture": "playwright test --grep @capture",
+    "test:validate": "playwright test --grep @validate",
+    "auth:save": "playwright test auth/save-storage-state.spec.ts --project=setup",
+    "report": "playwright show-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2",
+    "dotenv": "^16.6.1"
+  }
+}

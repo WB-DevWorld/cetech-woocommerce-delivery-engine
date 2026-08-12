@@ -14,6 +14,8 @@ coverage/
 # Frontend JS test tooling (development-only; not required at runtime)
 /node_modules/
 npm-debug.log*
+/training/playwright/node_modules/
+
 
 # Local / secrets
 *.log
@@ -23,6 +25,19 @@ docs/woodmart/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Playwright documentation harness — never commit auth/session state
+/training/playwright/auth/**
+!/training/playwright/auth/
+!/training/playwright/auth/.gitkeep
+!/training/playwright/auth/README.md
+/training/playwright/.auth/
+/training/playwright/test-results/
+/training/playwright/playwright-report/
+/training/playwright/blob-report/
+/training/playwright/storage-state*.json
+**/*storageState*.json
+**/auth/storage-state.json
 
 # Local read-only FLAIROC verification scratch (may contain page HTML dumps)
 /tmp-stage5b2-verify/
