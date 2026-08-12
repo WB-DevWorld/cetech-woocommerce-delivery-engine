@@ -12,7 +12,15 @@
     "autoload": {
         "psr-4": {
             "CetechDeliveryEngine\\": "src/"
-        }
+        },
+        "classmap": [
+            "src/"
+        ],
+        "files": [
+            "src/Core/Versioning/MigrationInterface.php",
+            "src/Core/Versioning/VerifiableMigrationInterface.php",
+            "src/Application/Runtime/VariationRelationshipInspectorInterface.php"
+        ]
     },
 	"autoload-dev": {
 		"psr-4": {

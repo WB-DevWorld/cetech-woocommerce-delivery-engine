@@ -52,6 +52,52 @@ if ( is_readable( $autoload ) ) {
 	return;
 }
 
+$runtime_contracts = CETECH_DE_PATH . 'src/Bootstrap/RuntimeContracts.php';
+
+if ( ! is_readable( $runtime_contracts ) ) {
+	add_action(
+		'admin_notices',
+		static function (): void {
+			if ( ! current_user_can( 'activate_plugins' ) ) {
+				return;
+			}
+
+			printf(
+				'<div class="notice notice-error"><p>%s</p></div>',
+				esc_html__(
+					'CETECH Delivery Engine is missing required plugin files. Delete the existing plugin folder, then install the complete plugin ZIP.',
+					'cetech-woocommerce-delivery-engine'
+				)
+			);
+		}
+	);
+
+	return;
+}
+
+require_once $runtime_contracts;
+
+if ( ! \CetechDeliveryEngine\Bootstrap\RuntimeContracts::load( CETECH_DE_PATH ) ) {
+	add_action(
+		'admin_notices',
+		static function (): void {
+			if ( ! current_user_can( 'activate_plugins' ) ) {
+				return;
+			}
+
+			printf(
+				'<div class="notice notice-error"><p>%s</p></div>',
+				esc_html__(
+					'CETECH Delivery Engine is missing required plugin files. Delete the existing plugin folder, then install the complete plugin ZIP.',
+					'cetech-woocommerce-delivery-engine'
+				)
+			);
+		}
+	);
+
+	return;
+}
+
 register_activation_hook( __FILE__, [ CetechDeliveryEngine\Bootstrap\Activator::class, 'activate' ] );
 register_deactivation_hook( __FILE__, [ CetechDeliveryEngine\Bootstrap\Deactivator::class, 'deactivate' ] );
 

@@ -74,10 +74,14 @@ $required_classes = [
 	'CetechDeliveryEngine\\Presentation\\Frontend\\VariableDeliverySelectorAssets',
 	'CetechDeliveryEngine\\Domain\\RateCard\\RateCardAmountFormatter',
 	'CetechDeliveryEngine\\Application\\Cart\\CartDeliverySelectionSessionData',
+	'CetechDeliveryEngine\\Bootstrap\\RuntimeContracts',
+	'CetechDeliveryEngine\\Core\\Versioning\\MigrationDiscovery',
 ];
 
 $required_interfaces = [
 	'CetechDeliveryEngine\\Application\\Runtime\\VariationRelationshipInspectorInterface',
+	'CetechDeliveryEngine\\Core\\Versioning\\VerifiableMigrationInterface',
+	'CetechDeliveryEngine\\Core\\Versioning\\MigrationInterface',
 ];
 
 foreach ( $required_classes as $class ) {
@@ -188,6 +192,111 @@ if ( preg_match_all( '/\b([A-Z][A-Za-z0-9_]+)::class\b/', $plugin_source, $match
 	}
 }
 
+$contracts_class = 'CetechDeliveryEngine\\Bootstrap\\RuntimeContracts';
+if ( class_exists( $contracts_class ) ) {
+	$missing_contracts = $contracts_class::missing_paths( $package_root );
+	foreach ( $missing_contracts as $missing_contract ) {
+		$failures[] = "Runtime contract file missing from package: {$missing_contract}";
+	}
+
+	if ( [] === $missing_contracts && ! $contracts_class::load( $package_root ) ) {
+		$failures[] = 'RuntimeContracts::load() failed against the extracted package.';
+	}
+
+	foreach ( $contracts_class::interface_names() as $contract_name ) {
+		if ( ! interface_exists( $contract_name ) ) {
+			$failures[] = "Runtime contract interface not defined after load: {$contract_name}";
+		}
+	}
+} else {
+	$failures[] = 'RuntimeContracts class did not autoload.';
+}
+
+$inspector_class = 'CetechDeliveryEngine\\Application\\Runtime\\WooCommerceVariationRelationshipInspector';
+if ( class_exists( $inspector_class ) ) {
+	try {
+		$inspector = new $inspector_class();
+		if ( ! $inspector instanceof \CetechDeliveryEngine\Application\Runtime\VariationRelationshipInspectorInterface ) {
+			$failures[] = 'WooCommerceVariationRelationshipInspector does not implement VariationRelationshipInspectorInterface.';
+		}
+	} catch ( \Throwable $exception ) {
+		$failures[] = 'Failed to instantiate WooCommerceVariationRelationshipInspector: ' . $exception->getMessage();
+	}
+}
+
+$schema3_migration = $package_root . '/database/migrations/20260810160000_create_scoped_configuration_tables.php';
+if ( ! is_readable( $schema3_migration ) ) {
+	$failures[] = 'Missing schema v3 migration file.';
+} else {
+	try {
+		$loaded_migration = require $schema3_migration;
+		if ( ! $loaded_migration instanceof \CetechDeliveryEngine\Core\Versioning\VerifiableMigrationInterface ) {
+			$failures[] = 'Schema v3 migration did not return VerifiableMigrationInterface after package autoload.';
+		} elseif ( '3' !== $loaded_migration->get_version() ) {
+			$failures[] = 'Schema v3 migration get_version() must be 3.';
+		}
+	} catch ( \Throwable $exception ) {
+		$failures[] = 'Schema v3 migration failed to load via production require path: ' . $exception->getMessage();
+	}
+}
+
+$classmap_file = $package_root . '/vendor/composer/autoload_classmap.php';
+if ( ! is_readable( $classmap_file ) ) {
+	$failures[] = 'Missing vendor/composer/autoload_classmap.php.';
+} else {
+	$classmap = require $classmap_file;
+	if ( ! is_array( $classmap ) ) {
+		$failures[] = 'Composer classmap is not an array.';
+	} else {
+		$required_map = [
+			'CetechDeliveryEngine\\Application\\Runtime\\VariationRelationshipInspectorInterface' => 'src/Application/Runtime/VariationRelationshipInspectorInterface.php',
+			'CetechDeliveryEngine\\Application\\Runtime\\WooCommerceVariationRelationshipInspector' => 'src/Application/Runtime/WooCommerceVariationRelationshipInspector.php',
+			'CetechDeliveryEngine\\Core\\Versioning\\VerifiableMigrationInterface' => 'src/Core/Versioning/VerifiableMigrationInterface.php',
+			'CetechDeliveryEngine\\Core\\Versioning\\MigrationInterface' => 'src/Core/Versioning/MigrationInterface.php',
+		];
+
+		foreach ( $required_map as $fqcn => $expected_relative ) {
+			if ( ! isset( $classmap[ $fqcn ] ) ) {
+				$failures[] = "Composer classmap missing {$fqcn}";
+				continue;
+			}
+
+			$mapped = str_replace( '\\', '/', (string) $classmap[ $fqcn ] );
+			if ( ! str_ends_with( $mapped, '/' . $expected_relative ) && ! str_ends_with( $mapped, $expected_relative ) ) {
+				$failures[] = "Composer classmap path for {$fqcn} is not Linux-case {$expected_relative}: {$mapped}";
+			}
+		}
+
+		foreach ( $classmap as $fqcn => $file_path ) {
+			if ( ! is_string( $fqcn ) || ! str_starts_with( $fqcn, 'CetechDeliveryEngine\\' ) ) {
+				continue;
+			}
+
+			$relative = 'src/' . str_replace( '\\', '/', substr( $fqcn, strlen( 'CetechDeliveryEngine\\' ) ) ) . '.php';
+			$mapped   = str_replace( '\\', '/', (string) $file_path );
+
+			if ( ! str_ends_with( $mapped, '/' . $relative ) && ! str_ends_with( $mapped, $relative ) ) {
+				$failures[] = "Linux-case PSR-4 mismatch for {$fqcn}; expected suffix {$relative}";
+			}
+		}
+	}
+}
+
+$autoload_static = $package_root . '/vendor/composer/autoload_static.php';
+if ( is_readable( $autoload_static ) ) {
+	$static_source = (string) file_get_contents( $autoload_static );
+	foreach (
+		[
+			'src/Core/Versioning/VerifiableMigrationInterface.php',
+			'src/Application/Runtime/VariationRelationshipInspectorInterface.php',
+		] as $files_autoload_path
+	) {
+		if ( ! str_contains( $static_source, $files_autoload_path ) ) {
+			$failures[] = "Composer files autoload missing {$files_autoload_path}";
+		}
+	}
+}
+
 if ( [] !== $failures ) {
 	fwrite( STDERR, "Package verification FAILED:\n- " . implode( "\n- ", $failures ) . "\n" );
 	exit( 1 );
@@ -201,4 +310,7 @@ fwrite( STDOUT, "- Schema target 3; main ECR + variable ECR flags default OFF\n"
 fwrite( STDOUT, "- Stage 6 variation endpoint/router/inspector/assets present\n" );
 fwrite( STDOUT, "- Variable frontend JS/CSS present with found_variation/reset_data/requestToken\n" );
 fwrite( STDOUT, "- No PHPUnit in production vendor\n" );
+fwrite( STDOUT, "- Runtime contracts loaded; VariationRelationshipInspectorInterface present\n" );
+fwrite( STDOUT, "- VerifiableMigrationInterface present; schema v3 migration require path OK\n" );
+fwrite( STDOUT, "- Linux-case PSR-4 classmap paths verified\n" );
 exit( 0 );
