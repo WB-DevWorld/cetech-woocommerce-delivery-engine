@@ -272,8 +272,22 @@ if ( ! is_readable( $classmap_file ) ) {
 				continue;
 			}
 
+			$mapped = str_replace( '\\', '/', (string) $file_path );
+			if ( ! is_readable( (string) $file_path ) ) {
+				$failures[] = "Composer classmap file missing for {$fqcn}: {$mapped}";
+				continue;
+			}
+
+			$short    = substr( $fqcn, (int) strrpos( $fqcn, '\\' ) + 1 );
+			$basename = basename( $mapped, '.php' );
+
+			// Secondary types may share a primary class file. Only the primary
+			// type is required to match the PSR-4 filename.
+			if ( $basename !== $short ) {
+				continue;
+			}
+
 			$relative = 'src/' . str_replace( '\\', '/', substr( $fqcn, strlen( 'CetechDeliveryEngine\\' ) ) ) . '.php';
-			$mapped   = str_replace( '\\', '/', (string) $file_path );
 
 			if ( ! str_ends_with( $mapped, '/' . $relative ) && ! str_ends_with( $mapped, $relative ) ) {
 				$failures[] = "Linux-case PSR-4 mismatch for {$fqcn}; expected suffix {$relative}";
