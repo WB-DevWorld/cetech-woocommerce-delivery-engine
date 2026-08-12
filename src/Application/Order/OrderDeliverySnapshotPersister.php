@@ -30,6 +30,53 @@ final class OrderDeliverySnapshotPersister {
 
 		add_action( 'woocommerce_checkout_create_order_line_item', [ $this, 'handle_create_order_line_item' ], 10, 4 );
 		add_action( 'woocommerce_checkout_order_created', [ $this, 'handle_order_created' ], 10, 1 );
+		add_filter( 'woocommerce_hidden_order_itemmeta', [ $this, 'hide_protected_order_item_meta' ] );
+		add_filter( 'woocommerce_order_item_get_formatted_meta_data', [ $this, 'strip_protected_formatted_meta' ], 10, 2 );
+	}
+
+	/**
+	 * @param list<string> $hidden
+	 *
+	 * @return list<string>
+	 */
+	public function hide_protected_order_item_meta( array $hidden ): array {
+		foreach ( [
+			OrderDeliverySnapshot::META_LINE_SNAPSHOT,
+			OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION,
+		] as $key ) {
+			if ( ! in_array( $key, $hidden, true ) ) {
+				$hidden[] = $key;
+			}
+		}
+
+		return $hidden;
+	}
+
+	/**
+	 * Remove protected meta from formatted order-item projections (customer/email/REST-safe).
+	 *
+	 * @param array<int|string, mixed> $formatted_meta
+	 * @param mixed                    $item
+	 *
+	 * @return array<int|string, mixed>
+	 */
+	public function strip_protected_formatted_meta( array $formatted_meta, $item ): array {
+		unset( $item );
+
+		$protected = [
+			OrderDeliverySnapshot::META_LINE_SNAPSHOT,
+			OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION,
+		];
+
+		foreach ( $formatted_meta as $meta_id => $meta ) {
+			$key = is_object( $meta ) && isset( $meta->key ) ? (string) $meta->key : '';
+
+			if ( in_array( $key, $protected, true ) || str_starts_with( $key, '_cetech_de_' ) ) {
+				unset( $formatted_meta[ $meta_id ] );
+			}
+		}
+
+		return $formatted_meta;
 	}
 
 	public function is_runtime_active(): bool {

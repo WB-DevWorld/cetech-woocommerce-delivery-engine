@@ -7,17 +7,21 @@ namespace CetechDeliveryEngine\Presentation\Admin;
 use CetechDeliveryEngine\Application\Order\OrderDeliveryLineReadResult;
 use CetechDeliveryEngine\Application\Order\OrderDeliveryLineSnapshot;
 use CetechDeliveryEngine\Application\Order\OrderDeliveryPackageReadResult;
-use CetechDeliveryEngine\Application\Order\OrderDeliveryPackageSnapshot;
 use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshot;
 use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotIntegrity;
 use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotReader;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentAvailability;
+use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
+use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
 use WC_Order;
 use WC_Order_Item_Product;
 use WP_Post;
 
 /**
- * Read-only WooCommerce order admin display for protected delivery snapshots.
+ * Read-only operational delivery information on WooCommerce order admin screens.
+ *
+ * Protected snapshot meta remains stored; this class never exposes raw JSON,
+ * versions, fingerprints, or internal IDs in the primary staff view.
  */
 final class OrderDeliverySnapshotAdminDisplay {
 
@@ -35,11 +39,34 @@ final class OrderDeliverySnapshotAdminDisplay {
 		}
 
 		add_action( 'add_meta_boxes', [ $this, 'register_meta_box' ], 30, 2 );
+		add_filter( 'woocommerce_hidden_order_itemmeta', [ $this, 'hide_protected_order_item_meta' ] );
 	}
 
 	/**
-	 * @param string  $post_type
-	 * @param WP_Post $post
+	 * Keep protected Delivery Engine order-item meta stored but invisible in normal WC item UI.
+	 *
+	 * @param list<string> $hidden
+	 *
+	 * @return list<string>
+	 */
+	public function hide_protected_order_item_meta( array $hidden ): array {
+		$protected = [
+			OrderDeliverySnapshot::META_LINE_SNAPSHOT,
+			OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION,
+		];
+
+		foreach ( $protected as $key ) {
+			if ( ! in_array( $key, $hidden, true ) ) {
+				$hidden[] = $key;
+			}
+		}
+
+		return $hidden;
+	}
+
+	/**
+	 * @param string              $post_type
+	 * @param WP_Post|WC_Order|null $post
 	 */
 	public function register_meta_box( string $post_type, $post ): void {
 		unset( $post_type, $post );
@@ -50,7 +77,7 @@ final class OrderDeliverySnapshotAdminDisplay {
 
 		add_meta_box(
 			self::META_BOX_ID,
-			__( 'Delivery Engine — Order Snapshots', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery information', 'cetech-woocommerce-delivery-engine' ),
 			[ $this, 'render_meta_box' ],
 			$screen,
 			'normal',
@@ -65,24 +92,21 @@ final class OrderDeliverySnapshotAdminDisplay {
 		$order = $this->resolve_order( $post_or_order );
 
 		if ( null === $order || ! $this->user_can_view_order( $order ) ) {
-			echo '<p>' . esc_html__( 'You do not have permission to view delivery snapshots for this order.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			echo '<p>' . esc_html__( 'You do not have permission to view delivery information for this order.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 
 			return;
 		}
 
-		$line_reads    = $this->collect_line_reads( $order );
-		$package_read  = $this->reader->read_package( $order );
-		$lines_status  = $this->integrity->classify_order_lines( $line_reads );
+		$line_reads     = $this->collect_line_reads( $order );
+		$package_read   = $this->reader->read_package( $order );
+		$lines_status   = $this->integrity->classify_order_lines( $line_reads );
 		$package_status = $this->integrity->classify_package( $package_read );
 
-		echo '<p class="description">';
-		echo esc_html__( 'Read-only view of protected delivery snapshots captured at checkout. No data is modified.', 'cetech-woocommerce-delivery-engine' );
-		echo '</p>';
-
-		$this->render_summary_table( $lines_status, $package_status, $package_read );
-
-		if ( OrderDeliverySnapshotIntegrity::STATUS_MISSING === $lines_status && OrderDeliverySnapshotIntegrity::STATUS_MISSING === $package_status ) {
-			echo '<p>' . esc_html__( 'No delivery snapshot meta found on this order.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		if (
+			OrderDeliverySnapshotIntegrity::STATUS_MISSING === $lines_status
+			&& OrderDeliverySnapshotIntegrity::STATUS_MISSING === $package_status
+		) {
+			echo '<p>' . esc_html__( 'No delivery information is saved on this order.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 
 			return;
 		}
@@ -90,35 +114,8 @@ final class OrderDeliverySnapshotAdminDisplay {
 		$this->render_line_items( $order, $line_reads );
 
 		if ( OrderDeliveryPackageReadResult::ERROR_MISSING !== $package_read->error ) {
-			$this->render_package_snapshot( $package_read, $package_status );
+			$this->render_package_summary( $package_read );
 		}
-	}
-
-	/**
-	 * @param list<OrderDeliveryLineReadResult> $line_reads
-	 */
-	private function render_summary_table(
-		string $lines_status,
-		string $package_status,
-		OrderDeliveryPackageReadResult $package_read
-	): void {
-		echo '<table class="widefat striped" style="margin-top:12px;margin-bottom:12px;">';
-		echo '<tbody>';
-		$this->render_row( __( 'Line snapshots status', 'cetech-woocommerce-delivery-engine' ), $this->format_status_label( $lines_status ) );
-		$this->render_row( __( 'Package snapshot status', 'cetech-woocommerce-delivery-engine' ), $this->format_status_label( $package_status ) );
-		$this->render_row(
-			__( 'Snapshot version', 'cetech-woocommerce-delivery-engine' ),
-			esc_html( OrderDeliverySnapshot::VERSION )
-		);
-
-		if ( null !== $package_read->stored_version ) {
-			$this->render_row(
-				__( 'Stored package version', 'cetech-woocommerce-delivery-engine' ),
-				esc_html( $package_read->stored_version )
-			);
-		}
-
-		echo '</tbody></table>';
 	}
 
 	/**
@@ -126,11 +123,9 @@ final class OrderDeliverySnapshotAdminDisplay {
 	 * @param list<OrderDeliveryLineReadResult> $line_reads
 	 */
 	private function render_line_items( WC_Order $order, array $line_reads ): void {
-		echo '<h4>' . esc_html__( 'Line item snapshots', 'cetech-woocommerce-delivery-engine' ) . '</h4>';
-
 		$index = 0;
 
-		foreach ( $order->get_items() as $item_id => $item ) {
+		foreach ( $order->get_items() as $item ) {
 			if ( ! $item instanceof WC_Order_Item_Product ) {
 				continue;
 			}
@@ -139,124 +134,75 @@ final class OrderDeliverySnapshotAdminDisplay {
 			$status = $this->integrity->classify_line( $read );
 			++$index;
 
-			echo '<div style="margin-bottom:16px;padding:12px;border:1px solid #ccd0d4;background:#fff;">';
-			echo '<p><strong>' . esc_html( $item->get_name() ) . '</strong>';
-			echo ' <span style="color:#646970;">(' . esc_html( sprintf(
-				/* translators: %d: WooCommerce order item ID */
-				__( 'Item #%d', 'cetech-woocommerce-delivery-engine' ),
-				(int) $item_id
-			) ) . ')</span></p>';
-
-			echo '<table class="widefat striped"><tbody>';
-			$this->render_row( __( 'Status', 'cetech-woocommerce-delivery-engine' ), $this->format_status_label( $status ) );
-			echo '</tbody></table>';
-
 			if ( null === $read->snapshot ) {
-				echo '<p><em>' . esc_html__( 'Snapshot could not be parsed safely.', 'cetech-woocommerce-delivery-engine' ) . '</em></p>';
-				echo '</div>';
-
 				continue;
 			}
 
-			$this->render_line_snapshot_details( $read->snapshot, $read );
+			echo '<div class="cetech-de-order-delivery-info" style="margin-bottom:16px;padding:12px;border:1px solid #ccd0d4;background:#fff;">';
+			echo '<table class="widefat striped"><tbody>';
+			$this->render_row( DeliveryPresentationLabels::product(), esc_html( $item->get_name() ) );
+			$this->render_operational_line_rows( $read->snapshot, $status );
+			echo '</tbody></table>';
 			echo '</div>';
 		}
 	}
 
-	private function render_line_snapshot_details( OrderDeliveryLineSnapshot $snapshot, OrderDeliveryLineReadResult $read ): void {
-		echo '<table class="widefat striped"><tbody>';
-		$this->render_row( __( 'Fulfilment availability', 'cetech-woocommerce-delivery-engine' ), esc_html( $this->format_fulfilment_availability( $snapshot->fulfilment_availability ) ) );
-		$this->render_row( __( 'Fulfilment choice', 'cetech-woocommerce-delivery-engine' ), esc_html( $this->format_fulfilment_choice( $snapshot->fulfilment_choice ) ) );
-		$this->render_row( __( 'Delivery offer', 'cetech-woocommerce-delivery-engine' ), esc_html( $snapshot->delivery_offer_public_label ?? '—' ) );
-
-		if ( null !== $snapshot->delivery_offer_public_description && '' !== $snapshot->delivery_offer_public_description ) {
-			$this->render_row( __( 'Offer description', 'cetech-woocommerce-delivery-engine' ), esc_html( $snapshot->delivery_offer_public_description ) );
-		}
-
-		if ( null !== $snapshot->estimate_text && '' !== $snapshot->estimate_text ) {
-			$this->render_row( __( 'Estimate', 'cetech-woocommerce-delivery-engine' ), esc_html( $snapshot->estimate_text ) );
-		}
-
-		$this->render_row( __( 'Quantity', 'cetech-woocommerce-delivery-engine' ), esc_html( (string) $snapshot->quantity ) );
-		$this->render_row( __( 'Quote status', 'cetech-woocommerce-delivery-engine' ), esc_html( $snapshot->quote_status ) );
+	private function render_operational_line_rows( OrderDeliveryLineSnapshot $snapshot, string $status ): void {
 		$this->render_row(
-			__( 'Quoted amount', 'cetech-woocommerce-delivery-engine' ),
-			esc_html( $this->format_amount( $snapshot->quoted_amount, $snapshot->currency_code ) )
+			DeliveryPresentationLabels::fulfilment(),
+			esc_html( $this->format_fulfilment_availability( $snapshot->fulfilment_availability ) )
 		);
-		$this->render_row( __( 'Snapshotted at', 'cetech-woocommerce-delivery-engine' ), esc_html( $snapshot->snapshotted_at ) );
+		$this->render_row(
+			DeliveryPresentationLabels::method_label_for_choice( $snapshot->fulfilment_choice ),
+			esc_html( $this->format_fulfilment_choice( $snapshot->fulfilment_choice ) )
+		);
 
-		if ( null !== $read->stored_version ) {
-			$this->render_row( __( 'Stored line version', 'cetech-woocommerce-delivery-engine' ), esc_html( $read->stored_version ) );
+		$offer_label = trim( (string) ( $snapshot->delivery_offer_public_label ?? '' ) );
+		if ( '' !== $offer_label ) {
+			$this->render_row( DeliveryPresentationLabels::delivery_option(), esc_html( $offer_label ) );
 		}
 
-		echo '</tbody></table>';
+		$estimate = trim( (string) ( $snapshot->estimate_text ?? '' ) );
+		if ( '' !== $estimate ) {
+			$this->render_row(
+				DeliveryPresentationLabels::estimate_label_for_choice( $snapshot->fulfilment_choice ),
+				esc_html( DeliveryPresentationLabels::strip_estimated_prefix( $estimate ) )
+			);
+		}
 
-		$this->render_internal_ids(
-			[
-				__( 'Product ID', 'cetech-woocommerce-delivery-engine' ) => null !== $snapshot->product_id ? (string) $snapshot->product_id : null,
-				__( 'Variation ID', 'cetech-woocommerce-delivery-engine' ) => null !== $snapshot->variation_id ? (string) $snapshot->variation_id : null,
-				__( 'Delivery offer ID', 'cetech-woocommerce-delivery-engine' ) => null !== $snapshot->delivery_offer_id ? (string) $snapshot->delivery_offer_id : null,
-				__( 'Rule ID', 'cetech-woocommerce-delivery-engine' ) => null !== $snapshot->rule_id ? (string) $snapshot->rule_id : null,
-				__( 'Destination zone ID', 'cetech-woocommerce-delivery-engine' ) => null !== $snapshot->destination_zone_id ? (string) $snapshot->destination_zone_id : null,
-				__( 'Rate card ID', 'cetech-woocommerce-delivery-engine' ) => null !== $snapshot->rate_card_id ? (string) $snapshot->rate_card_id : null,
-				__( 'Rate card code', 'cetech-woocommerce-delivery-engine' ) => $snapshot->rate_card_code,
-			]
+		$charge = $this->format_amount( $snapshot->quoted_amount, $snapshot->currency_code );
+		if ( '—' !== $charge ) {
+			$this->render_row( DeliveryPresentationLabels::delivery_charge(), esc_html( $charge ) );
+		}
+
+		$this->render_row(
+			DeliveryPresentationLabels::status(),
+			esc_html( $this->format_operational_status( $status ) )
 		);
 	}
 
-	private function render_package_snapshot( OrderDeliveryPackageReadResult $read, string $status ): void {
-		echo '<h4>' . esc_html__( 'Package / shipping snapshot', 'cetech-woocommerce-delivery-engine' ) . '</h4>';
-
+	private function render_package_summary( OrderDeliveryPackageReadResult $read ): void {
 		if ( null === $read->snapshot ) {
-			echo '<p><em>' . esc_html__( 'Package snapshot could not be parsed safely.', 'cetech-woocommerce-delivery-engine' ) . '</em></p>';
-
 			return;
 		}
 
 		$snapshot = $read->snapshot;
 
+		echo '<div class="cetech-de-order-delivery-package" style="margin-top:8px;">';
+		echo '<h4>' . esc_html__( 'Order delivery summary', 'cetech-woocommerce-delivery-engine' ) . '</h4>';
 		echo '<table class="widefat striped"><tbody>';
-		$this->render_row( __( 'Status', 'cetech-woocommerce-delivery-engine' ), $this->format_status_label( $status ) );
-		$this->render_row( __( 'Shipping method', 'cetech-woocommerce-delivery-engine' ), esc_html( $snapshot->shipping_method_label ?? '—' ) );
 		$this->render_row(
-			__( 'Package delivery amount', 'cetech-woocommerce-delivery-engine' ),
-			esc_html( $this->format_amount( $snapshot->package_total_delivery_amount, $snapshot->currency_code ) )
+			DeliveryPresentationLabels::shipping_method(),
+			esc_html( $snapshot->shipping_method_label ?? __( 'Delivery', 'cetech-woocommerce-delivery-engine' ) )
 		);
-		$this->render_row( __( 'Quote status', 'cetech-woocommerce-delivery-engine' ), esc_html( $snapshot->quote_status ) );
-		$this->render_row( __( 'Snapshotted at', 'cetech-woocommerce-delivery-engine' ), esc_html( $snapshot->snapshotted_at ) );
+
+		$charge = $this->format_amount( $snapshot->package_total_delivery_amount, $snapshot->currency_code );
+		if ( '—' !== $charge ) {
+			$this->render_row( DeliveryPresentationLabels::delivery_charge(), esc_html( $charge ) );
+		}
+
 		echo '</tbody></table>';
-
-		$this->render_internal_ids(
-			[
-				__( 'Shipping method ID', 'cetech-woocommerce-delivery-engine' ) => $snapshot->shipping_method_id,
-				__( 'Destination zone ID', 'cetech-woocommerce-delivery-engine' ) => null !== $snapshot->destination_zone_id ? (string) $snapshot->destination_zone_id : null,
-			]
-		);
-	}
-
-	/**
-	 * @param array<string, string|null> $ids
-	 */
-	private function render_internal_ids( array $ids ): void {
-		$rows = array_filter(
-			$ids,
-			static fn ( ?string $value ): bool => null !== $value && '' !== trim( $value )
-		);
-
-		if ( [] === $rows ) {
-			return;
-		}
-
-		echo '<details style="margin-top:8px;"><summary><em>';
-		echo esc_html__( 'Internal IDs (admin only)', 'cetech-woocommerce-delivery-engine' );
-		echo '</em></summary>';
-		echo '<table class="widefat striped" style="margin-top:8px;"><tbody>';
-
-		foreach ( $rows as $label => $value ) {
-			$this->render_row( $label, esc_html( $value ) );
-		}
-
-		echo '</tbody></table></details>';
+		echo '</div>';
 	}
 
 	private function render_row( string $label, string $value ): void {
@@ -309,31 +255,39 @@ final class OrderDeliverySnapshotAdminDisplay {
 			|| current_user_can( 'manage_woocommerce' );
 	}
 
-	private function format_status_label( string $status ): string {
-		$labels = [
-			OrderDeliverySnapshotIntegrity::STATUS_PRESENT_VALID => __( 'Present and valid', 'cetech-woocommerce-delivery-engine' ),
-			OrderDeliverySnapshotIntegrity::STATUS_MISSING       => __( 'Missing', 'cetech-woocommerce-delivery-engine' ),
-			OrderDeliverySnapshotIntegrity::STATUS_MALFORMED       => __( 'Malformed', 'cetech-woocommerce-delivery-engine' ),
-			OrderDeliverySnapshotIntegrity::STATUS_VERSION_MISMATCH => __( 'Version mismatch', 'cetech-woocommerce-delivery-engine' ),
-			OrderDeliverySnapshotIntegrity::STATUS_PARTIAL         => __( 'Partial', 'cetech-woocommerce-delivery-engine' ),
-			OrderDeliverySnapshotIntegrity::STATUS_QUOTE_MISSING   => __( 'Quote missing', 'cetech-woocommerce-delivery-engine' ),
-			OrderDeliverySnapshotIntegrity::STATUS_SELECTION_ONLY  => __( 'Selection only', 'cetech-woocommerce-delivery-engine' ),
-		];
-
-		return esc_html( $labels[ $status ] ?? $status );
+	private function format_operational_status( string $status ): string {
+		return match ( $status ) {
+			OrderDeliverySnapshotIntegrity::STATUS_PRESENT_VALID,
+			OrderDeliverySnapshotIntegrity::STATUS_SELECTION_ONLY => __( 'Saved', 'cetech-woocommerce-delivery-engine' ),
+			OrderDeliverySnapshotIntegrity::STATUS_MISSING => __( 'Not saved', 'cetech-woocommerce-delivery-engine' ),
+			default => __( 'Needs review', 'cetech-woocommerce-delivery-engine' ),
+		};
 	}
 
 	private function format_fulfilment_availability( string $value ): string {
 		foreach ( FulfilmentAvailability::cases() as $case ) {
 			if ( $case->value === $value ) {
-				return ucwords( str_replace( '_', ' ', $value ) );
+				return match ( $case ) {
+					FulfilmentAvailability::InternationalFulfilment => __( 'International fulfilment', 'cetech-woocommerce-delivery-engine' ),
+					FulfilmentAvailability::InStore => __( 'In store', 'cetech-woocommerce-delivery-engine' ),
+					FulfilmentAvailability::InWarehouse => __( 'In warehouse', 'cetech-woocommerce-delivery-engine' ),
+				};
 			}
 		}
 
-		return $value;
+		return ucwords( str_replace( '_', ' ', $value ) );
 	}
 
 	private function format_fulfilment_choice( string $value ): string {
+		foreach ( FulfilmentChoice::cases() as $case ) {
+			if ( $case->value === $value ) {
+				return match ( $case ) {
+					FulfilmentChoice::Delivery => __( 'Delivery', 'cetech-woocommerce-delivery-engine' ),
+					FulfilmentChoice::StorePickup => __( 'Store pickup', 'cetech-woocommerce-delivery-engine' ),
+				};
+			}
+		}
+
 		return ucwords( str_replace( '_', ' ', $value ) );
 	}
 

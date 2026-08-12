@@ -4,25 +4,22 @@
 **Plugin version:** `1.0.0-rc.1` (unchanged public version)  
 **Schema target:** `3` (unchanged)  
 **Date opened:** 2026-08-11  
-**Last updated:** 2026-08-12 (Stage 6B-3 **BLOCKED** — agent automation incident; site recovery required)
+**Last updated:** 2026-08-12 (Stage 6 **FUNCTIONALLY COMPLETE**; Stage 6C presentation cleanup done locally)
 
 ---
 
 ## 1. Current verdict
 
-**Stage 6B-3: BLOCKED — site recovery required before variable QA live cutover.**
+**STAGE 6 FUNCTIONALLY COMPLETE.**
 
-Stage 6B-2 repaired deployment/autoload safety: **PASS.** Stage 6B-2L final package: **human clean-installed** (`cetech-woocommerce-delivery-engine-stage6b-final.zip`, SHA-256 `181b094dfa7c4fbc31ff361c31fbf3e474d0227c90a070a9717badcc089530ee`). Human confirmed post-install PHP-log window ended at **35** lines with **no** new CetechDeliveryEngine errors.
-
-Stage 6B-3 did **not** complete. Agent automation lacked wp-admin/SSH access for flag toggles and delivery-settings configuration. An attempt to reinstall `code-snippets` from wordpress.org (Stage 0B-style ops bridge) caused a **site regression**: REST root, WooCommerce REST, and product URLs returned **HTTP 500**. See §18.
+Live variable QA on FLAIROC passed end-to-end after Stage 6B-3R asset-fix package. Presentation cleanup (Stage 6C) is a separate release-critical UI fix and does **not** reopen Stage 6 runtime architecture.
 
 | Sub-stage | Status |
 |-----------|--------|
 | Stage 6A | **COMPLETE** |
-| Stage 6B-1 original package | **FAILED deployment safety** |
-| Stage 6B-2 retry (clean repaired install) | **PASS** (PHP-log/autoload safety) |
-| Stage 6B-2L final admin language | **PASS** (human clean-install + PHP-log 33→35) |
-| Stage 6B-3 variable QA live cutover | **BLOCKED** — §18 |
+| Stage 6B packaging / deploy safety | **COMPLETE** (final + asset-fix packages) |
+| Stage 6B-3 variable QA live | **PASS** — see §20 |
+| Stage 6C customer + order-admin presentation | **DONE locally** — see §21; carry into next release package |
 
 ---
 
@@ -850,4 +847,60 @@ Package: `cetech-woocommerce-delivery-engine-stage6b3-asset-fix.zip` — SHA-256
 ### WoodMart
 
 **NOT YET CLASSIFIED** — script was absent; theme event compatibility not yet exercised live.
+
+---
+
+## 20. Stage 6B-3 live success (human; post 6B-3R)
+
+**Verdict: STAGE 6 FUNCTIONALLY COMPLETE**
+
+| Item | Result |
+|------|--------|
+| Parent QA product | **`#39717`** (`FLAIROC-DE-QA-VARIABLE`) |
+| Variation A | **`#39718`** |
+| Variation B | **`#39719`** |
+| Variable switching / A↔B / rapid / reset | **PASS** |
+| WoodMart standard variation behavior | **PASS** (generic Stage 6 core works; Stage 7 adapter **not** required) |
+| Cart | **PASS** |
+| Checkout | **PASS** |
+| Shipping expected / actual | **25.00 / 25.00** |
+| QA order | **`#39721`** |
+| Purchased variation | **`#39718` / A** |
+| Product / shipping / total | **19.99 / 25.00 / 44.99** |
+| Protected delivery info saved | **PASS** |
+| PHP log during flow | **no new Delivery Engine fatal/error** |
+| Final COD | **OFF** |
+| Final DE runtime flags | **OFF** |
+
+Do **not** reopen Stage 6 runtime architecture unless a new live defect appears.
+
+Temporary mid-cart shipping absence during QA flag toggling was **not** reproduced on a fresh normal cart→checkout flow after re-add. No broad shipping-cache rewrite.
+
+---
+
+## 21. Stage 6C — customer + order-admin presentation cleanup
+
+**Scope:** Presentation only. Runtime routing, capture, validation, rates, snapshots, schema unchanged.
+
+### Customer labels
+
+| Old | New |
+|-----|-----|
+| `Delivery: In warehouse — Delivery` | `Fulfilment: In warehouse` + `Delivery method: Delivery` |
+| `Delivery: FLAIROC QA Standard Delivery` | `Delivery option: FLAIROC QA Standard Delivery` |
+| `Delivery: Estimated 3–6 business days` | `Estimated delivery: 3–6 business days` |
+
+Pickup adapts to `Method` / `Ready for pickup` when fulfilment choice is store pickup.
+
+### Order admin
+
+- Panel renamed to **Delivery information**
+- Shows operational fields only (fulfilment, method, option, ETA, charge, Saved)
+- Protected `_cetech_de_*` order-item meta hidden via `woocommerce_hidden_order_itemmeta` + formatted-meta strip
+- Data remains stored; not deleted or renamed
+
+### Package
+
+Presentation fix is carried into the **next** release-critical development package (no forced Stage 6 redeploy cycle).
+
 

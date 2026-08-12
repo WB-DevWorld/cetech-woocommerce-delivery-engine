@@ -5,7 +5,7 @@
 **Last updated:** 2026-08-12  
 **Plugin version:** `1.0.0-rc.1`  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `master` — Stage 6B-3 live **INCOMPLETE**; Stage 6B-3R asset-enqueue repair **READY FOR REDEPLOY**; all DE runtime flags on FLAIROC per human test state until retest completes  
+**Git:** `master` — Stage 6 **FUNCTIONALLY COMPLETE** (live order `#39721`); Stage 6C presentation cleanup **DONE locally**; carry into next release package; keep DE runtime flags **OFF** on FLAIROC unless explicitly testing  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
@@ -33,28 +33,29 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 5 overall | **COMPLETE** |
 | Stage 6A Variable-product ECR support | **COMPLETE** — artifact `docs/STAGE-6A-VARIABLE-PRODUCT-ECR-SUPPORT.md` (local only; variable flag default OFF; no FLAIROC deploy) |
 | Stage 6B-1 original package | **FAILED** — `cetech-woocommerce-delivery-engine-stage6b.zip`; SHA-256 `cc89edf81799cdd734edf6f22d54472eaf6b2d26820a36fc70f371f4cbfa0e76`; **do not redeploy** |
-| Stage 6B-2 flag-OFF install safety | **BLOCKED** — HTTP/REST initially looked fine; human PHP log review found fresh fatals at **10:31:41 UTC** (`VariationRelationshipInspectorInterface` not found) and **10:31:42 UTC** (`VerifiableMigrationInterface` not found). Prior READY is overturned. |
-| Stage 6B-2R local repair | Autoload contracts + mixed-install boot refusal + package verifier regression + **mandatory** normal-user admin language; repaired ZIP `cetech-woocommerce-delivery-engine-stage6b-repaired.zip` SHA-256 `d4985c8195df50d0cffe69e96bd7d230f477dd87ec2dcf437f9b90de04dfa258` |
-| Stage 6B-2 retry (clean repaired install) | **PASS** — human PHP-log safety: marker `BASE_LOG_LINE = 28`, window ended at **33** lines; **no** new CetechDeliveryEngine errors; **no** recurrence of missing `VariationRelationshipInspectorInterface` / `VerifiableMigrationInterface` / `ConfigurationHealthChecker` / `get_category_ids()` on false / undefined `error_code`. WoodMart warnings were theme-origin; one WCFM SQL error was WCFM-origin. Do **not** revisit RuntimeContracts/autoload unless new evidence. Live admin language still had a remaining diagnostic-tools issue (Stage 6B-2L). |
-| Stage 6B-2L final admin language | Presentation-only cleanup; ZIP `cetech-woocommerce-delivery-engine-stage6b-final.zip` SHA-256 `181b094dfa7c4fbc31ff361c31fbf3e474d0227c90a070a9717badcc089530ee` (680669 bytes). Human **clean-installed**; post-install PHP-log window **35** lines; **no** new CetechDeliveryEngine errors. |
-| Stage 6B-3 variable QA live | **INCOMPLETE** — human QA product `#39717` configured; product-page blocked by missing `variable-delivery-selector.js` enqueue (cart-capture gate); **6B-3R repair ready** — see Stage 6B doc §19 |
+| Stage 6B-2 flag-OFF install safety | **BLOCKED** historically — later repaired |
+| Stage 6B-2R local repair | Autoload contracts + mixed-install boot refusal; repaired ZIP `d4985c81…a258` |
+| Stage 6B-2 retry (clean repaired install) | **PASS** — PHP-log safety |
+| Stage 6B-2L final admin language | **PASS** — ZIP `181b094d…308ee` |
+| Stage 6B-3 / 6B-3R variable QA live | **FUNCTIONALLY COMPLETE** — QA `#39717` / A `#39718` / B `#39719`; shipping **25.00**; order **`#39721`**; WoodMart **PASS** (no Stage 7 adapter required); flags/COD restored **OFF** |
+| Stage 6C presentation cleanup | **DONE locally** — distinct customer labels; hide `_cetech_de_*` item meta; simplify order admin to **Delivery information**; carry into next release package |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |
 | New admin UX | Default / Product-Specific / Variation-Specific delivery settings + preview; operational language required (`docs/ADMIN-UI-LANGUAGE-GUIDE.md`) |
 | Runtime cutover flag | `enable_effective_configuration_runtime` **defaults OFF** |
 | Variable ECR cutover flag | `enable_variable_product_ecr_runtime` **defaults OFF** — requires main ECR flag; does not affect simple-product Stage 5 path |
 | Legacy storage | `product_delivery_rules` remains default authoritative path while cutover flag OFF |
-| Runtime on FLAIROC | Human reported **clean install** of final Stage 6B ZIP `181b094d…308ee`; schema stays **3**; PHP-log safety **PASS** (33→35) before 6B-3 agent run. **After agent incident:** REST/WC/product URLs **500** until `code-snippets/code-snippets` removed — see Stage 6B doc §18. |
-| Variable runtime capture | **not cut over**; WoodMart adapter still Stage 7 |
+| Runtime on FLAIROC | Stage 6 live verified then restored **OFF**; schema **3** |
+| Variable runtime capture | **cut over and verified live** (Stage 6); WoodMart adapter **not required** for standard events |
 | Shipments / tracking / timeline | **Not implemented** |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Stage 5/6 **compatibility route** (category winners stay on legacy source); `#39705` is **not** category-routed |
-| Next stage | Human clean-installs `cetech-woocommerce-delivery-engine-stage6b3-asset-fix.zip`; keep QA `#39717` config; repeat product-page steps (script present → A → ajax → A↔B). **Do not start Stage 7.** |
+| Next stage | Move to remaining **release-critical** work for tomorrow’s deadline. Do **not** repeat Stage 6 live verification unless presentation/runtime regression appears. **Do not start Stage 7** unless a WoodMart-specific defect appears. |
 | Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual |
 | Release-quality backlog | Administrator language is **mandatory now**, not deferred to a later RC |
 | Stage 1 HPOS debt | **DEFERRED** (`countOrderSnapshotReferences` postmeta); non-numeric rate→0 **FIXED** in Stage 5A |
 
-Do **not** begin Stage 6B-3 or Stage 7 unless explicitly tasked. Keep all FLAIROC Delivery Engine runtime flags **OFF** until Stage 6B-3 enablement is explicitly approved.
+Do **not** begin Stage 7 unless a genuine WoodMart-specific live defect appears. Keep FLAIROC Delivery Engine runtime flags **OFF** unless explicitly testing.
 
 Administrator-language requirement: normal-user admin UI must use operational language throughout. Technical terminology belongs only in Technical details.
 

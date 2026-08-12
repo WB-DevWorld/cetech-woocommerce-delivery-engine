@@ -10,6 +10,7 @@ use CetechDeliveryEngine\Application\Order\CustomerOrderDeliverySummary;
 use CetechDeliveryEngine\Application\Order\CustomerOrderDeliverySummaryBuilder;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
+use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
 use WC_Email;
 use WC_Order;
 
@@ -137,11 +138,11 @@ final class CustomerOrderDeliveryEmailSummaryRenderer {
 	private function render_html_package_block( CustomerOrderDeliveryPackageSummary $package ): string {
 		$output = '<h3 style="margin-top:24px;">' . esc_html__( 'Shipping summary', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
 		$output .= '<table cellspacing="0" cellpadding="6" style="width:100%;border:1px solid #e5e5e5;" border="1"><tbody>';
-		$output .= '<tr><th scope="row" style="text-align:left;">' . esc_html__( 'Shipping method', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		$output .= '<tr><th scope="row" style="text-align:left;">' . esc_html( DeliveryPresentationLabels::shipping_method() ) . '</th>';
 		$output .= '<td>' . esc_html( $package->shipping_method_label ) . '</td></tr>';
 
 		if ( null !== $package->package_amount_display && '' !== trim( $package->package_amount_display ) ) {
-			$output .= '<tr><th scope="row" style="text-align:left;">' . esc_html__( 'Delivery total', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+			$output .= '<tr><th scope="row" style="text-align:left;">' . esc_html( DeliveryPresentationLabels::delivery_charge() ) . '</th>';
 			$output .= '<td>' . esc_html( $package->package_amount_display ) . '</td></tr>';
 		}
 
@@ -157,7 +158,7 @@ final class CustomerOrderDeliveryEmailSummaryRenderer {
 
 		foreach ( $summary->lines as $line ) {
 			$lines[] = $line->product_name;
-			$lines[] = __( 'Delivery option:', 'cetech-woocommerce-delivery-engine' ) . ' ' . $line->delivery_option_label;
+			$lines[] = DeliveryPresentationLabels::delivery_option() . ': ' . $line->delivery_option_label;
 
 			foreach ( $this->collect_line_detail_rows( $line ) as $row ) {
 				$lines[] = $row['label'] . ' ' . $row['value'];
@@ -168,10 +169,10 @@ final class CustomerOrderDeliveryEmailSummaryRenderer {
 
 		if ( null !== $summary->package ) {
 			$lines[] = __( 'Shipping summary', 'cetech-woocommerce-delivery-engine' );
-			$lines[] = __( 'Shipping method:', 'cetech-woocommerce-delivery-engine' ) . ' ' . $summary->package->shipping_method_label;
+			$lines[] = DeliveryPresentationLabels::shipping_method() . ': ' . $summary->package->shipping_method_label;
 
 			if ( null !== $summary->package->package_amount_display && '' !== trim( $summary->package->package_amount_display ) ) {
-				$lines[] = __( 'Delivery total:', 'cetech-woocommerce-delivery-engine' ) . ' ' . $summary->package->package_amount_display;
+				$lines[] = DeliveryPresentationLabels::delivery_charge() . ': ' . $summary->package->package_amount_display;
 			}
 		}
 
@@ -184,50 +185,51 @@ final class CustomerOrderDeliveryEmailSummaryRenderer {
 	 * @return list<array{label: string, value: string}>
 	 */
 	private function collect_line_detail_rows( CustomerOrderDeliveryLineSummary $line ): array {
-		$rows = [];
+		$rows        = [];
+		$choice_slug = $this->infer_choice_slug( $line->fulfilment_choice_label );
 
 		if ( '' !== $line->fulfilment_availability_label ) {
 			$rows[] = [
-				'label' => __( 'Availability:', 'cetech-woocommerce-delivery-engine' ),
+				'label' => DeliveryPresentationLabels::fulfilment() . ':',
 				'value' => $line->fulfilment_availability_label,
 			];
 		}
 
 		if ( '' !== $line->fulfilment_choice_label ) {
 			$rows[] = [
-				'label' => __( 'Choice:', 'cetech-woocommerce-delivery-engine' ),
+				'label' => DeliveryPresentationLabels::method_label_for_choice( $choice_slug ) . ':',
 				'value' => $line->fulfilment_choice_label,
-			];
-		}
-
-		if ( null !== $line->delivery_option_description && '' !== trim( $line->delivery_option_description ) ) {
-			$rows[] = [
-				'label' => __( 'Details:', 'cetech-woocommerce-delivery-engine' ),
-				'value' => $line->delivery_option_description,
 			];
 		}
 
 		if ( null !== $line->estimate_text && '' !== trim( $line->estimate_text ) ) {
 			$rows[] = [
-				'label' => __( 'Estimate:', 'cetech-woocommerce-delivery-engine' ),
-				'value' => $line->estimate_text,
-			];
-		}
-
-		if ( null !== $line->quote_status_label && '' !== trim( $line->quote_status_label ) ) {
-			$rows[] = [
-				'label' => __( 'Status:', 'cetech-woocommerce-delivery-engine' ),
-				'value' => $line->quote_status_label,
+				'label' => DeliveryPresentationLabels::estimate_label_for_choice( $choice_slug ) . ':',
+				'value' => DeliveryPresentationLabels::strip_estimated_prefix( $line->estimate_text ),
 			];
 		}
 
 		if ( null !== $line->quoted_amount_display && '' !== trim( $line->quoted_amount_display ) ) {
 			$rows[] = [
-				'label' => __( 'Delivery amount:', 'cetech-woocommerce-delivery-engine' ),
+				'label' => DeliveryPresentationLabels::delivery_charge() . ':',
 				'value' => $line->quoted_amount_display,
 			];
 		}
 
 		return $rows;
+	}
+
+	private function infer_choice_slug( string $choice_label ): ?string {
+		$normalized = strtolower( trim( $choice_label ) );
+
+		if ( str_contains( $normalized, 'pickup' ) ) {
+			return 'store_pickup';
+		}
+
+		if ( str_contains( $normalized, 'delivery' ) ) {
+			return 'delivery';
+		}
+
+		return null;
 	}
 }

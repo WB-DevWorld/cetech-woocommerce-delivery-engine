@@ -142,9 +142,9 @@ final class CustomerOrderDeliverySummaryBuilder {
 		foreach ( FulfilmentAvailability::cases() as $case ) {
 			if ( $case->value === $value ) {
 				return match ( $case ) {
-					FulfilmentAvailability::InternationalFulfilment => __( 'Delivery only', 'cetech-woocommerce-delivery-engine' ),
-					FulfilmentAvailability::InStore => __( 'In-store fulfilment', 'cetech-woocommerce-delivery-engine' ),
-					FulfilmentAvailability::InWarehouse => __( 'Local delivery', 'cetech-woocommerce-delivery-engine' ),
+					FulfilmentAvailability::InternationalFulfilment => __( 'International fulfilment', 'cetech-woocommerce-delivery-engine' ),
+					FulfilmentAvailability::InStore => __( 'In store', 'cetech-woocommerce-delivery-engine' ),
+					FulfilmentAvailability::InWarehouse => __( 'In warehouse', 'cetech-woocommerce-delivery-engine' ),
 				};
 			}
 		}
@@ -153,7 +153,11 @@ final class CustomerOrderDeliverySummaryBuilder {
 	}
 
 	private function format_fulfilment_choice( string $value ): string {
-		return ucwords( str_replace( '_', ' ', $value ) );
+		return match ( $value ) {
+			'delivery' => __( 'Delivery', 'cetech-woocommerce-delivery-engine' ),
+			'store_pickup' => __( 'Store pickup', 'cetech-woocommerce-delivery-engine' ),
+			default => ucwords( str_replace( '_', ' ', $value ) ),
+		};
 	}
 
 	private function format_amount( string $amount, string $currency_code ): string {

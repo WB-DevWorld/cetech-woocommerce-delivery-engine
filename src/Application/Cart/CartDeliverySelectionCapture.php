@@ -11,6 +11,7 @@ use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidator;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\Enum\ProductTargetType;
+use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
 use WC_Product;
 
 /**
@@ -214,16 +215,21 @@ final class CartDeliverySelectionCapture {
 			return $item_data;
 		}
 
-		$lines = self::formatPublicSummaryLines( $summary );
+		$intent = CartDeliverySelectionSessionData::normalizeIntent(
+			$cart_item[ self::CART_SELECTION_KEY ] ?? null
+		);
+		$choice = is_array( $intent ) ? (string) ( $intent['fulfilment_choice'] ?? '' ) : '';
 
-		if ( [] === $lines ) {
+		$rows = self::formatPublicSummaryRows( $summary, '' !== $choice ? $choice : null );
+
+		if ( [] === $rows ) {
 			return $item_data;
 		}
 
-		foreach ( $lines as $line ) {
+		foreach ( $rows as $row ) {
 			$item_data[] = [
-				'key'   => esc_html__( 'Delivery', 'cetech-woocommerce-delivery-engine' ),
-				'value' => esc_html( $line ),
+				'key'   => esc_html( $row['key'] ),
+				'value' => esc_html( $row['value'] ),
 			];
 		}
 
@@ -317,30 +323,25 @@ final class CartDeliverySelectionCapture {
 	/**
 	 * @param array<string, string|null> $summary
 	 *
+	 * @return list<array{key: string, value: string}>
+	 */
+	public static function formatPublicSummaryRows( array $summary, ?string $fulfilment_choice = null ): array {
+		return DeliveryPresentationLabels::format_public_summary_rows( $summary, $fulfilment_choice );
+	}
+
+	/**
+	 * @param array<string, string|null> $summary
+	 *
 	 * @return list<string>
+	 *
+	 * @deprecated Use formatPublicSummaryRows() for distinct customer labels.
 	 */
 	public static function formatPublicSummaryLines( array $summary ): array {
+		$rows  = self::formatPublicSummaryRows( $summary );
 		$lines = [];
 
-		$availability = trim( (string) ( $summary['fulfilment_availability_label'] ?? '' ) );
-		$choice       = trim( (string) ( $summary['fulfilment_choice_label'] ?? '' ) );
-		$offer_label  = trim( (string) ( $summary['delivery_offer_public_label'] ?? '' ) );
-		$estimate     = trim( (string) ( $summary['estimate_text'] ?? '' ) );
-
-		if ( '' !== $availability && '' !== $choice ) {
-			$lines[] = $availability . ' — ' . $choice;
-		} elseif ( '' !== $availability ) {
-			$lines[] = $availability;
-		} elseif ( '' !== $choice ) {
-			$lines[] = $choice;
-		}
-
-		if ( '' !== $offer_label ) {
-			$lines[] = $offer_label;
-		}
-
-		if ( '' !== $estimate ) {
-			$lines[] = $estimate;
+		foreach ( $rows as $row ) {
+			$lines[] = $row['value'];
 		}
 
 		return $lines;
