@@ -12,6 +12,17 @@
 
 **STAGE 8 FUNCTIONALLY COMPLETE** (live `#39724`)
 
+**Final RC.2 live verification: PASS.**
+
+| Live proof | Result |
+|------------|--------|
+| Compatible products share fixed-per-shipment charge | **25.00 once** (not 50.00) |
+| Quantity 2 on fixed-per-shipment path | Remained **25.00** |
+| Multi-line QA order | **`#39724`** — items **39.98** + shipping **25.00** = total **64.98** |
+| Saved delivery information | **PASS** |
+| Presentation cleanup (Stage 8C) | **PASS** |
+| Delivery Engine PHP fatals in final smoke | **None** |
+
 Stage 8A answers one business question for Classic Checkout:
 
 > Which cart items travel together, and what should the customer be charged?

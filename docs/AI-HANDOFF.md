@@ -5,7 +5,7 @@
 **Last updated:** 2026-08-12  
 **Plugin version:** `1.0.0-rc.2`  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `master` — Stage 6 **FUNCTIONALLY COMPLETE**; Stage 6C **COMPLETE**; Stage 7 **COMPLETE — NO WOODMART ADAPTER REQUIRED**; Stage 8 **FUNCTIONALLY COMPLETE** (live `#39724`); Stage 8C order-admin technical presentation cleanup **included**; Classic Checkout release candidate `1.0.0-rc.2`  
+**Git:** `master` — **LIVE VERIFIED** on FLAIROC Classic Checkout; package SHA-256 `f85af02c…4e3b`; release-candidate commit `e75b80c` + closure docs  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
@@ -15,51 +15,38 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 
 | Item | Status |
 |------|--------|
-| Stage 0B FLAIROC RC baseline | **VERIFIED** (`31fc016`) |
+| Stage 0B FLAIROC RC baseline | **COMPLETE** |
 | Stage 1 architecture gap analysis | **COMPLETE** — `docs/POST-RC-ARCHITECTURE-GAP-ANALYSIS.md` |
 | Stage 2 scoped configuration storage | **COMPLETE** — schema target `3`; artifact `docs/STAGE-2-SCOPED-CONFIGURATION-STORAGE.md` |
 | Stage 3 EffectiveConfigurationResolver | **COMPLETE** — artifact `docs/STAGE-3-EFFECTIVE-CONFIGURATION-RESOLVER.md` |
 | Stage 4 Admin inheritance UX + preview | **COMPLETE** — artifact `docs/STAGE-4-ADMIN-INHERITANCE-UX.md` |
-| Stage 5A Simple-product ECR runtime integration | **COMPLETE** — artifact `docs/STAGE-5A-SIMPLE-RUNTIME-ECR-INTEGRATION.md` (local only; flag default OFF) |
-| Stage 5B-1 original package | **FAILED** — SHA-256 `973c0209…e4cc`; fatals HealthChecker + preview `get_category_ids()` on false (`d5fefa2`) |
-| Stage 5B FLAIROC recovery | Filesystem-disable recovered wp-admin; ECR **never** left ON after 5B-3 restore |
-| Stage 5B bootstrap repair | **DONE** — `325e252` |
-| Stage 5B admin false-product repair | **DONE** — `4e8f503`; repaired ZIP SHA-256 `1d672dae…a59a` |
-| Stage 5B-2 deployment safety verification | **PASS (human + agent)** — repaired package active; dormant storefront PASS; COD OFF; `#39706` intact; human admin/schema/preview smoke PASS; no fresh DE fatals |
-| Stage 5B-2A QA migration/slice audit | **READY — WRONG SLICE SELECTED** — legacy rule `#1` migrated to v3 scope `slice_key=in_warehouse`; Default preview unresolved is expected; see `docs/STAGE-5B-FLAIROC-DEPLOYMENT-VERIFICATION.md` §8 |
-| Stage 5B-3 ECR live parity | **BLOCKED (historical)** — first live attempt; fingerprint dropped in session normalize; no order |
-| Stage 5B-3R-1 fingerprint package | **DONE** — Artifact 3 SHA-256 `dbddc1d7…cbfd` built and installed on FLAIROC |
-| Stage 5B-3R-2 ECR live parity retry | **VERIFIED** — fingerprint session MATCH; checkout valid; shipping **25.00**; ECR QA order **`#39711`**; snapshots PASS; flags/COD restored OFF; dormant PASS |
+| Stage 5A Simple-product ECR runtime integration | **COMPLETE** — artifact `docs/STAGE-5A-SIMPLE-RUNTIME-ECR-INTEGRATION.md` |
+| Stage 5B FLAIROC recovery / bootstrap / admin repairs | **COMPLETE** |
 | Stage 5 overall | **COMPLETE** |
-| Stage 6A Variable-product ECR support | **COMPLETE** — artifact `docs/STAGE-6A-VARIABLE-PRODUCT-ECR-SUPPORT.md` (local only; variable flag default OFF; no FLAIROC deploy) |
-| Stage 6B-1 original package | **FAILED** — `cetech-woocommerce-delivery-engine-stage6b.zip`; SHA-256 `cc89edf81799cdd734edf6f22d54472eaf6b2d26820a36fc70f371f4cbfa0e76`; **do not redeploy** |
-| Stage 6B-2 flag-OFF install safety | **BLOCKED** historically — later repaired |
-| Stage 6B-2R local repair | Autoload contracts + mixed-install boot refusal; repaired ZIP `d4985c81…a258` |
-| Stage 6B-2 retry (clean repaired install) | **PASS** — PHP-log safety |
-| Stage 6B-2L final admin language | **PASS** — ZIP `181b094d…308ee` |
-| Stage 6B-3 / 6B-3R variable QA live | **FUNCTIONALLY COMPLETE** — QA `#39717` / A `#39718` / B `#39719`; shipping **25.00**; order **`#39721`**; WoodMart **PASS** (no Stage 7 adapter required); flags/COD restored **OFF** |
-| Stage 6C presentation cleanup | **COMPLETE** — distinct customer labels; hide `_cetech_de_*` item meta; simplify order admin to **Delivery information** |
-| Stage 7 WoodMart adapter | **COMPLETE — NO WOODMART ADAPTER REQUIRED** — Stage 6 variable QA used WoodMart’s normal variation lifecycle; do not create empty adapter code |
-| Stage 8 multi-product shipping grouping | **FUNCTIONALLY COMPLETE** — live order **`#39724`** (two compatible lines; shipping **25.00**); artifact `docs/STAGE-8A-MULTI-PRODUCT-SHIPPING-GROUPING.md` |
-| Stage 8C order-admin technical presentation cleanup | **COMPLETE** — hide `cetech_de_group_id` / package accounting / implementation shipping labels from ordinary WC order UI; artifact `docs/STAGE-8C-ORDER-ADMIN-PRESENTATION-CLEANUP.md` |
-| Classic Checkout release candidate | **`1.0.0-rc.2`** — readiness `docs/CLASSIC-CHECKOUT-RELEASE-CANDIDATE-READINESS.md` |
+| Stage 6A Variable-product ECR support | **COMPLETE** |
+| Stage 6B variable FLAIROC QA | **FUNCTIONALLY COMPLETE** — parent `#39717` / A `#39718` / B `#39719`; order **`#39721`** |
+| Stage 6 | **FUNCTIONALLY COMPLETE** |
+| Stage 6C presentation cleanup | **COMPLETE** — Fulfilment / Delivery method / Delivery option / Estimated delivery; hide technical meta |
+| Stage 7 WoodMart adapter | **COMPLETE — NO WOODMART ADAPTER REQUIRED** |
+| Stage 8 multi-product shipping grouping | **FUNCTIONALLY COMPLETE** — order **`#39724`** shipping **25.00** / total **64.98** |
+| Stage 8C order-admin technical presentation cleanup | **COMPLETE** — live PASS |
+| Classic Checkout release `1.0.0-rc.2` | **LIVE AND USABLE** — final live smoke **PASS**; readiness `docs/RELEASE-1.0.0-RC.2-READINESS.md` |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |
-| New admin UX | Default / Product-Specific / Variation-Specific delivery settings + preview; operational language required (`docs/ADMIN-UI-LANGUAGE-GUIDE.md`) |
-| Runtime cutover flag | `enable_effective_configuration_runtime` **defaults OFF** |
-| Variable ECR cutover flag | `enable_variable_product_ecr_runtime` **defaults OFF** — requires main ECR flag; does not affect simple-product Stage 5 path |
-| Legacy storage | `product_delivery_rules` remains default authoritative path while cutover flag OFF |
-| Runtime on FLAIROC | Stage 8 live verified; restore/cutover per release readiness (leave ON only for intentional production cutover) |
-| Variable runtime capture | **cut over and verified live** (Stage 6); WoodMart adapter **not required** for standard events |
-| Shipments / tracking / timeline | **Not implemented** |
+| New admin UX | **Delivery Settings** is the everyday staff workflow (Default / Product / Variation + Preview). **Legacy Delivery Rules** = migration/compatibility only |
+| Runtime on FLAIROC | **Required production features ON**; deferred features **OFF**; **COD OFF**; schema **3** |
+| Variable runtime capture | Verified live; WoodMart adapter **not required** |
+| Shipments / tracking / timeline | **Not implemented** (deferred post-RC.2) |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
-| Category legacy parity | Stage 5/6 **compatibility route** (category winners stay on legacy source); `#39705` is **not** category-routed |
-| Next stage | Human clean-install **`1.0.0-rc.2`** and perform final live smoke (`docs/CLASSIC-CHECKOUT-RELEASE-CANDIDATE-READINESS.md`). Do **not** start shipment/tracking (Stage 9) unless explicitly instructed. |
-| Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual |
-| Release-quality backlog | Administrator language is **mandatory now**, not deferred to a later RC |
-| Stage 1 HPOS debt | **DEFERRED** (`countOrderSnapshotReferences` postmeta); non-numeric rate→0 **FIXED** in Stage 5A |
+| Category legacy parity | Compatibility route retained; do not mass-retire legacy runtime in this release |
+| Next stage | Post-RC.2 backlog only when owner prioritizes (shipments/tracking/Blocks/carriers). Do **not** start unless instructed. |
+| Final PHP log (RC.2 smoke) | Marker **546** → inspected through **548** — **PASS**; no new Delivery Engine fatals |
+| Live QA orders | `#39721` (variable); `#39724` (multi-product grouping) |
+| Package | `cetech-woocommerce-delivery-engine-1.0.0-rc.2.zip` SHA-256 `f85af02c5b02a88dcbb0fb061108a9ec02aff72569fcfd4e34cbc27af4cc4e3b` |
 
-Do **not** begin Stage 9 shipment/tracking for this release candidate. For production cutover, enable the documented runtime switches intentionally; COD remains OFF unless the site uses it.
+**RC.2 final live smoke: PASS.** Plugin is **live and usable** on the current FLAIROC Classic Checkout environment with required production features enabled.
+
+Do **not** begin Stage 9 shipment/tracking unless explicitly instructed. Leave required production Delivery Engine switches **ON** on the live site. COD remains **OFF**.
 
 Administrator-language requirement: normal-user admin UI must use operational language throughout. Technical terminology belongs only in Technical details.
 
@@ -89,7 +76,8 @@ Administrator-language requirement: normal-user admin UI must use operational la
 | `docs/STAGE-6B-FLAIROC-VARIABLE-ECR-VERIFICATION.md` | Stage 6B packaging record + FLAIROC variable verification plan |
 | `docs/STAGE-8A-MULTI-PRODUCT-SHIPPING-GROUPING.md` | Stage 8A cart delivery groups + WooCommerce shipping packages |
 | `docs/STAGE-8C-ORDER-ADMIN-PRESENTATION-CLEANUP.md` | Stage 8C order-admin technical meta presentation cleanup |
-| `docs/CLASSIC-CHECKOUT-RELEASE-CANDIDATE-READINESS.md` | Classic Checkout `1.0.0-rc.2` business readiness + activation plan |
+| `docs/CLASSIC-CHECKOUT-RELEASE-CANDIDATE-READINESS.md` | Pre-smoke Classic Checkout readiness (superseded for status by RC.2 readiness) |
+| `docs/RELEASE-1.0.0-RC.2-READINESS.md` | **Authoritative** live-verified `1.0.0-rc.2` release readiness |
 | `docs/ADMIN-UI-LANGUAGE-GUIDE.md` | Authoritative normal-administrator presentation language |
 | `docs/Delivery Shipping Plugin Up-To-Date Design and Expectations.md` | Latest intended product / end-state design |
 

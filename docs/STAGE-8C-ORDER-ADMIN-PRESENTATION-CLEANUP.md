@@ -12,6 +12,8 @@
 
 **Stage 8 functionally complete + Stage 8C presentation cleanup complete.**
 
+**Final RC.2 live smoke: PASS** — normal staff order presentation clean; technical/internal information hidden; Delivery information panel primary; no new Delivery Engine PHP fatals.
+
 No delivery-group architecture changes. No shipment/tracking work.
 
 ---

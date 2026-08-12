@@ -1,9 +1,12 @@
 # CETECH Delivery Engine — Classic Checkout Release Candidate Readiness
 
+**Status:** Superseded for live-verified status by [`docs/RELEASE-1.0.0-RC.2-READINESS.md`](RELEASE-1.0.0-RC.2-READINESS.md).
+
 **Package:** `1.0.0-rc.2`  
 **Schema:** `3`  
-**Date:** 2026-08-12  
-**Audience:** Store owner / administrator (business language first)
+**Final live smoke:** **PASS** — live and usable on current Classic Checkout environment.
+
+This file remains as the pre-smoke readiness draft. Use **RELEASE-1.0.0-RC.2-READINESS.md** as the authoritative release record.
 
 ---
 
