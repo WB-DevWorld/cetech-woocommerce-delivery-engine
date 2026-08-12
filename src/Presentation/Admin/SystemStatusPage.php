@@ -178,7 +178,7 @@ final class SystemStatusPage {
 			[
 				__( 'Product rule resolver registered', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( class_exists( ProductDeliveryRuleResolver::class ) ),
 				__( 'Resolver contract version', 'cetech-woocommerce-delivery-engine' ) => ProductRuleResolutionResult::CONTRACT_VERSION,
-				__( 'Resolver admin test location', 'cetech-woocommerce-delivery-engine' ) => __( 'Delivery Engine → Product Rules → Test product rule resolution', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Legacy rules admin test location', 'cetech-woocommerce-delivery-engine' ) => __( 'Delivery Engine → Legacy Delivery Rules → Test product rule resolution', 'cetech-woocommerce-delivery-engine' ),
 				__( 'Product delivery selector flag', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( $selector_enabled ),
 				__( 'Cart delivery selection capture flag', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( $capture_enabled ),
 				__( 'Product delivery selector renderer', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( class_exists( ProductDeliverySelectorRenderer::class ) ),
@@ -265,7 +265,7 @@ final class SystemStatusPage {
 		);
 
 		foreach ( $this->feature_flags->all() as $flag => $enabled ) {
-			$flag_rows[ $flag ] = $this->yes_no( $enabled );
+			$flag_rows[ FeatureFlagLabels::label( $flag ) ] = $this->yes_no( $enabled );
 		}
 
 		$this->render_table( __( 'Feature flags (read-only)', 'cetech-woocommerce-delivery-engine' ), $flag_rows );

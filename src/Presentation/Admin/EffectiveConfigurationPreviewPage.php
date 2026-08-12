@@ -69,7 +69,7 @@ final class EffectiveConfigurationPreviewPage {
 		}
 
 		$this->action_handler->notices()->flash_error(
-			__( 'Effective configuration preview cannot modify configuration.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Delivery Settings Preview cannot change settings. Use Delivery Settings to make edits.', 'cetech-woocommerce-delivery-engine' )
 		);
 		$this->action_handler->redirect( self::SLUG );
 	}
@@ -81,14 +81,14 @@ final class EffectiveConfigurationPreviewPage {
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
 			__( 'Delivery configuration', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Effective Configuration Preview', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Read-only inheritance preview using the Stage 3 EffectiveConfigurationResolver. Not a shipping quote.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery Settings Preview', 'cetech-woocommerce-delivery-engine' ),
+			__( 'See what delivery settings will actually apply for a product or variation. This is not a shipping price.', 'cetech-woocommerce-delivery-engine' ),
 			[
-				'label' => __( 'Scoped Configuration', 'cetech-woocommerce-delivery-engine' ),
+				'label' => __( 'Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
 				'url'   => AdminPageRenderer::list_url( ScopedConfigurationPage::SLUG ),
 			],
 			[
-				'label' => __( 'Legacy Product Rules', 'cetech-woocommerce-delivery-engine' ),
+				'label' => __( 'Legacy Delivery Rules', 'cetech-woocommerce-delivery-engine' ),
 				'url'   => AdminPageRenderer::list_url( ProductDeliveryRulesPage::SLUG ),
 			]
 		);
@@ -145,8 +145,8 @@ final class EffectiveConfigurationPreviewPage {
 
 	private function render_preview_form(): void {
 		AdminPageLayout::open_section(
-			__( 'Preview inputs', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Select a product, optional variation, and slice. Loading this preview never writes configuration.', 'cetech-woocommerce-delivery-engine' )
+			__( 'What do you want to preview?', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Choose a product, a variation if needed, and a delivery setup. Opening this preview never changes saved settings.', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -168,10 +168,10 @@ final class EffectiveConfigurationPreviewPage {
 		echo '<td><input type="number" min="1" class="small-text" id="parent_product_id" name="parent_product_id" value="' . esc_attr( $parent_product_id > 0 ? (string) $parent_product_id : '' ) . '" /></td></tr>';
 		echo '<tr><th scope="row"><label for="variation_id">' . esc_html__( 'Variation ID (optional)', 'cetech-woocommerce-delivery-engine' ) . '</label></th>';
 		echo '<td><input type="number" min="1" class="small-text" id="variation_id" name="variation_id" value="' . esc_attr( $variation_id > 0 ? (string) $variation_id : '' ) . '" /></td></tr>';
-		echo '<tr><th scope="row"><label for="slice_key">' . esc_html__( 'Slice', 'cetech-woocommerce-delivery-engine' ) . '</label></th><td>';
+		echo '<tr><th scope="row"><label for="slice_key">' . esc_html__( 'Delivery setup', 'cetech-woocommerce-delivery-engine' ) . '</label></th><td>';
 		echo '<select id="slice_key" name="slice_key">';
 		$slices = [
-			'' => __( 'Default (native root slice)', 'cetech-woocommerce-delivery-engine' ),
+			'' => __( 'Default delivery setup', 'cetech-woocommerce-delivery-engine' ),
 			'international_fulfilment' => __( 'International fulfilment', 'cetech-woocommerce-delivery-engine' ),
 			'in_store' => __( 'In store', 'cetech-woocommerce-delivery-engine' ),
 			'in_warehouse' => __( 'In warehouse', 'cetech-woocommerce-delivery-engine' ),
@@ -186,7 +186,7 @@ final class EffectiveConfigurationPreviewPage {
 		}
 		echo '</select></td></tr>';
 		echo '</tbody></table>';
-		submit_button( __( 'Run effective preview', 'cetech-woocommerce-delivery-engine' ), 'primary', 'submit', false );
+		submit_button( __( 'Show delivery settings', 'cetech-woocommerce-delivery-engine' ), 'primary', 'submit', false );
 		echo '</form>';
 		AdminPageLayout::close_section();
 	}
@@ -207,17 +207,17 @@ final class EffectiveConfigurationPreviewPage {
 		AdminPageLayout::render_summary_stats(
 			[
 				[
-					'label' => __( 'Overall state', 'cetech-woocommerce-delivery-engine' ),
+					'label' => __( 'Overall status', 'cetech-woocommerce-delivery-engine' ),
 					'value' => $model->overall_state_label,
 				],
 				[
-					'label' => __( 'Slice', 'cetech-woocommerce-delivery-engine' ),
+					'label' => __( 'Delivery setup', 'cetech-woocommerce-delivery-engine' ),
 					'value' => $model->slice_label,
 				],
 				[
-					'label' => __( 'Resolver', 'cetech-woocommerce-delivery-engine' ),
+					'label' => __( 'Settings source', 'cetech-woocommerce-delivery-engine' ),
 					'value' => $model->used_authoritative_resolver
-						? __( 'Stage 3 EffectiveConfigurationResolver', 'cetech-woocommerce-delivery-engine' )
+						? __( 'New inherited delivery settings', 'cetech-woocommerce-delivery-engine' )
 						: __( 'Unknown', 'cetech-woocommerce-delivery-engine' ),
 				],
 			]
@@ -241,18 +241,18 @@ final class EffectiveConfigurationPreviewPage {
 		}
 
 		AdminPageLayout::open_section(
-			__( 'Field-by-field effective result', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Values and provenance come from the authoritative resolver. No shipping prices are shown.', 'cetech-woocommerce-delivery-engine' )
+			__( 'What delivery settings will actually apply?', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Each row shows the value shoppers would use and where it currently comes from. No shipping prices are shown.', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		if ( [] === $model->fields ) {
-			echo '<p>' . esc_html__( 'No field results available for this request.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			echo '<p>' . esc_html__( 'No delivery settings are available for this product, variation, and delivery setup.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 		} else {
 			echo '<table class="widefat striped cetech-de-preview-table"><thead><tr>';
-			echo '<th scope="col">' . esc_html__( 'Field', 'cetech-woocommerce-delivery-engine' ) . '</th>';
-			echo '<th scope="col">' . esc_html__( 'State', 'cetech-woocommerce-delivery-engine' ) . '</th>';
-			echo '<th scope="col">' . esc_html__( 'Effective value', 'cetech-woocommerce-delivery-engine' ) . '</th>';
-			echo '<th scope="col">' . esc_html__( 'Source', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+			echo '<th scope="col">' . esc_html__( 'Setting', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+			echo '<th scope="col">' . esc_html__( 'Status', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+			echo '<th scope="col">' . esc_html__( 'Value that will apply', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+			echo '<th scope="col">' . esc_html__( 'Currently using', 'cetech-woocommerce-delivery-engine' ) . '</th>';
 			echo '<th scope="col">' . esc_html__( 'Notes', 'cetech-woocommerce-delivery-engine' ) . '</th>';
 			echo '</tr></thead><tbody>';
 
@@ -266,7 +266,7 @@ final class EffectiveConfigurationPreviewPage {
 				if ( ! empty( $field['is_collection'] ) ) {
 					$labels = $field['effective_member_labels'] ?? [];
 					$display = [] === $labels
-						? __( '(explicitly empty / none)', 'cetech-woocommerce-delivery-engine' )
+						? __( 'No delivery options for this setup', 'cetech-woocommerce-delivery-engine' )
 						: implode( ', ', array_map( 'strval', $labels ) );
 					echo '<td>' . esc_html( $display ) . '</td>';
 				} else {

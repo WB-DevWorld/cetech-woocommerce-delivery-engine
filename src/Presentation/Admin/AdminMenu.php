@@ -81,8 +81,8 @@ final class AdminMenu {
 
 			add_submenu_page(
 				self::PARENT_SLUG,
-				__( 'Scoped Configuration', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Scoped Configuration', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
 				'manage_delivery_settings',
 				ScopedConfigurationPage::SLUG,
 				[ $this->scoped_configuration_page, 'render' ]
@@ -156,8 +156,8 @@ final class AdminMenu {
 		if ( current_user_can( 'manage_product_delivery_rules' ) ) {
 			add_submenu_page(
 				self::PARENT_SLUG,
-				__( 'Product Rules', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Product Rules (Legacy RC)', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Legacy Delivery Rules', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Legacy Delivery Rules', 'cetech-woocommerce-delivery-engine' ),
 				'manage_product_delivery_rules',
 				ProductDeliveryRulesPage::SLUG,
 				[ $this->product_delivery_rules_page, 'render' ]
@@ -165,8 +165,8 @@ final class AdminMenu {
 
 			add_submenu_page(
 				self::PARENT_SLUG,
-				__( 'Effective Configuration Preview', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Effective Preview', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Delivery Settings Preview', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Delivery Settings Preview', 'cetech-woocommerce-delivery-engine' ),
 				'manage_product_delivery_rules',
 				EffectiveConfigurationPreviewPage::SLUG,
 				[ $this->effective_configuration_preview_page, 'render' ]
@@ -177,8 +177,8 @@ final class AdminMenu {
 		if ( current_user_can( 'manage_product_delivery_rules' ) && ! current_user_can( 'manage_delivery_settings' ) ) {
 			add_submenu_page(
 				self::PARENT_SLUG,
-				__( 'Scoped Configuration', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Scoped Configuration', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
 				'manage_product_delivery_rules',
 				ScopedConfigurationPage::SLUG,
 				[ $this->scoped_configuration_page, 'render' ]

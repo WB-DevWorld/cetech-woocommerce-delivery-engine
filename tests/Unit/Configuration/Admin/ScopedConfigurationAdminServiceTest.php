@@ -182,7 +182,7 @@ final class ScopedConfigurationAdminServiceTest extends TestCase {
 
 		self::assertSame( 'disable', $by_key[ ConfigurationFieldKey::LOGISTICS_PROFILE_ID ]->current_mode );
 		self::assertSame( 'disabled', $by_key[ ConfigurationFieldKey::LOGISTICS_PROFILE_ID ]->effective_state );
-		self::assertSame( 'Explicitly disabled', $by_key[ ConfigurationFieldKey::LOGISTICS_PROFILE_ID ]->provenance_label );
+		self::assertSame( 'Turned off for this item', $by_key[ ConfigurationFieldKey::LOGISTICS_PROFILE_ID ]->provenance_label );
 		self::assertSame( 'override', $by_key[ ConfigurationFieldKey::PRIORITY ]->current_mode );
 		self::assertSame( 0, $by_key[ ConfigurationFieldKey::PRIORITY ]->effective_value );
 
@@ -401,7 +401,7 @@ final class ScopedConfigurationAdminServiceTest extends TestCase {
 		foreach ( $preview->fields as $field ) {
 			if ( ConfigurationFieldKey::LOGISTICS_PROFILE_ID === $field['field_key'] ) {
 				self::assertSame( 'disabled', $field['effective_state'] );
-				self::assertSame( 'Disabled / None', $field['effective_value_label'] );
+				self::assertSame( 'Turned off', $field['effective_value_label'] );
 				self::assertNull( $field['effective_value'] );
 			}
 		}

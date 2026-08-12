@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Application\Configuration\Admin;
 
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver;
 use CetechDeliveryEngine\Domain\Configuration\CollectionFieldInstruction;
+use CetechDeliveryEngine\Domain\Configuration\CollectionMutationStep;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
 use CetechDeliveryEngine\Domain\Configuration\EffectiveConfiguration;
 use CetechDeliveryEngine\Domain\Configuration\EffectiveConfigurationRequest;
@@ -341,15 +342,15 @@ final class ScopedConfigurationAdminService {
 
 			$mode_labels = $is_collection
 				? [
-					'inherit' => 'Inherit',
-					'add'     => 'Add',
-					'remove'  => 'Remove',
-					'replace' => 'Replace',
+					'inherit' => 'Use inherited setting',
+					'add'     => 'Add to inherited options',
+					'remove'  => 'Remove from inherited options',
+					'replace' => 'Use only these options',
 				]
 				: [
-					'inherit'  => 'Inherit',
-					'override' => 'Override',
-					'disable'  => 'Disable',
+					'inherit'  => 'Use inherited setting',
+					'override' => 'Set a different value here',
+					'disable'  => 'Turn off',
 				];
 
 			if ( ConfigurationScopeType::Global === $scope_type ) {
@@ -378,11 +379,11 @@ final class ScopedConfigurationAdminService {
 					$configured_members = $collection_instruction->members;
 					$configured_state_label = match ( $collection_instruction->mode ) {
 						CollectionConfigurationMode::Replace => [] === $collection_instruction->members
-							? 'Configured (REPLACE — explicitly no values)'
-							: 'Configured (REPLACE)',
-						CollectionConfigurationMode::Add => 'Configured (ADD)',
-						CollectionConfigurationMode::Remove => 'Configured (REMOVE)',
-						CollectionConfigurationMode::Inherit => 'Inherit',
+							? 'Configured (no delivery options for this setup)'
+							: 'Configured (use only these options)',
+						CollectionConfigurationMode::Add => 'Configured (add to inherited options)',
+						CollectionConfigurationMode::Remove => 'Configured (remove from inherited options)',
+						CollectionConfigurationMode::Inherit => 'Use inherited setting',
 					};
 				} elseif ( ConfigurationScopeType::Global === $scope_type ) {
 					$current_mode = 'replace';
@@ -397,8 +398,8 @@ final class ScopedConfigurationAdminService {
 					$configured_value = $scalar_instruction->value;
 					$configured_state_label = match ( $scalar_instruction->mode ) {
 						ScalarConfigurationMode::Override => 'Configured',
-						ScalarConfigurationMode::Disable => 'Disabled',
-						ScalarConfigurationMode::Inherit => 'Inherit',
+						ScalarConfigurationMode::Disable => 'Turned off',
+						ScalarConfigurationMode::Inherit => 'Use inherited setting',
 					};
 				} elseif ( ConfigurationScopeType::Global === $scope_type ) {
 					$current_mode = '';
@@ -459,7 +460,15 @@ final class ScopedConfigurationAdminService {
 					$effective_members = $collection_instruction->members;
 					$provenance_label = ProvenanceLabelMapper::map( 'global' );
 					if ( CollectionConfigurationMode::Replace === $collection_instruction->mode && [] === $collection_instruction->members ) {
-						$provenance_lines = [ 'Global: Replaced with explicitly no values' ];
+						$provenance_lines = ProvenanceLabelMapper::mutation_summaries(
+							[
+								new CollectionMutationStep(
+									ConfigurationScopeType::Global,
+									CollectionConfigurationMode::Replace,
+									[]
+								),
+							]
+						);
 					}
 				} else {
 					$effective_state = EffectiveFieldState::Unresolved;
@@ -604,7 +613,7 @@ final class ScopedConfigurationAdminService {
 					'effective_state_label' => ReasonCodeLabelMapper::state_label( $state ),
 					'effective_state_tone'  => ReasonCodeLabelMapper::state_tone( $state ),
 					'effective_value'       => $value,
-					'effective_value_label' => EffectiveFieldState::Disabled === $state ? 'Disabled / None' : $value_label,
+					'effective_value_label' => EffectiveFieldState::Disabled === $state ? 'Turned off' : $value_label,
 					'effective_members'     => [],
 					'provenance_label'      => ProvenanceLabelMapper::map( $field?->provenance->source_label ?? 'global' ),
 					'provenance_lines'      => [],

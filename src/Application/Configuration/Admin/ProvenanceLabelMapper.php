@@ -11,13 +11,17 @@ final class ProvenanceLabelMapper {
 
 	public static function map( string $source_label ): string {
 		return match ( $source_label ) {
-			'global' => 'Global',
-			'product' => 'Product override',
-			'variation' => 'Variation override',
-			'explicit_disable' => 'Explicitly disabled',
-			'system_default' => 'System default',
+			'global' => 'Default Settings',
+			'product' => 'Product Settings',
+			'variation' => 'Variation Settings',
+			'explicit_disable' => 'Turned off for this item',
+			'system_default' => 'Built-in default',
 			default => $source_label,
 		};
+	}
+
+	public static function currently_using( string $source_label ): string {
+		return 'Currently using: ' . self::map( $source_label );
 	}
 
 	/**
@@ -31,9 +35,9 @@ final class ProvenanceLabelMapper {
 
 		foreach ( $steps as $step ) {
 			$scope = match ( $step->scope->value ) {
-				'global' => 'Global',
-				'product' => 'Product',
-				'variation' => 'Variation',
+				'global' => 'Default Settings',
+				'product' => 'Product Settings',
+				'variation' => 'Variation Settings',
 				default => $step->scope->value,
 			};
 
@@ -41,12 +45,12 @@ final class ProvenanceLabelMapper {
 
 			$lines[] = match ( $step->mode->value ) {
 				'replace' => sprintf(
-					'%s: Replaced with %s',
+					'%s: Use only %s',
 					$scope,
-					'' === $members ? 'explicitly no values' : $members
+					'' === $members ? 'no delivery options for this setup' : $members
 				),
-				'add' => sprintf( '%s: Added %s', $scope, $members ),
-				'remove' => sprintf( '%s: Removed %s', $scope, $members ),
+				'add' => sprintf( '%s: Add %s', $scope, $members ),
+				'remove' => sprintf( '%s: Remove %s', $scope, $members ),
 				default => sprintf( '%s: %s (%s)', $scope, $step->mode->value, $members ),
 			};
 		}

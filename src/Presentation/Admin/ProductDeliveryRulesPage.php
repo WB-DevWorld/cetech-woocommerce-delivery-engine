@@ -102,8 +102,8 @@ final class ProductDeliveryRulesPage {
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
 			__( 'Product delivery', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Product Rules', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Control how specific products should be handled for delivery, pickup, or special logistics.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Legacy Delivery Rules', 'cetech-woocommerce-delivery-engine' ),
+			__( 'These older product rules still control what shoppers see until the New Delivery Settings System is turned on. Use Delivery Settings for the new inherited values.', 'cetech-woocommerce-delivery-engine' ),
 			[
 				'label' => __( 'Add Product Rule', 'cetech-woocommerce-delivery-engine' ),
 				'url'   => add_query_arg( [ 'page' => self::SLUG, 'action' => 'add' ], admin_url( 'admin.php' ) ),
@@ -173,15 +173,15 @@ final class ProductDeliveryRulesPage {
 
 		if ( [] === $records ) {
 			AdminPageLayout::render_empty_state(
-				__( 'No product rules yet', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Create a product rule when certain products need special delivery treatment, such as heavy, fragile, pickup-only, or supplier-dispatched items.', 'cetech-woocommerce-delivery-engine' ),
+				__( 'No legacy delivery rules yet', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Create a legacy delivery rule when certain products need special delivery treatment, such as heavy, fragile, pickup-only, or supplier-dispatched items. Shoppers still use these rules until the New Delivery Settings System is turned on.', 'cetech-woocommerce-delivery-engine' ),
 				__( 'Add Product Rule', 'cetech-woocommerce-delivery-engine' ),
 				add_query_arg( [ 'page' => self::SLUG, 'action' => 'add' ], admin_url( 'admin.php' ) )
 			);
 		} else {
 			AdminPageLayout::open_section(
-				__( 'All product rules', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Rules apply to matching products, categories, or variations based on target type and ID.', 'cetech-woocommerce-delivery-engine' )
+				__( 'All legacy delivery rules', 'cetech-woocommerce-delivery-engine' ),
+				__( 'These rules apply to matching products, categories, or variations. They remain in use for shoppers until the New Delivery Settings System is turned on.', 'cetech-woocommerce-delivery-engine' )
 			);
 
 			$rows = [];

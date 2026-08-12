@@ -47,8 +47,8 @@ final class DeliverySettingsPage {
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
 			__( 'Delivery configuration', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Control how CETECH Delivery Engine appears and behaves during WooCommerce checkout.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Settings', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Control checkout features and advanced switches. Product and variation delivery values are edited under Delivery Settings.', 'cetech-woocommerce-delivery-engine' ),
 			[
 				'label' => __( 'Save Settings', 'cetech-woocommerce-delivery-engine' ),
 				'url'   => '#cetech-de-settings-form',
@@ -178,7 +178,7 @@ final class DeliverySettingsPage {
 			__( 'Optional adapters for themes, multilingual stores, and third-party plugins.', 'cetech-woocommerce-delivery-engine' )
 		);
 		foreach ( $this->integration_settings() as $setting ) {
-			$this->render_setting_checkbox( $setting, $flags );
+			$this->render_setting_checkbox( $setting, $flags, true );
 		}
 		AdminPageLayout::close_form_panel();
 
@@ -187,7 +187,7 @@ final class DeliverySettingsPage {
 			__( 'Not required for basic delivery pricing at checkout.', 'cetech-woocommerce-delivery-engine' )
 		);
 		foreach ( $this->experimental_settings() as $setting ) {
-			$this->render_setting_checkbox( $setting, $flags );
+			$this->render_setting_checkbox( $setting, $flags, true );
 		}
 		AdminPageLayout::close_form_panel();
 
@@ -334,7 +334,7 @@ final class DeliverySettingsPage {
 	 * @param array{flag: string, label: string, description: string, caution?: string} $setting
 	 * @param array<string, bool>                                                         $flags
 	 */
-	private function render_setting_checkbox( array $setting, array $flags ): void {
+	private function render_setting_checkbox( array $setting, array $flags, bool $show_technical_name = false ): void {
 		$flag    = $setting['flag'];
 		$name    = 'flags[' . $flag . ']';
 		$checked = ! empty( $flags[ $flag ] );
@@ -353,7 +353,12 @@ final class DeliverySettingsPage {
 			echo esc_html( (string) $setting['caution'] ) . '</p>';
 		}
 
-		echo '<p class="description cetech-de-setting-code">' . esc_html( $flag ) . '</p>';
+		if ( $show_technical_name ) {
+			echo '<details class="cetech-de-technical-details"><summary>' . esc_html__( 'Technical details', 'cetech-woocommerce-delivery-engine' ) . '</summary>';
+			echo '<p class="description cetech-de-setting-code">' . esc_html( $flag ) . '</p>';
+			echo '</details>';
+		}
+
 		echo '</td></tr>';
 	}
 
@@ -498,6 +503,18 @@ final class DeliverySettingsPage {
 	 */
 	private function experimental_settings(): array {
 		return [
+			[
+				'flag'        => 'enable_effective_configuration_runtime',
+				'label'       => __( 'Use the New Delivery Settings System', 'cetech-woocommerce-delivery-engine' ),
+				'description' => __( 'When enabled, eligible products use the new inherited delivery settings instead of the legacy product-rule system.', 'cetech-woocommerce-delivery-engine' ),
+				'caution'     => __( 'Deployment switch. Leave off unless CETECH support has asked you to turn it on for a controlled test.', 'cetech-woocommerce-delivery-engine' ),
+			],
+			[
+				'flag'        => 'enable_variable_product_ecr_runtime',
+				'label'       => __( 'Use New Delivery Settings for Product Variations', 'cetech-woocommerce-delivery-engine' ),
+				'description' => __( 'Allows individual WooCommerce variations to inherit or override delivery settings. Requires the New Delivery Settings System.', 'cetech-woocommerce-delivery-engine' ),
+				'caution'     => __( 'Deployment switch. Leave off unless CETECH support has asked you to turn it on for a controlled test.', 'cetech-woocommerce-delivery-engine' ),
+			],
 			[
 				'flag'        => 'enable_shipment_records',
 				'label'       => __( 'Shipment records (future feature)', 'cetech-woocommerce-delivery-engine' ),

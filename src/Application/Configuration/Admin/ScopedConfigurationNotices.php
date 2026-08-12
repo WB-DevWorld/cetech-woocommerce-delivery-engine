@@ -5,25 +5,25 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Application\Configuration\Admin;
 
 /**
- * Immutable transitional / quarantine notices for Stage 4 admin screens.
+ * Immutable notices for delivery-settings admin screens.
  */
 final class ScopedConfigurationNotices {
 
-	public const TRANSITIONAL_TITLE = 'Pre-cutover scoped configuration';
+	public const TRANSITIONAL_TITLE = 'These settings are stored, but customers still use the previous rules';
 
-	public const TRANSITIONAL_MESSAGE = 'Scoped configuration is currently in pre-cutover mode. Changes made here are stored and can be previewed, but the current customer-facing Delivery Engine runtime continues to use the legacy RC configuration until the runtime migration is completed.';
+	public const TRANSITIONAL_MESSAGE = 'You can edit and preview the new inherited delivery settings here. Shoppers continue to use the Legacy Delivery Rules until the New Delivery Settings System is turned on in Settings → Advanced.';
 
-	public const PREVIEW_LIMITATION_TITLE = 'Effective configuration preview only';
+	public const PREVIEW_LIMITATION_TITLE = 'This preview shows delivery settings, not a shipping price';
 
-	public const PREVIEW_LIMITATION_MESSAGE = 'Configuration inheritance has been resolved for this product, variation, and slice. Destination eligibility, rate calculation, checkout selection, and full fulfilment hard-constraint evaluation are not included. This is not a final shipping quote.';
+	public const PREVIEW_LIMITATION_MESSAGE = 'This page shows which delivery settings would apply for the selected product, variation, and delivery setup. It does not check the customer’s address, calculate a fee, or complete checkout.';
 
-	public const HARD_CONSTRAINT_NOTE = 'Stage 3 hard fulfilment constraints currently use a pass-through service; downstream constraints are not evaluated here.';
+	public const HARD_CONSTRAINT_NOTE = 'Some fulfilment limits are applied later, when a shopper actually chooses a delivery option.';
 
-	public const CATEGORY_WARNING_TITLE = 'Legacy category configuration present';
+	public const CATEGORY_WARNING_TITLE = 'This product still uses a legacy category rule';
 
-	public const CATEGORY_WARNING_MESSAGE = 'One or more legacy category product rules may affect this product under the current RC runtime. Category rules are not represented in the new Global → Product → Variation scoped resolver. Stage 5 must explicitly address parity before runtime cutover.';
+	public const CATEGORY_WARNING_MESSAGE = 'This product still gets its delivery settings from a legacy category rule. The new delivery settings system will not take control of this product until that legacy dependency is resolved.';
 
-	public const LEGACY_RUNTIME_LABEL = 'Legacy Product Rules (current RC runtime)';
+	public const LEGACY_RUNTIME_LABEL = 'Currently used for shoppers: Legacy Delivery Rules';
 
-	public const SCOPED_RUNTIME_LABEL = 'Scoped Configuration (v3 storage — pre-cutover)';
+	public const SCOPED_RUNTIME_LABEL = 'Stored here: new inherited delivery settings (not yet used for shoppers)';
 }

@@ -14,10 +14,10 @@ final class ReasonCodeLabelMapper {
 
 	public static function state_label( EffectiveFieldState $state ): string {
 		return match ( $state ) {
-			EffectiveFieldState::Valid => 'Valid',
-			EffectiveFieldState::Unresolved => 'Unresolved',
+			EffectiveFieldState::Valid => 'Ready',
+			EffectiveFieldState::Unresolved => 'Needs configuration',
 			EffectiveFieldState::Disabled => 'Disabled',
-			EffectiveFieldState::Invalid => 'Invalid',
+			EffectiveFieldState::Invalid => 'Configuration problem',
 		};
 	}
 
@@ -47,13 +47,13 @@ final class ReasonCodeLabelMapper {
 
 	public static function explain( string $code ): string {
 		return match ( $code ) {
-			ConfigurationReasonCode::UNRESOLVED_GLOBAL_VALUE => 'A required root (global) value is not configured.',
-			ConfigurationReasonCode::INVALID_COLLECTION_OPERATION => 'This collection operation needs a resolvable base collection first.',
+			ConfigurationReasonCode::UNRESOLVED_GLOBAL_VALUE => 'No default value has been set, and this product does not provide its own value.',
+			ConfigurationReasonCode::INVALID_COLLECTION_OPERATION => 'This list change needs a complete inherited list first. Set the Default Settings or choose “Use only these options”.',
 			ConfigurationReasonCode::INVALID_SCOPE_RELATIONSHIP => 'The variation does not belong to the selected parent product.',
-			ConfigurationReasonCode::MISSING_REQUIRED_FIELD => 'A required field is missing.',
-			ConfigurationReasonCode::UNSUPPORTED_DISABLE => 'Disable is not allowed for this field.',
-			ConfigurationReasonCode::INVALID_REFERENCE => 'A referenced entity is invalid.',
-			ConfigurationReasonCode::INVALID_REQUEST => 'The configuration request is invalid.',
+			ConfigurationReasonCode::MISSING_REQUIRED_FIELD => 'A required setting is missing.',
+			ConfigurationReasonCode::UNSUPPORTED_DISABLE => 'This setting cannot be turned off.',
+			ConfigurationReasonCode::INVALID_REFERENCE => 'A selected supplier, origin, profile, or offer is not valid.',
+			ConfigurationReasonCode::INVALID_REQUEST => 'This delivery settings request is not valid.',
 			default => $code,
 		};
 	}

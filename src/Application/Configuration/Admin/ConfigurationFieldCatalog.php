@@ -84,13 +84,13 @@ final class ConfigurationFieldCatalog {
 
 	public static function description( string $field_key ): string {
 		return match ( $field_key ) {
-			ConfigurationFieldKey::FULFILMENT_AVAILABILITY => 'Which fulfilment path this configuration applies to (for example in-store or international).',
+			ConfigurationFieldKey::FULFILMENT_AVAILABILITY => 'Which fulfilment path these settings apply to, such as In Store, In Warehouse, or International.',
 			ConfigurationFieldKey::FULFILMENT_CHOICE => 'Whether the customer chooses delivery or store pickup for this path.',
-			ConfigurationFieldKey::LOGISTICS_PROFILE_ID => 'Private logistics profile used for fulfilment planning. Use Disable for none.',
-			ConfigurationFieldKey::SUPPLIER_ID => 'Private supplier reference. Use Disable for none.',
-			ConfigurationFieldKey::ORIGIN_ID => 'Private origin reference. Use Disable for none.',
+			ConfigurationFieldKey::LOGISTICS_PROFILE_ID => 'Private logistics profile used for fulfilment planning. Choose “Turn off” if this item should not use a profile.',
+			ConfigurationFieldKey::SUPPLIER_ID => 'Private supplier reference. Choose “Turn off” if this item should not use a supplier.',
+			ConfigurationFieldKey::ORIGIN_ID => 'Private origin reference. Choose “Turn off” if this item should not use an origin.',
 			ConfigurationFieldKey::PRIORITY => 'Relative priority when multiple configurations compete. Zero is a valid value.',
-			ConfigurationFieldKey::DELIVERY_OFFER_IDS => 'Ordered list of delivery offers. REPLACE with an empty list means explicitly no offers (not inherit).',
+			ConfigurationFieldKey::DELIVERY_OFFER_IDS => 'Choose whether this product should use the delivery options it inherits, add more options, remove some, or use its own list. Choosing an empty list means no delivery options for this setup.',
 			default => '',
 		};
 	}
@@ -125,7 +125,7 @@ final class ConfigurationFieldCatalog {
 
 	public static function slice_label( string $slice_key ): string {
 		if ( '' === $slice_key ) {
-			return 'Default (native root slice)';
+			return 'Default delivery setup';
 		}
 
 		$options = self::enum_options( ConfigurationFieldKey::FULFILMENT_AVAILABILITY );

@@ -118,14 +118,14 @@ final class ScopedConfigurationPage {
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
 			__( 'Delivery configuration', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Scoped Configuration', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Manage Global → Product → Variation field inheritance for the new scoped configuration storage.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Set default delivery settings, then optionally change them for a product or a variation. If you do not set a different value, the next level up is used.', 'cetech-woocommerce-delivery-engine' ),
 			[
-				'label' => __( 'Effective Preview', 'cetech-woocommerce-delivery-engine' ),
+				'label' => __( 'Delivery Settings Preview', 'cetech-woocommerce-delivery-engine' ),
 				'url'   => AdminPageRenderer::list_url( EffectiveConfigurationPreviewPage::SLUG ),
 			],
 			[
-				'label' => __( 'Legacy Product Rules', 'cetech-woocommerce-delivery-engine' ),
+				'label' => __( 'Legacy Delivery Rules', 'cetech-woocommerce-delivery-engine' ),
 				'url'   => AdminPageRenderer::list_url( ProductDeliveryRulesPage::SLUG ),
 			]
 		);
@@ -147,6 +147,7 @@ final class ScopedConfigurationPage {
 		}
 
 		$this->render_context_summary( $model );
+		$this->render_empty_state( $model );
 		$this->render_editor_form( $model );
 		AdminPageLayout::close_page();
 	}
@@ -154,7 +155,7 @@ final class ScopedConfigurationPage {
 	private function handle_save( string $scope_type_raw ): void {
 		$scope_type = ConfigurationScopeType::tryFrom( $scope_type_raw );
 		if ( null === $scope_type ) {
-			$this->action_handler->notices()->flash_error( __( 'Invalid scope type.', 'cetech-woocommerce-delivery-engine' ) );
+			$this->action_handler->notices()->flash_error( __( 'Choose Default Settings, Product-Specific Settings, or Variation-Specific Settings.', 'cetech-woocommerce-delivery-engine' ) );
 			$this->action_handler->redirect( self::SLUG );
 		}
 
@@ -284,17 +285,17 @@ final class ScopedConfigurationPage {
 		?int $parent_product_id
 	): void {
 		AdminPageLayout::open_section(
-			__( 'Configuration scope', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Choose Global, Product, or Variation. Legacy Product Rules remain available for the current RC runtime.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Which settings are you editing?', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Default Settings apply unless a product or variation sets a different value. Legacy Delivery Rules still control what shoppers see until the new system is turned on.', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		$tabs = [
-			'global'    => __( 'Global', 'cetech-woocommerce-delivery-engine' ),
-			'product'   => __( 'Product', 'cetech-woocommerce-delivery-engine' ),
-			'variation' => __( 'Variation', 'cetech-woocommerce-delivery-engine' ),
+			'global'    => __( 'Default Settings', 'cetech-woocommerce-delivery-engine' ),
+			'product'   => __( 'Product-Specific Settings', 'cetech-woocommerce-delivery-engine' ),
+			'variation' => __( 'Variation-Specific Settings', 'cetech-woocommerce-delivery-engine' ),
 		];
 
-		echo '<nav class="cetech-de-scoped-tabs" aria-label="' . esc_attr__( 'Scoped configuration scopes', 'cetech-woocommerce-delivery-engine' ) . '">';
+		echo '<nav class="cetech-de-scoped-tabs" aria-label="' . esc_attr__( 'Delivery settings levels', 'cetech-woocommerce-delivery-engine' ) . '">';
 		echo '<ul class="cetech-de-scoped-tab-list">';
 		foreach ( $tabs as $key => $label ) {
 			$url = add_query_arg(
@@ -340,7 +341,7 @@ final class ScopedConfigurationPage {
 		}
 
 		echo '</tbody></table>';
-		submit_button( __( 'Load configuration', 'cetech-woocommerce-delivery-engine' ), 'secondary', 'submit', false );
+		submit_button( __( 'Load settings', 'cetech-woocommerce-delivery-engine' ), 'secondary', 'submit', false );
 		echo '</form>';
 		AdminPageLayout::close_section();
 	}
@@ -351,16 +352,17 @@ final class ScopedConfigurationPage {
 	private function render_context_summary( $model ): void {
 		$stats = [
 			[
-				'label' => __( 'Scope', 'cetech-woocommerce-delivery-engine' ),
-				'value' => ucfirst( $model->scope_type ),
+				'label' => __( 'Settings level', 'cetech-woocommerce-delivery-engine' ),
+				'value' => match ( $model->scope_type ) {
+					'global' => __( 'Default Settings', 'cetech-woocommerce-delivery-engine' ),
+					'product' => __( 'Product-Specific Settings', 'cetech-woocommerce-delivery-engine' ),
+					'variation' => __( 'Variation-Specific Settings', 'cetech-woocommerce-delivery-engine' ),
+					default => ucfirst( $model->scope_type ),
+				},
 			],
 			[
-				'label' => __( 'Slice', 'cetech-woocommerce-delivery-engine' ),
+				'label' => __( 'Delivery setup', 'cetech-woocommerce-delivery-engine' ),
 				'value' => $model->slice_label,
-			],
-			[
-				'label' => __( 'Scope version', 'cetech-woocommerce-delivery-engine' ),
-				'value' => $model->config_version > 0 ? (string) $model->config_version : '—',
 			],
 		];
 
@@ -392,10 +394,42 @@ final class ScopedConfigurationPage {
 	/**
 	 * @param \CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationEditViewModel $model
 	 */
+	private function render_empty_state( $model ): void {
+		$message = '';
+
+		if ( 'product' === $model->scope_type && 0 === $model->config_version ) {
+			$message = AdminLanguage::empty_product_settings();
+		} elseif ( 'variation' === $model->scope_type && 0 === $model->config_version ) {
+			$message = AdminLanguage::empty_variation_settings();
+		} elseif ( 'global' === $model->scope_type ) {
+			$all_unconfigured = true;
+			foreach ( $model->fields as $field ) {
+				if ( 'Not configured' !== $field->configured_state_label ) {
+					$all_unconfigured = false;
+					break;
+				}
+			}
+			if ( $all_unconfigured ) {
+				$message = AdminLanguage::empty_default_settings();
+			}
+		}
+
+		if ( '' === $message ) {
+			return;
+		}
+
+		echo '<div class="notice notice-info cetech-de-empty-state" role="status">';
+		echo '<p>' . esc_html( $message ) . '</p>';
+		echo '</div>';
+	}
+
+	/**
+	 * @param \CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationEditViewModel $model
+	 */
 	private function render_editor_form( $model ): void {
 		AdminPageLayout::open_section(
-			__( 'Field configuration', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Modes are explicit. Empty inputs never become inherit. REPLACE with no offers means explicitly none.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Delivery settings for this item', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Choose whether each setting uses the inherited value, a different value here, or is turned off. Leaving a setting unchanged keeps the value from Default Settings or the product.', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin.php?page=' . self::SLUG ) ) . '" class="cetech-de-scoped-editor">';
@@ -424,7 +458,7 @@ final class ScopedConfigurationPage {
 		}
 		echo '</ul></details>';
 
-		submit_button( __( 'Save scoped configuration', 'cetech-woocommerce-delivery-engine' ) );
+		submit_button( __( 'Save delivery settings', 'cetech-woocommerce-delivery-engine' ) );
 		echo '</form>';
 		AdminPageLayout::close_section();
 	}
@@ -435,14 +469,14 @@ final class ScopedConfigurationPage {
 	private function render_slice_controls( $model ): void {
 		if ( 'global' === $model->scope_type ) {
 			echo '<input type="hidden" name="slice_key" value="" />';
-			echo '<p><strong>' . esc_html__( 'Active slice:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
+			echo '<p><strong>' . esc_html__( 'Delivery setup:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
 			echo esc_html( $model->slice_label ) . '</p>';
 			return;
 		}
 
 		echo '<fieldset class="cetech-de-slice-controls">';
-		echo '<legend>' . esc_html__( 'Slice', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
-		echo '<label for="slice_key">' . esc_html__( 'Active slice', 'cetech-woocommerce-delivery-engine' ) . '</label> ';
+		echo '<legend>' . esc_html__( 'Delivery setup', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
+		echo '<label for="slice_key">' . esc_html__( 'Delivery setup', 'cetech-woocommerce-delivery-engine' ) . '</label> ';
 		echo '<select id="slice_key" name="slice_key">';
 		foreach ( $model->available_slices as $slice ) {
 			$label = $slice['label'];
@@ -463,14 +497,14 @@ final class ScopedConfigurationPage {
 		echo '</select>';
 
 		$availability = ConfigurationFieldCatalog::enum_options( \CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey::FULFILMENT_AVAILABILITY ) ?? [];
-		echo '<p><label for="new_slice_key">' . esc_html__( 'Or create a native slice', 'cetech-woocommerce-delivery-engine' ) . '</label> ';
+		echo '<p><label for="new_slice_key">' . esc_html__( 'Or add another delivery setup', 'cetech-woocommerce-delivery-engine' ) . '</label> ';
 		echo '<select id="new_slice_key" name="new_slice_key"><option value="">' . esc_html__( '—', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		foreach ( $availability as $key => $label ) {
 			printf( '<option value="%1$s">%2$s</option>', esc_attr( $key ), esc_html( $label ) );
 		}
 		echo '</select> ';
-		echo '<label><input type="checkbox" name="create_slice" value="1" /> ' . esc_html__( 'Create / switch to this slice on save', 'cetech-woocommerce-delivery-engine' ) . '</label></p>';
-		echo '<p class="description">' . esc_html__( 'Never edit one slice while intending another. Raw slice keys appear in technical details.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '<label><input type="checkbox" name="create_slice" value="1" /> ' . esc_html__( 'Save using this additional delivery setup', 'cetech-woocommerce-delivery-engine' ) . '</label></p>';
+		echo '<p class="description">' . esc_html__( 'Choose the delivery setup you mean to edit before saving. Internal setup codes are listed under Technical details.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 		echo '</fieldset>';
 	}
 
@@ -486,13 +520,13 @@ final class ScopedConfigurationPage {
 		echo esc_html( $field->configured_state_label );
 		echo '</span>';
 		if ( '' !== $field->effective_state_label ) {
-			echo ' · ' . esc_html__( 'Effective:', 'cetech-woocommerce-delivery-engine' ) . ' ';
+			echo ' · ' . esc_html__( 'Will apply:', 'cetech-woocommerce-delivery-engine' ) . ' ';
 			echo '<span class="cetech-de-state cetech-de-state--' . esc_attr( $field->effective_state_tone ) . '">' . esc_html( $field->effective_state_label ) . '</span>';
 		}
 		echo '</p>';
 
 		echo '<fieldset aria-describedby="' . esc_attr( $field_id . '_desc' ) . '">';
-		echo '<legend>' . esc_html__( 'Mode', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
+		echo '<legend>' . esc_html__( 'How this setting is applied', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
 
 		$modes = $field->allowed_modes;
 		if ( $field->is_global_root ) {
@@ -524,7 +558,7 @@ final class ScopedConfigurationPage {
 		}
 
 		if ( '' !== $field->provenance_label ) {
-			echo '<p><strong>' . esc_html__( 'Source:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ' . esc_html( $field->provenance_label ) . '</p>';
+			echo '<p><strong>' . esc_html__( 'Currently using:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ' . esc_html( $field->provenance_label ) . '</p>';
 		}
 		if ( [] !== $field->provenance_lines ) {
 			echo '<ul class="cetech-de-provenance-lines">';
@@ -542,17 +576,17 @@ final class ScopedConfigurationPage {
 		}
 
 		if ( ! $field->is_global_root ) {
-			echo '<p class="description">' . esc_html__( 'Inherited / effective preview uses the Stage 3 resolver.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			echo '<p class="description">' . esc_html__( 'If you do not set a different value here, this product uses the Default Settings. A variation uses the product’s delivery setting unless it has its own.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 			if ( $field->is_collection ) {
-				echo '<p><strong>' . esc_html__( 'Effective collection:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
-				echo esc_html( [] === $field->effective_members ? __( '(empty / none)', 'cetech-woocommerce-delivery-engine' ) : implode( ', ', array_map( 'strval', $field->effective_members ) ) );
+				echo '<p><strong>' . esc_html__( 'Delivery options that will apply:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
+				echo esc_html( [] === $field->effective_members ? __( 'No delivery options for this setup', 'cetech-woocommerce-delivery-engine' ) : implode( ', ', array_map( 'strval', $field->effective_members ) ) );
 				echo '</p>';
 			} else {
-				echo '<p><strong>' . esc_html__( 'Effective value:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
+				echo '<p><strong>' . esc_html__( 'Value that will apply:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
 				if ( 'disabled' === $field->effective_state ) {
-					echo esc_html__( 'Disabled / None', 'cetech-woocommerce-delivery-engine' );
+					echo esc_html__( 'Turned off', 'cetech-woocommerce-delivery-engine' );
 				} elseif ( null === $field->effective_value ) {
-					echo esc_html__( 'Unresolved', 'cetech-woocommerce-delivery-engine' );
+					echo esc_html__( 'Needs configuration', 'cetech-woocommerce-delivery-engine' );
 				} else {
 					echo esc_html( is_scalar( $field->effective_value ) ? (string) $field->effective_value : '' );
 				}
@@ -569,7 +603,7 @@ final class ScopedConfigurationPage {
 	private function render_scalar_inputs( $field, string $field_id ): void {
 		$value_id = $field_id . '_value';
 		echo '<div class="cetech-de-mode-panel" data-show-for="override">';
-		echo '<label for="' . esc_attr( $value_id ) . '">' . esc_html__( 'Override value', 'cetech-woocommerce-delivery-engine' ) . '</label> ';
+		echo '<label for="' . esc_attr( $value_id ) . '">' . esc_html__( 'Value to use here', 'cetech-woocommerce-delivery-engine' ) . '</label> ';
 
 		$current = is_scalar( $field->configured_value ) || null === $field->configured_value
 			? (string) ( $field->configured_value ?? '' )
@@ -617,7 +651,7 @@ final class ScopedConfigurationPage {
 	 */
 	private function render_collection_inputs( $field, string $field_id ): void {
 		echo '<div class="cetech-de-mode-panel" data-show-for="add,remove,replace">';
-		echo '<p class="description">' . esc_html__( 'ADD appends missing members. REMOVE removes listed members. REPLACE sets the exact list — an empty REPLACE means explicitly no values, which is not the same as Inherit.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '<p class="description">' . esc_html__( '“Add to inherited options” keeps the inherited list and adds more. “Remove from inherited options” keeps the inherited list minus the ones you select. “Use only these options” replaces the inherited list. An empty list means no delivery options for this setup.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 
 		$members_name = 'fields[' . $field->field_key . '][members][]';
 		if ( is_array( $field->selector_options ) ) {
