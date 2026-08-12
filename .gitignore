@@ -31,6 +31,7 @@ desktop.ini
 !/training/playwright/auth/
 !/training/playwright/auth/.gitkeep
 !/training/playwright/auth/README.md
+!/training/playwright/auth/save-storage-state.spec.ts
 /training/playwright/.auth/
 /training/playwright/test-results/
 /training/playwright/playwright-report/
