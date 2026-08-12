@@ -156,20 +156,21 @@ final class AdminMenu {
 		if ( current_user_can( 'manage_product_delivery_rules' ) ) {
 			add_submenu_page(
 				self::PARENT_SLUG,
-				__( 'Legacy Delivery Rules', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Legacy Delivery Rules', 'cetech-woocommerce-delivery-engine' ),
-				'manage_product_delivery_rules',
-				ProductDeliveryRulesPage::SLUG,
-				[ $this->product_delivery_rules_page, 'render' ]
-			);
-
-			add_submenu_page(
-				self::PARENT_SLUG,
 				__( 'Delivery Settings Preview', 'cetech-woocommerce-delivery-engine' ),
 				__( 'Delivery Settings Preview', 'cetech-woocommerce-delivery-engine' ),
 				'manage_product_delivery_rules',
 				EffectiveConfigurationPreviewPage::SLUG,
 				[ $this->effective_configuration_preview_page, 'render' ]
+			);
+
+			// Secondary compatibility menu — not an equal everyday workflow beside Delivery Settings.
+			add_submenu_page(
+				self::PARENT_SLUG,
+				__( 'Legacy Delivery Rules', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Legacy Delivery Rules', 'cetech-woocommerce-delivery-engine' ),
+				'manage_product_delivery_rules',
+				ProductDeliveryRulesPage::SLUG,
+				[ $this->product_delivery_rules_page, 'render' ]
 			);
 		}
 

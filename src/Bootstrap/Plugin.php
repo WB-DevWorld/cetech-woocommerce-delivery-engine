@@ -91,6 +91,7 @@ use CetechDeliveryEngine\Presentation\Admin\EffectiveConfigurationPreviewPage;
 use CetechDeliveryEngine\Presentation\Admin\LogisticsProfilesPage;
 use CetechDeliveryEngine\Presentation\Admin\PickupLocationsPage;
 use CetechDeliveryEngine\Presentation\Admin\OrderDeliverySnapshotAdminDisplay;
+use CetechDeliveryEngine\Presentation\Admin\OrderShippingItemPresentationGuard;
 use CetechDeliveryEngine\Presentation\Admin\ProductDeliveryRulesPage;
 use CetechDeliveryEngine\Presentation\Admin\ProductTargetResolver;
 use CetechDeliveryEngine\Presentation\Admin\RateCardsPage;
@@ -208,6 +209,7 @@ final class Plugin {
 		$this->container->get( ShippingPackageBuilder::class )->register();
 		$this->container->get( SelectedOfferShippingIntegration::class )->register();
 		$this->container->get( OrderDeliverySnapshotPersister::class )->register();
+		$this->container->get( OrderShippingItemPresentationGuard::class )->register();
 		$this->container->get( CustomerOrderDeliverySummaryRenderer::class )->register();
 		$this->container->get( CustomerOrderDeliveryEmailSummaryRenderer::class )->register();
 
@@ -569,6 +571,11 @@ final class Plugin {
 				$container->get( OrderDeliverySnapshotReader::class ),
 				$container->get( OrderDeliverySnapshotIntegrity::class )
 			)
+		);
+
+		$this->container->singleton(
+			OrderShippingItemPresentationGuard::class,
+			static fn (): OrderShippingItemPresentationGuard => new OrderShippingItemPresentationGuard()
 		);
 
 		$this->container->singleton(

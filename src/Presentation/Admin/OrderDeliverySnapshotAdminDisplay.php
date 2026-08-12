@@ -54,6 +54,7 @@ final class OrderDeliverySnapshotAdminDisplay {
 		$protected = [
 			OrderDeliverySnapshot::META_LINE_SNAPSHOT,
 			OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION,
+			OrderShippingItemPresentationGuard::GROUP_ID_META_KEY,
 		];
 
 		foreach ( $protected as $key ) {

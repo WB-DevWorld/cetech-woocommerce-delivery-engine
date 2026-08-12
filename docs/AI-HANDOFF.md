@@ -3,15 +3,15 @@
 ## CURRENT IMPLEMENTATION STATUS — V1 RC (read first)
 
 **Last updated:** 2026-08-12  
-**Plugin version:** `1.0.0-rc.1`  
+**Plugin version:** `1.0.0-rc.2`  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `master` — Stage 6 **FUNCTIONALLY COMPLETE** (live order `#39721`); Stage 6C presentation cleanup **included** (`331a856`); Stage 7 **COMPLETE — NO WOODMART ADAPTER REQUIRED**; Stage 8A multi-product grouping **committed** (`5f04147`) and **READY FOR STAGE 8 LIVE QA** (package `cetech-woocommerce-delivery-engine-stage8a-qa.zip`); keep DE runtime flags **OFF** on FLAIROC unless explicitly testing  
+**Git:** `master` — Stage 6 **FUNCTIONALLY COMPLETE**; Stage 6C **COMPLETE**; Stage 7 **COMPLETE — NO WOODMART ADAPTER REQUIRED**; Stage 8 **FUNCTIONALLY COMPLETE** (live `#39724`); Stage 8C order-admin technical presentation cleanup **included**; Classic Checkout release candidate `1.0.0-rc.2`  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
 This handoff remains the **product vision and domain source of truth**. Much of the document describes the full intended engine (including shipment records and customer tracking). **Only the V1 RC scope below is implemented in code today.** Do not assume later sections are already built.
 
-### Stage 0B / Stage 1 / Stage 2 / Stage 3 / Stage 4 / Stage 5A / Stage 5B / Stage 6A / Stage 6B / Stage 6C / Stage 7 / Stage 8A status
+### Stage 0B / Stage 1 / Stage 2 / Stage 3 / Stage 4 / Stage 5A / Stage 5B / Stage 6A / Stage 6B / Stage 6C / Stage 7 / Stage 8 / Stage 8C status
 
 | Item | Status |
 |------|--------|
@@ -38,26 +38,28 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 6B-2 retry (clean repaired install) | **PASS** — PHP-log safety |
 | Stage 6B-2L final admin language | **PASS** — ZIP `181b094d…308ee` |
 | Stage 6B-3 / 6B-3R variable QA live | **FUNCTIONALLY COMPLETE** — QA `#39717` / A `#39718` / B `#39719`; shipping **25.00**; order **`#39721`**; WoodMart **PASS** (no Stage 7 adapter required); flags/COD restored **OFF** |
-| Stage 6C presentation cleanup | **DONE locally** — `331a856`; distinct customer labels; hide `_cetech_de_*` item meta; simplify order admin to **Delivery information**; carry into next release package |
+| Stage 6C presentation cleanup | **COMPLETE** — distinct customer labels; hide `_cetech_de_*` item meta; simplify order admin to **Delivery information** |
 | Stage 7 WoodMart adapter | **COMPLETE — NO WOODMART ADAPTER REQUIRED** — Stage 6 variable QA used WoodMart’s normal variation lifecycle; do not create empty adapter code |
-| Stage 8A multi-product shipping grouping | **READY FOR STAGE 8 LIVE QA** — commit `5f04147` (+ docs `ff7ca68`); artifact `docs/STAGE-8A-MULTI-PRODUCT-SHIPPING-GROUPING.md`; QA ZIP `cetech-woocommerce-delivery-engine-stage8a-qa.zip` SHA-256 `daaa5582…2c52`; FLAIROC not modified |
+| Stage 8 multi-product shipping grouping | **FUNCTIONALLY COMPLETE** — live order **`#39724`** (two compatible lines; shipping **25.00**); artifact `docs/STAGE-8A-MULTI-PRODUCT-SHIPPING-GROUPING.md` |
+| Stage 8C order-admin technical presentation cleanup | **COMPLETE** — hide `cetech_de_group_id` / package accounting / implementation shipping labels from ordinary WC order UI; artifact `docs/STAGE-8C-ORDER-ADMIN-PRESENTATION-CLEANUP.md` |
+| Classic Checkout release candidate | **`1.0.0-rc.2`** — readiness `docs/CLASSIC-CHECKOUT-RELEASE-CANDIDATE-READINESS.md` |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |
 | New admin UX | Default / Product-Specific / Variation-Specific delivery settings + preview; operational language required (`docs/ADMIN-UI-LANGUAGE-GUIDE.md`) |
 | Runtime cutover flag | `enable_effective_configuration_runtime` **defaults OFF** |
 | Variable ECR cutover flag | `enable_variable_product_ecr_runtime` **defaults OFF** — requires main ECR flag; does not affect simple-product Stage 5 path |
 | Legacy storage | `product_delivery_rules` remains default authoritative path while cutover flag OFF |
-| Runtime on FLAIROC | Stage 6 live verified then restored **OFF**; schema **3** |
+| Runtime on FLAIROC | Stage 8 live verified; restore/cutover per release readiness (leave ON only for intentional production cutover) |
 | Variable runtime capture | **cut over and verified live** (Stage 6); WoodMart adapter **not required** for standard events |
 | Shipments / tracking / timeline | **Not implemented** |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Stage 5/6 **compatibility route** (category winners stay on legacy source); `#39705` is **not** category-routed |
-| Next stage | Human clean-install Stage 8 QA package; focused multi-product live test only. Do **not** start shipment/tracking (Stage 9). |
+| Next stage | Human clean-install **`1.0.0-rc.2`** and perform final live smoke (`docs/CLASSIC-CHECKOUT-RELEASE-CANDIDATE-READINESS.md`). Do **not** start shipment/tracking (Stage 9) unless explicitly instructed. |
 | Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual |
 | Release-quality backlog | Administrator language is **mandatory now**, not deferred to a later RC |
 | Stage 1 HPOS debt | **DEFERRED** (`countOrderSnapshotReferences` postmeta); non-numeric rate→0 **FIXED** in Stage 5A |
 
-Do **not** begin Stage 9 shipment/tracking unless Stage 8A live multi-product verification passes. Keep FLAIROC Delivery Engine runtime flags **OFF** unless explicitly testing.
+Do **not** begin Stage 9 shipment/tracking for this release candidate. For production cutover, enable the documented runtime switches intentionally; COD remains OFF unless the site uses it.
 
 Administrator-language requirement: normal-user admin UI must use operational language throughout. Technical terminology belongs only in Technical details.
 
@@ -86,6 +88,8 @@ Administrator-language requirement: normal-user admin UI must use operational la
 | `docs/STAGE-6A-VARIABLE-PRODUCT-ECR-SUPPORT.md` | Stage 6A variable-product ECR runtime (local; variable flag default OFF) |
 | `docs/STAGE-6B-FLAIROC-VARIABLE-ECR-VERIFICATION.md` | Stage 6B packaging record + FLAIROC variable verification plan |
 | `docs/STAGE-8A-MULTI-PRODUCT-SHIPPING-GROUPING.md` | Stage 8A cart delivery groups + WooCommerce shipping packages |
+| `docs/STAGE-8C-ORDER-ADMIN-PRESENTATION-CLEANUP.md` | Stage 8C order-admin technical meta presentation cleanup |
+| `docs/CLASSIC-CHECKOUT-RELEASE-CANDIDATE-READINESS.md` | Classic Checkout `1.0.0-rc.2` business readiness + activation plan |
 | `docs/ADMIN-UI-LANGUAGE-GUIDE.md` | Authoritative normal-administrator presentation language |
 | `docs/Delivery Shipping Plugin Up-To-Date Design and Expectations.md` | Latest intended product / end-state design |
 

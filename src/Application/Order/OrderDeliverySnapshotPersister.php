@@ -43,6 +43,7 @@ final class OrderDeliverySnapshotPersister {
 		foreach ( [
 			OrderDeliverySnapshot::META_LINE_SNAPSHOT,
 			OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION,
+			'cetech_de_group_id',
 		] as $key ) {
 			if ( ! in_array( $key, $hidden, true ) ) {
 				$hidden[] = $key;
@@ -66,12 +67,17 @@ final class OrderDeliverySnapshotPersister {
 		$protected = [
 			OrderDeliverySnapshot::META_LINE_SNAPSHOT,
 			OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION,
+			'cetech_de_group_id',
 		];
 
 		foreach ( $formatted_meta as $meta_id => $meta ) {
 			$key = is_object( $meta ) && isset( $meta->key ) ? (string) $meta->key : '';
 
-			if ( in_array( $key, $protected, true ) || str_starts_with( $key, '_cetech_de_' ) ) {
+			if (
+				in_array( $key, $protected, true )
+				|| str_starts_with( $key, '_cetech_de_' )
+				|| str_starts_with( $key, 'cetech_de_' )
+			) {
 				unset( $formatted_meta[ $meta_id ] );
 			}
 		}

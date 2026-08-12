@@ -103,15 +103,15 @@ final class ProductDeliveryRulesPage {
 		AdminPageLayout::render_page_header(
 			__( 'Product delivery', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Legacy Delivery Rules', 'cetech-woocommerce-delivery-engine' ),
-			__( 'These older product rules still control what shoppers see until the New Delivery Settings System is turned on. Use Delivery Settings for the new inherited values.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Use Delivery Settings for normal day-to-day delivery setup. These legacy rules remain for migration and compatibility while older product rules are still in use. They are not a second everyday delivery system.', 'cetech-woocommerce-delivery-engine' ),
 			[
 				'label' => __( 'Add Product Rule', 'cetech-woocommerce-delivery-engine' ),
 				'url'   => add_query_arg( [ 'page' => self::SLUG, 'action' => 'add' ], admin_url( 'admin.php' ) ),
 				'class' => 'primary',
 			],
 			[
-				'label' => __( 'Manage Logistics Profiles', 'cetech-woocommerce-delivery-engine' ),
-				'url'   => AdminPageRenderer::list_url( LogisticsProfilesPage::SLUG ),
+				'label' => __( 'Open Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
+				'url'   => AdminPageRenderer::list_url( ScopedConfigurationPage::SLUG ),
 			]
 		);
 

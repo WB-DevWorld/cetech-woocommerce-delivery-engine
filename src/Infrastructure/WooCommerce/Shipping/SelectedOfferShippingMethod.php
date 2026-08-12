@@ -24,9 +24,10 @@ final class SelectedOfferShippingMethod extends WC_Shipping_Method {
 	public function __construct( int $instance_id = 0 ) {
 		$this->id                 = self::METHOD_ID;
 		$this->instance_id        = absint( $instance_id );
-		$this->method_title       = __( 'Delivery Engine — Selected Offer', 'cetech-woocommerce-delivery-engine' );
+		// Operational staff/customer label — never show implementation method ids here.
+		$this->method_title       = __( 'Delivery', 'cetech-woocommerce-delivery-engine' );
 		$this->method_description = __(
-			'Prices delivery from captured product delivery selections using configured rate cards.',
+			'Uses the customer’s selected delivery option and configured rate cards.',
 			'cetech-woocommerce-delivery-engine'
 		);
 		$this->supports           = [

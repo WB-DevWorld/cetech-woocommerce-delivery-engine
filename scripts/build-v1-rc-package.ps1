@@ -8,7 +8,7 @@
     Does not commit artifacts. Runs Composer in the staging copy only when vendor/ is missing.
 #>
 param(
-    [string]$Version = '1.0.0-rc.1'
+    [string]$Version = '1.0.0-rc.2'
 )
 
 Set-StrictMode -Version Latest

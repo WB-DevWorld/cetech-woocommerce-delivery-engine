@@ -1,8 +1,8 @@
 # V1 Release Candidate — Packaging Guide
 
-**Target:** `v1.0.0-rc.1`  
+**Target:** `v1.0.0-rc.2`  
 **Plugin slug:** `cetech-woocommerce-delivery-engine`  
-**Package name:** `cetech-woocommerce-delivery-engine-v1.0.0-rc.1.zip`
+**Package name:** `cetech-woocommerce-delivery-engine-v1.0.0-rc.2.zip`
 
 This guide describes how to build a **private RC install ZIP** for staging. It does **not** create a Git tag or GitHub release.
 
@@ -61,13 +61,13 @@ Reference flag enablement order: [V1-RC-FLAG-MATRIX.md](V1-RC-FLAG-MATRIX.md).
 ## Build command
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File scripts/build-v1-rc-package.ps1 -Version 1.0.0-rc.1
+powershell -ExecutionPolicy Bypass -File scripts/build-v1-rc-package.ps1 -Version 1.0.0-rc.2
 ```
 
 Outputs (not committed):
 
-- `dist/cetech-woocommerce-delivery-engine-v1.0.0-rc.1.zip`
-- `dist/cetech-woocommerce-delivery-engine-v1.0.0-rc.1.zip.sha256`
+- `dist/cetech-woocommerce-delivery-engine-v1.0.0-rc.2.zip`
+- `dist/cetech-woocommerce-delivery-engine-v1.0.0-rc.2.zip.sha256`
 
 ---
 

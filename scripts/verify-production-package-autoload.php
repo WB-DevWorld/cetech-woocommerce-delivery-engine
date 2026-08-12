@@ -83,6 +83,7 @@ $required_classes = [
 	'CetechDeliveryEngine\\Application\\Shipping\\SelectedOfferShippingRateCalculator',
 	'CetechDeliveryEngine\\Application\\Order\\OrderDeliveryGroupSnapshot',
 	'CetechDeliveryEngine\\Presentation\\Admin\\OrderDeliverySnapshotAdminDisplay',
+	'CetechDeliveryEngine\\Presentation\\Admin\\OrderShippingItemPresentationGuard',
 ];
 
 $required_interfaces = [

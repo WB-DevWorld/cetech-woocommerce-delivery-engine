@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Tests\Unit\Presentation;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Presentation\Admin\OrderDeliverySnapshotAdminDisplay;
+use CetechDeliveryEngine\Presentation\Admin\OrderShippingItemPresentationGuard;
 use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
 use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshot;
 use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotIntegrity;
@@ -96,7 +97,87 @@ final class DeliveryPresentationCleanupTest extends TestCase {
 
 		self::assertContains( OrderDeliverySnapshot::META_LINE_SNAPSHOT, $hidden );
 		self::assertContains( OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION, $hidden );
+		self::assertContains( OrderShippingItemPresentationGuard::GROUP_ID_META_KEY, $hidden );
 		self::assertContains( '_qty', $hidden );
+	}
+
+	public function test_shipping_group_identity_meta_is_hidden_from_formatted_order_meta(): void {
+		$guard = new OrderShippingItemPresentationGuard();
+
+		$hidden = $guard->hide_technical_order_item_meta( [] );
+		self::assertContains( 'cetech_de_group_id', $hidden );
+		self::assertContains( 'package_qty', $hidden );
+
+		$group_meta = (object) [
+			'key'         => 'cetech_de_group_id',
+			'value'       => 'in_warehouse|delivery|1',
+			'display_key' => 'cetech_de_group_id',
+			'display_value' => 'in_warehouse|delivery|1',
+		];
+		$package_qty = (object) [
+			'key'         => 'package_qty',
+			'value'       => '2',
+			'display_key' => 'Package Qty',
+			'display_value' => '2',
+		];
+		$impl_label = (object) [
+			'key'         => 'Shipping Method',
+			'value'       => 'Delivery engine selected offer',
+			'display_key' => 'Shipping Method',
+			'display_value' => 'Delivery engine selected offer',
+		];
+		$keep = (object) [
+			'key'         => 'Note',
+			'value'       => 'Leave at door',
+			'display_key' => 'Note',
+			'display_value' => 'Leave at door',
+		];
+
+		// Exercise key classification without WooCommerce bootstrap.
+		self::assertTrue( $guard->is_technical_meta_key( 'cetech_de_group_id' ) );
+		self::assertTrue( $guard->is_technical_meta_key( 'Package Qty' ) );
+		self::assertTrue( $guard->is_technical_meta_key( '_cetech_de_delivery_snapshot' ) );
+		self::assertFalse( $guard->is_technical_meta_key( 'Note' ) );
+
+		$formatted = $guard->strip_technical_formatted_meta(
+			[
+				1 => $group_meta,
+				2 => $package_qty,
+				3 => $impl_label,
+				4 => $keep,
+			],
+			null
+		);
+
+		self::assertArrayNotHasKey( 1, $formatted );
+		self::assertArrayNotHasKey( 2, $formatted );
+		self::assertArrayNotHasKey( 3, $formatted );
+		self::assertArrayHasKey( 4, $formatted );
+
+		self::assertSame(
+			'Delivery',
+			$guard->operational_shipping_method_title( 'Delivery Engine — Selected Offer', null )
+		);
+		self::assertSame(
+			'Delivery',
+			$guard->operational_shipping_method_title( 'delivery_engine_selected_offer', null )
+		);
+		self::assertSame(
+			'Delivery',
+			$guard->operational_shipping_method_title( 'Delivery', null )
+		);
+	}
+
+	public function test_group_identity_storage_key_remains_available_for_snapshots(): void {
+		self::assertSame( 'cetech_de_group_id', OrderShippingItemPresentationGuard::GROUP_ID_META_KEY );
+		self::assertSame( 'delivery_engine_selected_offer', OrderShippingItemPresentationGuard::SHIPPING_METHOD_ID );
+
+		$shipping_method_file = dirname( __DIR__, 3 ) . '/src/Infrastructure/WooCommerce/Shipping/SelectedOfferShippingMethod.php';
+		$source               = file_get_contents( $shipping_method_file );
+		self::assertIsString( $source );
+		self::assertStringContainsString( "'cetech_de_group_id'", $source );
+		self::assertStringContainsString( "method_title       = __( 'Delivery'", $source );
+		self::assertStringNotContainsString( 'Delivery Engine — Selected Offer', $source );
 	}
 
 	public function test_admin_panel_title_is_operational_delivery_information(): void {

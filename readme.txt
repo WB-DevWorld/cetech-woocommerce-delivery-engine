@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-rc.1
+Stable tag: 1.0.0-rc.2
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,12 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-rc.2 =
+* Classic Checkout release candidate through Stage 8C.
+* Includes Stage 6 variable support, Stage 6C presentation cleanup, Stage 8 multi-product grouping, and Stage 8C order-admin technical meta cleanup.
+* Delivery Settings is the primary admin workflow; Legacy Delivery Rules remain for migration/compatibility.
+* Shipment records, tracking, Blocks checkout, and carrier APIs remain out of scope.
 
 = 1.0.0-rc.1 =
 * Release-candidate build for CETECH WooCommerce Delivery Engine V1.

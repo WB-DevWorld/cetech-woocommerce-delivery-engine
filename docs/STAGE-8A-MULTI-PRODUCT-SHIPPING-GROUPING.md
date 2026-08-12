@@ -1,16 +1,16 @@
 # Stage 8A — Release-Critical Multi-Product Shipping Grouping
 
 **Document status:** Stage 8A completion record  
-**Plugin version:** `1.0.0-rc.1` (unchanged)  
+**Plugin version:** `1.0.0-rc.2`  
 **Schema target:** `3` (unchanged)  
 **Date:** 2026-08-12  
-**Carry-forward:** Stage 6C presentation cleanup `331a856`
+**Carry-forward:** Stage 6C presentation cleanup; Stage 8 live `#39724`; Stage 8C presentation cleanup
 
 ---
 
 ## 1. Verdict
 
-**READY FOR FOCUSED MULTI-PRODUCT LIVE TEST** (after packaging Stage 6C + Stage 8A together)
+**STAGE 8 FUNCTIONALLY COMPLETE** (live `#39724`)
 
 Stage 8A answers one business question for Classic Checkout:
 
@@ -204,7 +204,7 @@ Internal group ids / hashes are never shown to customers or in normal staff UI.
 
 **Commit:** `5f04147` — `feat: add multi-product delivery grouping`  
 **Base includes Stage 6C:** `331a856`  
-**Public version:** `1.0.0-rc.1`  
+**Public version:** `1.0.0-rc.2`  
 **Schema:** `3`  
 **Stage 7:** COMPLETE — NO WOODMART ADAPTER REQUIRED  
 **Shipments/tracking:** not included  
