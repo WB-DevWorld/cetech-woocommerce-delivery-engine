@@ -4,21 +4,42 @@
 **Plugin version:** `1.0.0-rc.1` (unchanged public version)  
 **Schema target:** `3` (unchanged)  
 **Date opened:** 2026-08-11  
-**Last updated:** 2026-08-12 (Stage 6B-2 flag-OFF deployment safety — **PASS**)
+**Last updated:** 2026-08-12 (Stage 6B-2 **OVERTURNED** to BLOCKED; Stage 6B-2R local autoload + admin-language repair)
 
 ---
 
 ## 1. Current verdict
 
-**Stage 6B-2: READY FOR VARIABLE ECR LIVE VERIFICATION**
+**Stage 6B-2: BLOCKED** (overturned after human PHP log review)
 
-Human administrator installed Stage 6B package on FLAIROC. Agent flag-OFF deployment safety verification **PASS** (automated REST/storefront channel). All Delivery Engine customer/runtime flags remain **effectively OFF** (dormant storefront). COD remains **OFF**. No variable QA product created. **Do not enable ECR or variable ECR until Stage 6B-3 is explicitly started.**
+The 2026-08-12 agent REST/storefront check recorded **READY**. That verdict is **wrong** and is preserved below as chronology only.
+
+Human SSH log review found **two fresh PHP fatals** immediately after the Stage 6B package install (marker `2026-08-12T10:30:21Z`):
+
+| Fatal | Timestamp | Missing interface | While loading |
+|-------|-----------|-------------------|---------------|
+| #1 | 12-Aug-2026 10:31:41 UTC | `CetechDeliveryEngine\Application\Runtime\VariationRelationshipInspectorInterface` | `src/Application/Runtime/WooCommerceVariationRelationshipInspector.php` line 12 |
+| #2 | 12-Aug-2026 10:31:42 UTC | `CetechDeliveryEngine\Core\Versioning\VerifiableMigrationInterface` | `database/migrations/20260810160000_create_scoped_configuration_tables.php` line 19 |
+
+These are **fresh Stage 6 deployment failures**, not historical Stage 5 errors.
+
+**Do not perform Stage 6B-3. Do not enable** `enable_effective_configuration_runtime`, `enable_variable_product_ecr_runtime`, or any Delivery Engine runtime flag.
+
+The human administrator may restore the known-good Stage 5 fingerprint-fixed package for production safety:
+
+- `cetech-woocommerce-delivery-engine-stage5b-fingerprint-fixed.zip`
+- SHA-256 `dbddc1d7df3c1262296e9c42b05e87921066fc6f5f29b0f3c798385ad1d4cbfd`
+- Schema remains **3** (no downgrade expected)
+
+This Cursor repair task **does not modify FLAIROC**.
 
 | Sub-stage | Status |
 |-----------|--------|
-| Stage 6B-1 package + plan | **READY** |
-| Stage 6B-2 flag-OFF deployment safety | **PASS** (2026-08-12 UTC) |
-| Stage 6B-3 variable QA live cutover | **NOT STARTED** (gated; human admin DE smoke + log review recommended before enablement) |
+| Stage 6A | **COMPLETE** |
+| Stage 6B-1 original package | **FAILED deployment safety** — `cetech-woocommerce-delivery-engine-stage6b.zip` SHA-256 `cc89edf81799cdd734edf6f22d54472eaf6b2d26820a36fc70f371f4cbfa0e76` — **do not redeploy** |
+| Stage 6B-2 flag-OFF install | **BLOCKED** (HTTP looked healthy; PHP fatals in logs) |
+| Stage 6B-2R local repair | **this document** — repaired package + admin language + verifier gates |
+| Stage 6B-3 variable QA live cutover | **NOT STARTED** |
 
 ---
 
@@ -257,6 +278,8 @@ No schema downgrade should normally be required because schema remains **3**.
 
 **PASS — READY FOR VARIABLE ECR LIVE VERIFICATION**
 
+> **OVERTURNED 2026-08-12.** This REST/storefront PASS is retained as chronology. Human PHP log review found two fresh interface fatals at 10:31:41 UTC and 10:31:42 UTC. Correct Stage 6B-2 status is **BLOCKED**. See §14.
+
 ### Installed build evidence
 
 | Check | Result |
@@ -387,9 +410,11 @@ Delivery Engine has **no public REST options API**. Persisted `cetech_de_*` opti
 
 ---
 
-## 12. FLAIROC state at Stage 6B-2 close
+## 12. FLAIROC state at Stage 6B-2 close (as recorded before log overturn)
 
-| Item | State |
+The following table is the **pre-overturn** close state from the REST/storefront channel. It is **not** the current safety verdict.
+
+| Item | State recorded 2026-08-12 (REST/storefront) |
 |------|-------|
 | Stage 6B package | **INSTALLED** (human administrator) |
 | Delivery Engine | **ACTIVE** `1.0.0-rc.1` |
@@ -398,21 +423,87 @@ Delivery Engine has **no public REST options API**. Persisted `cetech_de_*` opti
 | Main ECR | **OFF** |
 | Variable ECR | **OFF** |
 | COD | **OFF** |
-| Dormant storefront | **PASS** |
+| Dormant storefront | **PASS** (HTTP) |
 | Variable QA product | **NOT CREATED** |
 | Stage 6 runtime exercised | **NO** |
 | `#39589` | **UNCHANGED** (reference only) |
+| PHP fatals (human SSH) | **TWO FRESH** — see §14 |
 
 ---
 
-## 13. Recommended next step
+## 13. Recommended next step (superseded)
 
-Proceed to **Stage 6B-3** only after:
+The previous recommendation to proceed to Stage 6B-3 after a REST/storefront PASS is **superseded**. Stage 6B-3 must not start until a repaired package is installed and Stage 6B-2 is repeated with a PHP log **time-range** check.
 
-1. Human confirms DE admin pages load without fatal (System Status, Delivery Settings, Scoped Configuration, Preview).
-2. Human confirms `#39705` / In warehouse preview still **VALID**.
-3. Human reviews PHP logs since **2026-08-12T10:30:21Z** for fresh DE fatals.
+---
 
-Then: create dedicated hidden variable QA product and perform controlled live variable-product ECR verification per §7.
+## 14. Stage 6B-2R — autoload failure repair (local; FLAIROC not modified)
+
+### 14.1 Why the previous READY was wrong
+
+The package verifier and agent HTTP probes did not execute the production migration `require` path or prove that both live-missing interfaces remained resolvable after a real WordPress ZIP replacement. HTTP 200 on storefront/REST can coexist with PHP fatals on admin/cron/migration boot.
+
+### 14.2 Root cause class
+
+Both interface files **existed in git** and **were present in the failed Stage 6B ZIP** with correct Linux-case paths and Composer classmap entries. Local `interface_exists()` against a clean extract would have passed.
+
+Live fatals are consistent with **incomplete / mixed WordPress plugin replacement** (implementing class + migration evaluated; matching interface files absent or not autoloadable on disk) and/or a stale `vendor` classmap. WordPress ZIP replacement is **not** an atomic clean directory swap.
+
+Classification:
+
+| Fatal | Class |
+|-------|--------|
+| VariationRelationshipInspectorInterface | **G. DEPLOYMENT LEFT MIXED OLD/NEW FILES** (package itself contained the file) plus **E** risk if boot evaluated the implementing class before contracts were guaranteed |
+| VerifiableMigrationInterface | Same mixed-FS class, plus **E. DIRECT REQUIRE** of the schema-3 migration via `MigrationDiscovery` (`require $file`) |
+
+Repair does **not** duplicate interfaces inside migration files, does **not** use `class_alias`, and does **not** suppress fatals.
+
+### 14.3 Repair
+
+1. `src/Bootstrap/RuntimeContracts.php` lists the three contract files and `require_once`s them after Composer autoload.
+2. Main plugin file refuses to boot (admin notice: delete the existing plugin folder, then install the complete ZIP) if any contract file is missing.
+3. `composer.json` production autoload now includes `psr-4`, `classmap` of `src/`, and `files` for the three contracts.
+4. Package verifier now requires both interfaces, instantiates `WooCommerceVariationRelationshipInspector`, `require`s the schema-3 migration the production way, and checks Linux-case classmap paths.
+
+### 14.4 Safe clean-replacement procedure
+
+If WordPress “replace plugin” can leave mixed files:
+
+1. Deactivate Delivery Engine.
+2. **Delete** the entire `wp-content/plugins/cetech-woocommerce-delivery-engine/` directory.
+3. Install the complete repaired ZIP.
+4. Activate.
+5. Confirm schema remains **3**.
+6. Keep **all** runtime flags **OFF**.
+7. Recheck PHP logs with a **time-range filter**, not only an exact marker line.
+
+### 14.5 Failed artifact (evidence only — do not redeploy)
+
+| Item | Value |
+|------|--------|
+| Filename | `cetech-woocommerce-delivery-engine-stage6b.zip` |
+| SHA-256 | `cc89edf81799cdd734edf6f22d54472eaf6b2d26820a36fc70f371f4cbfa0e76` |
+
+### 14.6 Repaired artifact
+
+Recorded after the local 6B-2R package build (see closing package identity in the Stage 6B-2R report / this section after SHA-256 is known).
+
+Target filename: `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-stage6b-repaired.zip`
+
+### 14.7 Administrator language
+
+Normal-user admin language is now a **required** Stage 6B repair criterion. See `docs/ADMIN-UI-LANGUAGE-GUIDE.md`.
+
+---
+
+## 15. Recommended next step after 6B-2R
+
+Human administrator first restores/installs the **repaired** Stage 6B package using the clean-replacement procedure in §14.4.
+
+Keep **ALL** runtime flags **OFF**.
+
+Repeat Stage 6B-2 deployment safety from the beginning, including a PHP log check using an actual time-range filter.
+
+Only after a clean flag-OFF result may Stage 6B-3 begin.
 
 **Do not enable ECR or variable ECR until Stage 6B-3 is explicitly approved and begun.**

@@ -5,7 +5,7 @@
 **Last updated:** 2026-08-12  
 **Plugin version:** `1.0.0-rc.1`  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `master` — Stage 6B-2 flag-OFF FLAIROC install **PASS**; Stage 6B-3 variable QA **NOT STARTED**; all DE runtime flags **OFF** (effective/dormant); COD **OFF**  
+**Git:** `master` — Stage 6A **COMPLETE**; first Stage 6B package **FAILED** deployment safety (fresh interface fatals); Stage 6B-2 **BLOCKED**; Stage 6B-2R local repair in progress; Stage 6B-3 **NOT STARTED**; all DE runtime flags **must stay OFF**  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
@@ -32,26 +32,29 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 5B-3R-2 ECR live parity retry | **VERIFIED** — fingerprint session MATCH; checkout valid; shipping **25.00**; ECR QA order **`#39711`**; snapshots PASS; flags/COD restored OFF; dormant PASS |
 | Stage 5 overall | **COMPLETE** |
 | Stage 6A Variable-product ECR support | **COMPLETE** — artifact `docs/STAGE-6A-VARIABLE-PRODUCT-ECR-SUPPORT.md` (local only; variable flag default OFF; no FLAIROC deploy) |
-| Stage 6B-1 package | **READY** — `cetech-woocommerce-delivery-engine-stage6b.zip`; SHA-256 `cc89edf81799cdd734edf6f22d54472eaf6b2d26820a36fc70f371f4cbfa0e76`; build `cdc4289`; includes Stage 6A `b6b86e4` |
-| Stage 6B-2 flag-OFF install safety | **PASS** — human installed Stage 6B package; agent REST/storefront verification **PASS** (2026-08-12); dormant storefront PASS; COD OFF; `#39589` non-regression PASS; variable QA product **NOT CREATED** |
-| Stage 6B-3 variable QA live | **NOT STARTED** — gated; human admin DE smoke + `#39705` preview VALID + PHP log review recommended before enablement |
+| Stage 6B-1 original package | **FAILED** — `cetech-woocommerce-delivery-engine-stage6b.zip`; SHA-256 `cc89edf81799cdd734edf6f22d54472eaf6b2d26820a36fc70f371f4cbfa0e76`; **do not redeploy** |
+| Stage 6B-2 flag-OFF install safety | **BLOCKED** — HTTP/REST initially looked fine; human PHP log review found fresh fatals at **10:31:41 UTC** (`VariationRelationshipInspectorInterface` not found) and **10:31:42 UTC** (`VerifiableMigrationInterface` not found). Prior READY is overturned. |
+| Stage 6B-2R local repair | Autoload contracts + mixed-install boot refusal + package verifier regression + **mandatory** normal-user admin language; FLAIROC **not modified by Cursor** |
+| Stage 6B-3 variable QA live | **NOT STARTED** |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |
-| New admin UX | Global/Product/Variation scoped editors + effective preview; pre-cutover notice |
-| Runtime cutover flag | `enable_effective_configuration_runtime` **defaults OFF** — FLAIROC currently OFF after Stage 5B-3R-2 |
+| New admin UX | Default / Product-Specific / Variation-Specific delivery settings + preview; operational language required (`docs/ADMIN-UI-LANGUAGE-GUIDE.md`) |
+| Runtime cutover flag | `enable_effective_configuration_runtime` **defaults OFF** |
 | Variable ECR cutover flag | `enable_variable_product_ecr_runtime` **defaults OFF** — requires main ECR flag; does not affect simple-product Stage 5 path |
 | Legacy storage | `product_delivery_rules` remains default authoritative path while cutover flag OFF |
-| Runtime on FLAIROC | Stage 6B package **installed**; DE active `1.0.0-rc.1`; all runtime flags **OFF** (effective); ECR OFF; variable ECR OFF; COD OFF; dormant storefront **PASS**; ECR simple-product parity historically **proven** (order `#39711` / 25.00) |
-| Variable runtime capture | Stage 6 package on FLAIROC; **not cut over**; WoodMart adapter still Stage 7 |
+| Runtime on FLAIROC | First Stage 6B package **must not remain** as the production artifact; human may restore Stage 5 fingerprint-fixed ZIP `dbddc1d7…cbfd`; schema stays **3**; Cursor did **not** modify FLAIROC in 6B-2R |
+| Variable runtime capture | **not cut over**; WoodMart adapter still Stage 7 |
 | Shipments / tracking / timeline | **Not implemented** |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Stage 5/6 **compatibility route** (category winners stay on legacy source); `#39705` is **not** category-routed |
-| Next stage | Stage 6B-3 — Create dedicated variable QA product + controlled live variable ECR verification (**do not auto-start**; human admin/log gates first) |
+| Next stage | Human installs repaired Stage 6B package, keeps flags OFF, repeats 6B-2 including PHP log **time-range** check. **Do not auto-start 6B-3.** |
 | Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual |
-| Release-quality backlog | **Admin terminology simplification required before next RC** (Stage 4 still shows technical labels such as Effective Configuration Preview / Stage 3 / Unresolved) |
+| Release-quality backlog | Administrator language is **mandatory now**, not deferred to a later RC |
 | Stage 1 HPOS debt | **DEFERRED** (`countOrderSnapshotReferences` postmeta); non-numeric rate→0 **FIXED** in Stage 5A |
 
-Do **not** begin Stage 6B-3 or Stage 7 unless explicitly tasked. Stage 6B-2 flag-OFF deployment safety **PASS**. Keep all FLAIROC Delivery Engine runtime flags **OFF** until Stage 6B-3 enablement is explicitly approved.
+Do **not** begin Stage 6B-3 or Stage 7 unless explicitly tasked. Keep all FLAIROC Delivery Engine runtime flags **OFF** until Stage 6B-3 enablement is explicitly approved.
+
+Administrator-language requirement: normal-user admin UI must use operational language throughout. Technical terminology belongs only in Technical details.
 
 
 
@@ -77,6 +80,7 @@ Do **not** begin Stage 6B-3 or Stage 7 unless explicitly tasked. Stage 6B-2 flag
 | `docs/STAGE-5B-FLAIROC-DEPLOYMENT-VERIFICATION.md` | Stage 5B FLAIROC deployment incident + verification record |
 | `docs/STAGE-6A-VARIABLE-PRODUCT-ECR-SUPPORT.md` | Stage 6A variable-product ECR runtime (local; variable flag default OFF) |
 | `docs/STAGE-6B-FLAIROC-VARIABLE-ECR-VERIFICATION.md` | Stage 6B packaging record + FLAIROC variable verification plan |
+| `docs/ADMIN-UI-LANGUAGE-GUIDE.md` | Authoritative normal-administrator presentation language |
 | `docs/Delivery Shipping Plugin Up-To-Date Design and Expectations.md` | Latest intended product / end-state design |
 
 ### What has been accomplished
