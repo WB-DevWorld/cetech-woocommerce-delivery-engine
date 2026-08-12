@@ -10,7 +10,7 @@
 
 ## 1. Current verdict
 
-**Stage 6B-2 repaired deployment/autoload safety: PASS.** Stage 6B-2L final administrator-language package: **READY FOR FINAL STAGE 6B REDEPLOYMENT** after local gates (checksum recorded in §17).
+**Stage 6B-2 repaired deployment/autoload safety: PASS.** Stage 6B-2L final administrator-language package: **READY FOR FINAL STAGE 6B REDEPLOYMENT** (`cetech-woocommerce-delivery-engine-stage6b-final.zip`, SHA-256 `181b094dfa7c4fbc31ff361c31fbf3e474d0227c90a070a9717badcc089530ee`).
 
 Human administrator later confirmed a clean PHP-log window on the repaired install:
 
@@ -715,9 +715,10 @@ No schema, resolver, flag-key, routing, cart, checkout, rate, migration, or AJAX
 |------|-------|
 | Filename | `cetech-woocommerce-delivery-engine-stage6b-final.zip` |
 | Full path | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-stage6b-final.zip` |
-| Bytes | *recorded after package build* |
-| SHA-256 | *recorded after package build* |
-| Must differ from repaired artifact | `d4985c8195df50d0cffe69e96bd7d230f477dd87ec2dcf437f9b90de04dfa258` |
+| Bytes | `680669` |
+| SHA-256 | `181b094dfa7c4fbc31ff361c31fbf3e474d0227c90a070a9717badcc089530ee` |
+| Checksum sidecar | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-stage6b-final.zip.sha256` |
+| Must differ from repaired artifact | `d4985c8195df50d0cffe69e96bd7d230f477dd87ec2dcf437f9b90de04dfa258` (**yes**) |
 | Do not reuse | `cetech-woocommerce-delivery-engine-stage6b-repaired.zip` |
 
 ### Next human step
