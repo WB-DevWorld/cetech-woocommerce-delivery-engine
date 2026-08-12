@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Infrastructure\WooCommerce\Shipping;
 
+use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
+use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingMethodLabel;
 use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingRateCalculator;
 use CetechDeliveryEngine\Bootstrap\Plugin;
 use WC_Shipping_Method;
@@ -11,7 +13,7 @@ use WC_Shipping_Method;
 /**
  * WooCommerce shipping method for validated selected delivery offers.
  *
- * Customer-facing label is "Delivery" only; no internal rate-card or supplier data.
+ * Customer-facing labels stay operational (Delivery / Delivery N / Store pickup).
  */
 final class SelectedOfferShippingMethod extends WC_Shipping_Method {
 
@@ -90,17 +92,54 @@ final class SelectedOfferShippingMethod extends WC_Shipping_Method {
 			return;
 		}
 
-		$label = is_string( $this->title ) && '' !== trim( (string) $this->title )
-			? (string) $this->title
-			: self::RATE_LABEL;
+		$meta  = DeliveryGroupIdentity::package_meta( $package );
+		$label = $this->label_for_package( $meta );
+		$suffix = $this->rate_suffix_for_package( $meta );
 
 		$this->add_rate(
 			[
-				'id'    => $this->get_rate_id(),
+				'id'    => $this->get_rate_id( $suffix ),
 				'label' => $label,
 				'cost'  => max( 0, (float) $result->total_amount ),
+				'meta_data' => [
+					'cetech_de_group_id' => is_array( $meta ) ? (string) ( $meta['group_id'] ?? '' ) : '',
+				],
 			]
 		);
+	}
+
+	/**
+	 * @param array<string, mixed>|null $meta
+	 */
+	private function label_for_package( ?array $meta ): string {
+		if ( is_array( $meta ) && isset( $meta['rate_label'] ) && is_string( $meta['rate_label'] ) && '' !== trim( $meta['rate_label'] ) ) {
+			return (string) $meta['rate_label'];
+		}
+
+		if ( is_string( $this->title ) && '' !== trim( (string) $this->title ) ) {
+			return (string) $this->title;
+		}
+
+		return SelectedOfferShippingMethodLabel::default_delivery_label();
+	}
+
+	/**
+	 * Unique rate id suffix per managed package so multi-package carts do not collide.
+	 *
+	 * @param array<string, mixed>|null $meta
+	 */
+	private function rate_suffix_for_package( ?array $meta ): string {
+		if ( ! is_array( $meta ) ) {
+			return '';
+		}
+
+		$group_id = isset( $meta['group_id'] ) ? (string) $meta['group_id'] : '';
+
+		if ( '' === $group_id ) {
+			return '';
+		}
+
+		return substr( hash( 'sha256', $group_id ), 0, 12 );
 	}
 
 	private function calculator(): ?SelectedOfferShippingRateCalculator {

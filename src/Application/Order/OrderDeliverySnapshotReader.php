@@ -97,7 +97,8 @@ final class OrderDeliverySnapshotReader {
 			sanitize_key( (string) $decoded['quote_status'] ),
 			$this->nullable_positive_int( $decoded['rate_card_id'] ?? null ),
 			$this->nullable_string( $decoded['rate_card_code'] ?? null ),
-			sanitize_text_field( (string) $decoded['snapshotted_at'] )
+			sanitize_text_field( (string) $decoded['snapshotted_at'] ),
+			$this->nullable_string( $decoded['delivery_group_id'] ?? null )
 		);
 
 		return new OrderDeliveryLineReadResult( true, $snapshot, OrderDeliveryLineReadResult::ERROR_NONE, $stored_version_normalized );
@@ -141,10 +142,48 @@ final class OrderDeliverySnapshotReader {
 			sanitize_text_field( (string) $decoded['currency_code'] ),
 			$this->nullable_positive_int( $decoded['destination_zone_id'] ?? null ),
 			sanitize_key( (string) $decoded['quote_status'] ),
-			sanitize_text_field( (string) $decoded['snapshotted_at'] )
+			sanitize_text_field( (string) $decoded['snapshotted_at'] ),
+			$this->parse_groups( $decoded['groups'] ?? null )
 		);
 
 		return new OrderDeliveryPackageReadResult( true, $snapshot, OrderDeliveryPackageReadResult::ERROR_NONE, $stored_version_normalized );
+	}
+
+	/**
+	 * @param mixed $raw
+	 *
+	 * @return list<OrderDeliveryGroupSnapshot>
+	 */
+	private function parse_groups( mixed $raw ): array {
+		if ( ! is_array( $raw ) ) {
+			return [];
+		}
+
+		$groups = [];
+
+		foreach ( $raw as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+
+			$group_id = isset( $row['group_id'] ) ? sanitize_text_field( (string) $row['group_id'] ) : '';
+
+			if ( '' === $group_id ) {
+				continue;
+			}
+
+			$groups[] = new OrderDeliveryGroupSnapshot(
+				$group_id,
+				$this->nullable_string( $row['shipping_method_id'] ?? null ),
+				$this->nullable_string( $row['shipping_method_label'] ?? null ),
+				$this->nullable_string( $row['package_total_delivery_amount'] ?? null ),
+				sanitize_key( (string) ( $row['fulfilment_choice'] ?? '' ) ),
+				! empty( $row['is_pickup'] ),
+				max( 0, (int) ( $row['display_index'] ?? 0 ) )
+			);
+		}
+
+		return $groups;
 	}
 
 	/**

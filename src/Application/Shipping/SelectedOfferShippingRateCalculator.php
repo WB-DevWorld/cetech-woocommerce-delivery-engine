@@ -4,22 +4,19 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Shipping;
 
-use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
-use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionFingerprint;
-use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidationResult;
-use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
-use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionSessionData;
-use CetechDeliveryEngine\Application\Destination\PackageDestinationZoneResolver;
+use CetechDeliveryEngine\Application\Destination\PackageDestinationZoneResolverInterface;
 use CetechDeliveryEngine\Application\RateQuote\RateQuoteEngine;
 use CetechDeliveryEngine\Application\RateQuote\RateQuoteRequest;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
 use CetechDeliveryEngine\Application\Runtime\RuntimeConfigurationSource;
+use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Domain\ProductRule\ProductDeliveryRuleRepositoryInterface;
 use CetechDeliveryEngine\Support\Logger;
 
 /**
  * Calculates a WooCommerce package shipping rate from captured delivery selections.
  *
+ * Managed packages quote once per delivery group (respecting rate-card charge types).
  * Does not write cart, session, order, or shipment data.
  */
 final class SelectedOfferShippingRateCalculator {
@@ -36,11 +33,12 @@ final class SelectedOfferShippingRateCalculator {
 
 	public const BLOCK_QUOTE_FAILED = 'quote_failed';
 
+	public const BLOCK_GROUP_MISMATCH = 'group_mismatch';
+
 	public function __construct(
 		private ShippingRateCalculationGate $gate,
-		private PackageDestinationZoneResolver $destination_resolver,
-		private CartDeliverySelectionCapture $cart_capture,
-		private CartDeliverySelectionRevalidator $cart_revalidator,
+		private PackageDestinationZoneResolverInterface $destination_resolver,
+		private CartLineShippingAssessorInterface $line_assessor,
 		private RateQuoteEngine $quote_engine,
 		private ProductDeliveryRuleRepositoryInterface $product_rule_repository,
 		private Logger $logger,
@@ -60,6 +58,37 @@ final class SelectedOfferShippingRateCalculator {
 			return SelectedOfferShippingRateResult::blocked( 'runtime_inactive' );
 		}
 
+		$meta = DeliveryGroupIdentity::package_meta( $package );
+
+		if ( is_array( $meta ) && ! empty( $meta['managed'] ) && ! empty( $meta['is_pickup'] ) ) {
+			$currency_code = $this->currency_code();
+
+			if ( null === $currency_code ) {
+				return SelectedOfferShippingRateResult::blocked( self::BLOCK_QUOTE_FAILED );
+			}
+
+			$contents = is_array( $package['contents'] ?? null ) ? $package['contents'] : [];
+
+			foreach ( $contents as $cart_item_key => $cart_item ) {
+				if ( ! is_array( $cart_item ) ) {
+					continue;
+				}
+
+				$line_outcome = $this->line_assessor->assess_line( (string) $cart_item_key, $cart_item );
+
+				if ( 'skip' === $line_outcome['action'] ) {
+					continue;
+				}
+
+				if ( 'block' === $line_outcome['action'] ) {
+					return SelectedOfferShippingRateResult::blocked( (string) $line_outcome['reason'] );
+				}
+			}
+
+			// Pickup is not a delivery charge; explicit zero keeps WC package valid.
+			return SelectedOfferShippingRateResult::quoted( '0.0000', $currency_code );
+		}
+
 		$destination = is_array( $package['destination'] ?? null ) ? $package['destination'] : [];
 		$zone_id     = $this->destination_resolver->resolve_zone_id( $destination );
 
@@ -73,14 +102,121 @@ final class SelectedOfferShippingRateCalculator {
 			return SelectedOfferShippingRateResult::blocked( self::BLOCK_NO_QUOTABLE_LINES );
 		}
 
-		$currency_code = function_exists( 'get_woocommerce_currency' )
-			? strtoupper( (string) get_woocommerce_currency() )
-			: '';
+		$currency_code = $this->currency_code();
 
-		if ( '' === $currency_code ) {
+		if ( null === $currency_code ) {
 			return SelectedOfferShippingRateResult::blocked( self::BLOCK_QUOTE_FAILED );
 		}
 
+		if ( is_array( $meta ) && ! empty( $meta['managed'] ) ) {
+			return $this->calculate_managed_group( $contents, $meta, $zone_id, $currency_code );
+		}
+
+		return $this->calculate_legacy_sum( $contents, $zone_id, $currency_code );
+	}
+
+	/**
+	 * @param array<string, mixed> $contents
+	 * @param array<string, mixed> $meta
+	 */
+	private function calculate_managed_group(
+		array $contents,
+		array $meta,
+		int $zone_id,
+		string $currency_code
+	): SelectedOfferShippingRateResult {
+		$expected_group = isset( $meta['group_id'] ) ? (string) $meta['group_id'] : '';
+		$quotable       = [];
+		$total_quantity = 0;
+
+		foreach ( $contents as $cart_item_key => $cart_item ) {
+			if ( ! is_array( $cart_item ) ) {
+				continue;
+			}
+
+			$line_outcome = $this->line_assessor->assess_line( (string) $cart_item_key, $cart_item );
+
+			if ( 'skip' === $line_outcome['action'] ) {
+				continue;
+			}
+
+			if ( 'block' === $line_outcome['action'] ) {
+				return SelectedOfferShippingRateResult::blocked( (string) $line_outcome['reason'] );
+			}
+
+			$intent = $line_outcome['intent'] ?? null;
+
+			if ( ! is_array( $intent ) ) {
+				return SelectedOfferShippingRateResult::blocked( self::BLOCK_LINE_INVALID );
+			}
+
+			$group_id = DeliveryGroupIdentity::fromIntent( $intent );
+
+			if ( null === $group_id || ( '' !== $expected_group && ! hash_equals( $expected_group, $group_id ) ) ) {
+				return SelectedOfferShippingRateResult::blocked( self::BLOCK_GROUP_MISMATCH );
+			}
+
+			if ( FulfilmentChoice::StorePickup->value === sanitize_key( (string) ( $intent['fulfilment_choice'] ?? '' ) ) ) {
+				continue;
+			}
+
+			$quantity = (int) ( $cart_item['quantity'] ?? 0 );
+
+			if ( $quantity <= 0 ) {
+				return SelectedOfferShippingRateResult::blocked( self::BLOCK_LINE_INVALID );
+			}
+
+			$quotable[]      = [
+				'cart_item' => $cart_item,
+				'intent'    => $intent,
+			];
+			$total_quantity += $quantity;
+		}
+
+		if ( [] === $quotable || $total_quantity <= 0 ) {
+			return SelectedOfferShippingRateResult::blocked( self::BLOCK_NO_QUOTABLE_LINES );
+		}
+
+		$representative = $quotable[0];
+		$request_item   = $representative['cart_item'];
+		$request_item['quantity'] = $total_quantity;
+
+		$request = $this->build_quote_request(
+			$request_item,
+			$representative['intent'],
+			$zone_id,
+			$currency_code
+		);
+
+		if ( null === $request ) {
+			return SelectedOfferShippingRateResult::blocked( self::BLOCK_NO_QUOTABLE_LINES );
+		}
+
+		$quote_result = $this->quote_engine->quote( $request );
+
+		if ( ! $quote_result->success || null === $quote_result->amount ) {
+			$this->logger->info(
+				'Selected-offer shipping quote blocked for delivery group.',
+				[
+					'block_reason' => self::BLOCK_QUOTE_FAILED,
+					'error_code'   => $quote_result->error_code,
+				]
+			);
+
+			return SelectedOfferShippingRateResult::blocked( self::BLOCK_QUOTE_FAILED );
+		}
+
+		return SelectedOfferShippingRateResult::quoted( $quote_result->amount->amount(), $currency_code );
+	}
+
+	/**
+	 * @param array<string, mixed> $contents
+	 */
+	private function calculate_legacy_sum(
+		array $contents,
+		int $zone_id,
+		string $currency_code
+	): SelectedOfferShippingRateResult {
 		$total_amount = '0.0000';
 		$quoted_lines = 0;
 
@@ -89,7 +225,7 @@ final class SelectedOfferShippingRateCalculator {
 				continue;
 			}
 
-			$line_outcome = $this->assess_line( (string) $cart_item_key, $cart_item );
+			$line_outcome = $this->line_assessor->assess_line( (string) $cart_item_key, $cart_item );
 
 			if ( 'skip' === $line_outcome['action'] ) {
 				continue;
@@ -134,76 +270,6 @@ final class SelectedOfferShippingRateCalculator {
 		}
 
 		return SelectedOfferShippingRateResult::quoted( $total_amount, $currency_code );
-	}
-
-	/**
-	 * @param array<string, mixed> $cart_item
-	 *
-	 * @return array{action: string, reason?: string, intent?: array<string, mixed>}
-	 */
-	private function assess_line( string $cart_item_key, array $cart_item ): array {
-		$product_id   = (int) ( $cart_item['product_id'] ?? 0 );
-		$variation_id = (int) ( $cart_item['variation_id'] ?? 0 );
-
-		if ( $product_id <= 0 ) {
-			return [ 'action' => 'skip' ];
-		}
-
-		$has_selection = isset( $cart_item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] );
-
-		if ( $has_selection ) {
-			if ( $this->has_hash_mismatch( $cart_item ) ) {
-				return [
-					'action' => 'block',
-					'reason' => self::BLOCK_LINE_INVALID,
-				];
-			}
-
-			$revalidation = $this->cart_revalidator->revalidate_cart_item( $cart_item_key, $cart_item );
-
-			if ( CartDeliverySelectionRevalidationResult::STATUS_VALID !== $revalidation->status ) {
-				return [
-					'action' => 'block',
-					'reason' => $this->block_reason_from_status( $revalidation->status ),
-				];
-			}
-
-			$intent = $revalidation->stored_intent;
-
-			if ( ! is_array( $intent ) ) {
-				return [
-					'action' => 'block',
-					'reason' => self::BLOCK_LINE_INVALID,
-				];
-			}
-
-			return [
-				'action' => 'quote',
-				'intent' => $intent,
-			];
-		}
-
-		if ( ! $this->cart_capture->should_apply_capture_to_line( $product_id, $variation_id ) ) {
-			return [ 'action' => 'skip' ];
-		}
-
-		$assessment = $this->cart_capture->assess_product_selection( $product_id, $variation_id );
-
-		if ( 'none' === $assessment['requirement'] ) {
-			return [ 'action' => 'skip' ];
-		}
-
-		if ( 'blocked' === $assessment['requirement'] ) {
-			return [
-				'action' => 'block',
-				'reason' => self::BLOCK_LINE_UNAVAILABLE,
-			];
-		}
-
-		return [
-			'action' => 'block',
-			'reason' => self::BLOCK_LINE_MISSING,
-		];
 	}
 
 	/**
@@ -311,33 +377,12 @@ final class SelectedOfferShippingRateCalculator {
 		return $int > 0 ? $int : null;
 	}
 
-	/**
-	 * @param array<string, mixed> $cart_item
-	 */
-	private function has_hash_mismatch( array $cart_item ): bool {
-		$intent_raw = $cart_item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] ?? null;
-		$hash_raw   = $cart_item[ CartDeliverySelectionCapture::CART_HASH_KEY ] ?? null;
+	private function currency_code(): ?string {
+		$currency_code = function_exists( 'get_woocommerce_currency' )
+			? strtoupper( (string) get_woocommerce_currency() )
+			: '';
 
-		if ( null === $intent_raw || null === $hash_raw ) {
-			return false;
-		}
-
-		$intent = CartDeliverySelectionSessionData::normalizeIntent( $intent_raw );
-		$hash   = CartDeliverySelectionSessionData::normalizeHash( $hash_raw );
-
-		if ( null === $intent || null === $hash ) {
-			return true;
-		}
-
-		return ! hash_equals( CartDeliverySelectionFingerprint::fromIntent( $intent ), $hash );
-	}
-
-	private function block_reason_from_status( string $status ): string {
-		return match ( $status ) {
-			CartDeliverySelectionRevalidationResult::STATUS_MISSING => self::BLOCK_LINE_MISSING,
-			CartDeliverySelectionRevalidationResult::STATUS_UNAVAILABLE => self::BLOCK_LINE_UNAVAILABLE,
-			default => self::BLOCK_LINE_INVALID,
-		};
+		return '' !== $currency_code ? $currency_code : null;
 	}
 
 	private function add_amounts( string $left, string $right ): string {

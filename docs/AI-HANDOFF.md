@@ -5,13 +5,13 @@
 **Last updated:** 2026-08-12  
 **Plugin version:** `1.0.0-rc.1`  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `master` — Stage 6 **FUNCTIONALLY COMPLETE** (live order `#39721`); Stage 6C presentation cleanup **DONE locally**; carry into next release package; keep DE runtime flags **OFF** on FLAIROC unless explicitly testing  
+**Git:** `master` — Stage 6 **FUNCTIONALLY COMPLETE** (live order `#39721`); Stage 6C presentation cleanup **DONE locally** (`331a856`); Stage 7 **COMPLETE — NO WOODMART ADAPTER REQUIRED**; Stage 8A multi-product shipping grouping **DONE locally** — package Stage 6C + 8A together for live QA; keep DE runtime flags **OFF** on FLAIROC unless explicitly testing  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
 This handoff remains the **product vision and domain source of truth**. Much of the document describes the full intended engine (including shipment records and customer tracking). **Only the V1 RC scope below is implemented in code today.** Do not assume later sections are already built.
 
-### Stage 0B / Stage 1 / Stage 2 / Stage 3 / Stage 4 / Stage 5A / Stage 5B / Stage 6A / Stage 6B status
+### Stage 0B / Stage 1 / Stage 2 / Stage 3 / Stage 4 / Stage 5A / Stage 5B / Stage 6A / Stage 6B / Stage 6C / Stage 7 / Stage 8A status
 
 | Item | Status |
 |------|--------|
@@ -38,7 +38,9 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 6B-2 retry (clean repaired install) | **PASS** — PHP-log safety |
 | Stage 6B-2L final admin language | **PASS** — ZIP `181b094d…308ee` |
 | Stage 6B-3 / 6B-3R variable QA live | **FUNCTIONALLY COMPLETE** — QA `#39717` / A `#39718` / B `#39719`; shipping **25.00**; order **`#39721`**; WoodMart **PASS** (no Stage 7 adapter required); flags/COD restored **OFF** |
-| Stage 6C presentation cleanup | **DONE locally** — distinct customer labels; hide `_cetech_de_*` item meta; simplify order admin to **Delivery information**; carry into next release package |
+| Stage 6C presentation cleanup | **DONE locally** — `331a856`; distinct customer labels; hide `_cetech_de_*` item meta; simplify order admin to **Delivery information**; carry into next release package |
+| Stage 7 WoodMart adapter | **COMPLETE — NO WOODMART ADAPTER REQUIRED** — Stage 6 variable QA used WoodMart’s normal variation lifecycle; do not create empty adapter code |
+| Stage 8A multi-product shipping grouping | **DONE locally** — artifact `docs/STAGE-8A-MULTI-PRODUCT-SHIPPING-GROUPING.md`; WC package split/consolidate; pickup/delivery + local/international split; order group snapshots; package with Stage 6C for live QA |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |
 | New admin UX | Default / Product-Specific / Variation-Specific delivery settings + preview; operational language required (`docs/ADMIN-UI-LANGUAGE-GUIDE.md`) |
@@ -50,12 +52,12 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Shipments / tracking / timeline | **Not implemented** |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Stage 5/6 **compatibility route** (category winners stay on legacy source); `#39705` is **not** category-routed |
-| Next stage | Move to remaining **release-critical** work for tomorrow’s deadline. Do **not** repeat Stage 6 live verification unless presentation/runtime regression appears. **Do not start Stage 7** unless a WoodMart-specific defect appears. |
+| Next stage | Build Stage 6C + Stage 8A live-QA package; focused multi-product live test. Do **not** start shipment/tracking (Stage 9). |
 | Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual |
 | Release-quality backlog | Administrator language is **mandatory now**, not deferred to a later RC |
 | Stage 1 HPOS debt | **DEFERRED** (`countOrderSnapshotReferences` postmeta); non-numeric rate→0 **FIXED** in Stage 5A |
 
-Do **not** begin Stage 7 unless a genuine WoodMart-specific live defect appears. Keep FLAIROC Delivery Engine runtime flags **OFF** unless explicitly testing.
+Do **not** begin Stage 9 shipment/tracking unless Stage 8A live multi-product verification passes. Keep FLAIROC Delivery Engine runtime flags **OFF** unless explicitly testing.
 
 Administrator-language requirement: normal-user admin UI must use operational language throughout. Technical terminology belongs only in Technical details.
 
@@ -83,6 +85,7 @@ Administrator-language requirement: normal-user admin UI must use operational la
 | `docs/STAGE-5B-FLAIROC-DEPLOYMENT-VERIFICATION.md` | Stage 5B FLAIROC deployment incident + verification record |
 | `docs/STAGE-6A-VARIABLE-PRODUCT-ECR-SUPPORT.md` | Stage 6A variable-product ECR runtime (local; variable flag default OFF) |
 | `docs/STAGE-6B-FLAIROC-VARIABLE-ECR-VERIFICATION.md` | Stage 6B packaging record + FLAIROC variable verification plan |
+| `docs/STAGE-8A-MULTI-PRODUCT-SHIPPING-GROUPING.md` | Stage 8A cart delivery groups + WooCommerce shipping packages |
 | `docs/ADMIN-UI-LANGUAGE-GUIDE.md` | Authoritative normal-administrator presentation language |
 | `docs/Delivery Shipping Plugin Up-To-Date Design and Expectations.md` | Latest intended product / end-state design |
 

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Admin;
 
+use CetechDeliveryEngine\Application\Order\OrderDeliveryGroupSnapshot;
 use CetechDeliveryEngine\Application\Order\OrderDeliveryLineReadResult;
 use CetechDeliveryEngine\Application\Order\OrderDeliveryLineSnapshot;
 use CetechDeliveryEngine\Application\Order\OrderDeliveryPackageReadResult;
@@ -21,7 +22,7 @@ use WP_Post;
  * Read-only operational delivery information on WooCommerce order admin screens.
  *
  * Protected snapshot meta remains stored; this class never exposes raw JSON,
- * versions, fingerprints, or internal IDs in the primary staff view.
+ * versions, fingerprints, group hashes, or internal IDs in the primary staff view.
  */
 final class OrderDeliverySnapshotAdminDisplay {
 
@@ -97,8 +98,9 @@ final class OrderDeliverySnapshotAdminDisplay {
 			return;
 		}
 
-		$line_reads     = $this->collect_line_reads( $order );
+		$line_entries   = $this->collect_line_entries( $order );
 		$package_read   = $this->reader->read_package( $order );
+		$line_reads     = array_map( static fn ( array $entry ) => $entry['read'], $line_entries );
 		$lines_status   = $this->integrity->classify_order_lines( $line_reads );
 		$package_status = $this->integrity->classify_package( $package_read );
 
@@ -111,7 +113,13 @@ final class OrderDeliverySnapshotAdminDisplay {
 			return;
 		}
 
-		$this->render_line_items( $order, $line_reads );
+		$grouped = $this->group_line_entries( $line_entries, $package_read );
+
+		if ( $this->should_render_grouped( $grouped ) ) {
+			$this->render_grouped_entries( $grouped );
+		} else {
+			$this->render_line_items( $line_entries );
+		}
 
 		if ( OrderDeliveryPackageReadResult::ERROR_MISSING !== $package_read->error ) {
 			$this->render_package_summary( $package_read );
@@ -119,35 +127,107 @@ final class OrderDeliverySnapshotAdminDisplay {
 	}
 
 	/**
-	 * @param WC_Order                          $order
-	 * @param list<OrderDeliveryLineReadResult> $line_reads
+	 * @param list<array{
+	 *     title: string,
+	 *     group: ?OrderDeliveryGroupSnapshot,
+	 *     entries: list<array{item: WC_Order_Item_Product, read: OrderDeliveryLineReadResult}>
+	 * }> $grouped
 	 */
-	private function render_line_items( WC_Order $order, array $line_reads ): void {
-		$index = 0;
+	private function should_render_grouped( array $grouped ): bool {
+		if ( count( $grouped ) > 1 ) {
+			return true;
+		}
 
-		foreach ( $order->get_items() as $item ) {
-			if ( ! $item instanceof WC_Order_Item_Product ) {
-				continue;
+		foreach ( $grouped as $group ) {
+			if ( count( $group['entries'] ) > 1 ) {
+				return true;
 			}
+		}
 
-			$read   = $line_reads[ $index ] ?? $this->reader->read_line( $item );
-			$status = $this->integrity->classify_line( $read );
-			++$index;
+		return false;
+	}
+
+	/**
+	 * @param list<array{item: WC_Order_Item_Product, read: OrderDeliveryLineReadResult}> $line_entries
+	 */
+	private function render_line_items( array $line_entries ): void {
+		foreach ( $line_entries as $entry ) {
+			$read = $entry['read'];
 
 			if ( null === $read->snapshot ) {
 				continue;
 			}
 
+			$status = $this->integrity->classify_line( $read );
+
 			echo '<div class="cetech-de-order-delivery-info" style="margin-bottom:16px;padding:12px;border:1px solid #ccd0d4;background:#fff;">';
 			echo '<table class="widefat striped"><tbody>';
-			$this->render_row( DeliveryPresentationLabels::product(), esc_html( $item->get_name() ) );
+			$this->render_row( DeliveryPresentationLabels::product(), esc_html( $entry['item']->get_name() ) );
 			$this->render_operational_line_rows( $read->snapshot, $status );
 			echo '</tbody></table>';
 			echo '</div>';
 		}
 	}
 
-	private function render_operational_line_rows( OrderDeliveryLineSnapshot $snapshot, string $status ): void {
+	/**
+	 * @param list<array{
+	 *     title: string,
+	 *     group: ?OrderDeliveryGroupSnapshot,
+	 *     entries: list<array{item: WC_Order_Item_Product, read: OrderDeliveryLineReadResult}>
+	 * }> $grouped
+	 */
+	private function render_grouped_entries( array $grouped ): void {
+		foreach ( $grouped as $group ) {
+			echo '<div class="cetech-de-order-delivery-group" style="margin-bottom:20px;padding:12px;border:1px solid #ccd0d4;background:#fff;">';
+			echo '<h4 style="margin:0 0 12px;">' . esc_html( $group['title'] ) . '</h4>';
+
+			$product_names = [];
+			foreach ( $group['entries'] as $entry ) {
+				$product_names[] = $entry['item']->get_name();
+			}
+
+			echo '<table class="widefat striped"><tbody>';
+			$this->render_row(
+				__( 'Products', 'cetech-woocommerce-delivery-engine' ),
+				esc_html( implode( ', ', $product_names ) )
+			);
+
+			$first_snapshot = null;
+			$first_status   = OrderDeliverySnapshotIntegrity::STATUS_MISSING;
+
+			foreach ( $group['entries'] as $entry ) {
+				if ( null !== $entry['read']->snapshot ) {
+					$first_snapshot = $entry['read']->snapshot;
+					$first_status   = $this->integrity->classify_line( $entry['read'] );
+					break;
+				}
+			}
+
+			if ( null !== $first_snapshot ) {
+				$this->render_operational_line_rows( $first_snapshot, $first_status, false );
+			}
+
+			$group_snapshot = $group['group'];
+			if ( $group_snapshot instanceof OrderDeliveryGroupSnapshot ) {
+				$charge = $this->format_amount(
+					$group_snapshot->package_total_delivery_amount,
+					$first_snapshot?->currency_code ?? ''
+				);
+				if ( '—' !== $charge && ! $group_snapshot->is_pickup ) {
+					$this->render_row( DeliveryPresentationLabels::delivery_charge(), esc_html( $charge ) );
+				}
+			}
+
+			echo '</tbody></table>';
+			echo '</div>';
+		}
+	}
+
+	private function render_operational_line_rows(
+		OrderDeliveryLineSnapshot $snapshot,
+		string $status,
+		bool $include_line_charge = true
+	): void {
 		$this->render_row(
 			DeliveryPresentationLabels::fulfilment(),
 			esc_html( $this->format_fulfilment_availability( $snapshot->fulfilment_availability ) )
@@ -170,9 +250,11 @@ final class OrderDeliverySnapshotAdminDisplay {
 			);
 		}
 
-		$charge = $this->format_amount( $snapshot->quoted_amount, $snapshot->currency_code );
-		if ( '—' !== $charge ) {
-			$this->render_row( DeliveryPresentationLabels::delivery_charge(), esc_html( $charge ) );
+		if ( $include_line_charge ) {
+			$charge = $this->format_amount( $snapshot->quoted_amount, $snapshot->currency_code );
+			if ( '—' !== $charge ) {
+				$this->render_row( DeliveryPresentationLabels::delivery_charge(), esc_html( $charge ) );
+			}
 		}
 
 		$this->render_row(
@@ -187,6 +269,26 @@ final class OrderDeliverySnapshotAdminDisplay {
 		}
 
 		$snapshot = $read->snapshot;
+
+		if ( count( $snapshot->groups ) > 1 ) {
+			echo '<div class="cetech-de-order-delivery-package" style="margin-top:8px;">';
+			echo '<h4>' . esc_html__( 'Order delivery summary', 'cetech-woocommerce-delivery-engine' ) . '</h4>';
+			echo '<table class="widefat striped"><tbody>';
+			$this->render_row(
+				DeliveryPresentationLabels::shipping_method(),
+				esc_html( $snapshot->shipping_method_label ?? __( 'Multiple deliveries', 'cetech-woocommerce-delivery-engine' ) )
+			);
+
+			$charge = $this->format_amount( $snapshot->package_total_delivery_amount, $snapshot->currency_code );
+			if ( '—' !== $charge ) {
+				$this->render_row( DeliveryPresentationLabels::delivery_charge(), esc_html( $charge ) );
+			}
+
+			echo '</tbody></table>';
+			echo '</div>';
+
+			return;
+		}
 
 		echo '<div class="cetech-de-order-delivery-package" style="margin-top:8px;">';
 		echo '<h4>' . esc_html__( 'Order delivery summary', 'cetech-woocommerce-delivery-engine' ) . '</h4>';
@@ -210,20 +312,114 @@ final class OrderDeliverySnapshotAdminDisplay {
 	}
 
 	/**
-	 * @return list<OrderDeliveryLineReadResult>
+	 * @return list<array{item: WC_Order_Item_Product, read: OrderDeliveryLineReadResult}>
 	 */
-	private function collect_line_reads( WC_Order $order ): array {
-		$reads = [];
+	private function collect_line_entries( WC_Order $order ): array {
+		$entries = [];
 
 		foreach ( $order->get_items() as $item ) {
 			if ( ! $item instanceof WC_Order_Item_Product ) {
 				continue;
 			}
 
-			$reads[] = $this->reader->read_line( $item );
+			$entries[] = [
+				'item' => $item,
+				'read' => $this->reader->read_line( $item ),
+			];
 		}
 
-		return $reads;
+		return $entries;
+	}
+
+	/**
+	 * @param list<array{item: WC_Order_Item_Product, read: OrderDeliveryLineReadResult}> $line_entries
+	 *
+	 * @return list<array{
+	 *     title: string,
+	 *     group: ?OrderDeliveryGroupSnapshot,
+	 *     entries: list<array{item: WC_Order_Item_Product, read: OrderDeliveryLineReadResult}>
+	 * }>
+	 */
+	private function group_line_entries( array $line_entries, OrderDeliveryPackageReadResult $package_read ): array {
+		$by_group = [];
+		$ungrouped = [];
+
+		foreach ( $line_entries as $entry ) {
+			$snapshot = $entry['read']->snapshot;
+
+			if ( null === $snapshot ) {
+				continue;
+			}
+
+			$group_id = trim( (string) ( $snapshot->delivery_group_id ?? '' ) );
+
+			if ( '' === $group_id ) {
+				$ungrouped[] = $entry;
+				continue;
+			}
+
+			if ( ! isset( $by_group[ $group_id ] ) ) {
+				$by_group[ $group_id ] = [];
+			}
+
+			$by_group[ $group_id ][] = $entry;
+		}
+
+		if ( [] === $by_group ) {
+			return [];
+		}
+
+		$package_groups = [];
+		if ( null !== $package_read->snapshot ) {
+			foreach ( $package_read->snapshot->groups as $group ) {
+				$package_groups[ $group->group_id ] = $group;
+			}
+		}
+
+		$result         = [];
+		$delivery_index = 0;
+		$pickup_index   = 0;
+
+		foreach ( $by_group as $group_id => $entries ) {
+			$package_group = $package_groups[ $group_id ] ?? null;
+			$first         = $entries[0]['read']->snapshot;
+			$is_pickup     = $package_group?->is_pickup
+				?? ( null !== $first && FulfilmentChoice::StorePickup->value === $first->fulfilment_choice );
+
+			if ( $is_pickup ) {
+				++$pickup_index;
+				$title = $package_group?->shipping_method_label
+					?? sprintf(
+						/* translators: %d: pickup group number */
+						__( 'Store pickup %d', 'cetech-woocommerce-delivery-engine' ),
+						$pickup_index
+					);
+			} else {
+				++$delivery_index;
+				$title = $package_group?->shipping_method_label
+					?? sprintf(
+						/* translators: %d: delivery group number */
+						__( 'Delivery %d', 'cetech-woocommerce-delivery-engine' ),
+						$delivery_index
+					);
+			}
+
+			$result[] = [
+				'title'   => $title,
+				'group'   => $package_group,
+				'entries' => $entries,
+			];
+		}
+
+		foreach ( $ungrouped as $entry ) {
+			$result[] = [
+				'title'   => __( 'Delivery', 'cetech-woocommerce-delivery-engine' ),
+				'group'   => null,
+				'entries' => [ $entry ],
+			];
+		}
+
+		return $result;
 	}
 
 	/**

@@ -76,12 +76,21 @@ $required_classes = [
 	'CetechDeliveryEngine\\Application\\Cart\\CartDeliverySelectionSessionData',
 	'CetechDeliveryEngine\\Bootstrap\\RuntimeContracts',
 	'CetechDeliveryEngine\\Core\\Versioning\\MigrationDiscovery',
+	'CetechDeliveryEngine\\Application\\Shipping\\DeliveryGroupIdentity',
+	'CetechDeliveryEngine\\Application\\Shipping\\ShippingPackageBuilder',
+	'CetechDeliveryEngine\\Application\\Shipping\\DefaultCartLineShippingAssessor',
+	'CetechDeliveryEngine\\Application\\Shipping\\SelectedOfferShippingIntegration',
+	'CetechDeliveryEngine\\Application\\Shipping\\SelectedOfferShippingRateCalculator',
+	'CetechDeliveryEngine\\Application\\Order\\OrderDeliveryGroupSnapshot',
+	'CetechDeliveryEngine\\Presentation\\Admin\\OrderDeliverySnapshotAdminDisplay',
 ];
 
 $required_interfaces = [
 	'CetechDeliveryEngine\\Application\\Runtime\\VariationRelationshipInspectorInterface',
 	'CetechDeliveryEngine\\Core\\Versioning\\VerifiableMigrationInterface',
 	'CetechDeliveryEngine\\Core\\Versioning\\MigrationInterface',
+	'CetechDeliveryEngine\\Application\\Shipping\\CartLineShippingAssessorInterface',
+	'CetechDeliveryEngine\\Application\\Destination\\PackageDestinationZoneResolverInterface',
 ];
 
 foreach ( $required_classes as $class ) {
@@ -323,6 +332,7 @@ fwrite( STDOUT, "- Boot factory class references resolve\n" );
 fwrite( STDOUT, "- Schema target 3; main ECR + variable ECR flags default OFF\n" );
 fwrite( STDOUT, "- Stage 6 variation endpoint/router/inspector/assets present\n" );
 fwrite( STDOUT, "- Variable frontend JS/CSS present with found_variation/reset_data/requestToken\n" );
+fwrite( STDOUT, "- Stage 8 grouping/shipping/order snapshot classes autoload\n" );
 fwrite( STDOUT, "- No PHPUnit in production vendor\n" );
 fwrite( STDOUT, "- Runtime contracts loaded; VariationRelationshipInspectorInterface present\n" );
 fwrite( STDOUT, "- VerifiableMigrationInterface present; schema v3 migration require path OK\n" );

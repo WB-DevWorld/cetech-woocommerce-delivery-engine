@@ -22,6 +22,7 @@ final class SelectedOfferShippingIntegration {
 		}
 
 		add_filter( 'woocommerce_shipping_methods', [ $this, 'register_shipping_method' ] );
+		add_filter( 'woocommerce_package_rates', [ $this, 'filter_managed_package_rates' ], 100, 2 );
 	}
 
 	/**
@@ -37,5 +38,42 @@ final class SelectedOfferShippingIntegration {
 		$methods[ SelectedOfferShippingMethod::METHOD_ID ] = SelectedOfferShippingMethod::class;
 
 		return $methods;
+	}
+
+	/**
+	 * Keep Delivery Engine rates exclusive on managed packages when a DE rate is present.
+	 *
+	 * @param array<string, mixed> $rates
+	 * @param array<string, mixed> $package
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function filter_managed_package_rates( array $rates, array $package ): array {
+		if ( ! $this->gate->is_runtime_active() ) {
+			return $rates;
+		}
+
+		if ( ! DeliveryGroupIdentity::is_managed_package( $package ) ) {
+			return $rates;
+		}
+
+		$managed = [];
+
+		foreach ( $rates as $rate_id => $rate ) {
+			$method_id = '';
+
+			if ( is_object( $rate ) && method_exists( $rate, 'get_method_id' ) ) {
+				$method_id = (string) $rate->get_method_id();
+			} elseif ( is_string( $rate_id ) && str_starts_with( $rate_id, SelectedOfferShippingMethod::METHOD_ID ) ) {
+				$method_id = SelectedOfferShippingMethod::METHOD_ID;
+			}
+
+			if ( SelectedOfferShippingMethod::METHOD_ID === $method_id ) {
+				$managed[ $rate_id ] = $rate;
+			}
+		}
+
+		// If DE produced a rate, hide conflicting native methods for this managed package.
+		return [] !== $managed ? $managed : $rates;
 	}
 }

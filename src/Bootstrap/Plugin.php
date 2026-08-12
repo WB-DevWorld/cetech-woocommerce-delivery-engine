@@ -20,8 +20,10 @@ use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotGate;
 use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotIntegrity;
 use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotPersister;
 use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotReader;
+use CetechDeliveryEngine\Application\Shipping\DefaultCartLineShippingAssessor;
 use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingIntegration;
 use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingRateCalculator;
+use CetechDeliveryEngine\Application\Shipping\ShippingPackageBuilder;
 use CetechDeliveryEngine\Application\Shipping\ShippingRateCalculationGate;
 use CetechDeliveryEngine\Application\Configuration\Admin\EntityLabelResolver;
 use CetechDeliveryEngine\Application\Configuration\Admin\LegacyCategoryConfigurationInspector;
@@ -203,6 +205,7 @@ final class Plugin {
 		$this->container->get( CartDeliverySelectionCapture::class )->register();
 		$this->container->get( CartDeliverySelectionRevalidator::class )->register();
 		$this->container->get( CheckoutDeliverySelectionValidator::class )->register();
+		$this->container->get( ShippingPackageBuilder::class )->register();
 		$this->container->get( SelectedOfferShippingIntegration::class )->register();
 		$this->container->get( OrderDeliverySnapshotPersister::class )->register();
 		$this->container->get( CustomerOrderDeliverySummaryRenderer::class )->register();
@@ -495,12 +498,22 @@ final class Plugin {
 			static fn ( ServiceContainer $container ): SelectedOfferShippingRateCalculator => new SelectedOfferShippingRateCalculator(
 				$container->get( ShippingRateCalculationGate::class ),
 				$container->get( PackageDestinationZoneResolver::class ),
-				$container->get( CartDeliverySelectionCapture::class ),
-				$container->get( CartDeliverySelectionRevalidator::class ),
+				new DefaultCartLineShippingAssessor(
+					$container->get( CartDeliverySelectionCapture::class ),
+					$container->get( CartDeliverySelectionRevalidator::class )
+				),
 				$container->get( RateQuoteEngine::class ),
 				$container->get( ProductDeliveryRuleRepositoryInterface::class ),
 				$container->get( Logger::class ),
 				$container->get( ProductDeliveryConfigurationSourceInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			ShippingPackageBuilder::class,
+			static fn ( ServiceContainer $container ): ShippingPackageBuilder => new ShippingPackageBuilder(
+				$container->get( ShippingRateCalculationGate::class ),
+				$container->get( CartDeliverySelectionCapture::class )
 			)
 		);
 

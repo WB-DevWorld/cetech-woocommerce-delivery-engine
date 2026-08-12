@@ -11,8 +11,10 @@ use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionSessionData;
 use CetechDeliveryEngine\Application\Destination\PackageDestinationZoneResolver;
 use CetechDeliveryEngine\Application\RateQuote\RateQuoteEngine;
 use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionIntent;
+use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
 use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingRateCalculator;
 use CetechDeliveryEngine\Domain\DeliveryOffer\DeliveryOfferRepositoryInterface;
+use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Infrastructure\WooCommerce\Shipping\SelectedOfferShippingMethod;
 use WC_Order;
 
@@ -104,6 +106,7 @@ final class OrderDeliverySnapshotBuilder {
 
 		$offer_label = $summary['delivery_offer_public_label'] ?? null;
 		$estimate    = $summary['estimate_text'] ?? null;
+		$group_id    = DeliveryGroupIdentity::fromIntent( $intent );
 
 		return new OrderDeliveryLineSnapshot(
 			ProductDeliverySelectionIntent::CONTRACT_VERSION,
@@ -124,7 +127,8 @@ final class OrderDeliverySnapshotBuilder {
 			$quote_status,
 			$rate_card_id,
 			null !== $rate_card_code ? sanitize_text_field( $rate_card_code ) : null,
-			gmdate( 'c' )
+			gmdate( 'c' ),
+			$group_id
 		);
 	}
 
@@ -135,11 +139,16 @@ final class OrderDeliverySnapshotBuilder {
 			return null;
 		}
 
-		$destination_zone_id     = $this->resolve_order_destination_zone_id( $order );
-		$shipping_method_id      = null;
-		$shipping_method_label   = null;
-		$package_total           = null;
-		$quote_status            = OrderDeliverySnapshot::PACKAGE_STATUS_NOT_APPLICABLE;
+		$destination_zone_id   = $this->resolve_order_destination_zone_id( $order );
+		$shipping_method_id    = null;
+		$shipping_method_label = null;
+		$package_total         = null;
+		$quote_status          = OrderDeliverySnapshot::PACKAGE_STATUS_NOT_APPLICABLE;
+		$groups                = [];
+		$running_total         = '0.0000';
+		$delivery_index        = 0;
+		$pickup_index          = 0;
+		$group_count           = 0;
 
 		foreach ( $order->get_items( 'shipping' ) as $shipping_item ) {
 			if ( ! is_object( $shipping_item ) || ! method_exists( $shipping_item, 'get_method_id' ) ) {
@@ -150,11 +159,62 @@ final class OrderDeliverySnapshotBuilder {
 				continue;
 			}
 
+			++$group_count;
+			$amount = function_exists( 'wc_format_decimal' )
+				? wc_format_decimal( (string) $shipping_item->get_total(), 4 )
+				: number_format( (float) $shipping_item->get_total(), 4, '.', '' );
+
+			$label = method_exists( $shipping_item, 'get_name' )
+				? trim( (string) $shipping_item->get_name() )
+				: SelectedOfferShippingMethod::RATE_LABEL;
+
+			if ( '' === $label ) {
+				$label = SelectedOfferShippingMethod::RATE_LABEL;
+			}
+
+			$group_meta = method_exists( $shipping_item, 'get_meta' )
+				? (string) $shipping_item->get_meta( 'cetech_de_group_id', true )
+				: '';
+
+			$is_pickup = str_contains( strtolower( $label ), 'pickup' )
+				|| ( '' !== $group_meta && DeliveryGroupIdentity::is_pickup_group( $group_meta ) );
+
+			if ( $is_pickup ) {
+				++$pickup_index;
+				$display_index = $pickup_index;
+				$choice        = FulfilmentChoice::StorePickup->value;
+			} else {
+				++$delivery_index;
+				$display_index = $delivery_index;
+				$choice        = FulfilmentChoice::Delivery->value;
+			}
+
+			$group_id = '' !== $group_meta
+				? $group_meta
+				: 'shipping-line-' . (string) $group_count;
+
+			$groups[] = new OrderDeliveryGroupSnapshot(
+				$group_id,
+				SelectedOfferShippingMethod::METHOD_ID,
+				$label,
+				$amount,
+				$choice,
+				$is_pickup,
+				$display_index
+			);
+
 			$shipping_method_id    = SelectedOfferShippingMethod::METHOD_ID;
-			$shipping_method_label = SelectedOfferShippingMethod::RATE_LABEL;
-			$package_total         = wc_format_decimal( (string) $shipping_item->get_total(), 4 );
+			$shipping_method_label = 1 === $group_count ? $label : SelectedOfferShippingMethod::RATE_LABEL;
+			$running_total         = $this->add_amounts( $running_total, (string) $amount );
 			$quote_status          = OrderDeliverySnapshot::PACKAGE_STATUS_SUCCESS;
-			break;
+		}
+
+		if ( OrderDeliverySnapshot::PACKAGE_STATUS_SUCCESS === $quote_status ) {
+			$package_total = $running_total;
+		}
+
+		if ( $group_count > 1 ) {
+			$shipping_method_label = __( 'Multiple deliveries', 'cetech-woocommerce-delivery-engine' );
 		}
 
 		return new OrderDeliveryPackageSnapshot(
@@ -165,8 +225,17 @@ final class OrderDeliverySnapshotBuilder {
 			strtoupper( $currency_code ),
 			$destination_zone_id,
 			$quote_status,
-			gmdate( 'c' )
+			gmdate( 'c' ),
+			$groups
 		);
+	}
+
+	private function add_amounts( string $left, string $right ): string {
+		if ( function_exists( 'bcadd' ) ) {
+			return bcadd( $left, $right, 4 );
+		}
+
+		return number_format( (float) $left + (float) $right, 4, '.', '' );
 	}
 
 	private function resolve_order_destination_zone_id( WC_Order $order ): ?int {

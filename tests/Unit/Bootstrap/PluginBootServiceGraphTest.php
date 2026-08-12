@@ -10,6 +10,7 @@ use CetechDeliveryEngine\Application\Checkout\CheckoutDeliverySelectionValidator
 use CetechDeliveryEngine\Application\Diagnostics\ConfigurationHealthChecker;
 use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotPersister;
 use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingIntegration;
+use CetechDeliveryEngine\Application\Shipping\ShippingPackageBuilder;
 use CetechDeliveryEngine\Bootstrap\Plugin;
 use CetechDeliveryEngine\Bootstrap\ServiceContainer;
 use CetechDeliveryEngine\Core\AdminNoticeManager;
@@ -97,6 +98,7 @@ final class PluginBootServiceGraphTest extends TestCase {
 			CartDeliverySelectionCapture::class,
 			CartDeliverySelectionRevalidator::class,
 			CheckoutDeliverySelectionValidator::class,
+			ShippingPackageBuilder::class,
 			SelectedOfferShippingIntegration::class,
 			OrderDeliverySnapshotPersister::class,
 			CustomerOrderDeliverySummaryRenderer::class,

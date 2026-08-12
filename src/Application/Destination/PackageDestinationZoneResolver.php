@@ -7,7 +7,7 @@ namespace CetechDeliveryEngine\Application\Destination;
 /**
  * Resolves a destination zone ID from a WooCommerce shipping package destination.
  */
-final class PackageDestinationZoneResolver {
+final class PackageDestinationZoneResolver implements PackageDestinationZoneResolverInterface {
 
 	public function __construct(
 		private DestinationZoneMatcher $zone_matcher

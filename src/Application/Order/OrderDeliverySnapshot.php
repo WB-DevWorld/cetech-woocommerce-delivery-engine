@@ -58,7 +58,8 @@ final class OrderDeliveryLineSnapshot {
 		public readonly string $quote_status,
 		public readonly ?int $rate_card_id,
 		public readonly ?string $rate_card_code,
-		public readonly string $snapshotted_at
+		public readonly string $snapshotted_at,
+		public readonly ?string $delivery_group_id = null
 	) {
 	}
 
@@ -66,7 +67,7 @@ final class OrderDeliveryLineSnapshot {
 	 * @return array<string, mixed>
 	 */
 	public function toArray(): array {
-		return [
+		$data = [
 			'contract_version'                  => $this->contract_version,
 			'snapshot_version'                  => $this->snapshot_version,
 			'product_id'                        => $this->product_id,
@@ -87,23 +88,28 @@ final class OrderDeliveryLineSnapshot {
 			'rate_card_code'                    => $this->rate_card_code,
 			'snapshotted_at'                    => $this->snapshotted_at,
 		];
+
+		if ( null !== $this->delivery_group_id && '' !== $this->delivery_group_id ) {
+			$data['delivery_group_id'] = $this->delivery_group_id;
+		}
+
+		return $data;
 	}
 }
 
 /**
- * Order-level delivery/shipping quote snapshot (protected meta JSON).
+ * One fulfilment/shipping group captured on the order (protected meta JSON).
  */
-final class OrderDeliveryPackageSnapshot {
+final class OrderDeliveryGroupSnapshot {
 
 	public function __construct(
-		public readonly string $snapshot_version,
+		public readonly string $group_id,
 		public readonly ?string $shipping_method_id,
 		public readonly ?string $shipping_method_label,
 		public readonly ?string $package_total_delivery_amount,
-		public readonly string $currency_code,
-		public readonly ?int $destination_zone_id,
-		public readonly string $quote_status,
-		public readonly string $snapshotted_at
+		public readonly string $fulfilment_choice,
+		public readonly bool $is_pickup,
+		public readonly int $display_index
 	) {
 	}
 
@@ -112,6 +118,43 @@ final class OrderDeliveryPackageSnapshot {
 	 */
 	public function toArray(): array {
 		return [
+			'group_id'                      => $this->group_id,
+			'shipping_method_id'            => $this->shipping_method_id,
+			'shipping_method_label'         => $this->shipping_method_label,
+			'package_total_delivery_amount' => $this->package_total_delivery_amount,
+			'fulfilment_choice'             => $this->fulfilment_choice,
+			'is_pickup'                     => $this->is_pickup,
+			'display_index'                 => $this->display_index,
+		];
+	}
+}
+
+/**
+ * Order-level delivery/shipping quote snapshot (protected meta JSON).
+ */
+final class OrderDeliveryPackageSnapshot {
+
+	/**
+	 * @param list<OrderDeliveryGroupSnapshot> $groups
+	 */
+	public function __construct(
+		public readonly string $snapshot_version,
+		public readonly ?string $shipping_method_id,
+		public readonly ?string $shipping_method_label,
+		public readonly ?string $package_total_delivery_amount,
+		public readonly string $currency_code,
+		public readonly ?int $destination_zone_id,
+		public readonly string $quote_status,
+		public readonly string $snapshotted_at,
+		public readonly array $groups = []
+	) {
+	}
+
+	/**
+	 * @return array<string, mixed>
+	 */
+	public function toArray(): array {
+		$data = [
 			'snapshot_version'              => $this->snapshot_version,
 			'shipping_method_id'            => $this->shipping_method_id,
 			'shipping_method_label'         => $this->shipping_method_label,
@@ -121,5 +164,14 @@ final class OrderDeliveryPackageSnapshot {
 			'quote_status'                  => $this->quote_status,
 			'snapshotted_at'                => $this->snapshotted_at,
 		];
+
+		if ( [] !== $this->groups ) {
+			$data['groups'] = array_map(
+				static fn ( OrderDeliveryGroupSnapshot $group ): array => $group->toArray(),
+				$this->groups
+			);
+		}
+
+		return $data;
 	}
 }
