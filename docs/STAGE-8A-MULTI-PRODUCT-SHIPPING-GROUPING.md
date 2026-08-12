@@ -202,16 +202,28 @@ Internal group ids / hashes are never shown to customers or in normal staff UI.
 
 ## 12. Stage 8B-1 package state
 
+**Commit:** `5f04147` — `feat: add multi-product delivery grouping`  
+**Base includes Stage 6C:** `331a856`  
 **Public version:** `1.0.0-rc.1`  
 **Schema:** `3`  
-**Stage 6C included:** yes (`331a856`)  
 **Stage 7:** COMPLETE — NO WOODMART ADAPTER REQUIRED  
 **Shipments/tracking:** not included  
-**FLAIROC:** not modified during 8B-1
+**FLAIROC:** not modified during 8B-1  
+
+**Automated gates (8B-1):**
+
+- PHPUnit: 204 tests / 893 assertions  
+- Vitest: 9 tests  
+- composer validate: OK  
+- production package verifier: OK  
 
 Package artifact (not committed):
 
-`C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-stage8a-qa.zip`
+- filename: `cetech-woocommerce-delivery-engine-stage8a-qa.zip`  
+- path: `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-stage8a-qa.zip`  
+- bytes: `701153`  
+- SHA-256: `f89d4aecb8aba663c9e68294debfb7741624cb84f3385cecb86469e4fcc82275`  
+- ZIP root: `cetech-woocommerce-delivery-engine/`  
 
 ---
 

@@ -5,7 +5,7 @@
 **Last updated:** 2026-08-12  
 **Plugin version:** `1.0.0-rc.1`  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `master` — Stage 6 **FUNCTIONALLY COMPLETE** (live order `#39721`); Stage 6C presentation cleanup **DONE locally** (`331a856`); Stage 7 **COMPLETE — NO WOODMART ADAPTER REQUIRED**; Stage 8A multi-product shipping grouping **DONE locally** — package Stage 6C + 8A together for live QA; keep DE runtime flags **OFF** on FLAIROC unless explicitly testing  
+**Git:** `master` — Stage 6 **FUNCTIONALLY COMPLETE** (live order `#39721`); Stage 6C presentation cleanup **included** (`331a856`); Stage 7 **COMPLETE — NO WOODMART ADAPTER REQUIRED**; Stage 8A multi-product grouping **committed** (`5f04147`) and **READY FOR STAGE 8 LIVE QA** (package `cetech-woocommerce-delivery-engine-stage8a-qa.zip`); keep DE runtime flags **OFF** on FLAIROC unless explicitly testing  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
@@ -40,7 +40,7 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 6B-3 / 6B-3R variable QA live | **FUNCTIONALLY COMPLETE** — QA `#39717` / A `#39718` / B `#39719`; shipping **25.00**; order **`#39721`**; WoodMart **PASS** (no Stage 7 adapter required); flags/COD restored **OFF** |
 | Stage 6C presentation cleanup | **DONE locally** — `331a856`; distinct customer labels; hide `_cetech_de_*` item meta; simplify order admin to **Delivery information**; carry into next release package |
 | Stage 7 WoodMart adapter | **COMPLETE — NO WOODMART ADAPTER REQUIRED** — Stage 6 variable QA used WoodMart’s normal variation lifecycle; do not create empty adapter code |
-| Stage 8A multi-product shipping grouping | **DONE locally** — artifact `docs/STAGE-8A-MULTI-PRODUCT-SHIPPING-GROUPING.md`; WC package split/consolidate; pickup/delivery + local/international split; order group snapshots; package with Stage 6C for live QA |
+| Stage 8A multi-product shipping grouping | **READY FOR STAGE 8 LIVE QA** — commit `5f04147`; artifact `docs/STAGE-8A-MULTI-PRODUCT-SHIPPING-GROUPING.md`; QA ZIP `cetech-woocommerce-delivery-engine-stage8a-qa.zip` SHA-256 `f89d4aec…2275`; FLAIROC not modified |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |
 | New admin UX | Default / Product-Specific / Variation-Specific delivery settings + preview; operational language required (`docs/ADMIN-UI-LANGUAGE-GUIDE.md`) |
@@ -52,7 +52,7 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Shipments / tracking / timeline | **Not implemented** |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Stage 5/6 **compatibility route** (category winners stay on legacy source); `#39705` is **not** category-routed |
-| Next stage | Build Stage 6C + Stage 8A live-QA package; focused multi-product live test. Do **not** start shipment/tracking (Stage 9). |
+| Next stage | Human clean-install Stage 8 QA package; focused multi-product live test only. Do **not** start shipment/tracking (Stage 9). |
 | Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual |
 | Release-quality backlog | Administrator language is **mandatory now**, not deferred to a later RC |
 | Stage 1 HPOS debt | **DEFERRED** (`countOrderSnapshotReferences` postmeta); non-numeric rate→0 **FIXED** in Stage 5A |
