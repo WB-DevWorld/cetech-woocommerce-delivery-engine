@@ -834,7 +834,7 @@ Human executes Stage 6B-3 checklist in wp-admin (flags, config, preview, order) 
 
 **INCOMPLETE — awaiting human redeploy + focused product-page retest.**
 
-Package: `cetech-woocommerce-delivery-engine-stage6b3-asset-fix.zip` (see commit/build record).
+Package: `cetech-woocommerce-delivery-engine-stage6b3-asset-fix.zip` — SHA-256 `d34a03e1061ba157fe51600e43bd83c19b8eb64d38bb30c48d2723b08406f1e1` (685388 bytes). Commit `e84af55`.
 
 ### Asset eligibility (PHPUnit)
 
