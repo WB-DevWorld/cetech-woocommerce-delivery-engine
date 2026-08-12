@@ -1,0 +1,21 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:20.000
+Inheritance always runs Default, then Product, then Variation. The most specific intentional value wins.
+
+2
+00:00:20.000 --> 00:00:40.000
+Use inherited setting means keep the value from the level above. This is the safest everyday choice.
+
+3
+00:00:40.000 --> 00:01:00.000
+Set a different value here replaces the inherited scalar for this product or variation only.
+
+4
+00:01:00.000 --> 00:01:20.000
+Turn off means intentionally none for this item where the field supports it. It is not the same as forgetting to configure.
+
+5
+00:01:20.000 --> 00:01:40.000
+For delivery offers, you may add, remove, or replace inherited options depending on the controls your screen shows. Empty lists are not always inherit — read the labels carefully.

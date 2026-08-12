@@ -1,0 +1,21 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:20.000
+Default Settings are the store-wide values products can inherit. When a product has no special override, it follows these defaults.
+
+2
+00:00:20.000 --> 00:00:40.000
+Here you set fulfilment availability and how fulfilment is chosen. These labels should match what your store actually offers customers.
+
+3
+00:00:40.000 --> 00:01:00.000
+Defaults also cover delivery method and which delivery offers products can use. Incomplete offers or pricing must never silently become free shipping.
+
+4
+00:01:00.000 --> 00:01:20.000
+Recommended workflow: set clear defaults, save, then open Delivery Settings Preview for a sample product. Prefer fixing defaults instead of overriding every product.
+
+5
+00:01:20.000 --> 00:01:40.000
+In Preview, confirm the product is Currently using Default when no product override exists, and that status is Ready when configuration is complete.

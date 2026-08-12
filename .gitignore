@@ -40,6 +40,17 @@ desktop.ini
 **/*storageState*.json
 **/auth/storage-state.json
 
+# Training walkthrough videos — keep scripts/index in Git; binaries usually external
+/training/playwright-videos/node_modules/
+/training/playwright-videos/output/
+/training/playwright-videos/test-results/
+/training/playwright-videos/playwright-report/
+/docs/training/assets/videos/*.webm
+/docs/training/assets/videos/*.mp4
+/docs/training/assets/videos/*.mov
+!/docs/training/assets/videos/README.md
+!/docs/training/assets/videos/transcripts/
+
 # Local read-only FLAIROC verification scratch (may contain page HTML dumps)
 /tmp-stage5b2-verify/
 /tmp-stage5b2a-audit/

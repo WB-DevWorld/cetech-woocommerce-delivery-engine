@@ -1,0 +1,21 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:20.000
+Variable products have a parent and variations. Start with parent product 39717. Parent settings apply when a variation inherits.
+
+2
+00:00:20.000 --> 00:00:40.000
+Open Variation A, number 39718. When fields say Use inherited setting, this variation follows the parent — or Default through the parent.
+
+3
+00:00:40.000 --> 00:01:00.000
+Variation B, number 39719, is useful to demonstrate an override. Only set a different value when this variation must differ.
+
+4
+00:01:00.000 --> 00:01:20.000
+Save authorised changes, then Preview for the exact variation ID you care about. Confirm Currently using and Ready.
+
+5
+00:01:20.000 --> 00:01:40.000
+On the storefront, the customer must select a variation. Delivery options then refresh for that variation. Do not complete payment just for this video.

@@ -1,0 +1,17 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:20.000
+Preview is read-only. Use it after changes, and whenever a customer or colleague reports a delivery problem.
+
+2
+00:00:20.000 --> 00:00:40.000
+Ready means required delivery values are present for this view. Staff can expect the customer journey to have a fair chance of showing options.
+
+3
+00:00:40.000 --> 00:01:00.000
+Needs configuration means something required is missing or incomplete. Do not invent free shipping. Fix Default or the correct product or variation layer, then Preview again. Do not break live production configuration just to film this state.
+
+4
+00:01:00.000 --> 00:01:20.000
+Currently using tells you which level is supplying the effective values. If inheritance looks wrong, fix the level Preview points to.

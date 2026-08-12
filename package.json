@@ -4,7 +4,11 @@
   "description": "Development-only JS tests for Stage 6 variable delivery selector. Not required at runtime.",
   "scripts": {
     "test:js": "vitest run",
-    "test:js:watch": "vitest"
+    "test:js:watch": "vitest",
+    "training:auth": "npm --prefix training/playwright run training:auth",
+    "training:capture": "npm --prefix training/playwright run test:capture",
+    "training:docs-test": "npm --prefix training/playwright test",
+    "training:video": "npm --prefix training/playwright-videos run record:headed"
   },
   "devDependencies": {
     "jsdom": "^26.1.0",

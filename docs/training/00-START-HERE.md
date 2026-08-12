@@ -22,26 +22,30 @@ You do **not** need to know PHP, databases, or plugin architecture.
 ### New staff
 
 1. [01 — Quick Start](01-QUICK-START.md) (about 10 minutes)
-2. [05 — Staff Training Manual](05-STAFF-TRAINING-MANUAL.md) (self-paced course)
-3. [04 — Visual Walkthrough](04-VISUAL-WALKTHROUGH.md) (screenshot tour)
+2. [10 — Video Training Library](10-VIDEO-TRAINING-LIBRARY.md) — start with videos **01** and **12**
+3. [05 — Staff Training Manual](05-STAFF-TRAINING-MANUAL.md) (self-paced course)
+4. [04 — Visual Walkthrough](04-VISUAL-WALKTHROUGH.md) (screenshot tour)
 
 ### Experienced staff
 
 1. [03 — Use-Case Playbook](03-USE-CASE-PLAYBOOK.md)
 2. [07 — Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md)
-3. [08 — Glossary](08-GLOSSARY.md)
+3. [10 — Video Training Library](10-VIDEO-TRAINING-LIBRARY.md) (topic videos 07–10)
+4. [08 — Glossary](08-GLOSSARY.md)
 
 ### Administrators
 
 1. [02 — Complete Administrator Guide](02-COMPLETE-ADMIN-GUIDE.md)
 2. [03 — Use-Case Playbook](03-USE-CASE-PLAYBOOK.md)
 3. [07 — Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md)
+4. [10 — Video Training Library](10-VIDEO-TRAINING-LIBRARY.md) (especially **02**, **05**, **11**)
 
 ### Trainers
 
 1. [06 — Trainer Guide](06-TRAINER-GUIDE.md)
-2. [05 — Staff Training Manual](05-STAFF-TRAINING-MANUAL.md)
-3. [04 — Visual Walkthrough](04-VISUAL-WALKTHROUGH.md)
+2. [10 — Video Training Library](10-VIDEO-TRAINING-LIBRARY.md) (full set + narration scripts)
+3. [05 — Staff Training Manual](05-STAFF-TRAINING-MANUAL.md)
+4. [04 — Visual Walkthrough](04-VISUAL-WALKTHROUGH.md)
 
 ### Technical support / developers
 
@@ -83,7 +87,7 @@ Use these dedicated QA products for training practice. Do **not** change real cu
 
 ## Playwright capture suite
 
-Reusable browser walkthroughs live in `training/playwright/`. See that folder’s README. Auth state is local and gitignored.
+Reusable browser walkthroughs live in `training/playwright/` (screenshots / smoke). Deliberate **training videos** use the separate harness `training/playwright-videos/` (`video: on`). See [10 — Video Training Library](10-VIDEO-TRAINING-LIBRARY.md). Auth state is local and gitignored — never commit it.
 
 ---
 

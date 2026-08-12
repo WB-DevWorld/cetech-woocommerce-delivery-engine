@@ -1,0 +1,13 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:20.000
+Use an existing QA order. Do not create a new paid order only for filming. Open Delivery information on the order screen.
+
+2
+00:00:20.000 --> 00:00:40.000
+Normal staff need Product, Fulfilment, Delivery method, Delivery option, Estimated delivery, Delivery charge, and Status. These describe what the customer bought and how delivery was recorded.
+
+3
+00:00:40.000 --> 00:01:00.000
+Normal staff do not need technical metadata. If you only see confusing technical details, stop and ask an administrator or technical support.

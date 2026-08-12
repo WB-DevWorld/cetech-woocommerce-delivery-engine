@@ -1,0 +1,15 @@
+{
+  "name": "cetech-de-training-playwright-videos",
+  "private": true,
+  "description": "Deliberate paced walkthrough video capture for CETECH Delivery Engine staff training. Separate from the screenshot/smoke harness so normal tests do not dump huge videos.",
+  "scripts": {
+    "auth": "npm --prefix ../playwright run training:auth",
+    "record": "playwright test --config=playwright.config.ts",
+    "record:headed": "playwright test --config=playwright.config.ts --headed",
+    "record:one": "playwright test --config=playwright.config.ts --headed --grep"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.54.2",
+    "dotenv": "^16.6.1"
+  }
+}

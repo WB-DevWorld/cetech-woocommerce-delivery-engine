@@ -1,0 +1,21 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:20.000
+If Preview says Needs configuration, open Delivery Settings for the same product or variation, complete missing values, prefer inheritance when the parent is correct, save, and Preview again.
+
+2
+00:00:20.000 --> 00:00:40.000
+If no delivery choice shows, confirm the correct product or variation, Preview Ready, and that offers are assigned. If the wrong inherited setting appears, change the level Preview says is Currently using.
+
+3
+00:00:40.000 --> 00:01:00.000
+No delivery charge usually means missing selection, zone, or rate card — escalate to an administrator if the selection is present but the fee is missing or unexpectedly zero. Unexpected multi-product charges may mean products cannot travel together.
+
+4
+00:01:00.000 --> 00:01:20.000
+If Delivery information is missing on an order, confirm you are on a Delivery Engine order from the enabled period, then escalate. Do not edit historical delivery details to fix future settings.
+
+5
+00:01:20.000 --> 00:01:40.000
+Stop and ask an administrator or technical support when Preview and Delivery Settings look complete but the shop still fails, or when you are asked to use SSH, SQL, PHP, Redis flush, Nginx, or Code Snippets. Those are not normal staff tools.

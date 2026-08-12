@@ -1,0 +1,17 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:20.000
+The customer starts on the product page. They choose a delivery option before adding to cart when the store requires it.
+
+2
+00:00:20.000 --> 00:00:40.000
+Release candidate labels use Fulfilment, Delivery method, Delivery option, and Estimated delivery. Teach these words — not internal field names.
+
+3
+00:00:40.000 --> 00:01:00.000
+After adding to cart, the delivery choice should remain. Reload the cart to show that the selection is remembered for the session.
+
+4
+00:01:00.000 --> 00:01:20.000
+At checkout, the customer should see a Delivery charge that matches their selection and destination. Stop before payment. No order creation is required for this video.

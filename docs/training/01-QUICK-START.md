@@ -4,6 +4,8 @@
 **Plugin version:** 1.0.0-rc.2  
 **Goal:** Do the everyday tasks safely without technical detail.
 
+**Watch (optional):** [Video 01 — Getting started overview](10-VIDEO-TRAINING-LIBRARY.md#01--getting-started-overview) · [Video 12 — Complete walkthrough](10-VIDEO-TRAINING-LIBRARY.md#12--complete-staff-walkthrough)
+
 ---
 
 ## 1. Where to go
@@ -13,6 +15,10 @@ In WordPress admin open:
 **Delivery Engine → Delivery Settings**
 
 That is the normal place to manage delivery for the store, a product, or a variation.
+
+![Delivery Settings home](assets/screenshots/01-delivery-settings-home.png)
+
+*Full captioned tour:* [04 — Visual Walkthrough](04-VISUAL-WALKTHROUGH.md).
 
 Also know:
 
@@ -67,6 +73,8 @@ Open **Delivery Engine → Delivery Settings Preview**.
 
 Confirm the product/variation shows **Ready** (or a clear message if something still needs configuration).
 
+![Delivery Settings Preview Ready](assets/screenshots/05-delivery-preview-ready.png)
+
 ---
 
 ## 6. Save
@@ -88,6 +96,8 @@ You should see **Delivery options**. For a variable product, select the variatio
 **WooCommerce → Orders →** open the order → find **Delivery information**.
 
 Look for fulfilment, delivery method/option, estimate, and charge. This is what was saved when the customer ordered.
+
+Practice on existing QA orders **#39721** or **#39724** (read-only). See walkthrough shot `13-order-delivery-information.png`.
 
 ---
 

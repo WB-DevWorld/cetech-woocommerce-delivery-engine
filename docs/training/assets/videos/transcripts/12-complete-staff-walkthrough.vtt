@@ -1,0 +1,41 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:20.000
+This complete walkthrough is your full onboarding video for the CETECH Delivery Engine on RC.2. We will move slowly from admin configuration to the customer journey and back to the order.
+
+2
+00:00:20.000 --> 00:00:40.000
+Open Delivery Settings. Defaults are the store-wide baseline. Prefer strong defaults over dozens of one-off product edits.
+
+3
+00:00:40.000 --> 00:01:00.000
+On simple QA product 39705, prefer Use inherited setting. Override only when needed. Save authorised changes.
+
+4
+00:01:00.000 --> 00:01:20.000
+For variable products, configure the parent, then each variation. Variation 39718 can demonstrate inheritance; 39719 can demonstrate an intentional override.
+
+5
+00:01:20.000 --> 00:01:40.000
+Always Preview. Confirm Ready and Currently using before you trust the shop page.
+
+6
+00:01:40.000 --> 00:02:00.000
+Customer selects delivery on the product, cart keeps it, checkout shows the Delivery charge. We stop before payment.
+
+7
+00:02:00.000 --> 00:02:20.000
+Compatible products can share one delivery charge. Incompatible fulfilment paths are separated. Explain simply to customers when more than one charge appears.
+
+8
+00:02:20.000 --> 00:02:40.000
+On the order, read Delivery information using operational labels. Do not rewrite historical delivery details to fix future settings.
+
+9
+00:02:40.000 --> 00:03:00.000
+For problems, use Preview and Delivery Settings first. Escalate technical work. Legacy Delivery Rules are not everyday. Never change Settings switches, suppliers and origins, or Legacy Rules without approval.
+
+10
+00:03:00.000 --> 00:03:20.000
+You now have the full staff path. Practise on QA products, watch the shorter topic videos as needed, and ask a trainer to sign off your practical tests.

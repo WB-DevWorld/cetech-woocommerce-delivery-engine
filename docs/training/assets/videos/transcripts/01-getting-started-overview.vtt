@@ -1,0 +1,33 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:20.000
+Welcome to the CETECH Delivery Engine staff walkthrough for release candidate 1.0.0-rc.2. In this short overview you will learn where everyday delivery work happens, and what customers and staff each see.
+
+2
+00:00:20.000 --> 00:00:40.000
+In WordPress admin, open Delivery Engine. This is the home for delivery configuration for your store.
+
+3
+00:00:40.000 --> 00:01:00.000
+Your everyday starting point is Delivery Settings. Most day-to-day work happens here — not in Legacy Delivery Rules.
+
+4
+00:01:00.000 --> 00:01:20.000
+Think of three layers. Default Settings apply store-wide. Product-Specific Settings can change one product. Variation-Specific Settings can change one variation. Prefer inheritance unless something truly needs to differ.
+
+5
+00:01:20.000 --> 00:01:40.000
+Delivery Settings Preview is read-only. It shows what will actually apply for a product or variation, including Ready or Needs configuration.
+
+6
+00:01:40.000 --> 00:02:00.000
+At a high level: Delivery Offers are the choices customers see. Destination Zones describe where a choice applies. Rate Cards connect an offer and zone to a delivery charge. You configure products in Delivery Settings; these pages support that setup.
+
+7
+00:02:00.000 --> 00:02:20.000
+After a customer pays, staff open the order and find Delivery information — fulfilment, delivery method, delivery option, estimated delivery, and charge. You do not need technical metadata for normal work.
+
+8
+00:02:20.000 --> 00:02:40.000
+Remember: Delivery Settings for everyday work, Preview to confirm, and Delivery information on orders after purchase. Next videos go deeper into each step.

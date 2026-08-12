@@ -3,7 +3,7 @@
 **Audience:** Everyday staff and administrators  
 **Version:** 1.0.0-rc.2  
 
-Use this guide first. Do **not** edit PHP, run SQL, clear Redis globally, change the database by hand, install Code Snippets, change Nginx, or use SSH. Those steps belong only in the [Technical Support Appendix](09-TECHNICAL-SUPPORT-APPENDIX.md).
+Use this guide first. Companion video: [Video 10 — Staff troubleshooting](10-VIDEO-TRAINING-LIBRARY.md#10--staff-troubleshooting). Do **not** edit PHP, run SQL, clear Redis globally, change the database by hand, install Code Snippets, change Nginx, or use SSH. Those steps belong only in the [Technical Support Appendix](09-TECHNICAL-SUPPORT-APPENDIX.md).
 
 ---
 

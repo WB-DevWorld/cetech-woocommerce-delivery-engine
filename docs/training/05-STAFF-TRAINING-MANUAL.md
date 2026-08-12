@@ -29,6 +29,7 @@ What the Delivery Engine does for the store, customers, and staff — without te
 Clear delivery choices and correct fees reduce checkout confusion and support tickets. Staff need a shared picture of the journey: configure → customer selects → cart/checkout → order Delivery information.
 
 ## 3. Watch the walkthrough
+Watch [Video 01 — Getting started](10-VIDEO-TRAINING-LIBRARY.md#01--getting-started-overview) (or the matching portion of [Video 12](10-VIDEO-TRAINING-LIBRARY.md#12--complete-staff-walkthrough)).  
 Read [04-VISUAL-WALKTHROUGH](04-VISUAL-WALKTHROUGH.md) sections 1–3 (admin home → Delivery Settings overview). Screenshot refs: `00-delivery-engine-dashboard.png`, `01-delivery-settings-home.png`.
 
 ## 4. Do it yourself
@@ -68,6 +69,7 @@ The Delivery Engine menus you will actually use, and which ones to leave alone.
 Wrong menu = wrong changes. Offers, zones, and rate cards work together; Delivery Settings applies them to products.
 
 ## 3. Watch the walkthrough
+Watch [Video 01](10-VIDEO-TRAINING-LIBRARY.md#01--getting-started-overview) (menus portion).  
 [04-VISUAL-WALKTHROUGH](04-VISUAL-WALKTHROUGH.md) Delivery Settings home. Also skim administrator guide pages for Offers, Zones, Rate Cards in [02-COMPLETE-ADMIN-GUIDE](02-COMPLETE-ADMIN-GUIDE.md).
 
 ## 4. Do it yourself
@@ -102,6 +104,7 @@ Inheritance: when to leave a value inherited, when to set a different value, whe
 Most products should follow Defaults. Overrides should be intentional. Wrong-level edits create confusing behaviour.
 
 ## 3. Watch the walkthrough
+Watch [Video 05 — Inheritance / overrides](10-VIDEO-TRAINING-LIBRARY.md#05--variation-inheritance-and-overrides) and [Video 02 — Defaults](10-VIDEO-TRAINING-LIBRARY.md#02--default-delivery-settings).  
 [04-VISUAL-WALKTHROUGH](04-VISUAL-WALKTHROUGH.md) Default / Product / Variation screens. Screenshots: `02-default-settings.png`, `03-product-specific-settings.png`, `04-variation-specific-settings.png`.
 
 ## 4. Do it yourself
@@ -136,6 +139,7 @@ How to configure a normal simple product using inheritance or a deliberate produ
 Simple products are the most common staff task.
 
 ## 3. Watch the walkthrough
+Watch [Video 03 — Configure a simple product](10-VIDEO-TRAINING-LIBRARY.md#03--configure-a-simple-product).  
 Use cases 1–2 in [03-USE-CASE-PLAYBOOK](03-USE-CASE-PLAYBOOK.md). Screenshot `03b-product-39705-editor.png` if present.
 
 ## 4. Do it yourself
@@ -170,6 +174,7 @@ Parent product settings vs variation overrides; how customers switching variatio
 Variable products fail in support when staff edit the wrong ID or expect parent changes to appear without selecting a variation on the shop.
 
 ## 3. Watch the walkthrough
+Watch [Video 04 — Configure a variable product](10-VIDEO-TRAINING-LIBRARY.md#04--configure-a-variable-product).  
 Use cases 7–8 and 12–13 in the playbook. Screenshots `04-variation-specific-settings.png`, `06b-variable-product-customer-view.png`.
 
 ## 4. Do it yourself
@@ -204,6 +209,7 @@ Fulfilment availability (In store / In warehouse / International fulfilment), fu
 These fields decide which paths are allowed. Wrong combinations show as Needs configuration or missing options.
 
 ## 3. Watch the walkthrough
+Watch [Video 02](10-VIDEO-TRAINING-LIBRARY.md#02--default-delivery-settings) and [Video 05](10-VIDEO-TRAINING-LIBRARY.md#05--variation-inheritance-and-overrides) (fulfilment portion).  
 Administrator guide field explanations + playbook use cases 3–6. Screenshot Default Settings fields.
 
 ## 4. Do it yourself
@@ -238,6 +244,7 @@ How Destination Zones and Rate Cards produce the checkout Delivery fee.
 Customers pay the fee shown at checkout. Missing rate cards must not become silent free shipping.
 
 ## 3. Watch the walkthrough
+Watch [Video 07](10-VIDEO-TRAINING-LIBRARY.md#07--customer-product-cart-and-checkout) (charge portion) and [Video 08](10-VIDEO-TRAINING-LIBRARY.md#08--multi-product-shipping).  
 Admin guide Rate Cards + Zones sections. Playbook use cases 14 and 16.
 
 ## 4. Do it yourself
@@ -272,6 +279,7 @@ Product page Delivery options, wording customers see, and what “good” looks 
 Staff configuration is successful only if the customer journey is clear.
 
 ## 3. Watch the walkthrough
+Watch [Video 07 — Customer journey](10-VIDEO-TRAINING-LIBRARY.md#07--customer-product-cart-and-checkout).  
 Visual walkthrough product → cart sections. Screenshots `06-simple-product-customer-view.png`, `06b-variable-product-customer-view.png`.
 
 ## 4. Do it yourself
@@ -306,6 +314,7 @@ How delivery selections appear in cart, and how multiple products can share or s
 Multi-item carts are a common source of “wrong shipping” tickets.
 
 ## 3. Watch the walkthrough
+Watch [Video 07](10-VIDEO-TRAINING-LIBRARY.md#07--customer-product-cart-and-checkout) and [Video 08 — Multi-product shipping](10-VIDEO-TRAINING-LIBRARY.md#08--multi-product-shipping).  
 Playbook use cases 14–16. Screenshot `07-cart-delivery-information.png` when available.
 
 ## 4. Do it yourself
@@ -340,6 +349,7 @@ How to read **Delivery information** on a WooCommerce order and what must not be
 Fulfilment teams rely on the order snapshot. Historical orders stay as purchased.
 
 ## 3. Watch the walkthrough
+Watch [Video 09 — Order Delivery information](10-VIDEO-TRAINING-LIBRARY.md#09--order-delivery-information).  
 Visual walkthrough order section. Screenshot `09-order-delivery-information.png`. Playbook use cases 17–18.
 
 ## 4. Do it yourself
@@ -374,6 +384,7 @@ How to respond to Needs configuration and other everyday failures using the staf
 Fast, safe first checks reduce downtime without risky technical steps.
 
 ## 3. Watch the walkthrough
+Watch [Video 10 — Staff troubleshooting](10-VIDEO-TRAINING-LIBRARY.md#10--staff-troubleshooting).  
 Read [07-TROUBLESHOOTING-FAQ](07-TROUBLESHOOTING-FAQ.md) end to end.
 
 ## 4. Do it yourself
@@ -408,6 +419,7 @@ What Legacy Delivery Rules are for, why they exist, and why Delivery Settings is
 Editing the wrong system causes conflicting behaviour and hard-to-diagnose live issues.
 
 ## 3. Watch the walkthrough
+Watch [Video 11 — Legacy Rules explained](10-VIDEO-TRAINING-LIBRARY.md#11--legacy-delivery-rules-explained).  
 Screenshot `10-legacy-delivery-rules.png`. Read Legacy section in the administrator guide and Module boundaries in Start Here.
 
 ## 4. Do it yourself

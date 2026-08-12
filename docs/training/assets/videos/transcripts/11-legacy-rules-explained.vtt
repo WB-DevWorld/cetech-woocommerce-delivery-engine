@@ -1,0 +1,13 @@
+WEBVTT
+
+1
+00:00:00.000 --> 00:00:20.000
+Delivery Settings is the normal current workflow for RC.2. That is where everyday staff work.
+
+2
+00:00:20.000 --> 00:00:40.000
+Legacy Delivery Rules is an older compatibility and migration area. It is not a second everyday delivery system. Normal staff should not edit it unless an administrator authorises a migration task.
+
+3
+00:00:40.000 --> 00:01:00.000
+If you are unsure which screen to use, choose Delivery Settings and ask. Do not maintain the same rule in two places.
