@@ -7,7 +7,9 @@
     "test:smoke": "playwright test --grep @smoke",
     "test:capture": "playwright test --grep @capture",
     "test:validate": "playwright test --grep @validate",
+    "training:auth": "node scripts/human-auth.mjs",
     "auth:save": "playwright test auth/save-storage-state.spec.ts --project=setup",
+    "auth:human": "node scripts/human-auth.mjs",
     "report": "playwright show-report"
   },
   "devDependencies": {

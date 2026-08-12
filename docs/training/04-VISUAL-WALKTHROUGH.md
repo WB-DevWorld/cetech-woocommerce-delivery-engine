@@ -17,6 +17,8 @@ For every screen below:
 
 Capture status is recorded honestly in the screenshots README (`PLAYWRIGHT-CAPTURED` vs `HUMAN-CAPTURED`). Do not invent images. Prefer QA products **#39705**, **#39717** / A **#39718** / B **#39719**, and existing orders **#39721** / **#39724**.
 
+**Stage 12B note (partial):** Many admin/storefront teaching PNGs are saved; cart shots **10–11** are still missing; checkout/order shots **12–14** were captured but **withheld from git** until PII redaction. See [`assets/screenshots/README.md`](assets/screenshots/README.md). Verdict remains **BLOCKED — VISUAL CAPTURE INCOMPLETE**.
+
 ---
 
 ## 1. Delivery Settings (everyday entry)

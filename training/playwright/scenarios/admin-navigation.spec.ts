@@ -30,4 +30,17 @@ test.describe('Admin navigation @smoke @capture @validate', () => {
 			await expect(page.getByText(new RegExp(label, 'i')).first()).toBeVisible();
 		}
 	});
+
+	test('Technical diagnostic tools capture for admin/support docs only', async ({ page }) => {
+		const admin = new DeliveryEngineAdmin(page);
+		await admin.openDashboard();
+		await redactSensitiveUi(page);
+		// Prefer an expanded diagnostics / system area when present; otherwise dashboard wrap.
+		const diag = page.getByText(/Technical diagnostic|System status|Advanced|Debug/i).first();
+		await expect(page.getByText(/Delivery Engine|Delivery readiness|CETECH/i).first()).toBeVisible();
+		if (await diag.isVisible().catch(() => false)) {
+			await diag.click().catch(() => undefined);
+		}
+		await captureTeachingShot(page, '16-technical-diagnostic-tools.png', { target: admin.mainContent() });
+	});
 });

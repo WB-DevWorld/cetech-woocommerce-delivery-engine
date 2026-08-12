@@ -33,20 +33,40 @@ FLAIROC_WP_APP_PASSWORD=...
 
 ## Authenticated admin captures
 
-Cloudflare may block automated `wp-login.php`. Preferred flow:
+Cloudflare may block unattended `wp-login.php`. **Preferred Stage 12B flow:**
 
-1. Log in manually in a normal browser session when needed.
-2. Or run `npm run auth:save` when password/app-password login is reachable.
-3. Confirm `auth/storage-state.json` exists locally and remains gitignored.
+```bash
+cd training/playwright
+npm install
+npm run training:auth
+```
+
+Or from the repository root:
+
+```bash
+npm run training:auth
+```
+
+That opens **headed Chrome**. A human completes Cloudflare + WordPress login normally. The script saves gitignored `auth/storage-state.json` when `#wpadminbar` is visible. Credentials are never printed.
+
+Fallback (automated form fill — often Cloudflare-blocked):
 
 ```bash
 npm run auth:save
 ```
 
+Confirm `auth/storage-state.json` exists locally and remains gitignored (`git check-ignore -v training/playwright/auth/storage-state.json`).
+
+### If headed Playwright is still blocked after human login
+
+Switch to **MANUAL SCREENSHOT MODE**: capture the Stage 12B canonical filenames in a normal browser session and save PNGs under `docs/training/assets/screenshots/`. Label captures as HUMAN-CAPTURED in that folder’s README. Do not invent images.
 ## Commands
 
 | Command | Use |
 |---------|-----|
+| `npm run training:auth` | Headed Chrome — human Cloudflare/login, then save storage state |
+| `npm run auth:human` | Alias of `training:auth` |
+| `npm run auth:save` | Automated login attempt (often Cloudflare-blocked) |
 | `npm run test:smoke` | Label presence / navigation smoke (`@smoke`) |
 | `npm run test:capture` | Write screenshots under `docs/training/assets/screenshots/` (`@capture`) |
 | `npm run test:validate` | Replay primary tutorial selectors (`@validate`) |

@@ -13,6 +13,6 @@ test.describe('Legacy Delivery Rules warning @smoke @capture @validate', () => {
 		await redactSensitiveUi(page);
 		await expect(page.getByText(/Legacy Delivery Rules/i).first()).toBeVisible();
 		await expect(page.getByText(/Delivery Settings/i).first()).toBeVisible();
-		await captureTeachingShot(page, '10-legacy-delivery-rules.png', { target: admin.mainContent() });
+		await captureTeachingShot(page, '15-legacy-delivery-rules.png', { target: admin.mainContent() });
 	});
 });

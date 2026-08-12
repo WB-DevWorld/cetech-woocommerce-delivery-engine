@@ -28,7 +28,7 @@ export default defineConfig({
 	use: {
 		baseURL,
 		...devices['Desktop Chrome'],
-		viewport: { width: 1440, height: 900 },
+		viewport: { width: 1440, height: 1000 },
 		locale: 'en-US',
 		colorScheme: 'light',
 		trace: 'off',
@@ -41,6 +41,10 @@ export default defineConfig({
 		{
 			name: 'public',
 			testMatch: /customer-|cart-|checkout-/,
+			use: {
+				// Reuse human-assisted FLAIROC session so /intl/ storefront is not CF-blocked when possible.
+				storageState: storageStatePath,
+			},
 		},
 		{
 			name: 'admin',
