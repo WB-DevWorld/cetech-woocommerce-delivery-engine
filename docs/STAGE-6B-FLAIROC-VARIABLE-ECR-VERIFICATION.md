@@ -4,15 +4,17 @@
 **Plugin version:** `1.0.0-rc.1` (unchanged public version)  
 **Schema target:** `3` (unchanged)  
 **Date opened:** 2026-08-11  
-**Last updated:** 2026-08-12 (Stage 6B-2 **OVERTURNED** to BLOCKED; Stage 6B-2R local autoload + admin-language repair)
+**Last updated:** 2026-08-12 (Stage 6B-2 retry after clean repaired install — **BLOCKED**; SSH/PHP-log + live admin-language gates unmet)
 
 ---
 
 ## 1. Current verdict
 
-**Stage 6B-2: BLOCKED** (overturned after human PHP log review)
+**Stage 6B-2 retry: BLOCKED** (clean repaired install observed over HTTP/REST; PHP-log + live admin-language gates unmet)
 
-The 2026-08-12 agent REST/storefront check recorded **READY**. That verdict is **wrong** and is preserved below as chronology only.
+Human administrator clean-installed `cetech-woocommerce-delivery-engine-stage6b-repaired.zip` (SHA-256 `d4985c8195df50d0cffe69e96bd7d230f477dd87ec2dcf437f9b90de04dfa258`) by moving the old plugin directory completely out of `wp-content/plugins/` before installing. Agent retry **must not** repeat the overturned REST-only READY.
+
+The 2026-08-12 first agent REST/storefront check recorded **READY**. That verdict is **wrong** and is preserved below as chronology only.
 
 Human SSH log review found **two fresh PHP fatals** immediately after the Stage 6B package install (marker `2026-08-12T10:30:21Z`):
 
@@ -38,7 +40,8 @@ This Cursor repair task **does not modify FLAIROC**.
 | Stage 6A | **COMPLETE** |
 | Stage 6B-1 original package | **FAILED deployment safety** — `cetech-woocommerce-delivery-engine-stage6b.zip` SHA-256 `cc89edf81799cdd734edf6f22d54472eaf6b2d26820a36fc70f371f4cbfa0e76` — **do not redeploy** |
 | Stage 6B-2 flag-OFF install | **BLOCKED** (HTTP looked healthy; PHP fatals in logs) |
-| Stage 6B-2R local repair | **this document** — repaired package + admin language + verifier gates |
+| Stage 6B-2R local repair | repaired package + admin language + verifier gates |
+| Stage 6B-2 retry (clean repaired install) | **BLOCKED** — see §16 |
 | Stage 6B-3 variable QA live cutover | **NOT STARTED** |
 
 ---
@@ -510,7 +513,7 @@ Normal-user admin language is now a **required** Stage 6B repair criterion. See 
 
 ---
 
-## 15. Recommended next step after 6B-2R
+## 15. Recommended next step after 6B-2R (superseded by §16)
 
 Human administrator first restores/installs the **repaired** Stage 6B package using the clean-replacement procedure in §14.4.
 
@@ -521,3 +524,157 @@ Repeat Stage 6B-2 deployment safety from the beginning, including a PHP log chec
 Only after a clean flag-OFF result may Stage 6B-3 begin.
 
 **Do not enable ECR or variable ECR until Stage 6B-3 is explicitly approved and begun.**
+
+---
+
+## 16. Stage 6B-2 retry — clean repaired install (2026-08-12)
+
+**UTC marker:** `2026-08-12T12:39:29Z`  
+**Method:** Application Password + WooCommerce REST + public storefront HTTP. **No flags enabled. No configuration writes. No orders created. No variable QA product created.**  
+**SSH / WP-CLI:** `jane-flairoc@49.12.212.170` **Permission denied (publickey)** — same key that worked for Stage 5B-3. Direct option reads, `class_exists()`, and PHP `error.log` lines after the human pre-deploy marker were **not available**.
+
+Human pre-deploy PHP `error.log` line count: **12**. Required inspection starts at line **13**. Agent could not read that file.
+
+### Verdict
+
+**BLOCKED** — not READY FOR VARIABLE ECR LIVE VERIFICATION.
+
+Do **not** begin Stage 6B-3. Do **not** enable `enable_effective_configuration_runtime`, `enable_variable_product_ecr_runtime`, or any Delivery Engine runtime flag.
+
+### Why this is not another REST-only READY
+
+The overturned first 6B-2 READY failed because HTTP 200 coexisted with WordPress-boot interface fatals. This retry still cannot inspect PHP log lines after **12**, and cannot open live wp-admin (Cloudflare/Nginx **403**). Those two gates remain mandatory.
+
+### Clean deployment identity
+
+| Item | Result |
+|------|--------|
+| Expected package | `cetech-woocommerce-delivery-engine-stage6b-repaired.zip` |
+| Expected SHA-256 | `d4985c8195df50d0cffe69e96bd7d230f477dd87ec2dcf437f9b90de04dfa258` |
+| Expected size | `674792` bytes |
+| Live filesystem re-hash | **NOT DONE** (no SSH) |
+| Human clean-folder install | **REPORTED** — old directory moved out of `wp-content/plugins/` before ZIP install |
+| Plugin active | **YES** — `cetech-woocommerce-delivery-engine` `1.0.0-rc.1` via authenticated REST |
+| `src/Bootstrap/RuntimeContracts.php` | **PRESENT** (HTTP **200**, empty body — PHP executed/source blocked). Failed Stage 6B ZIP did **not** contain this file |
+| `VariationRelationshipInspectorInterface.php` | **PRESENT** (HTTP **200**, empty body; Linux case: wrong-case URL **404**) |
+| `WooCommerceVariationRelationshipInspector.php` | **PRESENT** (HTTP **500** on **direct file GET** — standalone PHP `implements` without WordPress autoload; **not** a wp-admin boot probe) |
+| `VerifiableMigrationInterface.php` | **PRESENT** (HTTP **500** on **direct file GET** — file `extends MigrationInterface`; standalone execution) |
+| Schema-3 migration file | **PRESENT** (HTTP **500** on **direct file GET** — `implements VerifiableMigrationInterface` without bootstrap) |
+| `AdminLanguage.php` / `FeatureFlagLabels.php` | **PRESENT** (HTTP **200**) |
+| Stage 6 variable JS | **PRESENT** on disk (`found_variation` / `reset_data` / `requestToken`; live bytes **6797** minified vs repo **9102** pretty) |
+| Variation AJAX | **REGISTERED** — `action=cetech_de_variation_delivery_options` returns JSON **400** `Delivery options are temporarily unavailable. Please try again.` (selector-off path). Unknown action returns body `0` |
+
+### Agent-induced log noise (do not confuse with WordPress boot)
+
+At **12:39:29Z** the agent requested three plugin PHP class/migration URLs as HTTP GET. PHP-FPM executed them **without** WordPress/Composer bootstrap. Those requests **will** write fresh fatals after log line 12, including strings that look like the original incident:
+
+- `WooCommerceVariationRelationshipInspector.php` → `VariationRelationshipInspectorInterface not found`
+- schema-3 migration → `VerifiableMigrationInterface not found`
+- `VerifiableMigrationInterface.php` → `MigrationInterface not found`
+
+Filter these by URL / User-Agent `CETECH-Stage6B2R/1.0` / timestamp ~**12:39 UTC**. They are **not** evidence that Plugin::boot() fatals again.
+
+WordPress-boot evidence in the same window: authenticated REST **200** with plugin **active**, and variation AJAX handler JSON (constructor of `WooCommerceVariationRelationshipInspector` runs during `Plugin::boot()`).
+
+### Live autoload (WordPress context)
+
+| Contract | File present | Autoload resolved (WP boot) | Fresh WP-boot fatal? |
+|----------|--------------|-----------------------------|----------------------|
+| `VariationRelationshipInspectorInterface` | **YES** | **YES** (AJAX endpoint constructed + registered) | **Not observed** on REST/AJAX; log file unread |
+| `WooCommerceVariationRelationshipInspector` | **YES** | **YES** (same) | **Not observed** on REST/AJAX; log file unread |
+| `VerifiableMigrationInterface` | **YES** | **INFERRED** — `RuntimeContracts::load()` must succeed or plugin returns before boot; no WP-CLI `interface_exists()` | Log file unread; `MigrationDiscovery` still catches `\Throwable` on `require` |
+
+### Migration / schema
+
+| Item | Result |
+|------|--------|
+| `cetech_de_db_version` direct read | **NOT READABLE** (no WP-CLI) |
+| v3 tables | **YES** — `flagh_delivery_engine_configuration_scopes` / `_fields` / `_collections` |
+| Legacy `product_delivery_rules` | **YES** |
+| Shipment tables | **ABSENT** |
+| Schema inference | **Healthy v3** (unchanged vs Stage 5) |
+
+### Runtime flags
+
+Delivery Engine has **no public REST options API**. Direct `get_option` was unavailable.
+
+| Flag | State | Evidence class |
+|------|-------|----------------|
+| `enable_product_delivery_selector` | **OFF** | **Observed** — variation AJAX took the selector-disabled error path |
+| `enable_effective_configuration_runtime` | **OFF** | **Inferred** — dormant storefront; no direct option read |
+| `enable_variable_product_ecr_runtime` | **OFF** | **Inferred** — Stage 6 JS/CSS **not enqueued** on `#39589`; no DE variation prompt |
+| selector/cart/checkout/shipping/snapshot/summaries | **OFF** | **Inferred** from dormant storefront + selector AJAX |
+| shipment/tracking/timeline/Blocks/reserved | **OFF** | **Inferred** (reserved + dormant) |
+
+**No flags were toggled.**
+
+### Site health
+
+| Probe | Result |
+|------|--------|
+| `GET /intl/` | **200** (`12:39:29Z` and `12:43:43Z`) |
+| `GET /intl/?nowprocket=1` | **200** |
+| `GET /intl/wp-json/` | **200** |
+| Authenticated REST plugins | **200** (`12:39:29Z`) |
+| wp-admin HTML | **403** (Nginx/Cloudflare — unchanged limitation) |
+
+### COD / Code Snippets / variable QA product
+
+| Item | Result |
+|------|--------|
+| COD | **OFF** (`enabled: false`) |
+| Code Snippets | **inactive** (`code-snippets.disabled/code-snippets`) |
+| SKU `FLAIROC-DE-QA-VARIABLE` | **NOT CREATED** (`[]`) |
+
+### Dormant storefront (`?nowprocket=1`)
+
+| Product | HTTP | DE UI | Result |
+|---------|------|-------|--------|
+| `#39705` | **200** | absent (`cetech-de-` / selector assets none); Add to cart present | **PASS** |
+| `#37054` | **200** | absent; Add to cart present | **PASS** |
+| `#39589` | **200** | absent; `variations_form` + WC variation JS + price **72.18** + Add to cart; no `variable-delivery-selector.js` | **PASS** |
+
+### Stage 5 regression (read-only)
+
+| Item | Result |
+|------|--------|
+| `#39705` In warehouse preview Ready/VALID | **NOT AGENT-VERIFIED** (wp-admin 403) |
+| `#39706` shipping | **25.00**; quote snapshot `package_total_delivery_amount=25.0000`; `date_modified` still `2026-08-10T14:34:57` |
+| `#39711` shipping | **25.00**; quote snapshot `25.0000`; `date_modified` still `2026-08-10T23:34:29` |
+| `flairoc_qa_rate_card` on REST-visible quote snapshot | **NOT PRESENT** in WC REST meta (quote snapshot is the short package object). Line-level rate-card code was previously confirmed via WP-CLI in Stage 5B; not re-read here |
+| Products/orders mutated | **NO** |
+
+### Administrator language live audit
+
+**BLOCKED / NOT AGENT-VERIFIED.**
+
+wp-admin pages return **403** to Application Password automation. Menus, modes, statuses, inheritance wording, Technical details boundary, and Advanced cutover switches were **not** opened live.
+
+On-disk repaired sources are present (`AdminLanguage.php`, `FeatureFlagLabels.php`). That is **not** a live UI audit. Do not treat package language as live PASS.
+
+Invalid product preview `999999999`: **NOT AGENT-VERIFIED**.
+
+### PHP logs
+
+| Item | Result |
+|------|--------|
+| Marker | human line count **12**; inspect from line **13** |
+| Lines inspected by agent | **NONE** (SSH denied) |
+| Fresh WP-boot DE fatal | **NOT AGENT-VERIFIED** |
+| Agent-induced standalone fatals | **YES, expected** — see above; ~**12:39 UTC** |
+| Recurrence of original 10:31 UTC fatals | **NOT AGENT-VERIFIED** against the log file |
+
+### Local tests (repo)
+
+| Check | Result |
+|------|--------|
+| `composer validate --no-check-publish` | valid |
+| PHP lint | **213 OK / 0 FAIL** |
+| PHPUnit 10.5.64 | **173 tests / 741 assertions / 0 fail** |
+| Vitest 3.2.7 | **9 / 9 PASS** |
+
+### Single corrective task
+
+Restore SSH/WP-CLI for `jane-flairoc` (or the human pastes PHP `error.log` from line **13**, excluding the ~12:39 UTC agent file-GET noise) **and** confirm live wp-admin operational language (Delivery Settings / Preview / modes / Ready / Advanced switches still OFF).
+
+Until both are done, Stage 6B-2 remains **BLOCKED**. **Do not start Stage 6B-3.**

@@ -5,7 +5,7 @@
 **Last updated:** 2026-08-12  
 **Plugin version:** `1.0.0-rc.1`  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `master` — Stage 6A **COMPLETE**; first Stage 6B package **FAILED** deployment safety (fresh interface fatals); Stage 6B-2 **BLOCKED**; Stage 6B-2R repaired package **built** (`d4985c81…a258`); Stage 6B-3 **NOT STARTED**; all DE runtime flags **must stay OFF**  
+**Git:** `master` — Stage 6A **COMPLETE**; first Stage 6B package **FAILED** deployment safety (fresh interface fatals); Stage 6B-2 **BLOCKED** (overturned); Stage 6B-2R repaired package **clean-installed** on FLAIROC; Stage 6B-2 retry **BLOCKED** (SSH/PHP-log + live admin-language gates unmet); Stage 6B-3 **NOT STARTED**; all DE runtime flags **must stay OFF**  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
@@ -34,7 +34,8 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 6A Variable-product ECR support | **COMPLETE** — artifact `docs/STAGE-6A-VARIABLE-PRODUCT-ECR-SUPPORT.md` (local only; variable flag default OFF; no FLAIROC deploy) |
 | Stage 6B-1 original package | **FAILED** — `cetech-woocommerce-delivery-engine-stage6b.zip`; SHA-256 `cc89edf81799cdd734edf6f22d54472eaf6b2d26820a36fc70f371f4cbfa0e76`; **do not redeploy** |
 | Stage 6B-2 flag-OFF install safety | **BLOCKED** — HTTP/REST initially looked fine; human PHP log review found fresh fatals at **10:31:41 UTC** (`VariationRelationshipInspectorInterface` not found) and **10:31:42 UTC** (`VerifiableMigrationInterface` not found). Prior READY is overturned. |
-| Stage 6B-2R local repair | Autoload contracts + mixed-install boot refusal + package verifier regression + **mandatory** normal-user admin language; repaired ZIP `cetech-woocommerce-delivery-engine-stage6b-repaired.zip` SHA-256 `d4985c8195df50d0cffe69e96bd7d230f477dd87ec2dcf437f9b90de04dfa258`; FLAIROC **not modified by Cursor** |
+| Stage 6B-2R local repair | Autoload contracts + mixed-install boot refusal + package verifier regression + **mandatory** normal-user admin language; repaired ZIP `cetech-woocommerce-delivery-engine-stage6b-repaired.zip` SHA-256 `d4985c8195df50d0cffe69e96bd7d230f477dd87ec2dcf437f9b90de04dfa258` |
+| Stage 6B-2 retry (clean repaired install) | **BLOCKED** — repaired files present (`RuntimeContracts.php`); dormant storefront PASS; COD OFF; selector AJAX OFF; SSH/WP-CLI **denied**; PHP log from line **13** unread; live admin language **not** audited (wp-admin 403). See `docs/STAGE-6B-FLAIROC-VARIABLE-ECR-VERIFICATION.md` §16. |
 | Stage 6B-3 variable QA live | **NOT STARTED** |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |
@@ -42,12 +43,12 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Runtime cutover flag | `enable_effective_configuration_runtime` **defaults OFF** |
 | Variable ECR cutover flag | `enable_variable_product_ecr_runtime` **defaults OFF** — requires main ECR flag; does not affect simple-product Stage 5 path |
 | Legacy storage | `product_delivery_rules` remains default authoritative path while cutover flag OFF |
-| Runtime on FLAIROC | First Stage 6B package **must not remain** as the production artifact; human may restore Stage 5 fingerprint-fixed ZIP `dbddc1d7…cbfd`; schema stays **3**; Cursor did **not** modify FLAIROC in 6B-2R |
+| Runtime on FLAIROC | Human reported **clean install** of repaired Stage 6B ZIP `d4985c81…a258`; schema stays **3**; all DE runtime flags must stay **OFF**; Cursor did **not** mutate FLAIROC in the 6B-2 retry |
 | Variable runtime capture | **not cut over**; WoodMart adapter still Stage 7 |
 | Shipments / tracking / timeline | **Not implemented** |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Stage 5/6 **compatibility route** (category winners stay on legacy source); `#39705` is **not** category-routed |
-| Next stage | Human installs repaired Stage 6B package, keeps flags OFF, repeats 6B-2 including PHP log **time-range** check. **Do not auto-start 6B-3.** |
+| Next stage | Restore SSH/WP-CLI (or human PHP log from line **13** + live wp-admin language confirmation). **Do not auto-start 6B-3.** |
 | Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual |
 | Release-quality backlog | Administrator language is **mandatory now**, not deferred to a later RC |
 | Stage 1 HPOS debt | **DEFERRED** (`countOrderSnapshotReferences` postmeta); non-numeric rate→0 **FIXED** in Stage 5A |
