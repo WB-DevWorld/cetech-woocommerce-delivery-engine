@@ -5,7 +5,7 @@
 **Last updated:** 2026-08-12  
 **Plugin version:** `1.0.0-rc.1`  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `master` — Stage 6A **COMPLETE**; first Stage 6B package **FAILED** deployment safety (fresh interface fatals); Stage 6B-2 **BLOCKED**; Stage 6B-2R local repair in progress; Stage 6B-3 **NOT STARTED**; all DE runtime flags **must stay OFF**  
+**Git:** `master` — Stage 6A **COMPLETE**; first Stage 6B package **FAILED** deployment safety (fresh interface fatals); Stage 6B-2 **BLOCKED**; Stage 6B-2R repaired package **built** (`d4985c81…a258`); Stage 6B-3 **NOT STARTED**; all DE runtime flags **must stay OFF**  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
@@ -34,7 +34,7 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 6A Variable-product ECR support | **COMPLETE** — artifact `docs/STAGE-6A-VARIABLE-PRODUCT-ECR-SUPPORT.md` (local only; variable flag default OFF; no FLAIROC deploy) |
 | Stage 6B-1 original package | **FAILED** — `cetech-woocommerce-delivery-engine-stage6b.zip`; SHA-256 `cc89edf81799cdd734edf6f22d54472eaf6b2d26820a36fc70f371f4cbfa0e76`; **do not redeploy** |
 | Stage 6B-2 flag-OFF install safety | **BLOCKED** — HTTP/REST initially looked fine; human PHP log review found fresh fatals at **10:31:41 UTC** (`VariationRelationshipInspectorInterface` not found) and **10:31:42 UTC** (`VerifiableMigrationInterface` not found). Prior READY is overturned. |
-| Stage 6B-2R local repair | Autoload contracts + mixed-install boot refusal + package verifier regression + **mandatory** normal-user admin language; FLAIROC **not modified by Cursor** |
+| Stage 6B-2R local repair | Autoload contracts + mixed-install boot refusal + package verifier regression + **mandatory** normal-user admin language; repaired ZIP `cetech-woocommerce-delivery-engine-stage6b-repaired.zip` SHA-256 `d4985c8195df50d0cffe69e96bd7d230f477dd87ec2dcf437f9b90de04dfa258`; FLAIROC **not modified by Cursor** |
 | Stage 6B-3 variable QA live | **NOT STARTED** |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |

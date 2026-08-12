@@ -486,9 +486,23 @@ If WordPress “replace plugin” can leave mixed files:
 
 ### 14.6 Repaired artifact
 
-Recorded after the local 6B-2R package build (see closing package identity in the Stage 6B-2R report / this section after SHA-256 is known).
+| Item | Value |
+|------|--------|
+| Filename | `cetech-woocommerce-delivery-engine-stage6b-repaired.zip` |
+| Full path | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-stage6b-repaired.zip` |
+| Bytes | `674792` |
+| SHA-256 | `d4985c8195df50d0cffe69e96bd7d230f477dd87ec2dcf437f9b90de04dfa258` |
+| Checksum sidecar | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-stage6b-repaired.zip.sha256` |
+| Dist mirror | `dist/cetech-woocommerce-delivery-engine-v1.0.0-rc.1.zip` |
+| Runtime repair commit | `31cb5e3` (`fix: repair Stage 6 production autoload safety`) |
+| Verifier case-gate commit | `360c640` |
+| UX-language commit | `37cb894` (`feat: simplify Delivery Engine administrator language`) |
+| Docs commit | `aeb77d0` |
+| ZIP root | exactly `cetech-woocommerce-delivery-engine/` |
+| Production vendor | yes (`composer install --no-dev --optimize-autoloader`) |
+| Differs from failed 6B ZIP `cc89edf8…0e76` | **YES** |
 
-Target filename: `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-stage6b-repaired.zip`
+Extracted-package verifier: **PASS** (both interfaces, inspector instance, schema-3 migration `require`, Linux-case classmap, flags default OFF).
 
 ### 14.7 Administrator language
 
