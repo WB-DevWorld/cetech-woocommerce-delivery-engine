@@ -2,10 +2,10 @@
 
 ## CURRENT IMPLEMENTATION STATUS — V1 RC (read first)
 
-**Last updated:** 2026-08-11  
+**Last updated:** 2026-08-12  
 **Plugin version:** `1.0.0-rc.1`  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `master` — Stages 0B–6A **COMPLETE**; Stage 6B-1 package **READY** (SHA-256 `cc89edf8…0e76`); Stage 5B-3R-2 **VERIFIED** (ECR QA order `#39711`, shipping 25.00); FLAIROC **untouched** by Stage 6B-1; all DE runtime flags remain **OFF**  
+**Git:** `master` — Stage 6B-2 flag-OFF FLAIROC install **PASS**; Stage 6B-3 variable QA **NOT STARTED**; all DE runtime flags **OFF** (effective/dormant); COD **OFF**  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
@@ -32,26 +32,26 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 5B-3R-2 ECR live parity retry | **VERIFIED** — fingerprint session MATCH; checkout valid; shipping **25.00**; ECR QA order **`#39711`**; snapshots PASS; flags/COD restored OFF; dormant PASS |
 | Stage 5 overall | **COMPLETE** |
 | Stage 6A Variable-product ECR support | **COMPLETE** — artifact `docs/STAGE-6A-VARIABLE-PRODUCT-ECR-SUPPORT.md` (local only; variable flag default OFF; no FLAIROC deploy) |
-| Stage 6B-1 package | **READY FOR FLAIROC DEPLOYMENT** — `cetech-woocommerce-delivery-engine-stage6b.zip`; SHA-256 `cc89edf81799cdd734edf6f22d54472eaf6b2d26820a36fc70f371f4cbfa0e76`; build `cdc4289`; includes Stage 6A `b6b86e4`; FLAIROC **NOT MODIFIED** |
-| Stage 6B-2 flag-OFF install safety | **NOT STARTED** — human install only; keep all runtime flags OFF |
-| Stage 6B-3 variable QA live | **NOT STARTED** — gated on 6B-2; dedicated hidden QA product plan in `docs/STAGE-6B-FLAIROC-VARIABLE-ECR-VERIFICATION.md` |
+| Stage 6B-1 package | **READY** — `cetech-woocommerce-delivery-engine-stage6b.zip`; SHA-256 `cc89edf81799cdd734edf6f22d54472eaf6b2d26820a36fc70f371f4cbfa0e76`; build `cdc4289`; includes Stage 6A `b6b86e4` |
+| Stage 6B-2 flag-OFF install safety | **PASS** — human installed Stage 6B package; agent REST/storefront verification **PASS** (2026-08-12); dormant storefront PASS; COD OFF; `#39589` non-regression PASS; variable QA product **NOT CREATED** |
+| Stage 6B-3 variable QA live | **NOT STARTED** — gated; human admin DE smoke + `#39705` preview VALID + PHP log review recommended before enablement |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |
 | New admin UX | Global/Product/Variation scoped editors + effective preview; pre-cutover notice |
 | Runtime cutover flag | `enable_effective_configuration_runtime` **defaults OFF** — FLAIROC currently OFF after Stage 5B-3R-2 |
 | Variable ECR cutover flag | `enable_variable_product_ecr_runtime` **defaults OFF** — requires main ECR flag; does not affect simple-product Stage 5 path |
 | Legacy storage | `product_delivery_rules` remains default authoritative path while cutover flag OFF |
-| Runtime on FLAIROC | Fingerprint-fixed Stage 5 DE still the live package until human Stage 6B-2 install; all runtime flags OFF; ECR OFF; COD OFF; dormant storefront PASS; ECR simple-product parity **proven** (order `#39711` / 25.00) |
-| Variable runtime capture | **Implemented locally (Stage 6A)**; Stage 6B package ready; FLAIROC not cut over; WoodMart adapter still Stage 7 |
+| Runtime on FLAIROC | Stage 6B package **installed**; DE active `1.0.0-rc.1`; all runtime flags **OFF** (effective); ECR OFF; variable ECR OFF; COD OFF; dormant storefront **PASS**; ECR simple-product parity historically **proven** (order `#39711` / 25.00) |
+| Variable runtime capture | Stage 6 package on FLAIROC; **not cut over**; WoodMart adapter still Stage 7 |
 | Shipments / tracking / timeline | **Not implemented** |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Stage 5/6 **compatibility route** (category winners stay on legacy source); `#39705` is **not** category-routed |
-| Next stage | Stage 6B-2 — Human flag-OFF install of Stage 6B ZIP (**do not auto-start**; do not enable ECR yet) |
+| Next stage | Stage 6B-3 — Create dedicated variable QA product + controlled live variable ECR verification (**do not auto-start**; human admin/log gates first) |
 | Deferred ops notes | Redis namespace hygiene; disabled Code Snippets residual |
 | Release-quality backlog | **Admin terminology simplification required before next RC** (Stage 4 still shows technical labels such as Effective Configuration Preview / Stage 3 / Unresolved) |
 | Stage 1 HPOS debt | **DEFERRED** (`countOrderSnapshotReferences` postmeta); non-numeric rate→0 **FIXED** in Stage 5A |
 
-Do **not** begin Stage 6B-2/6B-3 or Stage 7 unless explicitly tasked. Stage 6B-1 package is ready; FLAIROC remains untouched. Keep FLAIROC Delivery Engine runtime flags **OFF** (dormant) unless a controlled Stage 6B-3 enablement plan is approved after 6B-2 PASS.
+Do **not** begin Stage 6B-3 or Stage 7 unless explicitly tasked. Stage 6B-2 flag-OFF deployment safety **PASS**. Keep all FLAIROC Delivery Engine runtime flags **OFF** until Stage 6B-3 enablement is explicitly approved.
 
 
 
@@ -170,7 +170,9 @@ Stage 6A variable cutover flag (default **off**): `enable_variable_product_ecr_r
 5. ~~Stage 4: Admin inheritance UX + effective configuration preview~~ — **DONE**
 6. ~~Stage 5A/5B: Simple-product ECR runtime + FLAIROC verification~~ — **DONE**
 7. ~~Stage 6A: Variable-product ECR support (local; flags OFF)~~ — **DONE**
-8. Stage 6B-1 package — **READY** (`docs/STAGE-6B-FLAIROC-VARIABLE-ECR-VERIFICATION.md`); next: human 6B-2 flag-OFF install → 6B-3 variable QA → WoodMart adapter → packages → shipments → integrations/Blocks → quality RC
+8. ~~Stage 6B-1 package~~ — **READY**
+9. ~~Stage 6B-2 flag-OFF FLAIROC install safety~~ — **PASS**
+10. Stage 6B-3 variable QA live verification → WoodMart adapter → packages → shipments → integrations/Blocks → quality RC
 9. Do not skip foundations to reach shipments early
 
 ### Agent orientation
