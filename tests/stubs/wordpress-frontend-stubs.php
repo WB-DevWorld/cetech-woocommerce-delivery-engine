@@ -1,0 +1,63 @@
+<?php
+
+declare(strict_types=1);
+
+/**
+ * WordPress frontend stubs for VariableDeliverySelectorAssets unit tests.
+ */
+
+if ( ! function_exists( 'is_product' ) ) {
+	function is_product(): bool {
+		return (bool) ( $GLOBALS['cetech_de_test_is_product'] ?? false );
+	}
+}
+
+if ( ! function_exists( 'get_the_ID' ) ) {
+	function get_the_ID(): int {
+		return (int) ( $GLOBALS['cetech_de_test_the_id'] ?? 0 );
+	}
+}
+
+if ( ! function_exists( 'wp_enqueue_script' ) ) {
+	/**
+	 * @param mixed $deps
+	 */
+	function wp_enqueue_script( string $handle, string $src = '', $deps = [], $ver = false, $args = false ): void {
+		$GLOBALS['cetech_de_test_enqueued_scripts'][] = $handle;
+	}
+}
+
+if ( ! function_exists( 'wp_enqueue_style' ) ) {
+	/**
+	 * @param mixed $deps
+	 */
+	function wp_enqueue_style( string $handle, string $src = '', $deps = [], $ver = false, $media = 'all' ): void {
+		$GLOBALS['cetech_de_test_enqueued_styles'][] = $handle;
+	}
+}
+
+if ( ! function_exists( 'wp_localize_script' ) ) {
+	/**
+	 * @param mixed $data
+	 */
+	function wp_localize_script( string $handle, string $object_name, $data ): bool {
+		return true;
+	}
+}
+
+if ( ! function_exists( 'admin_url' ) ) {
+	function admin_url( string $path = '' ): string {
+		return 'https://example.test/wp-admin/' . ltrim( $path, '/' );
+	}
+}
+
+if ( ! function_exists( 'wp_create_nonce' ) ) {
+	function wp_create_nonce( string $action ): string {
+		return 'test-nonce-' . $action;
+	}
+}
+
+if ( ! class_exists( 'WooCommerce', false ) ) {
+	class WooCommerce {
+	}
+}

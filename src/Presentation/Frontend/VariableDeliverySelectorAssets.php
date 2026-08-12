@@ -13,7 +13,8 @@ use WC_Product;
 /**
  * Conditionally enqueues Stage 6 variable-product delivery selector assets.
  *
- * Loaded only on variable product pages when selector + ECR + variable ECR flags are on.
+ * Loaded only on variable product pages when selector + main ECR + variable ECR flags are on.
+ * Does not require cart capture, checkout, shipping, or snapshot flags.
  */
 final class VariableDeliverySelectorAssets {
 
@@ -83,10 +84,6 @@ final class VariableDeliverySelectorAssets {
 		}
 
 		if ( ! $this->feature_flags->is_enabled( 'enable_product_delivery_selector' ) ) {
-			return false;
-		}
-
-		if ( ! $this->feature_flags->is_enabled( 'enable_cart_delivery_selection_capture' ) ) {
 			return false;
 		}
 

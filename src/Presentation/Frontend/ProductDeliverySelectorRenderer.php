@@ -109,7 +109,7 @@ final class ProductDeliverySelectorRenderer {
 		}
 
 		if ( $product->is_type( 'variable' ) ) {
-			if ( $interactive && $this->is_variable_ecr_enabled() ) {
+			if ( $this->is_variable_ecr_enabled() ) {
 				$this->render_variable_shell();
 
 				return;
