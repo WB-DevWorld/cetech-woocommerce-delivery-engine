@@ -221,8 +221,8 @@ Package artifact (not committed):
 
 - filename: `cetech-woocommerce-delivery-engine-stage8a-qa.zip`  
 - path: `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-stage8a-qa.zip`  
-- bytes: `701153`  
-- SHA-256: `f89d4aecb8aba663c9e68294debfb7741624cb84f3385cecb86469e4fcc82275`  
+- bytes: `701402`  
+- SHA-256: `daaa558207847d92594cab0cb7bb8cb25b993c792c10f521ca25668e021f2c52`  
 - ZIP root: `cetech-woocommerce-delivery-engine/`  
 
 ---

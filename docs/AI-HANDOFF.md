@@ -40,7 +40,7 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 6B-3 / 6B-3R variable QA live | **FUNCTIONALLY COMPLETE** — QA `#39717` / A `#39718` / B `#39719`; shipping **25.00**; order **`#39721`**; WoodMart **PASS** (no Stage 7 adapter required); flags/COD restored **OFF** |
 | Stage 6C presentation cleanup | **DONE locally** — `331a856`; distinct customer labels; hide `_cetech_de_*` item meta; simplify order admin to **Delivery information**; carry into next release package |
 | Stage 7 WoodMart adapter | **COMPLETE — NO WOODMART ADAPTER REQUIRED** — Stage 6 variable QA used WoodMart’s normal variation lifecycle; do not create empty adapter code |
-| Stage 8A multi-product shipping grouping | **READY FOR STAGE 8 LIVE QA** — commit `5f04147`; artifact `docs/STAGE-8A-MULTI-PRODUCT-SHIPPING-GROUPING.md`; QA ZIP `cetech-woocommerce-delivery-engine-stage8a-qa.zip` SHA-256 `f89d4aec…2275`; FLAIROC not modified |
+| Stage 8A multi-product shipping grouping | **READY FOR STAGE 8 LIVE QA** — commit `5f04147` (+ docs `ff7ca68`); artifact `docs/STAGE-8A-MULTI-PRODUCT-SHIPPING-GROUPING.md`; QA ZIP `cetech-woocommerce-delivery-engine-stage8a-qa.zip` SHA-256 `daaa5582…2c52`; FLAIROC not modified |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |
 | New admin UX | Default / Product-Specific / Variation-Specific delivery settings + preview; operational language required (`docs/ADMIN-UI-LANGUAGE-GUIDE.md`) |
