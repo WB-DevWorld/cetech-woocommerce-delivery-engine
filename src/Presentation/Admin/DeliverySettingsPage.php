@@ -201,9 +201,13 @@ final class DeliverySettingsPage {
 			$delete,
 			__( 'When enabled, removing the plugin from WordPress will also remove Delivery Engine configuration tables and settings. Leave off unless you want a full clean uninstall.', 'cetech-woocommerce-delivery-engine' )
 		);
-		echo '<tr><th scope="row"></th><td><p class="description cetech-de-setting-code">' . esc_html(
+		echo '<tr><th scope="row"></th><td>';
+		AdminPageLayout::open_technical_details();
+		echo '<p class="description cetech-de-setting-code">' . esc_html(
 			Uninstaller::DELETE_DATA_OPTION
-		) . '</p></td></tr>';
+		) . '</p>';
+		AdminPageLayout::close_technical_details();
+		echo '</td></tr>';
 		AdminPageLayout::close_form_panel();
 		AdminPageLayout::close_advanced();
 
@@ -401,7 +405,7 @@ final class DeliverySettingsPage {
 		return [
 			[
 				'flag'        => 'enable_product_delivery_selector',
-				'label'       => __( 'Show delivery options on product pages', 'cetech-woocommerce-delivery-engine' ),
+				'label'       => __( 'Show delivery choices on product pages', 'cetech-woocommerce-delivery-engine' ),
 				'description' => __( 'Lets shoppers choose a delivery service when adding a product to the cart.', 'cetech-woocommerce-delivery-engine' ),
 			],
 			[

@@ -178,7 +178,7 @@ final class SystemStatusPage {
 			[
 				__( 'Product rule resolver registered', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( class_exists( ProductDeliveryRuleResolver::class ) ),
 				__( 'Resolver contract version', 'cetech-woocommerce-delivery-engine' ) => ProductRuleResolutionResult::CONTRACT_VERSION,
-				__( 'Legacy rules admin test location', 'cetech-woocommerce-delivery-engine' ) => __( 'Delivery Engine → Legacy Delivery Rules → Test product rule resolution', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Legacy rules admin check location', 'cetech-woocommerce-delivery-engine' ) => __( 'Delivery Engine → Legacy Delivery Rules → Technical diagnostic tools → Check which legacy delivery rule applies', 'cetech-woocommerce-delivery-engine' ),
 				__( 'Product delivery selector flag', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( $selector_enabled ),
 				__( 'Cart delivery selection capture flag', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( $capture_enabled ),
 				__( 'Product delivery selector renderer', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( class_exists( ProductDeliverySelectorRenderer::class ) ),
@@ -206,7 +206,7 @@ final class SystemStatusPage {
 					: __( 'Not enabled', 'cetech-woocommerce-delivery-engine' ),
 				__( 'Rate quote engine registered', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( class_exists( RateQuoteEngine::class ) ),
 				__( 'Rate quote mode', 'cetech-woocommerce-delivery-engine' ) => $this->describe_rate_quote_mode( $shipping_runtime_active ),
-				__( 'Rate quote admin test location', 'cetech-woocommerce-delivery-engine' ) => __( 'Delivery Engine → Rate Cards → Test rate quote engine', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Rate quote admin check location', 'cetech-woocommerce-delivery-engine' ) => __( 'Delivery Engine → Rate Cards → Technical diagnostic tools → Check a delivery price', 'cetech-woocommerce-delivery-engine' ),
 				__( 'WooCommerce selected-offer shipping flag', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( $shipping_calculation_enabled ),
 				__( 'Selected-offer shipping method registered', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( $shipping_runtime_active && class_exists( SelectedOfferShippingMethod::class ) ),
 				__( 'Shipping method ID', 'cetech-woocommerce-delivery-engine' ) => SelectedOfferShippingMethod::METHOD_ID,

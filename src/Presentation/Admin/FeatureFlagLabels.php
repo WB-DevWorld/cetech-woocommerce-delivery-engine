@@ -15,7 +15,7 @@ final class FeatureFlagLabels {
 	public static function describe( string $flag ): array {
 		return match ( $flag ) {
 			'enable_product_delivery_selector' => [
-				'label'       => 'Show delivery choices on the product page',
+				'label'       => 'Show delivery choices on product pages',
 				'description' => 'Lets shoppers pick a delivery option before adding a product to the cart.',
 			],
 			'enable_cart_delivery_selection_capture' => [

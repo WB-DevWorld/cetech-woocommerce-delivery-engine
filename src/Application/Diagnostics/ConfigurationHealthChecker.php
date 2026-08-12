@@ -43,6 +43,7 @@ use CetechDeliveryEngine\Domain\Zone\DestinationRuleRepositoryInterface;
 use CetechDeliveryEngine\Domain\Zone\DestinationZoneRepositoryInterface;
 use CetechDeliveryEngine\Infrastructure\Persistence\ConfigurationTables;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbProductDeliveryRuleRepository;
+use CetechDeliveryEngine\Presentation\Admin\FeatureFlagLabels;
 use CetechDeliveryEngine\Presentation\Admin\ProductTargetResolver;
 
 /**
@@ -1173,8 +1174,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'selector_enabled_options_builder_missing',
-				__( 'Product selector: options builder missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'The product delivery selector is enabled but ProductDeliveryOptionsBuilder is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( 'enable_product_delivery_selector' ),
+				$this->setting_missing_component_message( 'enable_product_delivery_selector' ),
 				'feature_flag'
 			);
 		}
@@ -1184,8 +1185,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'selector_enabled_selection_validator_missing',
-				__( 'Product selector: selection validator missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'The product delivery selector is enabled but ProductDeliverySelectionValidator is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( 'enable_product_delivery_selector' ),
+				$this->setting_missing_component_message( 'enable_product_delivery_selector' ),
 				'feature_flag'
 			);
 		}
@@ -1322,8 +1323,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'cart_capture_enabled_selector_disabled',
-				__( 'Cart capture enabled without product selector', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Cart delivery selection capture is enabled but enable_product_delivery_selector is disabled.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_requires_other_title( 'enable_cart_delivery_selection_capture', 'enable_product_delivery_selector' ),
+				$this->setting_requires_other_message( 'enable_cart_delivery_selection_capture', 'enable_product_delivery_selector' ),
 				'feature_flag'
 			);
 		}
@@ -1333,8 +1334,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'cart_capture_enabled_selection_validator_missing',
-				__( 'Cart capture: selection validator missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Cart delivery selection capture is enabled but ProductDeliverySelectionValidator is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( 'enable_cart_delivery_selection_capture' ),
+				$this->setting_missing_component_message( 'enable_cart_delivery_selection_capture' ),
 				'feature_flag'
 			);
 		}
@@ -1344,8 +1345,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'cart_capture_enabled_options_builder_missing',
-				__( 'Cart capture: options builder missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Cart delivery selection capture is enabled but ProductDeliveryOptionsBuilder is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( 'enable_cart_delivery_selection_capture' ),
+				$this->setting_missing_component_message( 'enable_cart_delivery_selection_capture' ),
 				'feature_flag'
 			);
 		}
@@ -1355,8 +1356,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'cart_capture_enabled_capture_service_missing',
-				__( 'Cart capture: capture service missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Cart delivery selection capture is enabled but CartDeliverySelectionCapture is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( 'enable_cart_delivery_selection_capture' ),
+				$this->setting_missing_component_message( 'enable_cart_delivery_selection_capture' ),
 				'feature_flag'
 			);
 		}
@@ -1366,8 +1367,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'cart_capture_enabled_revalidator_missing',
-				__( 'Cart capture: revalidator missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Cart delivery selection capture is enabled but CartDeliverySelectionRevalidator is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( 'enable_cart_delivery_selection_capture' ),
+				$this->setting_missing_component_message( 'enable_cart_delivery_selection_capture' ),
 				'feature_flag'
 			);
 		}
@@ -1399,8 +1400,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'checkout_validation_enabled_cart_capture_disabled',
-				__( 'Checkout validation enabled without cart capture', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Checkout delivery selection validation is enabled but enable_cart_delivery_selection_capture is disabled.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_requires_other_title( 'enable_checkout_delivery_selection_validation', 'enable_cart_delivery_selection_capture' ),
+				$this->setting_requires_other_message( 'enable_checkout_delivery_selection_validation', 'enable_cart_delivery_selection_capture' ),
 				'feature_flag'
 			);
 		}
@@ -1410,8 +1411,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'checkout_validation_enabled_selector_disabled',
-				__( 'Checkout validation enabled without product selector', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Checkout delivery selection validation is enabled but enable_product_delivery_selector is disabled.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_requires_other_title( 'enable_checkout_delivery_selection_validation', 'enable_product_delivery_selector' ),
+				$this->setting_requires_other_message( 'enable_checkout_delivery_selection_validation', 'enable_product_delivery_selector' ),
 				'feature_flag'
 			);
 		}
@@ -1421,8 +1422,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'checkout_validation_enabled_validator_missing',
-				__( 'Checkout validation: validator service missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Checkout delivery selection validation is enabled but CheckoutDeliverySelectionValidator is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( 'enable_checkout_delivery_selection_validation' ),
+				$this->setting_missing_component_message( 'enable_checkout_delivery_selection_validation' ),
 				'feature_flag'
 			);
 		}
@@ -1432,8 +1433,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'checkout_validation_enabled_revalidator_missing',
-				__( 'Checkout validation: cart revalidator missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Checkout delivery selection validation is enabled but CartDeliverySelectionRevalidator is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( 'enable_checkout_delivery_selection_validation' ),
+				$this->setting_missing_component_message( 'enable_checkout_delivery_selection_validation' ),
 				'feature_flag'
 			);
 		}
@@ -1470,8 +1471,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'rate_quote_engine_missing_with_capture_or_checkout',
-				__( 'Rate quote engine missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Cart capture or checkout validation is enabled but RateQuoteEngine is not available.', 'cetech-woocommerce-delivery-engine' ),
+				__( 'A required pricing component is missing', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Cart memory or checkout checking is turned on, but a required Delivery Engine component is missing from this installation. Contact CETECH support.', 'cetech-woocommerce-delivery-engine' ),
 				'feature_flag'
 			);
 		}
@@ -1528,8 +1529,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'shipping_calculation_enabled_selector_disabled',
-				__( 'Shipping calculation enabled without product selector', 'cetech-woocommerce-delivery-engine' ),
-				__( 'WooCommerce shipping rate calculation is enabled but enable_product_delivery_selector is disabled.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_requires_other_title( ShippingRateCalculationGate::SHIPPING_FLAG, 'enable_product_delivery_selector' ),
+				$this->setting_requires_other_message( ShippingRateCalculationGate::SHIPPING_FLAG, 'enable_product_delivery_selector' ),
 				'feature_flag'
 			);
 		}
@@ -1539,8 +1540,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'shipping_calculation_enabled_cart_capture_disabled',
-				__( 'Shipping calculation enabled without cart capture', 'cetech-woocommerce-delivery-engine' ),
-				__( 'WooCommerce shipping rate calculation is enabled but enable_cart_delivery_selection_capture is disabled.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_requires_other_title( ShippingRateCalculationGate::SHIPPING_FLAG, 'enable_cart_delivery_selection_capture' ),
+				$this->setting_requires_other_message( ShippingRateCalculationGate::SHIPPING_FLAG, 'enable_cart_delivery_selection_capture' ),
 				'feature_flag'
 			);
 		}
@@ -1550,8 +1551,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'shipping_calculation_enabled_checkout_validation_disabled',
-				__( 'Shipping calculation enabled without checkout validation', 'cetech-woocommerce-delivery-engine' ),
-				__( 'WooCommerce shipping rate calculation is enabled but enable_checkout_delivery_selection_validation is disabled.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_requires_other_title( ShippingRateCalculationGate::SHIPPING_FLAG, 'enable_checkout_delivery_selection_validation' ),
+				$this->setting_requires_other_message( ShippingRateCalculationGate::SHIPPING_FLAG, 'enable_checkout_delivery_selection_validation' ),
 				'feature_flag'
 			);
 		}
@@ -1561,8 +1562,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'shipping_calculation_enabled_quote_engine_missing',
-				__( 'Shipping calculation: RateQuoteEngine missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'WooCommerce shipping rate calculation is enabled but RateQuoteEngine is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( ShippingRateCalculationGate::SHIPPING_FLAG ),
+				$this->setting_missing_component_message( ShippingRateCalculationGate::SHIPPING_FLAG ),
 				'feature_flag'
 			);
 		}
@@ -1572,8 +1573,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'shipping_calculation_destination_resolver_unavailable',
-				__( 'Shipping calculation: destination resolver unavailable', 'cetech-woocommerce-delivery-engine' ),
-				__( 'WooCommerce shipping rate calculation is enabled but the runtime destination zone resolver is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( ShippingRateCalculationGate::SHIPPING_FLAG ),
+				$this->setting_missing_component_message( ShippingRateCalculationGate::SHIPPING_FLAG ),
 				'feature_flag'
 			);
 		}
@@ -1628,8 +1629,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'order_snapshot_enabled_shipping_calculation_disabled',
-				__( 'Order snapshot enabled without shipping calculation', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Order delivery snapshot persistence is enabled but enable_woocommerce_shipping_rate_calculation is disabled.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_requires_other_title( OrderDeliverySnapshotGate::SNAPSHOT_FLAG, ShippingRateCalculationGate::SHIPPING_FLAG ),
+				$this->setting_requires_other_message( OrderDeliverySnapshotGate::SNAPSHOT_FLAG, ShippingRateCalculationGate::SHIPPING_FLAG ),
 				'feature_flag'
 			);
 		}
@@ -1639,8 +1640,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'order_snapshot_enabled_checkout_validation_disabled',
-				__( 'Order snapshot enabled without checkout validation', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Order delivery snapshot persistence is enabled but enable_checkout_delivery_selection_validation is disabled.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_requires_other_title( OrderDeliverySnapshotGate::SNAPSHOT_FLAG, 'enable_checkout_delivery_selection_validation' ),
+				$this->setting_requires_other_message( OrderDeliverySnapshotGate::SNAPSHOT_FLAG, 'enable_checkout_delivery_selection_validation' ),
 				'feature_flag'
 			);
 		}
@@ -1650,8 +1651,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'order_snapshot_enabled_cart_capture_disabled',
-				__( 'Order snapshot enabled without cart capture', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Order delivery snapshot persistence is enabled but enable_cart_delivery_selection_capture is disabled.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_requires_other_title( OrderDeliverySnapshotGate::SNAPSHOT_FLAG, 'enable_cart_delivery_selection_capture' ),
+				$this->setting_requires_other_message( OrderDeliverySnapshotGate::SNAPSHOT_FLAG, 'enable_cart_delivery_selection_capture' ),
 				'feature_flag'
 			);
 		}
@@ -1661,8 +1662,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'order_snapshot_enabled_selector_disabled',
-				__( 'Order snapshot enabled without product selector', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Order delivery snapshot persistence is enabled but enable_product_delivery_selector is disabled.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_requires_other_title( OrderDeliverySnapshotGate::SNAPSHOT_FLAG, 'enable_product_delivery_selector' ),
+				$this->setting_requires_other_message( OrderDeliverySnapshotGate::SNAPSHOT_FLAG, 'enable_product_delivery_selector' ),
 				'feature_flag'
 			);
 		}
@@ -1672,8 +1673,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'order_snapshot_enabled_persister_missing',
-				__( 'Order snapshot: persister service missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Order delivery snapshot persistence is enabled but OrderDeliverySnapshotPersister is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( OrderDeliverySnapshotGate::SNAPSHOT_FLAG ),
+				$this->setting_missing_component_message( OrderDeliverySnapshotGate::SNAPSHOT_FLAG ),
 				'feature_flag'
 			);
 		}
@@ -1694,8 +1695,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'order_snapshot_enabled_reader_missing',
-				__( 'Order snapshot: reader service missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Order delivery snapshot persistence is enabled but OrderDeliverySnapshotReader is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( OrderDeliverySnapshotGate::SNAPSHOT_FLAG ),
+				$this->setting_missing_component_message( OrderDeliverySnapshotGate::SNAPSHOT_FLAG ),
 				'feature_flag'
 			);
 		}
@@ -1705,8 +1706,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'order_snapshot_enabled_admin_display_missing',
-				__( 'Order snapshot: admin display service missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Order delivery snapshot persistence is enabled but OrderDeliverySnapshotAdminDisplay is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( OrderDeliverySnapshotGate::SNAPSHOT_FLAG ),
+				$this->setting_missing_component_message( OrderDeliverySnapshotGate::SNAPSHOT_FLAG ),
 				'feature_flag'
 			);
 		}
@@ -1716,8 +1717,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'order_snapshot_enabled_integrity_checker_missing',
-				__( 'Order snapshot: integrity checker missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Order delivery snapshot persistence is enabled but OrderDeliverySnapshotIntegrity is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( OrderDeliverySnapshotGate::SNAPSHOT_FLAG ),
+				$this->setting_missing_component_message( OrderDeliverySnapshotGate::SNAPSHOT_FLAG ),
 				'feature_flag'
 			);
 		}
@@ -1736,8 +1737,13 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'customer_summary_enabled_snapshot_persistence_disabled',
-				__( 'Customer summary enabled without snapshot persistence', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Customer order delivery summary is enabled but enable_order_delivery_snapshot_persistence is disabled. Existing orders may have no snapshots to display.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_requires_other_title( CustomerOrderDeliverySummaryBuilder::SUMMARY_FLAG, OrderDeliverySnapshotGate::SNAPSHOT_FLAG ),
+				sprintf(
+					/* translators: 1: enabled setting label, 2: required setting label */
+					__( '“%1$s” is turned on, but “%2$s” is still off. Existing orders may have no saved delivery details to display. Turn on the required setting in Settings first.', 'cetech-woocommerce-delivery-engine' ),
+					$this->setting_label( CustomerOrderDeliverySummaryBuilder::SUMMARY_FLAG ),
+					$this->setting_label( OrderDeliverySnapshotGate::SNAPSHOT_FLAG )
+				),
 				'feature_flag'
 			);
 		}
@@ -1747,8 +1753,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'customer_summary_enabled_reader_missing',
-				__( 'Customer summary: snapshot reader missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Customer order delivery summary is enabled but OrderDeliverySnapshotReader is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( CustomerOrderDeliverySummaryBuilder::SUMMARY_FLAG ),
+				$this->setting_missing_component_message( CustomerOrderDeliverySummaryBuilder::SUMMARY_FLAG ),
 				'feature_flag'
 			);
 		}
@@ -1758,8 +1764,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'customer_summary_enabled_integrity_checker_missing',
-				__( 'Customer summary: integrity checker missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Customer order delivery summary is enabled but OrderDeliverySnapshotIntegrity is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( CustomerOrderDeliverySummaryBuilder::SUMMARY_FLAG ),
+				$this->setting_missing_component_message( CustomerOrderDeliverySummaryBuilder::SUMMARY_FLAG ),
 				'feature_flag'
 			);
 		}
@@ -1769,8 +1775,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'customer_summary_enabled_renderer_missing',
-				__( 'Customer summary: renderer missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Customer order delivery summary is enabled but CustomerOrderDeliverySummaryRenderer is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( CustomerOrderDeliverySummaryBuilder::SUMMARY_FLAG ),
+				$this->setting_missing_component_message( CustomerOrderDeliverySummaryBuilder::SUMMARY_FLAG ),
 				'feature_flag'
 			);
 		}
@@ -1789,8 +1795,13 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'email_summary_enabled_customer_summary_disabled',
-				__( 'Email summary enabled without customer order summary', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Customer email delivery summary is enabled but enable_customer_order_delivery_summary is disabled. Email output uses the same builder; enable the customer summary flag for consistent configuration.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_requires_other_title( CustomerOrderDeliveryEmailSummaryRenderer::EMAIL_SUMMARY_FLAG, CustomerOrderDeliverySummaryBuilder::SUMMARY_FLAG ),
+				sprintf(
+					/* translators: 1: enabled setting label, 2: required setting label */
+					__( '“%1$s” is turned on, but “%2$s” is still off. Turn on the required setting in Settings first so email and order pages stay consistent.', 'cetech-woocommerce-delivery-engine' ),
+					$this->setting_label( CustomerOrderDeliveryEmailSummaryRenderer::EMAIL_SUMMARY_FLAG ),
+					$this->setting_label( CustomerOrderDeliverySummaryBuilder::SUMMARY_FLAG )
+				),
 				'feature_flag'
 			);
 		}
@@ -1800,8 +1811,13 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'email_summary_enabled_snapshot_persistence_disabled',
-				__( 'Email summary enabled without snapshot persistence', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Customer email delivery summary is enabled but enable_order_delivery_snapshot_persistence is disabled. Existing orders may have no snapshots to display.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_requires_other_title( CustomerOrderDeliveryEmailSummaryRenderer::EMAIL_SUMMARY_FLAG, OrderDeliverySnapshotGate::SNAPSHOT_FLAG ),
+				sprintf(
+					/* translators: 1: enabled setting label, 2: required setting label */
+					__( '“%1$s” is turned on, but “%2$s” is still off. Existing orders may have no saved delivery details to display. Turn on the required setting in Settings first.', 'cetech-woocommerce-delivery-engine' ),
+					$this->setting_label( CustomerOrderDeliveryEmailSummaryRenderer::EMAIL_SUMMARY_FLAG ),
+					$this->setting_label( OrderDeliverySnapshotGate::SNAPSHOT_FLAG )
+				),
 				'feature_flag'
 			);
 		}
@@ -1811,8 +1827,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'email_summary_enabled_builder_missing',
-				__( 'Email summary: customer summary builder missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Customer email delivery summary is enabled but CustomerOrderDeliverySummaryBuilder is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( CustomerOrderDeliveryEmailSummaryRenderer::EMAIL_SUMMARY_FLAG ),
+				$this->setting_missing_component_message( CustomerOrderDeliveryEmailSummaryRenderer::EMAIL_SUMMARY_FLAG ),
 				'feature_flag'
 			);
 		}
@@ -1822,8 +1838,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'email_summary_enabled_reader_missing',
-				__( 'Email summary: snapshot reader missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Customer email delivery summary is enabled but OrderDeliverySnapshotReader is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( CustomerOrderDeliveryEmailSummaryRenderer::EMAIL_SUMMARY_FLAG ),
+				$this->setting_missing_component_message( CustomerOrderDeliveryEmailSummaryRenderer::EMAIL_SUMMARY_FLAG ),
 				'feature_flag'
 			);
 		}
@@ -1833,8 +1849,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'email_summary_enabled_integrity_checker_missing',
-				__( 'Email summary: integrity checker missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Customer email delivery summary is enabled but OrderDeliverySnapshotIntegrity is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( CustomerOrderDeliveryEmailSummaryRenderer::EMAIL_SUMMARY_FLAG ),
+				$this->setting_missing_component_message( CustomerOrderDeliveryEmailSummaryRenderer::EMAIL_SUMMARY_FLAG ),
 				'feature_flag'
 			);
 		}
@@ -1844,8 +1860,8 @@ final class ConfigurationHealthChecker {
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'email_summary_enabled_renderer_missing',
-				__( 'Email summary: email renderer missing', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Customer email delivery summary is enabled but CustomerOrderDeliveryEmailSummaryRenderer is not available.', 'cetech-woocommerce-delivery-engine' ),
+				$this->setting_missing_component_title( CustomerOrderDeliveryEmailSummaryRenderer::EMAIL_SUMMARY_FLAG ),
+				$this->setting_missing_component_message( CustomerOrderDeliveryEmailSummaryRenderer::EMAIL_SUMMARY_FLAG ),
 				'feature_flag'
 			);
 		}
@@ -1879,6 +1895,44 @@ final class ConfigurationHealthChecker {
 	/**
 	 * @param list<ConfigurationDiagnostic> $diagnostics
 	 */
+	private function setting_label( string $flag ): string {
+		return FeatureFlagLabels::label( $flag );
+	}
+
+	private function setting_requires_other_title( string $enabled_flag, string $required_flag ): string {
+		return sprintf(
+			/* translators: 1: enabled setting label, 2: required setting label */
+			__( '“%1$s” needs “%2$s”', 'cetech-woocommerce-delivery-engine' ),
+			$this->setting_label( $enabled_flag ),
+			$this->setting_label( $required_flag )
+		);
+	}
+
+	private function setting_requires_other_message( string $enabled_flag, string $required_flag ): string {
+		return sprintf(
+			/* translators: 1: enabled setting label, 2: required setting label */
+			__( '“%1$s” is turned on, but “%2$s” is still off. Turn on the required setting in Settings first.', 'cetech-woocommerce-delivery-engine' ),
+			$this->setting_label( $enabled_flag ),
+			$this->setting_label( $required_flag )
+		);
+	}
+
+	private function setting_missing_component_title( string $enabled_flag ): string {
+		return sprintf(
+			/* translators: %s: setting label */
+			__( '“%s” is missing a required component', 'cetech-woocommerce-delivery-engine' ),
+			$this->setting_label( $enabled_flag )
+		);
+	}
+
+	private function setting_missing_component_message( string $enabled_flag ): string {
+		return sprintf(
+			/* translators: %s: setting label */
+			__( '“%s” is turned on, but a required Delivery Engine component is missing from this installation. Contact CETECH support.', 'cetech-woocommerce-delivery-engine' ),
+			$this->setting_label( $enabled_flag )
+		);
+	}
+
 	private function add(
 		array &$diagnostics,
 		DiagnosticSeverity $severity,

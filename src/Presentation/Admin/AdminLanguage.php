@@ -84,6 +84,34 @@ final class AdminLanguage {
 		return 'Technical details';
 	}
 
+	public static function developer_information_summary(): string {
+		return 'Developer information';
+	}
+
+	public static function technical_diagnostic_tools(): string {
+		return 'Technical diagnostic tools';
+	}
+
+	public static function technical_diagnostic_tools_intro(): string {
+		return 'These tools are intended for technical support and troubleshooting. You do not need them for normal delivery setup or daily operations.';
+	}
+
+	public static function check_applicable_legacy_rule(): string {
+		return 'Check which legacy delivery rule applies';
+	}
+
+	public static function check_applicable_rule_button(): string {
+		return 'Check applicable rule';
+	}
+
+	public static function check_delivery_choice(): string {
+		return 'Check a delivery choice';
+	}
+
+	public static function delivery_choice_identifier(): string {
+		return 'Delivery choice identifier';
+	}
+
 	/**
 	 * @return list<string>
 	 */
@@ -97,6 +125,12 @@ final class AdminLanguage {
 			'UNRESOLVED_GLOBAL_VALUE',
 			'LEGACY_CATEGORY_COMPATIBILITY',
 			'REPLACE []',
+			'enable_product_delivery_selector',
+			'enable_',
+			'display_key',
+			'availability:choice:suffix',
+			'Staff testing tools',
+			'feature flag',
 		];
 	}
 }

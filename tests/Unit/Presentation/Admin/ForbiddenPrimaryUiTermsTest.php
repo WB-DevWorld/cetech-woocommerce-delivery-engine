@@ -22,6 +22,7 @@ final class ForbiddenPrimaryUiTermsTest extends TestCase {
 			dirname( __DIR__, 4 ) . '/src/Application/Configuration/Admin',
 			dirname( __DIR__, 4 ) . '/src/Application/Selector',
 			dirname( __DIR__, 4 ) . '/src/Application/Cart',
+			dirname( __DIR__, 4 ) . '/src/Application/Diagnostics',
 		];
 
 		$allowlisted_files = [
@@ -105,6 +106,16 @@ final class ForbiddenPrimaryUiTermsTest extends TestCase {
 		) ?? $source;
 		$source = preg_replace(
 			'#<details id="cetech-de-advanced-details".*?</details>#s',
+			'',
+			$source
+		) ?? $source;
+		$source = preg_replace(
+			'#AdminPageLayout::open_developer_information\(\);.*?AdminPageLayout::close_developer_information\(\);#s',
+			'',
+			$source
+		) ?? $source;
+		$source = preg_replace(
+			'#AdminPageLayout::open_technical_details\([^;]*\);.*?AdminPageLayout::close_technical_details\(\);#s',
 			'',
 			$source
 		) ?? $source;

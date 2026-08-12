@@ -471,7 +471,7 @@ final class AdminOperationsDashboard {
 	private function render_help(): void {
 		echo '<section class="cetech-de-section cetech-de-section--help">';
 		echo '<div class="cetech-de-section-head">';
-		echo '<h2 class="cetech-de-section-title">' . esc_html__( 'Help and testing', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
+		echo '<h2 class="cetech-de-section-title">' . esc_html__( 'Help', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
 		echo '<p class="cetech-de-section-desc">' . esc_html__(
 			'Simple guidance for setting prices and checking checkout.',
 			'cetech-woocommerce-delivery-engine'
@@ -495,7 +495,7 @@ final class AdminOperationsDashboard {
 		echo '</div>';
 
 		echo '<div id="cetech-de-testing-instructions" class="cetech-de-help-card">';
-		echo '<h3 class="cetech-de-help-subtitle">' . esc_html__( 'How to test checkout', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
+		echo '<h3 class="cetech-de-help-subtitle">' . esc_html__( 'How to check checkout', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
 		echo '<ol class="cetech-de-help-steps">';
 		echo '<li>' . esc_html__( 'Make sure you have at least one zone, offer, and active rate card.', 'cetech-woocommerce-delivery-engine' ) . '</li>';
 		echo '<li>' . esc_html__( 'Open your store and add a product to the cart.', 'cetech-woocommerce-delivery-engine' ) . '</li>';

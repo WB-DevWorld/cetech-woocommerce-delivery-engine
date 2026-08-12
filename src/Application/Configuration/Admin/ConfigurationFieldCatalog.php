@@ -84,12 +84,12 @@ final class ConfigurationFieldCatalog {
 
 	public static function description( string $field_key ): string {
 		return match ( $field_key ) {
-			ConfigurationFieldKey::FULFILMENT_AVAILABILITY => 'Which fulfilment path these settings apply to, such as In Store, In Warehouse, or International.',
+			ConfigurationFieldKey::FULFILMENT_AVAILABILITY => 'Choose where this item is fulfilled from, such as In Store, In Warehouse, or International. This affects which delivery methods can be offered.',
 			ConfigurationFieldKey::FULFILMENT_CHOICE => 'Whether the customer chooses delivery or store pickup for this path.',
-			ConfigurationFieldKey::LOGISTICS_PROFILE_ID => 'Private logistics profile used for fulfilment planning. Choose “Turn off” if this item should not use a profile.',
+			ConfigurationFieldKey::LOGISTICS_PROFILE_ID => 'A logistics profile groups the delivery handling rules used to fulfil an item, such as how it is dispatched or which delivery services can be used. Choose “Turn off” if this item should not use a profile.',
 			ConfigurationFieldKey::SUPPLIER_ID => 'Private supplier reference. Choose “Turn off” if this item should not use a supplier.',
 			ConfigurationFieldKey::ORIGIN_ID => 'Private origin reference. Choose “Turn off” if this item should not use an origin.',
-			ConfigurationFieldKey::PRIORITY => 'Relative priority when multiple configurations compete. Zero is a valid value.',
+			ConfigurationFieldKey::PRIORITY => 'Priority decides which delivery setup takes precedence if more than one setup could apply. A lower number is considered first. Most products can leave this unchanged. Zero is a valid value.',
 			ConfigurationFieldKey::DELIVERY_OFFER_IDS => 'Choose whether this product should use the delivery options it inherits, add more options, remove some, or use its own list. Choosing an empty list means no delivery options for this setup.',
 			default => '',
 		};

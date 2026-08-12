@@ -27,11 +27,11 @@ final class ProductTargetResolver {
 	 */
 	public function validate_target( string $target_type, int $target_id ): ?string {
 		if ( $target_id <= 0 ) {
-			return __( 'Target ID must be a positive integer.', 'cetech-woocommerce-delivery-engine' );
+			return __( 'Enter a valid WooCommerce item ID.', 'cetech-woocommerce-delivery-engine' );
 		}
 
 		if ( ! $this->is_valid_target_type( $target_type ) ) {
-			return __( 'Invalid target type selected.', 'cetech-woocommerce-delivery-engine' );
+			return __( 'Choose whether this check is for a product, product variation, or product category.', 'cetech-woocommerce-delivery-engine' );
 		}
 
 		if ( ! $this->is_woocommerce_available() ) {

@@ -50,6 +50,41 @@ final class AdminLanguagePresentationTest extends TestCase {
 
 		self::assertSame( 'Use the New Delivery Settings System', FeatureFlagLabels::label( 'enable_effective_configuration_runtime' ) );
 		self::assertSame( 'Use New Delivery Settings for Product Variations', FeatureFlagLabels::label( 'enable_variable_product_ecr_runtime' ) );
+		self::assertSame( 'Show delivery choices on product pages', FeatureFlagLabels::label( 'enable_product_delivery_selector' ) );
+	}
+
+	public function test_technical_diagnostic_tools_are_labelled_as_non_routine(): void {
+		self::assertSame( 'Technical diagnostic tools', AdminLanguage::technical_diagnostic_tools() );
+		self::assertStringContainsString( 'technical support', strtolower( AdminLanguage::technical_diagnostic_tools_intro() ) );
+		self::assertStringContainsString( 'do not need them for normal delivery setup', strtolower( AdminLanguage::technical_diagnostic_tools_intro() ) );
+		self::assertSame( 'Check which legacy delivery rule applies', AdminLanguage::check_applicable_legacy_rule() );
+		self::assertSame( 'Check applicable rule', AdminLanguage::check_applicable_rule_button() );
+		self::assertSame( 'Check a delivery choice', AdminLanguage::check_delivery_choice() );
+		self::assertSame( 'Delivery choice identifier', AdminLanguage::delivery_choice_identifier() );
+		self::assertSame( 'Developer information', AdminLanguage::developer_information_summary() );
+		self::assertSame( 'Technical details', AdminLanguage::technical_details_summary() );
+	}
+
+	public function test_business_field_descriptions_explain_operational_consequence(): void {
+		$availability = ConfigurationFieldCatalog::description( \CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey::FULFILMENT_AVAILABILITY );
+		$logistics    = ConfigurationFieldCatalog::description( \CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey::LOGISTICS_PROFILE_ID );
+		$priority     = ConfigurationFieldCatalog::description( \CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey::PRIORITY );
+
+		self::assertStringContainsString( 'fulfilled from', strtolower( $availability ) );
+		self::assertStringContainsString( 'delivery methods', strtolower( $availability ) );
+		self::assertStringContainsString( 'groups the delivery handling rules', strtolower( $logistics ) );
+		self::assertStringContainsString( 'lower number', strtolower( $priority ) );
+		self::assertStringContainsString( 'leave this unchanged', strtolower( $priority ) );
+	}
+
+	public function test_forbidden_primary_terms_include_diagnostic_jargon(): void {
+		$terms = AdminLanguage::forbidden_primary_terms();
+
+		self::assertContains( 'enable_product_delivery_selector', $terms );
+		self::assertContains( 'display_key', $terms );
+		self::assertContains( 'availability:choice:suffix', $terms );
+		self::assertContains( 'Staff testing tools', $terms );
+		self::assertContains( 'feature flag', $terms );
 	}
 
 	public function test_inheritance_and_status_labels_avoid_developer_jargon(): void {
@@ -61,5 +96,18 @@ final class AdminLanguagePresentationTest extends TestCase {
 		self::assertStringContainsString( 'legacy category rule', strtolower( ScopedConfigurationNotices::CATEGORY_WARNING_MESSAGE ) );
 		self::assertSame( CollectionConfigurationMode::Replace->value, 'replace' );
 		self::assertStringNotContainsString( 'UNRESOLVED_GLOBAL_VALUE', ReasonCodeLabelMapper::explain( ConfigurationReasonCode::UNRESOLVED_GLOBAL_VALUE ) );
+	}
+
+	public function test_legacy_rules_page_uses_operational_diagnostic_labels(): void {
+		$source = (string) file_get_contents( dirname( __DIR__, 4 ) . '/src/Presentation/Admin/ProductDeliveryRulesPage.php' );
+
+		self::assertStringContainsString( 'AdminLanguage::technical_diagnostic_tools()', $source );
+		self::assertStringContainsString( 'AdminLanguage::check_applicable_legacy_rule()', $source );
+		self::assertStringContainsString( 'AdminLanguage::check_delivery_choice()', $source );
+		self::assertStringContainsString( 'AdminLanguage::delivery_choice_identifier()', $source );
+		self::assertStringNotContainsString( 'Staff testing tools', $source );
+		self::assertStringNotContainsString( 'Test product rule resolution', $source );
+		self::assertStringNotContainsString( 'Test delivery selection validation', $source );
+		self::assertStringNotContainsString( 'Run resolution test', $source );
 	}
 }

@@ -41,11 +41,11 @@ final class ProductDeliveryRuleValidator {
 		$target_id   = isset( $input['target_id'] ) ? (int) $input['target_id'] : 0;
 
 		if ( ! $this->is_valid_target_type( $target_type ) ) {
-			$errors['target_type'] = __( 'Target type is required.', 'cetech-woocommerce-delivery-engine' );
+			$errors['target_type'] = __( 'Choose whether this rule is for a product, product variation, or product category.', 'cetech-woocommerce-delivery-engine' );
 		}
 
 		if ( $target_id <= 0 ) {
-			$errors['target_id'] = __( 'Target ID is required.', 'cetech-woocommerce-delivery-engine' );
+			$errors['target_id'] = __( 'Enter the WooCommerce ID of the product, product variation, or product category.', 'cetech-woocommerce-delivery-engine' );
 		} elseif ( $this->is_valid_target_type( $target_type ) ) {
 			$target_error = $this->target_resolver->validate_target( $target_type, $target_id );
 
@@ -145,11 +145,11 @@ final class ProductDeliveryRuleValidator {
 		$target_id   = isset( $input['test_target_id'] ) ? (int) $input['test_target_id'] : 0;
 
 		if ( ! $this->is_valid_target_type( $target_type ) ) {
-			$errors['test_target_type'] = __( 'Target type is required.', 'cetech-woocommerce-delivery-engine' );
+			$errors['test_target_type'] = __( 'Choose a product, product variation, or product category.', 'cetech-woocommerce-delivery-engine' );
 		}
 
 		if ( $target_id <= 0 ) {
-			$errors['test_target_id'] = __( 'Target ID is required.', 'cetech-woocommerce-delivery-engine' );
+			$errors['test_target_id'] = __( 'Enter the WooCommerce ID of the item you want to check.', 'cetech-woocommerce-delivery-engine' );
 		} elseif ( $this->is_valid_target_type( $target_type ) ) {
 			$target_error = $this->target_resolver->validate_target( $target_type, $target_id );
 
@@ -183,7 +183,7 @@ final class ProductDeliveryRuleValidator {
 		}
 
 		if ( '' === $display_key ) {
-			$errors['test_display_key'] = __( 'Display key is required and must use the format availability:choice:suffix.', 'cetech-woocommerce-delivery-engine' );
+			$errors['test_display_key'] = __( 'Enter a delivery choice identifier. Support staff may provide one for you.', 'cetech-woocommerce-delivery-engine' );
 		}
 
 		return $errors;

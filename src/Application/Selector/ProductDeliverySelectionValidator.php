@@ -34,7 +34,7 @@ final class ProductDeliverySelectionValidator {
 		if ( '' === $display_key ) {
 			return ProductDeliverySelectionValidationResult::invalid(
 				'invalid_display_key',
-				__( 'Display key is required and must use the format availability:choice:suffix.', 'cetech-woocommerce-delivery-engine' )
+				__( 'A delivery choice identifier is required.', 'cetech-woocommerce-delivery-engine' )
 			);
 		}
 
@@ -55,7 +55,7 @@ final class ProductDeliverySelectionValidator {
 		if ( ! $this->feature_flags->is_enabled( 'enable_product_delivery_selector' ) ) {
 			return ProductDeliverySelectionValidationResult::invalid(
 				'selector_disabled',
-				__( 'The product delivery selector feature flag is disabled.', 'cetech-woocommerce-delivery-engine' )
+				__( 'This check requires “Show delivery choices on product pages” to be turned on.', 'cetech-woocommerce-delivery-engine' )
 			);
 		}
 
@@ -88,7 +88,7 @@ final class ProductDeliverySelectionValidator {
 		if ( ! $result->success ) {
 			return ProductDeliverySelectionValidationResult::invalid(
 				'resolver_failed',
-				(string) ( $result->error ?? __( 'Product rule resolution failed.', 'cetech-woocommerce-delivery-engine' ) ),
+				(string) ( $result->error ?? __( 'The Delivery Engine could not determine which legacy delivery rule applies.', 'cetech-woocommerce-delivery-engine' ) ),
 				$warnings
 			);
 		}
@@ -107,7 +107,7 @@ final class ProductDeliverySelectionValidator {
 		if ( null === $matched ) {
 			return ProductDeliverySelectionValidationResult::invalid(
 				'option_not_found',
-				__( 'No matching delivery option was found for the supplied display key.', 'cetech-woocommerce-delivery-engine' ),
+				__( 'No matching delivery choice was found for that identifier.', 'cetech-woocommerce-delivery-engine' ),
 				$warnings
 			);
 		}
@@ -124,7 +124,7 @@ final class ProductDeliverySelectionValidator {
 
 		if ( null === $rule_id && ! $runtime->is_ecr() ) {
 			$warnings[] = __(
-				'Matched option could not be linked to a resolved product rule ID.',
+				'The matching delivery choice could not be linked to a saved product rule.',
 				'cetech-woocommerce-delivery-engine'
 			);
 		}
@@ -159,7 +159,7 @@ final class ProductDeliverySelectionValidator {
 			if ( ! $variation instanceof WC_Product || ! $variation->is_type( 'variation' ) ) {
 				return [
 					'error_code'    => 'product_not_found',
-					'error_message' => __( 'Variation product was not found.', 'cetech-woocommerce-delivery-engine' ),
+					'error_message' => __( 'That product variation was not found.', 'cetech-woocommerce-delivery-engine' ),
 				];
 			}
 
@@ -168,7 +168,7 @@ final class ProductDeliverySelectionValidator {
 			if ( $parent_id > 0 && $parent_id !== $product_id ) {
 				return [
 					'error_code'    => 'invalid_product_context',
-					'error_message' => __( 'Variation does not belong to the supplied product ID.', 'cetech-woocommerce-delivery-engine' ),
+					'error_message' => __( 'This product variation does not belong to the product ID entered.', 'cetech-woocommerce-delivery-engine' ),
 				];
 			}
 

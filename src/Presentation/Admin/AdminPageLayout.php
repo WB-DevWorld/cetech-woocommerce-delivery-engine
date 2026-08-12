@@ -176,6 +176,25 @@ final class AdminPageLayout {
 		echo '</details>';
 	}
 
+	public static function open_technical_details( ?string $title = null ): void {
+		printf(
+			'<details class="cetech-de-technical-details"><summary>%s</summary>',
+			esc_html( $title ?? AdminLanguage::technical_details_summary() )
+		);
+	}
+
+	public static function close_technical_details(): void {
+		echo '</details>';
+	}
+
+	public static function open_developer_information(): void {
+		self::open_technical_details( AdminLanguage::developer_information_summary() );
+	}
+
+	public static function close_developer_information(): void {
+		self::close_technical_details();
+	}
+
 	public static function render_styles(): void {
 		if ( self::$styles_rendered ) {
 			return;
@@ -458,6 +477,21 @@ final class AdminPageLayout {
 			.cetech-de-advanced[open] > summary {
 				border-bottom: 1px solid #f0f0f1;
 				margin-bottom: 16px;
+			}
+			.cetech-de-technical-details {
+				margin: 12px 0 0;
+				padding: 8px 12px;
+				background: #f6f7f7;
+				border-radius: 6px;
+			}
+			.cetech-de-technical-details > summary {
+				cursor: pointer;
+				font-weight: 600;
+				font-size: 12px;
+				color: var(--cetech-de-muted);
+			}
+			.cetech-de-technical-details[open] > summary {
+				margin-bottom: 8px;
 			}
 			.cetech-de-contact-line {
 				display: block;

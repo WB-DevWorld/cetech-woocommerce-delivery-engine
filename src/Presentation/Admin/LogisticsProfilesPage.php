@@ -247,7 +247,7 @@ final class LogisticsProfilesPage {
 	private function render_help_section(): void {
 		AdminPageLayout::open_section(
 			__( 'What is a logistics profile?', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Logistics profiles help group delivery handling rules for similar products or delivery situations.', 'cetech-woocommerce-delivery-engine' )
+			__( 'A logistics profile groups the delivery handling rules used to fulfil an item, such as how it is dispatched or which delivery services can be used.', 'cetech-woocommerce-delivery-engine' )
 		);
 		echo '<div class="cetech-de-help-card">';
 		echo '<p>' . esc_html__(

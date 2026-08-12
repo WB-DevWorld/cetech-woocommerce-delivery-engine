@@ -4,44 +4,42 @@
 **Plugin version:** `1.0.0-rc.1` (unchanged public version)  
 **Schema target:** `3` (unchanged)  
 **Date opened:** 2026-08-11  
-**Last updated:** 2026-08-12 (Stage 6B-2 retry after clean repaired install — **BLOCKED**; SSH/PHP-log + live admin-language gates unmet)
+**Last updated:** 2026-08-12 (Stage 6B-2 PHP-log safety **PASS**; Stage 6B-2L final admin-language package pending human redeploy)
 
 ---
 
 ## 1. Current verdict
 
-**Stage 6B-2 retry: BLOCKED** (clean repaired install observed over HTTP/REST; PHP-log + live admin-language gates unmet)
+**Stage 6B-2 repaired deployment/autoload safety: PASS.** Stage 6B-2L final administrator-language package: **READY FOR FINAL STAGE 6B REDEPLOYMENT** after local gates (checksum recorded in §17).
 
-Human administrator clean-installed `cetech-woocommerce-delivery-engine-stage6b-repaired.zip` (SHA-256 `d4985c8195df50d0cffe69e96bd7d230f477dd87ec2dcf437f9b90de04dfa258`) by moving the old plugin directory completely out of `wp-content/plugins/` before installing. Agent retry **must not** repeat the overturned REST-only READY.
+Human administrator later confirmed a clean PHP-log window on the repaired install:
 
-The 2026-08-12 first agent REST/storefront check recorded **READY**. That verdict is **wrong** and is preserved below as chronology only.
+| Item | Value |
+|------|-------|
+| Marker | `BASE_LOG_LINE = 28` |
+| Window ended | **33** lines |
+| New CetechDeliveryEngine errors | **NONE** |
+| Recurrence of missing `VariationRelationshipInspectorInterface` | **NONE** |
+| Recurrence of missing `VerifiableMigrationInterface` | **NONE** |
+| Recurrence of missing `ConfigurationHealthChecker` | **NONE** |
+| Recurrence of `get_category_ids()` on false | **NONE** |
+| Recurrence of undefined `error_code` | **NONE** |
+| Other new events | Three PHP warnings from `wp-content/themes/woodmart/` (theme-origin); one WordPress database error from `WCFM_Admin` / `WCFM_Non_Ajax` / `wcfm_dashboard_sales_report` (WCFM-origin) |
 
-Human SSH log review found **two fresh PHP fatals** immediately after the Stage 6B package install (marker `2026-08-12T10:30:21Z`):
+Do **not** revisit RuntimeContracts/autoload architecture unless new evidence requires it.
 
-| Fatal | Timestamp | Missing interface | While loading |
-|-------|-----------|-------------------|---------------|
-| #1 | 12-Aug-2026 10:31:41 UTC | `CetechDeliveryEngine\Application\Runtime\VariationRelationshipInspectorInterface` | `src/Application/Runtime/WooCommerceVariationRelationshipInspector.php` line 12 |
-| #2 | 12-Aug-2026 10:31:42 UTC | `CetechDeliveryEngine\Core\Versioning\VerifiableMigrationInterface` | `database/migrations/20260810160000_create_scoped_configuration_tables.php` line 19 |
+The remaining live issue after that safety PASS was administrator language on **Legacy Delivery Rules → Staff testing tools** (raw feature-flag key, display-key syntax, “resolution” wording). That is Stage 6B-2L (presentation only). FLAIROC was **not** modified in 6B-2L.
 
-These are **fresh Stage 6 deployment failures**, not historical Stage 5 errors.
-
-**Do not perform Stage 6B-3. Do not enable** `enable_effective_configuration_runtime`, `enable_variable_product_ecr_runtime`, or any Delivery Engine runtime flag.
-
-The human administrator may restore the known-good Stage 5 fingerprint-fixed package for production safety:
-
-- `cetech-woocommerce-delivery-engine-stage5b-fingerprint-fixed.zip`
-- SHA-256 `dbddc1d7df3c1262296e9c42b05e87921066fc6f5f29b0f3c798385ad1d4cbfd`
-- Schema remains **3** (no downgrade expected)
-
-This Cursor repair task **does not modify FLAIROC**.
+**Do not perform Stage 6B-3** until the human clean-installs the final language package with all runtime flags OFF and completes a short flag-OFF smoke + clean PHP-log window.
 
 | Sub-stage | Status |
 |-----------|--------|
 | Stage 6A | **COMPLETE** |
 | Stage 6B-1 original package | **FAILED deployment safety** — `cetech-woocommerce-delivery-engine-stage6b.zip` SHA-256 `cc89edf81799cdd734edf6f22d54472eaf6b2d26820a36fc70f371f4cbfa0e76` — **do not redeploy** |
-| Stage 6B-2 flag-OFF install | **BLOCKED** (HTTP looked healthy; PHP fatals in logs) |
+| Stage 6B-2 flag-OFF install | **BLOCKED** historically (HTTP looked healthy; PHP fatals in logs) |
 | Stage 6B-2R local repair | repaired package + admin language + verifier gates |
-| Stage 6B-2 retry (clean repaired install) | **BLOCKED** — see §16 |
+| Stage 6B-2 retry (clean repaired install) | **PASS** for PHP-log/autoload safety — see above; live language still had diagnostic-tools jargon |
+| Stage 6B-2L final admin language | presentation-only cleanup; package `cetech-woocommerce-delivery-engine-stage6b-final.zip` — see §17 |
 | Stage 6B-3 variable QA live cutover | **NOT STARTED** |
 
 ---
@@ -678,3 +676,51 @@ Invalid product preview `999999999`: **NOT AGENT-VERIFIED**.
 Restore SSH/WP-CLI for `jane-flairoc` (or the human pastes PHP `error.log` from line **13**, excluding the ~12:39 UTC agent file-GET noise) **and** confirm live wp-admin operational language (Delivery Settings / Preview / modes / Ready / Advanced switches still OFF).
 
 Until both are done, Stage 6B-2 remains **BLOCKED**. **Do not start Stage 6B-3.**
+
+---
+
+## 17. Stage 6B-2L — final normal-admin language cleanup
+
+**Date:** 2026-08-12  
+**FLAIROC:** **NOT MODIFIED**
+
+### PHP-log safety (human, repaired package)
+
+Overturns the §16 “PHP log unread / BLOCKED” gate for autoload safety only.
+
+| Item | Result |
+|------|--------|
+| Marker | `BASE_LOG_LINE = 28` |
+| Clean window ended | **33** lines |
+| CetechDeliveryEngine errors | **NONE** |
+| Missing interface fatals | **NONE** (no recurrence) |
+| WoodMart warnings | theme-origin (`wp-content/themes/woodmart/`) |
+| WCFM SQL error | WCFM-origin (`WCFM_Admin` / `WCFM_Non_Ajax` / `wcfm_dashboard_sales_report`) |
+
+Stage 6B repaired deployment/autoload safety = **PASS**.
+
+### Remaining live language issue
+
+Broad operational wording (Delivery Settings, Ready, Use inherited setting, etc.) was already good.
+
+Legacy Delivery Rules still exposed **Staff testing tools** with developer wording (`Test product rule resolution`, `enable_product_delivery_selector`, `display_key`, `availability:choice:suffix`). That violated the owner’s normal-administrator language requirement.
+
+### Presentation-only repair
+
+No schema, resolver, flag-key, routing, cart, checkout, rate, migration, or AJAX behavior changes. Internal identifiers unchanged.
+
+### Final package
+
+| Item | Value |
+|------|-------|
+| Filename | `cetech-woocommerce-delivery-engine-stage6b-final.zip` |
+| Full path | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-stage6b-final.zip` |
+| Bytes | *recorded after package build* |
+| SHA-256 | *recorded after package build* |
+| Must differ from repaired artifact | `d4985c8195df50d0cffe69e96bd7d230f477dd87ec2dcf437f9b90de04dfa258` |
+| Do not reuse | `cetech-woocommerce-delivery-engine-stage6b-repaired.zip` |
+
+### Next human step
+
+Clean-install the final Stage 6B package with all runtime flags **OFF**. Perform one short flag-OFF smoke + clean PHP-log window. Then Stage 6B-3 may begin. **Do not start Stage 6B-3 from this task.**
+

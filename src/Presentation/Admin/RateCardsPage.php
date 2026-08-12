@@ -98,7 +98,7 @@ final class RateCardsPage {
 		AdminPageLayout::render_page_header(
 			__( 'Delivery pricing', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Rate Cards', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Rate cards connect a delivery zone and delivery offer to a delivery fee. Customers see the price at checkout when their address and chosen service match.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'A rate card contains the delivery prices used to calculate shipping. Each card connects a delivery zone and a delivery offer to a fee. Customers see that price at checkout when their address and chosen service match.', 'cetech-woocommerce-delivery-engine' ),
 			[
 				'label' => __( 'Add Rate Card', 'cetech-woocommerce-delivery-engine' ),
 				'url'   => add_query_arg( [ 'page' => self::SLUG, 'action' => 'add' ], admin_url( 'admin.php' ) ),
@@ -185,7 +185,8 @@ final class RateCardsPage {
 			AdminPageLayout::close_section();
 		}
 
-		AdminPageLayout::open_advanced( __( 'Testing tools (for staff)', 'cetech-woocommerce-delivery-engine' ) );
+		AdminPageLayout::open_advanced( AdminLanguage::technical_diagnostic_tools() );
+		echo '<p class="description">' . esc_html( AdminLanguage::technical_diagnostic_tools_intro() ) . '</p>';
 		$this->render_test_tool();
 		$this->render_quote_test_tool();
 		AdminPageLayout::close_advanced();
@@ -265,9 +266,9 @@ final class RateCardsPage {
 	private function render_quote_test_tool(): void {
 		$draft = $this->action_handler->notices()->consume_form_draft( self::SLUG . '_quote_test' );
 
-		echo '<h3>' . esc_html__( 'Preview quote engine result', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
+		echo '<h3>' . esc_html__( 'Check a delivery price', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
 		echo '<p class="description">' . esc_html__(
-			'Run a read-only quote using the same engine as admin pricing checks. Does not affect cart, checkout, or orders.',
+			'Use this support tool to preview the delivery fee the engine would calculate. This check does not change the cart, checkout, or orders.',
 			'cetech-woocommerce-delivery-engine'
 		) . '</p>';
 
@@ -328,7 +329,7 @@ final class RateCardsPage {
 			0
 		);
 		echo '</tbody></table>';
-		submit_button( __( 'Run quote test', 'cetech-woocommerce-delivery-engine' ), 'secondary', 'submit', false );
+		submit_button( __( 'Check delivery price', 'cetech-woocommerce-delivery-engine' ), 'secondary', 'submit', false );
 		echo '</form>';
 
 		if ( is_array( $draft ) && isset( $draft['quote_result'] ) ) {
@@ -466,7 +467,7 @@ final class RateCardsPage {
 			__( 'Priority', 'cetech-woocommerce-delivery-engine' ),
 			isset( $record['priority'] ) ? (int) $record['priority'] : 100,
 			0,
-			__( 'Lower numbers are checked first when more than one rate card could match.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Priority decides which rate card takes precedence if more than one card could apply. A lower number is considered first. Most rate cards can leave this unchanged (default 100).', 'cetech-woocommerce-delivery-engine' )
 		);
 		AdminFormHelper::text_field(
 			'effective_from',

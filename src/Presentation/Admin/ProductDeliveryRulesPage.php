@@ -214,9 +214,10 @@ final class ProductDeliveryRulesPage {
 
 		$this->render_help_section();
 
-		AdminPageLayout::open_advanced( __( 'Staff testing tools', 'cetech-woocommerce-delivery-engine' ) );
+		AdminPageLayout::open_advanced( AdminLanguage::technical_diagnostic_tools() );
+		echo '<p class="description">' . esc_html( AdminLanguage::technical_diagnostic_tools_intro() ) . '</p>';
 		echo '<p class="description">' . esc_html__(
-			'Read-only previews for support and troubleshooting. These tools do not change configuration, cart, checkout, or product metadata.',
+			'These checks do not change saved settings, the cart, checkout, or orders.',
 			'cetech-woocommerce-delivery-engine'
 		) . '</p>';
 		$this->render_resolution_test_tool( $lookups );
@@ -229,13 +230,9 @@ final class ProductDeliveryRulesPage {
 	private function render_resolution_test_tool( array $lookups ): void {
 		$draft = $this->action_handler->notices()->consume_form_draft( self::SLUG . '_resolve' );
 
-		echo '<h3>' . esc_html__( 'Test product rule resolution', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
+		echo '<h3>' . esc_html( AdminLanguage::check_applicable_legacy_rule() ) . '</h3>';
 		echo '<p class="description">' . esc_html__(
-			'Read-only admin preview of which active product rules would apply. Does not change configuration, cart, checkout, or product metadata.',
-			'cetech-woocommerce-delivery-engine'
-		) . '</p>';
-		echo '<p class="description">' . esc_html__(
-			'To preview the customer-facing product-page selector, enable the enable_product_delivery_selector feature flag and visit a product page. The selector is display-only in this phase and does not connect to cart or checkout.',
+			'Enter a product, variation, or category to see which Legacy Delivery Rule would currently apply. This check does not change any saved settings.',
 			'cetech-woocommerce-delivery-engine'
 		) . '</p>';
 
@@ -245,25 +242,25 @@ final class ProductDeliveryRulesPage {
 		echo '<table class="form-table" role="presentation"><tbody>';
 		AdminFormHelper::select_field(
 			'test_target_type',
-			__( 'Target type', 'cetech-woocommerce-delivery-engine' ),
-			$this->target_type_options(),
+			__( 'Item type', 'cetech-woocommerce-delivery-engine' ),
+			$this->friendly_target_type_options(),
 			(string) ( $draft['test_target_type'] ?? ProductTargetType::Product->value )
 		);
 		AdminFormHelper::number_field(
 			'test_target_id',
-			__( 'Target ID', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Item ID', 'cetech-woocommerce-delivery-engine' ),
 			isset( $draft['test_target_id'] ) ? (int) $draft['test_target_id'] : null,
 			1,
-			__( 'WooCommerce product, variation, or product category term ID.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Enter the WooCommerce ID of the product, product variation, or product category you want to check.', 'cetech-woocommerce-delivery-engine' )
 		);
 		echo '</tbody></table>';
-		submit_button( __( 'Run resolution test', 'cetech-woocommerce-delivery-engine' ), 'secondary', 'submit', false );
+		submit_button( AdminLanguage::check_applicable_rule_button(), 'secondary', 'submit', false );
 		echo '</form>';
 
 		if ( is_array( $draft ) && isset( $draft['resolution_result'] ) && is_array( $draft['resolution_result'] ) ) {
 			$this->render_resolution_result( ProductRuleResolutionResult::fromArray( $draft['resolution_result'] ), $lookups );
 		} elseif ( is_array( $draft ) && ! empty( $draft['resolution_error'] ) ) {
-			echo '<h3>' . esc_html__( 'Resolution result', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
+			echo '<h3>' . esc_html__( 'Check result', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
 			echo '<p><strong>' . esc_html__( 'Error:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
 			echo esc_html( (string) $draft['resolution_error'] );
 			echo '</p>';
@@ -279,7 +276,7 @@ final class ProductDeliveryRulesPage {
 	 * } $lookups
 	 */
 	private function render_resolution_result( ProductRuleResolutionResult $result, array $lookups ): void {
-		echo '<h3>' . esc_html__( 'Resolution result', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
+		echo '<h3>' . esc_html__( 'Check result', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
 
 		if ( ! $result->success ) {
 			echo '<p><strong>' . esc_html__( 'Error:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
@@ -288,35 +285,28 @@ final class ProductDeliveryRulesPage {
 			return;
 		}
 
-		echo '<p class="description">' . esc_html(
-			sprintf(
-				/* translators: %s: resolver contract version */
-				__( 'Contract version: %s (admin test only; not used on storefront).', 'cetech-woocommerce-delivery-engine' ),
-				$result->contract_version
-			)
-		) . '</p>';
-
-		echo '<p><strong>' . esc_html__( 'Input target:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
-		echo esc_html( $result->input_target_type . ' #' . (string) $result->input_target_id );
+		echo '<p><strong>' . esc_html__( 'Checked item:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
+		echo esc_html( $this->target_type_label( $result->input_target_type ) . ' #' . (string) $result->input_target_id );
 		if ( null !== $result->input_target_label && '' !== $result->input_target_label ) {
 			echo ' — ' . esc_html( $result->input_target_label );
 		}
 		echo '</p>';
 
 		if ( '' !== $result->hierarchy_explanation ) {
-			echo '<p><strong>' . esc_html__( 'Hierarchy policy:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
+			echo '<p><strong>' . esc_html__( 'How matching works:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
 			echo esc_html( $result->hierarchy_explanation );
 			echo '</p>';
 		}
 
 		if ( [] !== $result->candidate_hierarchy ) {
-			echo '<p><strong>' . esc_html__( 'Candidate hierarchy (search order):', 'cetech-woocommerce-delivery-engine' ) . '</strong></p>';
+			echo '<p><strong>' . esc_html__( 'Search order:', 'cetech-woocommerce-delivery-engine' ) . '</strong></p>';
 			echo '<ol>';
 			foreach ( $result->candidate_hierarchy as $entry ) {
 				$label = isset( $entry['label'] ) && is_string( $entry['label'] ) && '' !== $entry['label']
 					? $entry['label']
 					: '—';
-				echo '<li>' . esc_html( (string) ( $entry['target_type'] ?? '' ) . ' #' . (string) ( $entry['target_id'] ?? 0 ) . ' (' . $label . ')' ) . '</li>';
+				$type_label = $this->target_type_label( (string) ( $entry['target_type'] ?? '' ) );
+				echo '<li>' . esc_html( $type_label . ' #' . (string) ( $entry['target_id'] ?? 0 ) . ' (' . $label . ')' ) . '</li>';
 			}
 			echo '</ol>';
 		}
@@ -342,9 +332,9 @@ final class ProductDeliveryRulesPage {
 		}
 
 		if ( [] !== $result->chosen_rules ) {
-			echo '<p><strong>' . esc_html__( 'Chosen rules per fulfilment availability:', 'cetech-woocommerce-delivery-engine' ) . '</strong></p>';
+			echo '<p><strong>' . esc_html__( 'Applicable rules by fulfilment location:', 'cetech-woocommerce-delivery-engine' ) . '</strong></p>';
 			echo '<table class="widefat striped" style="max-width:960px;"><thead><tr>';
-			echo '<th scope="col">' . esc_html__( 'Availability', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+			echo '<th scope="col">' . esc_html__( 'Fulfilment availability', 'cetech-woocommerce-delivery-engine' ) . '</th>';
 			echo '<th scope="col">' . esc_html__( 'Rule', 'cetech-woocommerce-delivery-engine' ) . '</th>';
 			echo '<th scope="col">' . esc_html__( 'Why chosen', 'cetech-woocommerce-delivery-engine' ) . '</th>';
 			echo '<th scope="col">' . esc_html__( 'Target', 'cetech-woocommerce-delivery-engine' ) . '</th>';
@@ -364,11 +354,11 @@ final class ProductDeliveryRulesPage {
 				$explanation = $result->chosen_explanations[ $availability ] ?? '';
 
 				echo '<tr>';
-				echo '<td>' . esc_html( $availability ) . '</td>';
+				echo '<td>' . esc_html( $this->availability_label( $availability ) ) . '</td>';
 				echo '<td>' . esc_html( '#' . (string) $rule->rule_id ) . '</td>';
 				echo '<td>' . esc_html( $explanation ) . '</td>';
-				echo '<td>' . esc_html( $rule->target_type . ' #' . (string) $rule->target_id ) . '</td>';
-				echo '<td>' . esc_html( $rule->fulfilment_choice ) . '</td>';
+				echo '<td>' . esc_html( $this->target_type_label( $rule->target_type ) . ' #' . (string) $rule->target_id ) . '</td>';
+				echo '<td>' . esc_html( $this->choice_label( $rule->fulfilment_choice ) ) . '</td>';
 				echo '<td>' . esc_html( $this->format_offer_id_list( $lookups['offers'], $rule->delivery_offer_ids ) ) . '</td>';
 				echo '<td>' . esc_html( $this->lookup_optional( $lookups['profiles'], $rule->logistics_profile_id ) ) . '</td>';
 				echo '<td>' . esc_html( $this->lookup_optional( $lookups['suppliers'], $rule->supplier_id ) ) . '</td>';
@@ -379,8 +369,18 @@ final class ProductDeliveryRulesPage {
 
 			echo '</tbody></table>';
 		} elseif ( null === $result->no_match_message || '' === $result->no_match_message ) {
-			echo '<p><em>' . esc_html__( 'No rules were chosen for any fulfilment availability.', 'cetech-woocommerce-delivery-engine' ) . '</em></p>';
+			echo '<p><em>' . esc_html__( 'No rules were chosen for any fulfilment location.', 'cetech-woocommerce-delivery-engine' ) . '</em></p>';
 		}
+
+		AdminPageLayout::open_developer_information();
+		echo '<p class="description">' . esc_html(
+			sprintf(
+				/* translators: %s: internal contract version */
+				__( 'Internal contract version: %s (support check only; not used on the storefront).', 'cetech-woocommerce-delivery-engine' ),
+				$result->contract_version
+			)
+		) . '</p>';
+		AdminPageLayout::close_developer_information();
 
 		if ( [] !== $result->skipped_rules ) {
 			echo '<p><strong>' . esc_html__( 'Skipped rules:', 'cetech-woocommerce-delivery-engine' ) . '</strong></p><ul>';
@@ -430,15 +430,19 @@ final class ProductDeliveryRulesPage {
 
 	private function render_selection_validation_test_tool(): void {
 		$draft = $this->action_handler->notices()->consume_form_draft( self::SLUG . '_validate' );
+		$selector_label = FeatureFlagLabels::label( 'enable_product_delivery_selector' );
 
-		echo '<h3>' . esc_html__( 'Test delivery selection validation', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
+		echo '<h3>' . esc_html( AdminLanguage::check_delivery_choice() ) . '</h3>';
 		echo '<p class="description">' . esc_html__(
-			'Read-only admin check of whether a display_key would validate for a product context. Does not write cart, session, order, or product metadata.',
+			'Use this support tool to check whether a specific delivery choice is still valid for a product or variation. This check does not change the cart, checkout, orders, or product settings.',
 			'cetech-woocommerce-delivery-engine'
 		) . '</p>';
-		echo '<p class="description">' . esc_html__(
-			'Requires enable_product_delivery_selector to be enabled. Use display keys from the resolution test or product-page selector (format: availability:choice:suffix).',
-			'cetech-woocommerce-delivery-engine'
+		echo '<p class="description">' . esc_html(
+			sprintf(
+				/* translators: %s: operational setting label */
+				__( 'This diagnostic requires “%s” to be turned on.', 'cetech-woocommerce-delivery-engine' ),
+				$selector_label
+			)
 		) . '</p>';
 
 		echo '<form method="post" action="">';
@@ -454,26 +458,39 @@ final class ProductDeliveryRulesPage {
 		);
 		AdminFormHelper::number_field(
 			'test_variation_id',
-			__( 'Variation ID (optional)', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Product variation ID (optional)', 'cetech-woocommerce-delivery-engine' ),
 			isset( $draft['test_variation_id'] ) ? (int) $draft['test_variation_id'] : null,
 			0,
 			__( 'Required for variable products. Leave 0 for simple products.', 'cetech-woocommerce-delivery-engine' )
 		);
 		AdminFormHelper::text_field(
 			'test_display_key',
-			__( 'Display key', 'cetech-woocommerce-delivery-engine' ),
+			AdminLanguage::delivery_choice_identifier(),
 			(string) ( $draft['test_display_key'] ?? '' ),
 			true,
-			__( 'Example: in_store:delivery:12 or in_store:store_pickup:pickup', 'cetech-woocommerce-delivery-engine' )
+			__( 'This technical identifier represents one specific delivery choice. Support staff may ask you to paste one here when troubleshooting.', 'cetech-woocommerce-delivery-engine' )
 		);
 		echo '</tbody></table>';
-		submit_button( __( 'Run selection validation test', 'cetech-woocommerce-delivery-engine' ), 'secondary', 'submit', false );
+		AdminPageLayout::open_developer_information();
+		echo '<p class="description">' . esc_html(
+			sprintf(
+				/* translators: %s: internal setting key */
+				__( 'Internal setting key: %s', 'cetech-woocommerce-delivery-engine' ),
+				'enable_product_delivery_selector'
+			)
+		) . '</p>';
+		echo '<p class="description">' . esc_html__(
+			'Identifier format: availability:choice:suffix. Example: in_store:delivery:12 or in_store:store_pickup:pickup.',
+			'cetech-woocommerce-delivery-engine'
+		) . '</p>';
+		AdminPageLayout::close_developer_information();
+		submit_button( __( 'Check delivery choice', 'cetech-woocommerce-delivery-engine' ), 'secondary', 'submit', false );
 		echo '</form>';
 
 		if ( is_array( $draft ) && isset( $draft['validation_result'] ) && is_array( $draft['validation_result'] ) ) {
 			$this->render_selection_validation_result( ProductDeliverySelectionValidationResult::fromArray( $draft['validation_result'] ) );
 		} elseif ( is_array( $draft ) && ! empty( $draft['validation_error'] ) ) {
-			echo '<h3>' . esc_html__( 'Validation result', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
+			echo '<h3>' . esc_html__( 'Check result', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
 			echo '<p><strong>' . esc_html__( 'Error:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
 			echo esc_html( (string) $draft['validation_error'] );
 			echo '</p>';
@@ -481,16 +498,13 @@ final class ProductDeliveryRulesPage {
 	}
 
 	private function render_selection_validation_result( ProductDeliverySelectionValidationResult $result ): void {
-		echo '<h3>' . esc_html__( 'Validation result', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
+		echo '<h3>' . esc_html__( 'Check result', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
 
 		echo '<p><strong>' . esc_html__( 'Valid:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
 		echo esc_html( $result->valid ? __( 'Yes', 'cetech-woocommerce-delivery-engine' ) : __( 'No', 'cetech-woocommerce-delivery-engine' ) );
 		echo '</p>';
 
 		if ( ! $result->valid ) {
-			echo '<p><strong>' . esc_html__( 'Error code:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
-			echo esc_html( (string) $result->error_code );
-			echo '</p>';
 			echo '<p><strong>' . esc_html__( 'Message:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
 			echo esc_html( (string) $result->error_message );
 			echo '</p>';
@@ -505,14 +519,13 @@ final class ProductDeliveryRulesPage {
 		}
 
 		if ( is_array( $result->matched_option ) ) {
-			echo '<p><strong>' . esc_html__( 'Matched option:', 'cetech-woocommerce-delivery-engine' ) . '</strong></p>';
+			echo '<p><strong>' . esc_html__( 'Matching delivery choice:', 'cetech-woocommerce-delivery-engine' ) . '</strong></p>';
 			echo '<ul>';
 			foreach (
 				[
-					'display_key'                       => __( 'Display key', 'cetech-woocommerce-delivery-engine' ),
-					'fulfilment_availability_label'     => __( 'Availability', 'cetech-woocommerce-delivery-engine' ),
-					'fulfilment_choice_label'           => __( 'Choice', 'cetech-woocommerce-delivery-engine' ),
-					'delivery_offer_public_label'       => __( 'Public label', 'cetech-woocommerce-delivery-engine' ),
+					'fulfilment_availability_label'     => __( 'Fulfilment availability', 'cetech-woocommerce-delivery-engine' ),
+					'fulfilment_choice_label'           => __( 'Fulfilment choice', 'cetech-woocommerce-delivery-engine' ),
+					'delivery_offer_public_label'       => __( 'Customer-facing label', 'cetech-woocommerce-delivery-engine' ),
 					'estimate_text'                     => __( 'Estimate', 'cetech-woocommerce-delivery-engine' ),
 					'is_available'                      => __( 'Available', 'cetech-woocommerce-delivery-engine' ),
 				] as $field => $label
@@ -534,17 +547,28 @@ final class ProductDeliveryRulesPage {
 			echo '</ul>';
 		}
 
+		AdminPageLayout::open_developer_information();
+		if ( ! $result->valid ) {
+			echo '<p><strong>' . esc_html__( 'Error code:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
+			echo esc_html( (string) $result->error_code );
+			echo '</p>';
+		}
+		if ( is_array( $result->matched_option ) && isset( $result->matched_option['display_key'] ) ) {
+			echo '<p><strong>' . esc_html( AdminLanguage::delivery_choice_identifier() ) . ':</strong> ';
+			echo esc_html( (string) $result->matched_option['display_key'] );
+			echo '</p>';
+		}
 		if ( is_array( $result->intent ) ) {
-			echo '<p><strong>' . esc_html__( 'Selection intent (server-side handoff):', 'cetech-woocommerce-delivery-engine' ) . '</strong></p>';
+			echo '<p><strong>' . esc_html__( 'Internal selection record:', 'cetech-woocommerce-delivery-engine' ) . '</strong></p>';
 			echo '<ul>';
 			foreach (
 				[
 					'contract_version'        => __( 'Contract version', 'cetech-woocommerce-delivery-engine' ),
 					'product_id'              => __( 'Product ID', 'cetech-woocommerce-delivery-engine' ),
-					'variation_id'            => __( 'Variation ID', 'cetech-woocommerce-delivery-engine' ),
-					'target_type'             => __( 'Target type', 'cetech-woocommerce-delivery-engine' ),
-					'target_id'               => __( 'Target ID', 'cetech-woocommerce-delivery-engine' ),
-					'display_key'             => __( 'Display key', 'cetech-woocommerce-delivery-engine' ),
+					'variation_id'            => __( 'Product variation ID', 'cetech-woocommerce-delivery-engine' ),
+					'target_type'             => __( 'Item type', 'cetech-woocommerce-delivery-engine' ),
+					'target_id'               => __( 'Item ID', 'cetech-woocommerce-delivery-engine' ),
+					'display_key'             => AdminLanguage::delivery_choice_identifier(),
 					'rule_id'                 => __( 'Rule ID', 'cetech-woocommerce-delivery-engine' ),
 					'delivery_offer_id'       => __( 'Delivery offer ID', 'cetech-woocommerce-delivery-engine' ),
 					'issued_at'               => __( 'Issued at', 'cetech-woocommerce-delivery-engine' ),
@@ -558,6 +582,7 @@ final class ProductDeliveryRulesPage {
 			}
 			echo '</ul>';
 		}
+		AdminPageLayout::close_developer_information();
 	}
 
 	private function handle_selection_validation_test(): void {
@@ -713,7 +738,7 @@ final class ProductDeliveryRulesPage {
 			__( 'Fulfilment availability', 'cetech-woocommerce-delivery-engine' ),
 			$this->friendly_availability_options(),
 			(string) ( $record['fulfilment_availability'] ?? FulfilmentAvailability::InStore->value ),
-			__( 'Where the product is available from, such as in store or from a warehouse.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Choose where this item is fulfilled from. This affects which delivery methods can be offered.', 'cetech-woocommerce-delivery-engine' )
 		);
 		AdminFormHelper::select_field(
 			'fulfilment_choice',
@@ -734,7 +759,7 @@ final class ProductDeliveryRulesPage {
 			__( 'Logistics profile', 'cetech-woocommerce-delivery-engine' ),
 			$this->optional_select_options( $this->logistics_profile_options() ),
 			(string) ( $record['logistics_profile_id'] ?? '' ),
-			__( 'Optional. Links special handling rules such as heavy, fragile, or pickup-only items.', 'cetech-woocommerce-delivery-engine' )
+			__( 'A logistics profile groups the delivery handling rules used to fulfil an item, such as how it is dispatched or which delivery services can be used. Optional.', 'cetech-woocommerce-delivery-engine' )
 		);
 		AdminPageLayout::close_form_panel();
 
@@ -765,7 +790,7 @@ final class ProductDeliveryRulesPage {
 			__( 'Priority', 'cetech-woocommerce-delivery-engine' ),
 			isset( $record['priority'] ) ? (int) $record['priority'] : 100,
 			0,
-			__( 'Lower numbers win when multiple rules could match. Default is 100.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Priority decides which delivery setup takes precedence if more than one setup could apply. A lower number is considered first. Most products can leave this unchanged (default 100).', 'cetech-woocommerce-delivery-engine' )
 		);
 		echo '<tr><th scope="row"></th><td><p class="description cetech-de-setting-code">priority</p></td></tr>';
 		echo '</tbody></table>';
@@ -1369,8 +1394,8 @@ final class ProductDeliveryRulesPage {
 	private function target_type_label( string $type ): string {
 		return match ( $type ) {
 			ProductTargetType::Product->value => __( 'Product', 'cetech-woocommerce-delivery-engine' ),
-			ProductTargetType::Variation->value => __( 'Variation', 'cetech-woocommerce-delivery-engine' ),
-			ProductTargetType::Category->value => __( 'Category', 'cetech-woocommerce-delivery-engine' ),
+			ProductTargetType::Variation->value => __( 'Product variation', 'cetech-woocommerce-delivery-engine' ),
+			ProductTargetType::Category->value => __( 'Product category', 'cetech-woocommerce-delivery-engine' ),
 			default => $type,
 		};
 	}

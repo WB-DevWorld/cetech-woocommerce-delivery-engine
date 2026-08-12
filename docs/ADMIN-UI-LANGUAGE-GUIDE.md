@@ -157,6 +157,44 @@ Normal operation must not depend on reading that section.
 
 ---
 
+## Technical diagnostic tools
+
+**Technical diagnostic tools are not part of normal staff workflow.**
+
+They appear in a collapsed section on Legacy Delivery Rules (and Rate Cards). Ordinary staff do not need them for daily delivery setup.
+
+Heading: **Technical diagnostic tools**
+
+Intro: “These tools are intended for technical support and troubleshooting. You do not need them for normal delivery setup or daily operations.”
+
+| Old wording | Normal-user wording |
+|-------------|---------------------|
+| Staff testing tools | Technical diagnostic tools |
+| Test product rule resolution | Check which legacy delivery rule applies |
+| Run resolution test | Check applicable rule |
+| Test delivery selection validation | Check a delivery choice |
+| Display key | Delivery choice identifier |
+| `enable_product_delivery_selector` | Show delivery choices on product pages |
+| Target type / Target ID | Item type / Item ID |
+| product / variation / category | Product / Product variation / Product category |
+
+Raw internal keys, identifier syntax (`availability:choice:suffix`), and examples such as `in_store:delivery:12` belong only under **Developer information**.
+
+---
+
+## Business-term help text
+
+Keep the business terms. Always explain what they control:
+
+| Term | Meaning for staff |
+|------|-------------------|
+| Fulfilment availability | Choose where this item is fulfilled from (In Store, In Warehouse, or International). This affects which delivery methods can be offered. |
+| Logistics profile | Groups the delivery handling rules used to fulfil an item, such as how it is dispatched or which delivery services can be used. |
+| Priority | Decides which delivery setup takes precedence if more than one setup could apply. A **lower number is considered first**. Most products can leave this unchanged (default 100). |
+| Rate Card | Contains the delivery prices used to calculate shipping. Each card connects a delivery zone and a delivery offer to a fee. |
+
+---
+
 ## Customer Language Boundary
 
 Customer-facing strings stay operational. Stage 6 wording:
@@ -196,6 +234,11 @@ These may remain when defined with concise help text:
 
 Do not use these as primary labels, headings, notices, or empty states:
 
+- `enable_product_delivery_selector` and other raw `enable_*` option keys
+- `display_key`
+- `availability:choice:suffix`
+- Staff testing tools
+- feature flag
 - EffectiveConfigurationResolver
 - ECR (except inside Advanced / Technical details)
 - Scoped Configuration / scope / `scope_id` / `scope_type`
@@ -226,5 +269,8 @@ Allowlist: the terms may appear in Technical details, Advanced system details, d
 | Provenance: product | Currently using: Product Settings |
 | REPLACE [] | No delivery options for this setup |
 | enable_effective_configuration_runtime | Use the New Delivery Settings System |
+| enable_product_delivery_selector | Show delivery choices on product pages |
+| Staff testing tools | Technical diagnostic tools |
+| Display key | Delivery choice identifier |
 | No scoped records found | No product-specific delivery settings have been added… |
 | Legacy category dependency detected | This product still gets its delivery settings from a legacy category rule… |
