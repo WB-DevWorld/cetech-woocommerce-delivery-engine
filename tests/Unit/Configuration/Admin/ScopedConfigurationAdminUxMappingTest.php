@@ -18,12 +18,12 @@ use PHPUnit\Framework\TestCase;
 final class ScopedConfigurationAdminUxMappingTest extends TestCase {
 
 	public function test_provenance_labels(): void {
-		self::assertSame( 'Default Settings', ProvenanceLabelMapper::map( 'global' ) );
-		self::assertSame( 'Product Settings', ProvenanceLabelMapper::map( 'product' ) );
-		self::assertSame( 'Variation Settings', ProvenanceLabelMapper::map( 'variation' ) );
+		self::assertSame( 'Site-wide default', ProvenanceLabelMapper::map( 'global' ) );
+		self::assertSame( 'Product-specific', ProvenanceLabelMapper::map( 'product' ) );
+		self::assertSame( 'Variation-specific', ProvenanceLabelMapper::map( 'variation' ) );
 		self::assertSame( 'Turned off for this item', ProvenanceLabelMapper::map( 'explicit_disable' ) );
 		self::assertSame( 'Built-in default', ProvenanceLabelMapper::map( 'system_default' ) );
-		self::assertSame( 'Currently using: Product Settings', ProvenanceLabelMapper::currently_using( 'product' ) );
+		self::assertSame( 'Currently using: Product-specific', ProvenanceLabelMapper::currently_using( 'product' ) );
 	}
 
 	public function test_collection_mutation_summaries_include_replace_empty(): void {
@@ -35,8 +35,8 @@ final class ScopedConfigurationAdminUxMappingTest extends TestCase {
 			static fn ( int $id ): string => 'Offer-' . $id
 		);
 
-		self::assertSame( 'Default Settings: Use only Offer-1, Offer-2', $lines[0] );
-		self::assertSame( 'Product Settings: Use only no delivery options for this setup', $lines[1] );
+		self::assertSame( 'Site-wide default: Use only Offer-1, Offer-2', $lines[0] );
+		self::assertSame( 'Product-specific: Use only no delivery options for this setup', $lines[1] );
 	}
 
 	public function test_reason_and_state_mapping(): void {

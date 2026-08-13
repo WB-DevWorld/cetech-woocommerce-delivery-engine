@@ -26,15 +26,15 @@ final class AdminLanguagePresentationTest extends TestCase {
 		self::assertSame( 'Delivery Settings', AdminLanguage::menu_delivery_settings() );
 		self::assertSame( 'Delivery Settings Preview', AdminLanguage::menu_preview() );
 		self::assertSame( 'Legacy Delivery Rules', AdminLanguage::menu_legacy_rules() );
-		self::assertSame( 'Default Settings', AdminLanguage::tab_default_settings() );
+		self::assertSame( 'Site-wide Defaults', AdminLanguage::tab_default_settings() );
 		self::assertSame( 'Product-Specific Settings', AdminLanguage::tab_product_settings() );
 		self::assertSame( 'Variation-Specific Settings', AdminLanguage::tab_variation_settings() );
 	}
 
 	public function test_empty_states_explain_next_action(): void {
-		self::assertStringContainsString( 'Default Settings', AdminLanguage::empty_product_settings() );
+		self::assertStringContainsString( 'Site-wide Defaults', AdminLanguage::empty_product_settings() );
 		self::assertStringContainsString( 'parent product', AdminLanguage::empty_variation_settings() );
-		self::assertStringContainsString( 'default delivery settings', strtolower( AdminLanguage::empty_default_settings() ) );
+		self::assertStringContainsString( 'site-wide delivery defaults', strtolower( AdminLanguage::empty_default_settings() ) );
 	}
 
 	public function test_feature_flag_labels_cover_defaults_without_raw_keys(): void {
@@ -88,7 +88,7 @@ final class AdminLanguagePresentationTest extends TestCase {
 	}
 
 	public function test_inheritance_and_status_labels_avoid_developer_jargon(): void {
-		self::assertSame( 'Currently using: Default Settings', ProvenanceLabelMapper::currently_using( 'global' ) );
+		self::assertSame( 'Currently using: Site-wide default', ProvenanceLabelMapper::currently_using( 'global' ) );
 		self::assertSame( 'Ready', ReasonCodeLabelMapper::state_label( EffectiveFieldState::Valid ) );
 		self::assertSame( 'Needs configuration', ReasonCodeLabelMapper::state_label( EffectiveFieldState::Unresolved ) );
 		self::assertSame( 'Configuration problem', ReasonCodeLabelMapper::state_label( EffectiveFieldState::Invalid ) );

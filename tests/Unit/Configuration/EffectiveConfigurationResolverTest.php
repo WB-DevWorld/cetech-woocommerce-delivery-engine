@@ -306,7 +306,7 @@ final class EffectiveConfigurationResolverTest extends TestCase {
 		$counts = $this->repository->getReadCallCounts();
 		self::assertSame( 1, $counts['getGlobalConfiguration'] ?? 0 );
 		self::assertSame( 2, $counts['findByScope'] ?? 0 );
-		self::assertSame( 0, $counts['findByScopeAndSlice'] ?? 0 );
+		self::assertSame( 1, $counts['findByScopeAndSlice'] ?? 0 );
 		self::assertSame( 0, $this->repository->getWriteCalls() );
 	}
 
