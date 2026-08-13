@@ -2,10 +2,10 @@
 
 ## CURRENT IMPLEMENTATION STATUS — V1 RC (read first)
 
-**Last updated:** 2026-08-12  
-**Plugin version:** `1.0.0-rc.2`  
+**Last updated:** 2026-08-13  
+**Plugin version:** `1.0.0-rc.2` (Stage 13 developing `1.0.0-rc.3` on `feat/site-wide-delivery-defaults`; public version unchanged until packaged)  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `master` — **LIVE VERIFIED** on FLAIROC Classic Checkout; package SHA-256 `f85af02c…4e3b`; release-candidate commit `e75b80c` + closure docs  
+**Git:** `feat/site-wide-delivery-defaults` from `master`; RC.2 tag `v1.0.0-rc.2` **untouched**  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
@@ -30,16 +30,17 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 7 WoodMart adapter | **COMPLETE — NO WOODMART ADAPTER REQUIRED** |
 | Stage 8 multi-product shipping grouping | **FUNCTIONALLY COMPLETE** — order **`#39724`** shipping **25.00** / total **64.98** |
 | Stage 8C order-admin technical presentation cleanup | **COMPLETE** — live PASS |
-| Classic Checkout release `1.0.0-rc.2` | **LIVE AND USABLE** — final live smoke **PASS**; readiness `docs/RELEASE-1.0.0-RC.2-READINESS.md` |
-| New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos |
-| New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-slice; provenance; fingerprint; hard constraints |
-| New admin UX | **Delivery Settings** is the everyday staff workflow (Default / Product / Variation + Preview). **Legacy Delivery Rules** = migration/compatibility only |
+| Classic Checkout release `1.0.0-rc.2` | **LIVE AND USABLE** — final live smoke **PASS**; readiness `docs/RELEASE-1.0.0-RC.2-READINESS.md`; **do not modify the tag** |
+| Stage 13 site-wide delivery defaults | **IMPLEMENTED** on `feat/site-wide-delivery-defaults` — artifact `docs/STAGE-13-SITE-WIDE-DELIVERY-DEFAULTS.md`; live QA not yet run |
+| New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos; profile defaults use `global/0/{profile_key}` |
+| New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-profile site-wide root; primary default fallback; provenance; fingerprint; hard constraints |
+| New admin UX | **Delivery Settings** landing + guided setup + site-wide default cards. Product/variation customization is progressive. **Legacy Delivery Rules** = migration/compatibility only |
 | Runtime on FLAIROC | **Required production features ON**; deferred features **OFF**; **COD OFF**; schema **3** |
 | Variable runtime capture | Verified live; WoodMart adapter **not required** |
 | Shipments / tracking / timeline | **Not implemented** (deferred post-RC.2) |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Compatibility route retained; do not mass-retire legacy runtime in this release |
-| Next stage | Post-RC.2 backlog only when owner prioritizes (shipments/tracking/Blocks/carriers). Do **not** start unless instructed. |
+| Next stage | RC.3 live inheritance QA, then package `1.0.0-rc.3`. Do **not** start shipments/tracking/Blocks unless instructed. |
 | Final PHP log (RC.2 smoke) | Marker **546** → inspected through **548** — **PASS**; no new Delivery Engine fatals |
 | Live QA orders | `#39721` (variable); `#39724` (multi-product grouping) |
 | Package | `cetech-woocommerce-delivery-engine-1.0.0-rc.2.zip` SHA-256 `f85af02c5b02a88dcbb0fb061108a9ec02aff72569fcfd4e34cbc27af4cc4e3b` |
@@ -76,6 +77,8 @@ Administrator-language requirement: normal-user admin UI must use operational la
 | `docs/STAGE-6B-FLAIROC-VARIABLE-ECR-VERIFICATION.md` | Stage 6B packaging record + FLAIROC variable verification plan |
 | `docs/STAGE-8A-MULTI-PRODUCT-SHIPPING-GROUPING.md` | Stage 8A cart delivery groups + WooCommerce shipping packages |
 | `docs/STAGE-8C-ORDER-ADMIN-PRESENTATION-CLEANUP.md` | Stage 8C order-admin technical meta presentation cleanup |
+| `docs/STAGE-13-ARCHITECTURE-NOTE.md` | Stage 13 pre-change audit of RC.2 default/inheritance behavior |
+| `docs/STAGE-13-SITE-WIDE-DELIVERY-DEFAULTS.md` | Stage 13 site-wide defaults + guided admin experience |
 | `docs/CLASSIC-CHECKOUT-RELEASE-CANDIDATE-READINESS.md` | Pre-smoke Classic Checkout readiness (superseded for status by RC.2 readiness) |
 | `docs/RELEASE-1.0.0-RC.2-READINESS.md` | **Authoritative** live-verified `1.0.0-rc.2` release readiness |
 | `docs/ADMIN-UI-LANGUAGE-GUIDE.md` | Authoritative normal-administrator presentation language |
