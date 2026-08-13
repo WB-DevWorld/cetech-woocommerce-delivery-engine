@@ -11,11 +11,12 @@ final class ProvenanceLabelMapper {
 
 	public static function map( string $source_label ): string {
 		return match ( $source_label ) {
-			'global' => 'Default Settings',
-			'product' => 'Product Settings',
-			'variation' => 'Variation Settings',
+			'global' => 'Site-wide default',
+			'product' => 'Product-specific',
+			'variation' => 'Variation-specific',
 			'explicit_disable' => 'Turned off for this item',
 			'system_default' => 'Built-in default',
+			'hard_constraint' => 'Required fulfilment rule',
 			default => $source_label,
 		};
 	}
@@ -35,9 +36,9 @@ final class ProvenanceLabelMapper {
 
 		foreach ( $steps as $step ) {
 			$scope = match ( $step->scope->value ) {
-				'global' => 'Default Settings',
-				'product' => 'Product Settings',
-				'variation' => 'Variation Settings',
+				'global' => 'Site-wide default',
+				'product' => 'Product-specific',
+				'variation' => 'Variation-specific',
 				default => $step->scope->value,
 			};
 

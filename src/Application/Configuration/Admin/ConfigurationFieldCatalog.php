@@ -77,7 +77,8 @@ final class ConfigurationFieldCatalog {
 			ConfigurationFieldKey::SUPPLIER_ID => 'Supplier',
 			ConfigurationFieldKey::ORIGIN_ID => 'Origin',
 			ConfigurationFieldKey::PRIORITY => 'Priority',
-			ConfigurationFieldKey::DELIVERY_OFFER_IDS => 'Delivery offers',
+			ConfigurationFieldKey::ESTIMATED_DELIVERY => 'Estimated delivery',
+			ConfigurationFieldKey::DELIVERY_OFFER_IDS => 'Delivery options',
 			default => $field_key,
 		};
 	}
@@ -90,7 +91,8 @@ final class ConfigurationFieldCatalog {
 			ConfigurationFieldKey::SUPPLIER_ID => 'Private supplier reference. Choose “Turn off” if this item should not use a supplier.',
 			ConfigurationFieldKey::ORIGIN_ID => 'Private origin reference. Choose “Turn off” if this item should not use an origin.',
 			ConfigurationFieldKey::PRIORITY => 'Priority decides which delivery setup takes precedence if more than one setup could apply. A lower number is considered first. Most products can leave this unchanged. Zero is a valid value.',
-			ConfigurationFieldKey::DELIVERY_OFFER_IDS => 'Choose whether this product should use the delivery options it inherits, add more options, remove some, or use its own list. Choosing an empty list means no delivery options for this setup.',
+			ConfigurationFieldKey::ESTIMATED_DELIVERY => 'Customer-facing estimated delivery, such as 3–5 days. Leave this inherited to follow the site-wide default. Setting a different value here does not freeze the delivery option or charge.',
+			ConfigurationFieldKey::DELIVERY_OFFER_IDS => 'Choose whether this product should use the delivery options it inherits, add more options, remove some, or use only these options. Choosing an empty list means no delivery options for this setup.',
 			default => '',
 		};
 	}
@@ -111,9 +113,9 @@ final class ConfigurationFieldCatalog {
 	public static function enum_options( string $field_key ): ?array {
 		return match ( $field_key ) {
 			ConfigurationFieldKey::FULFILMENT_AVAILABILITY => [
-				FulfilmentAvailability::InternationalFulfilment->value => 'International fulfilment',
-				FulfilmentAvailability::InStore->value => 'In store',
-				FulfilmentAvailability::InWarehouse->value => 'In warehouse',
+				FulfilmentAvailability::InternationalFulfilment->value => 'International',
+				FulfilmentAvailability::InStore->value => 'In Store',
+				FulfilmentAvailability::InWarehouse->value => 'In Warehouse',
 			],
 			ConfigurationFieldKey::FULFILMENT_CHOICE => [
 				FulfilmentChoice::Delivery->value => 'Delivery',

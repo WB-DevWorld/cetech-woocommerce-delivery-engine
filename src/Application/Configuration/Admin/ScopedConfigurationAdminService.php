@@ -7,6 +7,7 @@ namespace CetechDeliveryEngine\Application\Configuration\Admin;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver;
 use CetechDeliveryEngine\Domain\Configuration\CollectionFieldInstruction;
 use CetechDeliveryEngine\Domain\Configuration\CollectionMutationStep;
+use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
 use CetechDeliveryEngine\Domain\Configuration\EffectiveConfiguration;
 use CetechDeliveryEngine\Domain\Configuration\EffectiveConfigurationRequest;
@@ -19,6 +20,7 @@ use CetechDeliveryEngine\Domain\Enum\ConfigurationSource;
 use CetechDeliveryEngine\Domain\Enum\EffectiveFieldState;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Domain\Enum\ScalarConfigurationMode;
+use CetechDeliveryEngine\Domain\FulfilmentProfile\FulfilmentProfileRegistry;
 use CetechDeliveryEngine\Presentation\Admin\ConfigurationAuditLogger;
 
 /**
@@ -335,6 +337,7 @@ final class ScopedConfigurationAdminService {
 		?EffectiveConfiguration $effective
 	): array {
 		$fields = [];
+		$profile_default_label = $this->profile_default_mode_label( $effective );
 
 		foreach ( ConfigurationFieldCatalog::all() as $meta ) {
 			$field_key = $meta['key'];
@@ -342,13 +345,13 @@ final class ScopedConfigurationAdminService {
 
 			$mode_labels = $is_collection
 				? [
-					'inherit' => 'Use inherited setting',
-					'add'     => 'Add to inherited options',
-					'remove'  => 'Remove from inherited options',
+					'inherit' => 'Use default options',
+					'add'     => 'Add options',
+					'remove'  => 'Remove options',
 					'replace' => 'Use only these options',
 				]
 				: [
-					'inherit'  => 'Use inherited setting',
+					'inherit'  => $profile_default_label,
 					'override' => 'Set a different value here',
 					'disable'  => 'Turn off',
 				];
@@ -708,7 +711,7 @@ final class ScopedConfigurationAdminService {
 		}
 
 		$options = ConfigurationFieldCatalog::enum_options(
-			\CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey::FULFILMENT_AVAILABILITY
+			ConfigurationFieldKey::FULFILMENT_AVAILABILITY
 		);
 
 		return is_array( $options ) && isset( $options[ $slice_key ] );
@@ -725,5 +728,17 @@ final class ScopedConfigurationAdminService {
 		}
 
 		return false;
+	}
+
+	private function profile_default_mode_label( ?EffectiveConfiguration $effective ): string {
+		$availability = $effective?->scalar( ConfigurationFieldKey::FULFILMENT_AVAILABILITY )?->value;
+		if ( is_string( $availability ) && '' !== $availability ) {
+			$profile = FulfilmentProfileRegistry::get( $availability );
+			if ( null !== $profile ) {
+				return sprintf( 'Use %s default', $profile->label );
+			}
+		}
+
+		return 'Use site-wide default';
 	}
 }

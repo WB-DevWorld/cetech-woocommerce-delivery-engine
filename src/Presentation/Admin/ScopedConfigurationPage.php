@@ -9,9 +9,11 @@ use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationAdmi
 use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationAuthorization;
 use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationNotices;
 use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationWriteCommand;
+use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsService;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
 use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
 use CetechDeliveryEngine\Domain\Enum\ProductTargetType;
+use CetechDeliveryEngine\Domain\FulfilmentProfile\FulfilmentProfileRegistry;
 
 /**
  * Admin UX for Global / Product / Variation scoped configuration (Stage 4).
@@ -24,11 +26,14 @@ final class ScopedConfigurationPage {
 
 	private const ACTION_SAVE = 'cetech_de_save_scoped_configuration';
 
+	private const ACTION_RESET = 'cetech_de_reset_scoped_configuration';
+
 	public function __construct(
 		private ScopedConfigurationAdminService $admin_service,
 		private ProductTargetResolver $product_target_resolver,
 		private AdminActionHandler $action_handler,
-		private ScopedConfigurationAuthorization $authorization
+		private ScopedConfigurationAuthorization $authorization,
+		private ?SiteWideDefaultsService $defaults = null
 	) {
 	}
 
@@ -40,6 +45,10 @@ final class ScopedConfigurationPage {
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
 		$action = sanitize_key( wp_unslash( (string) $_POST['cetech_de_action'] ) );
+		if ( self::ACTION_RESET === $action ) {
+			$this->handle_reset();
+			return;
+		}
 		if ( self::ACTION_SAVE !== $action ) {
 			return;
 		}
@@ -119,14 +128,14 @@ final class ScopedConfigurationPage {
 		AdminPageLayout::render_page_header(
 			__( 'Delivery configuration', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Set default delivery settings, then optionally change them for a product or a variation. If you do not set a different value, the next level up is used.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Most products should use site-wide defaults. Only customize a product or variation when it genuinely needs different delivery rules.', 'cetech-woocommerce-delivery-engine' ),
+			[
+				'label' => __( 'Site-wide Defaults', 'cetech-woocommerce-delivery-engine' ),
+				'url'   => AdminPageRenderer::list_url( DeliverySettingsHomePage::SLUG ),
+			],
 			[
 				'label' => __( 'Delivery Settings Preview', 'cetech-woocommerce-delivery-engine' ),
 				'url'   => AdminPageRenderer::list_url( EffectiveConfigurationPreviewPage::SLUG ),
-			],
-			[
-				'label' => __( 'Legacy Delivery Rules', 'cetech-woocommerce-delivery-engine' ),
-				'url'   => AdminPageRenderer::list_url( ProductDeliveryRulesPage::SLUG ),
 			]
 		);
 
@@ -147,9 +156,50 @@ final class ScopedConfigurationPage {
 		}
 
 		$this->render_context_summary( $model );
+		$customize = $this->wants_customize( $model );
+		if ( ! $customize && $this->render_simplified_scope_intro( $model ) ) {
+			AdminPageLayout::close_page();
+			return;
+		}
 		$this->render_empty_state( $model );
+		$this->render_reset_action( $model );
 		$this->render_editor_form( $model );
 		AdminPageLayout::close_page();
+	}
+
+	private function handle_reset(): void {
+		if ( ! $this->action_handler->verify_post( self::ACTION_RESET, self::ACTION_RESET, ScopedConfigurationAuthorization::CAPABILITY_PRODUCT, self::SLUG ) ) {
+			return;
+		}
+
+		$scope_type_raw = isset( $_POST['scope_type'] ) ? sanitize_key( wp_unslash( (string) $_POST['scope_type'] ) ) : '';
+		$scope_id       = isset( $_POST['scope_id'] ) ? absint( wp_unslash( $_POST['scope_id'] ) ) : 0;
+		$slice_key      = isset( $_POST['slice_key'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['slice_key'] ) ) : ConfigurationScope::DEFAULT_SLICE_KEY;
+		$parent_id      = isset( $_POST['parent_product_id'] ) ? absint( wp_unslash( $_POST['parent_product_id'] ) ) : 0;
+
+		$ok = false;
+		if ( ConfigurationScopeType::Product->value === $scope_type_raw && null !== $this->defaults ) {
+			$ok = $this->defaults->reset_product_to_site_wide( $scope_id, $slice_key );
+		}
+		if ( ConfigurationScopeType::Variation->value === $scope_type_raw && null !== $this->defaults ) {
+			$ok = $this->defaults->reset_variation_to_product( $scope_id, $slice_key );
+		}
+
+		$redirect = [
+			'scope_type' => $scope_type_raw,
+			'scope_id'   => $scope_id,
+			'slice_key'  => $slice_key,
+		];
+		if ( $parent_id > 0 ) {
+			$redirect['parent_product_id'] = $parent_id;
+		}
+
+		$this->action_handler->notices()->flash_success(
+			$ok
+				? __( 'Custom delivery settings were removed. Inheritance has been restored.', 'cetech-woocommerce-delivery-engine' )
+				: __( 'There were no custom delivery settings to remove.', 'cetech-woocommerce-delivery-engine' )
+		);
+		$this->action_handler->redirect( self::SLUG, $redirect );
 	}
 
 	private function handle_save( string $scope_type_raw ): void {
@@ -349,12 +399,121 @@ final class ScopedConfigurationPage {
 	/**
 	 * @param \CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationEditViewModel $model
 	 */
+	/**
+	 * @param \CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationEditViewModel $model
+	 */
+	private function wants_customize( $model ): bool {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		if ( isset( $_GET['customize'] ) && '1' === (string) wp_unslash( $_GET['customize'] ) ) {
+			return true;
+		}
+
+		foreach ( $model->fields as $field ) {
+			if ( 'inherit' !== $field->current_mode && 'not_configured' !== $field->current_mode && 'Not configured' !== $field->configured_state_label ) {
+				if ( 'fulfilment_availability' === $field->field_key ) {
+					continue;
+				}
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * @param \CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationEditViewModel $model
+	 */
+	private function render_simplified_scope_intro( $model ): bool {
+		if ( 'product' !== $model->scope_type && 'variation' !== $model->scope_type ) {
+			return false;
+		}
+
+		$profile_label = $this->current_profile_label( $model );
+		$using         = 'variation' === $model->scope_type
+			? __( 'Product Settings', 'cetech-woocommerce-delivery-engine' )
+			: sprintf(
+				/* translators: %s fulfilment type */
+				__( '%s Site-wide Defaults', 'cetech-woocommerce-delivery-engine' ),
+				$profile_label
+			);
+
+		echo '<div class="cetech-de-form-panel">';
+		echo '<h2>' . esc_html__( 'Currently using:', 'cetech-woocommerce-delivery-engine' ) . ' ' . esc_html( $using ) . '</h2>';
+		if ( 'product' === $model->scope_type ) {
+			echo '<p>' . esc_html__( 'This product has no special delivery settings.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			echo '<p><strong>' . esc_html__( 'Use Site-wide Defaults', 'cetech-woocommerce-delivery-engine' ) . '</strong> — ' . esc_html__( 'Recommended', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		} else {
+			echo '<p>' . esc_html__( 'This variation uses the same delivery settings as its product, unless you customize it.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		}
+
+		$customize_url = add_query_arg(
+			[
+				'page'               => self::SLUG,
+				'scope_type'         => $model->scope_type,
+				'scope_id'           => $model->scope_id,
+				'slice_key'          => $model->slice_key,
+				'customize'          => 1,
+			] + ( null !== $model->parent_product_id ? [ 'parent_product_id' => $model->parent_product_id ] : [] ),
+			admin_url( 'admin.php' )
+		);
+
+		echo '<p><a class="button" href="' . esc_url( $customize_url ) . '">';
+		echo 'variation' === $model->scope_type
+			? esc_html__( 'Customize this variation', 'cetech-woocommerce-delivery-engine' )
+			: esc_html__( 'Customize this product', 'cetech-woocommerce-delivery-engine' );
+		echo '</a></p></div>';
+
+		return true;
+	}
+
+	/**
+	 * @param \CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationEditViewModel $model
+	 */
+	private function current_profile_label( $model ): string {
+		foreach ( $model->fields as $field ) {
+			if ( 'fulfilment_availability' !== $field->field_key ) {
+				continue;
+			}
+			$value = is_string( $field->effective_value ) ? $field->effective_value : (string) $field->configured_value;
+			$profile = FulfilmentProfileRegistry::get( $value );
+			if ( null !== $profile ) {
+				return $profile->label;
+			}
+		}
+
+		return __( 'Site-wide', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	/**
+	 * @param \CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationEditViewModel $model
+	 */
+	private function render_reset_action( $model ): void {
+		if ( 'product' !== $model->scope_type && 'variation' !== $model->scope_type ) {
+			return;
+		}
+
+		echo '<form method="post" class="cetech-de-reset-form" onsubmit="return confirm(\'' . esc_js( __( 'Remove custom delivery settings for this item?', 'cetech-woocommerce-delivery-engine' ) ) . '\');">';
+		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_RESET ) . '" />';
+		echo '<input type="hidden" name="scope_type" value="' . esc_attr( $model->scope_type ) . '" />';
+		echo '<input type="hidden" name="scope_id" value="' . esc_attr( (string) $model->scope_id ) . '" />';
+		echo '<input type="hidden" name="slice_key" value="' . esc_attr( $model->slice_key ) . '" />';
+		if ( null !== $model->parent_product_id ) {
+			echo '<input type="hidden" name="parent_product_id" value="' . esc_attr( (string) $model->parent_product_id ) . '" />';
+		}
+		AdminFormHelper::nonce_field( self::ACTION_RESET );
+		echo '<p><button type="submit" class="button">';
+		echo 'variation' === $model->scope_type
+			? esc_html__( 'Reset this variation to product settings', 'cetech-woocommerce-delivery-engine' )
+			: esc_html__( 'Reset this product to Site-wide Defaults', 'cetech-woocommerce-delivery-engine' );
+		echo '</button></p></form>';
+	}
+
 	private function render_context_summary( $model ): void {
 		$stats = [
 			[
 				'label' => __( 'Settings level', 'cetech-woocommerce-delivery-engine' ),
 				'value' => match ( $model->scope_type ) {
-					'global' => __( 'Default Settings', 'cetech-woocommerce-delivery-engine' ),
+					'global' => __( 'Site-wide Defaults', 'cetech-woocommerce-delivery-engine' ),
 					'product' => __( 'Product-Specific Settings', 'cetech-woocommerce-delivery-engine' ),
 					'variation' => __( 'Variation-Specific Settings', 'cetech-woocommerce-delivery-engine' ),
 					default => ucfirst( $model->scope_type ),
@@ -429,7 +588,7 @@ final class ScopedConfigurationPage {
 	private function render_editor_form( $model ): void {
 		AdminPageLayout::open_section(
 			__( 'Delivery settings for this item', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Choose whether each setting uses the inherited value, a different value here, or is turned off. Leaving a setting unchanged keeps the value from Default Settings or the product.', 'cetech-woocommerce-delivery-engine' )
+			__( 'For each setting choose: use the default, set a different value here, or turn it off. Changing one setting does not freeze the others.', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		echo '<form method="post" action="' . esc_url( admin_url( 'admin.php?page=' . self::SLUG ) ) . '" class="cetech-de-scoped-editor">';

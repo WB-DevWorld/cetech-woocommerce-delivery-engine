@@ -49,7 +49,7 @@ final class AdminLanguage {
 	}
 
 	public static function tab_default_settings(): string {
-		return 'Default Settings';
+		return 'Site-wide Defaults';
 	}
 
 	public static function tab_product_settings(): string {
@@ -69,7 +69,7 @@ final class AdminLanguage {
 	}
 
 	public static function empty_product_settings(): string {
-		return 'No product-specific delivery settings have been added. This product will continue using the Default Settings until you make a change here.';
+		return 'This product has no special delivery settings. It uses Site-wide Defaults until you customize it.';
 	}
 
 	public static function empty_variation_settings(): string {
@@ -77,7 +77,7 @@ final class AdminLanguage {
 	}
 
 	public static function empty_default_settings(): string {
-		return 'No default delivery settings have been saved yet. Add the values your products should use unless a product or variation sets its own.';
+		return 'No site-wide delivery defaults have been saved yet. Set them once so products can inherit them automatically.';
 	}
 
 	public static function technical_details_summary(): string {

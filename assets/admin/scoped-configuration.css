@@ -91,3 +91,65 @@
 	border: 1px solid #dcdcde;
 	border-radius: 6px;
 }
+
+.wrap.cetech-de-admin-page .cetech-de-profile-card-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+	gap: 1rem;
+	margin: 0 0 1.5rem;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-profile-card {
+	padding: 1rem 1.1rem;
+	border: 1px solid #dcdcde;
+	border-radius: 8px;
+	background: #fff;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-profile-card h3 {
+	margin: 0 0 0.35rem;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-profile-status {
+	font-weight: 600;
+	margin: 0 0 0.75rem;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-setup-steps {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.75rem;
+	margin: 0 0 1.5rem;
+	padding: 0;
+	list-style: none;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-setup-steps li {
+	display: flex;
+	align-items: center;
+	gap: 0.4rem;
+	color: #646970;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-setup-steps li.is-current {
+	color: #1d2327;
+	font-weight: 600;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-setup-steps li span {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 1.5rem;
+	height: 1.5rem;
+	border-radius: 999px;
+	background: #f0f0f1;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-review-counts {
+	margin: 0 0 1rem;
+}
+
+.wrap.cetech-de-admin-page .cetech-de-reset-form {
+	margin: 0 0 1rem;
+}

@@ -85,7 +85,7 @@ final class EffectiveConfigurationPreviewPage {
 			__( 'See what delivery settings will actually apply for a product or variation. This is not a shipping price.', 'cetech-woocommerce-delivery-engine' ),
 			[
 				'label' => __( 'Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
-				'url'   => AdminPageRenderer::list_url( ScopedConfigurationPage::SLUG ),
+				'url'   => AdminPageRenderer::list_url( DeliverySettingsHomePage::SLUG ),
 			],
 			[
 				'label' => __( 'Legacy Delivery Rules', 'cetech-woocommerce-delivery-engine' ),
@@ -241,8 +241,8 @@ final class EffectiveConfigurationPreviewPage {
 		}
 
 		AdminPageLayout::open_section(
-			__( 'What delivery settings will actually apply?', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Each row shows the value shoppers would use and where it currently comes from. No shipping prices are shown.', 'cetech-woocommerce-delivery-engine' )
+			__( 'What will this product use?', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Each row shows the value that will apply and whether it comes from the site-wide default, this product, or this variation.', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		if ( [] === $model->fields ) {

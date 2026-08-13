@@ -15,6 +15,9 @@ final class ScopedConfigurationAdminAssets {
 	private const PAGE_SLUGS = [
 		ScopedConfigurationPage::SLUG,
 		EffectiveConfigurationPreviewPage::SLUG,
+		DeliverySettingsHomePage::SLUG,
+		ProductExceptionsPage::SLUG,
+		NeedsAttentionPage::SLUG,
 	];
 
 	public function register(): void {

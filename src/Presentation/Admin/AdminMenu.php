@@ -25,6 +25,9 @@ final class AdminMenu {
 		private ProductDeliveryRulesPage $product_delivery_rules_page,
 		private ScopedConfigurationPage $scoped_configuration_page,
 		private EffectiveConfigurationPreviewPage $effective_configuration_preview_page,
+		private DeliverySettingsHomePage $delivery_settings_home_page,
+		private ProductExceptionsPage $product_exceptions_page,
+		private NeedsAttentionPage $needs_attention_page,
 		private ScopedConfigurationAdminAssets $scoped_configuration_admin_assets
 	) {
 	}
@@ -42,6 +45,9 @@ final class AdminMenu {
 		add_action( 'admin_init', [ $this->product_delivery_rules_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->scoped_configuration_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->effective_configuration_preview_page, 'handle_actions' ] );
+		add_action( 'admin_init', [ $this->delivery_settings_home_page, 'handle_actions' ] );
+		add_action( 'admin_init', [ $this->product_exceptions_page, 'handle_actions' ] );
+		add_action( 'admin_init', [ $this->needs_attention_page, 'handle_actions' ] );
 		$this->scoped_configuration_admin_assets->register();
 	}
 
@@ -73,19 +79,19 @@ final class AdminMenu {
 			add_submenu_page(
 				self::PARENT_SLUG,
 				__( 'Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Settings', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
 				'manage_delivery_settings',
-				DeliverySettingsPage::SLUG,
-				[ $this->delivery_settings_page, 'render' ]
+				DeliverySettingsHomePage::SLUG,
+				[ $this->delivery_settings_home_page, 'render' ]
 			);
 
 			add_submenu_page(
 				self::PARENT_SLUG,
-				__( 'Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Settings', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Settings', 'cetech-woocommerce-delivery-engine' ),
 				'manage_delivery_settings',
-				ScopedConfigurationPage::SLUG,
-				[ $this->scoped_configuration_page, 'render' ]
+				DeliverySettingsPage::SLUG,
+				[ $this->delivery_settings_page, 'render' ]
 			);
 		}
 
@@ -103,8 +109,8 @@ final class AdminMenu {
 		if ( current_user_can( 'manage_delivery_offers' ) ) {
 			add_submenu_page(
 				self::PARENT_SLUG,
-				__( 'Delivery Offers', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Delivery Offers', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Delivery Options', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Delivery Options', 'cetech-woocommerce-delivery-engine' ),
 				'manage_delivery_offers',
 				DeliveryOffersPage::SLUG,
 				[ $this->delivery_offers_page, 'render' ]
@@ -114,8 +120,8 @@ final class AdminMenu {
 		if ( current_user_can( 'manage_delivery_zones' ) ) {
 			add_submenu_page(
 				self::PARENT_SLUG,
-				__( 'Destination Zones', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Destination Zones', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Delivery Areas', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Delivery Areas', 'cetech-woocommerce-delivery-engine' ),
 				'manage_delivery_zones',
 				DestinationZonesPage::SLUG,
 				[ $this->destination_zones_page, 'render' ]
@@ -145,8 +151,8 @@ final class AdminMenu {
 		if ( current_user_can( 'manage_delivery_rate_cards' ) ) {
 			add_submenu_page(
 				self::PARENT_SLUG,
-				__( 'Rate Cards', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Rate Cards', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Delivery Charges', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Delivery Charges', 'cetech-woocommerce-delivery-engine' ),
 				'manage_delivery_rate_cards',
 				RateCardsPage::SLUG,
 				[ $this->rate_cards_page, 'render' ]
@@ -154,6 +160,24 @@ final class AdminMenu {
 		}
 
 		if ( current_user_can( 'manage_product_delivery_rules' ) ) {
+			add_submenu_page(
+				self::PARENT_SLUG,
+				__( 'Product Exceptions', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Product Exceptions', 'cetech-woocommerce-delivery-engine' ),
+				'manage_product_delivery_rules',
+				ProductExceptionsPage::SLUG,
+				[ $this->product_exceptions_page, 'render' ]
+			);
+
+			add_submenu_page(
+				self::PARENT_SLUG,
+				__( 'Needs Attention', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Needs Attention', 'cetech-woocommerce-delivery-engine' ),
+				'manage_product_delivery_rules',
+				NeedsAttentionPage::SLUG,
+				[ $this->needs_attention_page, 'render' ]
+			);
+
 			add_submenu_page(
 				self::PARENT_SLUG,
 				__( 'Delivery Settings Preview', 'cetech-woocommerce-delivery-engine' ),
@@ -181,9 +205,21 @@ final class AdminMenu {
 				__( 'Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
 				__( 'Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
 				'manage_product_delivery_rules',
+				DeliverySettingsHomePage::SLUG,
+				[ $this->delivery_settings_home_page, 'render' ]
+			);
+		}
+
+		if ( current_user_can( 'manage_product_delivery_rules' ) ) {
+			add_submenu_page(
+				self::PARENT_SLUG,
+				__( 'Product Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Product Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
+				'manage_product_delivery_rules',
 				ScopedConfigurationPage::SLUG,
 				[ $this->scoped_configuration_page, 'render' ]
 			);
+			remove_submenu_page( self::PARENT_SLUG, ScopedConfigurationPage::SLUG );
 		}
 
 		remove_submenu_page( self::PARENT_SLUG, self::PARENT_SLUG );
