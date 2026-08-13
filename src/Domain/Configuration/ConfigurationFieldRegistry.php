@@ -133,6 +133,20 @@ final class ConfigurationFieldRegistry {
 					self::assert_int_including_zero( $value, ConfigurationFieldKey::PRIORITY );
 				}
 			),
+			ConfigurationFieldKey::ESTIMATED_DELIVERY => new ConfigurationFieldDefinition(
+				ConfigurationFieldKey::ESTIMATED_DELIVERY,
+				false,
+				ConfigurationFieldValueType::String,
+				[ ScalarConfigurationMode::Inherit, ScalarConfigurationMode::Override ],
+				false,
+				false,
+				false,
+				static fn ( mixed $value ): string => self::normalize_estimated_delivery( $value ),
+				static function ( mixed $value ): void {
+					self::assert_estimated_delivery( $value, ConfigurationFieldKey::ESTIMATED_DELIVERY );
+				},
+				true
+			),
 			ConfigurationFieldKey::DELIVERY_OFFER_IDS => new ConfigurationFieldDefinition(
 				ConfigurationFieldKey::DELIVERY_OFFER_IDS,
 				true,
@@ -191,6 +205,31 @@ final class ConfigurationFieldRegistry {
 	 */
 	public static function reset_for_tests(): void {
 		self::$definitions = null;
+	}
+
+	public static function is_optional( string $field_key ): bool {
+		return self::has( $field_key ) && self::get( $field_key )->is_optional;
+	}
+
+	private static function normalize_estimated_delivery( mixed $value ): string {
+		$text = trim( (string) $value );
+		$text = preg_replace( '/\s+/', ' ', $text );
+
+		return is_string( $text ) ? $text : '';
+	}
+
+	private static function assert_estimated_delivery( mixed $value, string $field_key ): void {
+		if ( ! is_string( $value ) || '' === $value ) {
+			throw new InvalidConfigurationException(
+				sprintf( 'Field %s requires a non-empty estimated delivery value for OVERRIDE.', $field_key )
+			);
+		}
+
+		if ( strlen( $value ) > 120 ) {
+			throw new InvalidConfigurationException(
+				sprintf( 'Field %s exceeds the maximum length of 120 characters.', $field_key )
+			);
+		}
 	}
 
 	private static function normalize_slug( mixed $value ): string {

@@ -18,10 +18,12 @@ use CetechDeliveryEngine\Domain\Configuration\EffectiveScalarField;
 use CetechDeliveryEngine\Domain\Configuration\FieldProvenance;
 use CetechDeliveryEngine\Domain\Configuration\ScopedConfiguration;
 use CetechDeliveryEngine\Domain\Configuration\ScopedConfigurationRepositoryInterface;
+use CetechDeliveryEngine\Domain\Configuration\ScalarFieldInstruction;
 use CetechDeliveryEngine\Domain\Enum\CollectionConfigurationMode;
 use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
 use CetechDeliveryEngine\Domain\Enum\EffectiveFieldState;
 use CetechDeliveryEngine\Domain\Enum\ScalarConfigurationMode;
+use CetechDeliveryEngine\Domain\FulfilmentProfile\FulfilmentProfileRegistry;
 
 final class EffectiveConfigurationResolver {
 
@@ -31,12 +33,16 @@ final class EffectiveConfigurationResolver {
 	/** @var array<string, EffectiveConfiguration> */
 	private array $memoized = [];
 
+	/** @var array<string, ScopedConfiguration|false> */
+	private array $profile_global_cache = [];
+
 	private ConfigurationFingerprintBuilder $fingerprint_builder;
 
 	public function __construct(
 		private readonly ScopedConfigurationRepositoryInterface $repository,
 		private readonly EffectiveConfigurationValidator $validator,
-		private readonly ?FulfilmentConstraintServiceInterface $constraint_service = null
+		private readonly ?FulfilmentConstraintServiceInterface $constraint_service = null,
+		private readonly ?SiteWideDefaultsPolicyInterface $sitewide_policy = null
 	) {
 		$this->fingerprint_builder = new ConfigurationFingerprintBuilder();
 	}
@@ -44,9 +50,14 @@ final class EffectiveConfigurationResolver {
 	public function resolve( EffectiveConfigurationRequest $request ): EffectiveConfiguration {
 		$context = $this->load_context( $request->product_id, $request->variation_id );
 
-		$product_scope   = $context['product_by_slice'][ $request->slice_key ] ?? null;
-		$variation_scope = $context['variation_by_slice'][ $request->slice_key ] ?? null;
-		$global_scope    = $context['global'];
+		$product_scope   = $this->select_item_scope( $context['product_by_slice'], $request->slice_key );
+		$variation_scope = $this->select_item_scope( $context['variation_by_slice'], $request->slice_key );
+		$global_scope    = $this->select_profile_global(
+			$request,
+			$product_scope instanceof ScopedConfiguration ? $product_scope : null,
+			$variation_scope instanceof ScopedConfiguration ? $variation_scope : null,
+			$context['global'] instanceof ScopedConfiguration ? $context['global'] : null
+		);
 
 		$product_version   = $product_scope instanceof ScopedConfiguration ? $product_scope->scope->config_version : 0;
 		$variation_version = $variation_scope instanceof ScopedConfiguration ? $variation_scope->scope->config_version : 0;
@@ -142,8 +153,9 @@ final class EffectiveConfigurationResolver {
 	}
 
 	public function clearMemoization(): void {
-		$this->loaded_contexts = [];
-		$this->memoized        = [];
+		$this->loaded_contexts      = [];
+		$this->memoized             = [];
+		$this->profile_global_cache = [];
 	}
 
 	/**
@@ -173,6 +185,84 @@ final class EffectiveConfigurationResolver {
 		$this->loaded_contexts[ $key ] = $context;
 
 		return $context;
+	}
+
+	/**
+	 * @param array<string, ScopedConfiguration> $by_slice
+	 */
+	private function select_item_scope( array $by_slice, string $slice_key ): ?ScopedConfiguration {
+		if ( isset( $by_slice[ $slice_key ] ) ) {
+			return $by_slice[ $slice_key ];
+		}
+
+		if ( ConfigurationScope::DEFAULT_SLICE_KEY !== $slice_key && isset( $by_slice[ ConfigurationScope::DEFAULT_SLICE_KEY ] ) ) {
+			return $by_slice[ ConfigurationScope::DEFAULT_SLICE_KEY ];
+		}
+
+		return null;
+	}
+
+	private function select_profile_global(
+		EffectiveConfigurationRequest $request,
+		?ScopedConfiguration $product_scope,
+		?ScopedConfiguration $variation_scope,
+		?ScopedConfiguration $fallback_global
+	): ?ScopedConfiguration {
+		$profile_key = $this->determine_profile_key( $request, $product_scope, $variation_scope );
+
+		if ( null === $profile_key ) {
+			return $fallback_global;
+		}
+
+		if ( ! array_key_exists( $profile_key, $this->profile_global_cache ) ) {
+			$found = $this->repository->findByScopeAndSlice(
+				ConfigurationScopeType::Global,
+				ConfigurationScope::GLOBAL_SCOPE_ID,
+				$profile_key
+			);
+			$this->profile_global_cache[ $profile_key ] = $found ?? false;
+		}
+
+		$profile_global = $this->profile_global_cache[ $profile_key ];
+
+		return $profile_global instanceof ScopedConfiguration ? $profile_global : $fallback_global;
+	}
+
+	private function determine_profile_key(
+		EffectiveConfigurationRequest $request,
+		?ScopedConfiguration $product_scope,
+		?ScopedConfiguration $variation_scope
+	): ?string {
+		foreach ( [ $variation_scope, $product_scope ] as $scope ) {
+			if ( ! $scope instanceof ScopedConfiguration ) {
+				continue;
+			}
+
+			$instruction = $scope->scalars[ ConfigurationFieldKey::FULFILMENT_AVAILABILITY ] ?? null;
+			if (
+				$instruction instanceof ScalarFieldInstruction
+				&& ScalarConfigurationMode::Override === $instruction->mode
+				&& is_string( $instruction->value )
+				&& FulfilmentProfileRegistry::has( $instruction->value )
+			) {
+				return $instruction->value;
+			}
+		}
+
+		if ( FulfilmentProfileRegistry::has( $request->slice_key ) ) {
+			return $request->slice_key;
+		}
+
+		if (
+			$product_scope instanceof ScopedConfiguration
+			&& FulfilmentProfileRegistry::has( $product_scope->scope->slice_key )
+		) {
+			return $product_scope->scope->slice_key;
+		}
+
+		$primary = $this->sitewide_policy?->primary_profile_key();
+
+		return null !== $primary && FulfilmentProfileRegistry::has( $primary ) ? $primary : null;
 	}
 
 	/**

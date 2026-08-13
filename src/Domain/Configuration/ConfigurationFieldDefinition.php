@@ -31,7 +31,8 @@ final class ConfigurationFieldDefinition {
 		public readonly bool $preserve_order,
 		public readonly bool $dedupe_members,
 		public readonly mixed $normalizer = null,
-		public readonly mixed $validator = null
+		public readonly mixed $validator = null,
+		public readonly bool $is_optional = false
 	) {
 	}
 

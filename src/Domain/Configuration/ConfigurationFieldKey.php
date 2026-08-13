@@ -15,6 +15,7 @@ final class ConfigurationFieldKey {
 	public const SUPPLIER_ID             = 'supplier_id';
 	public const ORIGIN_ID               = 'origin_id';
 	public const PRIORITY                = 'priority';
+	public const ESTIMATED_DELIVERY      = 'estimated_delivery';
 	public const DELIVERY_OFFER_IDS      = 'delivery_offer_ids';
 
 	private function __construct() {
@@ -31,6 +32,7 @@ final class ConfigurationFieldKey {
 			self::SUPPLIER_ID,
 			self::ORIGIN_ID,
 			self::PRIORITY,
+			self::ESTIMATED_DELIVERY,
 			self::DELIVERY_OFFER_IDS,
 		];
 	}

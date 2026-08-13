@@ -38,8 +38,8 @@ final class ConfigurationScope {
 				throw new InvalidConfigurationException( 'Global scope_id must be 0.' );
 			}
 
-			if ( self::DEFAULT_SLICE_KEY !== $this->slice_key ) {
-				throw new InvalidConfigurationException( 'Global scope must use the default slice key.' );
+			if ( self::DEFAULT_SLICE_KEY !== $this->slice_key && ! self::is_valid_profile_slice_key( $this->slice_key ) ) {
+				throw new InvalidConfigurationException( 'Global scope slice_key must be empty or a fulfilment profile key.' );
 			}
 
 			if ( null !== $this->parent_product_id ) {
@@ -74,5 +74,28 @@ final class ConfigurationScope {
 			ConfigurationSource::Native,
 			null
 		);
+	}
+
+	public static function profileDefault( string $profile_key, int $config_version = 1, ?int $id = null ): self {
+		return new self(
+			$id,
+			ConfigurationScopeType::Global,
+			self::GLOBAL_SCOPE_ID,
+			$profile_key,
+			null,
+			RecordStatus::Active,
+			$config_version,
+			ConfigurationSource::Native,
+			null
+		);
+	}
+
+	public function is_profile_default(): bool {
+		return ConfigurationScopeType::Global === $this->scope_type
+			&& self::DEFAULT_SLICE_KEY !== $this->slice_key;
+	}
+
+	private static function is_valid_profile_slice_key( string $slice_key ): bool {
+		return 1 === preg_match( '/^[a-z][a-z0-9_\-]{0,63}$/', $slice_key );
 	}
 }

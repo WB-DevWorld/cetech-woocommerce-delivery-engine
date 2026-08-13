@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Configuration;
 
+use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldRegistry;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationValidationResult;
 use CetechDeliveryEngine\Domain\Configuration\EffectiveConfiguration;
 use CetechDeliveryEngine\Domain\Enum\EffectiveFieldState;
@@ -22,6 +23,9 @@ final class EffectiveConfigurationValidator {
 			}
 
 			if ( EffectiveFieldState::Unresolved === $field->state ) {
+				if ( ConfigurationFieldRegistry::is_optional( $field->field_key ) ) {
+					continue;
+				}
 				$has_unresolved = true;
 			}
 
@@ -37,6 +41,9 @@ final class EffectiveConfigurationValidator {
 			}
 
 			if ( EffectiveFieldState::Unresolved === $field->state ) {
+				if ( ConfigurationFieldRegistry::is_optional( $field->field_key ) ) {
+					continue;
+				}
 				$has_unresolved = true;
 			}
 

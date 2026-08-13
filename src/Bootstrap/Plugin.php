@@ -32,11 +32,20 @@ use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationAdmi
 use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationAuthorization;
 use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationSubmissionParser;
 use CetechDeliveryEngine\Application\Configuration\ConfigurationFingerprintBuilder;
+use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogIndexInterface;
+use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogInheritanceClassifier;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
+use CetechDeliveryEngine\Application\Configuration\Catalog\ProductExceptionsQuery;
+use CetechDeliveryEngine\Application\Configuration\Catalog\WooCommerceCatalogIndex;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationValidator;
 use CetechDeliveryEngine\Application\Configuration\FulfilmentConstraintServiceInterface;
 use CetechDeliveryEngine\Application\Configuration\HardFulfilmentConstraintService;
 use CetechDeliveryEngine\Application\Configuration\LegacyConfigurationMigrator;
+use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultSummary;
+use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsPolicyInterface;
+use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsService;
+use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsSettings;
 use CetechDeliveryEngine\Application\Diagnostics\ConfigurationHealthChecker;
 use CetechDeliveryEngine\Application\Runtime\EcrProductDeliveryConfigurationSource;
 use CetechDeliveryEngine\Application\Runtime\EcrToRuntimeConfigurationAdapter;
@@ -85,6 +94,9 @@ use CetechDeliveryEngine\Presentation\Admin\AdminMenu;
 use CetechDeliveryEngine\Presentation\Admin\AdminNoticeService;
 use CetechDeliveryEngine\Presentation\Admin\ConfigurationAuditLogger;
 use CetechDeliveryEngine\Presentation\Admin\DeliveryOffersPage;
+use CetechDeliveryEngine\Presentation\Admin\DeliverySettingsHomePage;
+use CetechDeliveryEngine\Presentation\Admin\NeedsAttentionPage;
+use CetechDeliveryEngine\Presentation\Admin\ProductExceptionsPage;
 use CetechDeliveryEngine\Presentation\Admin\DestinationZoneTestMatcher;
 use CetechDeliveryEngine\Presentation\Admin\DestinationZonesPage;
 use CetechDeliveryEngine\Presentation\Admin\EffectiveConfigurationPreviewPage;
@@ -787,7 +799,8 @@ final class Plugin {
 				$container->get( ScopedConfigurationAdminService::class ),
 				$container->get( ProductTargetResolver::class ),
 				$container->get( AdminActionHandler::class ),
-				$container->get( ScopedConfigurationAuthorization::class )
+				$container->get( ScopedConfigurationAuthorization::class ),
+				$container->get( SiteWideDefaultsService::class )
 			)
 		);
 
@@ -798,6 +811,36 @@ final class Plugin {
 				$container->get( ProductTargetResolver::class ),
 				$container->get( AdminActionHandler::class ),
 				$container->get( ScopedConfigurationAuthorization::class )
+			)
+		);
+
+		$this->container->singleton(
+			DeliverySettingsHomePage::class,
+			static fn ( ServiceContainer $container ): DeliverySettingsHomePage => new DeliverySettingsHomePage(
+				$container->get( SiteWideDefaultsService::class ),
+				$container->get( SiteWideDefaultsSettings::class ),
+				$container->get( SiteWideDefaultSummary::class ),
+				$container->get( NeedsAttentionQuery::class ),
+				$container->get( ScopedConfigurationRepositoryInterface::class ),
+				$container->get( EntityLabelResolver::class ),
+				$container->get( AdminActionHandler::class )
+			)
+		);
+
+		$this->container->singleton(
+			ProductExceptionsPage::class,
+			static fn ( ServiceContainer $container ): ProductExceptionsPage => new ProductExceptionsPage(
+				$container->get( ProductExceptionsQuery::class ),
+				$container->get( SiteWideDefaultsService::class ),
+				$container->get( AdminActionHandler::class )
+			)
+		);
+
+		$this->container->singleton(
+			NeedsAttentionPage::class,
+			static fn ( ServiceContainer $container ): NeedsAttentionPage => new NeedsAttentionPage(
+				$container->get( NeedsAttentionQuery::class ),
+				$container->get( AdminActionHandler::class )
 			)
 		);
 
@@ -849,6 +892,9 @@ final class Plugin {
 				$container->get( ProductDeliveryRulesPage::class ),
 				$container->get( ScopedConfigurationPage::class ),
 				$container->get( EffectiveConfigurationPreviewPage::class ),
+				$container->get( DeliverySettingsHomePage::class ),
+				$container->get( ProductExceptionsPage::class ),
+				$container->get( NeedsAttentionPage::class ),
 				$container->get( ScopedConfigurationAdminAssets::class )
 			)
 		);
@@ -928,11 +974,77 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			SiteWideDefaultsSettings::class,
+			static fn (): SiteWideDefaultsSettings => new SiteWideDefaultsSettings()
+		);
+
+		$this->container->singleton(
+			SiteWideDefaultsPolicyInterface::class,
+			static fn ( ServiceContainer $container ): SiteWideDefaultsPolicyInterface => $container->get( SiteWideDefaultsSettings::class )
+		);
+
+		$this->container->singleton(
+			CatalogIndexInterface::class,
+			static fn (): CatalogIndexInterface => new WooCommerceCatalogIndex()
+		);
+
+		$this->container->singleton(
 			EffectiveConfigurationResolver::class,
 			static fn ( ServiceContainer $container ): EffectiveConfigurationResolver => new EffectiveConfigurationResolver(
 				$container->get( ScopedConfigurationRepositoryInterface::class ),
 				$container->get( EffectiveConfigurationValidator::class ),
-				$container->get( FulfilmentConstraintServiceInterface::class )
+				$container->get( FulfilmentConstraintServiceInterface::class ),
+				$container->get( SiteWideDefaultsPolicyInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			CatalogInheritanceClassifier::class,
+			static fn ( ServiceContainer $container ): CatalogInheritanceClassifier => new CatalogInheritanceClassifier(
+				$container->get( ScopedConfigurationRepositoryInterface::class ),
+				$container->get( CatalogIndexInterface::class ),
+				$container->get( EffectiveConfigurationResolver::class ),
+				$container->get( SiteWideDefaultsPolicyInterface::class ),
+				$container->get( ProductDeliveryRuleRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			NeedsAttentionQuery::class,
+			static fn ( ServiceContainer $container ): NeedsAttentionQuery => new NeedsAttentionQuery(
+				$container->get( CatalogIndexInterface::class ),
+				$container->get( EffectiveConfigurationResolver::class )
+			)
+		);
+
+		$this->container->singleton(
+			ProductExceptionsQuery::class,
+			static fn ( ServiceContainer $container ): ProductExceptionsQuery => new ProductExceptionsQuery(
+				$container->get( ScopedConfigurationRepositoryInterface::class ),
+				$container->get( CatalogIndexInterface::class ),
+				$container->get( CatalogInheritanceClassifier::class ),
+				$container->get( SiteWideDefaultsPolicyInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			SiteWideDefaultSummary::class,
+			static fn ( ServiceContainer $container ): SiteWideDefaultSummary => new SiteWideDefaultSummary(
+				$container->get( ScopedConfigurationRepositoryInterface::class ),
+				$container->get( DeliveryOfferRepositoryInterface::class ),
+				$container->get( RateCardRepositoryInterface::class ),
+				$container->get( EntityLabelResolver::class )
+			)
+		);
+
+		$this->container->singleton(
+			SiteWideDefaultsService::class,
+			static fn ( ServiceContainer $container ): SiteWideDefaultsService => new SiteWideDefaultsService(
+				$container->get( ScopedConfigurationRepositoryInterface::class ),
+				$container->get( SiteWideDefaultsSettings::class ),
+				$container->get( CatalogInheritanceClassifier::class ),
+				$container->get( EffectiveConfigurationResolver::class ),
+				$container->get( CatalogIndexInterface::class )
 			)
 		);
 
