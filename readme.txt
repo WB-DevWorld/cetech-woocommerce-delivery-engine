@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-rc.3
+Stable tag: 1.0.0-rc.4
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,11 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-rc.4 =
+* Release candidate after Stage 13F customer-facing delivery presentation polish. Owner physical QA.1 (`1.0.0-rc.4-qa.1`) accepted on FLAIROC; no additional QA build required.
+* Compact public Delivery option + Estimated delivery on product, thank-you, My Account, and customer emails; WooCommerce shipping rate label uses the selected public Delivery Option label.
+* Schema target remains 3; no migration. Tagged v1.0.0-rc.3 is untouched. Existing configuration, flags, exceptions, and order snapshots are not reset on folder replace.
 
 = 1.0.0-rc.3 =
 * Release candidate after Stage 13 / 13B / 13C / 13D / 13D-R1: site-wide defaults, WordPress-native admin UX, Setup Guide, Overview, legacy retirement from the normal menu, real role Access controls, and Administrator access recovery hardening.

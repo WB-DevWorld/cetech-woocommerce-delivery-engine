@@ -301,8 +301,8 @@ final class ShippingPackageGroupingTest extends TestCase {
 			static fn ( array $p ): string => (string) $p[ DeliveryGroupIdentity::PACKAGE_META_KEY ]['rate_label'],
 			$packages
 		);
-		self::assertContains( 'Delivery 1', $labels );
-		self::assertContains( 'Delivery 2', $labels );
+		self::assertContains( 'Standard Delivery (1)', $labels );
+		self::assertContains( 'Standard Delivery (2)', $labels );
 	}
 
 	/**

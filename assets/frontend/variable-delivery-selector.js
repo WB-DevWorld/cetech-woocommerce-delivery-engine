@@ -187,7 +187,7 @@
 			this.setVariationBinding(variationId);
 		},
 
-		renderOptions: function (options, variationId) {
+			renderOptions: function (options, variationId) {
 			if (!this.optionsEl) {
 				return;
 			}
@@ -195,6 +195,8 @@
 			this.optionsEl.innerHTML = '';
 			var fieldName = config.postField || 'cetech_de_delivery_option_key';
 			var fragment = document.createDocumentFragment();
+			var estimatePrefix = (config.i18n && config.i18n.estimatedDelivery) || 'Estimated delivery';
+			var pickupPrefix = (config.i18n && config.i18n.readyForPickup) || 'Ready for pickup';
 
 			options.forEach(function (option) {
 				var displayKey = String(option.display_key || '');
@@ -207,6 +209,7 @@
 
 				var inputId = 'cetech-de-delivery-option-' + displayKey.replace(/[^a-zA-Z0-9_-]/g, '-');
 				var label = document.createElement('label');
+				label.className = 'cetech-de-delivery-option__label-wrap';
 				label.setAttribute('for', inputId);
 
 				var input = document.createElement('input');
@@ -217,28 +220,30 @@
 				input.required = true;
 				input.setAttribute('data-cetech-de-variation-bound', String(variationId));
 
+				var body = document.createElement('span');
+				body.className = 'cetech-de-delivery-option__body';
+
 				var labelText = document.createElement('span');
 				labelText.className = 'cetech-de-delivery-option__label';
 				labelText.textContent = String(option.delivery_offer_public_label || '');
+				body.appendChild(labelText);
+
+				// Compact product selector: public label + estimate only.
+				// Public description remains in the data contract but is omitted here.
+				if (option.estimate_text) {
+					var rawEstimate = String(option.estimate_text).replace(/^Estimated\s+/i, '').trim();
+					if (rawEstimate) {
+						var isPickup = String(option.fulfilment_choice || '').toLowerCase() === 'store_pickup'
+							|| String(option.fulfilment_choice_label || '').toLowerCase().indexOf('pickup') !== -1;
+						var eta = document.createElement('span');
+						eta.className = 'cetech-de-delivery-option__estimate';
+						eta.textContent = (isPickup ? pickupPrefix : estimatePrefix) + ': ' + rawEstimate;
+						body.appendChild(eta);
+					}
+				}
 
 				label.appendChild(input);
-				label.appendChild(document.createTextNode(' '));
-				label.appendChild(labelText);
-
-				if (option.delivery_offer_public_description) {
-					var desc = document.createElement('span');
-					desc.className = 'cetech-de-delivery-option__description';
-					desc.textContent = ' ' + String(option.delivery_offer_public_description);
-					label.appendChild(desc);
-				}
-
-				if (option.estimate_text) {
-					var eta = document.createElement('span');
-					eta.className = 'cetech-de-delivery-option__estimate';
-					eta.textContent = ' ' + String(option.estimate_text);
-					label.appendChild(eta);
-				}
-
+				label.appendChild(body);
 				p.appendChild(label);
 				fragment.appendChild(p);
 			});

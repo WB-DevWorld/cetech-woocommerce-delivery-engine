@@ -79,6 +79,72 @@ final class RateQuoteSafetyTest extends TestCase {
 		self::assertSame( '0.0000', $result->amount?->amount() );
 	}
 
+	public function test_qty_one_fixed_per_shipment_does_not_multiply_base_amount(): void {
+		$engine = new RateQuoteEngine( new FixedRateCardRepository( [
+			[
+				'id'                   => 25,
+				'internal_code'        => 'QA25',
+				'delivery_offer_id'    => 10,
+				'destination_zone_id'  => 20,
+				'logistics_profile_id' => null,
+				'supplier_id'          => null,
+				'origin_id'            => null,
+				'charge_type'          => RateCardChargeType::FixedPerShipment->value,
+				'base_amount'          => '25.00',
+				'base_currency'        => 'USD',
+				'priority'             => 100,
+				'status'               => 'active',
+			],
+		] ) );
+
+		$result = $engine->quote(
+			RateQuoteRequest::fromArray(
+				[
+					'delivery_offer_id'   => 10,
+					'destination_zone_id' => 20,
+					'quantity'            => 1,
+					'currency_code'       => 'USD',
+				]
+			)
+		);
+
+		self::assertTrue( $result->success );
+		self::assertSame( '25.0000', $result->amount?->amount() );
+	}
+
+	public function test_configured_base_amount_250_quotes_250_not_rewritten(): void {
+		$engine = new RateQuoteEngine( new FixedRateCardRepository( [
+			[
+				'id'                   => 250,
+				'internal_code'        => 'QA250',
+				'delivery_offer_id'    => 10,
+				'destination_zone_id'  => 20,
+				'logistics_profile_id' => null,
+				'supplier_id'          => null,
+				'origin_id'            => null,
+				'charge_type'          => RateCardChargeType::FixedPerShipment->value,
+				'base_amount'          => '250.00',
+				'base_currency'        => 'USD',
+				'priority'             => 100,
+				'status'               => 'active',
+			],
+		] ) );
+
+		$result = $engine->quote(
+			RateQuoteRequest::fromArray(
+				[
+					'delivery_offer_id'   => 10,
+					'destination_zone_id' => 20,
+					'quantity'            => 1,
+					'currency_code'       => 'USD',
+				]
+			)
+		);
+
+		self::assertTrue( $result->success );
+		self::assertSame( '250.0000', $result->amount?->amount() );
+	}
+
 	public function test_missing_base_amount_is_unavailable(): void {
 		$engine = new RateQuoteEngine( new FixedRateCardRepository( [
 			[

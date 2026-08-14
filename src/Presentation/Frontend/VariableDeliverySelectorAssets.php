@@ -38,10 +38,18 @@ final class VariableDeliverySelectorAssets {
 		$version = defined( 'CETECH_DE_VERSION' ) ? CETECH_DE_VERSION : '1.0.0-rc.1';
 		$base    = defined( 'CETECH_DE_URL' ) ? CETECH_DE_URL : '';
 
+		// Shared compact option hierarchy for simple + variable product pages.
+		wp_enqueue_style(
+			ProductDeliverySelectorRenderer::STYLE_HANDLE,
+			$base . 'assets/frontend/product-delivery-selector.css',
+			[],
+			$version
+		);
+
 		wp_enqueue_style(
 			self::HANDLE,
 			$base . 'assets/frontend/variable-delivery-selector.css',
-			[],
+			[ ProductDeliverySelectorRenderer::STYLE_HANDLE ],
 			$version
 		);
 
@@ -65,12 +73,14 @@ final class VariableDeliverySelectorAssets {
 				'nonce'     => wp_create_nonce( VariationDeliveryOptionsEndpoint::ACTION ),
 				'productId' => $product_id,
 				'i18n'      => [
-					'selectOptions' => __( 'Select your product options to see delivery choices.', 'cetech-woocommerce-delivery-engine' ),
-					'loading'       => __( 'Loading delivery choices…', 'cetech-woocommerce-delivery-engine' ),
-					'unavailable'   => __( 'Delivery options are not available for this variation.', 'cetech-woocommerce-delivery-engine' ),
-					'error'         => __( 'Delivery options are temporarily unavailable. Please try again.', 'cetech-woocommerce-delivery-engine' ),
-					'choose'        => __( 'Choose a delivery option.', 'cetech-woocommerce-delivery-engine' ),
-					'title'         => __( 'Delivery options', 'cetech-woocommerce-delivery-engine' ),
+					'selectOptions'     => __( 'Select your product options to see delivery choices.', 'cetech-woocommerce-delivery-engine' ),
+					'loading'           => __( 'Loading delivery choices…', 'cetech-woocommerce-delivery-engine' ),
+					'unavailable'       => __( 'Delivery options are not available for this variation.', 'cetech-woocommerce-delivery-engine' ),
+					'error'             => __( 'Delivery options are temporarily unavailable. Please try again.', 'cetech-woocommerce-delivery-engine' ),
+					'choose'            => __( 'Choose a delivery option.', 'cetech-woocommerce-delivery-engine' ),
+					'title'             => __( 'Delivery options', 'cetech-woocommerce-delivery-engine' ),
+					'estimatedDelivery' => __( 'Estimated delivery', 'cetech-woocommerce-delivery-engine' ),
+					'readyForPickup'    => __( 'Ready for pickup', 'cetech-woocommerce-delivery-engine' ),
 				],
 				'postField'           => 'cetech_de_delivery_option_key',
 				'postVariationField'  => 'cetech_de_delivery_variation_id',

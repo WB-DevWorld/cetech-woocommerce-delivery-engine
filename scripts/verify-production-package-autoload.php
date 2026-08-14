@@ -190,6 +190,11 @@ if ( ! is_readable( $variable_css ) ) {
 	$failures[] = 'Missing assets/frontend/variable-delivery-selector.css';
 }
 
+$product_css = $package_root . '/assets/frontend/product-delivery-selector.css';
+if ( ! is_readable( $product_css ) ) {
+	$failures[] = 'Missing assets/frontend/product-delivery-selector.css';
+}
+
 $admin_css = $package_root . '/assets/admin/delivery-engine-admin.css';
 $admin_js  = $package_root . '/assets/admin/delivery-engine-admin.js';
 if ( ! is_readable( $admin_css ) ) {

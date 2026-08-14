@@ -53,6 +53,10 @@ final class VariableDeliverySelectorAssetsTest extends TestCase {
 
 		self::assertContains( VariableDeliverySelectorAssets::HANDLE, $GLOBALS['cetech_de_test_enqueued_scripts'] );
 		self::assertContains( VariableDeliverySelectorAssets::HANDLE, $GLOBALS['cetech_de_test_enqueued_styles'] );
+		self::assertContains(
+			\CetechDeliveryEngine\Presentation\Frontend\ProductDeliverySelectorRenderer::STYLE_HANDLE,
+			$GLOBALS['cetech_de_test_enqueued_styles']
+		);
 	}
 
 	public function test_should_enqueue_true_for_eligible_variable_product_without_cart_capture(): void {

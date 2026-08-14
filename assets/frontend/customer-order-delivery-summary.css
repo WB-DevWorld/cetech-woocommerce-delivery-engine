@@ -1,0 +1,31 @@
+/**
+ * Stage 13F — compact customer Delivery details (thank-you / My Account).
+ */
+
+.cetech-de-order-delivery-summary {
+	margin: 1.5em 0;
+}
+
+.cetech-de-order-delivery-summary__compact {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.cetech-de-order-delivery-summary__compact li {
+	margin: 0.35em 0;
+}
+
+.cetech-de-order-delivery-summary__compact .label {
+	font-weight: 600;
+	margin-right: 0.35em;
+}
+
+.cetech-de-order-delivery-summary__product {
+	margin: 0.75em 0 0.25em;
+	font-weight: 600;
+}
+
+.cetech-de-order-delivery-summary__product:first-child {
+	margin-top: 0;
+}

@@ -65,6 +65,8 @@ function loadController() {
 			error: 'Delivery options are temporarily unavailable. Please try again.',
 			choose: 'Choose a delivery option.',
 			title: 'Delivery options',
+			estimatedDelivery: 'Estimated delivery',
+			readyForPickup: 'Ready for pickup',
 		},
 	};
 
@@ -165,8 +167,28 @@ describe('Variable delivery selector controller', () => {
 
 		await flush();
 		expect(controller.optionsEl.textContent).toContain('Offer A');
+		expect(controller.optionsEl.textContent).toContain('Estimated delivery: 2 days');
+		expect(controller.optionsEl.querySelector('.cetech-de-delivery-option__body')).not.toBeNull();
+		expect(controller.optionsEl.querySelector('.cetech-de-delivery-option__description')).toBeNull();
 		expect(controller.variationInput.value).toBe('11');
 		expect(controller.variationInput.disabled).toBe(false);
+	});
+
+	it('omits public description from compact product hierarchy', async () => {
+		const { controller, $form, ajax } = loadController();
+		const payload = okPayload(11, 'FLAIROC QA Standard Delivery');
+		payload.data.options[0].delivery_offer_public_description =
+			'QA-only delivery option for Delivery Engine Stage 0B.';
+		payload.data.options[0].estimate_text = 'Estimated 3–6 business days';
+		ajax.mockReturnValue(createDeferred({ type: 'success', payload }));
+
+		$form.trigger('found_variation', { variation_id: 11 });
+		await flush();
+
+		expect(controller.optionsEl.textContent).toContain('FLAIROC QA Standard Delivery');
+		expect(controller.optionsEl.textContent).toContain('Estimated delivery: 3–6 business days');
+		expect(controller.optionsEl.textContent).not.toContain('QA-only');
+		expect(controller.optionsEl.textContent).not.toContain('In Warehouse');
 	});
 
 	it('reset_data clears options and selected DE state', async () => {

@@ -173,12 +173,53 @@ final class ShippingPackageBuilder {
 			'is_pickup'               => $is_pickup,
 			'offer_public_label'      => '' !== $offer_label ? $offer_label : null,
 			'display_index'           => null,
-			'rate_label'              => $is_pickup
-				? __( 'Store pickup', 'cetech-woocommerce-delivery-engine' )
-				: SelectedOfferShippingMethodLabel::default_delivery_label(),
+			// Stage 13F: genuine WC shipping rate label uses the selected public option label.
+			'rate_label'              => $this->customer_rate_label( $is_pickup, $offer_label, null ),
 		];
 
 		return $package;
+	}
+
+	/**
+	 * Customer-facing WC shipping rate label for a managed package.
+	 *
+	 * Preserves method ID / grouping / snapshots; presentation only.
+	 */
+	private function customer_rate_label( bool $is_pickup, string $offer_label, ?int $display_index ): string {
+		if ( '' !== $offer_label ) {
+			if ( null !== $display_index && $display_index > 0 ) {
+				return sprintf(
+					/* translators: 1: public delivery option label, 2: package number */
+					__( '%1$s (%2$d)', 'cetech-woocommerce-delivery-engine' ),
+					$offer_label,
+					$display_index
+				);
+			}
+
+			return $offer_label;
+		}
+
+		if ( $is_pickup ) {
+			if ( null !== $display_index && $display_index > 0 ) {
+				return sprintf(
+					/* translators: %d: pickup group number */
+					__( 'Store pickup %d', 'cetech-woocommerce-delivery-engine' ),
+					$display_index
+				);
+			}
+
+			return __( 'Store pickup', 'cetech-woocommerce-delivery-engine' );
+		}
+
+		if ( null !== $display_index && $display_index > 0 ) {
+			return sprintf(
+				/* translators: %d: delivery group number */
+				__( 'Delivery %d', 'cetech-woocommerce-delivery-engine' ),
+				$display_index
+			);
+		}
+
+		return SelectedOfferShippingMethodLabel::default_delivery_label();
 	}
 
 	/**
@@ -292,27 +333,18 @@ final class ShippingPackageBuilder {
 			}
 
 			$is_pickup = ! empty( $meta['is_pickup'] );
+			$offer_label = trim( (string) ( $meta['offer_public_label'] ?? '' ) );
 
 			if ( $is_pickup ) {
 				++$pickup_index;
-				$label = sprintf(
-					/* translators: %d: pickup group number */
-					__( 'Store pickup %d', 'cetech-woocommerce-delivery-engine' ),
-					$pickup_index
-				);
 				$display_index = $pickup_index;
 			} else {
 				++$delivery_index;
-				$label = sprintf(
-					/* translators: %d: delivery group number */
-					__( 'Delivery %d', 'cetech-woocommerce-delivery-engine' ),
-					$delivery_index
-				);
 				$display_index = $delivery_index;
 			}
 
 			$meta['display_index'] = $display_index;
-			$meta['rate_label']    = $label;
+			$meta['rate_label']    = $this->customer_rate_label( $is_pickup, $offer_label, $display_index );
 			$packages[ $index ][ DeliveryGroupIdentity::PACKAGE_META_KEY ] = $meta;
 		}
 

@@ -12,6 +12,7 @@ use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\Enum\ProductTargetType;
+use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
 use WC_Product;
 
 /**
@@ -19,9 +20,11 @@ use WC_Product;
  *
  * Display-only when cart capture is disabled. Radio submission inside add-to-cart form when capture is enabled.
  * Stage 6A: variable products render an AJAX-driven shell when variable ECR flags are enabled.
- * Does not calculate shipping prices or write order meta.
+ * Stage 13F: compact public hierarchy (label + estimate). Does not calculate shipping prices or write order meta.
  */
 final class ProductDeliverySelectorRenderer {
+
+	public const STYLE_HANDLE = 'cetech-de-product-delivery-selector';
 
 	public function __construct(
 		private FeatureFlags $feature_flags,
@@ -40,12 +43,30 @@ final class ProductDeliverySelectorRenderer {
 			return;
 		}
 
+		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_assets' ] );
+
 		if ( $this->is_capture_enabled() ) {
 			add_action( 'woocommerce_before_add_to_cart_button', [ $this, 'render_form_controls' ], 10 );
 			add_action( 'woocommerce_single_product_summary', [ $this, 'render_variable_notice' ], 25 );
 		} else {
 			add_action( 'woocommerce_single_product_summary', [ $this, 'render' ], 25 );
 		}
+	}
+
+	public function enqueue_assets(): void {
+		if ( ! function_exists( 'is_product' ) || ! is_product() ) {
+			return;
+		}
+
+		$version = defined( 'CETECH_DE_VERSION' ) ? CETECH_DE_VERSION : '1.0.0-rc.3';
+		$base    = defined( 'CETECH_DE_URL' ) ? CETECH_DE_URL : '';
+
+		wp_enqueue_style(
+			self::STYLE_HANDLE,
+			$base . 'assets/frontend/product-delivery-selector.css',
+			[],
+			$version
+		);
 	}
 
 	public function render_variable_notice(): void {
@@ -197,25 +218,15 @@ final class ProductDeliverySelectorRenderer {
 	 * @param list<ProductDeliveryOption> $options
 	 */
 	private function render_display_options( array $options ): void {
-		$groups = $this->group_options( $options );
-
 		echo '<div class="cetech-de-product-delivery-selector">';
 		echo '<h3 class="cetech-de-delivery-selector__title">' . esc_html__( 'Delivery options', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
+		echo '<ul class="cetech-de-delivery-options">';
 
-		foreach ( $groups as $group ) {
-			echo '<div class="cetech-de-delivery-availability">';
-			echo '<h4 class="cetech-de-delivery-availability__heading">' . esc_html( $group['availability_label'] ) . '</h4>';
-			echo '<p class="cetech-de-delivery-availability__choice"><em>' . esc_html( $group['choice_label'] ) . '</em></p>';
-			echo '<ul class="cetech-de-delivery-options">';
-
-			foreach ( $group['options'] as $option ) {
-				$this->render_display_option( $option );
-			}
-
-			echo '</ul>';
-			echo '</div>';
+		foreach ( $options as $option ) {
+			$this->render_display_option( $option );
 		}
 
+		echo '</ul>';
 		echo '</div>';
 	}
 
@@ -251,27 +262,6 @@ final class ProductDeliverySelectorRenderer {
 		echo '</fieldset>';
 	}
 
-	/**
-	 * @param list<ProductDeliveryOption> $options
-	 *
-	 * @return array<string, array{availability_label: string, choice_label: string, options: list<ProductDeliveryOption>}>
-	 */
-	private function group_options( array $options ): array {
-		$groups = [];
-
-		foreach ( $options as $option ) {
-			$group_key = $option->fulfilment_availability . ':' . $option->fulfilment_choice;
-			$groups[ $group_key ]   = $groups[ $group_key ] ?? [
-				'availability_label' => $option->fulfilment_availability_label,
-				'choice_label'       => $option->fulfilment_choice_label,
-				'options'            => [],
-			];
-			$groups[ $group_key ]['options'][] = $option;
-		}
-
-		return $groups;
-	}
-
 	private function render_display_option( ProductDeliveryOption $option ): void {
 		$label = $option->delivery_offer_public_label ?? '';
 
@@ -284,18 +274,13 @@ final class ProductDeliverySelectorRenderer {
 			: 'cetech-de-delivery-option cetech-de-delivery-option--unavailable';
 
 		echo '<li class="' . esc_attr( $class ) . '">';
+		echo '<div class="cetech-de-delivery-option__body">';
 		echo '<span class="cetech-de-delivery-option__label">' . esc_html( $label ) . '</span>';
-
-		if ( null !== $option->delivery_offer_public_description && '' !== $option->delivery_offer_public_description ) {
-			echo '<span class="cetech-de-delivery-option__description"> ' . esc_html( $option->delivery_offer_public_description ) . '</span>';
-		}
-
-		if ( null !== $option->estimate_text && '' !== $option->estimate_text ) {
-			echo '<span class="cetech-de-delivery-option__estimate"> ' . esc_html( $option->estimate_text ) . '</span>';
-		}
+		$this->render_estimate_line( $option );
+		echo '</div>';
 
 		if ( ! $option->is_available && null !== $option->unavailable_reason && '' !== $option->unavailable_reason ) {
-			echo '<span class="cetech-de-delivery-option__unavailable-reason"> ' . esc_html( $option->unavailable_reason ) . '</span>';
+			echo '<span class="cetech-de-delivery-option__unavailable-reason">' . esc_html( $option->unavailable_reason ) . '</span>';
 		}
 
 		echo '</li>';
@@ -312,20 +297,31 @@ final class ProductDeliverySelectorRenderer {
 		$checked  = $selected === $option->display_key;
 
 		echo '<p class="cetech-de-delivery-option cetech-de-delivery-option--radio">';
-		echo '<label for="' . esc_attr( $input_id ) . '">';
-		echo '<input type="radio" name="' . esc_attr( CartDeliverySelectionCapture::POST_FIELD ) . '" id="' . esc_attr( $input_id ) . '" value="' . esc_attr( $option->display_key ) . '"' . ( $checked ? ' checked="checked"' : '' ) . ' required="required" /> ';
+		echo '<label for="' . esc_attr( $input_id ) . '" class="cetech-de-delivery-option__label-wrap">';
+		echo '<input type="radio" name="' . esc_attr( CartDeliverySelectionCapture::POST_FIELD ) . '" id="' . esc_attr( $input_id ) . '" value="' . esc_attr( $option->display_key ) . '"' . ( $checked ? ' checked="checked"' : '' ) . ' required="required" />';
+		echo '<span class="cetech-de-delivery-option__body">';
 		echo '<span class="cetech-de-delivery-option__label">' . esc_html( $label ) . '</span>';
-
-		if ( null !== $option->delivery_offer_public_description && '' !== $option->delivery_offer_public_description ) {
-			echo '<span class="cetech-de-delivery-option__description"> ' . esc_html( $option->delivery_offer_public_description ) . '</span>';
-		}
-
-		if ( null !== $option->estimate_text && '' !== $option->estimate_text ) {
-			echo '<span class="cetech-de-delivery-option__estimate"> ' . esc_html( $option->estimate_text ) . '</span>';
-		}
-
+		$this->render_estimate_line( $option );
+		echo '</span>';
 		echo '</label>';
 		echo '</p>';
+	}
+
+	private function render_estimate_line( ProductDeliveryOption $option ): void {
+		if ( null === $option->estimate_text || '' === trim( $option->estimate_text ) ) {
+			return;
+		}
+
+		$line = DeliveryPresentationLabels::format_product_estimate_line(
+			$option->estimate_text,
+			$option->fulfilment_choice
+		);
+
+		if ( '' === $line ) {
+			return;
+		}
+
+		echo '<span class="cetech-de-delivery-option__estimate">' . esc_html( $line ) . '</span>';
 	}
 
 	private function render_notice( string $message ): void {

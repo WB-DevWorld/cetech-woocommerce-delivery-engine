@@ -13,7 +13,8 @@ use WC_Shipping_Method;
 /**
  * WooCommerce shipping method for validated selected delivery offers.
  *
- * Customer-facing labels stay operational (Delivery / Delivery N / Store pickup).
+ * Customer-facing rate labels prefer the selected public Delivery Option label
+ * (Stage 13F). Method ID and grouping architecture remain unchanged.
  */
 final class SelectedOfferShippingMethod extends WC_Shipping_Method {
 

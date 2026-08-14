@@ -102,7 +102,12 @@ final class CustomerOrderDeliverySummaryBuilder {
 			$snapshot->estimate_text,
 			$this->customer_quote_status_label( $snapshot->quote_status, $is_quoted ),
 			$quoted_amount,
-			$this->format_snapshotted_at( $snapshot->snapshotted_at )
+			$this->format_snapshotted_at( $snapshot->snapshotted_at ),
+			// Pickup location/address/instructions are not part of the V1 protected
+			// line snapshot contract. Compact presentation supports them when present.
+			null,
+			null,
+			null
 		);
 	}
 
@@ -181,6 +186,10 @@ final class CustomerOrderDeliverySummaryBuilder {
 
 /**
  * Customer-safe per-line delivery summary (no internal IDs).
+ *
+ * Stage 13F customer surfaces render only the compact public contract.
+ * Availability/method/charge fields remain available for internal mapping
+ * but must not be shown on customer thank-you / email surfaces.
  */
 final class CustomerOrderDeliveryLineSummary {
 
@@ -193,7 +202,10 @@ final class CustomerOrderDeliveryLineSummary {
 		public readonly ?string $estimate_text,
 		public readonly ?string $quote_status_label,
 		public readonly ?string $quoted_amount_display,
-		public readonly ?string $snapshotted_at_display
+		public readonly ?string $snapshotted_at_display,
+		public readonly ?string $pickup_location_label = null,
+		public readonly ?string $pickup_address = null,
+		public readonly ?string $pickup_instructions = null
 	) {
 	}
 }

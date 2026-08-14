@@ -1,13 +1,14 @@
+/**
+ * Variable-product selector shell styles.
+ * Shared option hierarchy lives in product-delivery-selector.css.
+ */
+
 .cetech-de-product-delivery-selector--variable {
 	margin: 1em 0;
 }
 
 .cetech-de-delivery-selector__status {
 	margin: 0.5em 0;
-}
-
-.cetech-de-delivery-selector__options .cetech-de-delivery-option--radio {
-	margin: 0.4em 0;
 }
 
 .cetech-de-delivery-selector__status[data-state="error"],

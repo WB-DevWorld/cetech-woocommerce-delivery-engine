@@ -16,7 +16,7 @@ use ReflectionClass;
 
 final class DeliveryPresentationCleanupTest extends TestCase {
 
-	public function test_customer_summary_rows_use_distinct_labels(): void {
+	public function test_customer_summary_rows_use_compact_public_contract(): void {
 		$rows = DeliveryPresentationLabels::format_public_summary_rows(
 			[
 				'fulfilment_availability_label' => 'In warehouse',
@@ -31,19 +31,18 @@ final class DeliveryPresentationCleanupTest extends TestCase {
 
 		self::assertSame(
 			[
-				'Fulfilment',
-				'Delivery method',
 				'Delivery option',
 				'Estimated delivery',
 			],
 			$keys
 		);
-		self::assertNotContains( 'Delivery', $keys );
-		self::assertCount( 4, array_unique( $keys ) );
-		self::assertSame( '3–6 business days', $rows[3]['value'] );
+		self::assertNotContains( 'Fulfilment', $keys );
+		self::assertNotContains( 'Delivery method', $keys );
+		self::assertCount( 2, array_unique( $keys ) );
+		self::assertSame( '3–6 business days', $rows[1]['value'] );
 	}
 
-	public function test_store_pickup_uses_method_and_ready_for_pickup_labels(): void {
+	public function test_store_pickup_uses_ready_for_pickup_without_method_label(): void {
 		$rows = DeliveryPresentationLabels::format_public_summary_rows(
 			[
 				'fulfilment_availability_label' => 'In store',
@@ -56,13 +55,13 @@ final class DeliveryPresentationCleanupTest extends TestCase {
 
 		$keys = array_column( $rows, 'key' );
 
-		self::assertSame( 'Fulfilment', $keys[0] );
-		self::assertSame( 'Method', $keys[1] );
-		self::assertSame( 'Delivery option', $keys[2] );
-		self::assertSame( 'Ready for pickup', $keys[3] );
+		self::assertSame( 'Delivery option', $keys[0] );
+		self::assertSame( 'Ready for pickup', $keys[1] );
+		self::assertNotContains( 'Fulfilment', $keys );
+		self::assertNotContains( 'Method', $keys );
 	}
 
-	public function test_cart_capture_helper_returns_labeled_rows_not_repeated_delivery(): void {
+	public function test_cart_capture_helper_returns_compact_rows_not_fulfilment_or_method(): void {
 		$rows = CartDeliverySelectionCapture::formatPublicSummaryRows(
 			[
 				'fulfilment_availability_label' => 'In warehouse',
@@ -81,10 +80,9 @@ final class DeliveryPresentationCleanupTest extends TestCase {
 		}
 
 		self::assertSame( 0, $delivery_key_count );
-		self::assertSame( 'Fulfilment', $rows[0]['key'] );
-		self::assertSame( 'Delivery method', $rows[1]['key'] );
-		self::assertSame( 'Delivery option', $rows[2]['key'] );
-		self::assertSame( 'Estimated delivery', $rows[3]['key'] );
+		self::assertSame( 'Delivery option', $rows[0]['key'] );
+		self::assertSame( 'Estimated delivery', $rows[1]['key'] );
+		self::assertCount( 2, $rows );
 	}
 
 	public function test_protected_order_item_meta_keys_are_hidden_from_normal_wc_item_ui(): void {
