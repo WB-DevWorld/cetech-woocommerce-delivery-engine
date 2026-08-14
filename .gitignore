@@ -25,6 +25,12 @@ docs/woodmart/
 .DS_Store
 Thumbs.db
 desktop.ini
+.cursor/
+
+# Local-only review screenshots / training media (not part of RC package)
+/docs/review/**/screenshots/
+/docs/training/
+/training/
 
 # Local read-only FLAIROC verification scratch (may contain page HTML dumps)
 /tmp-stage5b2-verify/
