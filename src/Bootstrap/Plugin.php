@@ -25,6 +25,7 @@ use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingIntegration;
 use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingRateCalculator;
 use CetechDeliveryEngine\Application\Shipping\ShippingPackageBuilder;
 use CetechDeliveryEngine\Application\Shipping\ShippingRateCalculationGate;
+use CetechDeliveryEngine\Application\Shipping\WooCommerceShippingReadiness;
 use CetechDeliveryEngine\Application\Configuration\Admin\EntityLabelResolver;
 use CetechDeliveryEngine\Application\Configuration\Admin\LegacyCategoryConfigurationInspector;
 use CetechDeliveryEngine\Application\Configuration\Admin\ProductVariationScopeGuard;
@@ -36,12 +37,17 @@ use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogIndexInterface
 use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogInheritanceClassifier;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
 use CetechDeliveryEngine\Application\Configuration\Catalog\ProductExceptionsQuery;
+use CetechDeliveryEngine\Application\Configuration\ClassicCheckoutRuntimeActivation;
+use CetechDeliveryEngine\Application\Configuration\OperationalReadinessAssessor;
+use CetechDeliveryEngine\Application\Configuration\OperationalStateService;
 use CetechDeliveryEngine\Application\Configuration\Catalog\WooCommerceCatalogIndex;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationValidator;
 use CetechDeliveryEngine\Application\Configuration\FulfilmentConstraintServiceInterface;
 use CetechDeliveryEngine\Application\Configuration\HardFulfilmentConstraintService;
 use CetechDeliveryEngine\Application\Configuration\LegacyConfigurationMigrator;
+use CetechDeliveryEngine\Application\Configuration\ContextualEntityService;
+use CetechDeliveryEngine\Application\Configuration\SetupWizardProgress;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultSummary;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsPolicyInterface;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsService;
@@ -62,6 +68,8 @@ use CetechDeliveryEngine\Domain\Configuration\ScopedConfigurationRepositoryInter
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbScopedConfigurationRepository;
 use CetechDeliveryEngine\Core\AdminNoticeManager;
 use CetechDeliveryEngine\Core\Capabilities\Capabilities;
+use CetechDeliveryEngine\Core\Capabilities\RoleAccessService;
+use CetechDeliveryEngine\Presentation\Admin\AdministratorAccessRecovery;
 use CetechDeliveryEngine\Core\FeaturesCompatibility;
 use CetechDeliveryEngine\Core\Health\HealthCheckRegistry;
 use CetechDeliveryEngine\Core\Requirements;
@@ -92,6 +100,10 @@ use CetechDeliveryEngine\Presentation\Admin\AdminActionHandler;
 use CetechDeliveryEngine\Presentation\Admin\AdminRecordDependencyChecker;
 use CetechDeliveryEngine\Presentation\Admin\AdminMenu;
 use CetechDeliveryEngine\Presentation\Admin\AdminNoticeService;
+use CetechDeliveryEngine\Presentation\Admin\AdminUxAssets;
+use CetechDeliveryEngine\Presentation\Admin\OverviewPage;
+use CetechDeliveryEngine\Presentation\Admin\ProductDeliveryPanel;
+use CetechDeliveryEngine\Presentation\Admin\SetupWizardPage;
 use CetechDeliveryEngine\Presentation\Admin\ConfigurationAuditLogger;
 use CetechDeliveryEngine\Presentation\Admin\DeliveryOffersPage;
 use CetechDeliveryEngine\Presentation\Admin\DeliverySettingsHomePage;
@@ -100,6 +112,7 @@ use CetechDeliveryEngine\Presentation\Admin\ProductExceptionsPage;
 use CetechDeliveryEngine\Presentation\Admin\DestinationZoneTestMatcher;
 use CetechDeliveryEngine\Presentation\Admin\DestinationZonesPage;
 use CetechDeliveryEngine\Presentation\Admin\EffectiveConfigurationPreviewPage;
+use CetechDeliveryEngine\Presentation\Admin\PreviewVariationsEndpoint;
 use CetechDeliveryEngine\Presentation\Admin\LogisticsProfilesPage;
 use CetechDeliveryEngine\Presentation\Admin\PickupLocationsPage;
 use CetechDeliveryEngine\Presentation\Admin\OrderDeliverySnapshotAdminDisplay;
@@ -187,8 +200,15 @@ final class Plugin {
 		$migration_runner = $this->container->get( MigrationRunner::class );
 		$migration_runner->run();
 
+		// Capability matrix must self-heal when an active plugin folder is replaced
+		// without reactivation (activation hooks do not run in that path).
+		$this->container->get( Capabilities::class )->ensure_current();
+
 		if ( is_admin() ) {
 			$this->container->get( AdminMenu::class )->register();
+			$this->container->get( AdministratorAccessRecovery::class )->register();
+			$this->container->get( ProductDeliveryPanel::class )->register();
+			$this->container->get( PreviewVariationsEndpoint::class )->register();
 		}
 
 		if ( ! $requirements->is_woocommerce_active() ) {
@@ -260,6 +280,18 @@ final class Plugin {
 		$this->container->singleton(
 			Capabilities::class,
 			static fn (): Capabilities => new Capabilities()
+		);
+
+		$this->container->singleton(
+			RoleAccessService::class,
+			static fn (): RoleAccessService => new RoleAccessService()
+		);
+
+		$this->container->singleton(
+			AdministratorAccessRecovery::class,
+			static fn ( ServiceContainer $container ): AdministratorAccessRecovery => new AdministratorAccessRecovery(
+				$container->get( Capabilities::class )
+			)
 		);
 
 		$this->container->singleton(
@@ -737,7 +769,9 @@ final class Plugin {
 				$container->get( ProductDeliverySelectionValidator::class ),
 				$container->get( AdminActionHandler::class ),
 				$container->get( ConfigurationAuditLogger::class ),
-				$container->get( AdminRecordDependencyChecker::class )
+				$container->get( AdminRecordDependencyChecker::class ),
+				$container->get( ClassicCheckoutRuntimeActivation::class ),
+				$container->get( CatalogInheritanceClassifier::class )
 			)
 		);
 
@@ -800,7 +834,9 @@ final class Plugin {
 				$container->get( ProductTargetResolver::class ),
 				$container->get( AdminActionHandler::class ),
 				$container->get( ScopedConfigurationAuthorization::class ),
-				$container->get( SiteWideDefaultsService::class )
+				$container->get( SiteWideDefaultsService::class ),
+				$container->get( DeliveryOfferRepositoryInterface::class ),
+				$container->get( ClassicCheckoutRuntimeActivation::class )
 			)
 		);
 
@@ -810,6 +846,18 @@ final class Plugin {
 				$container->get( ScopedConfigurationAdminService::class ),
 				$container->get( ProductTargetResolver::class ),
 				$container->get( AdminActionHandler::class ),
+				$container->get( ScopedConfigurationAuthorization::class ),
+				$container->get( OperationalReadinessAssessor::class ),
+				$container->get( CatalogIndexInterface::class ),
+				$container->get( ClassicCheckoutRuntimeActivation::class ),
+				$container->get( OperationalStateService::class )
+			)
+		);
+
+		$this->container->singleton(
+			PreviewVariationsEndpoint::class,
+			static fn ( ServiceContainer $container ): PreviewVariationsEndpoint => new PreviewVariationsEndpoint(
+				$container->get( CatalogIndexInterface::class ),
 				$container->get( ScopedConfigurationAuthorization::class )
 			)
 		);
@@ -823,7 +871,8 @@ final class Plugin {
 				$container->get( NeedsAttentionQuery::class ),
 				$container->get( ScopedConfigurationRepositoryInterface::class ),
 				$container->get( EntityLabelResolver::class ),
-				$container->get( AdminActionHandler::class )
+				$container->get( AdminActionHandler::class ),
+				$container->get( DeliveryOfferRepositoryInterface::class )
 			)
 		);
 
@@ -840,7 +889,8 @@ final class Plugin {
 			NeedsAttentionPage::class,
 			static fn ( ServiceContainer $container ): NeedsAttentionPage => new NeedsAttentionPage(
 				$container->get( NeedsAttentionQuery::class ),
-				$container->get( AdminActionHandler::class )
+				$container->get( AdminActionHandler::class ),
+				$container->get( OperationalStateService::class )
 			)
 		);
 
@@ -854,7 +904,13 @@ final class Plugin {
 					$container->get( FeatureFlags::class ),
 					$container->get( Requirements::class )
 				),
-				$container->get( AdminActionHandler::class )
+				$container->get( AdminActionHandler::class ),
+				$container->get( SetupWizardProgress::class ),
+				$container->get( ClassicCheckoutRuntimeActivation::class ),
+				$container->get( WooCommerceShippingReadiness::class ),
+				$container->get( SiteWideDefaultsSettings::class ),
+				$container->get( OperationalStateService::class ),
+				$container->get( RoleAccessService::class )
 			)
 		);
 
@@ -879,6 +935,77 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			AdminUxAssets::class,
+			static fn (): AdminUxAssets => new AdminUxAssets()
+		);
+
+		$this->container->singleton(
+			SetupWizardProgress::class,
+			static fn ( ServiceContainer $container ): SetupWizardProgress => new SetupWizardProgress(
+				$container->get( SiteWideDefaultsSettings::class )
+			)
+		);
+
+		$this->container->singleton(
+			ContextualEntityService::class,
+			static fn ( ServiceContainer $container ): ContextualEntityService => new ContextualEntityService(
+				$container->get( DeliveryOfferRepositoryInterface::class ),
+				$container->get( DestinationZoneRepositoryInterface::class ),
+				$container->get( DestinationRuleRepositoryInterface::class ),
+				$container->get( RateCardRepositoryInterface::class ),
+				$container->get( PickupLocationRepositoryInterface::class ),
+				$container->get( DeliveryOfferValidator::class ),
+				$container->get( DestinationZoneValidator::class ),
+				$container->get( DestinationRuleValidator::class ),
+				$container->get( RateCardValidator::class ),
+				$container->get( PickupLocationValidator::class )
+			)
+		);
+
+		$this->container->singleton(
+			SetupWizardPage::class,
+			static fn ( ServiceContainer $container ): SetupWizardPage => new SetupWizardPage(
+				$container->get( SetupWizardProgress::class ),
+				$container->get( SiteWideDefaultsService::class ),
+				$container->get( SiteWideDefaultsSettings::class ),
+				$container->get( SiteWideDefaultSummary::class ),
+				$container->get( ContextualEntityService::class ),
+				$container->get( ScopedConfigurationRepositoryInterface::class ),
+				$container->get( DeliveryOfferRepositoryInterface::class ),
+				$container->get( DestinationZoneRepositoryInterface::class ),
+				$container->get( RateCardRepositoryInterface::class ),
+				$container->get( PickupLocationRepositoryInterface::class ),
+				$container->get( NeedsAttentionQuery::class ),
+				$container->get( AdminActionHandler::class ),
+				$container->get( ClassicCheckoutRuntimeActivation::class ),
+				$container->get( WooCommerceShippingReadiness::class ),
+				$container->get( OperationalStateService::class )
+			)
+		);
+
+		$this->container->singleton(
+			OverviewPage::class,
+			static fn ( ServiceContainer $container ): OverviewPage => new OverviewPage(
+				$container->get( SetupWizardPage::class ),
+				$container->get( SetupWizardProgress::class ),
+				$container->get( SiteWideDefaultsService::class ),
+				$container->get( SiteWideDefaultsSettings::class ),
+				$container->get( SiteWideDefaultSummary::class ),
+				$container->get( NeedsAttentionQuery::class ),
+				$container->get( AdminActionHandler::class ),
+				$container->get( OperationalStateService::class )
+			)
+		);
+
+		$this->container->singleton(
+			ProductDeliveryPanel::class,
+			static fn ( ServiceContainer $container ): ProductDeliveryPanel => new ProductDeliveryPanel(
+				$container->get( ScopedConfigurationAdminService::class ),
+				$container->get( ProductTargetResolver::class )
+			)
+		);
+
+		$this->container->singleton(
 			AdminMenu::class,
 			static fn ( ServiceContainer $container ): AdminMenu => new AdminMenu(
 				$container->get( SystemStatusPage::class ),
@@ -895,7 +1022,11 @@ final class Plugin {
 				$container->get( DeliverySettingsHomePage::class ),
 				$container->get( ProductExceptionsPage::class ),
 				$container->get( NeedsAttentionPage::class ),
-				$container->get( ScopedConfigurationAdminAssets::class )
+				$container->get( OverviewPage::class ),
+				$container->get( SetupWizardPage::class ),
+				$container->get( ScopedConfigurationAdminAssets::class ),
+				$container->get( AdminUxAssets::class ),
+				$container->get( SetupWizardProgress::class )
 			)
 		);
 	}
@@ -1010,10 +1141,35 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			OperationalReadinessAssessor::class,
+			static fn ( ServiceContainer $container ): OperationalReadinessAssessor => new OperationalReadinessAssessor(
+				$container->get( EffectiveConfigurationResolver::class )
+			)
+		);
+
+		$this->container->singleton(
+			ClassicCheckoutRuntimeActivation::class,
+			static fn ( ServiceContainer $container ): ClassicCheckoutRuntimeActivation => new ClassicCheckoutRuntimeActivation(
+				$container->get( FeatureFlags::class ),
+				$container->get( SiteWideDefaultsSettings::class )
+			)
+		);
+
+		$this->container->singleton(
+			WooCommerceShippingReadiness::class,
+			static fn ( ServiceContainer $container ): WooCommerceShippingReadiness => new WooCommerceShippingReadiness(
+				$container->get( Requirements::class )
+			)
+		);
+
+		$this->container->singleton(
 			NeedsAttentionQuery::class,
 			static fn ( ServiceContainer $container ): NeedsAttentionQuery => new NeedsAttentionQuery(
 				$container->get( CatalogIndexInterface::class ),
-				$container->get( EffectiveConfigurationResolver::class )
+				$container->get( OperationalReadinessAssessor::class ),
+				$container->get( OperationalStateService::class ),
+				$container->get( CatalogInheritanceClassifier::class ),
+				$container->get( ScopedConfigurationRepositoryInterface::class )
 			)
 		);
 
@@ -1023,7 +1179,8 @@ final class Plugin {
 				$container->get( ScopedConfigurationRepositoryInterface::class ),
 				$container->get( CatalogIndexInterface::class ),
 				$container->get( CatalogInheritanceClassifier::class ),
-				$container->get( SiteWideDefaultsPolicyInterface::class )
+				$container->get( SiteWideDefaultsPolicyInterface::class ),
+				$container->get( OperationalReadinessAssessor::class )
 			)
 		);
 
@@ -1034,6 +1191,17 @@ final class Plugin {
 				$container->get( DeliveryOfferRepositoryInterface::class ),
 				$container->get( RateCardRepositoryInterface::class ),
 				$container->get( EntityLabelResolver::class )
+			)
+		);
+
+		$this->container->singleton(
+			OperationalStateService::class,
+			static fn ( ServiceContainer $container ): OperationalStateService => new OperationalStateService(
+				$container->get( FeatureFlags::class ),
+				$container->get( SiteWideDefaultsSettings::class ),
+				$container->get( SetupWizardProgress::class ),
+				$container->get( ClassicCheckoutRuntimeActivation::class ),
+				$container->get( SiteWideDefaultSummary::class )
 			)
 		);
 

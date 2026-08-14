@@ -68,6 +68,13 @@ $required_classes = [
 	'CetechDeliveryEngine\\Presentation\\Admin\\DeliverySettingsHomePage',
 	'CetechDeliveryEngine\\Presentation\\Admin\\ProductExceptionsPage',
 	'CetechDeliveryEngine\\Presentation\\Admin\\NeedsAttentionPage',
+	'CetechDeliveryEngine\\Presentation\\Admin\\OverviewPage',
+	'CetechDeliveryEngine\\Presentation\\Admin\\SetupWizardPage',
+	'CetechDeliveryEngine\\Presentation\\Admin\\ProductDeliveryPanel',
+	'CetechDeliveryEngine\\Presentation\\Admin\\AdminUxAssets',
+	'CetechDeliveryEngine\\Presentation\\Admin\\PreviewVariationsEndpoint',
+	'CetechDeliveryEngine\\Application\\Configuration\\SetupWizardProgress',
+	'CetechDeliveryEngine\\Application\\Configuration\\ContextualEntityService',
 	'CetechDeliveryEngine\\Domain\\FulfilmentProfile\\FulfilmentProfileRegistry',
 	'CetechDeliveryEngine\\Application\\Configuration\\SiteWideDefaultsService',
 	'CetechDeliveryEngine\\Application\\Configuration\\EffectiveConfigurationResolver',
@@ -90,6 +97,21 @@ $required_classes = [
 	'CetechDeliveryEngine\\Application\\Order\\OrderDeliveryGroupSnapshot',
 	'CetechDeliveryEngine\\Presentation\\Admin\\OrderDeliverySnapshotAdminDisplay',
 	'CetechDeliveryEngine\\Presentation\\Admin\\OrderShippingItemPresentationGuard',
+	'CetechDeliveryEngine\\Application\\Configuration\\DeliveryOptionCompatibility',
+	'CetechDeliveryEngine\\Application\\Configuration\\Admin\\StaffChargeSummary',
+	'CetechDeliveryEngine\\Presentation\\Admin\\StaffDeliveryCustomizeView',
+	'CetechDeliveryEngine\\Application\\Configuration\\OperationalReadinessAssessor',
+	'CetechDeliveryEngine\\Application\\Configuration\\OperationalState',
+	'CetechDeliveryEngine\\Application\\Configuration\\OperationalStateService',
+	'CetechDeliveryEngine\\Application\\Configuration\\Admin\\AdminMoneyFormatter',
+	'CetechDeliveryEngine\\Application\\Configuration\\Admin\\StoreAwareExamples',
+	'CetechDeliveryEngine\\Application\\Configuration\\Admin\\OfferEstimatedDeliveryDisplay',
+	'CetechDeliveryEngine\\Core\\Capabilities\\Capabilities',
+	'CetechDeliveryEngine\\Core\\Capabilities\\RoleAccessService',
+	'CetechDeliveryEngine\\Presentation\\Admin\\AdministratorAccessRecovery',
+	'CetechDeliveryEngine\\Application\\Configuration\\ClassicCheckoutRuntimeActivation',
+	'CetechDeliveryEngine\\Application\\Configuration\\SetupWizardProgress',
+	'CetechDeliveryEngine\\Application\\Shipping\\WooCommerceShippingReadiness',
 ];
 
 $required_interfaces = [
@@ -166,6 +188,34 @@ if ( ! is_readable( $variable_js ) ) {
 }
 if ( ! is_readable( $variable_css ) ) {
 	$failures[] = 'Missing assets/frontend/variable-delivery-selector.css';
+}
+
+$admin_css = $package_root . '/assets/admin/delivery-engine-admin.css';
+$admin_js  = $package_root . '/assets/admin/delivery-engine-admin.js';
+if ( ! is_readable( $admin_css ) ) {
+	$failures[] = 'Missing assets/admin/delivery-engine-admin.css';
+} else {
+	$admin_css_source = (string) file_get_contents( $admin_css );
+	if ( ! str_contains( $admin_css_source, 'cetech-de-delivery-tab-active' ) ) {
+		$failures[] = 'Admin CSS missing scoped Delivery product-panel responsive class.';
+	}
+	if ( ! str_contains( $admin_css_source, 'auto-fit' ) ) {
+		$failures[] = 'Admin CSS missing responsive auto-fit grid.';
+	}
+}
+if ( ! is_readable( $admin_js ) ) {
+	$failures[] = 'Missing assets/admin/delivery-engine-admin.js';
+}
+
+$plugin_header = $package_root . '/cetech-woocommerce-delivery-engine.php';
+if ( is_readable( $plugin_header ) ) {
+	$header_source = (string) file_get_contents( $plugin_header );
+	if ( ! str_contains( $header_source, "define( 'CETECH_DE_VERSION'" ) ) {
+		$failures[] = 'Plugin bootstrap missing CETECH_DE_VERSION.';
+	}
+	if ( preg_match( '/code[_ -]?snippets/i', $header_source ) ) {
+		$failures[] = 'Plugin bootstrap must not depend on Code Snippets.';
+	}
 }
 
 if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
@@ -332,6 +382,231 @@ if ( [] !== $failures ) {
 	exit( 1 );
 }
 
+// Stage 13C-R1 repair presence checks (source inspection inside package).
+$caps_php = $package_root . '/src/Core/Capabilities/Capabilities.php';
+if ( ! is_readable( $caps_php ) ) {
+	$failures[] = 'Missing Capabilities.php';
+} else {
+	$caps_source = (string) file_get_contents( $caps_php );
+	if ( ! str_contains( $caps_source, 'function ensure_current' ) || ! str_contains( $caps_source, 'VERSION_OPTION' ) ) {
+		$failures[] = 'Capabilities self-heal (ensure_current / VERSION_OPTION) missing from package.';
+	}
+}
+
+$plugin_boot = (string) file_get_contents( $plugin_php );
+if ( ! str_contains( $plugin_boot, 'ensure_current()' ) ) {
+	$failures[] = 'Plugin.php does not call Capabilities::ensure_current() on boot.';
+}
+
+$preview_source = is_readable( $preview_php ) ? (string) file_get_contents( $preview_php ) : '';
+if ( '' !== $preview_source && ! str_contains( $preview_source, 'should_handle_posted_action' ) ) {
+	$failures[] = 'Preview page gate should_handle_posted_action missing from package.';
+}
+
+$wizard_php = $package_root . '/src/Presentation/Admin/SetupWizardPage.php';
+if ( ! is_readable( $wizard_php ) ) {
+	$failures[] = 'Missing SetupWizardPage.php';
+} else {
+	$wizard_source = (string) file_get_contents( $wizard_php );
+	if ( ! str_contains( $wizard_source, 'continue_redirect_args' ) ) {
+		$failures[] = 'SetupWizardPage continue_redirect_args missing from package.';
+	}
+	if ( ! str_contains( $wizard_source, 'validate_fulfilment_default_selection' ) ) {
+		$failures[] = 'SetupWizardPage R3 fulfilment validation missing from package.';
+	}
+	if ( ! str_contains( $wizard_source, 'Select at least one Delivery Option before continuing.' ) ) {
+		$failures[] = 'SetupWizardPage R3 Delivery Option validation message missing from package.';
+	}
+	if ( ! str_contains( $wizard_source, 'Inline create panels must stay outside the save form' ) ) {
+		$failures[] = 'SetupWizardPage R3 nested-form repair missing from package.';
+	}
+	if ( ! str_contains( $wizard_source, 'Create Air or Sea Shipping option' ) ) {
+		$failures[] = 'SetupWizardPage R3 International Air/Sea guided create missing from package.';
+	}
+}
+
+$menu_php = $package_root . '/src/Presentation/Admin/AdminMenu.php';
+if ( is_readable( $menu_php ) ) {
+	$menu_source = (string) file_get_contents( $menu_php );
+	if ( ! str_contains( $menu_source, "'options.php'" ) ) {
+		$failures[] = 'AdminMenu missing options.php registration for Product Delivery Settings.';
+	}
+}
+
+$needs_php = $package_root . '/src/Application/Configuration/Catalog/NeedsAttentionQuery.php';
+if ( is_readable( $needs_php ) ) {
+	$needs_source = (string) file_get_contents( $needs_php );
+	if ( ! str_contains( $needs_source, 'scan_catalog_as_customer_problems' ) ) {
+		$failures[] = 'NeedsAttentionQuery missing upgrade-aware scan gate.';
+	}
+}
+
+$assessor_php = $package_root . '/src/Application/Configuration/OperationalReadinessAssessor.php';
+if ( is_readable( $assessor_php ) ) {
+	$assessor_source = (string) file_get_contents( $assessor_php );
+	if ( ! str_contains( $assessor_source, 'null !== $slice_key' )
+		|| ! str_contains( $assessor_source, 'DEFAULT_SLICE_KEY' )
+	) {
+		$failures[] = 'OperationalReadinessAssessor missing explicit null-vs-empty slice semantics.';
+	}
+	if ( ! str_contains( $assessor_source, 'Private/technical unresolved fields' ) ) {
+		$failures[] = 'OperationalReadinessAssessor missing R3 private-field readiness guard.';
+	}
+}
+
+$exceptions_php = $package_root . '/src/Application/Configuration/Catalog/ProductExceptionsQuery.php';
+if ( is_readable( $exceptions_php ) ) {
+	$exceptions_source = (string) file_get_contents( $exceptions_php );
+	if ( ! str_contains( $exceptions_source, 'technical_delivery_details_label' ) ) {
+		$failures[] = 'ProductExceptionsQuery missing Technical delivery details privacy summarization.';
+	}
+	if ( preg_match( '/customized_labels[\s\S]{0,800}ConfigurationFieldCatalog::label\(\s*\$field_key\s*\)/', $exceptions_source )
+		&& ! str_contains( $exceptions_source, 'private_field_keys' )
+	) {
+		$failures[] = 'ProductExceptionsQuery still appears to dump every field label including private fields.';
+	}
+}
+
+$eta_php = $package_root . '/src/Application/Configuration/Admin/OfferEstimatedDeliveryDisplay.php';
+if ( ! is_readable( $eta_php ) ) {
+	$failures[] = 'Missing OfferEstimatedDeliveryDisplay.php';
+} else {
+	$eta_source = (string) file_get_contents( $eta_php );
+	if ( ! str_contains( $eta_source, 'INTERNAL_SERVICE_LEVEL_CODES' ) || ! str_contains( $eta_source, 'standard' ) ) {
+		$failures[] = 'OfferEstimatedDeliveryDisplay must refuse internal service_level codes as ETA.';
+	}
+}
+
+$money_php = $package_root . '/src/Application/Configuration/Admin/AdminMoneyFormatter.php';
+if ( ! is_readable( $money_php ) ) {
+	$failures[] = 'Missing AdminMoneyFormatter.php';
+}
+
+$preview_variations_php = $package_root . '/src/Presentation/Admin/PreviewVariationsEndpoint.php';
+if ( ! is_readable( $preview_variations_php ) ) {
+	$failures[] = 'Missing PreviewVariationsEndpoint.php';
+} else {
+	$preview_variations_source = (string) file_get_contents( $preview_variations_php );
+	if ( ! str_contains( $preview_variations_source, 'cetech_de_preview_variations' )
+		|| ! str_contains( $preview_variations_source, 'check_ajax_referer' )
+		|| ! str_contains( $preview_variations_source, 'can_preview' )
+	) {
+		$failures[] = 'PreviewVariationsEndpoint missing AJAX action, nonce, or capability checks.';
+	}
+}
+
+if ( ! str_contains( $plugin_boot, 'PreviewVariationsEndpoint' ) ) {
+	$failures[] = 'Plugin.php does not register PreviewVariationsEndpoint.';
+}
+
+$resolver_php = $package_root . '/src/Application/Configuration/EffectiveConfigurationResolver.php';
+if ( is_readable( $resolver_php ) ) {
+	$resolver_source = (string) file_get_contents( $resolver_php );
+	if ( ! str_contains( $resolver_source, 'Stage 13 root (empty slice) → sole Stage 5/6 profile item scope' )
+		&& ! str_contains( $resolver_source, 'sole Stage 5/6 profile item scope' )
+	) {
+		$failures[] = 'EffectiveConfigurationResolver missing Stage 6 ↔ Stage 13 item-scope bridge.';
+	}
+}
+
+$admin_js_source = is_readable( $admin_js ) ? (string) file_get_contents( $admin_js ) : '';
+if ( '' === $admin_js_source || ! str_contains( $admin_js_source, 'loadPreviewVariations' ) || ! str_contains( $admin_js_source, 'cetech_de_preview_variations' ) ) {
+	$failures[] = 'Admin JS missing Preview variation refresh logic.';
+}
+
+$access_php = $package_root . '/src/Core/Capabilities/RoleAccessService.php';
+if ( ! is_readable( $access_php ) ) {
+	$failures[] = 'Missing RoleAccessService.php';
+} else {
+	$access_source = (string) file_get_contents( $access_php );
+	if ( ! str_contains( $access_source, 'function apply' ) || ! str_contains( $access_source, 'locked_for_administrator' ) ) {
+		$failures[] = 'RoleAccessService missing apply() or administrator lockout protection.';
+	}
+	if ( ! str_contains( $access_source, 'function editable_roles' ) || ! str_contains( $access_source, 'function protect_administrator' ) ) {
+		$failures[] = 'RoleAccessService missing editable_roles()/protect_administrator() Stage 13D-R1 hardening.';
+	}
+}
+
+$recovery_php = $package_root . '/src/Presentation/Admin/AdministratorAccessRecovery.php';
+if ( ! is_readable( $recovery_php ) ) {
+	$failures[] = 'Missing AdministratorAccessRecovery.php';
+} else {
+	$recovery_source = (string) file_get_contents( $recovery_php );
+	if ( ! str_contains( $recovery_source, "manage_options" ) || ! str_contains( $recovery_source, 'check_admin_referer' ) ) {
+		$failures[] = 'AdministratorAccessRecovery missing manage_options + nonce protection.';
+	}
+}
+
+$caps_source = is_readable( $caps_php ) ? (string) file_get_contents( $caps_php ) : '';
+if ( '' !== $caps_source ) {
+	if ( ! str_contains( $caps_source, "const VIEW = 'view_delivery_engine'" ) ) {
+		$failures[] = 'Capabilities missing view_delivery_engine.';
+	}
+	if ( ! str_contains( $caps_source, 'const VERSION = 3' ) ) {
+		$failures[] = 'Capabilities VERSION is not 3 in the packaged plugin.';
+	}
+	if ( ! str_contains( $caps_source, 'administrator_missing_required_capabilities' ) ) {
+		$failures[] = 'Capabilities missing administrator_missing_required_capabilities() self-heal probe.';
+	}
+}
+
+$menu_source = is_readable( $menu_php ) ? (string) file_get_contents( $menu_php ) : '';
+if ( '' !== $menu_source ) {
+	if ( str_contains( $menu_source, "__( 'Legacy Delivery Rules'" ) ) {
+		$failures[] = 'AdminMenu still registers a normal Legacy Delivery Rules submenu.';
+	}
+	if ( str_contains( $menu_source, "__( 'Technical Diagnostic Tools'" ) ) {
+		$failures[] = 'AdminMenu still registers Technical Diagnostic Tools as a normal submenu title.';
+	}
+	if ( ! str_contains( $menu_source, 'register_hidden_page' ) || ! str_contains( $menu_source, 'HIDDEN_PARENT' ) ) {
+		$failures[] = 'AdminMenu missing hidden support-page registration.';
+	}
+	if ( str_contains( $menu_source, 'ProductDeliveryRulesPage::SLUG' ) ) {
+		$failures[] = 'AdminMenu still registers the Legacy product-rules page.';
+	}
+}
+
+$rate_card_validator_php = $package_root . '/src/Presentation/Admin/Validation/RateCardValidator.php';
+if ( ! is_readable( $rate_card_validator_php ) ) {
+	$failures[] = 'Missing RateCardValidator.php';
+} else {
+	$rate_card_validator_source = (string) file_get_contents( $rate_card_validator_php );
+	if ( ! str_contains( $rate_card_validator_source, "\$input['effective_from'] ?? null" )
+		|| ! str_contains( $rate_card_validator_source, "\$input['effective_to'] ?? null" )
+		|| ! str_contains( $rate_card_validator_source, 'function is_supplied_date' )
+	) {
+		$failures[] = 'RateCardValidator missing optional effective_from/effective_to warning repair.';
+	}
+}
+
+if ( ! str_contains( $plugin_boot, 'RoleAccessService' ) ) {
+	$failures[] = 'Plugin.php does not wire RoleAccessService.';
+}
+if ( ! str_contains( $plugin_boot, 'AdministratorAccessRecovery' ) ) {
+	$failures[] = 'Plugin.php does not wire AdministratorAccessRecovery.';
+}
+
+$settings_php = $package_root . '/src/Presentation/Admin/DeliverySettingsPage.php';
+if ( is_readable( $settings_php ) ) {
+	$settings_source = (string) file_get_contents( $settings_php );
+	if ( ! str_contains( $settings_source, "__( 'Access'" ) || ! str_contains( $settings_source, 'role_access->apply' ) ) {
+		$failures[] = 'Settings page missing real Access role permissions save.';
+	}
+}
+
+$system_status_php = $package_root . '/src/Presentation/Admin/SystemStatusPage.php';
+if ( is_readable( $system_status_php ) ) {
+	$system_status_source = (string) file_get_contents( $system_status_php );
+	if ( ! str_contains( $system_status_source, 'Capabilities::DIAGNOSTICS' ) ) {
+		$failures[] = 'SystemStatusPage missing view_delivery_diagnostics enforcement.';
+	}
+}
+
+if ( [] !== $failures ) {
+	fwrite( STDERR, "Package verification FAILED:\n- " . implode( "\n- ", $failures ) . "\n" );
+	exit( 1 );
+}
+
 fwrite( STDOUT, "Package verification OK\n" );
 fwrite( STDOUT, "- ConfigurationHealthChecker autoloads from Application\\Diagnostics\n" );
 fwrite( STDOUT, "- Plugin.php import present\n" );
@@ -343,5 +618,9 @@ fwrite( STDOUT, "- Stage 8 grouping/shipping/order snapshot classes autoload\n" 
 fwrite( STDOUT, "- No PHPUnit in production vendor\n" );
 fwrite( STDOUT, "- Runtime contracts loaded; VariationRelationshipInspectorInterface present\n" );
 fwrite( STDOUT, "- VerifiableMigrationInterface present; schema v3 migration require path OK\n" );
+fwrite( STDOUT, "- Stage 13B-R2 compatibility/customize/readiness/admin CSS-JS present\n" );
+fwrite( STDOUT, "- Stage 13C-R1 operational state / capability / wizard / preview repairs present\n" );
+fwrite( STDOUT, "- Stage 13C-R3 wizard validation / International Air-Sea / Preview variations / variable readiness present\n" );
+fwrite( STDOUT, "- Stage 13D RoleAccessService / hidden diagnostics / Legacy menu retirement / RateCard optional dates present\n" );
 fwrite( STDOUT, "- Linux-case PSR-4 classmap paths verified\n" );
 exit( 0 );

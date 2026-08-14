@@ -1,0 +1,370 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Edit Delivery Area — Delivery Engine fixture</title><link rel="stylesheet" href="https://s.w.org/wp-includes/css/dashicons.min.css" /><link rel="stylesheet" href="../wp-admin-chrome.css" /><link rel="stylesheet" href="../../../../../assets/admin/delivery-engine-admin.css" /><link rel="stylesheet" href="../../../../../assets/admin/scoped-configuration.css" /><script src="../../../../../assets/admin/delivery-engine-admin.js" defer></script></head><body class="wp-admin wp-core-ui"><div id="wpadminbar"><span class="ab-label">Fixture Store</span><span class="ab-label">Dashboard</span><span class="ab-label">Jane Admin</span></div><div class="cetech-de-fixture-banner">Fixture render — sample catalog data — not a live WordPress screenshot</div><div id="wpwrap"><div id="wpcontent"><div id="adminmenumain"><ul id="adminmenu"><li class=""><a href="#"><span class="dashicons dashicons-dashboard"></span><span class="wp-menu-name">Dashboard</span></a></li><li class=""><a href="#"><span class="dashicons dashicons-admin-post"></span><span class="wp-menu-name">Posts</span></a></li><li class=""><a href="#"><span class="dashicons dashicons-cart"></span><span class="wp-menu-name">WooCommerce</span></a></li><li class=""><a href="#"><span class="dashicons dashicons-products"></span><span class="wp-menu-name">Products</span></a></li><li class="wp-has-current-submenu current"><a href="#"><span class="dashicons dashicons-location-alt"></span><span class="wp-menu-name">Delivery Engine</span></a><ul class="wp-submenu"><li><a href="#">Overview</a></li><li><a href="#">Site-wide Defaults</a></li><li><a href="#">Delivery Options</a></li><li class="current"><a href="#">Delivery Areas</a></li><li><a href="#">Delivery Charges</a></li><li><a href="#">Pickup Locations</a></li><li><a href="#">Product Exceptions</a></li><li><a href="#">Needs Attention</a></li><li><a href="#">Settings</a></li><li><a href="#">Legacy Delivery Rules</a></li><li><a href="#">Technical Diagnostic Tools</a></li></ul></li><li class=""><a href="#"><span class="dashicons dashicons-admin-appearance"></span><span class="wp-menu-name">Appearance</span></a></li><li class=""><a href="#"><span class="dashicons dashicons-admin-plugins"></span><span class="wp-menu-name">Plugins</span></a></li><li class=""><a href="#"><span class="dashicons dashicons-admin-settings"></span><span class="wp-menu-name">Settings</span></a></li></ul></div><div id="wpbody"><div id="wpbody-content"><style>
+			.cetech-de-admin-page,
+			.cetech-de-dashboard {
+				--cetech-de-bg: #fff;
+				--cetech-de-border: #dcdcde;
+				--cetech-de-muted: #646970;
+				--cetech-de-text: #1d2327;
+				--cetech-de-accent: #2271b1;
+				--cetech-de-radius: 8px;
+				--cetech-de-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+				max-width: 1180px;
+				margin-top: 8px;
+			}
+			.cetech-de-admin-page > hr.wp-header-end {
+				display: none;
+				margin: 0;
+				border: 0;
+				height: 0;
+			}
+			.cetech-de-page-header .notice,
+			.cetech-de-dashboard-header .notice {
+				margin: 0 0 12px;
+				box-shadow: none;
+			}
+			.cetech-de-admin-page > h1 { display: none; }
+			.cetech-de-dashboard-header,
+			.cetech-de-page-header {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 20px;
+				justify-content: space-between;
+				align-items: flex-start;
+				margin-bottom: 20px;
+				padding: 24px;
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-dashboard-eyebrow {
+				margin: 0 0 6px;
+				color: var(--cetech-de-accent);
+				font-size: 12px;
+				font-weight: 600;
+				letter-spacing: 0.04em;
+				text-transform: uppercase;
+			}
+			.cetech-de-dashboard-title {
+				margin: 0 0 8px;
+				font-size: 24px;
+				font-weight: 600;
+				line-height: 1.25;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-dashboard-subtitle {
+				margin: 0;
+				color: var(--cetech-de-muted);
+				font-size: 14px;
+				line-height: 1.6;
+				max-width: 640px;
+			}
+			.cetech-de-dashboard-header-actions {
+				display: flex;
+				flex-direction: column;
+				gap: 10px;
+				align-items: flex-end;
+				min-width: min(100%, 420px);
+			}
+			.cetech-de-button-group {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px;
+				justify-content: flex-end;
+			}
+			.cetech-de-header-button { margin: 0 !important; }
+			.cetech-de-section,
+			.cetech-de-admin-section {
+				margin-top: 28px;
+				padding-top: 4px;
+			}
+			.cetech-de-section-head { margin-bottom: 14px; }
+			.cetech-de-section-title {
+				margin: 0 0 4px;
+				font-size: 18px;
+				font-weight: 600;
+				line-height: 1.3;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-section-desc {
+				margin: 0;
+				color: var(--cetech-de-muted);
+				font-size: 13px;
+				line-height: 1.5;
+				max-width: 760px;
+			}
+			.cetech-de-admin-summary { margin: 0 0 20px; }
+			.cetech-de-admin-example { margin: 0 0 20px; }
+			.cetech-de-summary-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+				gap: 12px;
+			}
+			.cetech-de-summary-stat {
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 18px 16px;
+				text-align: center;
+				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-summary-stat--empty .cetech-de-summary-value { color: #a7aaad; }
+			.cetech-de-summary-value {
+				display: block;
+				font-size: 28px;
+				font-weight: 700;
+				line-height: 1.1;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-summary-label {
+				display: block;
+				margin-top: 6px;
+				color: var(--cetech-de-muted);
+				font-size: 12px;
+				line-height: 1.4;
+			}
+			.cetech-de-empty-state {
+				background: var(--cetech-de-bg);
+				border: 1px dashed var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 24px;
+				text-align: center;
+				margin: 0 0 20px;
+			}
+			.cetech-de-empty-state-action { margin: 16px 0 0; }
+			.cetech-de-empty-state-title {
+				margin: 0 0 6px;
+				font-size: 15px;
+				font-weight: 600;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-empty-state-text {
+				margin: 0;
+				color: var(--cetech-de-muted);
+				font-size: 13px;
+				line-height: 1.55;
+				max-width: 560px;
+				margin-left: auto;
+				margin-right: auto;
+			}
+			.cetech-de-warning-card {
+				display: grid;
+				grid-template-columns: auto 1fr;
+				gap: 14px;
+				align-items: start;
+				background: #fffaf0;
+				border: 1px solid #f0d58a;
+				border-left: 4px solid #dba617;
+				border-radius: var(--cetech-de-radius);
+				padding: 16px 18px;
+				margin: 0 0 20px;
+			}
+			.cetech-de-warning-icon {
+				width: 28px;
+				height: 28px;
+				border-radius: 999px;
+				background: #dba617;
+				color: #fff;
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				font-weight: 700;
+				font-size: 14px;
+				flex-shrink: 0;
+			}
+			.cetech-de-warning-title {
+				margin: 0 0 6px;
+				font-size: 14px;
+				font-weight: 600;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-warning-message {
+				margin: 0;
+				color: var(--cetech-de-muted);
+				font-size: 13px;
+				line-height: 1.55;
+			}
+			.cetech-de-warning-action { margin: 12px 0 0; }
+			.cetech-de-help-example {
+				margin: 0;
+				padding: 10px 12px;
+				background: #f6f7f7;
+				border-radius: 6px;
+				color: var(--cetech-de-text);
+				font-size: 13px;
+			}
+			.cetech-de-help-example-label {
+				display: inline-block;
+				margin-right: 6px;
+				padding: 2px 8px;
+				border-radius: 999px;
+				background: #e5f5fa;
+				color: var(--cetech-de-accent);
+				font-size: 11px;
+				font-weight: 600;
+				text-transform: uppercase;
+			}
+			.cetech-de-form-panel {
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 4px 20px 8px;
+				margin: 0 0 16px;
+				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-form-panel-head {
+				padding: 16px 0 8px;
+				border-bottom: 1px solid #f0f0f1;
+				margin-bottom: 4px;
+			}
+			.cetech-de-form-panel-title {
+				margin: 0 0 4px;
+				font-size: 15px;
+				font-weight: 600;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-form-panel-desc {
+				margin: 0;
+				color: var(--cetech-de-muted);
+				font-size: 13px;
+				line-height: 1.5;
+			}
+			.cetech-de-form-table th { width: 220px; }
+			.cetech-de-form-actions {
+				margin: 8px 0 24px;
+				padding-top: 4px;
+			}
+			.cetech-de-admin-table-wrap {
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				overflow: hidden;
+				box-shadow: var(--cetech-de-shadow);
+				margin-bottom: 20px;
+			}
+			.cetech-de-admin-table-wrap .widefat {
+				border: 0;
+				box-shadow: none;
+				margin: 0;
+			}
+			.cetech-de-admin-table-wrap .widefat thead th {
+				font-weight: 600;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-badge {
+				display: inline-flex;
+				align-items: center;
+				padding: 4px 10px;
+				border-radius: 999px;
+				font-size: 11px;
+				font-weight: 600;
+				line-height: 1.4;
+				white-space: nowrap;
+				border: 1px solid transparent;
+			}
+			.cetech-de-badge--ready { background: #edfaef; color: #007017; border-color: #b8e6bf; }
+			.cetech-de-badge--needs_setup { background: #fcf9e8; color: #8a6d1d; border-color: #f0e6b8; }
+			.cetech-de-badge--not_active { background: #f6f7f7; color: #50575e; border-color: #dcdcde; }
+			.cetech-de-badge--attention { background: #fcf0f1; color: #8a2424; border-color: #f1aeb5; }
+			.cetech-de-advanced {
+				margin-top: 28px;
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 0 20px 20px;
+				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-advanced > summary {
+				cursor: pointer;
+				font-weight: 600;
+				font-size: 14px;
+				padding: 18px 0;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-advanced[open] > summary {
+				border-bottom: 1px solid #f0f0f1;
+				margin-bottom: 16px;
+			}
+			.cetech-de-technical-details {
+				margin: 12px 0 0;
+				padding: 8px 12px;
+				background: #f6f7f7;
+				border-radius: 6px;
+			}
+			.cetech-de-technical-details > summary {
+				cursor: pointer;
+				font-weight: 600;
+				font-size: 12px;
+				color: var(--cetech-de-muted);
+			}
+			.cetech-de-technical-details[open] > summary {
+				margin-bottom: 8px;
+			}
+			.cetech-de-contact-line {
+				display: block;
+				font-size: 13px;
+				line-height: 1.5;
+			}
+			.cetech-de-contact-line + .cetech-de-contact-line { margin-top: 2px; }
+			.cetech-de-setting-code {
+				color: #a7aaad;
+				font-family: Consolas, Monaco, monospace;
+				font-size: 11px;
+				margin-top: 6px;
+			}
+			.cetech-de-help-card {
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 20px 22px;
+				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-help-steps {
+				margin: 0 0 14px 20px;
+				color: var(--cetech-de-text);
+				font-size: 13px;
+				line-height: 1.6;
+			}
+			.cetech-de-help-action { margin: 14px 0 0; }
+			.cetech-de-delete-link {
+				color: #b32d2e;
+			}
+			.cetech-de-delete-link:hover,
+			.cetech-de-delete-link:focus {
+				color: #8a2424;
+			}
+			.cetech-de-action-sep {
+				color: #c3c4c7;
+				margin: 0 4px;
+			}
+			.cetech-de-delete-confirm {
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 20px 22px;
+				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-delete-confirm-actions {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px;
+				align-items: center;
+				margin-top: 18px;
+			}
+			.cetech-de-delete-confirm-form {
+				display: inline;
+				margin-left: auto;
+			}
+			@media (max-width: 782px) {
+				.cetech-de-dashboard-header,
+				.cetech-de-page-header { padding: 18px; }
+				.cetech-de-dashboard-header-actions {
+					align-items: stretch;
+					min-width: 100%;
+				}
+				.cetech-de-button-group { justify-content: flex-start; }
+				.cetech-de-form-table th,
+				.cetech-de-form-table td { display: block; width: 100%; }
+				.cetech-de-form-table th { padding-bottom: 4px; }
+			}
+		</style><div class="wrap cetech-de-admin-page"><hr class="wp-header-end" /><header class="cetech-de-dashboard-header cetech-de-page-header"><div class="cetech-de-dashboard-header-text"><p class="cetech-de-dashboard-eyebrow">Delivery coverage</p><h1 class="cetech-de-dashboard-title">Edit Delivery Area</h1><p class="cetech-de-dashboard-subtitle">Define an area where delivery is available. Add matching rules so customer addresses map to this delivery area.</p></div><div class="cetech-de-dashboard-header-actions"><div class="cetech-de-button-group cetech-de-button-group--primary"><a href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-destination-zones" class="button cetech-de-header-button">Back to Delivery Areas</a></div></div></header><form method="post" action=""><input type="hidden" name="cetech_de_nonce" value="fixture-nonce-cetech_de_save_destination_zone" /><input type="hidden" name="cetech_de_action" value="cetech_de_save_destination_zone" /><input type="hidden" name="id" value="1" /><div class="cetech-de-form-panel"><div class="cetech-de-form-panel-head"><h2 class="cetech-de-form-panel-title">Delivery area details</h2><p class="cetech-de-form-panel-desc">Give the delivery area a clear name your team will recognize.</p></div><table class="form-table cetech-de-form-table" role="presentation"><tbody><tr><th scope="row"><label for="name">Delivery area name <span class="description">(required)</span></label></th><td><input type="text" class="regular-text" id="name" name="name" value="Greater Accra" required /><p class="description">Example: City Centre</p></td></tr><tr><th scope="row"><label for="public_label">Customer-facing label</label></th><td><input type="text" class="regular-text" id="public_label" name="public_label" value="Greater Accra"  /><p class="description">Optional label shown to customers when relevant.</p></td></tr><tr><th scope="row"><label for="status">Status</label></th><td><select id="status" name="status" class="cetech-de-select"><option value="active"  selected="selected">Active</option><option value="inactive" >Inactive</option><option value="archived" >Archived</option></select><p class="description">Inactive delivery areas are kept for reference but are not used for new orders.</p></td></tr></tbody></table></div><section class="cetech-de-section cetech-de-admin-section"><div class="cetech-de-section-head"><h2 class="cetech-de-section-title">Locations &amp; delivery options</h2><p class="cetech-de-section-desc">Tell the system which addresses belong in this delivery area.</p></div><p>Where should this delivery area apply?</p><div class="cetech-de-condition-builder" data-cetech-de-condition-builder><table class="widefat striped cetech-de-condition-table"><thead><tr><th>Location</th><th>Value</th></tr></thead><tbody><tr class="cetech-de-condition-row"><td><select name="destination_rules[0][rule_type]"><option value="">— Select —</option><option value="country"  selected="selected">Country</option><option value="region" >State / Region</option><option value="city" >City</option><option value="postcode" >Postcode</option></select></td><td><input type="text" class="regular-text" name="destination_rules[0][rule_value]" value="GH" /></td><input type="hidden" name="destination_rules[0][match_mode]" value="exact" class="cetech-de-condition-match" /><input type="hidden" name="destination_rules[0][priority]" value="10" class="cetech-de-condition-priority" /></tr><tr class="cetech-de-condition-row"><td><select name="destination_rules[1][rule_type]"><option value="">— Select —</option><option value="country" >Country</option><option value="region" >State / Region</option><option value="city"  selected="selected">City</option><option value="postcode" >Postcode</option></select></td><td><input type="text" class="regular-text" name="destination_rules[1][rule_value]" value="Accra" /></td><input type="hidden" name="destination_rules[1][match_mode]" value="exact" class="cetech-de-condition-match" /><input type="hidden" name="destination_rules[1][priority]" value="20" class="cetech-de-condition-priority" /></tr></tbody></table><p><button type="button" class="button" data-cetech-de-add-condition>+ Add another location condition</button></p><table class="hidden"><tbody><tr data-cetech-de-condition-template><td><select name="destination_rules[{{index}}][rule_type]"><option value="">— Select —</option><option value="country" >Country</option><option value="region" >State / Region</option><option value="city" >City</option><option value="postcode" >Postcode</option></select></td><td><input type="text" class="regular-text" name="destination_rules[{{index}}][rule_value]" value="" /></td><input type="hidden" name="destination_rules[{{index}}][match_mode]" value="exact" class="cetech-de-condition-match" /><input type="hidden" name="destination_rules[{{index}}][priority]" value="100" class="cetech-de-condition-priority" /></tr></tbody></table></div><details class="cetech-de-advanced-matching"><summary>Advanced matching</summary><p class="description">Exact or starts-with matching and numeric priority stay available here. Most stores can leave these unchanged.</p><p class="description">Match mode and priority are saved with each location condition. Change them only when a more specific match is required.</p></details></section><details class="cetech-de-advanced cetech-de-admin-advanced"><summary>Advanced details</summary><table class="form-table cetech-de-form-table" role="presentation"><tbody><tr><th scope="row"><label for="code">Reference code</label></th><td><input type="text" class="regular-text" id="code" name="code" value="greater-accra"  /><p class="description">Generated from the area name if left blank.</p></td></tr><tr><th scope="row"><label for="priority">Priority</label></th><td><input type="number" class="small-text" id="priority" name="priority" value="100" min="0" step="1" /><p class="description">Lower numbers are checked first when more than one delivery area could match.</p></td></tr><tr><th scope="row">Fallback delivery area</th><td><label><input type="checkbox" id="is_fallback" name="is_fallback" value="1"  /> Yes</label><p class="description">Used when no other delivery area matches during address lookup.</p></td></tr><tr><th scope="row">Remote area</th><td><label><input type="checkbox" id="is_remote_area" name="is_remote_area" value="1"  /> Yes</label><p class="description">Mark this delivery area as a remote or hard-to-reach area for your team.</p></td></tr></tbody></table></details><div class="cetech-de-form-actions"><p class="submit"><input type="submit" name="submit" class="button button-primary" value="Save Delivery Area" /></p> <a class="button" href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-destination-zones">Cancel</a></div></form><section class="cetech-de-section cetech-de-admin-section"><div class="cetech-de-section-head"><h2 class="cetech-de-section-title">Danger zone</h2><p class="cetech-de-section-desc">Permanent delete removes this record from storage. Deactivate is the safer option if you may need it again.</p></div><p><a href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-destination-zones&amp;action=delete&amp;id=1&amp;_wpnonce=fixture-nonce-cetech_de_delete_destination_zone_confirm_1" class="button button-link-delete cetech-de-delete-link">Delete permanently…</a></p></section></div></div></div></div></div></body></html>

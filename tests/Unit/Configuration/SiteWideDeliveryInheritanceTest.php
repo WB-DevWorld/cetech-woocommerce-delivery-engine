@@ -7,13 +7,19 @@ namespace CetechDeliveryEngine\Tests\Unit\Configuration;
 use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogInheritanceClassifier;
 use CetechDeliveryEngine\Application\Configuration\Catalog\InMemoryCatalogIndex;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
+use CetechDeliveryEngine\Application\Configuration\ClassicCheckoutRuntimeActivation;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationValidator;
 use CetechDeliveryEngine\Application\Configuration\HardFulfilmentConstraintService;
 use CetechDeliveryEngine\Application\Configuration\InMemorySiteWideDefaultsPolicy;
+use CetechDeliveryEngine\Application\Configuration\OperationalReadinessAssessor;
+use CetechDeliveryEngine\Application\Configuration\OperationalStateService;
 use CetechDeliveryEngine\Application\Configuration\PassthroughFulfilmentConstraintService;
+use CetechDeliveryEngine\Application\Configuration\SetupWizardProgress;
+use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultSummary;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsService;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsSettings;
+use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Domain\Configuration\CollectionFieldInstruction;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
@@ -452,11 +458,71 @@ final class SiteWideDeliveryInheritanceTest extends TestCase {
 	}
 
 	public function test_needs_attention_reports_missing_offers(): void {
+		foreach ( ClassicCheckoutRuntimeActivation::CHAIN as $flag ) {
+			$GLOBALS['cetech_de_test_options'][ 'cetech_de_' . $flag ] = 1;
+		}
 		$this->defaults->apply_site_wide( [ FulfilmentAvailability::InWarehouse->value ], FulfilmentAvailability::InWarehouse->value, false );
-		$query = new NeedsAttentionQuery( $this->catalog, $this->resolver );
+		$query = $this->needs_attention_query();
 		$items = $query->list();
 		self::assertNotEmpty( $items );
 		self::assertSame( 'Fulfilment type is incomplete.', $items[0]['reason'] );
+	}
+
+	public function test_preview_readiness_matches_needs_attention_for_empty_delivery_options(): void {
+		$this->seed_warehouse_defaults();
+		$this->defaults->apply_site_wide( [ FulfilmentAvailability::InWarehouse->value ], FulfilmentAvailability::InWarehouse->value, false );
+		$this->repository->saveScopedConfiguration(
+			new ScopedConfiguration(
+				new ConfigurationScope( null, ConfigurationScopeType::Product, 101, '', null, RecordStatus::Active, 1, ConfigurationSource::Native, null ),
+				[],
+				[
+					ConfigurationFieldKey::DELIVERY_OFFER_IDS => CollectionFieldInstruction::replace( ConfigurationFieldKey::DELIVERY_OFFER_IDS, [] ),
+				]
+			)
+		);
+
+		$assessor = new OperationalReadinessAssessor( $this->resolver );
+		$preview  = $assessor->assess( 101 );
+		$query    = $this->needs_attention_query( $assessor );
+		$items    = $query->list();
+		$match    = null;
+		foreach ( $items as $item ) {
+			if ( 101 === $item['id'] ) {
+				$match = $item;
+				break;
+			}
+		}
+
+		self::assertFalse( $preview->is_ready );
+		self::assertSame( 'Needs Attention', $preview->status_label );
+		self::assertSame( 'No usable delivery option is configured.', $preview->reason );
+		self::assertNotNull( $match );
+		self::assertSame( $preview->reason, $match['reason'] );
+		$field = $assessor->assess_field_for( 101, null, ConfigurationFieldKey::DELIVERY_OFFER_IDS );
+		self::assertFalse( $field->is_ready );
+		self::assertSame( $preview->reason, $field->reason );
+	}
+
+	private function needs_attention_query( ?OperationalReadinessAssessor $assessor = null ): NeedsAttentionQuery {
+		$assessor ??= new OperationalReadinessAssessor( $this->resolver );
+		$flags      = new FeatureFlags();
+		$summaries  = new SiteWideDefaultSummary( $this->repository );
+		$state      = new OperationalStateService(
+			$flags,
+			$this->settings,
+			new SetupWizardProgress( $this->settings ),
+			new ClassicCheckoutRuntimeActivation( $flags, $this->settings ),
+			$summaries
+		);
+		$classifier = new CatalogInheritanceClassifier(
+			$this->repository,
+			$this->catalog,
+			$this->resolver,
+			$this->settings,
+			$this->legacy_repo()
+		);
+
+		return new NeedsAttentionQuery( $this->catalog, $assessor, $state, $classifier, $this->repository );
 	}
 
 	private function seed_warehouse_defaults(): void {

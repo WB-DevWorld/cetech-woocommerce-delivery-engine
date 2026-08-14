@@ -95,13 +95,13 @@ final class FeatureFlagLabels {
 				'description' => 'Uses a fallback legacy rule when no product-specific rule matches.',
 			],
 			'enable_effective_configuration_runtime' => [
-				'label'       => 'Use the New Delivery Settings System',
-				'description' => 'When enabled, eligible products use the new inherited delivery settings instead of the legacy product-rule system.',
+				'label'       => 'Use Site-wide Defaults at checkout',
+				'description' => 'When enabled, eligible products use Site-wide Defaults and Product Exceptions for live checkout.',
 				'caution'     => 'Deployment switch. Leave off unless CETECH support has asked you to turn it on for a controlled test.',
 			],
 			'enable_variable_product_ecr_runtime' => [
-				'label'       => 'Use New Delivery Settings for Product Variations',
-				'description' => 'Allows individual WooCommerce variations to inherit or override delivery settings. Requires the New Delivery Settings System.',
+				'label'       => 'Use Site-wide Defaults for product variations',
+				'description' => 'Allows individual WooCommerce variations to inherit or override delivery settings. Requires Site-wide Defaults at checkout.',
 				'caution'     => 'Deployment switch. Leave off unless CETECH support has asked you to turn it on for a controlled test.',
 			],
 			'demo_data_on_activation' => [

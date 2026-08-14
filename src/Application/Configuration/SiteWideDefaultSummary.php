@@ -59,6 +59,7 @@ final class SiteWideDefaultSummary {
 				'delivery_options'    => '',
 				'estimated_delivery'  => '',
 				'rate_summary'        => '',
+				'air_sea'             => false,
 			];
 		}
 
@@ -72,6 +73,7 @@ final class SiteWideDefaultSummary {
 			'delivery_options'   => $this->offer_labels( $scope ),
 			'estimated_delivery' => $this->eta_label( $scope ),
 			'rate_summary'       => $this->rate_summary( $scope ),
+			'air_sea'            => $profile->air_sea_allowed,
 		];
 	}
 
@@ -95,7 +97,7 @@ final class SiteWideDefaultSummary {
 			return 'Delivery + Store Pickup';
 		}
 
-		return 'Delivery';
+		return 'Delivery only';
 	}
 
 	private function offer_labels( ?ScopedConfiguration $scope ): string {

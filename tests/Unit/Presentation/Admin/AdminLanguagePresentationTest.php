@@ -21,11 +21,24 @@ final class AdminLanguagePresentationTest extends TestCase {
 
 	public function test_menu_and_page_titles_use_operational_language(): void {
 		self::assertSame( 'Delivery Engine', AdminLanguage::menu_parent() );
-		self::assertSame( 'Dashboard', AdminLanguage::menu_dashboard() );
+		self::assertSame( 'Overview', AdminLanguage::menu_dashboard() );
 		self::assertSame( 'Settings', AdminLanguage::menu_settings() );
-		self::assertSame( 'Delivery Settings', AdminLanguage::menu_delivery_settings() );
+		self::assertSame( 'Site-wide Defaults', AdminLanguage::menu_delivery_settings() );
 		self::assertSame( 'Delivery Settings Preview', AdminLanguage::menu_preview() );
 		self::assertSame( 'Legacy Delivery Rules', AdminLanguage::menu_legacy_rules() );
+		self::assertSame( 'Overview', AdminLanguage::menu_overview() );
+		self::assertSame( 'Delivery Options', AdminLanguage::menu_delivery_options() );
+		self::assertSame( 'Delivery Areas', AdminLanguage::menu_delivery_areas() );
+		self::assertSame( 'Delivery Charges', AdminLanguage::menu_delivery_charges() );
+		self::assertSame( 'Pickup Locations', AdminLanguage::menu_pickup_locations() );
+		self::assertSame( 'Product Exceptions', AdminLanguage::menu_product_exceptions() );
+		self::assertSame( 'Needs Attention', AdminLanguage::menu_needs_attention() );
+		self::assertSame( 'Run Setup Guide Again', AdminLanguage::run_setup_guide_again() );
+		self::assertSame( 'Setup Guide', AdminLanguage::menu_setup_guide() );
+		self::assertSame( 'Set up Delivery', AdminLanguage::wizard_title() );
+		self::assertSame( 'Use In Warehouse Site-wide Default', AdminLanguage::use_site_wide_default( 'In Warehouse' ) );
+		self::assertSame( 'Use In Store Site-wide Default', AdminLanguage::use_site_wide_default( 'In Store' ) );
+		self::assertSame( 'Use International Site-wide Default', AdminLanguage::use_site_wide_default( 'International' ) );
 		self::assertSame( 'Site-wide Defaults', AdminLanguage::tab_default_settings() );
 		self::assertSame( 'Product-Specific Settings', AdminLanguage::tab_product_settings() );
 		self::assertSame( 'Variation-Specific Settings', AdminLanguage::tab_variation_settings() );
@@ -33,7 +46,7 @@ final class AdminLanguagePresentationTest extends TestCase {
 
 	public function test_empty_states_explain_next_action(): void {
 		self::assertStringContainsString( 'Site-wide Defaults', AdminLanguage::empty_product_settings() );
-		self::assertStringContainsString( 'parent product', AdminLanguage::empty_variation_settings() );
+		self::assertStringContainsString( 'product settings', AdminLanguage::empty_variation_settings() );
 		self::assertStringContainsString( 'site-wide delivery defaults', strtolower( AdminLanguage::empty_default_settings() ) );
 	}
 
@@ -48,8 +61,8 @@ final class AdminLanguagePresentationTest extends TestCase {
 			self::assertStringNotContainsString( 'enable_variable_product_ecr_runtime', $label );
 		}
 
-		self::assertSame( 'Use the New Delivery Settings System', FeatureFlagLabels::label( 'enable_effective_configuration_runtime' ) );
-		self::assertSame( 'Use New Delivery Settings for Product Variations', FeatureFlagLabels::label( 'enable_variable_product_ecr_runtime' ) );
+		self::assertSame( 'Use Site-wide Defaults at checkout', FeatureFlagLabels::label( 'enable_effective_configuration_runtime' ) );
+		self::assertSame( 'Use Site-wide Defaults for product variations', FeatureFlagLabels::label( 'enable_variable_product_ecr_runtime' ) );
 		self::assertSame( 'Show delivery choices on product pages', FeatureFlagLabels::label( 'enable_product_delivery_selector' ) );
 	}
 
@@ -93,7 +106,7 @@ final class AdminLanguagePresentationTest extends TestCase {
 		self::assertSame( 'Needs configuration', ReasonCodeLabelMapper::state_label( EffectiveFieldState::Unresolved ) );
 		self::assertSame( 'Configuration problem', ReasonCodeLabelMapper::state_label( EffectiveFieldState::Invalid ) );
 		self::assertSame( 'Default delivery setup', ConfigurationFieldCatalog::slice_label( '' ) );
-		self::assertStringContainsString( 'legacy category rule', strtolower( ScopedConfigurationNotices::CATEGORY_WARNING_MESSAGE ) );
+		self::assertStringContainsString( 'category rule', strtolower( ScopedConfigurationNotices::CATEGORY_WARNING_MESSAGE ) );
 		self::assertSame( CollectionConfigurationMode::Replace->value, 'replace' );
 		self::assertStringNotContainsString( 'UNRESOLVED_GLOBAL_VALUE', ReasonCodeLabelMapper::explain( ConfigurationReasonCode::UNRESOLVED_GLOBAL_VALUE ) );
 	}

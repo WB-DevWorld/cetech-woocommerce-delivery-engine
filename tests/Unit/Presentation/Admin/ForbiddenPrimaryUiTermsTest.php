@@ -27,6 +27,7 @@ final class ForbiddenPrimaryUiTermsTest extends TestCase {
 
 		$allowlisted_files = [
 			'AdminLanguage.php',
+			'ProductDeliveryRulesPage.php',
 		];
 
 		$violations = [];

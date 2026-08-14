@@ -18,6 +18,8 @@ final class ScopedConfigurationAdminAssets {
 		DeliverySettingsHomePage::SLUG,
 		ProductExceptionsPage::SLUG,
 		NeedsAttentionPage::SLUG,
+		SetupWizardPage::SLUG,
+		AdminMenu::PARENT_SLUG,
 	];
 
 	public function register(): void {

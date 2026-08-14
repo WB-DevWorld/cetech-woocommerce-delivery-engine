@@ -38,10 +38,13 @@ if ( is_readable( $autoload ) ) {
 $roles = [ 'administrator', 'shop_manager' ];
 
 $capabilities = [
+	'view_delivery_engine',
 	'manage_delivery_settings',
+	'manage_site_wide_defaults',
 	'manage_delivery_offers',
 	'manage_delivery_rate_cards',
 	'manage_delivery_zones',
+	'manage_pickup_locations',
 	'manage_logistics_profiles',
 	'manage_private_sources',
 	'manage_product_delivery_rules',
@@ -52,6 +55,7 @@ $capabilities = [
 	'manage_delivery_integrations',
 	'view_delivery_logs',
 	'import_delivery_data',
+	'view_delivery_diagnostics',
 ];
 
 foreach ( $roles as $role_slug ) {
@@ -101,6 +105,7 @@ delete_option( 'cetech_de_last_migration_status' );
 delete_option( 'cetech_de_delete_data_on_uninstall' );
 delete_option( 'cetech_de_global_configuration_version' );
 delete_option( 'cetech_de_v3_config_migration_report' );
+delete_option( 'cetech_de_capabilities_version' );
 
 global $wpdb;
 

@@ -5,15 +5,19 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Configuration\Admin\ConfigurationFieldCatalog;
+use CetechDeliveryEngine\Core\Capabilities\Capabilities;
 use CetechDeliveryEngine\Application\Configuration\Admin\EntityLabelResolver;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
+use CetechDeliveryEngine\Application\Configuration\DeliveryOptionCompatibility;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultSummary;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsService;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsSettings;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
 use CetechDeliveryEngine\Domain\Configuration\ScopedConfigurationRepositoryInterface;
+use CetechDeliveryEngine\Domain\DeliveryOffer\DeliveryOfferRepositoryInterface;
 use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
+use CetechDeliveryEngine\Domain\FulfilmentProfile\FulfilmentProfile;
 use CetechDeliveryEngine\Domain\FulfilmentProfile\FulfilmentProfileRegistry;
 
 /**
@@ -34,7 +38,8 @@ final class DeliverySettingsHomePage {
 		private readonly NeedsAttentionQuery $needs_attention,
 		private readonly ScopedConfigurationRepositoryInterface $scopes,
 		private readonly EntityLabelResolver $labels,
-		private readonly AdminActionHandler $action_handler
+		private readonly AdminActionHandler $action_handler,
+		private readonly ?DeliveryOfferRepositoryInterface $offers = null
 	) {
 	}
 
@@ -47,17 +52,17 @@ final class DeliverySettingsHomePage {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
 		$action = sanitize_key( wp_unslash( (string) $_POST['cetech_de_action'] ) );
 
-		if ( self::ACTION_APPLY === $action && $this->action_handler->verify_post( self::ACTION_APPLY, self::ACTION_APPLY, 'manage_delivery_settings', self::SLUG ) ) {
+		if ( self::ACTION_APPLY === $action && $this->action_handler->verify_post( self::ACTION_APPLY, self::ACTION_APPLY, Capabilities::SITE_WIDE, self::SLUG ) ) {
 			$this->handle_apply();
 		}
 
-		if ( self::ACTION_SAVE_PROFILE === $action && $this->action_handler->verify_post( self::ACTION_SAVE_PROFILE, self::ACTION_SAVE_PROFILE, 'manage_delivery_settings', self::SLUG ) ) {
+		if ( self::ACTION_SAVE_PROFILE === $action && $this->action_handler->verify_post( self::ACTION_SAVE_PROFILE, self::ACTION_SAVE_PROFILE, Capabilities::SITE_WIDE, self::SLUG ) ) {
 			$this->handle_save_profile();
 		}
 	}
 
 	public function render(): void {
-		AdminPageAccess::require_capability( 'manage_delivery_settings' );
+		AdminPageAccess::require_capability( Capabilities::SITE_WIDE );
 		$this->action_handler->notices()->render_notices();
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -69,13 +74,13 @@ final class DeliverySettingsHomePage {
 
 		$state = $this->settings->read();
 
-		if ( 'setup' === $view || ( ! $state['setup_completed'] && '' === $view && '' === $profile_key ) ) {
-			$this->render_setup( max( 1, $step ), $state );
-			return;
+		if ( '' === $profile_key ) {
+			$active = $state['active_profiles'] ?: FulfilmentProfileRegistry::keys();
+			$profile_key = $active[0] ?? '';
 		}
 
 		if ( '' !== $profile_key && FulfilmentProfileRegistry::has( $profile_key ) ) {
-			$this->render_profile_editor( $profile_key );
+			$this->render_profile_editor( $profile_key, $state );
 			return;
 		}
 
@@ -93,16 +98,8 @@ final class DeliverySettingsHomePage {
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
 			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Set normal delivery rules once. Products inherit them automatically unless they need their own settings.', 'cetech-woocommerce-delivery-engine' ),
-			[
-				'label' => __( 'Manage Site-wide Defaults', 'cetech-woocommerce-delivery-engine' ),
-				'url'   => $this->url( [ 'view' => 'setup', 'step' => $state['setup_completed'] ? 2 : 1 ] ),
-			],
-			[
-				'label' => __( 'Review items needing attention', 'cetech-woocommerce-delivery-engine' ),
-				'url'   => AdminPageRenderer::list_url( NeedsAttentionPage::SLUG ),
-			]
+			__( 'Site-wide Defaults', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Products use these settings automatically unless you create an exception.', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		AdminPageLayout::render_summary_stats(
@@ -134,10 +131,6 @@ final class DeliverySettingsHomePage {
 					'value' => (string) $attention_count,
 					'empty' => 0 === $attention_count,
 				],
-				[
-					'label' => __( 'Still using Legacy Delivery Rules', 'cetech-woocommerce-delivery-engine' ),
-					'value' => (string) $preview->legacy_dependent,
-				],
 			]
 		);
 
@@ -162,10 +155,16 @@ final class DeliverySettingsHomePage {
 					: __( 'Not configured yet', 'cetech-woocommerce-delivery-engine' )
 			) . '</p>';
 			if ( '' !== (string) $summary['delivery_method'] ) {
-				echo '<p><strong>' . esc_html__( 'Delivery method', 'cetech-woocommerce-delivery-engine' ) . ':</strong> ' . esc_html( (string) $summary['delivery_method'] ) . '</p>';
+				$method_label = ! empty( $summary['air_sea'] )
+					? __( 'Customer fulfilment', 'cetech-woocommerce-delivery-engine' )
+					: __( 'Delivery method', 'cetech-woocommerce-delivery-engine' );
+				echo '<p><strong>' . esc_html( $method_label ) . ':</strong> ' . esc_html( (string) $summary['delivery_method'] ) . '</p>';
 			}
 			if ( '' !== (string) $summary['delivery_options'] ) {
-				echo '<p><strong>' . esc_html__( 'Delivery option', 'cetech-woocommerce-delivery-engine' ) . ':</strong> ' . esc_html( (string) $summary['delivery_options'] ) . '</p>';
+				$options_label = ! empty( $summary['air_sea'] )
+					? __( 'International shipping options', 'cetech-woocommerce-delivery-engine' )
+					: __( 'Delivery option', 'cetech-woocommerce-delivery-engine' );
+				echo '<p><strong>' . esc_html( $options_label ) . ':</strong> ' . esc_html( (string) $summary['delivery_options'] ) . '</p>';
 			}
 			if ( '' !== (string) $summary['estimated_delivery'] ) {
 				echo '<p><strong>' . esc_html__( 'Estimated delivery', 'cetech-woocommerce-delivery-engine' ) . ':</strong> ' . esc_html( (string) $summary['estimated_delivery'] ) . '</p>';
@@ -181,8 +180,7 @@ final class DeliverySettingsHomePage {
 
 		echo '<p class="cetech-de-button-group">';
 		echo '<a class="button button-primary" href="' . esc_url( AdminPageRenderer::list_url( ProductExceptionsPage::SLUG ) ) . '">' . esc_html__( 'Review Product Exceptions', 'cetech-woocommerce-delivery-engine' ) . '</a> ';
-		echo '<a class="button" href="' . esc_url( AdminPageRenderer::list_url( NeedsAttentionPage::SLUG ) ) . '">' . esc_html__( 'Review Items Needing Attention', 'cetech-woocommerce-delivery-engine' ) . '</a> ';
-		echo '<a class="button" href="' . esc_url( $this->url( [ 'view' => 'setup', 'step' => 1 ] ) ) . '">' . esc_html__( 'Open guided setup', 'cetech-woocommerce-delivery-engine' ) . '</a>';
+		echo '<a class="button" href="' . esc_url( AdminPageRenderer::list_url( NeedsAttentionPage::SLUG ) ) . '">' . esc_html__( 'Review Items Needing Attention', 'cetech-woocommerce-delivery-engine' ) . '</a>';
 		echo '</p>';
 
 		AdminPageLayout::close_page();
@@ -326,13 +324,11 @@ final class DeliverySettingsHomePage {
 		echo '<li>' . esc_html( sprintf( /* translators: %d count */ __( '%d products can use Site-wide Defaults.', 'cetech-woocommerce-delivery-engine' ), $preview->can_safely_inherit ) ) . '</li>';
 		echo '<li>' . esc_html( sprintf( /* translators: %d count */ __( '%d products already have Product-Specific Settings and will retain them.', 'cetech-woocommerce-delivery-engine' ), $preview->product_exceptions ) ) . '</li>';
 		echo '<li>' . esc_html( sprintf( /* translators: %d count */ __( '%d variations already have Variation-Specific Settings and will retain them.', 'cetech-woocommerce-delivery-engine' ), $preview->variation_exceptions ) ) . '</li>';
-		echo '<li>' . esc_html( sprintf( /* translators: %d count */ __( '%d products still rely on Legacy Delivery Rules and need migration/review.', 'cetech-woocommerce-delivery-engine' ), $preview->legacy_dependent ) ) . '</li>';
 		echo '<li>' . esc_html( sprintf( /* translators: %d count */ __( '%d products need review before defaults are applied.', 'cetech-woocommerce-delivery-engine' ), $preview->needs_review ) ) . '</li>';
 		echo '</ul>';
 		$this->render_example_list( __( 'Can safely inherit', 'cetech-woocommerce-delivery-engine' ), $preview->can_safely_inherit_examples );
 		$this->render_example_list( __( 'Has product-specific differences', 'cetech-woocommerce-delivery-engine' ), $preview->product_exception_examples );
 		$this->render_example_list( __( 'Has variation-specific differences', 'cetech-woocommerce-delivery-engine' ), $preview->variation_exception_examples );
-		$this->render_example_list( __( 'Uses legacy compatibility', 'cetech-woocommerce-delivery-engine' ), $preview->legacy_examples );
 		$this->render_example_list( __( 'Needs review', 'cetech-woocommerce-delivery-engine' ), $preview->needs_review_examples );
 		echo '</div>';
 
@@ -368,7 +364,10 @@ final class DeliverySettingsHomePage {
 		echo '</form>';
 	}
 
-	private function render_profile_editor( string $profile_key ): void {
+	/**
+	 * @param array<string, mixed> $state
+	 */
+	private function render_profile_editor( string $profile_key, array $state = [] ): void {
 		$profile = FulfilmentProfileRegistry::get( $profile_key );
 		if ( null === $profile ) {
 			return;
@@ -383,20 +382,38 @@ final class DeliverySettingsHomePage {
 
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
+			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Site-wide Defaults', 'cetech-woocommerce-delivery-engine' ),
-			sprintf( /* translators: %s fulfilment type */ __( '%s defaults', 'cetech-woocommerce-delivery-engine' ), $profile->label ),
-			$profile->description,
-			[
-				'label' => __( 'Back to Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
-				'url'   => $this->url(),
-			]
+			__( 'Products use these settings automatically unless you create an exception.', 'cetech-woocommerce-delivery-engine' )
 		);
+
+		AdminPageLayout::render_info_notice(
+			__( 'These settings apply store-wide unless a product or variation has its own exception.', 'cetech-woocommerce-delivery-engine' )
+		);
+
+		$active = $state['active_profiles'] ?? FulfilmentProfileRegistry::keys();
+		if ( [] === $active ) {
+			$active = FulfilmentProfileRegistry::keys();
+		}
+		echo '<nav class="cetech-de-profile-tabs" aria-label="' . esc_attr__( 'Fulfilment types', 'cetech-woocommerce-delivery-engine' ) . '">';
+		foreach ( $active as $key ) {
+			$tab = FulfilmentProfileRegistry::get( $key );
+			if ( null === $tab ) {
+				continue;
+			}
+			$class = $key === $profile_key ? ' is-current' : '';
+			echo '<a class="' . esc_attr( trim( $class ) ) . '" href="' . esc_url( $this->url( [ 'profile' => $key ] ) ) . '">' . esc_html( $tab->label ) . '</a>';
+		}
+		echo '</nav>';
+
+		echo '<p>' . esc_html( $profile->description ) . '</p>';
 
 		echo '<p>';
 		echo '<a href="' . esc_url( AdminPageRenderer::list_url( DeliveryOffersPage::SLUG ) ) . '">' . esc_html__( 'Manage Delivery Options', 'cetech-woocommerce-delivery-engine' ) . '</a> · ';
-		echo '<a href="' . esc_url( AdminPageRenderer::list_url( DestinationZonesPage::SLUG ) ) . '">' . esc_html__( 'Manage Delivery Areas', 'cetech-woocommerce-delivery-engine' ) . '</a> · ';
-		echo '<a href="' . esc_url( AdminPageRenderer::list_url( RateCardsPage::SLUG ) ) . '">' . esc_html__( 'Manage Delivery Charges', 'cetech-woocommerce-delivery-engine' ) . '</a>';
+		echo '<a href="' . esc_url( AdminPageRenderer::list_url( DestinationZonesPage::SLUG ) ) . '">' . esc_html__( 'Manage Delivery Areas', 'cetech-woocommerce-delivery-engine' ) . '</a>';
 		echo '</p>';
+		echo '<p class="description">' . esc_html__( 'Delivery charges are determined by the customer\'s Delivery Area and selected Delivery Option.', 'cetech-woocommerce-delivery-engine' ) . ' ';
+		echo '<a href="' . esc_url( AdminPageRenderer::list_url( RateCardsPage::SLUG ) ) . '">' . esc_html__( 'Manage Delivery Charges', 'cetech-woocommerce-delivery-engine' ) . '</a></p>';
 
 		echo '<form method="post" class="cetech-de-profile-editor">';
 		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_SAVE_PROFILE ) . '" />';
@@ -411,7 +428,7 @@ final class DeliverySettingsHomePage {
 		echo '<tr><th>' . esc_html__( 'Fulfilment', 'cetech-woocommerce-delivery-engine' ) . '</th><td>' . esc_html( $profile->label ) . '</td></tr>';
 
 		if ( $profile->pickup_allowed ) {
-			echo '<tr><th><label for="fulfilment_choice">' . esc_html__( 'Delivery method', 'cetech-woocommerce-delivery-engine' ) . '</label></th><td>';
+			echo '<tr><th><label for="fulfilment_choice">' . esc_html__( 'Customer fulfilment', 'cetech-woocommerce-delivery-engine' ) . '</label></th><td>';
 			echo '<select id="fulfilment_choice" name="fields[' . esc_attr( ConfigurationFieldKey::FULFILMENT_CHOICE ) . '][value]">';
 			foreach ( ConfigurationFieldCatalog::enum_options( ConfigurationFieldKey::FULFILMENT_CHOICE ) ?? [] as $value => $label ) {
 				echo '<option value="' . esc_attr( $value ) . '"' . selected( (string) $choice, $value, false ) . '>' . esc_html( $label ) . '</option>';
@@ -420,13 +437,26 @@ final class DeliverySettingsHomePage {
 			echo '<input type="hidden" name="fields[' . esc_attr( ConfigurationFieldKey::FULFILMENT_CHOICE ) . '][mode]" value="override" />';
 			echo '</td></tr>';
 		} else {
-			echo '<tr><th>' . esc_html__( 'Delivery method', 'cetech-woocommerce-delivery-engine' ) . '</th><td>' . esc_html__( 'Delivery', 'cetech-woocommerce-delivery-engine' ) . '</td></tr>';
+			echo '<tr><th>' . esc_html__( 'Customer fulfilment', 'cetech-woocommerce-delivery-engine' ) . '</th><td>' . esc_html__( 'Delivery only', 'cetech-woocommerce-delivery-engine' ) . '</td></tr>';
 		}
 
-		echo '<tr><th>' . esc_html__( 'Delivery options', 'cetech-woocommerce-delivery-engine' ) . '</th><td>';
-		foreach ( $this->labels->options_for( 'delivery_offer' ) as $id => $label ) {
-			$checked = in_array( $id, $offers, true ) ? ' checked' : '';
-			echo '<label style="display:block;margin:0 0 0.35rem;"><input type="checkbox" name="fields[' . esc_attr( ConfigurationFieldKey::DELIVERY_OFFER_IDS ) . '][members][]" value="' . esc_attr( (string) $id ) . '"' . $checked . ' /> ' . esc_html( $label ) . '</label>';
+		$options_label = $profile->air_sea_allowed
+			? __( 'International shipping options', 'cetech-woocommerce-delivery-engine' )
+			: __( 'Delivery options', 'cetech-woocommerce-delivery-engine' );
+		echo '<tr><th>' . esc_html( $options_label ) . '</th><td>';
+		$compatible = $this->compatible_option_labels( $profile );
+		if ( [] === $compatible ) {
+			if ( $profile->air_sea_allowed ) {
+				echo '<p>' . esc_html__( 'No Air Shipping or Sea Shipping options yet. Create an international Delivery Option, then return here to select it.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+				echo '<p><a class="button" href="' . esc_url( AdminPageRenderer::list_url( DeliveryOffersPage::SLUG ) ) . '">' . esc_html__( 'Create Air or Sea Shipping option', 'cetech-woocommerce-delivery-engine' ) . '</a></p>';
+			} else {
+				echo '<p>' . esc_html__( 'No compatible delivery options for this fulfilment type.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			}
+		} else {
+			foreach ( $compatible as $id => $label ) {
+				$checked = in_array( $id, $offers, true ) ? ' checked' : '';
+				echo '<label style="display:block;margin:0 0 0.35rem;"><input type="checkbox" name="fields[' . esc_attr( ConfigurationFieldKey::DELIVERY_OFFER_IDS ) . '][members][]" value="' . esc_attr( (string) $id ) . '"' . $checked . ' /> ' . esc_html( $label ) . '</label>';
+			}
 		}
 		echo '<input type="hidden" name="fields[' . esc_attr( ConfigurationFieldKey::DELIVERY_OFFER_IDS ) . '][mode]" value="replace" />';
 		echo '</td></tr>';
@@ -438,7 +468,13 @@ final class DeliverySettingsHomePage {
 		echo '</td></tr>';
 		echo '</tbody></table>';
 
-		echo '<p><button type="submit" class="button button-primary">' . esc_html__( 'Save defaults', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
+		echo '<p class="cetech-de-button-group">';
+		echo '<button type="submit" class="button button-primary">' . esc_html__( 'Save Changes', 'cetech-woocommerce-delivery-engine' ) . '</button>';
+		if ( empty( $state['setup_completed'] ) ) {
+			echo ' <a class="button" href="' . esc_url( AdminPageRenderer::list_url( SetupWizardPage::SLUG ) ) . '">' . esc_html__( 'Save & Apply Site-wide', 'cetech-woocommerce-delivery-engine' ) . '</a>';
+		}
+		echo '</p>';
+		echo '<p class="description">' . esc_html__( 'Changes affect products still using these defaults. Product and variation exceptions remain protected.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 		echo '</form>';
 		AdminPageLayout::close_page();
 	}
@@ -547,6 +583,15 @@ final class DeliverySettingsHomePage {
 			$fields[ $field_key ] = $entry;
 		}
 
+		$profile = FulfilmentProfileRegistry::get( $profile_key );
+		if ( $profile instanceof FulfilmentProfile && isset( $fields[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ]['members'] ) && is_array( $fields[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ]['members'] ) ) {
+			$fields[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ]['members'] = DeliveryOptionCompatibility::filter_member_ids(
+				$fields[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ]['members'],
+				$this->offers?->list( [ 'limit' => 200 ] ) ?? [],
+				$profile
+			);
+		}
+
 		try {
 			$this->defaults->save_profile_defaults( $profile_key, $fields );
 		} catch ( \Throwable $exception ) {
@@ -557,6 +602,19 @@ final class DeliverySettingsHomePage {
 
 		$this->action_handler->notices()->flash_success( __( 'Site-wide defaults saved. Products that inherit these settings will use the new values immediately.', 'cetech-woocommerce-delivery-engine' ) );
 		$this->action_handler->redirect( self::SLUG, [ 'profile' => $profile_key ] );
+	}
+
+	/**
+	 * @return array<int, string>
+	 */
+	private function compatible_option_labels( FulfilmentProfile $profile ): array {
+		$offers = $this->offers?->list( [ 'limit' => 200 ] ) ?? [];
+
+		return DeliveryOptionCompatibility::filter_option_labels(
+			$this->labels->options_for( 'delivery_offer' ),
+			$offers,
+			$profile
+		);
 	}
 
 	/**

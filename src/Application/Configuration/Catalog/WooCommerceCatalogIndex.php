@@ -92,11 +92,24 @@ final class WooCommerceCatalogIndex implements CatalogIndexInterface {
 		}
 
 		$product = wc_get_product( $product_id );
-		if ( ! is_object( $product ) || ! method_exists( $product, 'get_children' ) ) {
+		if ( ! is_object( $product ) || ! method_exists( $product, 'is_type' ) || ! $product->is_type( 'variable' ) ) {
 			return [];
 		}
 
-		return array_map( 'intval', $product->get_children() );
+		$ids = [];
+		if ( method_exists( $product, 'get_children' ) ) {
+			$ids = array_map( 'intval', (array) $product->get_children() );
+		}
+
+		if ( [] === $ids && method_exists( $product, 'get_available_variations' ) ) {
+			foreach ( (array) $product->get_available_variations() as $row ) {
+				if ( is_array( $row ) && isset( $row['variation_id'] ) ) {
+					$ids[] = (int) $row['variation_id'];
+				}
+			}
+		}
+
+		return array_values( array_unique( array_filter( $ids ) ) );
 	}
 
 	public function variation_label( int $variation_id ): string {
@@ -105,12 +118,24 @@ final class WooCommerceCatalogIndex implements CatalogIndexInterface {
 		}
 
 		$product = wc_get_product( $variation_id );
-		if ( ! is_object( $product ) || ! method_exists( $product, 'get_name' ) ) {
+		if ( ! is_object( $product ) ) {
 			return 'Variation #' . $variation_id;
 		}
 
-		$name = (string) $product->get_name();
+		if ( method_exists( $product, 'get_attribute_summary' ) ) {
+			$summary = trim( (string) $product->get_attribute_summary() );
+			if ( '' !== $summary ) {
+				return $summary;
+			}
+		}
 
-		return '' !== $name ? $name : 'Variation #' . $variation_id;
+		if ( method_exists( $product, 'get_name' ) ) {
+			$name = trim( (string) $product->get_name() );
+			if ( '' !== $name ) {
+				return $name;
+			}
+		}
+
+		return 'Variation #' . $variation_id;
 	}
 }

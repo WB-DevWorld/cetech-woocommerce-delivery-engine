@@ -135,21 +135,21 @@ final class CatalogInheritanceClassifier {
 		if ( $has_legacy_only ) {
 			return [
 				'bucket' => 'legacy',
-				'reason' => 'This product still uses Legacy Delivery Rules.',
+				'reason' => 'This product still uses older delivery settings that need review.',
 			];
 		}
 
 		if ( [] !== $legacy_rows && $this->has_custom_fields( $product_scopes ) ) {
 			return [
 				'bucket' => 'review',
-				'reason' => 'This product has both Legacy Delivery Rules and newer delivery settings.',
+				'reason' => 'This product has both older delivery settings and current Product Exceptions.',
 			];
 		}
 
 		if ( [] !== $legacy_rows ) {
 			return [
 				'bucket' => 'legacy',
-				'reason' => 'This product still uses Legacy Delivery Rules.',
+				'reason' => 'This product still uses older delivery settings that need review.',
 			];
 		}
 

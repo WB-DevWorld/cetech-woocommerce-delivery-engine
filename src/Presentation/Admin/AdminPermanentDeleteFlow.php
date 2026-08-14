@@ -61,7 +61,7 @@ final class AdminPermanentDeleteFlow {
 		$url = self::confirm_url( $page_slug, $record_id, $delete_post_action, $query_args );
 
 		return sprintf(
-			' <span class="cetech-de-action-sep" aria-hidden="true">|</span> <a href="%1$s" class="cetech-de-delete-link">%2$s</a>',
+			' <span class="cetech-de-action-sep" aria-hidden="true">|</span> <span class="trash"><a href="%1$s" class="cetech-de-delete-link submitdelete">%2$s</a></span>',
 			esc_url( $url ),
 			esc_html__( 'Delete permanently', 'cetech-woocommerce-delivery-engine' )
 		);

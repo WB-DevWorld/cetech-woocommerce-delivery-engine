@@ -1,0 +1,472 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Technical Diagnostic Tools — Delivery Engine fixture</title><link rel="stylesheet" href="https://s.w.org/wp-includes/css/dashicons.min.css" /><link rel="stylesheet" href="../wp-admin-chrome.css" /><link rel="stylesheet" href="../../../../../assets/admin/delivery-engine-admin.css" /><link rel="stylesheet" href="../../../../../assets/admin/scoped-configuration.css" /><script src="../../../../../assets/admin/delivery-engine-admin.js" defer></script></head><body class="wp-admin wp-core-ui"><div id="wpadminbar"><span class="ab-label">Fixture Store</span><span class="ab-label">Dashboard</span><span class="ab-label">Jane Admin</span></div><div class="cetech-de-fixture-banner">Fixture render — sample catalog data — not a live WordPress screenshot</div><div id="wpwrap"><div id="wpcontent"><div id="adminmenumain"><ul id="adminmenu"><li class=""><a href="#"><span class="dashicons dashicons-dashboard"></span><span class="wp-menu-name">Dashboard</span></a></li><li class=""><a href="#"><span class="dashicons dashicons-admin-post"></span><span class="wp-menu-name">Posts</span></a></li><li class=""><a href="#"><span class="dashicons dashicons-cart"></span><span class="wp-menu-name">WooCommerce</span></a></li><li class=""><a href="#"><span class="dashicons dashicons-products"></span><span class="wp-menu-name">Products</span></a></li><li class="wp-has-current-submenu current"><a href="#"><span class="dashicons dashicons-location-alt"></span><span class="wp-menu-name">Delivery Engine</span></a><ul class="wp-submenu"><li><a href="#">Overview</a></li><li><a href="#">Site-wide Defaults</a></li><li><a href="#">Delivery Options</a></li><li><a href="#">Delivery Areas</a></li><li><a href="#">Delivery Charges</a></li><li><a href="#">Pickup Locations</a></li><li><a href="#">Product Exceptions</a></li><li><a href="#">Needs Attention</a></li><li><a href="#">Settings</a></li><li><a href="#">Legacy Delivery Rules</a></li><li class="current"><a href="#">Technical Diagnostic Tools</a></li></ul></li><li class=""><a href="#"><span class="dashicons dashicons-admin-appearance"></span><span class="wp-menu-name">Appearance</span></a></li><li class=""><a href="#"><span class="dashicons dashicons-admin-plugins"></span><span class="wp-menu-name">Plugins</span></a></li><li class=""><a href="#"><span class="dashicons dashicons-admin-settings"></span><span class="wp-menu-name">Settings</span></a></li></ul></div><div id="wpbody"><div id="wpbody-content"><div class="wrap cetech-de-admin-page"><style>
+			.cetech-de-severity-error { color: #b32d2e; font-weight: 600; }
+			.cetech-de-severity-warning { color: #996800; font-weight: 600; }
+			.cetech-de-severity-info { color: #2271b1; font-weight: 600; }
+			.cetech-de-severity-ok { color: #007017; font-weight: 600; }
+			.cetech-de-status-active { color: #007017; font-weight: 600; }
+			.cetech-de-status-inactive { color: #646970; }
+		</style><header class="cetech-de-dashboard-header cetech-de-page-header"><div class="cetech-de-dashboard-header-text"><p class="cetech-de-dashboard-eyebrow">Delivery Engine</p><h1 class="cetech-de-dashboard-title">Technical diagnostic tools</h1><p class="cetech-de-dashboard-subtitle">These tools are intended for technical support and troubleshooting. You do not need them for normal delivery setup or daily operations.</p></div></header><style>
+			.cetech-de-dashboard {
+				--cetech-de-bg: #fff;
+				--cetech-de-border: #dcdcde;
+				--cetech-de-muted: #646970;
+				--cetech-de-text: #1d2327;
+				--cetech-de-accent: #2271b1;
+				--cetech-de-radius: 8px;
+				--cetech-de-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+				max-width: 1180px;
+				margin-top: 8px;
+			}
+			.cetech-de-dashboard-header {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 20px;
+				justify-content: space-between;
+				align-items: flex-start;
+				margin-bottom: 8px;
+				padding: 24px;
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-dashboard-eyebrow {
+				margin: 0 0 6px;
+				color: var(--cetech-de-accent);
+				font-size: 12px;
+				font-weight: 600;
+				letter-spacing: 0.04em;
+				text-transform: uppercase;
+			}
+			.cetech-de-dashboard-title {
+				margin: 0 0 8px;
+				font-size: 24px;
+				font-weight: 600;
+				line-height: 1.25;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-dashboard-subtitle {
+				margin: 0;
+				color: var(--cetech-de-muted);
+				font-size: 14px;
+				line-height: 1.6;
+				max-width: 640px;
+			}
+			.cetech-de-dashboard-header-actions {
+				display: flex;
+				flex-direction: column;
+				gap: 10px;
+				align-items: flex-end;
+				min-width: min(100%, 420px);
+			}
+			.cetech-de-button-group {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px;
+				justify-content: flex-end;
+			}
+			.cetech-de-header-button { margin: 0 !important; }
+			.cetech-de-section {
+				margin-top: 28px;
+				padding-top: 4px;
+			}
+			.cetech-de-section-head {
+				margin-bottom: 14px;
+			}
+			.cetech-de-section-title {
+				margin: 0 0 4px;
+				font-size: 18px;
+				font-weight: 600;
+				line-height: 1.3;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-section-desc {
+				margin: 0;
+				color: var(--cetech-de-muted);
+				font-size: 13px;
+				line-height: 1.5;
+				max-width: 760px;
+			}
+			.cetech-de-card-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+				gap: 16px;
+			}
+			.cetech-de-readiness-grid .cetech-de-card {
+				min-height: 190px;
+				display: flex;
+				flex-direction: column;
+			}
+			.cetech-de-card {
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 18px;
+				box-shadow: var(--cetech-de-shadow);
+				transition: box-shadow 0.15s ease, border-color 0.15s ease;
+			}
+			.cetech-de-card:hover {
+				border-color: #c3c4c7;
+				box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+			}
+			.cetech-de-card-head {
+				display: flex;
+				justify-content: space-between;
+				gap: 10px;
+				align-items: flex-start;
+				margin-bottom: 10px;
+			}
+			.cetech-de-card-title {
+				margin: 0;
+				font-size: 15px;
+				font-weight: 600;
+				line-height: 1.35;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-card-text {
+				margin: 0;
+				color: var(--cetech-de-muted);
+				font-size: 13px;
+				line-height: 1.55;
+				flex: 1;
+			}
+			.cetech-de-card-footer {
+				margin-top: 16px;
+				padding-top: 12px;
+				border-top: 1px solid #f0f0f1;
+			}
+			.cetech-de-card-button { width: 100%; text-align: center; justify-content: center; }
+			.cetech-de-badge {
+				display: inline-flex;
+				align-items: center;
+				padding: 4px 10px;
+				border-radius: 999px;
+				font-size: 11px;
+				font-weight: 600;
+				line-height: 1.4;
+				white-space: nowrap;
+				border: 1px solid transparent;
+			}
+			.cetech-de-badge--ready { background: #edfaef; color: #007017; border-color: #b8e6bf; }
+			.cetech-de-badge--needs_setup { background: #fcf9e8; color: #8a6d1d; border-color: #f0e6b8; }
+			.cetech-de-badge--not_active { background: #f6f7f7; color: #50575e; border-color: #dcdcde; }
+			.cetech-de-badge--attention { background: #fcf0f1; color: #8a2424; border-color: #f1aeb5; }
+			.cetech-de-card--ready { border-top: 3px solid #00a32a; }
+			.cetech-de-card--needs_setup { border-top: 3px solid #dba617; }
+			.cetech-de-card--not_active { border-top: 3px solid #8c8f94; }
+			.cetech-de-card--attention { border-top: 3px solid #d63638; }
+			.cetech-de-checklist {
+				display: grid;
+				gap: 10px;
+			}
+			.cetech-de-checklist-item {
+				display: grid;
+				grid-template-columns: auto 1fr auto;
+				gap: 14px;
+				align-items: center;
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 16px 18px;
+				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-checklist-item--completed { background: #f6fbf7; border-color: #b8e6bf; }
+			.cetech-de-checklist-item--pending { background: #fffdf5; }
+			.cetech-de-checklist-step {
+				width: 32px;
+				height: 32px;
+				border-radius: 999px;
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				background: #f0f0f1;
+				color: var(--cetech-de-text);
+				font-size: 13px;
+				font-weight: 700;
+				flex-shrink: 0;
+			}
+			.cetech-de-checklist-item--completed .cetech-de-checklist-step {
+				background: #00a32a;
+				color: #fff;
+			}
+			.cetech-de-checklist-title {
+				margin: 0 0 4px;
+				font-size: 14px;
+				font-weight: 600;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-checklist-desc {
+				margin: 0;
+				color: var(--cetech-de-muted);
+				font-size: 13px;
+				line-height: 1.5;
+			}
+			.cetech-de-checklist-side {
+				display: flex;
+				flex-direction: column;
+				gap: 8px;
+				align-items: flex-end;
+				min-width: 150px;
+			}
+			.cetech-de-checklist-button { white-space: nowrap; }
+			.cetech-de-action-card {
+				position: relative;
+				display: block;
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 18px 42px 18px 18px;
+				text-decoration: none;
+				color: inherit;
+				box-shadow: var(--cetech-de-shadow);
+				min-height: 108px;
+				transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+			}
+			.cetech-de-action-card:hover {
+				border-color: var(--cetech-de-accent);
+				box-shadow: 0 0 0 1px var(--cetech-de-accent);
+				color: inherit;
+				transform: translateY(-1px);
+			}
+			.cetech-de-action-card-arrow {
+				position: absolute;
+				top: 18px;
+				right: 16px;
+				color: var(--cetech-de-accent);
+				font-size: 18px;
+				line-height: 1;
+			}
+			.cetech-de-action-card-title {
+				display: block;
+				font-size: 14px;
+				font-weight: 600;
+				margin-bottom: 6px;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-action-card-desc {
+				display: block;
+				color: var(--cetech-de-muted);
+				font-size: 13px;
+				line-height: 1.5;
+			}
+			.cetech-de-warnings { display: grid; gap: 12px; }
+			.cetech-de-warning-card {
+				display: grid;
+				grid-template-columns: auto 1fr;
+				gap: 14px;
+				align-items: start;
+				background: #fffaf0;
+				border: 1px solid #f0d58a;
+				border-left: 4px solid #dba617;
+				border-radius: var(--cetech-de-radius);
+				padding: 16px 18px;
+			}
+			.cetech-de-warning-icon {
+				width: 28px;
+				height: 28px;
+				border-radius: 999px;
+				background: #dba617;
+				color: #fff;
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				font-weight: 700;
+				font-size: 14px;
+				flex-shrink: 0;
+			}
+			.cetech-de-warning-title {
+				margin: 0 0 6px;
+				font-size: 14px;
+				font-weight: 600;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-warning-message {
+				margin: 0;
+				color: var(--cetech-de-muted);
+				font-size: 13px;
+				line-height: 1.55;
+			}
+			.cetech-de-warning-action { margin: 12px 0 0; }
+			.cetech-de-empty-state {
+				background: var(--cetech-de-bg);
+				border: 1px dashed var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 24px;
+				text-align: center;
+			}
+			.cetech-de-empty-state--success {
+				background: #f6fbf7;
+				border-color: #b8e6bf;
+			}
+			.cetech-de-empty-state-title {
+				margin: 0 0 6px;
+				font-size: 15px;
+				font-weight: 600;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-empty-state-text {
+				margin: 0;
+				color: var(--cetech-de-muted);
+				font-size: 13px;
+				line-height: 1.55;
+				max-width: 560px;
+				margin-left: auto;
+				margin-right: auto;
+			}
+			.cetech-de-summary-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+				gap: 12px;
+			}
+			.cetech-de-summary-stat {
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 18px 16px;
+				text-align: center;
+				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-summary-stat--empty .cetech-de-summary-value { color: #a7aaad; }
+			.cetech-de-summary-value {
+				display: block;
+				font-size: 28px;
+				font-weight: 700;
+				line-height: 1.1;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-summary-label {
+				display: block;
+				margin-top: 6px;
+				color: var(--cetech-de-muted);
+				font-size: 12px;
+				line-height: 1.4;
+			}
+			.cetech-de-help-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+				gap: 16px;
+			}
+			.cetech-de-help-card {
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 20px 22px;
+				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-help-subtitle {
+				margin: 0 0 10px;
+				font-size: 15px;
+				font-weight: 600;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-help-lead {
+				margin: 0 0 8px;
+				color: var(--cetech-de-muted);
+				font-size: 13px;
+			}
+			.cetech-de-help-steps {
+				margin: 0 0 14px 20px;
+				color: var(--cetech-de-text);
+				font-size: 13px;
+				line-height: 1.6;
+			}
+			.cetech-de-help-example {
+				margin: 0;
+				padding: 10px 12px;
+				background: #f6f7f7;
+				border-radius: 6px;
+				color: var(--cetech-de-text);
+				font-size: 13px;
+			}
+			.cetech-de-help-example-label {
+				display: inline-block;
+				margin-right: 6px;
+				padding: 2px 8px;
+				border-radius: 999px;
+				background: #e5f5fa;
+				color: var(--cetech-de-accent);
+				font-size: 11px;
+				font-weight: 600;
+				text-transform: uppercase;
+			}
+			.cetech-de-help-action { margin: 14px 0 0; }
+			.cetech-de-advanced {
+				margin-top: 36px;
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 0 20px 20px;
+				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-advanced > summary {
+				cursor: pointer;
+				font-weight: 600;
+				font-size: 14px;
+				padding: 18px 0;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-advanced[open] > summary {
+				border-bottom: 1px solid #f0f0f1;
+				margin-bottom: 16px;
+			}
+			@media (max-width: 782px) {
+				.cetech-de-dashboard-header { padding: 18px; }
+				.cetech-de-dashboard-header-actions {
+					align-items: stretch;
+					min-width: 100%;
+				}
+				.cetech-de-button-group { justify-content: flex-start; }
+				.cetech-de-checklist-item {
+					grid-template-columns: 1fr;
+				}
+				.cetech-de-checklist-side {
+					align-items: flex-start;
+					flex-direction: row;
+					flex-wrap: wrap;
+				}
+				.cetech-de-card-button,
+				.cetech-de-checklist-button { width: auto; }
+			}
+		</style><div class="cetech-de-dashboard"><header class="cetech-de-dashboard-header"><div class="cetech-de-dashboard-header-text"><p class="cetech-de-dashboard-eyebrow">Delivery operations</p><h1 class="cetech-de-dashboard-title">CETECH Delivery Engine</h1><p class="cetech-de-dashboard-subtitle">Manage delivery areas, delivery options, and delivery charges for WooCommerce orders.</p></div><div class="cetech-de-dashboard-header-actions"><div class="cetech-de-button-group cetech-de-button-group--primary"><a class="button button-primary cetech-de-header-button" href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-rate-cards">Manage Delivery Charges</a><a class="button button-secondary cetech-de-header-button" href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-delivery-offers">Manage Delivery Options</a><a class="button button-secondary cetech-de-header-button" href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-destination-zones">Manage Delivery Areas</a></div><div class="cetech-de-button-group cetech-de-button-group--secondary"><a class="button button-link cetech-de-header-button" href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-settings">View Settings</a></div></div></header><section class="cetech-de-section"><div class="cetech-de-section-head"><h2 class="cetech-de-section-title">Delivery readiness</h2><p class="cetech-de-section-desc">A quick look at whether your delivery setup is ready for customers.</p></div><div class="cetech-de-card-grid cetech-de-readiness-grid"><article class="cetech-de-card cetech-de-card--ready"><div class="cetech-de-card-head"><h3 class="cetech-de-card-title">Delivery Areas</h3><span class="cetech-de-badge cetech-de-badge--ready">Ready</span></div><p class="cetech-de-card-text">Delivery areas tell the system where you deliver.</p><div class="cetech-de-card-footer"><a class="button button-secondary cetech-de-card-button" href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-destination-zones">Manage delivery areas</a></div></article><article class="cetech-de-card cetech-de-card--ready"><div class="cetech-de-card-head"><h3 class="cetech-de-card-title">Delivery Options</h3><span class="cetech-de-badge cetech-de-badge--ready">Ready</span></div><p class="cetech-de-card-text">Delivery options define services like Same-Day, Next-Day, or Standard Delivery.</p><div class="cetech-de-card-footer"><a class="button button-secondary cetech-de-card-button" href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-delivery-offers">Manage delivery options</a></div></article><article class="cetech-de-card cetech-de-card--ready"><div class="cetech-de-card-head"><h3 class="cetech-de-card-title">Delivery Charges</h3><span class="cetech-de-badge cetech-de-badge--ready">Ready</span></div><p class="cetech-de-card-text">Delivery charges connect delivery areas and options to actual delivery fees.</p><div class="cetech-de-card-footer"><a class="button button-secondary cetech-de-card-button" href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-rate-cards">Manage delivery charges</a></div></article><article class="cetech-de-card cetech-de-card--ready"><div class="cetech-de-card-head"><h3 class="cetech-de-card-title">Checkout Status</h3><span class="cetech-de-badge cetech-de-badge--ready">Ready</span></div><p class="cetech-de-card-text">This confirms whether customers can see delivery options during checkout.</p><div class="cetech-de-card-footer"><a class="button button-secondary cetech-de-card-button" href="https://example.test/wp-admin/admin.php?page=wc-settings&amp;tab=shipping">Open shipping settings</a></div></article></div></section><section class="cetech-de-section"><div class="cetech-de-section-head"><h2 class="cetech-de-section-title">Setup checklist</h2><p class="cetech-de-section-desc">Complete these steps to get delivery pricing working at checkout.</p></div><div class="cetech-de-checklist"><div class="cetech-de-checklist-item cetech-de-checklist-item--completed"><div class="cetech-de-checklist-step" aria-hidden="true">1</div><div class="cetech-de-checklist-main"><p class="cetech-de-checklist-title">Create at least one Delivery Area</p><p class="cetech-de-checklist-desc">Delivery areas group the places you deliver to, such as a city or region.</p></div><div class="cetech-de-checklist-side"><span class="cetech-de-badge cetech-de-badge--ready">Completed</span><a class="button button-secondary cetech-de-checklist-button" href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-destination-zones">Add a delivery area</a></div></div><div class="cetech-de-checklist-item cetech-de-checklist-item--completed"><div class="cetech-de-checklist-step" aria-hidden="true">2</div><div class="cetech-de-checklist-main"><p class="cetech-de-checklist-title">Create at least one Delivery Option</p><p class="cetech-de-checklist-desc">Delivery options describe the service your customers choose.</p></div><div class="cetech-de-checklist-side"><span class="cetech-de-badge cetech-de-badge--ready">Completed</span><a class="button button-secondary cetech-de-checklist-button" href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-delivery-offers">Add a delivery option</a></div></div><div class="cetech-de-checklist-item cetech-de-checklist-item--completed"><div class="cetech-de-checklist-step" aria-hidden="true">3</div><div class="cetech-de-checklist-main"><p class="cetech-de-checklist-title">Create at least one Delivery Charge</p><p class="cetech-de-checklist-desc">Delivery charges set the price for each delivery area and option combination.</p></div><div class="cetech-de-checklist-side"><span class="cetech-de-badge cetech-de-badge--ready">Completed</span><a class="button button-secondary cetech-de-checklist-button" href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-rate-cards&amp;action=add">Add a delivery charge</a></div></div><div class="cetech-de-checklist-item cetech-de-checklist-item--completed"><div class="cetech-de-checklist-step" aria-hidden="true">4</div><div class="cetech-de-checklist-main"><p class="cetech-de-checklist-title">Enable delivery at checkout</p><p class="cetech-de-checklist-desc">Confirm WooCommerce shipping is configured and Delivery Engine checkout features are turned on.</p></div><div class="cetech-de-checklist-side"><span class="cetech-de-badge cetech-de-badge--ready">Completed</span><a class="button button-secondary cetech-de-checklist-button" href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-settings">Review settings</a></div></div><div class="cetech-de-checklist-item cetech-de-checklist-item--manual"><div class="cetech-de-checklist-step" aria-hidden="true">5</div><div class="cetech-de-checklist-main"><p class="cetech-de-checklist-title">Test checkout with a sample product</p><p class="cetech-de-checklist-desc">Add a product to the cart, enter a delivery address, and confirm the delivery fee appears.</p></div><div class="cetech-de-checklist-side"><span class="cetech-de-badge cetech-de-badge--not_active">Manual check</span><a class="button button-secondary cetech-de-checklist-button" href="https://example.test/">View store</a></div></div></div></section><section class="cetech-de-section"><div class="cetech-de-section-head"><h2 class="cetech-de-section-title">Today&#039;s delivery controls</h2><p class="cetech-de-section-desc">Common tasks your team can open with one click.</p></div><div class="cetech-de-card-grid cetech-de-quick-actions"><a class="cetech-de-action-card" href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-rate-cards&amp;action=add"><span class="cetech-de-action-card-arrow" aria-hidden="true">&rarr;</span><span class="cetech-de-action-card-title">Add New Delivery Charge</span><span class="cetech-de-action-card-desc">Set a delivery price for a delivery area and service.</span></a><a class="cetech-de-action-card" href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-destination-zones"><span class="cetech-de-action-card-arrow" aria-hidden="true">&rarr;</span><span class="cetech-de-action-card-title">Review Delivery Areas</span><span class="cetech-de-action-card-desc">Check which areas you deliver to.</span></a><a class="cetech-de-action-card" href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-delivery-offers"><span class="cetech-de-action-card-arrow" aria-hidden="true">&rarr;</span><span class="cetech-de-action-card-title">Review Delivery Options</span><span class="cetech-de-action-card-desc">Check the delivery services available to customers.</span></a><a class="cetech-de-action-card" href="https://example.test/wp-admin/admin.php?page=wc-settings&amp;tab=shipping"><span class="cetech-de-action-card-arrow" aria-hidden="true">&rarr;</span><span class="cetech-de-action-card-title">Open WooCommerce Shipping Settings</span><span class="cetech-de-action-card-desc">Review shipping zones and methods in WooCommerce.</span></a><a class="cetech-de-action-card" href="#cetech-de-testing-instructions"><span class="cetech-de-action-card-arrow" aria-hidden="true">&rarr;</span><span class="cetech-de-action-card-title">Testing instructions</span><span class="cetech-de-action-card-desc">How to verify delivery pricing before going live.</span></a></div></section><section class="cetech-de-section cetech-de-section--warnings"><div class="cetech-de-section-head"><h2 class="cetech-de-section-title">Needs your attention</h2></div><div class="cetech-de-warnings"><div class="cetech-de-warning-card"><div class="cetech-de-warning-icon" aria-hidden="true">!</div><div class="cetech-de-warning-body"><p class="cetech-de-warning-title">Active zone without rules</p><p class="cetech-de-warning-message">An active destination zone has no rules and is not marked as fallback.</p></div></div><div class="cetech-de-warning-card"><div class="cetech-de-warning-icon" aria-hidden="true">!</div><div class="cetech-de-warning-body"><p class="cetech-de-warning-title">Orphan destination rule</p><p class="cetech-de-warning-message">A destination rule references a zone that does not exist.</p></div></div><div class="cetech-de-warning-card"><div class="cetech-de-warning-icon" aria-hidden="true">!</div><div class="cetech-de-warning-body"><p class="cetech-de-warning-title">Product rule invalid choice</p><p class="cetech-de-warning-message">An active product rule uses an unknown fulfilment choice value.</p></div></div><div class="cetech-de-warning-card"><div class="cetech-de-warning-icon" aria-hidden="true">!</div><div class="cetech-de-warning-body"><p class="cetech-de-warning-title">Product rule invalid availability/choice pair</p><p class="cetech-de-warning-message">An active product rule combines fulfilment availability and choice in an unsupported way.</p></div></div><div class="cetech-de-warning-card"><div class="cetech-de-warning-icon" aria-hidden="true">!</div><div class="cetech-de-warning-body"><p class="cetech-de-warning-title">Active delivery offer without rate cards</p><p class="cetech-de-warning-message">Active delivery offer &quot;store-pickup&quot; has no matching active rate cards.</p></div></div><div class="cetech-de-warning-card"><div class="cetech-de-warning-icon" aria-hidden="true">!</div><div class="cetech-de-warning-body"><p class="cetech-de-warning-title">Public REST route detected</p><p class="cetech-de-warning-message">The plugin codebase contains register_rest_route usage. Verify no private configuration is exposed.</p></div></div></div></section><section class="cetech-de-section"><div class="cetech-de-section-head"><h2 class="cetech-de-section-title">At a glance</h2></div><div class="cetech-de-summary-grid"><div class="cetech-de-summary-stat"><span class="cetech-de-summary-value">2</span><span class="cetech-de-summary-label">Delivery zones</span></div><div class="cetech-de-summary-stat"><span class="cetech-de-summary-value">4</span><span class="cetech-de-summary-label">Delivery offers</span></div><div class="cetech-de-summary-stat"><span class="cetech-de-summary-value">3</span><span class="cetech-de-summary-label">Rate cards (total)</span></div><div class="cetech-de-summary-stat"><span class="cetech-de-summary-value">3</span><span class="cetech-de-summary-label">Active rate cards</span></div><div class="cetech-de-summary-stat cetech-de-summary-stat--empty"><span class="cetech-de-summary-value">0</span><span class="cetech-de-summary-label">Inactive rate cards</span></div></div></section><section class="cetech-de-section cetech-de-section--help"><div class="cetech-de-section-head"><h2 class="cetech-de-section-title">Help</h2><p class="cetech-de-section-desc">Simple guidance for setting prices and checking checkout.</p></div><div class="cetech-de-help-grid"><div class="cetech-de-help-card"><h3 class="cetech-de-help-subtitle">How delivery pricing works</h3><p class="cetech-de-help-lead">Delivery pricing works in three steps:</p><ol class="cetech-de-help-steps"><li>Create a Delivery Area for where you deliver.</li><li>Create a Delivery Option for the service you provide.</li><li>Create a Delivery Charge to set the price for that area and option.</li></ol><p class="cetech-de-help-example"><span class="cetech-de-help-example-label">Example</span> City centre + Standard Delivery = GHS 25.00</p></div><div id="cetech-de-testing-instructions" class="cetech-de-help-card"><h3 class="cetech-de-help-subtitle">How to check checkout</h3><ol class="cetech-de-help-steps"><li>Make sure you have at least one zone, offer, and active rate card.</li><li>Open your store and add a product to the cart.</li><li>Go to checkout and enter a delivery address inside one of your zones.</li><li>Confirm a delivery fee appears before placing the order.</li></ol><p class="cetech-de-help-action"><a class="button button-secondary" href="https://example.test/" target="_blank" rel="noopener noreferrer">Open store in new tab</a></p></div></div></section></div><p><button type="button" class="button button-secondary" id="cetech-de-copy-diagnostic" data-copied="Copied">Copy Diagnostic Report</button></p><textarea id="cetech-de-diagnostic-report" class="large-text" rows="8" readonly hidden>CETECH Delivery Engine diagnostic report
+Plugin version: 1.0.0-rc.2
+PHP: 8.5.0
+WordPress: 6.7.2
+WooCommerce: N/A
+Schema: 3 / target 3
+
+Health
+- Migration status unknown
+- Active zone without rules
+- Active zone without rules
+- Orphan destination rule
+- Orphan destination rule
+- Orphan destination rule
+- Product rule invalid choice
+- Product rule invalid availability/choice pair
+- Active delivery offer without rate cards
+- Public REST route detected
+
+Feature flags
+enable_product_delivery_selector: on
+enable_cart_delivery_selection_capture: on
+enable_checkout_delivery_selection_validation: on
+enable_woocommerce_shipping_rate_calculation: on
+enable_order_delivery_snapshot_persistence: on
+enable_customer_order_delivery_summary: off
+enable_customer_email_delivery_summary: off
+enable_shipment_records: off
+enable_customer_timeline: off
+enable_tracking_links: off
+enable_wpml_adapter: off
+enable_wcml_adapter: off
+enable_woodmart_adapter: off
+enable_wcfm_adapter: off
+enable_vitepos_adapter: off
+enable_bulk_import: off
+enable_classic_checkout_adapter: on
+enable_blocks_adapter: off
+enable_category_rules: off
+enable_site_fallback_rule: off
+enable_effective_configuration_runtime: on
+enable_variable_product_ecr_runtime: on
+demo_data_on_activation: off</textarea><details id="cetech-de-advanced-details" class="cetech-de-advanced"><summary>Advanced system details</summary><p class="description">Technical diagnostics for developers and advanced troubleshooting. Most day-to-day tasks can be completed from the dashboard above.</p><h2>Environment</h2><table class="widefat striped" style="max-width:960px;"><thead><tr><th scope="col">Item</th><th scope="col">Value</th></tr></thead><tbody><tr><th scope="row">Plugin version</th><td>1.0.0-rc.2</td></tr><tr><th scope="row">PHP version</th><td>8.5.0</td></tr><tr><th scope="row">WordPress version</th><td>6.7.2</td></tr><tr><th scope="row">WooCommerce active</th><td>Yes</td></tr><tr><th scope="row">WooCommerce version</th><td>N/A</td></tr><tr><th scope="row">HPOS compatibility declaration attempted</th><td>No</td></tr><tr><th scope="row">Schema up to date</th><td>Yes</td></tr><tr><th scope="row">Target schema version</th><td>3</td></tr><tr><th scope="row">Installed schema version</th><td>3</td></tr><tr><th scope="row">Configuration tables present</th><td>Yes</td></tr><tr><th scope="row">Missing configuration tables</th><td>None</td></tr><tr><th scope="row">Last migration status</th><td>N/A</td></tr><tr><th scope="row">Composer autoload present</th><td>Yes</td></tr></tbody></table><h2>Configuration records</h2><table class="widefat striped" style="max-width:960px;"><thead><tr><th scope="col">Item</th><th scope="col">Value</th></tr></thead><tbody><tr><th scope="row">Logistics profiles</th><td>1</td></tr><tr><th scope="row">Delivery offers</th><td>4</td></tr><tr><th scope="row">Destination zones</th><td>2</td></tr><tr><th scope="row">Destination rules</th><td>3</td></tr><tr><th scope="row">Pickup locations</th><td>1</td></tr><tr><th scope="row">Suppliers</th><td>1</td></tr><tr><th scope="row">Origins</th><td>1</td></tr><tr><th scope="row">Rate cards</th><td>3</td></tr><tr><th scope="row">Product delivery rules</th><td>1</td></tr></tbody></table><h2>Runtime readiness (admin/test only)</h2><table class="widefat striped" style="max-width:960px;"><thead><tr><th scope="col">Item</th><th scope="col">Value</th></tr></thead><tbody><tr><th scope="row">Product rule resolver registered</th><td>Yes</td></tr><tr><th scope="row">Resolver contract version</th><td>1</td></tr><tr><th scope="row">Legacy rules admin check location</th><td>Delivery Engine → Legacy Delivery Rules → Technical diagnostic tools → Check which legacy delivery rule applies</td></tr><tr><th scope="row">Product delivery selector flag</th><td>Yes</td></tr><tr><th scope="row">Cart delivery selection capture flag</th><td>Yes</td></tr><tr><th scope="row">Product delivery selector renderer</th><td>Yes</td></tr><tr><th scope="row">Selector option contract version</th><td>1</td></tr><tr><th scope="row">Selector options builder registered</th><td>Yes</td></tr><tr><th scope="row">Add-to-cart capture registered</th><td>Yes</td></tr><tr><th scope="row">Cart session restore hook</th><td>Yes</td></tr><tr><th scope="row">Cart selection revalidator registered</th><td>Yes</td></tr><tr><th scope="row">Cart selection revalidation mode</th><td>Cart page warnings only; no checkout blocking</td></tr><tr><th scope="row">Checkout delivery validation flag</th><td>Yes</td></tr><tr><th scope="row">Checkout validation registered</th><td>Yes</td></tr><tr><th scope="row">Checkout validation mode</th><td>Preflight validation only; no shipping calculation</td></tr><tr><th scope="row">Checkout delivery selector</th><td>Not enabled</td></tr><tr><th scope="row">Selection validator registered</th><td>Yes</td></tr><tr><th scope="row">Selection intent contract version</th><td>1</td></tr><tr><th scope="row">Cart item selection persistence</th><td>Enabled (cart item data only; no checkout/order)</td></tr><tr><th scope="row">Add-to-cart validation</th><td>Enabled when capture flag active</td></tr><tr><th scope="row">Rate quote engine registered</th><td>Yes</td></tr><tr><th scope="row">Rate quote mode</th><td>RateQuoteEngine-backed WooCommerce shipping calculation</td></tr><tr><th scope="row">Rate quote admin check location</th><td>Delivery Engine → Technical Diagnostic Tools → Technical details</td></tr><tr><th scope="row">WooCommerce selected-offer shipping flag</th><td>Yes</td></tr><tr><th scope="row">Selected-offer shipping method registered</th><td>Yes</td></tr><tr><th scope="row">Shipping method ID</th><td>delivery_engine_selected_offer</td></tr><tr><th scope="row">Shipping calculation mode</th><td>RateQuoteEngine-backed / enabled</td></tr><tr><th scope="row">Destination zone resolver</th><td>Package destination → active zone rules (+ explicit fallback zone when configured)</td></tr><tr><th scope="row">WooCommerce shipping method</th><td>Registered when runtime gates active</td></tr><tr><th scope="row">Cart/checkout totals</th><td>WooCommerce shipping rates only (no direct total hooks)</td></tr><tr><th scope="row">Missing quote behavior</th><td>No rate / no free fallback</td></tr><tr><th scope="row">Order delivery snapshot flag</th><td>Yes</td></tr><tr><th scope="row">Order snapshot persistence registered</th><td>Yes</td></tr><tr><th scope="row">Snapshot mode</th><td>Order item protected meta only</td></tr><tr><th scope="row">Order snapshot</th><td>Enabled (_cetech_de_delivery_snapshot on order items/orders)</td></tr><tr><th scope="row">Order snapshot admin display</th><td>Yes</td></tr><tr><th scope="row">Snapshot reader registered</th><td>Yes</td></tr><tr><th scope="row">Snapshot integrity checker registered</th><td>Yes</td></tr><tr><th scope="row">Snapshot display mode</th><td>Read-only admin only</td></tr><tr><th scope="row">Customer order delivery summary flag</th><td>No</td></tr><tr><th scope="row">Customer order delivery summary renderer</th><td>No</td></tr><tr><th scope="row">Customer summary mode</th><td>Disabled</td></tr><tr><th scope="row">Customer email delivery summary flag</th><td>No</td></tr><tr><th scope="row">Customer email delivery summary renderer</th><td>No</td></tr><tr><th scope="row">Email summary mode</th><td>Disabled</td></tr><tr><th scope="row">Shipment tracking in emails</th><td>Not enabled</td></tr><tr><th scope="row">Carrier email updates</th><td>Not enabled</td></tr><tr><th scope="row">Email delivery summary</th><td>Not enabled</td></tr><tr><th scope="row">Shipment tracking timeline</th><td>Not enabled</td></tr><tr><th scope="row">Public shipment page</th><td>Not enabled</td></tr><tr><th scope="row">Shipment creation</th><td>Not enabled</td></tr><tr><th scope="row">Shipping calculation</th><td>Enabled (WooCommerce shipping rates only)</td></tr><tr><th scope="row">Order delivery persistence</th><td>Not enabled</td></tr><tr><th scope="row">Selector storefront output</th><td>Enabled on simple product pages (radio selection inside add-to-cart form; no checkout/shipping)</td></tr></tbody></table><h2>Configuration Health</h2><p class="description">Read-only diagnostics for configuration records. Does not modify data or expose customer information.</p><h2>Diagnostics summary</h2><table class="widefat striped" style="max-width:960px;"><thead><tr><th scope="col">Item</th><th scope="col">Value</th></tr></thead><tbody><tr><th scope="row">Errors</th><td>3</td></tr><tr><th scope="row">Warnings</th><td>6</td></tr><tr><th scope="row">Info</th><td>1</td></tr></tbody></table><table class="widefat striped" style="max-width:960px;"><thead><tr><th scope="col">Severity</th><th scope="col">Title</th><th scope="col">Message</th><th scope="col">Related entity</th></tr></thead><tbody><tr><td><span class="cetech-de-severity cetech-de-severity-info">Info</span></td><td>Migration status unknown</td><td>No migration status record was found.</td><td>schema</td></tr><tr><td><span class="cetech-de-severity cetech-de-severity-warning">Warning</span></td><td>Active zone without rules</td><td>An active destination zone has no rules and is not marked as fallback.</td><td>destination_zone · ID 1 · code=greater-accra</td></tr><tr><td><span class="cetech-de-severity cetech-de-severity-warning">Warning</span></td><td>Active zone without rules</td><td>An active destination zone has no rules and is not marked as fallback.</td><td>destination_zone · ID 2 · code=international</td></tr><tr><td><span class="cetech-de-severity cetech-de-severity-error">Error</span></td><td>Orphan destination rule</td><td>A destination rule references a zone that does not exist.</td><td>destination_rule · ID 1 · zone_id=0</td></tr><tr><td><span class="cetech-de-severity cetech-de-severity-error">Error</span></td><td>Orphan destination rule</td><td>A destination rule references a zone that does not exist.</td><td>destination_rule · ID 2 · zone_id=0</td></tr><tr><td><span class="cetech-de-severity cetech-de-severity-error">Error</span></td><td>Orphan destination rule</td><td>A destination rule references a zone that does not exist.</td><td>destination_rule · ID 3 · zone_id=0</td></tr><tr><td><span class="cetech-de-severity cetech-de-severity-warning">Warning</span></td><td>Product rule invalid choice</td><td>An active product rule uses an unknown fulfilment choice value.</td><td>product_delivery_rule · ID 77 · fulfilment_choice=</td></tr><tr><td><span class="cetech-de-severity cetech-de-severity-warning">Warning</span></td><td>Product rule invalid availability/choice pair</td><td>An active product rule combines fulfilment availability and choice in an unsupported way.</td><td>product_delivery_rule · ID 77 · availability=in_warehouse choice=</td></tr><tr><td><span class="cetech-de-severity cetech-de-severity-warning">Warning</span></td><td>Active delivery offer without rate cards</td><td>Active delivery offer &quot;store-pickup&quot; has no matching active rate cards.</td><td>delivery_offer · ID 21</td></tr><tr><td><span class="cetech-de-severity cetech-de-severity-warning">Warning</span></td><td>Public REST route detected</td><td>The plugin codebase contains register_rest_route usage. Verify no private configuration is exposed.</td><td>privacy</td></tr></tbody></table><h2>Feature flags</h2><p class="description">Feature flags are managed on the Delivery Settings page. The table below is read-only for support and troubleshooting. <a href="https://example.test/wp-admin/admin.php?page=cetech-delivery-engine-settings">Open Delivery Settings</a></p><h2>Feature flags (read-only)</h2><table class="widefat striped" style="max-width:960px;"><thead><tr><th scope="col">Item</th><th scope="col">Value</th></tr></thead><tbody><tr><th scope="row">Show delivery choices on product pages</th><td>Yes</td></tr><tr><th scope="row">Remember the shopper’s delivery choice in the cart</th><td>Yes</td></tr><tr><th scope="row">Check delivery choices at checkout</th><td>Yes</td></tr><tr><th scope="row">Calculate delivery fees in WooCommerce shipping</th><td>Yes</td></tr><tr><th scope="row">Save delivery details on the order</th><td>Yes</td></tr><tr><th scope="row">Show delivery details on customer order pages</th><td>No</td></tr><tr><th scope="row">Include delivery details in order emails</th><td>No</td></tr><tr><th scope="row">Shipment records (future feature)</th><td>No</td></tr><tr><th scope="row">Customer delivery timeline (future feature)</th><td>No</td></tr><tr><th scope="row">Carrier tracking links (future feature)</th><td>No</td></tr><tr><th scope="row">WPML language adapter</th><td>No</td></tr><tr><th scope="row">WooCommerce Multilingual adapter</th><td>No</td></tr><tr><th scope="row">WoodMart theme adapter</th><td>No</td></tr><tr><th scope="row">WCFM marketplace adapter</th><td>No</td></tr><tr><th scope="row">Vitepos adapter</th><td>No</td></tr><tr><th scope="row">Bulk import tools</th><td>No</td></tr><tr><th scope="row">Classic checkout support</th><td>Yes</td></tr><tr><th scope="row">Block checkout adapter</th><td>No</td></tr><tr><th scope="row">Category-based product rules</th><td>No</td></tr><tr><th scope="row">Site-wide fallback product rule</th><td>No</td></tr><tr><th scope="row">Use the New Delivery Settings System</th><td>Yes</td></tr><tr><th scope="row">Use New Delivery Settings for Product Variations</th><td>Yes</td></tr><tr><th scope="row">Load demo data on plugin activation</th><td>No</td></tr></tbody></table><h2>Optional integrations (detected)</h2><table class="widefat striped" style="max-width:960px;"><thead><tr><th scope="col">Item</th><th scope="col">Value</th></tr></thead><tbody><tr><th scope="row">woodmart</th><td>No</td></tr><tr><th scope="row">wpml</th><td>No</td></tr><tr><th scope="row">wcml</th><td>No</td></tr><tr><th scope="row">wcfm</th><td>No</td></tr><tr><th scope="row">vitepos</th><td>No</td></tr></tbody></table><h2>Current user delivery capabilities</h2><table class="widefat striped" style="max-width:960px;"><thead><tr><th scope="col">Item</th><th scope="col">Value</th></tr></thead><tbody><tr><th scope="row">manage_delivery_settings</th><td>Yes</td></tr><tr><th scope="row">manage_delivery_offers</th><td>Yes</td></tr><tr><th scope="row">manage_delivery_rate_cards</th><td>Yes</td></tr><tr><th scope="row">manage_delivery_zones</th><td>Yes</td></tr><tr><th scope="row">manage_logistics_profiles</th><td>Yes</td></tr><tr><th scope="row">manage_private_sources</th><td>Yes</td></tr><tr><th scope="row">manage_product_delivery_rules</th><td>Yes</td></tr><tr><th scope="row">manage_shipments</th><td>Yes</td></tr><tr><th scope="row">update_shipment_status</th><td>Yes</td></tr><tr><th scope="row">view_private_delivery_costs</th><td>Yes</td></tr><tr><th scope="row">view_private_origins</th><td>Yes</td></tr><tr><th scope="row">manage_delivery_integrations</th><td>Yes</td></tr><tr><th scope="row">view_delivery_logs</th><td>Yes</td></tr><tr><th scope="row">import_delivery_data</th><td>Yes</td></tr><tr><th scope="row">view_delivery_diagnostics</th><td>Yes</td></tr></tbody></table><h2>Maintenance</h2><form method="post" action=""><input type="hidden" name="cetech_de_nonce" value="fixture-nonce-cetech_de_resync_capabilities" /><input type="hidden" name="cetech_de_action" value="cetech_de_resync_capabilities" /><input type="submit" name="submit" class="button button-secondary" value="Re-sync capabilities" /><p class="description">Re-applies delivery capabilities to the administrator and shop_manager roles.</p></form></details></div></div></div></div></div></body></html>

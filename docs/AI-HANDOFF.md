@@ -2,10 +2,10 @@
 
 ## CURRENT IMPLEMENTATION STATUS — V1 RC (read first)
 
-**Last updated:** 2026-08-13  
-**Plugin version:** `1.0.0-rc.2` (Stage 13 developing `1.0.0-rc.3` on `feat/site-wide-delivery-defaults`; public version unchanged until packaged)  
+**Last updated:** 2026-08-14  
+**Plugin version:** `1.0.0-rc.3` (Stage 13 / 13B / 13C / 13D / 13D-R1 finalized; tagged release candidate)  
 **Schema target:** `3` (`cetech_de_db_version`)  
-**Git:** `feat/site-wide-delivery-defaults` from `master`; RC.2 tag `v1.0.0-rc.2` **untouched**  
+**Git:** `feat/site-wide-delivery-defaults` from `master`; RC.2 tag `v1.0.0-rc.2` **untouched**; RC.3 tag `v1.0.0-rc.3`  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
 
@@ -31,23 +31,30 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 8 multi-product shipping grouping | **FUNCTIONALLY COMPLETE** — order **`#39724`** shipping **25.00** / total **64.98** |
 | Stage 8C order-admin technical presentation cleanup | **COMPLETE** — live PASS |
 | Classic Checkout release `1.0.0-rc.2` | **LIVE AND USABLE** — final live smoke **PASS**; readiness `docs/RELEASE-1.0.0-RC.2-READINESS.md`; **do not modify the tag** |
-| Stage 13 site-wide delivery defaults | **IMPLEMENTED** on `feat/site-wide-delivery-defaults` — artifact `docs/STAGE-13-SITE-WIDE-DELIVERY-DEFAULTS.md`; live QA not yet run |
+| Stage 13 site-wide delivery defaults | **COMPLETE** — artifact `docs/STAGE-13-SITE-WIDE-DELIVERY-DEFAULTS.md`; owner-accepted via QA.4 / QA.5 |
+| Stage 13B WordPress-native admin UX | **COMPLETE** — Overview, Setup Guide, progressive product panel; artifacts `docs/STAGE-13B-*.md` |
+| Stage 13C owner-review repairs | **COMPLETE** — wizard / International Air-Sea / Preview / readiness; artifacts `docs/STAGE-13C-R*.md` |
+| Stage 13D final admin simplification | **COMPLETE** — legacy retired from normal menu; real WP role Access; RateCard optional-date repair. Artifact `docs/STAGE-13D-FINAL-ADMIN-SIMPLIFICATION.md` |
+| Stage 13D-R1 admin access / recovery hardening | **COMPLETE** — Administrator protected full access; independent `manage_options` recovery. Artifact `docs/STAGE-13D-R1-ADMIN-ACCESS-RECOVERY-HARDENING.md` |
+| Stage 13E RC.3 finalization | **COMPLETE** — version `1.0.0-rc.3`; artifact `docs/STAGE-13E-RC3-FINALIZATION.md`. Owner QA.4 + QA.5 accepted; FLAIROC final RC.3 install smoke **pending owner** |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos; profile defaults use `global/0/{profile_key}` |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-profile site-wide root; primary default fallback; provenance; fingerprint; hard constraints |
-| New admin UX | **Delivery Settings** landing + guided setup + site-wide default cards. Product/variation customization is progressive. **Legacy Delivery Rules** = migration/compatibility only |
-| Runtime on FLAIROC | **Required production features ON**; deferred features **OFF**; **COD OFF**; schema **3** |
+| New admin UX | **Overview** + first-time setup wizard + Site-wide Defaults + Product Exceptions + Needs Attention. Product/variation customization is progressive. Legacy Delivery Rules is **retired from the normal menu**. Technical Diagnostics is a hidden support destination. Administrator is a protected full-access role in Settings → Access. |
+| Runtime on FLAIROC | **Required production features ON**; deferred features **OFF**; **COD OFF**; schema **3** — final RC.3 folder-replace smoke still owner-pending |
 | Variable runtime capture | Verified live; WoodMart adapter **not required** |
-| Shipments / tracking / timeline | **Not implemented** (deferred post-RC.2) |
+| Shipments / tracking / timeline | **Not implemented** (deferred; do not start Stage 14 unless instructed) |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
-| Category legacy parity | Compatibility route retained; do not mass-retire legacy runtime in this release |
-| Next stage | RC.3 live inheritance QA, then package `1.0.0-rc.3`. Do **not** start shipments/tracking/Blocks unless instructed. |
+| Category legacy parity | Hidden compatibility route retained; Legacy management UI is not a normal workflow |
+| Next stage | Owner installs tagged `1.0.0-rc.3` on FLAIROC via clean folder replace and runs one focused final runtime smoke. Then **STOP**. Do **not** start shipments/tracking/Blocks unless instructed. |
 | Final PHP log (RC.2 smoke) | Marker **546** → inspected through **548** — **PASS**; no new Delivery Engine fatals |
 | Live QA orders | `#39721` (variable); `#39724` (multi-product grouping) |
-| Package | `cetech-woocommerce-delivery-engine-1.0.0-rc.2.zip` SHA-256 `f85af02c5b02a88dcbb0fb061108a9ec02aff72569fcfd4e34cbc27af4cc4e3b` |
+| Package | `cetech-woocommerce-delivery-engine-1.0.0-rc.3.zip` (see Stage 13E finalization report for SHA-256) |
 
 **RC.2 final live smoke: PASS.** Plugin is **live and usable** on the current FLAIROC Classic Checkout environment with required production features enabled.
 
-Do **not** begin Stage 9 shipment/tracking unless explicitly instructed. Leave required production Delivery Engine switches **ON** on the live site. COD remains **OFF**.
+**RC.3 package:** locally finalized and tagged after owner QA.4 + QA.5 acceptance. Do **not** claim FLAIROC final RC.3 runtime verification until the owner completes the post-install smoke.
+
+Do **not** begin Stage 9/14 shipment/tracking unless explicitly instructed. Leave required production Delivery Engine switches **ON** on the live site. COD remains **OFF**.
 
 Administrator-language requirement: normal-user admin UI must use operational language throughout. Technical terminology belongs only in Technical details.
 
@@ -79,6 +86,17 @@ Administrator-language requirement: normal-user admin UI must use operational la
 | `docs/STAGE-8C-ORDER-ADMIN-PRESENTATION-CLEANUP.md` | Stage 8C order-admin technical meta presentation cleanup |
 | `docs/STAGE-13-ARCHITECTURE-NOTE.md` | Stage 13 pre-change audit of RC.2 default/inheritance behavior |
 | `docs/STAGE-13-SITE-WIDE-DELIVERY-DEFAULTS.md` | Stage 13 site-wide defaults + guided admin experience |
+| `docs/STAGE-13B-DESIGN-REFERENCE-MAP.md` | Stage 13B design-reference adoption / deviations |
+| `docs/STAGE-13B-ADMIN-SCREEN-INVENTORY.md` | Stage 13B RC.3 admin screen inventory |
+| `docs/STAGE-13B-WORDPRESS-NATIVE-UX.md` | Stage 13B WordPress-native UX implementation record |
+| `docs/STAGE-13C-R1-OWNER-REVIEW-REPAIR.md` | Stage 13C-R1 live owner-review repair (local complete; FLAIROC retest pending) |
+| `docs/STAGE-13C-R2-OWNER-RETEST-PACKAGE.md` | Stage 13C-R2 QA.2 packaging record |
+| `docs/STAGE-13C-R3-OWNER-QA2-FOLLOW-UP-REPAIR.md` | Stage 13C-R3 live QA.2 follow-up repair (local complete; packaged in QA.3) |
+| `docs/STAGE-13C-R4-OWNER-RETEST-PACKAGE.md` | Stage 13C-R4 QA.3 owner retest packaging record |
+| `docs/STAGE-13D-FINAL-ADMIN-SIMPLIFICATION.md` | Stage 13D final admin simplification, legacy retirement, real role permissions, QA.4 package |
+| `docs/STAGE-13D-R1-ADMIN-ACCESS-RECOVERY-HARDENING.md` | Stage 13D-R1 Administrator protected access + independent manage_options recovery |
+| `docs/STAGE-13D-R1-QA5-OWNER-RETEST-PACKAGE.md` | Stage 13D-R1 QA.5 packaging + short owner retest list |
+| `docs/STAGE-13E-RC3-FINALIZATION.md` | Stage 13E final RC.3 release record (owner QA.4 + QA.5 accepted; FLAIROC final smoke pending) |
 | `docs/CLASSIC-CHECKOUT-RELEASE-CANDIDATE-READINESS.md` | Pre-smoke Classic Checkout readiness (superseded for status by RC.2 readiness) |
 | `docs/RELEASE-1.0.0-RC.2-READINESS.md` | **Authoritative** live-verified `1.0.0-rc.2` release readiness |
 | `docs/ADMIN-UI-LANGUAGE-GUIDE.md` | Authoritative normal-administrator presentation language |

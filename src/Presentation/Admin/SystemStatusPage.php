@@ -76,7 +76,7 @@ final class SystemStatusPage {
 	}
 
 	public function handle_actions(): void {
-		if ( ! is_admin() || ! current_user_can( 'manage_delivery_settings' ) ) {
+		if ( ! is_admin() || ! current_user_can( \CetechDeliveryEngine\Core\Capabilities\Capabilities::DIAGNOSTICS ) ) {
 			return;
 		}
 
@@ -107,21 +107,29 @@ final class SystemStatusPage {
 	}
 
 	public function render(): void {
-		AdminPageAccess::require_capability( 'manage_delivery_settings' );
+		AdminPageAccess::require_capability( \CetechDeliveryEngine\Core\Capabilities\Capabilities::DIAGNOSTICS );
 
 		$this->render_admin_notices();
 
 		$integrations = $this->integration_registry->get_detection_statuses();
 		$display_keys = [ 'woodmart', 'wpml', 'wcml', 'wcfm', 'vitepos' ];
 
-		echo '<div class="wrap">';
+		echo '<div class="wrap cetech-de-admin-page">';
 		$this->render_admin_ui_styles();
-		$this->operations_dashboard()->render();
+		AdminPageLayout::render_page_header(
+			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
+			AdminLanguage::technical_diagnostic_tools(),
+			AdminLanguage::technical_diagnostic_tools_intro()
+		);
+
+		$report = $this->diagnostic_report_text();
+		echo '<p><button type="button" class="button button-secondary" id="cetech-de-copy-diagnostic" data-copied="' . esc_attr__( 'Copied', 'cetech-woocommerce-delivery-engine' ) . '">' . esc_html__( 'Copy Diagnostic Report', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
+		echo '<textarea id="cetech-de-diagnostic-report" class="large-text" rows="8" readonly hidden>' . esc_textarea( $report ) . '</textarea>';
 
 		echo '<details id="cetech-de-advanced-details" class="cetech-de-advanced">';
 		echo '<summary>' . esc_html__( 'Advanced system details', 'cetech-woocommerce-delivery-engine' ) . '</summary>';
 		echo '<p class="description">' . esc_html__(
-			'Technical diagnostics for developers and advanced troubleshooting. Most day-to-day tasks can be completed from the dashboard above.',
+			'Support-only technical details. Opening this screen does not change store configuration.',
 			'cetech-woocommerce-delivery-engine'
 		) . '</p>';
 
@@ -178,7 +186,7 @@ final class SystemStatusPage {
 			[
 				__( 'Product rule resolver registered', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( class_exists( ProductDeliveryRuleResolver::class ) ),
 				__( 'Resolver contract version', 'cetech-woocommerce-delivery-engine' ) => ProductRuleResolutionResult::CONTRACT_VERSION,
-				__( 'Legacy rules admin check location', 'cetech-woocommerce-delivery-engine' ) => __( 'Delivery Engine → Legacy Delivery Rules → Technical diagnostic tools → Check which legacy delivery rule applies', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Legacy rules admin check location', 'cetech-woocommerce-delivery-engine' ) => __( 'Internal compatibility reader only. Not shown in the normal Delivery Engine menu.', 'cetech-woocommerce-delivery-engine' ),
 				__( 'Product delivery selector flag', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( $selector_enabled ),
 				__( 'Cart delivery selection capture flag', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( $capture_enabled ),
 				__( 'Product delivery selector renderer', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( class_exists( ProductDeliverySelectorRenderer::class ) ),
@@ -206,7 +214,7 @@ final class SystemStatusPage {
 					: __( 'Not enabled', 'cetech-woocommerce-delivery-engine' ),
 				__( 'Rate quote engine registered', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( class_exists( RateQuoteEngine::class ) ),
 				__( 'Rate quote mode', 'cetech-woocommerce-delivery-engine' ) => $this->describe_rate_quote_mode( $shipping_runtime_active ),
-				__( 'Rate quote admin check location', 'cetech-woocommerce-delivery-engine' ) => __( 'Delivery Engine → Rate Cards → Technical diagnostic tools → Check a delivery price', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Rate quote admin check location', 'cetech-woocommerce-delivery-engine' ) => __( 'Delivery Engine → Technical Diagnostic Tools → Technical details', 'cetech-woocommerce-delivery-engine' ),
 				__( 'WooCommerce selected-offer shipping flag', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( $shipping_calculation_enabled ),
 				__( 'Selected-offer shipping method registered', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( $shipping_runtime_active && class_exists( SelectedOfferShippingMethod::class ) ),
 				__( 'Shipping method ID', 'cetech-woocommerce-delivery-engine' ) => SelectedOfferShippingMethod::METHOD_ID,
@@ -410,13 +418,13 @@ final class SystemStatusPage {
 		wp_nonce_field( self::RESYNC_ACTION, 'cetech_de_nonce' );
 		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::RESYNC_ACTION ) . '" />';
 		submit_button(
-			__( 'Re-sync capabilities', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Repair administrator Delivery Engine access', 'cetech-woocommerce-delivery-engine' ),
 			'secondary',
 			'submit',
 			false
 		);
 		echo '<p class="description">' . esc_html__(
-			'Re-applies delivery capabilities to the administrator and shop_manager roles.',
+			'Restores full Delivery Engine access for the WordPress Administrator role. Does not reset other WordPress roles. An independent recovery notice is also available to users with manage_options even when Technical Diagnostics is inaccessible.',
 			'cetech-woocommerce-delivery-engine'
 		) . '</p>';
 		echo '</form>';
@@ -645,5 +653,37 @@ final class SystemStatusPage {
 		}
 
 		return WC_VERSION;
+	}
+
+	private function diagnostic_report_text(): string {
+		$lines = [
+			'CETECH Delivery Engine diagnostic report',
+			'Plugin version: ' . CETECH_DE_VERSION,
+			'PHP: ' . PHP_VERSION,
+			'WordPress: ' . get_bloginfo( 'version' ),
+			'WooCommerce: ' . $this->woocommerce_version(),
+			'Schema: ' . SchemaVersion::get() . ' / target ' . SchemaVersion::target(),
+			'',
+			'Health',
+		];
+
+		$health = $this->configuration_health_checker->run();
+		$diagnostics = is_array( $health['diagnostics'] ?? null ) ? $health['diagnostics'] : [];
+		if ( [] === $diagnostics ) {
+			$lines[] = 'No configuration health warnings.';
+		} else {
+			foreach ( $diagnostics as $item ) {
+				$title = is_object( $item ) && isset( $item->title ) ? (string) $item->title : (string) ( $item['title'] ?? 'Issue' );
+				$lines[] = '- ' . $title;
+			}
+		}
+
+		$lines[] = '';
+		$lines[] = 'Feature flags';
+		foreach ( $this->feature_flags->all() as $flag => $enabled ) {
+			$lines[] = $flag . ': ' . ( $enabled ? 'on' : 'off' );
+		}
+
+		return implode( "\n", $lines );
 	}
 }

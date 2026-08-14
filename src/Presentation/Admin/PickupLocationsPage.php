@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Admin;
 
+use CetechDeliveryEngine\Core\Capabilities\Capabilities;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Domain\Pickup\PickupLocationRepositoryInterface;
 use CetechDeliveryEngine\Presentation\Admin\Validation\PickupLocationValidator;
@@ -28,21 +29,21 @@ final class PickupLocationsPage {
 	}
 
 	public function handle_actions(): void {
-		if ( $this->action_handler->verify_post( self::ACTION_SAVE, self::ACTION_SAVE, 'manage_delivery_zones', self::SLUG ) ) {
+		if ( $this->action_handler->verify_post( self::ACTION_SAVE, self::ACTION_SAVE, Capabilities::PICKUP, self::SLUG ) ) {
 			$this->handle_save();
 		}
 
-		if ( $this->action_handler->verify_post( self::ACTION_DEACTIVATE, self::ACTION_DEACTIVATE, 'manage_delivery_zones', self::SLUG ) ) {
+		if ( $this->action_handler->verify_post( self::ACTION_DEACTIVATE, self::ACTION_DEACTIVATE, Capabilities::PICKUP, self::SLUG ) ) {
 			$this->handle_deactivate();
 		}
 
-		if ( $this->action_handler->verify_post( self::ACTION_DELETE, self::ACTION_DELETE, 'manage_delivery_zones', self::SLUG ) ) {
+		if ( $this->action_handler->verify_post( self::ACTION_DELETE, self::ACTION_DELETE, Capabilities::PICKUP, self::SLUG ) ) {
 			$this->handle_delete();
 		}
 	}
 
 	public function render(): void {
-		AdminPageAccess::require_capability( 'manage_delivery_zones' );
+		AdminPageAccess::require_capability( Capabilities::PICKUP );
 
 		$this->action_handler->notices()->render_notices();
 
@@ -65,9 +66,9 @@ final class PickupLocationsPage {
 	private function render_list(): void {
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
-			__( 'Customer pickup', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Pickup Locations', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Pickup locations are places where customers or staff can collect orders instead of having them delivered.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Manage store or warehouse pickup points.', 'cetech-woocommerce-delivery-engine' ),
 			[
 				'label' => __( 'Add Pickup Location', 'cetech-woocommerce-delivery-engine' ),
 				'url'   => add_query_arg( [ 'page' => self::SLUG, 'action' => 'add' ], admin_url( 'admin.php' ) ),
@@ -101,9 +102,9 @@ final class PickupLocationsPage {
 
 		if ( [] === $records ) {
 			AdminPageLayout::render_empty_state(
-				__( 'No pickup locations yet', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Add a location when customers can collect orders from your store, branch, or pickup point.', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Add pickup location', 'cetech-woocommerce-delivery-engine' ),
+				__( 'No pickup locations have been added yet.', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Pickup locations are used when customers choose pickup instead of delivery. Add the places where customers can collect their orders.', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Add Pickup Location', 'cetech-woocommerce-delivery-engine' ),
 				add_query_arg( [ 'page' => self::SLUG, 'action' => 'add' ], admin_url( 'admin.php' ) )
 			);
 		} else {
@@ -118,13 +119,11 @@ final class PickupLocationsPage {
 				$id      = (int) ( $record['id'] ?? 0 );
 				$address = $this->validator->decode_public_address( isset( $record['public_address'] ) ? (string) $record['public_address'] : null );
 
+				$ready = trim( (string) ( $record['public_pickup_instructions'] ?? $record['public_opening_hours'] ?? '' ) );
 				$rows[] = [
-					esc_html( (string) ( $record['location_name'] ?? '' ) ),
+					'<strong>' . esc_html( (string) ( $record['location_name'] ?? '' ) ) . '</strong>',
 					esc_html( $this->validator->address_summary( isset( $record['public_address'] ) ? (string) $record['public_address'] : null ) ),
-					$this->render_contact_cell(
-						(string) ( $record['contact_phone'] ?? '' ),
-						(string) ( $record['contact_email'] ?? '' )
-					),
+					esc_html( '' !== $ready ? $ready : '—' ),
 					AdminUiHelper::record_status_badge( (string) ( $record['status'] ?? '' ) ),
 					$this->render_actions( $id ),
 				];
@@ -132,9 +131,9 @@ final class PickupLocationsPage {
 
 			AdminPageRenderer::render_table(
 				[
-					__( 'Location name', 'cetech-woocommerce-delivery-engine' ),
-					__( 'Address', 'cetech-woocommerce-delivery-engine' ),
-					__( 'Contact', 'cetech-woocommerce-delivery-engine' ),
+					__( 'Location', 'cetech-woocommerce-delivery-engine' ),
+					__( 'Public address', 'cetech-woocommerce-delivery-engine' ),
+					__( 'Pickup readiness', 'cetech-woocommerce-delivery-engine' ),
 					__( 'Status', 'cetech-woocommerce-delivery-engine' ),
 					__( 'Actions', 'cetech-woocommerce-delivery-engine' ),
 				],
@@ -284,7 +283,7 @@ final class PickupLocationsPage {
 				self::SLUG,
 				(int) $record['id'],
 				self::ACTION_DELETE,
-				'manage_delivery_zones'
+				Capabilities::PICKUP
 			);
 		}
 
@@ -442,7 +441,7 @@ final class PickupLocationsPage {
 	}
 
 	private function render_delete_confirmation(): void {
-		AdminPageAccess::require_capability( 'manage_delivery_zones' );
+		AdminPageAccess::require_capability( Capabilities::PICKUP );
 		$this->action_handler->notices()->render_notices();
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -462,7 +461,7 @@ final class PickupLocationsPage {
 			self::SLUG,
 			self::ACTION_DELETE,
 			self::ACTION_DEACTIVATE,
-			'manage_delivery_zones',
+			Capabilities::PICKUP,
 			__( 'Pickup Location', 'cetech-woocommerce-delivery-engine' ),
 			$id,
 			(string) ( $record['location_name'] ?? '' ),
@@ -575,7 +574,7 @@ final class PickupLocationsPage {
 		$deactivate .= wp_nonce_field( self::ACTION_DEACTIVATE, 'cetech_de_nonce', true, false );
 		$deactivate .= '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_DEACTIVATE ) . '" />';
 		$deactivate .= '<input type="hidden" name="id" value="' . esc_attr( (string) $id ) . '" />';
-		$deactivate .= '<button type="submit" class="button-link delete" onclick="return confirm(\'' . esc_js( __( 'Deactivate this pickup location?', 'cetech-woocommerce-delivery-engine' ) ) . '\');">';
+		$deactivate .= '<button type="submit" class="button-link" onclick="return confirm(\'' . esc_js( __( 'Deactivate this pickup location?', 'cetech-woocommerce-delivery-engine' ) ) . '\');">';
 		$deactivate .= esc_html__( 'Deactivate', 'cetech-woocommerce-delivery-engine' );
 		$deactivate .= '</button></form>';
 
@@ -583,7 +582,7 @@ final class PickupLocationsPage {
 			self::SLUG,
 			$id,
 			self::ACTION_DELETE,
-			'manage_delivery_zones'
+			Capabilities::PICKUP
 		);
 
 		return $edit . $deactivate . $delete;

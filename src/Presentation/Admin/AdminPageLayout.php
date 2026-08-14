@@ -14,6 +14,7 @@ final class AdminPageLayout {
 	public static function open_page(): void {
 		self::render_styles();
 		echo '<div class="wrap cetech-de-admin-page">';
+		echo '<hr class="wp-header-end" />';
 	}
 
 	public static function close_page(): void {
@@ -132,6 +133,95 @@ final class AdminPageLayout {
 		echo '</div></div>';
 	}
 
+	/**
+	 * @param list<array{number: int, label: string}> $steps
+	 */
+	public static function render_step_indicator( array $steps, int $current ): void {
+		echo '<ol class="cetech-de-wizard-steps" aria-label="' . esc_attr__( 'Setup steps', 'cetech-woocommerce-delivery-engine' ) . '">';
+		foreach ( $steps as $index => $step ) {
+			$number = (int) $step['number'];
+			$class  = $number === $current ? ' is-current' : ( $number < $current ? ' is-complete' : '' );
+			echo '<li class="' . esc_attr( trim( $class ) ) . '">';
+			echo '<span class="cetech-de-wizard-step-number">' . esc_html( (string) $number ) . '</span>';
+			echo '<span class="cetech-de-wizard-step-label">' . esc_html( $step['label'] ) . '</span>';
+			if ( $index < count( $steps ) - 1 ) {
+				echo '<span class="cetech-de-wizard-step-arrow" aria-hidden="true">→</span>';
+			}
+			echo '</li>';
+		}
+		echo '</ol>';
+	}
+
+	/**
+	 * @param array{tone?: string, title: string, text?: string, meta?: string, action_label?: string, action_url?: string} $banner
+	 */
+	public static function render_status_banner( array $banner ): void {
+		$tone = sanitize_key( (string) ( $banner['tone'] ?? 'ready' ) );
+		if ( ! in_array( $tone, [ 'ready', 'attention', 'info', 'neutral' ], true ) ) {
+			$tone = 'info';
+		}
+
+		echo '<div class="cetech-de-status-banner cetech-de-status-banner--' . esc_attr( $tone ) . '" role="status">';
+		echo '<span class="cetech-de-status-banner-icon dashicons ' . esc_attr( self::banner_icon( $tone ) ) . '" aria-hidden="true"></span>';
+		echo '<div class="cetech-de-status-banner-body">';
+		echo '<p class="cetech-de-status-banner-title">' . esc_html( $banner['title'] ) . '</p>';
+		if ( ! empty( $banner['text'] ) ) {
+			echo '<p class="cetech-de-status-banner-text">' . esc_html( (string) $banner['text'] ) . '</p>';
+		}
+		if ( ! empty( $banner['meta'] ) ) {
+			echo '<p class="cetech-de-status-banner-meta">' . wp_kses_post( (string) $banner['meta'] ) . '</p>';
+		}
+		echo '</div>';
+		if ( ! empty( $banner['action_label'] ) && ! empty( $banner['action_url'] ) ) {
+			echo '<a class="button" href="' . esc_url( (string) $banner['action_url'] ) . '">' . esc_html( (string) $banner['action_label'] ) . '</a>';
+		}
+		echo '</div>';
+	}
+
+	/**
+	 * @param list<array{value: string, title: string, text: string, icon?: string, checked?: bool, name?: string, type?: string}> $cards
+	 */
+	public static function render_choice_cards( array $cards, string $legend, string $helper = '' ): void {
+		echo '<fieldset class="cetech-de-choice-block">';
+		echo '<legend class="cetech-de-choice-legend">' . esc_html( $legend ) . '</legend>';
+		if ( '' !== $helper ) {
+			echo '<p class="description cetech-de-choice-helper">' . esc_html( $helper ) . '</p>';
+		}
+		echo '<div class="cetech-de-choice-grid">';
+		foreach ( $cards as $card ) {
+			$type    = ( $card['type'] ?? 'radio' ) === 'checkbox' ? 'checkbox' : 'radio';
+			$name    = (string) ( $card['name'] ?? 'choice' );
+			$checked = ! empty( $card['checked'] ) ? ' checked' : '';
+			$icon    = (string) ( $card['icon'] ?? 'dashicons-admin-generic' );
+			echo '<label class="cetech-de-choice-card">';
+			echo '<input type="' . esc_attr( $type ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( $card['value'] ) . '"' . $checked . ' />';
+			echo '<span class="cetech-de-choice-card-body">';
+			echo '<span class="cetech-de-choice-card-mark" aria-hidden="true"></span>';
+			echo '<span class="cetech-de-choice-card-icon dashicons ' . esc_attr( $icon ) . '" aria-hidden="true"></span>';
+			echo '<span class="cetech-de-choice-card-title">' . esc_html( $card['title'] ) . '</span>';
+			echo '<span class="cetech-de-choice-card-text">' . esc_html( $card['text'] ) . '</span>';
+			echo '</span></label>';
+		}
+		echo '</div></fieldset>';
+	}
+
+	public static function render_info_notice( string $text, string $tone = 'info' ): void {
+		$tone = in_array( $tone, [ 'info', 'success', 'warning' ], true ) ? $tone : 'info';
+		echo '<div class="cetech-de-info-notice cetech-de-info-notice--' . esc_attr( $tone ) . '" role="note">';
+		echo '<span class="dashicons ' . esc_attr( 'success' === $tone ? 'dashicons-yes-alt' : ( 'warning' === $tone ? 'dashicons-warning' : 'dashicons-info' ) ) . '" aria-hidden="true"></span>';
+		echo '<p>' . esc_html( $text ) . '</p>';
+		echo '</div>';
+	}
+
+	private static function banner_icon( string $tone ): string {
+		return match ( $tone ) {
+			'ready' => 'dashicons-yes-alt',
+			'attention' => 'dashicons-warning',
+			'neutral' => 'dashicons-marker',
+			default => 'dashicons-info',
+		};
+	}
+
 	public static function open_section( string $title, ?string $description = null ): void {
 		echo '<section class="cetech-de-section cetech-de-admin-section">';
 		echo '<div class="cetech-de-section-head">';
@@ -214,6 +304,17 @@ final class AdminPageLayout {
 				--cetech-de-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
 				max-width: 1180px;
 				margin-top: 8px;
+			}
+			.cetech-de-admin-page > hr.wp-header-end {
+				display: none;
+				margin: 0;
+				border: 0;
+				height: 0;
+			}
+			.cetech-de-page-header .notice,
+			.cetech-de-dashboard-header .notice {
+				margin: 0 0 12px;
+				box-shadow: none;
 			}
 			.cetech-de-admin-page > h1 { display: none; }
 			.cetech-de-dashboard-header,

@@ -9,7 +9,7 @@ namespace CetechDeliveryEngine\Application\Configuration\Admin;
  */
 final class ScopedConfigurationAuthorization {
 
-	public const CAPABILITY_GLOBAL = 'manage_delivery_settings';
+	public const CAPABILITY_GLOBAL = \CetechDeliveryEngine\Core\Capabilities\Capabilities::SITE_WIDE;
 
 	public const CAPABILITY_PRODUCT = 'manage_product_delivery_rules';
 

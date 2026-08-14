@@ -17,7 +17,7 @@ final class AdminLanguage {
 	}
 
 	public static function menu_dashboard(): string {
-		return 'Dashboard';
+		return 'Overview';
 	}
 
 	public static function menu_settings(): string {
@@ -25,7 +25,47 @@ final class AdminLanguage {
 	}
 
 	public static function menu_delivery_settings(): string {
-		return 'Delivery Settings';
+		return 'Site-wide Defaults';
+	}
+
+	public static function menu_overview(): string {
+		return 'Overview';
+	}
+
+	public static function menu_setup_guide(): string {
+		return 'Setup Guide';
+	}
+
+	public static function wizard_title(): string {
+		return 'Set up Delivery';
+	}
+
+	public static function menu_delivery_options(): string {
+		return 'Delivery Options';
+	}
+
+	public static function menu_delivery_areas(): string {
+		return 'Delivery Areas';
+	}
+
+	public static function menu_delivery_charges(): string {
+		return 'Delivery Charges';
+	}
+
+	public static function menu_pickup_locations(): string {
+		return 'Pickup Locations';
+	}
+
+	public static function menu_product_exceptions(): string {
+		return 'Product Exceptions';
+	}
+
+	public static function menu_needs_attention(): string {
+		return 'Needs Attention';
+	}
+
+	public static function run_setup_guide_again(): string {
+		return 'Run Setup Guide Again';
 	}
 
 	public static function menu_preview(): string {
@@ -72,8 +112,32 @@ final class AdminLanguage {
 		return 'This product has no special delivery settings. It uses Site-wide Defaults until you customize it.';
 	}
 
+	public static function customize_this_product(): string {
+		return 'Customize This Product';
+	}
+
+	public static function customize_this_variation(): string {
+		return 'Customize This Variation';
+	}
+
+	public static function use_site_wide_default( string $profile_label ): string {
+		return 'Use ' . $profile_label . ' Site-wide Default';
+	}
+
+	public static function use_product_setting(): string {
+		return 'Use Product Setting';
+	}
+
+	public static function set_a_different_value(): string {
+		return 'Set a different value here';
+	}
+
+	public static function diagnostics_capability(): string {
+		return 'view_delivery_diagnostics';
+	}
+
 	public static function empty_variation_settings(): string {
-		return 'No variation-specific delivery settings have been added. This variation currently uses its parent product\'s delivery settings.';
+		return 'This variation has no special delivery settings. It currently uses its product settings.';
 	}
 
 	public static function empty_default_settings(): string {
@@ -131,6 +195,7 @@ final class AdminLanguage {
 			'availability:choice:suffix',
 			'Staff testing tools',
 			'feature flag',
+			'New Delivery Settings System',
 		];
 	}
 }

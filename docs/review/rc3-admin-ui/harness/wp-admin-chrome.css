@@ -1,0 +1,350 @@
+/* WordPress-like admin chrome for Stage 13B fixture screenshots. Not a live wp-admin stylesheet. */
+html, body {
+	margin: 0;
+	padding: 0;
+	background: #f0f0f1;
+	color: #2c3338;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+#wpadminbar {
+	position: sticky;
+	top: 0;
+	z-index: 100;
+	display: flex;
+	align-items: center;
+	gap: 18px;
+	height: 32px;
+	padding: 0 12px;
+	background: #1d2327;
+	color: #fff;
+	font-size: 13px;
+}
+
+#wpadminbar .ab-label {
+	opacity: 0.92;
+}
+
+.cetech-de-fixture-banner {
+	background: #1d2327;
+	color: #f0c33c;
+	font-size: 11px;
+	letter-spacing: 0.04em;
+	text-transform: uppercase;
+	padding: 4px 12px;
+	border-top: 1px solid #3c434a;
+}
+
+#adminmenumain {
+	width: 160px;
+	background: #1d2327;
+	color: #fff;
+	min-height: calc(100vh - 54px);
+	flex-shrink: 0;
+}
+
+#adminmenu {
+	margin: 0;
+	padding: 8px 0 24px;
+	list-style: none;
+}
+
+#adminmenu li {
+	margin: 0;
+}
+
+#adminmenu a {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 12px;
+	color: #fff;
+	text-decoration: none;
+}
+
+#adminmenu .wp-menu-name {
+	font-size: 13px;
+}
+
+#adminmenu .dashicons {
+	width: 20px;
+	height: 20px;
+	font-size: 20px;
+	color: #a7aaad;
+}
+
+#adminmenu .wp-has-current-submenu > a,
+#adminmenu .current > a,
+#adminmenu li.current > a {
+	background: #2271b1;
+	color: #fff;
+}
+
+#adminmenu .wp-submenu {
+	margin: 0;
+	padding: 0 0 8px;
+	list-style: none;
+	background: #2c3338;
+}
+
+#adminmenu .wp-submenu a {
+	padding: 6px 12px 6px 40px;
+	color: #c3c4c7;
+	font-size: 13px;
+}
+
+#adminmenu .wp-submenu .current a,
+#adminmenu .wp-submenu a.current {
+	color: #fff;
+	font-weight: 600;
+}
+
+#wpwrap {
+	display: flex;
+	min-height: 100vh;
+	flex-direction: column;
+}
+
+#wpcontent {
+	display: flex;
+	flex: 1;
+	align-items: stretch;
+}
+
+#wpbody {
+	flex: 1;
+	min-width: 0;
+	background: #f0f0f1;
+}
+
+#wpbody-content {
+	padding: 12px 20px 40px;
+}
+
+.wrap {
+	margin: 10px 0 0;
+}
+
+.wrap h1,
+.cetech-de-dashboard-title {
+	font-size: 23px;
+	font-weight: 400;
+	margin: 0 0 8px;
+	color: #1d2327;
+}
+
+.button,
+.button-primary,
+.button-secondary,
+.page-title-action {
+	display: inline-block;
+	padding: 4px 12px;
+	border-radius: 3px;
+	border: 1px solid #2271b1;
+	background: #f6f7f7;
+	color: #2271b1;
+	text-decoration: none;
+	cursor: pointer;
+	font-size: 13px;
+	line-height: 2.15384615;
+	min-height: 30px;
+	box-sizing: border-box;
+}
+
+.button-primary,
+input.button-primary {
+	background: #2271b1;
+	color: #fff;
+	border-color: #2271b1;
+}
+
+.button-secondary,
+.button-link {
+	background: transparent;
+}
+
+.page-title-action {
+	margin-left: 8px;
+	top: -3px;
+	position: relative;
+}
+
+.form-table {
+	width: 100%;
+	border-collapse: collapse;
+	margin: 0;
+}
+
+.form-table th {
+	width: 220px;
+	padding: 16px 10px 16px 0;
+	text-align: left;
+	font-weight: 600;
+	vertical-align: top;
+}
+
+.form-table td {
+	padding: 12px 10px;
+	vertical-align: top;
+}
+
+.regular-text,
+.large-text,
+.small-text,
+select,
+textarea,
+input[type="text"],
+input[type="number"],
+input[type="search"] {
+	border: 1px solid #8c8f94;
+	border-radius: 4px;
+	padding: 4px 8px;
+	font-size: 14px;
+	line-height: 1.5;
+	background: #fff;
+}
+
+.regular-text {
+	width: 25em;
+	max-width: 100%;
+}
+
+.large-text {
+	width: 100%;
+	max-width: 36em;
+}
+
+.description {
+	color: #646970;
+	font-size: 13px;
+}
+
+.widefat {
+	width: 100%;
+	border-collapse: collapse;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+}
+
+.widefat th,
+.widefat td {
+	padding: 10px 12px;
+	text-align: left;
+	border-bottom: 1px solid #f0f0f1;
+}
+
+.widefat thead th {
+	background: #f6f7f7;
+}
+
+.notice {
+	margin: 8px 0 16px;
+	padding: 8px 12px;
+	border-left: 4px solid #72aee6;
+	background: #fff;
+}
+
+.notice-success { border-left-color: #00a32a; }
+.notice-warning { border-left-color: #dba617; }
+.notice-error { border-left-color: #d63638; }
+.notice-info { border-left-color: #72aee6; }
+
+.screen-reader-text {
+	position: absolute;
+	left: -10000px;
+	width: 1px;
+	height: 1px;
+	overflow: hidden;
+}
+
+fieldset {
+	border: 0;
+	margin: 0;
+	padding: 0;
+}
+
+legend {
+	font-weight: 600;
+	margin: 0 0 8px;
+}
+
+a { color: #2271b1; }
+
+.woocommerce_options_panel {
+	padding: 12px 20px 20px;
+	background: #fff;
+	border: 1px solid #dcdcde;
+}
+
+.product-data-wrapper {
+	display: flex;
+	min-height: 420px;
+	background: #fff;
+	border: 1px solid #dcdcde;
+}
+
+.product-data-tabs {
+	width: 180px;
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	background: #f0f0f1;
+	border-right: 1px solid #dcdcde;
+}
+
+.product-data-tabs li a {
+	display: block;
+	padding: 10px 12px;
+	color: #2c3338;
+	text-decoration: none;
+}
+
+.product-data-tabs li.active a {
+	background: #fff;
+	font-weight: 600;
+	border-left: 4px solid #2271b1;
+}
+
+.product-data-panels {
+	flex: 1;
+	padding: 8px 16px 24px;
+}
+
+.wp-heading-inline {
+	display: inline-block;
+	margin-right: 8px;
+}
+
+@media (max-width: 960px) {
+	#adminmenumain { width: 120px; }
+	#adminmenu .wp-menu-name { font-size: 12px; }
+}
+
+@media (max-width: 782px) {
+	#wpcontent { display: block; }
+	#adminmenumain { width: 100%; min-height: 0; }
+	#adminmenu { display: flex; flex-wrap: wrap; }
+	#adminmenu .wp-submenu { display: none; }
+	#adminmenu .wp-has-current-submenu .wp-submenu { display: block; width: 100%; }
+	.product-data-wrapper {
+		flex-direction: column;
+	}
+	.product-data-tabs {
+		width: 100%;
+		display: flex;
+		flex-wrap: wrap;
+		border-right: 0;
+		border-bottom: 1px solid #dcdcde;
+	}
+	.product-data-panels {
+		width: 100%;
+		padding: 12px 16px 24px;
+	}
+	.form-table th,
+	.form-table td {
+		display: block;
+		width: 100%;
+	}
+}

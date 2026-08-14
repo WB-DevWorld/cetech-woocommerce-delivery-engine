@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Application\Configuration\Catalog;
 
 use CetechDeliveryEngine\Application\Configuration\Admin\ConfigurationFieldCatalog;
+use CetechDeliveryEngine\Application\Configuration\OperationalReadinessAssessor;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsPolicyInterface;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
@@ -23,7 +24,8 @@ final class ProductExceptionsQuery {
 		private readonly ScopedConfigurationRepositoryInterface $scopes,
 		private readonly CatalogIndexInterface $catalog,
 		private readonly CatalogInheritanceClassifier $classifier,
-		private readonly SiteWideDefaultsPolicyInterface $policy
+		private readonly SiteWideDefaultsPolicyInterface $policy,
+		private readonly OperationalReadinessAssessor $readiness
 	) {
 	}
 
@@ -36,10 +38,12 @@ final class ProductExceptionsQuery {
 	 *     url: string,
 	 *     fulfilment: string,
 	 *     currently_using: string,
-	 *     customized: list<string>
+	 *     customized: list<string>,
+	 *     status: string,
+	 *     type_label: string
 	 * }>
 	 */
-	public function list( int $limit = 100 ): array {
+	public function list( int $limit = 100, array $filters = [] ): array {
 		$items = [];
 
 		foreach ( $this->catalog->published_product_ids( 0, 5000 ) as $product_id ) {
@@ -71,12 +75,40 @@ final class ProductExceptionsQuery {
 				);
 			}
 
-			if ( count( $items ) >= $limit ) {
+			if ( count( $items ) >= max( $limit * 5, 500 ) ) {
 				break;
 			}
 		}
 
-		return array_slice( $items, 0, $limit );
+		$search     = strtolower( trim( (string) ( $filters['search'] ?? '' ) ) );
+		$fulfilment = sanitize_key( (string) ( $filters['fulfilment'] ?? '' ) );
+		$type       = sanitize_key( (string) ( $filters['type'] ?? '' ) );
+		$status     = sanitize_key( (string) ( $filters['status'] ?? '' ) );
+
+		$filtered = [];
+		foreach ( $items as $item ) {
+			if ( '' !== $search && ! str_contains( strtolower( (string) $item['label'] ), $search ) ) {
+				continue;
+			}
+			if ( '' !== $fulfilment && sanitize_key( (string) $item['fulfilment_key'] ) !== $fulfilment ) {
+				continue;
+			}
+			if ( '' !== $type && (string) $item['type'] !== $type ) {
+				continue;
+			}
+			if ( 'ready' === $status && 'Ready' !== $item['status'] ) {
+				continue;
+			}
+			if ( 'needs_attention' === $status && 'Needs Attention' !== $item['status'] ) {
+				continue;
+			}
+			$filtered[] = $item;
+			if ( count( $filtered ) >= $limit ) {
+				break;
+			}
+		}
+
+		return $filtered;
 	}
 
 	/**
@@ -137,7 +169,10 @@ final class ProductExceptionsQuery {
 		$profile = FulfilmentProfileRegistry::get( $profile_key );
 		$label   = 'product' === $type
 			? $this->catalog->product_label( $id )
-			: $this->catalog->variation_label( $id );
+			: $this->variation_display_label( $id, $parent_id );
+		$readiness = 'variation' === $type
+			? $this->readiness->assess( (int) $parent_id, $id, $scope->scope->slice_key )
+			: $this->readiness->assess( $id, null, $scope->scope->slice_key );
 
 		return [
 			'id'              => $id,
@@ -146,34 +181,67 @@ final class ProductExceptionsQuery {
 			'label'           => $label,
 			'url'             => $this->catalog->product_edit_url( $parent_id ?? $id ),
 			'fulfilment'      => $profile?->label ?? 'Site-wide default',
-			'currently_using' => $profile instanceof \CetechDeliveryEngine\Domain\FulfilmentProfile\FulfilmentProfile
-				? $profile->label . ' with product-specific settings'
-				: 'Product-specific settings',
+			'fulfilment_key'  => $profile_key,
+			'type_label'      => 'variation' === $type ? 'Variation-specific' : 'Product-specific',
+			'currently_using' => 'variation' === $type
+				? __( 'Product Settings', 'cetech-woocommerce-delivery-engine' )
+				: __( 'Product-specific delivery settings', 'cetech-woocommerce-delivery-engine' ),
 			'customized'      => $customized,
+			'status'          => $readiness->status_label,
 		];
+	}
+
+	private function variation_display_label( int $variation_id, ?int $parent_id ): string {
+		$variation = $this->catalog->variation_label( $variation_id );
+		$parent    = null !== $parent_id ? $this->catalog->product_label( $parent_id ) : '';
+		if ( '' === $parent ) {
+			return $variation . ' variation';
+		}
+
+		if ( str_contains( strtolower( $variation ), strtolower( $parent ) ) ) {
+			return rtrim( $variation ) . ' variation';
+		}
+
+		return $parent . ' — ' . $variation . ' variation';
 	}
 
 	/**
 	 * @return list<string>
 	 */
 	private function customized_labels( \CetechDeliveryEngine\Domain\Configuration\ScopedConfiguration $scope ): array {
-		$labels = [];
+		$labels      = [];
+		$has_private = false;
+		$business    = ConfigurationFieldCatalog::business_field_keys();
+		$private     = ConfigurationFieldCatalog::private_field_keys();
 
 		foreach ( $scope->scalars as $field_key => $instruction ) {
 			if ( ScalarConfigurationMode::Inherit === $instruction->mode ) {
 				continue;
 			}
-			if ( ConfigurationFieldKey::FULFILMENT_AVAILABILITY === $field_key ) {
+			if ( in_array( $field_key, $private, true ) ) {
+				$has_private = true;
 				continue;
 			}
-			$labels[] = ConfigurationFieldCatalog::label( $field_key );
+			if ( in_array( $field_key, $business, true ) ) {
+				$labels[] = ConfigurationFieldCatalog::label( $field_key );
+			}
 		}
 
 		foreach ( $scope->collections as $field_key => $instruction ) {
 			if ( CollectionConfigurationMode::Inherit === $instruction->mode ) {
 				continue;
 			}
-			$labels[] = ConfigurationFieldCatalog::label( $field_key );
+			if ( in_array( $field_key, $private, true ) ) {
+				$has_private = true;
+				continue;
+			}
+			if ( in_array( $field_key, $business, true ) ) {
+				$labels[] = ConfigurationFieldCatalog::label( $field_key );
+			}
+		}
+
+		if ( $has_private ) {
+			$labels[] = ConfigurationFieldCatalog::technical_delivery_details_label();
 		}
 
 		return $labels;

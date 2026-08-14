@@ -68,8 +68,19 @@ final class EntityLabelResolver {
 				continue;
 			}
 
-			$name = trim( (string) ( $record['name'] ?? $record['label'] ?? $record['code'] ?? '' ) );
-			$options[ $id ] = '' !== $name ? sprintf( '%s (#%d)', $name, $id ) : sprintf( '#%d', $id );
+			$name = trim(
+				(string) (
+					$record['public_label']
+					?? $record['location_name']
+					?? $record['internal_name']
+					?? $record['name']
+					?? $record['label']
+					?? $record['internal_code']
+					?? $record['code']
+					?? ''
+				)
+			);
+			$options[ $id ] = '' !== $name ? $name : sprintf( '#%d', $id );
 		}
 
 		return $options;

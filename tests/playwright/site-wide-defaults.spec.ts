@@ -7,16 +7,16 @@ import { test, expect } from '@playwright/test';
 test.describe('Site-wide delivery defaults @smoke', () => {
 	test('Delivery Settings landing and setup copy are present in fixtures', async () => {
 		const labels = [
-			'Delivery Settings',
 			'Site-wide Defaults',
 			'Save & Apply Site-wide',
-			'Apply to products without delivery exceptions',
+			'Save Changes',
 			'Product Exceptions',
 			'Needs Attention',
 			'Currently using:',
-			'Customize this product',
-			'Customize this variation',
+			'Customize This Product',
+			'Customize This Variation',
 			'What will this product use?',
+			'Run Setup Guide Again',
 		];
 
 		for (const label of labels) {

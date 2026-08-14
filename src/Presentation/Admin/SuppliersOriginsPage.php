@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Admin;
 
+use CetechDeliveryEngine\Application\Configuration\Admin\StoreAwareExamples;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Domain\Supplier\OriginRepositoryInterface;
 use CetechDeliveryEngine\Domain\Supplier\SupplierRepositoryInterface;
@@ -118,7 +119,7 @@ final class SuppliersOriginsPage {
 			__( 'Suppliers are the businesses or partners you source goods from. Origins are the physical places orders are dispatched from — such as your main store, a warehouse, a supplier location, or a pickup point.', 'cetech-woocommerce-delivery-engine' )
 		);
 		AdminPageLayout::render_example(
-			__( 'Supplier: ABC Wholesale · Origin: Main Warehouse, Accra', 'cetech-woocommerce-delivery-engine' )
+			StoreAwareExamples::supplier_origin_example()
 		);
 
 		$this->render_supplier_list();

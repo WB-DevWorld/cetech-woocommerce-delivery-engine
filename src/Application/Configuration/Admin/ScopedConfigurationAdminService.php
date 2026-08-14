@@ -337,7 +337,7 @@ final class ScopedConfigurationAdminService {
 		?EffectiveConfiguration $effective
 	): array {
 		$fields = [];
-		$profile_default_label = $this->profile_default_mode_label( $effective );
+		$profile_default_label = $this->profile_default_mode_label( $scope_type, $effective );
 
 		foreach ( ConfigurationFieldCatalog::all() as $meta ) {
 			$field_key = $meta['key'];
@@ -345,14 +345,18 @@ final class ScopedConfigurationAdminService {
 
 			$mode_labels = $is_collection
 				? [
-					'inherit' => 'Use default options',
+					'inherit' => ConfigurationScopeType::Variation === $scope_type
+						? 'Use Product Setting'
+						: 'Use Site-wide Default',
 					'add'     => 'Add options',
 					'remove'  => 'Remove options',
 					'replace' => 'Use only these options',
 				]
 				: [
 					'inherit'  => $profile_default_label,
-					'override' => 'Set a different value here',
+					'override' => ConfigurationScopeType::Variation === $scope_type
+						? 'Use a different value'
+						: 'Set a different value here',
 					'disable'  => 'Turn off',
 				];
 
@@ -730,15 +734,19 @@ final class ScopedConfigurationAdminService {
 		return false;
 	}
 
-	private function profile_default_mode_label( ?EffectiveConfiguration $effective ): string {
+	private function profile_default_mode_label( ConfigurationScopeType $scope_type, ?EffectiveConfiguration $effective ): string {
+		if ( ConfigurationScopeType::Variation === $scope_type ) {
+			return 'Use Product Setting';
+		}
+
 		$availability = $effective?->scalar( ConfigurationFieldKey::FULFILMENT_AVAILABILITY )?->value;
 		if ( is_string( $availability ) && '' !== $availability ) {
 			$profile = FulfilmentProfileRegistry::get( $availability );
 			if ( null !== $profile ) {
-				return sprintf( 'Use %s default', $profile->label );
+				return sprintf( 'Use Site-wide Default: %s', $profile->label );
 			}
 		}
 
-		return 'Use site-wide default';
+		return 'Use Site-wide Default';
 	}
 }

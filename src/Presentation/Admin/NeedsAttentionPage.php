@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
+use CetechDeliveryEngine\Application\Configuration\OperationalState;
+use CetechDeliveryEngine\Application\Configuration\OperationalStateService;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
 use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
 
@@ -17,7 +19,8 @@ final class NeedsAttentionPage {
 
 	public function __construct(
 		private readonly NeedsAttentionQuery $query,
-		private readonly AdminActionHandler $action_handler
+		private readonly AdminActionHandler $action_handler,
+		private readonly OperationalStateService $operational_state
 	) {
 	}
 
@@ -29,17 +32,24 @@ final class NeedsAttentionPage {
 		$this->action_handler->notices()->render_notices();
 
 		$items = $this->query->list( 200 );
+		$op    = $this->operational_state->current();
 
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
-			__( 'Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Needs Attention', 'cetech-woocommerce-delivery-engine' ),
-			__( 'These products do not currently have a complete, usable delivery setup.', 'cetech-woocommerce-delivery-engine' ),
-			[
-				'label' => __( 'Back to Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
-				'url'   => AdminPageRenderer::list_url( DeliverySettingsHomePage::SLUG ),
-			]
+			__( 'An operational to-do list for products that are missing a usable delivery setup.', 'cetech-woocommerce-delivery-engine' )
 		);
+
+		if ( $op->customers_still_use_previous_rules() && ! $op->sitewide_setup_complete ) {
+			AdminPageLayout::render_status_banner(
+				[
+					'tone'  => $op->overview_tone,
+					'title' => $op->overview_title,
+					'text'  => $op->overview_text,
+				]
+			);
+		}
 
 		if ( [] === $items ) {
 			AdminPageLayout::render_empty_state(
@@ -62,17 +72,24 @@ final class NeedsAttentionPage {
 				admin_url( 'admin.php' )
 			);
 
+			$problem = esc_html( $item['reason'] );
+			if ( $op->customers_still_use_previous_rules() ) {
+				$problem .= '<br /><span class="description">' . esc_html__( 'Existing delivery configuration is still serving customers while you finish Delivery Engine setup.', 'cetech-woocommerce-delivery-engine' ) . '</span>';
+			} elseif ( OperationalState::CUSTOMER_RUNTIME_ECR === $op->customer_runtime ) {
+				$problem .= '<br /><span class="description">' . esc_html__( 'Customers cannot currently use delivery for this product.', 'cetech-woocommerce-delivery-engine' ) . '</span>';
+			}
+
 			$rows[] = [
 				'<a href="' . esc_url( $item['url'] ) . '"><strong>' . esc_html( $item['label'] ) . '</strong></a>',
-				esc_html( $item['reason'] ),
-				'<a href="' . esc_url( $edit_url ) . '">' . esc_html__( 'Open delivery settings', 'cetech-woocommerce-delivery-engine' ) . '</a>',
+				$problem,
+				'<a class="button" href="' . esc_url( $edit_url ) . '">' . esc_html__( 'Fix Now', 'cetech-woocommerce-delivery-engine' ) . '</a>',
 			];
 		}
 
 		AdminPageRenderer::render_table(
 			[
 				__( 'Product', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Why it needs attention', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Problem', 'cetech-woocommerce-delivery-engine' ),
 				__( 'Action', 'cetech-woocommerce-delivery-engine' ),
 			],
 			$rows,

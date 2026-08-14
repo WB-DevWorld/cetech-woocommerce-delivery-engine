@@ -8,7 +8,9 @@
     Does not commit artifacts. Runs Composer in the staging copy only when vendor/ is missing.
 #>
 param(
-    [string]$Version = '1.0.0-rc.2'
+    [string]$Version = '1.0.0-rc.3',
+    [switch]$AllowDirty,
+    [string]$ZipFileName = ''
 )
 
 Set-StrictMode -Version Latest
@@ -21,7 +23,7 @@ $DistDir        = Join-Path $RepoRoot 'dist'
 $BuildRoot      = Join-Path $RepoRoot 'build'
 $StageRoot      = Join-Path $BuildRoot "stage-$Version"
 $StagePluginDir = Join-Path $StageRoot $PluginSlug
-$ZipName        = "$PluginSlug-v$Version.zip"
+$ZipName        = if ($ZipFileName) { $ZipFileName } else { "$PluginSlug-v$Version.zip" }
 $ZipPath        = Join-Path $DistDir $ZipName
 $ShaPath        = Join-Path $DistDir "$ZipName.sha256"
 
@@ -61,7 +63,11 @@ if (-not (Test-Path (Join-Path $RepoRoot '.git'))) {
 Write-Step 'Checking Git working tree is clean'
 $Status = Invoke-Git @('status', '--porcelain')
 if ($Status) {
-    throw "Git working tree is not clean:`n$Status"
+    if ($AllowDirty) {
+        Write-Warning "Git working tree is not clean. Packaging uncommitted files because -AllowDirty was set.`n$Status"
+    } else {
+        throw "Git working tree is not clean:`n$Status"
+    }
 }
 
 $Branch = (Invoke-Git @('branch', '--show-current')).Trim()
@@ -98,7 +104,8 @@ New-Item -ItemType Directory -Path $DistDir -Force | Out-Null
 
 $ExcludeDirNames = @(
     '.git', '.github', 'dist', 'build', 'node_modules', 'tests', 'coverage',
-    '.vscode', '.idea', '.cursor', 'vendor'
+    '.vscode', '.idea', '.cursor', 'vendor', 'training', 'test-results',
+    'Design Reference'
 )
 
 $ExcludeDirPrefixes = @(
@@ -143,6 +150,27 @@ if (Test-Path $WoodmartPath) {
     Write-Step 'Removing docs/woodmart from staging (local compatibility copy only)'
     Remove-Item -LiteralPath $WoodmartPath -Recurse -Force
 }
+
+$ReviewPath = Join-Path $StagePluginDir 'docs/review'
+if (Test-Path $ReviewPath) {
+    Write-Step 'Removing docs/review fixture harness and screenshots from staging'
+    Remove-Item -LiteralPath $ReviewPath -Recurse -Force
+}
+
+$DocsTrainingPath = Join-Path $StagePluginDir 'docs/training'
+if (Test-Path $DocsTrainingPath) {
+    Write-Step 'Removing docs/training from staging (not required at runtime)'
+    Remove-Item -LiteralPath $DocsTrainingPath -Recurse -Force
+}
+
+Write-Step 'Pruning nested development directories from staging'
+$nestedPrune = @('node_modules', '.git', 'tests', 'coverage', 'playwright-report', 'test-results')
+Get-ChildItem -LiteralPath $StagePluginDir -Recurse -Directory -Force -ErrorAction SilentlyContinue |
+    Where-Object { $nestedPrune -contains $_.Name } |
+    Sort-Object { $_.FullName.Length } -Descending |
+    ForEach-Object {
+        Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+    }
 
 $VendorAutoload = Join-Path $StagePluginDir 'vendor/autoload.php'
 if (-not (Test-Path (Join-Path $StagePluginDir 'composer.json'))) {

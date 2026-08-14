@@ -10,6 +10,8 @@ composer.lock
 tests/.phpunit.cache/
 .phpunit.result.cache
 coverage/
+/test-results/
+/playwright-report/
 
 # Frontend JS test tooling (development-only; not required at runtime)
 /node_modules/

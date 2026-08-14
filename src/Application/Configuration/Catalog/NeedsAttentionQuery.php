@@ -4,9 +4,10 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Configuration\Catalog;
 
-use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver;
-use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey;
-use CetechDeliveryEngine\Domain\Enum\EffectiveFieldState;
+use CetechDeliveryEngine\Application\Configuration\OperationalReadinessAssessor;
+use CetechDeliveryEngine\Application\Configuration\OperationalStateService;
+use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
+use CetechDeliveryEngine\Domain\Configuration\ScopedConfigurationRepositoryInterface;
 
 /**
  * Products whose effective delivery setup is incomplete for staff follow-up.
@@ -15,7 +16,10 @@ final class NeedsAttentionQuery {
 
 	public function __construct(
 		private readonly CatalogIndexInterface $catalog,
-		private readonly EffectiveConfigurationResolver $resolver
+		private readonly OperationalReadinessAssessor $readiness,
+		private readonly OperationalStateService $operational_state,
+		private readonly CatalogInheritanceClassifier $classifier,
+		private readonly ScopedConfigurationRepositoryInterface $scopes
 	) {
 	}
 
@@ -51,33 +55,18 @@ final class NeedsAttentionQuery {
 	}
 
 	public function reason_for( int $product_id ): ?string {
-		$set = $this->resolver->resolveAll( $product_id, null );
+		$reason = $this->readiness->reason_for( $product_id );
+		if ( null === $reason ) {
+			return null;
+		}
 
-		foreach ( $set->ordered_slice_keys as $slice_key ) {
-			$configuration = $set->for_slice( $slice_key );
-			if ( null === $configuration ) {
-				continue;
-			}
-
-			if ( EffectiveFieldState::Invalid === $configuration->state ) {
-				return 'This product has a fulfilment combination that is not allowed.';
-			}
-
-			$availability = $configuration->scalar( ConfigurationFieldKey::FULFILMENT_AVAILABILITY );
-			if ( null === $availability || EffectiveFieldState::Valid !== $availability->state ) {
-				return 'Fulfilment type is incomplete.';
-			}
-
-			$offers = $configuration->collection( ConfigurationFieldKey::DELIVERY_OFFER_IDS );
-			if ( null === $offers || EffectiveFieldState::Valid !== $offers->state || [] === $offers->members ) {
-				return 'No usable delivery option is configured.';
-			}
-
-			if ( EffectiveFieldState::Unresolved === $configuration->state ) {
-				return 'Required delivery settings are still missing.';
+		if ( ! $this->operational_state->current()->scan_catalog_as_customer_problems ) {
+			$product_scopes = $this->scopes->findByScope( ConfigurationScopeType::Product, $product_id );
+			if ( ! $this->classifier->has_custom_fields( $product_scopes ) ) {
+				return null;
 			}
 		}
 
-		return null;
+		return $reason;
 	}
 }

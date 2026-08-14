@@ -56,12 +56,13 @@ final class ScopedConfigurationAdminUxMappingTest extends TestCase {
 	}
 
 	public function test_transitional_and_category_notices(): void {
-		self::assertStringContainsString( 'Legacy Delivery Rules', ScopedConfigurationNotices::TRANSITIONAL_MESSAGE );
-		self::assertStringContainsString( 'New Delivery Settings System', ScopedConfigurationNotices::TRANSITIONAL_MESSAGE );
+		self::assertStringContainsString( 'existing delivery configuration', strtolower( ScopedConfigurationNotices::TRANSITIONAL_MESSAGE ) );
+		self::assertStringNotContainsString( 'Legacy Delivery Rules', ScopedConfigurationNotices::TRANSITIONAL_MESSAGE );
+		self::assertStringNotContainsString( 'New Delivery Settings System', ScopedConfigurationNotices::TRANSITIONAL_MESSAGE );
 		self::assertStringNotContainsString( 'pre-cutover', ScopedConfigurationNotices::TRANSITIONAL_MESSAGE );
 		self::assertStringContainsString( 'does not check the customer', strtolower( ScopedConfigurationNotices::PREVIEW_LIMITATION_MESSAGE ) );
 		self::assertStringContainsString( 'not a shipping price', strtolower( ScopedConfigurationNotices::PREVIEW_LIMITATION_TITLE ) );
-		self::assertStringContainsString( 'legacy category rule', strtolower( ScopedConfigurationNotices::CATEGORY_WARNING_MESSAGE ) );
+		self::assertStringContainsString( 'category rule', strtolower( ScopedConfigurationNotices::CATEGORY_WARNING_MESSAGE ) );
 		self::assertStringNotContainsString( 'Stage 5', ScopedConfigurationNotices::CATEGORY_WARNING_MESSAGE );
 	}
 

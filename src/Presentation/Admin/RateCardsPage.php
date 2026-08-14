@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Calculator\AdminRateCardTester;
+use CetechDeliveryEngine\Application\Configuration\Admin\AdminMoneyFormatter;
+use CetechDeliveryEngine\Application\Configuration\Admin\StoreAwareExamples;
 use CetechDeliveryEngine\Application\RateQuote\RateQuoteEngine;
 use CetechDeliveryEngine\Application\RateQuote\RateQuoteRequest;
 use CetechDeliveryEngine\Domain\DeliveryOffer\DeliveryOfferRepositoryInterface;
@@ -96,17 +98,17 @@ final class RateCardsPage {
 	private function render_list(): void {
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
-			__( 'Delivery pricing', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Rate Cards', 'cetech-woocommerce-delivery-engine' ),
-			__( 'A rate card contains the delivery prices used to calculate shipping. Each card connects a delivery zone and a delivery offer to a fee. Customers see that price at checkout when their address and chosen service match.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery Charges', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Set how much customers pay for delivery.', 'cetech-woocommerce-delivery-engine' ),
 			[
-				'label' => __( 'Add Rate Card', 'cetech-woocommerce-delivery-engine' ),
+				'label' => __( 'Add Delivery Charge', 'cetech-woocommerce-delivery-engine' ),
 				'url'   => add_query_arg( [ 'page' => self::SLUG, 'action' => 'add' ], admin_url( 'admin.php' ) ),
 				'class' => 'primary',
 			]
 		);
 		AdminPageLayout::render_example(
-			__( 'Accra + Same-Day Delivery = GHS 35', 'cetech-woocommerce-delivery-engine' )
+			StoreAwareExamples::charge_list_example()
 		);
 
 		$records = $this->repository->list( [ 'limit' => 500 ] );
@@ -124,7 +126,7 @@ final class RateCardsPage {
 		AdminPageLayout::render_summary_stats(
 			[
 				[
-					'label' => __( 'Total rate cards', 'cetech-woocommerce-delivery-engine' ),
+					'label' => __( 'Total delivery charges', 'cetech-woocommerce-delivery-engine' ),
 					'value' => count( $records ),
 					'empty' => [] === $records,
 				],
@@ -143,14 +145,14 @@ final class RateCardsPage {
 
 		if ( [] === $records ) {
 			AdminPageLayout::render_empty_state(
-				__( 'No rate cards yet', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Create your first rate card to set delivery prices. You will need at least one delivery zone and one delivery offer first.', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Add your first rate card', 'cetech-woocommerce-delivery-engine' ),
+				__( 'No Delivery Charges have been created yet.', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Delivery charges are linked to delivery areas and delivery options. Customers see the applicable charge at checkout based on their address and selected delivery option.', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Add Delivery Charge', 'cetech-woocommerce-delivery-engine' ),
 				add_query_arg( [ 'page' => self::SLUG, 'action' => 'add' ], admin_url( 'admin.php' ) )
 			);
 		} else {
 			AdminPageLayout::open_section(
-				__( 'All rate cards', 'cetech-woocommerce-delivery-engine' ),
+				__( 'All delivery charges', 'cetech-woocommerce-delivery-engine' ),
 				__( 'Each row shows where a delivery service applies and how much it costs.', 'cetech-woocommerce-delivery-engine' )
 			);
 
@@ -159,10 +161,16 @@ final class RateCardsPage {
 
 			foreach ( $records as $record ) {
 				$id = (int) ( $record['id'] ?? 0 );
+				$zone_label  = $this->lookup_zone_label( $lookups['zones'], (int) ( $record['destination_zone_id'] ?? 0 ) );
+				$offer_label = $this->lookup_offer_label( $lookups['offers'], (int) ( $record['delivery_offer_id'] ?? 0 ) );
+				$charge_name = $this->human_charge_name( $zone_label, $offer_label );
+				if ( '' === $charge_name ) {
+					$charge_name = (string) ( $record['internal_code'] ?? '' );
+				}
 				$rows[] = [
-					esc_html( (string) ( $record['internal_code'] ?? '' ) ),
-					esc_html( $this->lookup_zone_label( $lookups['zones'], (int) ( $record['destination_zone_id'] ?? 0 ) ) ),
-					esc_html( $this->lookup_offer_label( $lookups['offers'], (int) ( $record['delivery_offer_id'] ?? 0 ) ) ),
+					'<strong>' . esc_html( $charge_name ) . '</strong>',
+					esc_html( $this->charge_how_label( (string) ( $record['charge_type'] ?? '' ) ) ),
+					esc_html( $zone_label . ' / ' . $offer_label ),
 					esc_html( AdminUiHelper::format_money( (string) ( $record['base_amount'] ?? '' ), (string) ( $record['base_currency'] ?? '' ) ) ),
 					AdminUiHelper::record_status_badge( (string) ( $record['status'] ?? '' ) ),
 					$this->render_actions( $id ),
@@ -171,10 +179,10 @@ final class RateCardsPage {
 
 			AdminPageRenderer::render_table(
 				[
-					__( 'Reference code', 'cetech-woocommerce-delivery-engine' ),
-					__( 'Delivery zone', 'cetech-woocommerce-delivery-engine' ),
-					__( 'Delivery offer', 'cetech-woocommerce-delivery-engine' ),
-					__( 'Delivery fee', 'cetech-woocommerce-delivery-engine' ),
+					__( 'Charge Name', 'cetech-woocommerce-delivery-engine' ),
+					__( 'How it is calculated', 'cetech-woocommerce-delivery-engine' ),
+					__( 'Area / Option', 'cetech-woocommerce-delivery-engine' ),
+					__( 'Amount', 'cetech-woocommerce-delivery-engine' ),
 					__( 'Status', 'cetech-woocommerce-delivery-engine' ),
 					__( 'Actions', 'cetech-woocommerce-delivery-engine' ),
 				],
@@ -185,11 +193,6 @@ final class RateCardsPage {
 			AdminPageLayout::close_section();
 		}
 
-		AdminPageLayout::open_advanced( AdminLanguage::technical_diagnostic_tools() );
-		echo '<p class="description">' . esc_html( AdminLanguage::technical_diagnostic_tools_intro() ) . '</p>';
-		$this->render_test_tool();
-		$this->render_quote_test_tool();
-		AdminPageLayout::close_advanced();
 		AdminPageLayout::close_page();
 	}
 
@@ -349,24 +352,24 @@ final class RateCardsPage {
 		}
 
 		$title = $is_edit
-			? __( 'Edit Rate Card', 'cetech-woocommerce-delivery-engine' )
-			: __( 'Add Rate Card', 'cetech-woocommerce-delivery-engine' );
+			? __( 'Edit Delivery Charge', 'cetech-woocommerce-delivery-engine' )
+			: __( 'Add Delivery Charge', 'cetech-woocommerce-delivery-engine' );
 
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
-			__( 'Delivery pricing', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
 			$title,
 			$is_edit
-				? __( 'Update the delivery fee for this zone and service combination.', 'cetech-woocommerce-delivery-engine' )
-				: __( 'Set a delivery fee by choosing where delivery applies and which service it belongs to.', 'cetech-woocommerce-delivery-engine' ),
+				? __( 'Update how much customers pay for this delivery area and option.', 'cetech-woocommerce-delivery-engine' )
+				: __( 'Set how much customers pay by choosing an area, a delivery option, and a charge method.', 'cetech-woocommerce-delivery-engine' ),
 			[
-				'label' => __( 'Back to rate cards', 'cetech-woocommerce-delivery-engine' ),
+				'label' => __( 'Back to Delivery Charges', 'cetech-woocommerce-delivery-engine' ),
 				'url'   => AdminPageRenderer::list_url( self::SLUG ),
 				'class' => 'secondary',
 			]
 		);
 		AdminPageLayout::render_example(
-			__( 'Accra + Same-Day Delivery = GHS 35', 'cetech-woocommerce-delivery-engine' )
+			StoreAwareExamples::charge_editor_name_example()
 		);
 
 		echo '<form method="post" action="">';
@@ -378,33 +381,32 @@ final class RateCardsPage {
 		}
 
 		AdminPageLayout::open_form_panel(
-			__( 'Reference', 'cetech-woocommerce-delivery-engine' ),
-			__( 'A short internal code helps your team identify this rate card.', 'cetech-woocommerce-delivery-engine' )
+			__( 'How should this delivery charge work?', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Choose a simple method first. Advanced pricing rules can be refined later if needed.', 'cetech-woocommerce-delivery-engine' )
 		);
-		AdminFormHelper::text_field(
-			'code',
-			__( 'Reference code', 'cetech-woocommerce-delivery-engine' ),
-			(string) ( $record['code'] ?? '' ),
-			true,
-			__( 'Use lowercase letters, numbers, or dashes. Example: accra-same-day', 'cetech-woocommerce-delivery-engine' )
-		);
+		echo '<fieldset class="cetech-de-choice-fieldset"><legend class="screen-reader-text">' . esc_html__( 'How should this delivery charge work?', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
+		$selected_charge = (string) ( $record['charge_type'] ?? RateCardChargeType::FixedPerShipment->value );
+		foreach ( $this->charge_type_options() as $value => $label ) {
+			echo '<p><label><input type="radio" name="charge_type" value="' . esc_attr( $value ) . '" ' . checked( $selected_charge, $value, false ) . ' /> ' . esc_html( $label ) . '</label></p>';
+		}
+		echo '</fieldset>';
 		AdminPageLayout::close_form_panel();
 
 		AdminPageLayout::open_form_panel(
-			__( 'Zone and delivery service', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery area and option', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Choose where delivery applies and which service this price is for.', 'cetech-woocommerce-delivery-engine' )
 		);
 		AdminFormHelper::select_field(
 			'destination_zone_id',
-			__( 'Delivery zone', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery area', 'cetech-woocommerce-delivery-engine' ),
 			$this->required_select_options( $this->destination_zone_options() ),
 			(string) ( $record['destination_zone_id'] ?? '' ),
-			__( 'The area where this delivery fee applies, such as Accra or Madina.', 'cetech-woocommerce-delivery-engine' ),
+			StoreAwareExamples::area_help(),
 			true
 		);
 		AdminFormHelper::select_field(
 			'delivery_offer_id',
-			__( 'Delivery offer', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery option', 'cetech-woocommerce-delivery-engine' ),
 			$this->required_select_options( $this->delivery_offer_options() ),
 			(string) ( $record['delivery_offer_id'] ?? '' ),
 			__( 'The delivery service this price belongs to, such as Same-Day or Standard Delivery.', 'cetech-woocommerce-delivery-engine' ),
@@ -414,33 +416,30 @@ final class RateCardsPage {
 
 		AdminPageLayout::open_form_panel(
 			__( 'Delivery fee', 'cetech-woocommerce-delivery-engine' ),
-			__( 'The amount customers pay when this zone and service match at checkout.', 'cetech-woocommerce-delivery-engine' )
+			__( 'The amount customers pay when this area and option match at checkout.', 'cetech-woocommerce-delivery-engine' )
 		);
-		AdminFormHelper::select_field(
-			'charge_type',
-			__( 'Charge type', 'cetech-woocommerce-delivery-engine' ),
-			$this->charge_type_options(),
-			(string) ( $record['charge_type'] ?? RateCardChargeType::FixedPerShipment->value ),
-			__( 'How the fee is calculated. Most stores use a fixed amount per shipment.', 'cetech-woocommerce-delivery-engine' )
-		);
-		AdminFormHelper::text_field(
-			'base_amount',
-			__( 'Delivery fee amount', 'cetech-woocommerce-delivery-engine' ),
-			(string) ( $record['base_amount'] ?? '' ),
-			true,
-			__( 'Example: 35', 'cetech-woocommerce-delivery-engine' )
-		);
-		AdminFormHelper::text_field(
-			'currency_code',
-			__( 'Currency', 'cetech-woocommerce-delivery-engine' ),
-			(string) ( $record['currency_code'] ?? '' ),
-			true,
-			__( '3-letter currency code. Example: GHS', 'cetech-woocommerce-delivery-engine' )
-		);
+		$store_currency = $this->store_currency();
+		$currency       = strtoupper( trim( (string) ( $record['currency_code'] ?? '' ) ) );
+		if ( '' === $currency ) {
+			$currency = $store_currency;
+		}
+		echo '<tr><th scope="row">' . esc_html__( 'Delivery fee', 'cetech-woocommerce-delivery-engine' ) . '</th><td>';
+		echo '<span class="cetech-de-currency-prefix">' . esc_html( $store_currency ) . '</span> ';
+		echo '<input type="text" class="regular-text" id="base_amount" name="base_amount" value="' . esc_attr( AdminMoneyFormatter::input_amount( (string) ( $record['base_amount'] ?? '' ) ) ) . '" required />';
+		echo '<input type="hidden" name="currency_code" value="' . esc_attr( $store_currency ) . '" />';
+		echo '<p class="description">' . esc_html__( 'Currency: ', 'cetech-woocommerce-delivery-engine' ) . esc_html( $store_currency ) . ' — ' . esc_html__( 'From WooCommerce', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '</td></tr>';
 		AdminPageLayout::close_form_panel();
 
-		AdminPageLayout::open_advanced( __( 'Optional filters and schedule', 'cetech-woocommerce-delivery-engine' ) );
+		AdminPageLayout::open_advanced( __( 'Advanced Details', 'cetech-woocommerce-delivery-engine' ) );
 		echo '<table class="form-table cetech-de-form-table" role="presentation"><tbody>';
+		AdminFormHelper::text_field(
+			'code',
+			__( 'Reference code', 'cetech-woocommerce-delivery-engine' ),
+			(string) ( $record['code'] ?? '' ),
+			false,
+			__( 'Optional. Leave blank to generate one automatically. Use lowercase letters, numbers, or dashes.', 'cetech-woocommerce-delivery-engine' )
+		);
 		AdminFormHelper::select_field(
 			'logistics_profile_id',
 			__( 'Logistics profile', 'cetech-woocommerce-delivery-engine' ),
@@ -488,13 +487,13 @@ final class RateCardsPage {
 			__( 'Status', 'cetech-woocommerce-delivery-engine' ),
 			$this->friendly_status_options(),
 			(string) ( $record['status'] ?? RecordStatus::Active->value ),
-			__( 'Inactive rate cards are kept for reference but are not used at checkout.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Inactive delivery charges are kept for reference but are not used at checkout.', 'cetech-woocommerce-delivery-engine' )
 		);
 		echo '</tbody></table>';
 		AdminPageLayout::close_advanced();
 
 		echo '<div class="cetech-de-form-actions">';
-		submit_button( $is_edit ? __( 'Save Rate Card', 'cetech-woocommerce-delivery-engine' ) : __( 'Create Rate Card', 'cetech-woocommerce-delivery-engine' ) );
+		submit_button( $is_edit ? __( 'Save Delivery Charge', 'cetech-woocommerce-delivery-engine' ) : __( 'Create Delivery Charge', 'cetech-woocommerce-delivery-engine' ) );
 		echo ' <a class="button" href="' . esc_url( AdminPageRenderer::list_url( self::SLUG ) ) . '">' . esc_html__( 'Cancel', 'cetech-woocommerce-delivery-engine' ) . '</a>';
 		echo '</div></form>';
 
@@ -511,7 +510,10 @@ final class RateCardsPage {
 	}
 
 	private function handle_save(): void {
-		$input  = $this->read_form_input();
+		$input = $this->read_form_input();
+		if ( '' === AdminFormHelper::sanitize_code( (string) ( $input['code'] ?? '' ) ) ) {
+			$input['code'] = $this->generate_charge_code( $input );
+		}
 		$errors = $this->validator->validate( $input, isset( $input['id'] ) ? (int) $input['id'] : null );
 
 		if ( [] !== $errors ) {
@@ -542,7 +544,7 @@ final class RateCardsPage {
 			'origin_id'            => $this->nullable_int( $input['origin_id'] ?? null ),
 			'charge_type'          => (string) $input['charge_type'],
 			'base_amount'          => trim( (string) $input['base_amount'] ),
-			'base_currency'        => strtoupper( trim( (string) $input['currency_code'] ) ),
+			'base_currency'        => strtoupper( trim( (string) ( $input['currency_code'] ?? '' ) ) ) ?: $this->store_currency(),
 			'priority'             => (int) $input['priority'],
 			'effective_from'       => trim( (string) ( $input['effective_from'] ?? '' ) ),
 			'effective_to'         => trim( (string) ( $input['effective_to'] ?? '' ) ),
@@ -687,7 +689,7 @@ final class RateCardsPage {
 			self::ACTION_DELETE,
 			self::ACTION_DEACTIVATE,
 			'manage_delivery_rate_cards',
-			__( 'Rate Card', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery Charge', 'cetech-woocommerce-delivery-engine' ),
 			$id,
 			(string) ( $record['internal_code'] ?? '' ),
 			(string) ( $record['internal_code'] ?? '' ),
@@ -813,7 +815,7 @@ final class RateCardsPage {
 
 		ob_start();
 		echo '<a href="' . esc_url( $edit_url ) . '">' . esc_html__( 'Edit', 'cetech-woocommerce-delivery-engine' ) . '</a> | ';
-		echo '<form method="post" style="display:inline;" onsubmit="return confirm(\'' . esc_js( __( 'Deactivate this rate card?', 'cetech-woocommerce-delivery-engine' ) ) . '\');">';
+		echo '<form method="post" style="display:inline;" onsubmit="return confirm(\'' . esc_js( __( 'Deactivate this delivery charge?', 'cetech-woocommerce-delivery-engine' ) ) . '\');">';
 		AdminFormHelper::nonce_field( self::ACTION_DEACTIVATE );
 		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_DEACTIVATE ) . '" />';
 		echo '<input type="hidden" name="id" value="' . esc_attr( (string) $id ) . '" />';
@@ -920,7 +922,9 @@ final class RateCardsPage {
 			'origin_id'            => isset( $_POST['origin_id'] ) ? (int) $_POST['origin_id'] : 0,
 			'charge_type'          => isset( $_POST['charge_type'] ) ? sanitize_key( wp_unslash( (string) $_POST['charge_type'] ) ) : '',
 			'base_amount'          => isset( $_POST['base_amount'] ) ? wp_unslash( (string) $_POST['base_amount'] ) : '',
-			'currency_code'        => isset( $_POST['currency_code'] ) ? wp_unslash( (string) $_POST['currency_code'] ) : '',
+			'currency_code'        => isset( $_POST['currency_code'] ) && '' !== trim( (string) wp_unslash( $_POST['currency_code'] ) )
+				? wp_unslash( (string) $_POST['currency_code'] )
+				: $this->store_currency(),
 			'priority'             => isset( $_POST['priority'] ) ? (int) $_POST['priority'] : 100,
 			'effective_from'       => isset( $_POST['effective_from'] ) ? wp_unslash( (string) $_POST['effective_from'] ) : '',
 			'effective_to'         => isset( $_POST['effective_to'] ) ? wp_unslash( (string) $_POST['effective_to'] ) : '',
@@ -953,11 +957,8 @@ final class RateCardsPage {
 				continue;
 			}
 
-			$options[ (string) $id ] = sprintf(
-				'%s (%s)',
-				(string) ( $row['internal_code'] ?? '' ),
-				(string) ( $row['public_label'] ?? '' )
-			);
+			$label = trim( (string) ( $row['public_label'] ?? $row['internal_name'] ?? '' ) );
+			$options[ (string) $id ] = '' !== $label ? $label : (string) ( $row['internal_code'] ?? $id );
 		}
 
 		return $options;
@@ -976,11 +977,8 @@ final class RateCardsPage {
 				continue;
 			}
 
-			$options[ (string) $id ] = sprintf(
-				'%s (%s)',
-				(string) ( $row['internal_code'] ?? '' ),
-				(string) ( $row['internal_name'] ?? '' )
-			);
+			$label = trim( (string) ( $row['public_label'] ?? $row['internal_name'] ?? '' ) );
+			$options[ (string) $id ] = '' !== $label ? $label : (string) ( $row['internal_code'] ?? $id );
 		}
 
 		return $options;
@@ -1059,13 +1057,39 @@ final class RateCardsPage {
 	 * @return array<string, string>
 	 */
 	private function charge_type_options(): array {
-		$options = [];
+		return [
+			RateCardChargeType::FixedPerShipment->value => __( 'Flat amount per delivery', 'cetech-woocommerce-delivery-engine' ),
+			RateCardChargeType::FixedPerItem->value => __( 'Amount per item', 'cetech-woocommerce-delivery-engine' ),
+		];
+	}
 
-		foreach ( RateCardChargeType::cases() as $case ) {
-			$options[ $case->value ] = $case->value;
+	private function charge_how_label( string $type ): string {
+		$options = $this->charge_type_options();
+
+		return $options[ $type ] ?? __( 'Advanced pricing rules', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	/**
+	 * @param array<string, mixed> $input
+	 */
+	private function generate_charge_code( array $input ): string {
+		$parts = [
+			'dc',
+			(string) ( (int) ( $input['destination_zone_id'] ?? 0 ) ),
+			(string) ( (int) ( $input['delivery_offer_id'] ?? 0 ) ),
+			(string) ( $input['charge_type'] ?? RateCardChargeType::FixedPerShipment->value ),
+		];
+		$code = AdminFormHelper::sanitize_code( implode( '-', $parts ) );
+		if ( '' === $code ) {
+			$code = 'delivery-charge-' . (string) time();
 		}
 
-		return $options;
+		$existing = $this->repository->findByCode( $code );
+		if ( null !== $existing && (int) ( $existing['id'] ?? 0 ) !== (int) ( $input['id'] ?? 0 ) ) {
+			$code .= '-' . (string) time();
+		}
+
+		return $code;
 	}
 
 	/**
@@ -1100,10 +1124,7 @@ final class RateCardsPage {
 	 * @return array<string, string>
 	 */
 	private function required_select_options( array $options ): array {
-		return array_merge(
-			[ '' => __( '— Select —', 'cetech-woocommerce-delivery-engine' ) ],
-			$options
-		);
+		return [ '' => __( '— Select —', 'cetech-woocommerce-delivery-engine' ) ] + $options;
 	}
 
 	/**
@@ -1112,10 +1133,7 @@ final class RateCardsPage {
 	 * @return array<string, string>
 	 */
 	private function optional_select_options( array $options ): array {
-		return array_merge(
-			[ '' => __( '— None —', 'cetech-woocommerce-delivery-engine' ) ],
-			$options
-		);
+		return [ '' => __( '— None —', 'cetech-woocommerce-delivery-engine' ) ] + $options;
 	}
 
 	/**
@@ -1164,11 +1182,9 @@ final class RateCardsPage {
 			return '—';
 		}
 
-		return sprintf(
-			'%s (%s)',
-			(string) ( $lookup[ $id ]['internal_code'] ?? '' ),
-			(string) ( $lookup[ $id ]['public_label'] ?? '' )
-		);
+		$label = trim( (string) ( $lookup[ $id ]['public_label'] ?? '' ) );
+
+		return '' !== $label ? $label : (string) ( $lookup[ $id ]['internal_name'] ?? '—' );
 	}
 
 	/**
@@ -1179,11 +1195,34 @@ final class RateCardsPage {
 			return '—';
 		}
 
-		return sprintf(
-			'%s (%s)',
-			(string) ( $lookup[ $id ]['internal_code'] ?? '' ),
-			(string) ( $lookup[ $id ]['internal_name'] ?? '' )
-		);
+		$label = trim( (string) ( $lookup[ $id ]['public_label'] ?? $lookup[ $id ]['internal_name'] ?? '' ) );
+
+		return '' !== $label ? $label : '—';
+	}
+
+	private function human_charge_name( string $area, string $option ): string {
+		if ( '—' === $area && '—' === $option ) {
+			return '';
+		}
+		if ( '—' === $area || '' === $area ) {
+			return $option;
+		}
+		if ( '—' === $option || '' === $option ) {
+			return $area;
+		}
+
+		return $area . ' — ' . $option;
+	}
+
+	private function store_currency(): string {
+		if ( function_exists( 'get_woocommerce_currency' ) ) {
+			$currency = strtoupper( (string) get_woocommerce_currency() );
+			if ( '' !== $currency ) {
+				return $currency;
+			}
+		}
+
+		return 'USD';
 	}
 
 	private function lookup_optional( array $lookup, mixed $id ): string {

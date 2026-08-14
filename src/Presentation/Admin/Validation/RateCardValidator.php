@@ -116,14 +116,16 @@ final class RateCardValidator {
 			$errors['status'] = __( 'Invalid status selected.', 'cetech-woocommerce-delivery-engine' );
 		}
 
-		$effective_from = $this->parse_datetime( $input['effective_from'] ?? null );
-		$effective_to   = $this->parse_datetime( $input['effective_to'] ?? null );
+		$effective_from_raw = $input['effective_from'] ?? null;
+		$effective_to_raw   = $input['effective_to'] ?? null;
+		$effective_from     = $this->parse_datetime( $effective_from_raw );
+		$effective_to       = $this->parse_datetime( $effective_to_raw );
 
-		if ( null !== $input['effective_from'] && '' !== trim( (string) $input['effective_from'] ) && null === $effective_from ) {
+		if ( $this->is_supplied_date( $effective_from_raw ) && null === $effective_from ) {
 			$errors['effective_from'] = __( 'Effective from must be a valid date.', 'cetech-woocommerce-delivery-engine' );
 		}
 
-		if ( null !== $input['effective_to'] && '' !== trim( (string) $input['effective_to'] ) && null === $effective_to ) {
+		if ( $this->is_supplied_date( $effective_to_raw ) && null === $effective_to ) {
 			$errors['effective_to'] = __( 'Effective to must be a valid date.', 'cetech-woocommerce-delivery-engine' );
 		}
 
@@ -228,8 +230,16 @@ final class RateCardValidator {
 		return $int > 0 ? $int : null;
 	}
 
+	private function is_supplied_date( mixed $value ): bool {
+		if ( null === $value ) {
+			return false;
+		}
+
+		return '' !== trim( (string) $value );
+	}
+
 	private function parse_datetime( mixed $value ): ?int {
-		if ( null === $value || '' === $value ) {
+		if ( ! $this->is_supplied_date( $value ) ) {
 			return null;
 		}
 

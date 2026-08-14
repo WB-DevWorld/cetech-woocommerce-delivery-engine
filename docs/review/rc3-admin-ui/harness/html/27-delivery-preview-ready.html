@@ -1,0 +1,370 @@
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" /><title>Delivery Settings Preview — Delivery Engine fixture</title><link rel="stylesheet" href="https://s.w.org/wp-includes/css/dashicons.min.css" /><link rel="stylesheet" href="../wp-admin-chrome.css" /><link rel="stylesheet" href="../../../../../assets/admin/delivery-engine-admin.css" /><link rel="stylesheet" href="../../../../../assets/admin/scoped-configuration.css" /><script src="../../../../../assets/admin/delivery-engine-admin.js" defer></script></head><body class="wp-admin wp-core-ui"><div id="wpadminbar"><span class="ab-label">Fixture Store</span><span class="ab-label">Dashboard</span><span class="ab-label">Jane Admin</span></div><div class="cetech-de-fixture-banner">Fixture render — sample catalog data — not a live WordPress screenshot</div><div id="wpwrap"><div id="wpcontent"><div id="adminmenumain"><ul id="adminmenu"><li class=""><a href="#"><span class="dashicons dashicons-dashboard"></span><span class="wp-menu-name">Dashboard</span></a></li><li class=""><a href="#"><span class="dashicons dashicons-admin-post"></span><span class="wp-menu-name">Posts</span></a></li><li class=""><a href="#"><span class="dashicons dashicons-cart"></span><span class="wp-menu-name">WooCommerce</span></a></li><li class=""><a href="#"><span class="dashicons dashicons-products"></span><span class="wp-menu-name">Products</span></a></li><li class="wp-has-current-submenu current"><a href="#"><span class="dashicons dashicons-location-alt"></span><span class="wp-menu-name">Delivery Engine</span></a><ul class="wp-submenu"><li><a href="#">Overview</a></li><li><a href="#">Site-wide Defaults</a></li><li><a href="#">Delivery Options</a></li><li><a href="#">Delivery Areas</a></li><li><a href="#">Delivery Charges</a></li><li><a href="#">Pickup Locations</a></li><li><a href="#">Product Exceptions</a></li><li><a href="#">Needs Attention</a></li><li><a href="#">Settings</a></li><li><a href="#">Legacy Delivery Rules</a></li><li><a href="#">Technical Diagnostic Tools</a></li></ul></li><li class=""><a href="#"><span class="dashicons dashicons-admin-appearance"></span><span class="wp-menu-name">Appearance</span></a></li><li class=""><a href="#"><span class="dashicons dashicons-admin-plugins"></span><span class="wp-menu-name">Plugins</span></a></li><li class=""><a href="#"><span class="dashicons dashicons-admin-settings"></span><span class="wp-menu-name">Settings</span></a></li></ul></div><div id="wpbody"><div id="wpbody-content"><style>
+			.cetech-de-admin-page,
+			.cetech-de-dashboard {
+				--cetech-de-bg: #fff;
+				--cetech-de-border: #dcdcde;
+				--cetech-de-muted: #646970;
+				--cetech-de-text: #1d2327;
+				--cetech-de-accent: #2271b1;
+				--cetech-de-radius: 8px;
+				--cetech-de-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+				max-width: 1180px;
+				margin-top: 8px;
+			}
+			.cetech-de-admin-page > hr.wp-header-end {
+				display: none;
+				margin: 0;
+				border: 0;
+				height: 0;
+			}
+			.cetech-de-page-header .notice,
+			.cetech-de-dashboard-header .notice {
+				margin: 0 0 12px;
+				box-shadow: none;
+			}
+			.cetech-de-admin-page > h1 { display: none; }
+			.cetech-de-dashboard-header,
+			.cetech-de-page-header {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 20px;
+				justify-content: space-between;
+				align-items: flex-start;
+				margin-bottom: 20px;
+				padding: 24px;
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-dashboard-eyebrow {
+				margin: 0 0 6px;
+				color: var(--cetech-de-accent);
+				font-size: 12px;
+				font-weight: 600;
+				letter-spacing: 0.04em;
+				text-transform: uppercase;
+			}
+			.cetech-de-dashboard-title {
+				margin: 0 0 8px;
+				font-size: 24px;
+				font-weight: 600;
+				line-height: 1.25;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-dashboard-subtitle {
+				margin: 0;
+				color: var(--cetech-de-muted);
+				font-size: 14px;
+				line-height: 1.6;
+				max-width: 640px;
+			}
+			.cetech-de-dashboard-header-actions {
+				display: flex;
+				flex-direction: column;
+				gap: 10px;
+				align-items: flex-end;
+				min-width: min(100%, 420px);
+			}
+			.cetech-de-button-group {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px;
+				justify-content: flex-end;
+			}
+			.cetech-de-header-button { margin: 0 !important; }
+			.cetech-de-section,
+			.cetech-de-admin-section {
+				margin-top: 28px;
+				padding-top: 4px;
+			}
+			.cetech-de-section-head { margin-bottom: 14px; }
+			.cetech-de-section-title {
+				margin: 0 0 4px;
+				font-size: 18px;
+				font-weight: 600;
+				line-height: 1.3;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-section-desc {
+				margin: 0;
+				color: var(--cetech-de-muted);
+				font-size: 13px;
+				line-height: 1.5;
+				max-width: 760px;
+			}
+			.cetech-de-admin-summary { margin: 0 0 20px; }
+			.cetech-de-admin-example { margin: 0 0 20px; }
+			.cetech-de-summary-grid {
+				display: grid;
+				grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+				gap: 12px;
+			}
+			.cetech-de-summary-stat {
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 18px 16px;
+				text-align: center;
+				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-summary-stat--empty .cetech-de-summary-value { color: #a7aaad; }
+			.cetech-de-summary-value {
+				display: block;
+				font-size: 28px;
+				font-weight: 700;
+				line-height: 1.1;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-summary-label {
+				display: block;
+				margin-top: 6px;
+				color: var(--cetech-de-muted);
+				font-size: 12px;
+				line-height: 1.4;
+			}
+			.cetech-de-empty-state {
+				background: var(--cetech-de-bg);
+				border: 1px dashed var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 24px;
+				text-align: center;
+				margin: 0 0 20px;
+			}
+			.cetech-de-empty-state-action { margin: 16px 0 0; }
+			.cetech-de-empty-state-title {
+				margin: 0 0 6px;
+				font-size: 15px;
+				font-weight: 600;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-empty-state-text {
+				margin: 0;
+				color: var(--cetech-de-muted);
+				font-size: 13px;
+				line-height: 1.55;
+				max-width: 560px;
+				margin-left: auto;
+				margin-right: auto;
+			}
+			.cetech-de-warning-card {
+				display: grid;
+				grid-template-columns: auto 1fr;
+				gap: 14px;
+				align-items: start;
+				background: #fffaf0;
+				border: 1px solid #f0d58a;
+				border-left: 4px solid #dba617;
+				border-radius: var(--cetech-de-radius);
+				padding: 16px 18px;
+				margin: 0 0 20px;
+			}
+			.cetech-de-warning-icon {
+				width: 28px;
+				height: 28px;
+				border-radius: 999px;
+				background: #dba617;
+				color: #fff;
+				display: inline-flex;
+				align-items: center;
+				justify-content: center;
+				font-weight: 700;
+				font-size: 14px;
+				flex-shrink: 0;
+			}
+			.cetech-de-warning-title {
+				margin: 0 0 6px;
+				font-size: 14px;
+				font-weight: 600;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-warning-message {
+				margin: 0;
+				color: var(--cetech-de-muted);
+				font-size: 13px;
+				line-height: 1.55;
+			}
+			.cetech-de-warning-action { margin: 12px 0 0; }
+			.cetech-de-help-example {
+				margin: 0;
+				padding: 10px 12px;
+				background: #f6f7f7;
+				border-radius: 6px;
+				color: var(--cetech-de-text);
+				font-size: 13px;
+			}
+			.cetech-de-help-example-label {
+				display: inline-block;
+				margin-right: 6px;
+				padding: 2px 8px;
+				border-radius: 999px;
+				background: #e5f5fa;
+				color: var(--cetech-de-accent);
+				font-size: 11px;
+				font-weight: 600;
+				text-transform: uppercase;
+			}
+			.cetech-de-form-panel {
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 4px 20px 8px;
+				margin: 0 0 16px;
+				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-form-panel-head {
+				padding: 16px 0 8px;
+				border-bottom: 1px solid #f0f0f1;
+				margin-bottom: 4px;
+			}
+			.cetech-de-form-panel-title {
+				margin: 0 0 4px;
+				font-size: 15px;
+				font-weight: 600;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-form-panel-desc {
+				margin: 0;
+				color: var(--cetech-de-muted);
+				font-size: 13px;
+				line-height: 1.5;
+			}
+			.cetech-de-form-table th { width: 220px; }
+			.cetech-de-form-actions {
+				margin: 8px 0 24px;
+				padding-top: 4px;
+			}
+			.cetech-de-admin-table-wrap {
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				overflow: hidden;
+				box-shadow: var(--cetech-de-shadow);
+				margin-bottom: 20px;
+			}
+			.cetech-de-admin-table-wrap .widefat {
+				border: 0;
+				box-shadow: none;
+				margin: 0;
+			}
+			.cetech-de-admin-table-wrap .widefat thead th {
+				font-weight: 600;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-badge {
+				display: inline-flex;
+				align-items: center;
+				padding: 4px 10px;
+				border-radius: 999px;
+				font-size: 11px;
+				font-weight: 600;
+				line-height: 1.4;
+				white-space: nowrap;
+				border: 1px solid transparent;
+			}
+			.cetech-de-badge--ready { background: #edfaef; color: #007017; border-color: #b8e6bf; }
+			.cetech-de-badge--needs_setup { background: #fcf9e8; color: #8a6d1d; border-color: #f0e6b8; }
+			.cetech-de-badge--not_active { background: #f6f7f7; color: #50575e; border-color: #dcdcde; }
+			.cetech-de-badge--attention { background: #fcf0f1; color: #8a2424; border-color: #f1aeb5; }
+			.cetech-de-advanced {
+				margin-top: 28px;
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 0 20px 20px;
+				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-advanced > summary {
+				cursor: pointer;
+				font-weight: 600;
+				font-size: 14px;
+				padding: 18px 0;
+				color: var(--cetech-de-text);
+			}
+			.cetech-de-advanced[open] > summary {
+				border-bottom: 1px solid #f0f0f1;
+				margin-bottom: 16px;
+			}
+			.cetech-de-technical-details {
+				margin: 12px 0 0;
+				padding: 8px 12px;
+				background: #f6f7f7;
+				border-radius: 6px;
+			}
+			.cetech-de-technical-details > summary {
+				cursor: pointer;
+				font-weight: 600;
+				font-size: 12px;
+				color: var(--cetech-de-muted);
+			}
+			.cetech-de-technical-details[open] > summary {
+				margin-bottom: 8px;
+			}
+			.cetech-de-contact-line {
+				display: block;
+				font-size: 13px;
+				line-height: 1.5;
+			}
+			.cetech-de-contact-line + .cetech-de-contact-line { margin-top: 2px; }
+			.cetech-de-setting-code {
+				color: #a7aaad;
+				font-family: Consolas, Monaco, monospace;
+				font-size: 11px;
+				margin-top: 6px;
+			}
+			.cetech-de-help-card {
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 20px 22px;
+				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-help-steps {
+				margin: 0 0 14px 20px;
+				color: var(--cetech-de-text);
+				font-size: 13px;
+				line-height: 1.6;
+			}
+			.cetech-de-help-action { margin: 14px 0 0; }
+			.cetech-de-delete-link {
+				color: #b32d2e;
+			}
+			.cetech-de-delete-link:hover,
+			.cetech-de-delete-link:focus {
+				color: #8a2424;
+			}
+			.cetech-de-action-sep {
+				color: #c3c4c7;
+				margin: 0 4px;
+			}
+			.cetech-de-delete-confirm {
+				background: var(--cetech-de-bg);
+				border: 1px solid var(--cetech-de-border);
+				border-radius: var(--cetech-de-radius);
+				padding: 20px 22px;
+				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-delete-confirm-actions {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px;
+				align-items: center;
+				margin-top: 18px;
+			}
+			.cetech-de-delete-confirm-form {
+				display: inline;
+				margin-left: auto;
+			}
+			@media (max-width: 782px) {
+				.cetech-de-dashboard-header,
+				.cetech-de-page-header { padding: 18px; }
+				.cetech-de-dashboard-header-actions {
+					align-items: stretch;
+					min-width: 100%;
+				}
+				.cetech-de-button-group { justify-content: flex-start; }
+				.cetech-de-form-table th,
+				.cetech-de-form-table td { display: block; width: 100%; }
+				.cetech-de-form-table th { padding-bottom: 4px; }
+			}
+		</style><div class="wrap cetech-de-admin-page"><hr class="wp-header-end" /><header class="cetech-de-dashboard-header cetech-de-page-header"><div class="cetech-de-dashboard-header-text"><p class="cetech-de-dashboard-eyebrow">Delivery Engine</p><h1 class="cetech-de-dashboard-title">Delivery Settings Preview</h1><p class="cetech-de-dashboard-subtitle">See what delivery settings will apply to a product or variation.</p></div></header><div class="notice notice-info cetech-de-preview-limitation" role="status"><p><strong>This preview shows delivery settings, not a shipping price</strong></p><p>This page shows which delivery settings would apply for the selected product, variation, and delivery setup. It does not check the customer’s address, calculate a fee, or complete checkout.</p></div><section class="cetech-de-section cetech-de-admin-section"><div class="cetech-de-section-head"><h2 class="cetech-de-section-title">What do you want to preview?</h2><p class="cetech-de-section-desc">Choose a product, a variation if needed, and a delivery setup. Opening this preview never changes saved settings.</p></div><form method="get" action="https://example.test/wp-admin/admin.php" class="cetech-de-preview-form" data-cetech-de-preview-form><input type="hidden" name="page" value="cetech-delivery-engine-effective-preview" /><input type="hidden" name="preview" value="1" /><table class="form-table" role="presentation"><tbody><tr><th scope="row"><label for="product_id">Product</label></th><td><select id="product_id" name="product_id" required data-cetech-de-preview-product><option value="">Search/select product</option><option value="101"  selected="selected" data-variable="0">Simple Lamp</option><option value="201"  data-variable="1">Variable Chair</option><option value="301"  data-variable="0">International Radio</option><option value="401"  data-variable="0">In Store Speaker</option><option value="501"  data-variable="0">Legacy Only Item</option><option value="601"  data-variable="0">Incomplete Desk</option></select></td></tr><tr class="cetech-de-preview-variation-row" hidden><th scope="row"><label for="variation_id">Variation</label></th><td><select id="variation_id" name="variation_id" data-cetech-de-preview-variation><option value="">Select variation</option></select></td></tr></tbody></table><input type="submit" name="submit" class="button button-primary" value="Show delivery settings" /></form></section><div class="cetech-de-status-banner cetech-de-status-banner--ready" role="status"><span class="cetech-de-status-banner-icon dashicons dashicons-yes-alt" aria-hidden="true"></span><div class="cetech-de-status-banner-body"><p class="cetech-de-status-banner-title">Ready ✓</p><p class="cetech-de-status-banner-text">This product can use the delivery settings shown below.</p></div></div><div class="cetech-de-summary-grid cetech-de-admin-summary"><div class="cetech-de-summary-stat"><span class="cetech-de-summary-value">Ready</span><span class="cetech-de-summary-label">Status</span></div><div class="cetech-de-summary-stat"><span class="cetech-de-summary-value">Site-wide Default</span><span class="cetech-de-summary-label">Settings source</span></div></div><p>Product: Simple Lamp </p><section class="cetech-de-section cetech-de-admin-section"><div class="cetech-de-section-head"><h2 class="cetech-de-section-title">Delivery Preview</h2><p class="cetech-de-section-desc">Each row shows the result that will apply and whether it comes from the Site-wide Default, this product, or this variation.</p></div><table class="widefat striped cetech-de-preview-table"><thead><tr><th scope="col">Information</th><th scope="col">Result</th><th scope="col">Source</th></tr></thead><tbody><tr><th scope="row">Fulfilment</th><td>In Warehouse</td><td>Site-wide Default</td></tr><tr><th scope="row">Delivery method</th><td>Delivery</td><td>Site-wide Default</td></tr><tr><th scope="row">Estimated delivery</th><td>3–5 business days</td><td>Site-wide Default</td></tr><tr><th scope="row">Delivery options</th><td>Standard Delivery</td><td>Site-wide Default</td></tr></tbody></table><details class="cetech-de-technical-details"><summary>Technical details</summary><ul><li>Logistics profile: Local Warehouse</li><li>Supplier: Fixture Supplier</li><li>Origin: Accra Origin</li><li>Priority: 10</li><li><code>global_version</code>: 2</li><li><code>product_version</code>: 0</li><li><code>variation_version</code>: 0</li><li><code>fingerprint</code>: 52f63d76be3acf89fecc61cb6ae1ad0e115674fd88c34433fab57f262b51eadb</li></ul></details></section></div></div></div></div></div></body></html>

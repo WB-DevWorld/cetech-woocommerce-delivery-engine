@@ -166,6 +166,37 @@ final class AdminFormHelper {
 		return (bool) preg_match( '/^[a-z0-9_-]+$/', $code );
 	}
 
+	/**
+	 * Generate a unique reference code from a display name.
+	 *
+	 * @param callable(string): bool $exists
+	 */
+	public static function generate_code_from_name( string $name, callable $exists, string $fallback = 'item' ): string {
+		$base = strtolower( trim( $name ) );
+		$base = (string) preg_replace( '/[\s_]+/', '-', $base );
+		$base = self::sanitize_code( $base );
+		if ( '' === $base ) {
+			$base = $fallback;
+		}
+		if ( strlen( $base ) > 40 ) {
+			$base = substr( $base, 0, 40 );
+		}
+
+		$code  = $base;
+		$index = 2;
+		while ( $exists( $code ) ) {
+			$suffix = '-' . $index;
+			$code   = substr( $base, 0, max( 1, 48 - strlen( $suffix ) ) ) . $suffix;
+			++$index;
+			if ( $index > 99 ) {
+				$code = $base . '-' . wp_generate_password( 4, false, false );
+				break;
+			}
+		}
+
+		return $code;
+	}
+
 	public static function checkbox_field(
 		string $name,
 		string $label,

@@ -71,8 +71,8 @@ final class ConfigurationFieldCatalog {
 
 	public static function label( string $field_key ): string {
 		return match ( $field_key ) {
-			ConfigurationFieldKey::FULFILMENT_AVAILABILITY => 'Fulfilment availability',
-			ConfigurationFieldKey::FULFILMENT_CHOICE => 'Fulfilment choice',
+			ConfigurationFieldKey::FULFILMENT_AVAILABILITY => 'Fulfilment',
+			ConfigurationFieldKey::FULFILMENT_CHOICE => 'Delivery method',
 			ConfigurationFieldKey::LOGISTICS_PROFILE_ID => 'Logistics profile',
 			ConfigurationFieldKey::SUPPLIER_ID => 'Supplier',
 			ConfigurationFieldKey::ORIGIN_ID => 'Origin',
@@ -81,6 +81,46 @@ final class ConfigurationFieldCatalog {
 			ConfigurationFieldKey::DELIVERY_OFFER_IDS => 'Delivery options',
 			default => $field_key,
 		};
+	}
+
+	/**
+	 * Business-facing fields shown on normal Product Exceptions / product summaries.
+	 *
+	 * @return list<string>
+	 */
+	public static function business_field_keys(): array {
+		return [
+			ConfigurationFieldKey::FULFILMENT_AVAILABILITY,
+			ConfigurationFieldKey::FULFILMENT_CHOICE,
+			ConfigurationFieldKey::DELIVERY_OFFER_IDS,
+			ConfigurationFieldKey::ESTIMATED_DELIVERY,
+		];
+	}
+
+	/**
+	 * Private / technical fields — never list individually on normal staff tables.
+	 *
+	 * @return list<string>
+	 */
+	public static function private_field_keys(): array {
+		return [
+			ConfigurationFieldKey::LOGISTICS_PROFILE_ID,
+			ConfigurationFieldKey::SUPPLIER_ID,
+			ConfigurationFieldKey::ORIGIN_ID,
+			ConfigurationFieldKey::PRIORITY,
+		];
+	}
+
+	public static function technical_delivery_details_label(): string {
+		return 'Technical delivery details';
+	}
+
+	public static function is_business_field( string $field_key ): bool {
+		return in_array( $field_key, self::business_field_keys(), true );
+	}
+
+	public static function is_private_field( string $field_key ): bool {
+		return in_array( $field_key, self::private_field_keys(), true );
 	}
 
 	public static function description( string $field_key ): string {

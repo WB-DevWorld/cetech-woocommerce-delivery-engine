@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-rc.2
+Stable tag: 1.0.0-rc.3
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,35 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-rc.3 =
+* Release candidate after Stage 13 / 13B / 13C / 13D / 13D-R1: site-wide defaults, WordPress-native admin UX, Setup Guide, Overview, legacy retirement from the normal menu, real role Access controls, and Administrator access recovery hardening.
+* Owner physical QA.4 and QA.5 acceptance passed on FLAIROC prior to this tagged package.
+* Schema target remains 3; no migration for the version bump.
+* Administrator remains a protected full-access role; subordinate WordPress roles remain configurable; recovery uses manage_options independently of Technical Diagnostics.
+* Existing RC.2 configuration, flags, exceptions, and order snapshots are not reset on folder replace.
+* Shipments, tracking, Blocks checkout, bulk import, and carrier APIs remain out of scope.
+
+= 1.0.0-rc.3-qa.5 =
+* Owner physical retest QA package after Stage 13D-R1 administrator access / recovery hardening. Superseded by tagged 1.0.0-rc.3.
+* Administrator is a protected full-access role; Access matrix edits subordinate WordPress roles only.
+* Independent Restore Administrator Access recovery uses manage_options + nonce and does not depend on Technical Diagnostics.
+* Existing RC.2 / QA.4 configuration, flags, exceptions, and order snapshots are not reset on folder replace.
+
+= 1.0.0-rc.3-qa.3 =
+* Owner physical retest QA package after Stage 13C-R3 local repair. Not a tagged RC.3 release.
+* Includes Setup Guide Step 3 validation, International Air/Sea guided UX, Preview variation loading, and variable-parent readiness repairs.
+* Existing RC.2 / QA.2 configuration, flags, exceptions, and order snapshots are not reset on folder replace.
+
+= 1.0.0-rc.3-qa.2 =
+* Owner physical retest QA package after Stage 13C-R1 local repair. Not a tagged RC.3 release.
+* Includes wizard routing, capability self-heal, authoritative operational state, Preview/Needs Attention readiness, and staff UI privacy/formatting repairs.
+* Existing RC.2 / QA.1 configuration, flags, exceptions, and order snapshots are not reset on folder replace.
+
+= 1.0.0-rc.3-qa.1 =
+* Owner-review QA package of Stage 13 / 13B-R2. Not a tagged RC.3 release.
+* Adds site-wide fulfilment defaults, Setup Guide, Overview, and staff-facing admin UX on schema 3.
+* Existing RC.2 configuration, flags, exceptions, and order snapshots are not reset on activation.
 
 = 1.0.0-rc.2 =
 * Classic Checkout release candidate through Stage 8C.

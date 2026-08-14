@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Admin;
 
+use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogInheritanceClassifier;
+use CetechDeliveryEngine\Application\Configuration\ClassicCheckoutRuntimeActivation;
 use CetechDeliveryEngine\Application\ProductRule\ProductDeliveryRuleResolver;
 use CetechDeliveryEngine\Application\ProductRule\ProductRuleResolutionResult;
 use CetechDeliveryEngine\Application\ProductRule\ResolvedProductDeliveryRule;
@@ -51,30 +53,15 @@ final class ProductDeliveryRulesPage {
 		private ProductDeliverySelectionValidator $selection_validator,
 		private AdminActionHandler $action_handler,
 		private ConfigurationAuditLogger $audit_logger,
-		private AdminRecordDependencyChecker $dependency_checker
+		private AdminRecordDependencyChecker $dependency_checker,
+		private ?ClassicCheckoutRuntimeActivation $runtime = null,
+		private ?CatalogInheritanceClassifier $classifier = null
 	) {
 	}
 
 	public function handle_actions(): void {
-		if ( $this->action_handler->verify_post( self::ACTION_SAVE, self::ACTION_SAVE, 'manage_product_delivery_rules', self::SLUG ) ) {
-			$this->handle_save();
-		}
-
-		if ( $this->action_handler->verify_post( self::ACTION_DEACTIVATE, self::ACTION_DEACTIVATE, 'manage_product_delivery_rules', self::SLUG ) ) {
-			$this->handle_deactivate();
-		}
-
-		if ( $this->action_handler->verify_post( self::ACTION_DELETE, self::ACTION_DELETE, 'manage_product_delivery_rules', self::SLUG ) ) {
-			$this->handle_delete();
-		}
-
-		if ( $this->action_handler->verify_post( self::ACTION_RESOLVE_TEST, self::ACTION_RESOLVE_TEST, 'manage_product_delivery_rules', self::SLUG ) ) {
-			$this->handle_resolution_test();
-		}
-
-		if ( $this->action_handler->verify_post( self::ACTION_VALIDATE_SELECTION, self::ACTION_VALIDATE_SELECTION, 'manage_product_delivery_rules', self::SLUG ) ) {
-			$this->handle_selection_validation_test();
-		}
+		// Stage 13D: Legacy create/edit is retired from the normal product.
+		// Historical rows remain in the database for compatibility readers only.
 	}
 
 	public function render(): void {
@@ -101,26 +88,35 @@ final class ProductDeliveryRulesPage {
 	private function render_list(): void {
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
-			__( 'Product delivery', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Legacy Delivery Rules', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Use Delivery Settings for normal day-to-day delivery setup. These legacy rules remain for migration and compatibility while older product rules are still in use. They are not a second everyday delivery system.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Older compatibility settings kept so older product configurations continue working. For normal delivery setup, use Site-wide Defaults.', 'cetech-woocommerce-delivery-engine' ),
 			[
-				'label' => __( 'Add Product Rule', 'cetech-woocommerce-delivery-engine' ),
-				'url'   => add_query_arg( [ 'page' => self::SLUG, 'action' => 'add' ], admin_url( 'admin.php' ) ),
-				'class' => 'primary',
-			],
-			[
-				'label' => __( 'Open Delivery Settings', 'cetech-woocommerce-delivery-engine' ),
-				'url'   => AdminPageRenderer::list_url( ScopedConfigurationPage::SLUG ),
+				'label' => __( 'Review Legacy Products', 'cetech-woocommerce-delivery-engine' ),
+				'url'   => AdminPageRenderer::list_url( ProductExceptionsPage::SLUG ),
+				'class' => 'secondary',
 			]
 		);
-
-		AdminPageLayout::render_example(
-			__( 'Heavy Tools → use the Heavy Items logistics profile and restrict same-day delivery.', 'cetech-woocommerce-delivery-engine' )
+		AdminPageLayout::render_warning(
+			__( 'Older compatibility settings', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Use Site-wide Defaults for normal work. Legacy Delivery Rules are kept only so older products continue to work.', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		$lookups        = $this->build_lookups();
 		$records        = $this->repository->list( [ 'limit' => 500 ] );
+		$legacy_count   = $this->legacy_dependent_product_count();
+		AdminPageLayout::render_example(
+			sprintf(
+				/* translators: %d: number of products still using legacy rules. */
+				_n(
+					'%d product still relies on Legacy Delivery Rules.',
+					'%d products still rely on Legacy Delivery Rules.',
+					$legacy_count,
+					'cetech-woocommerce-delivery-engine'
+				),
+				$legacy_count
+			)
+		);
 		$active         = 0;
 		$inactive       = 0;
 		$needing_review = 0;
@@ -164,24 +160,27 @@ final class ProductDeliveryRulesPage {
 
 		if ( $needing_review > 0 ) {
 			AdminPageLayout::render_warning(
-				__( 'Some rules may not be ready to use', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Inactive rules are ignored at checkout. Active rules without a product target or logistics profile may also need attention before they affect delivery.', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Manage logistics profiles', 'cetech-woocommerce-delivery-engine' ),
-				AdminPageRenderer::list_url( LogisticsProfilesPage::SLUG )
+				__( 'Some legacy rules may need review', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Inactive rules are ignored. Review remaining legacy products and move them to Site-wide Defaults or Product Exceptions.', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Review Legacy Products', 'cetech-woocommerce-delivery-engine' ),
+				AdminPageRenderer::list_url( ProductExceptionsPage::SLUG )
 			);
 		}
 
 		if ( [] === $records ) {
 			AdminPageLayout::render_empty_state(
-				__( 'No legacy delivery rules yet', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Create a legacy delivery rule when certain products need special delivery treatment, such as heavy, fragile, pickup-only, or supplier-dispatched items. Shoppers still use these rules until the New Delivery Settings System is turned on.', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Add Product Rule', 'cetech-woocommerce-delivery-engine' ),
-				add_query_arg( [ 'page' => self::SLUG, 'action' => 'add' ], admin_url( 'admin.php' ) )
+				__( 'No products currently rely on Legacy Delivery Rules.', 'cetech-woocommerce-delivery-engine' ),
+				__( 'For normal delivery setup, use Site-wide Defaults and Product Exceptions. Do not create new legacy rules unless you are supporting an older configuration.', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Open Site-wide Defaults', 'cetech-woocommerce-delivery-engine' ),
+				AdminPageRenderer::list_url( DeliverySettingsHomePage::SLUG )
 			);
 		} else {
+			$engine_active = $this->runtime?->is_active() ?? false;
 			AdminPageLayout::open_section(
 				__( 'All legacy delivery rules', 'cetech-woocommerce-delivery-engine' ),
-				__( 'These rules apply to matching products, categories, or variations. They remain in use for shoppers until the New Delivery Settings System is turned on.', 'cetech-woocommerce-delivery-engine' )
+				$engine_active
+					? __( 'The Delivery Engine is active. These remaining products still rely on Legacy Delivery Rules and should be reviewed for migration.', 'cetech-woocommerce-delivery-engine' )
+					: __( 'These older product configurations continue working while they are reviewed. Do not create new delivery setups here.', 'cetech-woocommerce-delivery-engine' )
 			);
 
 			$rows = [];
@@ -666,10 +665,8 @@ final class ProductDeliveryRulesPage {
 
 		if ( $logistics_profile_id <= 0 && FulfilmentChoice::Delivery->value === (string) ( $record['fulfilment_choice'] ?? '' ) ) {
 			AdminPageLayout::render_warning(
-				__( 'No logistics profile linked', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Delivery rules often work best when linked to a logistics profile for special handling or pricing.', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Manage logistics profiles', 'cetech-woocommerce-delivery-engine' ),
-				AdminPageRenderer::list_url( LogisticsProfilesPage::SLUG )
+				__( 'This legacy rule is incomplete', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Review this product and move it to Site-wide Defaults or a Product Exception instead of completing a new legacy setup.', 'cetech-woocommerce-delivery-engine' )
 			);
 		}
 
@@ -1172,13 +1169,23 @@ final class ProductDeliveryRulesPage {
 			return sprintf( '#%d', $int );
 		}
 
-		$row = $entities[ $int ];
+		$label = $this->entity_staff_label( $entities[ $int ] );
 
-		return sprintf(
-			'%s (%s)',
-			(string) ( $row['internal_code'] ?? '' ),
-			(string) ( $row['internal_name'] ?? $row['public_label'] ?? '' )
-		);
+		return '' !== $label ? $label : sprintf( '#%d', $int );
+	}
+
+	/**
+	 * @param array<string, mixed> $row
+	 */
+	private function entity_staff_label( array $row ): string {
+		foreach ( [ 'public_label', 'internal_name', 'name' ] as $key ) {
+			$value = trim( (string) ( $row[ $key ] ?? '' ) );
+			if ( '' !== $value ) {
+				return $value;
+			}
+		}
+
+		return '';
 	}
 
 	/**
@@ -1195,7 +1202,8 @@ final class ProductDeliveryRulesPage {
 
 		foreach ( $ids as $id ) {
 			if ( isset( $offers[ $id ] ) ) {
-				$labels[] = (string) ( $offers[ $id ]['internal_code'] ?? (string) $id );
+				$label = $this->entity_staff_label( $offers[ $id ] );
+				$labels[] = '' !== $label ? $label : '#' . (string) $id;
 			} else {
 				$labels[] = '#' . (string) $id;
 			}
@@ -1217,7 +1225,8 @@ final class ProductDeliveryRulesPage {
 
 		foreach ( $ids as $id ) {
 			if ( isset( $offers[ $id ] ) ) {
-				$labels[] = (string) ( $offers[ $id ]['internal_code'] ?? (string) $id );
+				$label = $this->entity_staff_label( $offers[ $id ] );
+				$labels[] = '' !== $label ? $label : '#' . (string) $id;
 			} else {
 				$labels[] = '#' . (string) $id;
 			}
@@ -1297,7 +1306,7 @@ final class ProductDeliveryRulesPage {
 			return $name;
 		}
 
-		return $name . '<br><span class="cetech-de-setting-code">#' . esc_html( (string) $id ) . '</span>';
+		return $name . '<details class="cetech-de-technical-details"><summary>' . esc_html__( 'Technical details', 'cetech-woocommerce-delivery-engine' ) . '</summary><p class="description cetech-de-setting-code">#' . esc_html( (string) $id ) . '</p></details>';
 	}
 
 	/**
@@ -1305,15 +1314,10 @@ final class ProductDeliveryRulesPage {
 	 */
 	private function matching_summary( array $record ): string {
 		$type  = $this->target_type_label( (string) ( $record['target_type'] ?? '' ) );
-		$id    = (int) ( $record['target_id'] ?? 0 );
 		$label = trim( (string) ( $record['target_label_snapshot'] ?? '' ) );
 
-		if ( '' !== $label && $id > 0 ) {
-			return sprintf( '%s (%s #%d)', $label, $type, $id );
-		}
-
-		if ( $id > 0 ) {
-			return sprintf( '%s #%d', $type, $id );
+		if ( '' !== $label ) {
+			return sprintf( '%s (%s)', $label, $type );
 		}
 
 		return $type;
@@ -1360,32 +1364,54 @@ final class ProductDeliveryRulesPage {
 		return (int) ( $record['target_id'] ?? 0 ) <= 0;
 	}
 
+	private function legacy_dependent_product_count(): int {
+		if ( null !== $this->classifier ) {
+			return $this->classifier->preview()->legacy_dependent;
+		}
+
+		$count = 0;
+		$seen  = [];
+		foreach ( $this->repository->list( [ 'limit' => 500 ] ) as $record ) {
+			$target_id = (int) ( $record['target_id'] ?? 0 );
+			if ( $target_id > 0 && ! isset( $seen[ $target_id ] ) ) {
+				$seen[ $target_id ] = true;
+				++$count;
+			}
+		}
+
+		return $count;
+	}
+
 	private function render_help_section(): void {
+		$legacy_count  = $this->legacy_dependent_product_count();
+		$engine_active = $this->runtime?->is_active() ?? false;
+
 		AdminPageLayout::open_section(
-			__( 'What is a product rule?', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Product rules tell the Delivery Engine how to treat certain products during delivery.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Moving away from Legacy Delivery Rules', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Legacy Delivery Rules are retained only so older product configurations continue working while they are reviewed.', 'cetech-woocommerce-delivery-engine' )
 		);
 		echo '<div class="cetech-de-help-card">';
-		echo '<p>' . esc_html__(
-			'Use them when a product needs special handling, such as heavy items, fragile items, pickup-only items, supplier-dispatched items, or products that should use a specific logistics profile.',
-			'cetech-woocommerce-delivery-engine'
+		echo '<p>' . esc_html__( 'Do not create new delivery setups here.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '<p>' . esc_html(
+			sprintf(
+				/* translators: %d products still using legacy rules */
+				_n(
+					'%d product still uses Legacy Delivery Rules.',
+					'%d products still use Legacy Delivery Rules.',
+					$legacy_count,
+					'cetech-woocommerce-delivery-engine'
+				),
+				$legacy_count
+			)
 		) . '</p>';
-		echo '<ul class="cetech-de-help-steps">';
-		echo '<li>' . esc_html__( 'Heavy tools → special delivery handling', 'cetech-woocommerce-delivery-engine' ) . '</li>';
-		echo '<li>' . esc_html__( 'Fragile items → careful handling / standard delivery only', 'cetech-woocommerce-delivery-engine' ) . '</li>';
-		echo '<li>' . esc_html__( 'Pickup-only products → do not show normal delivery', 'cetech-woocommerce-delivery-engine' ) . '</li>';
-		echo '<li>' . esc_html__( 'Supplier-dispatched products → dispatch from supplier origin', 'cetech-woocommerce-delivery-engine' ) . '</li>';
-		echo '<li>' . esc_html__( 'Same-day eligible products → allow faster delivery offers', 'cetech-woocommerce-delivery-engine' ) . '</li>';
-		echo '</ul>';
+		if ( $engine_active && $legacy_count > 0 ) {
+			echo '<p>' . esc_html__( 'The Delivery Engine is already active. Remaining products that still rely on Legacy Delivery Rules should be reviewed for migration.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		}
+		echo '<p>' . esc_html__( 'When all products have moved to Site-wide Defaults or Product/Variation Exceptions, Legacy compatibility can be retired.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 		printf(
-			'<p class="cetech-de-help-action"><a class="button button-secondary" href="%1$s">%2$s</a> ',
-			esc_url( AdminPageRenderer::list_url( LogisticsProfilesPage::SLUG ) ),
-			esc_html__( 'Manage logistics profiles', 'cetech-woocommerce-delivery-engine' )
-		);
-		printf(
-			'<a class="button button-secondary" href="%1$s">%2$s</a></p>',
-			esc_url( AdminPageRenderer::list_url( AdminMenu::SYSTEM_STATUS_SLUG ) ),
-			esc_html__( 'Back to Dashboard', 'cetech-woocommerce-delivery-engine' )
+			'<p class="cetech-de-help-action"><a class="button button-secondary" href="%1$s">%2$s</a></p>',
+			esc_url( AdminPageRenderer::list_url( ProductExceptionsPage::SLUG ) ),
+			esc_html__( 'Review Legacy Products', 'cetech-woocommerce-delivery-engine' )
 		);
 		echo '</div>';
 		AdminPageLayout::close_section();

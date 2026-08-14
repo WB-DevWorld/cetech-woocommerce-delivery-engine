@@ -9,8 +9,10 @@ use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationAdmi
 use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationAuthorization;
 use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationNotices;
 use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationWriteCommand;
+use CetechDeliveryEngine\Application\Configuration\ClassicCheckoutRuntimeActivation;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsService;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
+use CetechDeliveryEngine\Domain\DeliveryOffer\DeliveryOfferRepositoryInterface;
 use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
 use CetechDeliveryEngine\Domain\Enum\ProductTargetType;
 use CetechDeliveryEngine\Domain\FulfilmentProfile\FulfilmentProfileRegistry;
@@ -24,16 +26,18 @@ final class ScopedConfigurationPage {
 
 	public const SLUG = 'cetech-delivery-engine-scoped-config';
 
-	private const ACTION_SAVE = 'cetech_de_save_scoped_configuration';
+	public const ACTION_SAVE = 'cetech_de_save_scoped_configuration';
 
-	private const ACTION_RESET = 'cetech_de_reset_scoped_configuration';
+	public const ACTION_RESET = 'cetech_de_reset_scoped_configuration';
 
 	public function __construct(
 		private ScopedConfigurationAdminService $admin_service,
 		private ProductTargetResolver $product_target_resolver,
 		private AdminActionHandler $action_handler,
 		private ScopedConfigurationAuthorization $authorization,
-		private ?SiteWideDefaultsService $defaults = null
+		private ?SiteWideDefaultsService $defaults = null,
+		private ?DeliveryOfferRepositoryInterface $offers = null,
+		private ?ClassicCheckoutRuntimeActivation $runtime = null
 	) {
 	}
 
@@ -139,8 +143,11 @@ final class ScopedConfigurationPage {
 			]
 		);
 
-		$this->render_transitional_notice( $model->transitional_title, $model->transitional_message );
-		$this->render_scope_switcher( $scope_type, $scope_id, $slice_key, $parent_product_id );
+		$this->render_state_notice( $model );
+		$customize = $this->wants_customize( $model );
+		if ( ! $customize ) {
+			$this->render_scope_switcher( $scope_type, $scope_id, $slice_key, $parent_product_id );
+		}
 
 		if ( ConfigurationScopeType::Global !== $scope_type && $scope_id <= 0 ) {
 			$this->render_target_picker( $scope_type );
@@ -155,8 +162,13 @@ final class ScopedConfigurationPage {
 			);
 		}
 
+		if ( $customize && ConfigurationScopeType::Global !== $scope_type && null !== $this->offers ) {
+			( new StaffDeliveryCustomizeView( $this->offers ) )->render( $model );
+			AdminPageLayout::close_page();
+			return;
+		}
+
 		$this->render_context_summary( $model );
-		$customize = $this->wants_customize( $model );
 		if ( ! $customize && $this->render_simplified_scope_intro( $model ) ) {
 			AdminPageLayout::close_page();
 			return;
@@ -189,6 +201,7 @@ final class ScopedConfigurationPage {
 			'scope_type' => $scope_type_raw,
 			'scope_id'   => $scope_id,
 			'slice_key'  => $slice_key,
+			'customize'  => 1,
 		];
 		if ( $parent_id > 0 ) {
 			$redirect['parent_product_id'] = $parent_id;
@@ -267,6 +280,7 @@ final class ScopedConfigurationPage {
 			)
 		);
 
+		$customize = isset( $_POST['customize'] ) && '1' === (string) wp_unslash( $_POST['customize'] );
 		$redirect = [
 			'scope_type' => $scope_type->value,
 			'scope_id'   => $scope_id,
@@ -274,6 +288,9 @@ final class ScopedConfigurationPage {
 		];
 		if ( null !== $parent_product_id ) {
 			$redirect['parent_product_id'] = $parent_product_id;
+		}
+		if ( $customize ) {
+			$redirect['customize'] = 1;
 		}
 
 		if ( ! $result->success ) {
@@ -283,7 +300,11 @@ final class ScopedConfigurationPage {
 			$this->action_handler->redirect( self::SLUG, $redirect );
 		}
 
-		if ( $result->version_changed ) {
+		if ( $customize ) {
+			$this->action_handler->notices()->flash_success(
+				__( 'Delivery settings saved.', 'cetech-woocommerce-delivery-engine' )
+			);
+		} elseif ( $result->version_changed ) {
 			$this->action_handler->notices()->flash_success(
 				sprintf(
 					/* translators: %d: configuration version */
@@ -319,12 +340,23 @@ final class ScopedConfigurationPage {
 		return $args;
 	}
 
-	private function render_transitional_notice( string $title, string $message ): void {
+	private function render_state_notice( $model ): void {
+		$engine_active = $this->runtime?->is_active() ?? false;
+		$legacy_product = ! empty( $model->legacy_rule_id ) || ! empty( $model->category_warning['has_legacy_category_rules'] );
+		if ( $engine_active && $legacy_product ) {
+			AdminPageLayout::render_warning(
+				ScopedConfigurationNotices::PRODUCT_LEGACY_TITLE,
+				ScopedConfigurationNotices::PRODUCT_LEGACY_MESSAGE
+			);
+			return;
+		}
+		if ( $engine_active ) {
+			return;
+		}
+
 		echo '<div class="notice notice-info cetech-de-scoped-transitional" role="status">';
-		echo '<p><strong>' . esc_html( $title ) . '</strong></p>';
-		echo '<p>' . esc_html( $message ) . '</p>';
-		echo '<p class="description">' . esc_html( ScopedConfigurationNotices::SCOPED_RUNTIME_LABEL ) . ' — ';
-		echo esc_html( ScopedConfigurationNotices::LEGACY_RUNTIME_LABEL ) . '</p>';
+		echo '<p><strong>' . esc_html( $model->transitional_title ) . '</strong></p>';
+		echo '<p>' . esc_html( $model->transitional_message ) . '</p>';
 		echo '</div>';
 	}
 
@@ -334,9 +366,12 @@ final class ScopedConfigurationPage {
 		string $slice_key,
 		?int $parent_product_id
 	): void {
+		$engine_active = $this->runtime?->is_active() ?? false;
 		AdminPageLayout::open_section(
 			__( 'Which settings are you editing?', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Default Settings apply unless a product or variation sets a different value. Legacy Delivery Rules still control what shoppers see until the new system is turned on.', 'cetech-woocommerce-delivery-engine' )
+			$engine_active
+				? __( 'Site-wide Defaults apply unless a product or variation sets a different value.', 'cetech-woocommerce-delivery-engine' )
+				: __( 'Site-wide Defaults apply unless a product or variation sets a different value. Existing delivery configuration is still serving customers while you finish Delivery Engine setup.', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		$tabs = [
@@ -457,10 +492,10 @@ final class ScopedConfigurationPage {
 			admin_url( 'admin.php' )
 		);
 
-		echo '<p><a class="button" href="' . esc_url( $customize_url ) . '">';
+			echo '<p><a class="button" href="' . esc_url( $customize_url ) . '">';
 		echo 'variation' === $model->scope_type
-			? esc_html__( 'Customize this variation', 'cetech-woocommerce-delivery-engine' )
-			: esc_html__( 'Customize this product', 'cetech-woocommerce-delivery-engine' );
+			? esc_html( AdminLanguage::customize_this_variation() )
+			: esc_html( AdminLanguage::customize_this_product() );
 		echo '</a></p></div>';
 
 		return true;
@@ -602,9 +637,21 @@ final class ScopedConfigurationPage {
 
 		$this->render_slice_controls( $model );
 
+		$advanced_keys = [ 'logistics_profile_id', 'supplier_id', 'origin_id', 'priority' ];
 		foreach ( $model->fields as $field ) {
+			if ( in_array( $field->field_key, $advanced_keys, true ) ) {
+				continue;
+			}
 			$this->render_field_editor( $field );
 		}
+		echo '<details class="cetech-de-advanced"><summary>' . esc_html__( 'Advanced Details', 'cetech-woocommerce-delivery-engine' ) . '</summary>';
+		foreach ( $model->fields as $field ) {
+			if ( ! in_array( $field->field_key, $advanced_keys, true ) ) {
+				continue;
+			}
+			$this->render_field_editor( $field );
+		}
+		echo '</details>';
 
 		echo '<details class="cetech-de-technical-details"><summary>' . esc_html__( 'Technical details', 'cetech-woocommerce-delivery-engine' ) . '</summary>';
 		echo '<ul>';

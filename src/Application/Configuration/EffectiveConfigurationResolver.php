@@ -195,8 +195,26 @@ final class EffectiveConfigurationResolver {
 			return $by_slice[ $slice_key ];
 		}
 
+		// Profile slice requested → fall back to the native default item scope.
 		if ( ConfigurationScope::DEFAULT_SLICE_KEY !== $slice_key && isset( $by_slice[ ConfigurationScope::DEFAULT_SLICE_KEY ] ) ) {
 			return $by_slice[ ConfigurationScope::DEFAULT_SLICE_KEY ];
+		}
+
+		// Stage 13 root (empty slice) → sole Stage 5/6 profile item scope.
+		// Migrated variable parents often store business delivery on in_warehouse/etc.
+		if ( ConfigurationScope::DEFAULT_SLICE_KEY === $slice_key ) {
+			$profile_scopes = [];
+			foreach ( $by_slice as $key => $scope ) {
+				if ( ! $scope instanceof ScopedConfiguration ) {
+					continue;
+				}
+				if ( ConfigurationScope::DEFAULT_SLICE_KEY !== $key && FulfilmentProfileRegistry::has( (string) $key ) ) {
+					$profile_scopes[ (string) $key ] = $scope;
+				}
+			}
+			if ( 1 === count( $profile_scopes ) ) {
+				return reset( $profile_scopes ) ?: null;
+			}
 		}
 
 		return null;

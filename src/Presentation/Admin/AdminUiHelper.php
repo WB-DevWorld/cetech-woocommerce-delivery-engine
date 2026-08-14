@@ -43,7 +43,7 @@ final class AdminUiHelper {
 				esc_html(
 					sprintf(
 						/* translators: %d: number of rate cards */
-						_n( '%d rate card', '%d rate cards', $count, 'cetech-woocommerce-delivery-engine' ),
+						_n( '%d delivery charge', '%d delivery charges', $count, 'cetech-woocommerce-delivery-engine' ),
 						$count
 					)
 				)
@@ -57,18 +57,7 @@ final class AdminUiHelper {
 	}
 
 	public static function format_money( string $amount, string $currency ): string {
-		$amount   = trim( $amount );
-		$currency = strtoupper( trim( $currency ) );
-
-		if ( '' === $amount ) {
-			return '—';
-		}
-
-		if ( '' === $currency ) {
-			return $amount;
-		}
-
-		return sprintf( '%s %s', $currency, $amount );
+		return \CetechDeliveryEngine\Application\Configuration\Admin\AdminMoneyFormatter::display( $amount, $currency );
 	}
 
 	public static function diagnostic_severity_badge( DiagnosticSeverity $severity ): string {

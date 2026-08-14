@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Admin;
 
+use CetechDeliveryEngine\Application\Configuration\Admin\StoreAwareExamples;
 use CetechDeliveryEngine\Application\Diagnostics\ConfigurationDiagnostic;
 use CetechDeliveryEngine\Application\Diagnostics\ConfigurationHealthChecker;
 use CetechDeliveryEngine\Application\Diagnostics\DiagnosticSeverity;
@@ -150,7 +151,7 @@ final class AdminOperationsDashboard {
 		echo '<p class="cetech-de-dashboard-eyebrow">' . esc_html__( 'Delivery operations', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 		echo '<h1 class="cetech-de-dashboard-title">' . esc_html__( 'CETECH Delivery Engine', 'cetech-woocommerce-delivery-engine' ) . '</h1>';
 		echo '<p class="cetech-de-dashboard-subtitle">' . esc_html__(
-			'Manage delivery zones, offers, and rate cards for WooCommerce orders.',
+			'Manage delivery areas, delivery options, and delivery charges for WooCommerce orders.',
 			'cetech-woocommerce-delivery-engine'
 		) . '</p>';
 		echo '</div>';
@@ -158,16 +159,16 @@ final class AdminOperationsDashboard {
 		echo '<div class="cetech-de-button-group cetech-de-button-group--primary">';
 
 		$this->render_button(
-			__( 'Manage Rate Cards', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Manage Delivery Charges', 'cetech-woocommerce-delivery-engine' ),
 			AdminPageRenderer::list_url( RateCardsPage::SLUG ),
 			'primary'
 		);
 		$this->render_button(
-			__( 'Manage Delivery Offers', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Manage Delivery Options', 'cetech-woocommerce-delivery-engine' ),
 			AdminPageRenderer::list_url( DeliveryOffersPage::SLUG )
 		);
 		$this->render_button(
-			__( 'Manage Delivery Zones', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Manage Delivery Areas', 'cetech-woocommerce-delivery-engine' ),
 			AdminPageRenderer::list_url( DestinationZonesPage::SLUG )
 		);
 
@@ -187,30 +188,30 @@ final class AdminOperationsDashboard {
 		echo '<div class="cetech-de-card-grid cetech-de-readiness-grid">';
 
 		$this->render_readiness_card(
-			__( 'Delivery Zones', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Delivery zones tell the system where you deliver.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery Areas', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery areas tell the system where you deliver.', 'cetech-woocommerce-delivery-engine' ),
 			$this->zones_status( $state ),
 			$this->zones_status_label( $state ),
 			AdminPageRenderer::list_url( DestinationZonesPage::SLUG ),
-			__( 'Manage zones', 'cetech-woocommerce-delivery-engine' )
+			__( 'Manage delivery areas', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		$this->render_readiness_card(
-			__( 'Delivery Offers', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Delivery offers define services like Same-Day, Next-Day, or Standard Delivery.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery Options', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery options define services like Same-Day, Next-Day, or Standard Delivery.', 'cetech-woocommerce-delivery-engine' ),
 			$this->offers_status( $state ),
 			$this->offers_status_label( $state ),
 			AdminPageRenderer::list_url( DeliveryOffersPage::SLUG ),
-			__( 'Manage offers', 'cetech-woocommerce-delivery-engine' )
+			__( 'Manage delivery options', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		$this->render_readiness_card(
-			__( 'Rate Cards', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Rate cards connect zones and offers to actual delivery fees.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery Charges', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery charges connect delivery areas and options to actual delivery fees.', 'cetech-woocommerce-delivery-engine' ),
 			$this->rate_cards_status( $state ),
 			$this->rate_cards_status_label( $state ),
 			AdminPageRenderer::list_url( RateCardsPage::SLUG ),
-			__( 'Manage rate cards', 'cetech-woocommerce-delivery-engine' )
+			__( 'Manage delivery charges', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		$this->render_readiness_card(
@@ -234,29 +235,29 @@ final class AdminOperationsDashboard {
 
 		$step = $this->render_checklist_item(
 			$step,
-			__( 'Create at least one Delivery Zone', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Zones group the places you deliver to, such as a city or region.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Create at least one Delivery Area', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery areas group the places you deliver to, such as a city or region.', 'cetech-woocommerce-delivery-engine' ),
 			$state['zone_count'] > 0,
 			AdminPageRenderer::list_url( DestinationZonesPage::SLUG ),
-			__( 'Add a zone', 'cetech-woocommerce-delivery-engine' )
+			__( 'Add a delivery area', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		$step = $this->render_checklist_item(
 			$step,
-			__( 'Create at least one Delivery Offer', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Offers describe the delivery service your customers choose.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Create at least one Delivery Option', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery options describe the service your customers choose.', 'cetech-woocommerce-delivery-engine' ),
 			$state['offer_count'] > 0,
 			AdminPageRenderer::list_url( DeliveryOffersPage::SLUG ),
-			__( 'Add an offer', 'cetech-woocommerce-delivery-engine' )
+			__( 'Add a delivery option', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		$step = $this->render_checklist_item(
 			$step,
-			__( 'Create at least one Rate Card', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Rate cards set the price for each zone and offer combination.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Create at least one Delivery Charge', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Delivery charges set the price for each delivery area and option combination.', 'cetech-woocommerce-delivery-engine' ),
 			$state['active_rate_cards'] > 0,
 			add_query_arg( [ 'page' => RateCardsPage::SLUG, 'action' => 'add' ], admin_url( 'admin.php' ) ),
-			__( 'Add a rate card', 'cetech-woocommerce-delivery-engine' )
+			__( 'Add a delivery charge', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		$step = $this->render_checklist_item(
@@ -285,19 +286,19 @@ final class AdminOperationsDashboard {
 		echo '<div class="cetech-de-card-grid cetech-de-quick-actions">';
 
 		$this->render_action_card(
-			__( 'Add New Rate Card', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Set a delivery price for a zone and service.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Add New Delivery Charge', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Set a delivery price for a delivery area and service.', 'cetech-woocommerce-delivery-engine' ),
 			add_query_arg( [ 'page' => RateCardsPage::SLUG, 'action' => 'add' ], admin_url( 'admin.php' ) )
 		);
 
 		$this->render_action_card(
-			__( 'Review Delivery Zones', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Review Delivery Areas', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Check which areas you deliver to.', 'cetech-woocommerce-delivery-engine' ),
 			AdminPageRenderer::list_url( DestinationZonesPage::SLUG )
 		);
 
 		$this->render_action_card(
-			__( 'Review Delivery Offers', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Review Delivery Options', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Check the delivery services available to customers.', 'cetech-woocommerce-delivery-engine' ),
 			AdminPageRenderer::list_url( DeliveryOffersPage::SLUG )
 		);
@@ -486,12 +487,12 @@ final class AdminOperationsDashboard {
 			'cetech-woocommerce-delivery-engine'
 		) . '</p>';
 		echo '<ol class="cetech-de-help-steps">';
-		echo '<li>' . esc_html__( 'Create a Delivery Zone for where you deliver.', 'cetech-woocommerce-delivery-engine' ) . '</li>';
-		echo '<li>' . esc_html__( 'Create a Delivery Offer for the service you provide.', 'cetech-woocommerce-delivery-engine' ) . '</li>';
-		echo '<li>' . esc_html__( 'Create a Rate Card to set the price for that zone and offer.', 'cetech-woocommerce-delivery-engine' ) . '</li>';
+		echo '<li>' . esc_html__( 'Create a Delivery Area for where you deliver.', 'cetech-woocommerce-delivery-engine' ) . '</li>';
+		echo '<li>' . esc_html__( 'Create a Delivery Option for the service you provide.', 'cetech-woocommerce-delivery-engine' ) . '</li>';
+		echo '<li>' . esc_html__( 'Create a Delivery Charge to set the price for that area and option.', 'cetech-woocommerce-delivery-engine' ) . '</li>';
 		echo '</ol>';
 		echo '<p class="cetech-de-help-example"><span class="cetech-de-help-example-label">' . esc_html__( 'Example', 'cetech-woocommerce-delivery-engine' ) . '</span> ';
-		echo esc_html__( 'Accra + Same-Day Delivery = GHS 35.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo esc_html( StoreAwareExamples::charge_list_example() ) . '</p>';
 		echo '</div>';
 
 		echo '<div id="cetech-de-testing-instructions" class="cetech-de-help-card">';

@@ -64,8 +64,8 @@ Examples:
 
 | Internal key | User-facing label |
 |--------------|-------------------|
-| `enable_effective_configuration_runtime` | Use the New Delivery Settings System |
-| `enable_variable_product_ecr_runtime` | Use New Delivery Settings for Product Variations |
+| `enable_effective_configuration_runtime` | Use Site-wide Defaults at checkout |
+| `enable_variable_product_ecr_runtime` | Use Site-wide Defaults for product variations |
 
 If a switch is a deployment/cutover control, keep it under **Advanced settings** and warn staff not to change it unless CETECH support asked them to.
 
@@ -268,7 +268,7 @@ Allowlist: the terms may appear in Technical details, Advanced system details, d
 | Unresolved | Needs configuration |
 | Provenance: product | Currently using: Product Settings |
 | REPLACE [] | No delivery options for this setup |
-| enable_effective_configuration_runtime | Use the New Delivery Settings System |
+| enable_effective_configuration_runtime | Use Site-wide Defaults at checkout |
 | enable_product_delivery_selector | Show delivery choices on product pages |
 | Staff testing tools | Technical diagnostic tools |
 | Display key | Delivery choice identifier |
