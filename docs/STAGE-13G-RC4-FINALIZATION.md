@@ -202,7 +202,8 @@ Exact commit SHA, ZIP byte size, and SHA-256 are filled after the clean tagged b
 
 | Item | Value |
 |------|-------|
-| Final commit SHA | `889072e9972b4e8341c3af3fc8c3dfb24ca93c79` |
+| Product finalize commit (package source) | `889072e9972b4e8341c3af3fc8c3dfb24ca93c79` |
+| Tag tip `v1.0.0-rc.4` | `6b70c29b31362d1dad1c41e22fa30fa50e4ad559` (adds this package identity table only) |
 | ZIP bytes | `864059` |
 | SHA-256 | `6C30643329D9FF1C2CA970957D879F50B4C1D7FE8FB87CA8A2C2C3FCB3EB406B` |
 
