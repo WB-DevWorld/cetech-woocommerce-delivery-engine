@@ -202,9 +202,9 @@ Exact commit SHA, ZIP byte size, and SHA-256 are filled after the clean tagged b
 
 | Item | Value |
 |------|-------|
-| Final commit SHA | _(filled after commit)_ |
-| ZIP bytes | _(filled after build)_ |
-| SHA-256 | _(filled after build)_ |
+| Final commit SHA | `889072e9972b4e8341c3af3fc8c3dfb24ca93c79` |
+| ZIP bytes | `864059` |
+| SHA-256 | `6C30643329D9FF1C2CA970957D879F50B4C1D7FE8FB87CA8A2C2C3FCB3EB406B` |
 
 ---
 
