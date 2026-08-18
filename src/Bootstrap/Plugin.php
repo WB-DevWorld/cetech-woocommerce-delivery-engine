@@ -132,6 +132,12 @@ use CetechDeliveryEngine\Presentation\Frontend\CustomerOrderDeliverySummaryRende
 use CetechDeliveryEngine\Presentation\Frontend\ProductDeliverySelectorRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\VariableDeliverySelectorAssets;
 use CetechDeliveryEngine\Application\Selector\VariationDeliveryOptionsEndpoint;
+use CetechDeliveryEngine\Application\Shipment\HistoricalOrderShipmentContextFactory;
+use CetechDeliveryEngine\Application\Shipment\HistoricalShipmentPlanner;
+use CetechDeliveryEngine\Application\Shipment\PaidOrderShipmentSubscriber;
+use CetechDeliveryEngine\Application\Shipment\ShipmentCreationFailureStore;
+use CetechDeliveryEngine\Application\Shipment\ShipmentCreationIssueQuery;
+use CetechDeliveryEngine\Application\Shipment\ShipmentService;
 use CetechDeliveryEngine\Application\Runtime\VariationRelationshipInspectorInterface;
 use CetechDeliveryEngine\Application\Runtime\WooCommerceVariationRelationshipInspector;
 use CetechDeliveryEngine\Presentation\Admin\Validation\DeliveryOfferValidator;
@@ -243,6 +249,7 @@ final class Plugin {
 		$this->container->get( ShippingPackageBuilder::class )->register();
 		$this->container->get( SelectedOfferShippingIntegration::class )->register();
 		$this->container->get( OrderDeliverySnapshotPersister::class )->register();
+		$this->container->get( PaidOrderShipmentSubscriber::class )->register();
 		$this->container->get( OrderShippingItemPresentationGuard::class )->register();
 		$this->container->get( CustomerOrderDeliverySummaryRenderer::class )->register();
 		$this->container->get( CustomerOrderDeliveryEmailSummaryRenderer::class )->register();
@@ -607,6 +614,50 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			HistoricalShipmentPlanner::class,
+			static fn (): HistoricalShipmentPlanner => new HistoricalShipmentPlanner()
+		);
+
+		$this->container->singleton(
+			HistoricalOrderShipmentContextFactory::class,
+			static fn ( ServiceContainer $container ): HistoricalOrderShipmentContextFactory => new HistoricalOrderShipmentContextFactory(
+				$container->get( OrderDeliverySnapshotReader::class )
+			)
+		);
+
+		$this->container->singleton(
+			ShipmentCreationFailureStore::class,
+			static fn (): ShipmentCreationFailureStore => new ShipmentCreationFailureStore()
+		);
+
+		$this->container->singleton(
+			ShipmentService::class,
+			static fn ( ServiceContainer $container ): ShipmentService => new ShipmentService(
+				$container->get( FeatureFlags::class ),
+				$container->get( HistoricalOrderShipmentContextFactory::class ),
+				$container->get( HistoricalShipmentPlanner::class ),
+				$container->get( ShipmentRepositoryInterface::class ),
+				$container->get( ShipmentCreationFailureStore::class ),
+				$container->get( AuditLogRepositoryInterface::class ),
+				$container->get( Logger::class )
+			)
+		);
+
+		$this->container->singleton(
+			PaidOrderShipmentSubscriber::class,
+			static fn ( ServiceContainer $container ): PaidOrderShipmentSubscriber => new PaidOrderShipmentSubscriber(
+				$container->get( ShipmentService::class )
+			)
+		);
+
+		$this->container->singleton(
+			ShipmentCreationIssueQuery::class,
+			static fn ( ServiceContainer $container ): ShipmentCreationIssueQuery => new ShipmentCreationIssueQuery(
+				$container->get( ShipmentCreationFailureStore::class )
+			)
+		);
+
+		$this->container->singleton(
 			OrderDeliverySnapshotIntegrity::class,
 			static fn (): OrderDeliverySnapshotIntegrity => new OrderDeliverySnapshotIntegrity()
 		);
@@ -892,7 +943,9 @@ final class Plugin {
 			static fn ( ServiceContainer $container ): NeedsAttentionPage => new NeedsAttentionPage(
 				$container->get( NeedsAttentionQuery::class ),
 				$container->get( AdminActionHandler::class ),
-				$container->get( OperationalStateService::class )
+				$container->get( OperationalStateService::class ),
+				$container->get( ShipmentCreationIssueQuery::class ),
+				$container->get( ShipmentService::class )
 			)
 		);
 

@@ -13,6 +13,10 @@ final class AdminFormHelper {
 		wp_nonce_field( $action, 'cetech_de_nonce' );
 	}
 
+	public static function nonce_field_html( string $action ): string {
+		return '<input type="hidden" name="cetech_de_nonce" value="' . esc_attr( wp_create_nonce( $action ) ) . '" />';
+	}
+
 	public static function verify_nonce( string $action ): bool {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
 		if ( ! isset( $_POST['cetech_de_nonce'] ) ) {

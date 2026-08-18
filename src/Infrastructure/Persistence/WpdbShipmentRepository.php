@@ -8,6 +8,7 @@ use CetechDeliveryEngine\Domain\Enum\ShipmentEventSource;
 use CetechDeliveryEngine\Domain\Enum\ShipmentEventType;
 use CetechDeliveryEngine\Domain\Enum\ShipmentStatus;
 use CetechDeliveryEngine\Domain\Shipment\Shipment;
+use CetechDeliveryEngine\Domain\Shipment\ShipmentAggregateWriteResult;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentEvent;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentItem;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentListResult;
@@ -321,6 +322,196 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 		}
 
 		return $events;
+	}
+
+	public function ensureCompleteAggregate( Shipment $draft, array $items ): ShipmentAggregateWriteResult {
+		return $this->transact(
+			function () use ( $draft, $items ): ShipmentAggregateWriteResult {
+				$existing = $this->findByOrderAndGroup( $draft->order_id, $draft->delivery_group_id );
+				$status   = ShipmentAggregateWriteResult::CREATED;
+
+				if ( null === $existing ) {
+					$existing = $this->insert_new_shipment( $draft );
+				} else {
+					$status = ShipmentAggregateWriteResult::ALREADY_COMPLETE;
+				}
+
+				$changed = $this->ensure_items( $existing->id, $items );
+
+				if ( $this->ensure_created_event( $existing->id ) ) {
+					$changed = true;
+				}
+
+				if ( ! $this->aggregate_is_complete( $existing->id, $items ) ) {
+					throw new \RuntimeException( 'Shipment aggregate is incomplete after write.' );
+				}
+
+				if ( ShipmentAggregateWriteResult::CREATED !== $status && $changed ) {
+					$status = ShipmentAggregateWriteResult::REPAIRED;
+				}
+
+				$reloaded = $this->findById( $existing->id );
+
+				if ( null === $reloaded ) {
+					throw new \RuntimeException( 'Shipment aggregate could not be reloaded.' );
+				}
+
+				return new ShipmentAggregateWriteResult( $reloaded, $status );
+			}
+		);
+	}
+
+	/**
+	 * @template T
+	 * @param callable(): T $work
+	 * @return T
+	 */
+	private function transact( callable $work ): mixed {
+		global $wpdb;
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->query( 'START TRANSACTION' );
+
+		try {
+			$result = $work();
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->query( 'COMMIT' );
+
+			return $result;
+		} catch ( \Throwable $exception ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->query( 'ROLLBACK' );
+
+			throw $exception;
+		}
+	}
+
+	private function insert_new_shipment( Shipment $shipment ): Shipment {
+		$now = gmdate( 'Y-m-d H:i:s' );
+		$row = $this->to_shipment_row( $shipment, $now, true );
+		$id  = $this->insert_row( $row['data'], $row['formats'] );
+
+		if ( $id <= 0 ) {
+			if ( $this->is_duplicate_key_error() ) {
+				$existing = $this->findByOrderAndGroup( $shipment->order_id, $shipment->delivery_group_id );
+
+				if ( null !== $existing ) {
+					return $existing;
+				}
+			}
+
+			throw new \RuntimeException( 'Failed to create shipment record.' );
+		}
+
+		$created = $this->findById( $id );
+
+		if ( null === $created ) {
+			throw new \RuntimeException( 'Shipment insert succeeded but the row could not be reloaded.' );
+		}
+
+		return $created;
+	}
+
+	/**
+	 * @param list<ShipmentItem> $items
+	 */
+	private function ensure_items( int $shipment_id, array $items ): bool {
+		$existing     = $this->findItems( $shipment_id );
+		$existing_ids = [];
+
+		foreach ( $existing as $item ) {
+			$existing_ids[ $item->order_item_id ] = true;
+		}
+
+		$changed = false;
+
+		foreach ( $items as $item ) {
+			if ( isset( $existing_ids[ $item->order_item_id ] ) ) {
+				continue;
+			}
+
+			$this->insert_item( $shipment_id, $item );
+			$changed = true;
+		}
+
+		return $changed;
+	}
+
+	private function insert_item( int $shipment_id, ShipmentItem $item ): void {
+		global $wpdb;
+
+		$table = TableNames::for( ShipmentSchema::ITEMS_SUFFIX );
+		$now   = gmdate( 'Y-m-d H:i:s' );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+		$inserted = $wpdb->insert(
+			$table,
+			[
+				'shipment_id'           => $shipment_id,
+				'order_id'              => $item->order_id,
+				'order_item_id'         => $item->order_item_id,
+				'product_id'            => $item->product_id,
+				'variation_id'          => $item->variation_id,
+				'quantity'              => $item->quantity,
+				'product_name_snapshot' => $item->product_name_snapshot,
+				'created_at'            => '' !== $item->created_at ? $item->created_at : $now,
+			],
+			[ '%d', '%d', '%d', '%d', '%d', '%d', '%s', '%s' ]
+		);
+
+		if ( false === $inserted ) {
+			if ( $this->is_duplicate_key_error() ) {
+				return;
+			}
+
+			throw new \RuntimeException( 'Failed to persist shipment item.' );
+		}
+	}
+
+	private function ensure_created_event( int $shipment_id ): bool {
+		foreach ( $this->findEvents( $shipment_id ) as $event ) {
+			if ( ShipmentEventType::Created === $event->event_type ) {
+				return false;
+			}
+		}
+
+		$this->appendEvent(
+			ShipmentEvent::create(
+				$shipment_id,
+				ShipmentEventType::Created,
+				ShipmentEventSource::System,
+				null,
+				ShipmentStatus::AwaitingFulfilment
+			)
+		);
+
+		return true;
+	}
+
+	/**
+	 * @param list<ShipmentItem> $expected
+	 */
+	private function aggregate_is_complete( int $shipment_id, array $expected ): bool {
+		$stored     = $this->findItems( $shipment_id );
+		$stored_ids = [];
+
+		foreach ( $stored as $item ) {
+			$stored_ids[ $item->order_item_id ] = true;
+		}
+
+		foreach ( $expected as $item ) {
+			if ( ! isset( $stored_ids[ $item->order_item_id ] ) ) {
+				return false;
+			}
+		}
+
+		foreach ( $this->findEvents( $shipment_id ) as $event ) {
+			if ( ShipmentEventType::Created === $event->event_type ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private function find_event_by_id( int $id ): ?ShipmentEvent {

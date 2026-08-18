@@ -138,7 +138,7 @@ At the current known baseline:
 * runtime customer-facing flags default off;
 * WooCommerce is the only hard dependency;
 * HPOS compatibility exists through WooCommerce CRUD;
-* shipment tables and repository exist as a persistence foundation; runtime shipment creation is not implemented;
+* shipment tables, repository, and paid-order creation runtime exist; creation remains feature-gated OFF (`enable_shipment_records`);
 * shipment workspace is not yet implemented;
 * tracking runtime is not yet implemented;
 * customer shipment timeline is not yet implemented;

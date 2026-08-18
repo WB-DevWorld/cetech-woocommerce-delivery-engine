@@ -10,6 +10,11 @@ use PHPUnit\Framework\TestCase;
 
 final class Stage14BRuntimeFreezeTest extends TestCase {
 
+	protected function setUp(): void {
+		parent::setUp();
+		$GLOBALS['cetech_de_test_options'] = [];
+	}
+
 	public function test_shipment_feature_flags_remain_off(): void {
 		$flags = new FeatureFlags();
 
@@ -27,12 +32,23 @@ final class Stage14BRuntimeFreezeTest extends TestCase {
 
 		self::assertStringContainsString( 'ShipmentRepositoryInterface', $plugin );
 		self::assertStringContainsString( 'WpdbShipmentRepository', $plugin );
+		self::assertStringContainsString( 'ShipmentService', $plugin );
+		self::assertStringContainsString( 'PaidOrderShipmentSubscriber', $plugin );
 		self::assertStringNotContainsString( 'WooCommerceFulfillmentsAdapter', $plugin );
-		self::assertStringNotContainsString( 'woocommerce_payment_complete', $plugin );
 		self::assertStringNotContainsString( 'woocommerce_thankyou', $plugin );
-		self::assertStringNotContainsString( 'woocommerce_order_status', $plugin );
-		self::assertStringNotContainsString( 'ShipmentService', $plugin );
-		self::assertStringNotContainsString( 'enable_shipment_records', $plugin );
+	}
+
+	public function test_paid_order_subscriber_is_post_payment_only(): void {
+		$source = (string) file_get_contents(
+			dirname( __DIR__, 3 ) . '/src/Application/Shipment/PaidOrderShipmentSubscriber.php'
+		);
+
+		self::assertStringContainsString( 'woocommerce_payment_complete', $source );
+		self::assertStringContainsString( 'woocommerce_order_status_processing', $source );
+		self::assertStringContainsString( 'woocommerce_order_status_completed', $source );
+		self::assertStringNotContainsString( 'woocommerce_thankyou', $source );
+		self::assertStringNotContainsString( 'woocommerce_new_order', $source );
+		self::assertStringNotContainsString( 'woocommerce_checkout_order_processed', $source );
 	}
 
 	public function test_fulfillments_adapter_is_unimplemented_and_not_a_write_path(): void {

@@ -51,4 +51,13 @@ interface ShipmentRepositoryInterface {
 	 * @return list<ShipmentEvent>
 	 */
 	public function findEvents( int $shipment_id ): array;
+
+	/**
+	 * Atomically persist a shipment plus its items and initial created event.
+	 *
+	 * Repairs an incomplete aggregate. Does not duplicate complete items/events.
+	 *
+	 * @param list<ShipmentItem> $items
+	 */
+	public function ensureCompleteAggregate( Shipment $draft, array $items ): ShipmentAggregateWriteResult;
 }

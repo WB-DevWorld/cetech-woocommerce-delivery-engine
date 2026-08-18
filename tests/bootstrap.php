@@ -204,7 +204,79 @@ if ( ! function_exists( 'plugin_basename' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_unslash' ) ) {
+	function wp_unslash( mixed $value ): mixed {
+		return $value;
+	}
+}
+
+if ( ! function_exists( 'wp_verify_nonce' ) ) {
+	function wp_verify_nonce( string $nonce, string $action ): bool {
+		return $nonce === 'test-nonce-' . $action;
+	}
+}
+
+if ( ! function_exists( 'add_action' ) ) {
+	function add_action( string $hook, $callback, int $priority = 10, int $accepted_args = 1 ): bool {
+		$GLOBALS['cetech_de_test_actions'][ $hook ][] = [
+			'callback' => $callback,
+			'priority' => $priority,
+			'args'     => $accepted_args,
+		];
+
+		return true;
+	}
+}
+
+if ( ! function_exists( 'add_option' ) ) {
+	function add_option( string $option, mixed $value = '', mixed $deprecated = '', bool|string $autoload = 'yes' ): bool {
+		unset( $deprecated, $autoload );
+
+		if ( array_key_exists( $option, $GLOBALS['cetech_de_test_options'] ?? [] ) ) {
+			return false;
+		}
+
+		$GLOBALS['cetech_de_test_options'][ $option ] = $value;
+
+		return true;
+	}
+}
+
+if ( ! function_exists( 'wc_format_decimal' ) ) {
+	function wc_format_decimal( mixed $number, mixed $dp = false, bool $trim_zeros = false ): string {
+		unset( $trim_zeros );
+		$decimals = is_numeric( $dp ) ? (int) $dp : 4;
+
+		return number_format( (float) $number, $decimals, '.', '' );
+	}
+}
+
+if ( ! function_exists( 'add_query_arg' ) ) {
+	function add_query_arg( mixed ...$args ): string {
+		unset( $args );
+
+		return 'https://example.test/wp-admin/admin.php';
+	}
+}
+
+if ( ! function_exists( 'wp_safe_redirect' ) ) {
+	function wp_safe_redirect( mixed $location, int $status = 302, string $x_redirect_by = 'WordPress' ): bool {
+		unset( $status, $x_redirect_by );
+		$GLOBALS['cetech_de_test_redirects'][] = $location;
+
+		throw new RuntimeException( 'cetech_de_test_redirect' );
+	}
+}
+
+if ( ! function_exists( 'is_user_logged_in' ) ) {
+	function is_user_logged_in(): bool {
+		return (bool) ( $GLOBALS['cetech_de_test_logged_in'] ?? false );
+	}
+}
+
 require_once __DIR__ . '/stubs/woocommerce-product-stub.php';
+
+require_once __DIR__ . '/stubs/woocommerce-order-stub.php';
 
 require_once __DIR__ . '/stubs/wordpress-frontend-stubs.php';
 

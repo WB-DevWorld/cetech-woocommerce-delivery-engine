@@ -26,6 +26,16 @@ final class FakeWpdb {
 	/** @var array<string, int> */
 	private array $auto_increment = [];
 
+	public ?string $fail_next_insert_table = null;
+
+	/** @var array<string, list<array<string, mixed>>>|null */
+	private ?array $transaction_tables = null;
+
+	/** @var array<string, int>|null */
+	private ?array $transaction_auto_increment = null;
+
+	private int $transaction_insert_id = 0;
+
 	/**
 	 * @param list<list<string>> $unique_indexes
 	 */
@@ -37,6 +47,40 @@ final class FakeWpdb {
 
 	public function get_charset_collate(): string {
 		return 'DEFAULT CHARSET=utf8mb4';
+	}
+
+	public function query( mixed $sql ): bool {
+		$normalized = strtoupper( trim( (string) $sql ) );
+
+		if ( 'START TRANSACTION' === $normalized ) {
+			$this->transaction_tables         = unserialize( serialize( $this->tables ) );
+			$this->transaction_auto_increment = $this->auto_increment;
+			$this->transaction_insert_id      = $this->insert_id;
+
+			return true;
+		}
+
+		if ( 'COMMIT' === $normalized ) {
+			$this->transaction_tables         = null;
+			$this->transaction_auto_increment = null;
+
+			return true;
+		}
+
+		if ( 'ROLLBACK' === $normalized ) {
+			if ( null !== $this->transaction_tables ) {
+				$this->tables         = $this->transaction_tables;
+				$this->auto_increment = $this->transaction_auto_increment ?? $this->auto_increment;
+				$this->insert_id      = $this->transaction_insert_id;
+			}
+
+			$this->transaction_tables         = null;
+			$this->transaction_auto_increment = null;
+
+			return true;
+		}
+
+		throw new \RuntimeException( 'Unsupported SQL: ' . (string) $sql );
 	}
 
 	public function prepare( string $query, mixed ...$args ): string {
@@ -77,6 +121,13 @@ final class FakeWpdb {
 
 		if ( ! isset( $this->tables[ $table ] ) ) {
 			$this->last_error = 'Table not found';
+
+			return false;
+		}
+
+		if ( $this->fail_next_insert_table === $table ) {
+			$this->fail_next_insert_table = null;
+			$this->last_error             = 'Simulated insert failure';
 
 			return false;
 		}
