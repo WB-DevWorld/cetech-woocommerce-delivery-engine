@@ -137,10 +137,16 @@ use CetechDeliveryEngine\Application\Selector\VariationDeliveryOptionsEndpoint;
 use CetechDeliveryEngine\Application\Shipment\CustomerShipmentQuery;
 use CetechDeliveryEngine\Application\Shipment\HistoricalOrderShipmentContextFactory;
 use CetechDeliveryEngine\Application\Shipment\HistoricalShipmentPlanner;
+use CetechDeliveryEngine\Application\Shipment\OrderShipmentOperationsSubscriber;
 use CetechDeliveryEngine\Application\Shipment\PaidOrderShipmentSubscriber;
+use CetechDeliveryEngine\Application\Shipment\ShipmentRefundInspector;
 use CetechDeliveryEngine\Application\Shipment\ShipmentCreationFailureStore;
 use CetechDeliveryEngine\Application\Shipment\ShipmentCreationIssueQuery;
+use CetechDeliveryEngine\Application\Shipment\ShipmentEtaService;
+use CetechDeliveryEngine\Application\Shipment\ShipmentOperationsIssueQuery;
+use CetechDeliveryEngine\Application\Shipment\ShipmentOperationsIssueStore;
 use CetechDeliveryEngine\Application\Shipment\ShipmentService;
+use CetechDeliveryEngine\Application\Shipment\ShipmentStatusService;
 use CetechDeliveryEngine\Application\Shipment\ShipmentTrackingService;
 use CetechDeliveryEngine\Application\Shipment\ShipmentWorkspaceQuery;
 use CetechDeliveryEngine\Application\Runtime\VariationRelationshipInspectorInterface;
@@ -255,6 +261,7 @@ final class Plugin {
 		$this->container->get( SelectedOfferShippingIntegration::class )->register();
 		$this->container->get( OrderDeliverySnapshotPersister::class )->register();
 		$this->container->get( PaidOrderShipmentSubscriber::class )->register();
+		$this->container->get( OrderShipmentOperationsSubscriber::class )->register();
 		$this->container->get( OrderShippingItemPresentationGuard::class )->register();
 		$this->container->get( CustomerOrderDeliverySummaryRenderer::class )->register();
 		$this->container->get( CustomerShipmentRenderer::class )->register();
@@ -657,6 +664,46 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			ShipmentOperationsIssueStore::class,
+			static fn (): ShipmentOperationsIssueStore => new ShipmentOperationsIssueStore()
+		);
+
+		$this->container->singleton(
+			ShipmentStatusService::class,
+			static fn ( ServiceContainer $container ): ShipmentStatusService => new ShipmentStatusService(
+				$container->get( ShipmentRepositoryInterface::class ),
+				$container->get( ShipmentOperationsIssueStore::class )
+			)
+		);
+
+		$this->container->singleton(
+			ShipmentEtaService::class,
+			static fn ( ServiceContainer $container ): ShipmentEtaService => new ShipmentEtaService(
+				$container->get( ShipmentRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			OrderShipmentOperationsSubscriber::class,
+			static fn ( ServiceContainer $container ): OrderShipmentOperationsSubscriber => new OrderShipmentOperationsSubscriber(
+				$container->get( FeatureFlags::class ),
+				$container->get( ShipmentRepositoryInterface::class ),
+				$container->get( ShipmentStatusService::class ),
+				new ShipmentRefundInspector(),
+				$container->get( ShipmentOperationsIssueStore::class )
+			)
+		);
+
+		$this->container->singleton(
+			ShipmentOperationsIssueQuery::class,
+			static fn ( ServiceContainer $container ): ShipmentOperationsIssueQuery => new ShipmentOperationsIssueQuery(
+				$container->get( FeatureFlags::class ),
+				$container->get( ShipmentRepositoryInterface::class ),
+				$container->get( ShipmentOperationsIssueStore::class )
+			)
+		);
+
+		$this->container->singleton(
 			ShipmentCreationIssueQuery::class,
 			static fn ( ServiceContainer $container ): ShipmentCreationIssueQuery => new ShipmentCreationIssueQuery(
 				$container->get( ShipmentCreationFailureStore::class )
@@ -984,7 +1031,8 @@ final class Plugin {
 				$container->get( OperationalStateService::class ),
 				$container->get( ShipmentCreationIssueQuery::class ),
 				$container->get( ShipmentService::class ),
-				$container->get( FeatureFlags::class )
+				$container->get( FeatureFlags::class ),
+				$container->get( ShipmentOperationsIssueQuery::class )
 			)
 		);
 
@@ -994,7 +1042,9 @@ final class Plugin {
 				$container->get( FeatureFlags::class ),
 				$container->get( ShipmentWorkspaceQuery::class ),
 				$container->get( AdminActionHandler::class ),
-				$container->get( ShipmentTrackingService::class )
+				$container->get( ShipmentTrackingService::class ),
+				$container->get( ShipmentStatusService::class ),
+				$container->get( ShipmentEtaService::class )
 			)
 		);
 

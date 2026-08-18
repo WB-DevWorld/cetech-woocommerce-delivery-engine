@@ -268,6 +268,33 @@ Human labels are presentation only. Initial status: `awaiting_fulfilment`.
 
 Do **not** automatically complete the whole WooCommerce order because one shipment becomes `delivered`.
 
+Stage 14F normal transition matrix (corrections are a separate authorised path):
+
+```text
+awaiting_fulfilment → processing | cancelled
+processing → dispatched | delayed | cancelled
+dispatched → in_transit | delayed
+in_transit → delivered | delayed
+delayed → processing | dispatched | in_transit | delivered | cancelled
+delivered → (none)
+cancelled → (none)
+```
+
+`delivered` and `cancelled` are terminal for ordinary actions. Authorised staff may apply a **corrective** status change with a mandatory internal reason. Correction reasons are not customer-visible.
+
+Marking a shipment `dispatched` does **not** invent `dispatch_at`. A shipment may be dispatched with no dispatch date.
+
+WooCommerce remains the money authority. Shipment status never refunds, requotes, or edits paid shipping snapshots.
+
+Conservative order sync:
+
+- WooCommerce order `cancelled` + shipment `awaiting_fulfilment` or `processing` → automatic shipment `cancelled`
+- WooCommerce order `cancelled` + shipment already `dispatched` / `in_transit` / `delayed` / `delivered` → keep operational status; Needs Attention
+- Full refund of every quantity on one not-yet-dispatched shipment → automatic shipment `cancelled`
+- Partial refund, or any refund after physical progress → keep operational status; Needs Attention
+- Sibling shipments are not rewritten
+
+
 ### Tracking V1
 
 Tracking remains **manual**. Allowed fields: public carrier display name, tracking number, tracking URL, dispatch date, public shipment note.
@@ -389,11 +416,16 @@ Surface genuine operational shipment problems:
 - broken shipment/order linkage
 - invalid tracking URL
 - missing required historical shipment data
+- delayed / issue shipments
+- WooCommerce order cancelled after the shipment has already progressed
+- refund that requires physical fulfilment review
+- failed automatic order-state / refund status sync
 
 Do **not** flag harmless normal states:
 
 - newly created shipment without tracking
 - pickup-only order with zero delivery shipments
+- ordinary `awaiting_fulfilment` or `processing` shipments
 
 ---
 

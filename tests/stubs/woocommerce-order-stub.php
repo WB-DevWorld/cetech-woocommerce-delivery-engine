@@ -57,6 +57,24 @@ if ( ! class_exists( 'WC_Order', false ) ) {
 			unset( $this->data['meta'][ $key ] );
 		}
 
+		public function get_qty_refunded_for_item( int $item_id ): float {
+			$map = is_array( $this->data['refunded_qty'] ?? null ) ? $this->data['refunded_qty'] : [];
+
+			return (float) ( $map[ $item_id ] ?? 0 );
+		}
+
+		public function set_refunded_qty( int $item_id, float $qty ): void {
+			if ( ! isset( $this->data['refunded_qty'] ) || ! is_array( $this->data['refunded_qty'] ) ) {
+				$this->data['refunded_qty'] = [];
+			}
+
+			$this->data['refunded_qty'][ $item_id ] = $qty;
+		}
+
+		public function set_status( string $status ): void {
+			$this->data['status'] = $status;
+		}
+
 		public function save(): void {
 			$GLOBALS['cetech_de_test_wc_orders'][ $this->get_id() ] = $this;
 		}

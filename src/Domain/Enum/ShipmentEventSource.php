@@ -9,7 +9,8 @@ namespace CetechDeliveryEngine\Domain\Enum;
  */
 enum ShipmentEventSource: string {
 
-	case System = 'system';
-	case Staff  = 'staff';
-	case Retry  = 'retry';
+	case System      = 'system';
+	case Staff       = 'staff';
+	case Retry       = 'retry';
+	case WooCommerce = 'woocommerce';
 }

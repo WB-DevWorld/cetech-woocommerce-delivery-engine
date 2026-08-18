@@ -9,6 +9,7 @@ use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
 use CetechDeliveryEngine\Application\Checkout\CheckoutDeliverySelectionValidator;
 use CetechDeliveryEngine\Application\Diagnostics\ConfigurationHealthChecker;
 use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotPersister;
+use CetechDeliveryEngine\Application\Shipment\OrderShipmentOperationsSubscriber;
 use CetechDeliveryEngine\Application\Shipment\PaidOrderShipmentSubscriber;
 use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingIntegration;
 use CetechDeliveryEngine\Application\Shipping\ShippingPackageBuilder;
@@ -107,6 +108,7 @@ final class PluginBootServiceGraphTest extends TestCase {
 			ShippingPackageBuilder::class,
 			SelectedOfferShippingIntegration::class,
 			PaidOrderShipmentSubscriber::class,
+			OrderShipmentOperationsSubscriber::class,
 			OrderDeliverySnapshotPersister::class,
 			CustomerOrderDeliverySummaryRenderer::class,
 			\CetechDeliveryEngine\Presentation\Frontend\CustomerShipmentRenderer::class,

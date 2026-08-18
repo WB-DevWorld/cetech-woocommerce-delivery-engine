@@ -33,6 +33,10 @@ final class RoleAccessService {
 
 	public const PERMISSION_DIAGNOSTICS = 'diagnostics';
 
+	public const PERMISSION_SHIPMENTS = 'shipments';
+
+	public const PERMISSION_SHIPMENT_STATUS = 'shipment_status';
+
 	/**
 	 * @return list<array{
 	 *     key: string,
@@ -105,6 +109,20 @@ final class RoleAccessService {
 				'label'                    => __( 'View Technical Diagnostics', 'cetech-woocommerce-delivery-engine' ),
 				'capability'               => Capabilities::DIAGNOSTICS,
 				'implies_view'             => false,
+				'locked_for_administrator' => true,
+			],
+			[
+				'key'                      => self::PERMISSION_SHIPMENTS,
+				'label'                    => __( 'Manage Shipments', 'cetech-woocommerce-delivery-engine' ),
+				'capability'               => 'manage_shipments',
+				'implies_view'             => true,
+				'locked_for_administrator' => true,
+			],
+			[
+				'key'                      => self::PERMISSION_SHIPMENT_STATUS,
+				'label'                    => __( 'Update shipment status', 'cetech-woocommerce-delivery-engine' ),
+				'capability'               => 'update_shipment_status',
+				'implies_view'             => true,
 				'locked_for_administrator' => true,
 			],
 		];

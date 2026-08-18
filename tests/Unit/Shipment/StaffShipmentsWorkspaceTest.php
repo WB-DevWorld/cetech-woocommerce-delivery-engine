@@ -329,7 +329,7 @@ final class StaffShipmentsWorkspaceTest extends TestCase {
 			ShipmentPresentation::event_type_label( 'future_mystery_event' )
 		);
 		self::assertSame(
-			'Awaiting fulfilment',
+			'Shipment created',
 			ShipmentPresentation::event_type_label( ShipmentEventType::Created->value )
 		);
 		self::assertSame( '1 item', ShipmentPresentation::item_count_label( 1 ) );

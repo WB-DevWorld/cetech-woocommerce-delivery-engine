@@ -59,14 +59,20 @@ final class AdminFormHelper {
 		string $label,
 		string $value = '',
 		int $rows = 4,
-		string $description = ''
+		string $description = '',
+		bool $required = false
 	): void {
-		echo '<tr><th scope="row"><label for="' . esc_attr( $name ) . '">' . esc_html( $label ) . '</label></th><td>';
+		echo '<tr><th scope="row"><label for="' . esc_attr( $name ) . '">' . esc_html( $label );
+		if ( $required ) {
+			echo ' <span class="description">' . esc_html__( '(required)', 'cetech-woocommerce-delivery-engine' ) . '</span>';
+		}
+		echo '</label></th><td>';
 		printf(
-			'<textarea class="large-text" id="%1$s" name="%1$s" rows="%2$d">%3$s</textarea>',
+			'<textarea class="large-text" id="%1$s" name="%1$s" rows="%2$d"%4$s>%3$s</textarea>',
 			esc_attr( $name ),
 			$rows,
-			esc_textarea( $value )
+			esc_textarea( $value ),
+			$required ? ' required' : ''
 		);
 		if ( '' !== $description ) {
 			echo '<p class="description">' . esc_html( $description ) . '</p>';

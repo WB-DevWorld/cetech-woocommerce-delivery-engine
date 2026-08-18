@@ -8,6 +8,7 @@ use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
 use CetechDeliveryEngine\Application\Configuration\OperationalState;
 use CetechDeliveryEngine\Application\Configuration\OperationalStateService;
 use CetechDeliveryEngine\Application\Shipment\ShipmentCreationIssueQuery;
+use CetechDeliveryEngine\Application\Shipment\ShipmentOperationsIssueQuery;
 use CetechDeliveryEngine\Application\Shipment\ShipmentService;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
@@ -15,8 +16,8 @@ use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
 use CetechDeliveryEngine\Domain\Enum\ShipmentEventSource;
 
 /**
- * Products whose effective delivery configuration is incomplete, plus
- * genuine paid-order shipment creation failures.
+ * Products whose effective delivery configuration is incomplete, paid-order
+ * shipment creation failures, and operational shipment review items.
  */
 final class NeedsAttentionPage {
 
@@ -30,7 +31,8 @@ final class NeedsAttentionPage {
 		private readonly OperationalStateService $operational_state,
 		private readonly ShipmentCreationIssueQuery $shipment_issues,
 		private readonly ShipmentService $shipment_service,
-		private readonly FeatureFlags $flags
+		private readonly FeatureFlags $flags,
+		private readonly ShipmentOperationsIssueQuery $operations_issues
 	) {
 	}
 
@@ -71,18 +73,22 @@ final class NeedsAttentionPage {
 	}
 
 	public function render(): void {
-		AdminPageAccess::require_capability( 'manage_product_delivery_rules' );
+		if ( ! current_user_can( 'manage_product_delivery_rules' ) && ! current_user_can( 'manage_shipments' ) ) {
+			AdminPageAccess::require_capability( 'manage_product_delivery_rules' );
+		}
+
 		$this->action_handler->notices()->render_notices();
 
-		$items    = $this->query->list( 200 );
+		$items     = current_user_can( 'manage_product_delivery_rules' ) ? $this->query->list( 200 ) : [];
 		$shipments = $this->shipment_issues->list( 50 );
-		$op       = $this->operational_state->current();
+		$operations = $this->operations_issues->list( 50 );
+		$op        = $this->operational_state->current();
 
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
 			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Needs Attention', 'cetech-woocommerce-delivery-engine' ),
-			__( 'An operational to-do list for products that are missing a usable delivery setup, and paid orders whose delivery shipments could not be created.', 'cetech-woocommerce-delivery-engine' )
+			__( 'An operational to-do list for products that are missing a usable delivery setup, paid orders whose delivery shipments could not be created, and shipments that need fulfilment review.', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		if ( $op->customers_still_use_previous_rules() && ! $op->sitewide_setup_complete ) {
@@ -96,11 +102,12 @@ final class NeedsAttentionPage {
 		}
 
 		$this->render_shipment_issues( $shipments );
+		$this->render_operations_issues( $operations );
 
-		if ( [] === $items && [] === $shipments ) {
+		if ( [] === $items && [] === $shipments && [] === $operations ) {
 			AdminPageLayout::render_empty_state(
 				__( 'Nothing needs attention', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Every listed product currently has a usable delivery setup, and no paid-order shipment creation problems are waiting.', 'cetech-woocommerce-delivery-engine' )
+				__( 'Every listed product currently has a usable delivery setup, and no paid-order shipment creation or operational shipment problems are waiting.', 'cetech-woocommerce-delivery-engine' )
 			);
 			AdminPageLayout::close_page();
 			return;
@@ -213,6 +220,52 @@ final class NeedsAttentionPage {
 
 		AdminPageRenderer::render_table(
 			[
+				__( 'Order', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Problem', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Action', 'cetech-woocommerce-delivery-engine' ),
+			],
+			$rows,
+			true
+		);
+	}
+
+	/**
+	 * @param list<array{shipment_id: int, shipment_number: string, order_id: int, order_number: string, order_url: string, shipment_url: string, codes: list<string>, reasons: list<string>}> $issues
+	 */
+	private function render_operations_issues( array $issues ): void {
+		if ( [] === $issues ) {
+			return;
+		}
+
+		echo '<h2>' . esc_html__( 'Shipment operations', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
+		echo '<p class="description">' . esc_html__( 'These shipments need a fulfilment review. Delayed shipments appear here until they leave the delayed state. Refund and cancellation mismatches stay until the shipment is cancelled or otherwise resolved operationally.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+
+		$rows = [];
+
+		foreach ( $issues as $issue ) {
+			$order = esc_html(
+				sprintf(
+					/* translators: %s: order number */
+					__( 'Order %s', 'cetech-woocommerce-delivery-engine' ),
+					$issue['order_number']
+				)
+			);
+
+			if ( '' !== $issue['order_url'] ) {
+				$order = '<a href="' . esc_url( $issue['order_url'] ) . '">' . $order . '</a>';
+			}
+
+			$rows[] = [
+				'<a href="' . esc_url( $issue['shipment_url'] ) . '"><strong>' . esc_html( $issue['shipment_number'] ) . '</strong></a>',
+				$order,
+				esc_html( implode( ' ', $issue['reasons'] ) ),
+				'<a class="button" href="' . esc_url( $issue['shipment_url'] ) . '">' . esc_html__( 'Review shipment', 'cetech-woocommerce-delivery-engine' ) . '</a>',
+			];
+		}
+
+		AdminPageRenderer::render_table(
+			[
+				__( 'Shipment', 'cetech-woocommerce-delivery-engine' ),
 				__( 'Order', 'cetech-woocommerce-delivery-engine' ),
 				__( 'Problem', 'cetech-woocommerce-delivery-engine' ),
 				__( 'Action', 'cetech-woocommerce-delivery-engine' ),

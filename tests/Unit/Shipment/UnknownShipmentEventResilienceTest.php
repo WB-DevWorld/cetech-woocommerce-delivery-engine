@@ -70,7 +70,7 @@ final class UnknownShipmentEventResilienceTest extends TestCase {
 		self::assertSame( 'created', $this->stored_event_type( $event->id ) );
 		self::assertNotSame( 'Awaiting fulfilment', $this->stored_event_type( $event->id ) );
 		self::assertSame(
-			'Awaiting fulfilment',
+			'Shipment created — Awaiting fulfilment',
 			ShipmentPresentation::event_label( $event )
 		);
 	}

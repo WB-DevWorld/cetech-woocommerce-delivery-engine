@@ -5,36 +5,58 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Shipment\ShipmentDispatchDate;
+use CetechDeliveryEngine\Application\Shipment\ShipmentEtaService;
 use CetechDeliveryEngine\Application\Shipment\ShipmentListRow;
+use CetechDeliveryEngine\Application\Shipment\ShipmentStatusChangeRequest;
+use CetechDeliveryEngine\Application\Shipment\ShipmentStatusService;
+use CetechDeliveryEngine\Application\Shipment\ShipmentStatusTransitionPolicy;
 use CetechDeliveryEngine\Application\Shipment\ShipmentTrackingInput;
 use CetechDeliveryEngine\Application\Shipment\ShipmentTrackingService;
 use CetechDeliveryEngine\Application\Shipment\ShipmentWorkspaceDetail;
 use CetechDeliveryEngine\Application\Shipment\ShipmentWorkspaceQuery;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
+use CetechDeliveryEngine\Domain\Enum\ShipmentStatus;
 use CetechDeliveryEngine\Domain\Shipment\Shipment;
+use CetechDeliveryEngine\Domain\Shipment\ShipmentEvent;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentItem;
 
 /**
  * WordPress-native staff Shipments list and detail workspace.
  *
- * Tracking may be edited when shipment records are enabled. Status remains read-only in Stage 14E.
+ * Tracking, status, and current ETA may be edited when shipment records are enabled.
  */
 final class ShipmentsPage {
 
 	public const SLUG = 'cetech-delivery-engine-shipments';
 
-	public const ACTION_SAVE_TRACKING = 'cetech_de_save_shipment_tracking';
+	public const ACTION_SAVE_TRACKING   = 'cetech_de_save_shipment_tracking';
+	public const ACTION_CHANGE_STATUS   = 'cetech_de_change_shipment_status';
+	public const ACTION_CORRECT_STATUS  = 'cetech_de_correct_shipment_status';
+	public const ACTION_UPDATE_ETA      = 'cetech_de_update_shipment_eta';
 
 	public function __construct(
 		private readonly FeatureFlags $flags,
 		private readonly ShipmentWorkspaceQuery $query,
 		private readonly ?AdminActionHandler $actions = null,
-		private readonly ?ShipmentTrackingService $tracking = null
+		private readonly ?ShipmentTrackingService $tracking = null,
+		private readonly ?ShipmentStatusService $status = null,
+		private readonly ?ShipmentEtaService $eta = null
 	) {
 	}
 
 	public function handle_actions(): void {
-		if ( ! $this->actions instanceof AdminActionHandler || ! $this->tracking instanceof ShipmentTrackingService ) {
+		if ( ! $this->actions instanceof AdminActionHandler ) {
+			return;
+		}
+
+		$this->handle_tracking_action();
+		$this->handle_status_action();
+		$this->handle_correction_action();
+		$this->handle_eta_action();
+	}
+
+	private function handle_tracking_action(): void {
+		if ( ! $this->tracking instanceof ShipmentTrackingService ) {
 			return;
 		}
 
@@ -74,6 +96,128 @@ final class ShipmentsPage {
 			self::SLUG,
 			[ 'shipment' => (string) max( 0, $shipment_id ) ]
 		);
+	}
+
+	private function handle_status_action(): void {
+		if ( ! $this->status instanceof ShipmentStatusService ) {
+			return;
+		}
+
+		if ( ! $this->actions->verify_post(
+			self::ACTION_CHANGE_STATUS,
+			self::ACTION_CHANGE_STATUS,
+			'update_shipment_status',
+			self::SLUG
+		) ) {
+			return;
+		}
+
+		$this->apply_status_post( false );
+	}
+
+	private function handle_correction_action(): void {
+		if ( ! $this->status instanceof ShipmentStatusService ) {
+			return;
+		}
+
+		if ( ! $this->actions->verify_post(
+			self::ACTION_CORRECT_STATUS,
+			self::ACTION_CORRECT_STATUS,
+			'update_shipment_status',
+			self::SLUG
+		) ) {
+			return;
+		}
+
+		$this->apply_status_post( true );
+	}
+
+	private function apply_status_post( bool $correction ): void {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified by AdminActionHandler::verify_post().
+		$shipment_id = isset( $_POST['shipment_id'] ) ? absint( wp_unslash( (string) $_POST['shipment_id'] ) ) : 0;
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified by AdminActionHandler::verify_post().
+		$target_raw = isset( $_POST['target_status'] ) ? sanitize_key( wp_unslash( (string) $_POST['target_status'] ) ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified by AdminActionHandler::verify_post().
+		$reason = isset( $_POST['status_reason'] ) ? (string) wp_unslash( (string) $_POST['status_reason'] ) : '';
+
+		if ( ! $this->flags->is_enabled( 'enable_shipment_records' ) ) {
+			$this->actions->notices()->flash_error(
+				__( 'You do not have permission to perform this action.', 'cetech-woocommerce-delivery-engine' )
+			);
+			$this->actions->redirect( self::SLUG, [ 'shipment' => (string) max( 0, $shipment_id ) ] );
+		}
+
+		$target = $this->status->target_from_request( $target_raw );
+
+		if ( ! $target instanceof ShipmentStatus ) {
+			$this->actions->notices()->flash_error(
+				__( 'That shipment status is not recognised.', 'cetech-woocommerce-delivery-engine' )
+			);
+			$this->actions->redirect( self::SLUG, [ 'shipment' => (string) max( 0, $shipment_id ) ] );
+		}
+
+		$request = $correction
+			? ShipmentStatusChangeRequest::staff_correction( $reason, $this->actor_id() )
+			: ShipmentStatusChangeRequest::staff_normal( $reason, $this->actor_id() );
+
+		$result = $this->status->change( $shipment_id, $target, $request );
+
+		if ( $result->ok ) {
+			$this->actions->notices()->flash_success( $result->message );
+		} else {
+			$this->actions->notices()->flash_error( $result->message );
+		}
+
+		$this->actions->redirect(
+			self::SLUG,
+			[ 'shipment' => (string) max( 0, $shipment_id ) ]
+		);
+	}
+
+	private function handle_eta_action(): void {
+		if ( ! $this->eta instanceof ShipmentEtaService ) {
+			return;
+		}
+
+		if ( ! $this->actions->verify_post(
+			self::ACTION_UPDATE_ETA,
+			self::ACTION_UPDATE_ETA,
+			'update_shipment_status',
+			self::SLUG
+		) ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified by AdminActionHandler::verify_post().
+		$shipment_id = isset( $_POST['shipment_id'] ) ? absint( wp_unslash( (string) $_POST['shipment_id'] ) ) : 0;
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified by AdminActionHandler::verify_post().
+		$eta = isset( $_POST['eta_current'] ) ? (string) wp_unslash( (string) $_POST['eta_current'] ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified by AdminActionHandler::verify_post().
+		$reason = isset( $_POST['eta_reason'] ) ? (string) wp_unslash( (string) $_POST['eta_reason'] ) : '';
+
+		if ( ! $this->flags->is_enabled( 'enable_shipment_records' ) ) {
+			$this->actions->notices()->flash_error(
+				__( 'You do not have permission to perform this action.', 'cetech-woocommerce-delivery-engine' )
+			);
+			$this->actions->redirect( self::SLUG, [ 'shipment' => (string) max( 0, $shipment_id ) ] );
+		}
+
+		$result = $this->eta->update_current( $shipment_id, $eta, $reason, $this->actor_id() );
+
+		if ( $result->ok ) {
+			$this->actions->notices()->flash_success( $result->message );
+		} else {
+			$this->actions->notices()->flash_error( $result->message );
+		}
+
+		$this->actions->redirect(
+			self::SLUG,
+			[ 'shipment' => (string) max( 0, $shipment_id ) ]
+		);
+	}
+
+	private function actor_id(): ?int {
+		return function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : null;
 	}
 
 	public function render(): void {
@@ -171,7 +315,7 @@ final class ShipmentsPage {
 		AdminPageLayout::render_page_header(
 			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Shipment', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Shipment details from the historical paid-order record. Tracking can be updated here. Status stays unchanged until a later workflow stage.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Shipment details from the historical paid-order record. Tracking, status, and the current estimate can be updated here. The original checkout estimate and paid delivery charge stay unchanged.', 'cetech-woocommerce-delivery-engine' ),
 			null,
 			[
 				'label' => __( 'Back to shipments', 'cetech-woocommerce-delivery-engine' ),
@@ -206,6 +350,14 @@ final class ShipmentsPage {
 		AdminPageLayout::open_section( __( 'Delivery', 'cetech-woocommerce-delivery-engine' ) );
 		$this->render_definition_table( $this->delivery_rows( $shipment ) );
 		AdminPageLayout::close_section();
+
+		if ( $this->can_change_status() ) {
+			$this->render_status_controls( $shipment );
+		}
+
+		if ( $this->can_update_eta() ) {
+			$this->render_eta_form( $shipment );
+		}
 
 		AdminPageLayout::open_section( __( 'Items', 'cetech-woocommerce-delivery-engine' ) );
 		$this->render_items( $detail );
@@ -472,20 +624,14 @@ final class ShipmentsPage {
 		$rows   = [];
 
 		foreach ( $events as $event ) {
-			$note = '';
+			$note = $this->history_note_html( $event );
 
-			if ( null !== $event->public_note && '' !== $event->public_note ) {
-				$note = esc_html( $event->public_note );
-			}
-
-			if ( ShipmentPresentation::can_view_private_notes() && null !== $event->internal_note && '' !== $event->internal_note ) {
-				$private = esc_html( $event->internal_note );
-				$note    = '' === $note ? $private : $note . '<br /><span class="description">' . $private . '</span>';
-			}
+			$event_cell = esc_html( ShipmentPresentation::event_label( $event ) );
+			$event_cell .= '<br /><span class="description">' . esc_html( ShipmentPresentation::source_label( $event->source ) ) . '</span>';
 
 			$rows[] = [
 				esc_html( ShipmentPresentation::timestamp( $event->event_at ) ),
-				esc_html( ShipmentPresentation::event_label( $event ) ),
+				$event_cell,
 				'' !== $note ? $note : '—',
 			];
 		}
@@ -545,6 +691,197 @@ final class ShipmentsPage {
 
 	private function can_edit_tracking(): bool {
 		return $this->tracking instanceof ShipmentTrackingService;
+	}
+
+	private function can_change_status(): bool {
+		return $this->status instanceof ShipmentStatusService
+			&& current_user_can( 'update_shipment_status' );
+	}
+
+	private function can_update_eta(): bool {
+		return $this->eta instanceof ShipmentEtaService
+			&& current_user_can( 'update_shipment_status' );
+	}
+
+	private function history_note_html( ShipmentEvent $event ): string {
+		$parts = [];
+
+		if ( ! ShipmentPresentation::is_correction_event( $event ) && null !== $event->public_note && '' !== $event->public_note ) {
+			$parts[] = esc_html( $event->public_note );
+		}
+
+		if ( null !== $event->internal_note && '' !== $event->internal_note ) {
+			$parts[] = esc_html( ShipmentPresentation::operational_reason_label( $event->internal_note ) );
+		}
+
+		return implode( '<br />', $parts );
+	}
+
+	private function render_status_controls( Shipment $shipment ): void {
+		AdminPageLayout::open_section( __( 'Status', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<p><strong>' . esc_html__( 'Current status', 'cetech-woocommerce-delivery-engine' ) . ':</strong> ';
+		echo $this->status_html( $shipment );
+		echo '</p>';
+
+		$targets = ShipmentStatusTransitionPolicy::normal_targets( $shipment->status );
+
+		if ( [] !== $targets ) {
+			echo '<h3>' . esc_html__( 'Available actions', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
+			echo '<div class="cetech-de-shipment-actions">';
+
+			foreach ( $targets as $target ) {
+				$this->render_normal_status_form( $shipment, $target );
+			}
+
+			echo '</div>';
+		} else {
+			echo '<p class="description">' . esc_html__( 'Delivered and cancelled shipments have no ordinary next step. Use Correct status only if the recorded status is wrong.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		}
+
+		$this->render_correction_form( $shipment );
+		AdminPageLayout::close_section();
+	}
+
+	private function render_normal_status_form( Shipment $shipment, ShipmentStatus $target ): void {
+		$needs_reason = ShipmentStatusTransitionPolicy::requires_reason( $shipment->status, $target, false );
+
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin.php' ) ) . '" class="cetech-de-shipment-ops-form">';
+		echo '<input type="hidden" name="page" value="' . esc_attr( self::SLUG ) . '" />';
+		echo '<input type="hidden" name="shipment_id" value="' . esc_attr( (string) $shipment->id ) . '" />';
+		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_CHANGE_STATUS ) . '" />';
+		echo '<input type="hidden" name="target_status" value="' . esc_attr( $target->value ) . '" />';
+		AdminFormHelper::nonce_field( self::ACTION_CHANGE_STATUS );
+
+		if ( $needs_reason ) {
+			$reason_id = 'status_reason_' . $target->value;
+			echo '<p>';
+			echo '<label for="' . esc_attr( $reason_id ) . '">' . esc_html( $this->status_reason_label( $target ) );
+			echo ' <span class="description">' . esc_html__( '(required)', 'cetech-woocommerce-delivery-engine' ) . '</span></label><br />';
+			echo '<textarea class="large-text" id="' . esc_attr( $reason_id ) . '" name="status_reason" rows="3" required></textarea>';
+			echo '</p>';
+		}
+
+		$destructive = ShipmentStatus::Cancelled === $target;
+		$class       = $destructive ? 'button button-secondary cetech-de-delete-link' : 'button button-secondary';
+
+		echo '<p class="submit">';
+		echo '<button type="submit" class="' . esc_attr( $class ) . '">' . esc_html( $this->status_action_label( $shipment->status, $target ) ) . '</button>';
+		echo '</p>';
+		echo '</form>';
+	}
+
+	private function render_correction_form( Shipment $shipment ): void {
+		echo '<div class="cetech-de-shipment-correction">';
+		echo '<h3>' . esc_html__( 'Correct status', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
+		echo '<p class="description">' . esc_html__( 'Use this only to fix a status that was recorded incorrectly. This is not a normal workflow action. The reason stays internal and is not shown to the customer.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin.php' ) ) . '" class="cetech-de-shipment-ops-form">';
+		echo '<input type="hidden" name="page" value="' . esc_attr( self::SLUG ) . '" />';
+		echo '<input type="hidden" name="shipment_id" value="' . esc_attr( (string) $shipment->id ) . '" />';
+		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_CORRECT_STATUS ) . '" />';
+		AdminFormHelper::nonce_field( self::ACTION_CORRECT_STATUS );
+
+		echo '<p>';
+		echo '<label for="cetech-de-correct-status">' . esc_html__( 'Corrected status', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
+		echo '<select id="cetech-de-correct-status" name="target_status" required>';
+
+		foreach ( ShipmentStatus::cases() as $status ) {
+			if ( $status === $shipment->status ) {
+				continue;
+			}
+
+			echo '<option value="' . esc_attr( $status->value ) . '">' . esc_html( $status->label() ) . '</option>';
+		}
+
+		echo '</select></p>';
+		echo '<p>';
+		echo '<label for="cetech-de-correct-reason">' . esc_html__( 'Correction reason', 'cetech-woocommerce-delivery-engine' );
+		echo ' <span class="description">' . esc_html__( '(required)', 'cetech-woocommerce-delivery-engine' ) . '</span></label><br />';
+		echo '<textarea class="large-text" id="cetech-de-correct-reason" name="status_reason" rows="3" required></textarea>';
+		echo '</p>';
+		echo '<p class="submit">';
+		echo '<button type="submit" class="button">' . esc_html__( 'Save correction', 'cetech-woocommerce-delivery-engine' ) . '</button>';
+		echo '</p>';
+		echo '</form></div>';
+	}
+
+	private function render_eta_form( Shipment $shipment ): void {
+		AdminPageLayout::open_section( __( 'Estimated delivery', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<p><strong>' . esc_html__( 'Original estimate', 'cetech-woocommerce-delivery-engine' ) . ':</strong> ';
+		echo esc_html( '' !== trim( (string) $shipment->eta_original ) ? (string) $shipment->eta_original : '—' );
+		echo '</p>';
+		echo '<p class="description">' . esc_html__( 'The original checkout estimate cannot be changed. Update only the current operational estimate. The reason stays internal and is not shown to the customer.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin.php' ) ) . '" class="cetech-de-shipment-ops-form">';
+		echo '<input type="hidden" name="page" value="' . esc_attr( self::SLUG ) . '" />';
+		echo '<input type="hidden" name="shipment_id" value="' . esc_attr( (string) $shipment->id ) . '" />';
+		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_UPDATE_ETA ) . '" />';
+		AdminFormHelper::nonce_field( self::ACTION_UPDATE_ETA );
+
+		echo '<table class="form-table cetech-de-form-table" role="presentation"><tbody>';
+		AdminFormHelper::text_field(
+			'eta_current',
+			__( 'Current estimate', 'cetech-woocommerce-delivery-engine' ),
+			(string) $shipment->eta_current,
+			false,
+			__( 'Human-readable estimate text, matching the original checkout estimate format. This is not recalculated from current product settings.', 'cetech-woocommerce-delivery-engine' )
+		);
+		AdminFormHelper::textarea_field(
+			'eta_reason',
+			__( 'Reason for updating the estimate', 'cetech-woocommerce-delivery-engine' ),
+			'',
+			3,
+			__( 'Required when the current estimate actually changes. This is not the public shipment note.', 'cetech-woocommerce-delivery-engine' ),
+			true
+		);
+		echo '</tbody></table>';
+		echo '<p class="submit">';
+		echo '<button type="submit" class="button button-primary">' . esc_html__( 'Update current estimate', 'cetech-woocommerce-delivery-engine' ) . '</button>';
+		echo '</p>';
+		echo '</form>';
+		AdminPageLayout::close_section();
+	}
+
+	private function status_action_label( ShipmentStatus $from, ShipmentStatus $to ): string {
+		if ( ShipmentStatus::Delayed === $from ) {
+			return match ( $to ) {
+				ShipmentStatus::Processing => __( 'Resume as Processing', 'cetech-woocommerce-delivery-engine' ),
+				ShipmentStatus::Dispatched => __( 'Resume as Dispatched', 'cetech-woocommerce-delivery-engine' ),
+				ShipmentStatus::InTransit => __( 'Resume as In transit', 'cetech-woocommerce-delivery-engine' ),
+				ShipmentStatus::Delivered => __( 'Mark as Delivered', 'cetech-woocommerce-delivery-engine' ),
+				ShipmentStatus::Cancelled => __( 'Cancel shipment', 'cetech-woocommerce-delivery-engine' ),
+				default => sprintf(
+					/* translators: %s: shipment status label */
+					__( 'Mark as %s', 'cetech-woocommerce-delivery-engine' ),
+					$to->label()
+				),
+			};
+		}
+
+		return match ( $to ) {
+			ShipmentStatus::Processing => __( 'Mark as Processing', 'cetech-woocommerce-delivery-engine' ),
+			ShipmentStatus::Dispatched => __( 'Mark as Dispatched', 'cetech-woocommerce-delivery-engine' ),
+			ShipmentStatus::InTransit => __( 'Mark as In transit', 'cetech-woocommerce-delivery-engine' ),
+			ShipmentStatus::Delayed => __( 'Mark as Delayed / issue', 'cetech-woocommerce-delivery-engine' ),
+			ShipmentStatus::Delivered => __( 'Mark as Delivered', 'cetech-woocommerce-delivery-engine' ),
+			ShipmentStatus::Cancelled => __( 'Cancel shipment', 'cetech-woocommerce-delivery-engine' ),
+			default => sprintf(
+				/* translators: %s: shipment status label */
+				__( 'Mark as %s', 'cetech-woocommerce-delivery-engine' ),
+				$to->label()
+			),
+		};
+	}
+
+	private function status_reason_label( ShipmentStatus $target ): string {
+		if ( ShipmentStatus::Delayed === $target ) {
+			return __( 'Reason for delay or issue', 'cetech-woocommerce-delivery-engine' );
+		}
+
+		if ( ShipmentStatus::Cancelled === $target ) {
+			return __( 'Reason for cancelling this shipment', 'cetech-woocommerce-delivery-engine' );
+		}
+
+		return __( 'Reason for this status change', 'cetech-woocommerce-delivery-engine' );
 	}
 
 	private function render_tracking_form( Shipment $shipment ): void {

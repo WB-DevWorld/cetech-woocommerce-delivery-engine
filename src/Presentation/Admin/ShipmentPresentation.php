@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Admin;
 
+use CetechDeliveryEngine\Application\Shipment\ShipmentStatusService;
+use CetechDeliveryEngine\Domain\Enum\ShipmentEventSource;
 use CetechDeliveryEngine\Domain\Enum\ShipmentEventType;
 use CetechDeliveryEngine\Domain\Enum\ShipmentStatus;
 use CetechDeliveryEngine\Domain\Shipment\Shipment;
@@ -157,23 +159,56 @@ final class ShipmentPresentation {
 
 	public static function event_type_label( string $event_type ): string {
 		return match ( $event_type ) {
-			ShipmentEventType::Created->value => __( 'Awaiting fulfilment', 'cetech-woocommerce-delivery-engine' ),
-			ShipmentEventType::StatusChanged->value => __( 'Status updated', 'cetech-woocommerce-delivery-engine' ),
+			ShipmentEventType::Created->value => __( 'Shipment created', 'cetech-woocommerce-delivery-engine' ),
+			ShipmentEventType::StatusChanged->value => __( 'Status changed', 'cetech-woocommerce-delivery-engine' ),
 			ShipmentEventType::TrackingAdded->value => __( 'Tracking added', 'cetech-woocommerce-delivery-engine' ),
 			ShipmentEventType::TrackingUpdated->value => __( 'Tracking updated', 'cetech-woocommerce-delivery-engine' ),
 			ShipmentEventType::NoteAdded->value => __( 'Note added', 'cetech-woocommerce-delivery-engine' ),
+			ShipmentEventType::EtaUpdated->value => __( 'Estimated delivery updated', 'cetech-woocommerce-delivery-engine' ),
 			default => __( 'Shipment update', 'cetech-woocommerce-delivery-engine' ),
 		};
 	}
 
 	public static function event_label( ShipmentEvent $event ): string {
-		$label = self::event_type_label( $event->event_type->value );
+		if ( $event->event_type->is( ShipmentEventType::Created ) ) {
+			$initial = $event->to_status instanceof ShipmentStatus
+				? $event->to_status->label()
+				: ShipmentStatus::AwaitingFulfilment->label();
 
-		if ( $event->event_type->is( ShipmentEventType::StatusChanged ) && $event->to_status instanceof ShipmentStatus ) {
-			return $label . ' — ' . $event->to_status->label();
+			return __( 'Shipment created', 'cetech-woocommerce-delivery-engine' ) . ' — ' . $initial;
 		}
 
-		return $label;
+		if ( $event->event_type->is( ShipmentEventType::StatusChanged ) && $event->to_status instanceof ShipmentStatus ) {
+			$prefix = self::is_correction_event( $event )
+				? __( 'Status corrected', 'cetech-woocommerce-delivery-engine' )
+				: __( 'Status changed', 'cetech-woocommerce-delivery-engine' );
+
+			return $prefix . ' — ' . $event->to_status->label();
+		}
+
+		return self::event_type_label( $event->event_type->value );
+	}
+
+	public static function is_correction_event( ShipmentEvent $event ): bool {
+		return $event->event_type->is( ShipmentEventType::StatusChanged )
+			&& ShipmentStatusService::CORRECTION_MARKER === trim( (string) $event->public_note );
+	}
+
+	public static function source_label( ShipmentEventSource $source ): string {
+		return match ( $source ) {
+			ShipmentEventSource::System => __( 'Automatic', 'cetech-woocommerce-delivery-engine' ),
+			ShipmentEventSource::Staff => __( 'Staff', 'cetech-woocommerce-delivery-engine' ),
+			ShipmentEventSource::Retry => __( 'Retry', 'cetech-woocommerce-delivery-engine' ),
+			ShipmentEventSource::WooCommerce => __( 'WooCommerce order', 'cetech-woocommerce-delivery-engine' ),
+		};
+	}
+
+	public static function operational_reason_label( string $reason ): string {
+		return match ( $reason ) {
+			'order_cancelled' => __( 'WooCommerce order was cancelled.', 'cetech-woocommerce-delivery-engine' ),
+			'shipment_quantities_refunded' => __( 'All quantities on this shipment were refunded.', 'cetech-woocommerce-delivery-engine' ),
+			default => $reason,
+		};
 	}
 
 	public static function can_view_private_notes(): bool {

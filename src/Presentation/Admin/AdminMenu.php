@@ -204,12 +204,16 @@ final class AdminMenu {
 			);
 		}
 
-		if ( current_user_can( 'manage_product_delivery_rules' ) ) {
+		if ( current_user_can( 'manage_product_delivery_rules' ) || $this->should_show_shipments_menu() ) {
+			$attention_cap = current_user_can( 'manage_product_delivery_rules' )
+				? 'manage_product_delivery_rules'
+				: 'manage_shipments';
+
 			add_submenu_page(
 				$parent_slug,
 				__( 'Needs Attention', 'cetech-woocommerce-delivery-engine' ),
 				__( 'Needs Attention', 'cetech-woocommerce-delivery-engine' ),
-				'manage_product_delivery_rules',
+				$attention_cap,
 				NeedsAttentionPage::SLUG,
 				[ $this->needs_attention_page, 'render' ]
 			);

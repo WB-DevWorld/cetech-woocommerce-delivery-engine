@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Application\Shipment;
 
 /**
- * Dispatch date is stored as a UTC datetime. Stage 14E does not change shipment status.
+ * Dispatch date is stored as a UTC datetime. The staff calendar date must
+ * round-trip in the site timezone and must not shift a day because storage is UTC.
+ *
+ * Marking a shipment dispatched does not invent this date.
  */
 final class ShipmentDispatchDate {
 
@@ -31,66 +34,96 @@ final class ShipmentDispatchDate {
 			throw new \InvalidArgumentException( 'dispatch_date_invalid' );
 		}
 
-		$local = $date . ' 00:00:00';
-
-		if ( function_exists( 'get_gmt_from_date' ) ) {
-			$utc = get_gmt_from_date( $local );
-
-			if ( is_string( $utc ) && '' !== $utc ) {
-				return $utc;
-			}
+		try {
+			$local = new \DateTimeImmutable( $date . ' 00:00:00', self::site_timezone() );
+		} catch ( \Exception ) {
+			throw new \InvalidArgumentException( 'dispatch_date_invalid' );
 		}
 
-		return $local;
+		return $local->setTimezone( new \DateTimeZone( 'UTC' ) )->format( 'Y-m-d H:i:s' );
 	}
 
 	public static function to_staff_date( ?string $stored ): string {
-		$stored = trim( (string) $stored );
+		$utc = self::as_utc( $stored );
 
-		if ( '' === $stored ) {
+		if ( null === $utc ) {
 			return '';
 		}
 
-		if ( function_exists( 'get_date_from_gmt' ) ) {
-			$local = get_date_from_gmt( $stored, 'Y-m-d' );
-
-			if ( is_string( $local ) && '' !== $local ) {
-				return $local;
-			}
-		}
-
-		return substr( $stored, 0, 10 );
+		return $utc->setTimezone( self::site_timezone() )->format( 'Y-m-d' );
 	}
 
 	public static function to_display( ?string $stored ): string {
-		$stored = trim( (string) $stored );
+		$utc = self::as_utc( $stored );
 
-		if ( '' === $stored ) {
+		if ( null === $utc ) {
 			return '';
 		}
 
-		$local = $stored;
+		$format = function_exists( 'get_option' ) ? (string) get_option( 'date_format', 'Y-m-d' ) : 'Y-m-d';
 
-		if ( function_exists( 'get_date_from_gmt' ) ) {
-			$converted = get_date_from_gmt( $stored );
+		if ( '' === $format ) {
+			$format = 'Y-m-d';
+		}
 
-			if ( is_string( $converted ) && '' !== $converted ) {
-				$local = $converted;
+		if ( function_exists( 'wp_date' ) ) {
+			$display = wp_date( $format, $utc->getTimestamp(), self::site_timezone() );
+
+			if ( is_string( $display ) && '' !== $display ) {
+				return $display;
 			}
 		}
 
-		$timestamp = strtotime( $local );
-
-		if ( false === $timestamp ) {
-			return substr( $stored, 0, 10 );
-		}
+		$local = $utc->setTimezone( self::site_timezone() );
 
 		if ( function_exists( 'date_i18n' ) ) {
-			$format = function_exists( 'get_option' ) ? (string) get_option( 'date_format', 'Y-m-d' ) : 'Y-m-d';
-
-			return date_i18n( $format, $timestamp );
+			return date_i18n( $format, $local->getTimestamp() );
 		}
 
-		return date( 'Y-m-d', $timestamp );
+		return $local->format( 'Y-m-d' );
+	}
+
+	private static function as_utc( ?string $stored ): ?\DateTimeImmutable {
+		$stored = trim( (string) $stored );
+
+		if ( '' === $stored ) {
+			return null;
+		}
+
+		try {
+			return new \DateTimeImmutable( $stored, new \DateTimeZone( 'UTC' ) );
+		} catch ( \Exception ) {
+			return null;
+		}
+	}
+
+	private static function site_timezone(): \DateTimeZone {
+		if ( function_exists( 'wp_timezone' ) ) {
+			$timezone = wp_timezone();
+
+			if ( $timezone instanceof \DateTimeZone ) {
+				return $timezone;
+			}
+		}
+
+		$string = function_exists( 'get_option' ) ? (string) get_option( 'timezone_string', '' ) : '';
+
+		if ( '' !== $string ) {
+			try {
+				return new \DateTimeZone( $string );
+			} catch ( \Exception ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement.DetectedCatch
+			}
+		}
+
+		$offset  = function_exists( 'get_option' ) ? (float) get_option( 'gmt_offset', 0 ) : 0.0;
+		$hours   = (int) $offset;
+		$minutes = (int) round( abs( $offset - $hours ) * 60 );
+		$sign    = $offset < 0 ? '-' : '+';
+
+		try {
+			return new \DateTimeZone( sprintf( '%s%02d:%02d', $sign, abs( $hours ), $minutes ) );
+		} catch ( \Exception ) {
+			return new \DateTimeZone( 'UTC' );
+		}
 	}
 }
