@@ -34,9 +34,7 @@ final class DeliverySettingsPage {
 
 	/** @var list<string> */
 	private const UNAVAILABLE_EXPERIMENTAL_FLAGS = [
-		'enable_shipment_records',
 		'enable_customer_timeline',
-		'enable_tracking_links',
 		'enable_bulk_import',
 	];
 
@@ -184,6 +182,25 @@ final class DeliverySettingsPage {
 		foreach ( $this->order_display_settings() as $setting ) {
 			$this->render_setting_checkbox( $setting, $flags );
 		}
+		AdminPageLayout::close_form_panel();
+		AdminPageLayout::close_section();
+
+		AdminPageLayout::open_section(
+			__( 'Shipments', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Optional staff shipment records and customer tracking links. These stay off after an upgrade until you turn them on.', 'cetech-woocommerce-delivery-engine' )
+		);
+		AdminPageLayout::open_form_panel(
+			__( 'Shipment records and tracking', 'cetech-woocommerce-delivery-engine' )
+		);
+		foreach ( $this->shipment_release_settings() as $setting ) {
+			$this->render_setting_checkbox( $setting, $flags );
+		}
+		echo '<tr><th scope="row"></th><td>';
+		echo '<p class="description">' . esc_html__(
+			'Customer Track shipment still requires shipment records to be on, a tracking link setting that is on, and a safe http or https tracking URL. Turning on tracking links alone does not create shipment records or change checkout.',
+			'cetech-woocommerce-delivery-engine'
+		) . '</p>';
+		echo '</td></tr>';
 		AdminPageLayout::close_form_panel();
 		AdminPageLayout::close_section();
 
@@ -590,6 +607,24 @@ final class DeliverySettingsPage {
 		];
 	}
 
+	/**
+	 * @return list<array{flag: string, label: string, description: string}>
+	 */
+	private function shipment_release_settings(): array {
+		return [
+			[
+				'flag'        => 'enable_shipment_records',
+				'label'       => __( 'Enable shipment records', 'cetech-woocommerce-delivery-engine' ),
+				'description' => __( 'Turns on shipment creation and the staff Shipments workspace for eligible paid Delivery Engine orders.', 'cetech-woocommerce-delivery-engine' ),
+			],
+			[
+				'flag'        => 'enable_tracking_links',
+				'label'       => __( 'Enable customer tracking links', 'cetech-woocommerce-delivery-engine' ),
+				'description' => __( 'Allows customers to use Track shipment when a shipment has a valid tracking URL. This does not contact carriers or update tracking automatically.', 'cetech-woocommerce-delivery-engine' ),
+			],
+		];
+	}
+
 	private function runtime_settings(): array {
 		return array_merge(
 			[
@@ -688,21 +723,9 @@ final class DeliverySettingsPage {
 				'caution'     => __( 'Deployment switch. Leave off unless CETECH support has asked you to turn it on for a controlled test.', 'cetech-woocommerce-delivery-engine' ),
 			],
 			[
-				'flag'         => 'enable_shipment_records',
-				'label'        => __( 'Shipment records (future feature)', 'cetech-woocommerce-delivery-engine' ),
-				'description'  => __( 'Reserved shipment workspace, tracking, and customer shipment cards. Not required for checkout pricing.', 'cetech-woocommerce-delivery-engine' ),
-				'unavailable'  => true,
-			],
-			[
 				'flag'         => 'enable_customer_timeline',
 				'label'        => __( 'Customer delivery timeline (future feature)', 'cetech-woocommerce-delivery-engine' ),
-				'description'  => __( 'Reserved for future customer-facing tracking timelines.', 'cetech-woocommerce-delivery-engine' ),
-				'unavailable'  => true,
-			],
-			[
-				'flag'         => 'enable_tracking_links',
-				'label'        => __( 'Carrier tracking links (future feature)', 'cetech-woocommerce-delivery-engine' ),
-				'description'  => __( 'When shipment records are enabled, this controls the customer Track shipment control. Default off.', 'cetech-woocommerce-delivery-engine' ),
+				'description'  => __( 'Reserved for a future customer-facing tracking timeline. Not part of this release.', 'cetech-woocommerce-delivery-engine' ),
 				'unavailable'  => true,
 			],
 			[

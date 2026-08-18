@@ -43,16 +43,16 @@ final class FeatureFlagLabels {
 				'description' => 'Adds the saved delivery summary to WooCommerce customer emails.',
 			],
 			'enable_shipment_records' => [
-				'label'       => 'Shipment records (future feature)',
-				'description' => 'Reserved shipment workspace, tracking, and customer shipment cards. Not required for checkout pricing.',
+				'label'       => 'Enable shipment records',
+				'description' => 'Turns on shipment creation and the staff Shipments workspace for eligible paid Delivery Engine orders.',
 			],
 			'enable_customer_timeline' => [
 				'label'       => 'Customer delivery timeline (future feature)',
-				'description' => 'Reserved for future customer-facing tracking timelines.',
+				'description' => 'Reserved for a future customer-facing tracking timeline. Not part of this release.',
 			],
 			'enable_tracking_links' => [
-				'label'       => 'Carrier tracking links (future feature)',
-				'description' => 'When shipment records are enabled, this controls the customer Track shipment control. Default off.',
+				'label'       => 'Enable customer tracking links',
+				'description' => 'Allows customers to use Track shipment when a shipment has a valid tracking URL. This does not contact carriers or update tracking automatically.',
 			],
 			'enable_wpml_adapter' => [
 				'label'       => 'WPML language adapter',

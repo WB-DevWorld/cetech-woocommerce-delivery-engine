@@ -60,17 +60,26 @@ final class Stage14BRuntimeFreezeTest extends TestCase {
 		$adapter->persist();
 	}
 
-	public function test_settings_keep_shipment_flags_unavailable(): void {
+	public function test_settings_expose_v1_shipment_controls_and_keep_timeline_reserved(): void {
 		$plugin_root = dirname( __DIR__, 3 );
 		$settings    = (string) file_get_contents( $plugin_root . '/src/Presentation/Admin/DeliverySettingsPage.php' );
 
 		self::assertStringContainsString( "'enable_shipment_records'", $settings );
 		self::assertStringContainsString( "'enable_tracking_links'", $settings );
 		self::assertStringContainsString( "'enable_customer_timeline'", $settings );
-		self::assertMatchesRegularExpression(
-			'/UNAVAILABLE_EXPERIMENTAL_FLAGS\s*=\s*\[[^\]]*enable_shipment_records[^\]]*enable_customer_timeline[^\]]*enable_tracking_links/s',
+		self::assertDoesNotMatchRegularExpression(
+			'/UNAVAILABLE_EXPERIMENTAL_FLAGS\s*=\s*\[[^\]]*enable_shipment_records/s',
 			$settings
 		);
-		self::assertStringContainsString( "'unavailable'  => true", $settings );
+		self::assertDoesNotMatchRegularExpression(
+			'/UNAVAILABLE_EXPERIMENTAL_FLAGS\s*=\s*\[[^\]]*enable_tracking_links/s',
+			$settings
+		);
+		self::assertMatchesRegularExpression(
+			'/UNAVAILABLE_EXPERIMENTAL_FLAGS\s*=\s*\[[^\]]*enable_customer_timeline/s',
+			$settings
+		);
+		self::assertStringContainsString( 'Enable shipment records', $settings );
+		self::assertStringContainsString( 'Enable customer tracking links', $settings );
 	}
 }

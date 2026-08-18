@@ -561,9 +561,9 @@ Reuse existing reserved flags. Current Stage 14A proposal:
 | `enable_tracking_links` | Customer Track control. Default **OFF** |
 | `enable_customer_timeline` | Remains reserved/off for V1 (compact order-view cards, not a separate timeline) |
 
-Defaults remain **OFF** until the relevant implementation/QA stage explicitly changes release policy.
+Defaults remain **OFF**. Stage 14H exposes `enable_shipment_records` and `enable_tracking_links` through protected Delivery Engine Settings (`manage_delivery_settings`, nonce-protected). `enable_customer_timeline` remains reserved and is not administratively activatable in V1.
 
-Activation/update must not silently take over storefront behaviour.
+Activation/update must not silently take over storefront behaviour. An RC.4 → schema-4 upgrade must leave Stage 14 flags **OFF** until an Administrator turns them on.
 
 ### Rollback
 

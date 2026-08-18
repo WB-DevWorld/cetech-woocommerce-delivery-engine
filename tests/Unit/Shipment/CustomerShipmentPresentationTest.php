@@ -153,6 +153,18 @@ final class CustomerShipmentPresentationTest extends TestCase {
 		self::assertStringContainsString( 'cetech-de-customer-shipment__track-link', $with_flag );
 	}
 
+	public function test_tracking_links_alone_do_not_show_customer_shipments(): void {
+		$this->enable_tracking_links();
+		$order = $this->order( 910 );
+		$this->store_delivery_shipment( 910, 'g-air', '910-D1', 'Air Shipping', 771, 'Widget' );
+
+		$html = $this->render_cards( $order );
+
+		self::assertSame( '', $html );
+		self::assertSame( [], $this->query->cards_for_order( $order ) );
+		self::assertStringNotContainsString( 'Track shipment', $html );
+	}
+
 	public function test_pickup_is_not_a_shipment_card_and_rc4_pickup_remains(): void {
 		$this->enable_shipment_records();
 		$order = $this->order( 907 );
