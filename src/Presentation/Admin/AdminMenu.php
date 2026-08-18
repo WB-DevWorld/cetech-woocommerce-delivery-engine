@@ -61,6 +61,7 @@ final class AdminMenu {
 		add_action( 'admin_init', [ $this->delivery_settings_home_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->product_exceptions_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->needs_attention_page, 'handle_actions' ] );
+		add_action( 'admin_init', [ $this->shipments_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->overview_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->setup_wizard_page, 'handle_actions' ] );
 		$this->scoped_configuration_admin_assets->register();

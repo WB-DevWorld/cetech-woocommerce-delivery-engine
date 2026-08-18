@@ -44,7 +44,7 @@ final class FeatureFlagLabels {
 			],
 			'enable_shipment_records' => [
 				'label'       => 'Shipment records (future feature)',
-				'description' => 'Reserved for future shipment tracking features. Not required for checkout pricing.',
+				'description' => 'Reserved shipment workspace, tracking, and customer shipment cards. Not required for checkout pricing.',
 			],
 			'enable_customer_timeline' => [
 				'label'       => 'Customer delivery timeline (future feature)',
@@ -52,7 +52,7 @@ final class FeatureFlagLabels {
 			],
 			'enable_tracking_links' => [
 				'label'       => 'Carrier tracking links (future feature)',
-				'description' => 'Reserved for future carrier tracking link support.',
+				'description' => 'When shipment records are enabled, this controls the customer Track shipment control. Default off.',
 			],
 			'enable_wpml_adapter' => [
 				'label'       => 'WPML language adapter',

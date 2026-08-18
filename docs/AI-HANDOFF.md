@@ -44,17 +44,18 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 14A shipment architecture audit | **COMPLETE** — documentation only. Artifact `docs/STAGE-14A-SHIPMENT-ARCHITECTURE-AUDIT.md`. Recommended V1: Delivery Engine schema-4 tables as canonical store behind `ShipmentRepositoryInterface`; WooCommerce Fulfillments adapter reserved, not canonical. **No runtime shipment functionality.** |
 | Stage 14B shipment persistence foundation | **COMPLETE** — schema target `4`; domain + `WpdbShipmentRepository`. Artifact `docs/STAGE-14B-SHIPMENT-PERSISTENCE-FOUNDATION.md`. |
 | Stage 14C shipment planning/creation runtime | **COMPLETE** — historical snapshot planner + idempotent paid-order creation; **feature-gated OFF** (`enable_shipment_records`). Artifact `docs/STAGE-14C-SHIPMENT-CREATION.md`. No tracking editing or customer timeline. |
-| Stage 14D staff Shipments workspace | **COMPLETE** — flag-gated staff list + read-only detail. Artifact `docs/STAGE-14D-STAFF-SHIPMENTS-WORKSPACE.md`. Stage 14D-R1: unknown persisted event codes hydrate and present as “Shipment update” without rewriting rows. No tracking editing, customer tracking, or status workflow. |
+| Stage 14D staff Shipments workspace | **COMPLETE** — flag-gated staff list + read-only detail. Artifact `docs/STAGE-14D-STAFF-SHIPMENTS-WORKSPACE.md`. Stage 14D-R1: unknown persisted event codes hydrate and present as “Shipment update” without rewriting rows. |
+| Stage 14E tracking + customer shipment presentation | **COMPLETE** — manual staff tracking save + customer View Order shipment cards, both behind feature flags. Artifact `docs/STAGE-14E-TRACKING-CUSTOMER-SHIPMENTS.md`. No status workflow, emails, customer timeline, or carrier APIs. |
 | Governing rules hardening | **COMPLETE** — canonical rulebook `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`; Cursor always-apply wrapper `.cursor/rules/000-delivery-engine-governance.mdc`. Documentation/governance only. |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos; profile defaults use `global/0/{profile_key}` |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-profile site-wide root; primary default fallback; provenance; fingerprint; hard constraints |
 | New admin UX | **Overview** + first-time setup wizard + Site-wide Defaults + Product Exceptions + **Shipments** (behind `enable_shipment_records`) + Needs Attention. Product/variation customization is progressive. Legacy Delivery Rules is **retired from the normal menu**. Technical Diagnostics is a hidden support destination. Administrator is a protected full-access role in Settings → Access. |
 | Runtime on FLAIROC | **Required production features ON**; deferred features **OFF**; **COD OFF**; schema **3** — owner installs final RC.4 for short confirmation. Master code schema target is **4** and is not on FLAIROC. |
 | Variable runtime capture | Verified live; WoodMart adapter **not required** |
-| Shipments / tracking / timeline | **Stage 14D staff list/detail workspace implemented behind `enable_shipment_records` (default OFF).** Creation runtime exists from 14C. **No** tracking editing, **no** customer timeline, **no** status workflow. Do **not** start Stage 14E until instructed. |
+| Shipments / tracking / timeline | **Stage 14E manual tracking + customer View Order cards implemented behind `enable_shipment_records` / `enable_tracking_links` (default OFF).** **No** status workflow, **no** customer timeline, **no** shipment emails. Do **not** start Stage 14F until instructed. |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Hidden compatibility route retained; Legacy management UI is not a normal workflow |
-| Next stage | **Stage 14E** (manual tracking + customer shipment presentation) only when explicitly instructed. Do **not** package, tag, deploy, or modify FLAIROC. RC.4 checkout/runtime remains the protected customer baseline. Plugin version stays `1.0.0-rc.4`. |
+| Next stage | **Stage 14F** (shipment status workflow + ETA updates + refund/cancellation behavior + access/audit hardening) only when explicitly instructed. Do **not** package, tag, deploy, or modify FLAIROC. RC.4 checkout/runtime remains the protected customer baseline. Plugin version stays `1.0.0-rc.4`. |
 | Final PHP log (RC.2 smoke) | Marker **546** → inspected through **548** — **PASS**; no new Delivery Engine fatals |
 | Live QA orders | `#39721` (variable); `#39724` (multi-product grouping) |
 | Package | `cetech-woocommerce-delivery-engine-1.0.0-rc.4.zip` (see Stage 13G finalization report for SHA-256) |
@@ -63,7 +64,7 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 
 **RC.3 package:** tagged and untouched. **RC.4 package:** locally finalized and tagged after owner QA.1 (`1.0.0-rc.4-qa.1`) acceptance of Stage 13F customer presentation polish. Do **not** claim FLAIROC final RC.4 runtime confirmation until the owner completes the short post-install check.
 
-Stage 14C added historical-snapshot shipment planning and idempotent paid-order creation. Stage 14D added the staff Shipments list/detail workspace. Both remain **feature-gated OFF**. Tracking editing, customer timeline, and status workflow are **not** implemented. Do **not** begin Stage 14E unless explicitly instructed. Leave required production Delivery Engine switches **ON** on the live site. COD remains **OFF**.
+Stage 14C added historical-snapshot shipment planning and idempotent paid-order creation. Stage 14D added the staff Shipments list/detail workspace. Stage 14E added manual tracking management and customer View Order shipment cards. All remain **feature-gated OFF**. Status workflow, customer timeline, and shipment emails are **not** implemented. Do **not** begin Stage 14F unless explicitly instructed. Leave required production Delivery Engine switches **ON** on the live site. COD remains **OFF**.
 
 Administrator-language requirement: normal-user admin UI must use operational language throughout. Technical terminology belongs only in Technical details.
 

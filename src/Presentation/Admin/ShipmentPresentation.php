@@ -51,9 +51,7 @@ final class ShipmentPresentation {
 	}
 
 	public static function has_tracking( Shipment $shipment ): bool {
-		return '' !== trim( (string) $shipment->tracking_number )
-			|| '' !== trim( (string) $shipment->tracking_url )
-			|| '' !== trim( (string) $shipment->tracking_carrier_display );
+		return $shipment->hasPublicTracking();
 	}
 
 	public static function eta_original_and_current_differ( Shipment $shipment ): bool {
@@ -161,6 +159,7 @@ final class ShipmentPresentation {
 		return match ( $event_type ) {
 			ShipmentEventType::Created->value => __( 'Awaiting fulfilment', 'cetech-woocommerce-delivery-engine' ),
 			ShipmentEventType::StatusChanged->value => __( 'Status updated', 'cetech-woocommerce-delivery-engine' ),
+			ShipmentEventType::TrackingAdded->value => __( 'Tracking added', 'cetech-woocommerce-delivery-engine' ),
 			ShipmentEventType::TrackingUpdated->value => __( 'Tracking updated', 'cetech-woocommerce-delivery-engine' ),
 			ShipmentEventType::NoteAdded->value => __( 'Note added', 'cetech-woocommerce-delivery-engine' ),
 			default => __( 'Shipment update', 'cetech-woocommerce-delivery-engine' ),

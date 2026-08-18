@@ -74,6 +74,42 @@ final class AdminFormHelper {
 		echo '</td></tr>';
 	}
 
+	public static function date_field(
+		string $name,
+		string $label,
+		string $value = '',
+		string $description = ''
+	): void {
+		echo '<tr><th scope="row"><label for="' . esc_attr( $name ) . '">' . esc_html( $label ) . '</label></th><td>';
+		printf(
+			'<input type="date" class="cetech-de-date-input" id="%1$s" name="%1$s" value="%2$s" />',
+			esc_attr( $name ),
+			esc_attr( $value )
+		);
+		if ( '' !== $description ) {
+			echo '<p class="description">' . esc_html( $description ) . '</p>';
+		}
+		echo '</td></tr>';
+	}
+
+	public static function url_field(
+		string $name,
+		string $label,
+		string $value = '',
+		string $description = ''
+	): void {
+		echo '<tr><th scope="row"><label for="' . esc_attr( $name ) . '">' . esc_html( $label ) . '</label></th><td>';
+		printf(
+			'<input type="url" class="regular-text" id="%1$s" name="%1$s" value="%2$s" inputmode="url" autocomplete="off" />',
+			esc_attr( $name ),
+			esc_attr( $value )
+		);
+		if ( '' !== $description ) {
+			echo '<p class="description">' . esc_html( $description ) . '</p>';
+		}
+		echo '</td></tr>';
+	}
+
 	public static function number_field(
 		string $name,
 		string $label,

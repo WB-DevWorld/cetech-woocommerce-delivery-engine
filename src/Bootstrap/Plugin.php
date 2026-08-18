@@ -130,15 +130,18 @@ use CetechDeliveryEngine\Presentation\Admin\DeliverySettingsPage;
 use CetechDeliveryEngine\Presentation\Admin\SystemStatusPage;
 use CetechDeliveryEngine\Presentation\Email\CustomerOrderDeliveryEmailSummaryRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\CustomerOrderDeliverySummaryRenderer;
+use CetechDeliveryEngine\Presentation\Frontend\CustomerShipmentRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\ProductDeliverySelectorRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\VariableDeliverySelectorAssets;
 use CetechDeliveryEngine\Application\Selector\VariationDeliveryOptionsEndpoint;
+use CetechDeliveryEngine\Application\Shipment\CustomerShipmentQuery;
 use CetechDeliveryEngine\Application\Shipment\HistoricalOrderShipmentContextFactory;
 use CetechDeliveryEngine\Application\Shipment\HistoricalShipmentPlanner;
 use CetechDeliveryEngine\Application\Shipment\PaidOrderShipmentSubscriber;
 use CetechDeliveryEngine\Application\Shipment\ShipmentCreationFailureStore;
 use CetechDeliveryEngine\Application\Shipment\ShipmentCreationIssueQuery;
 use CetechDeliveryEngine\Application\Shipment\ShipmentService;
+use CetechDeliveryEngine\Application\Shipment\ShipmentTrackingService;
 use CetechDeliveryEngine\Application\Shipment\ShipmentWorkspaceQuery;
 use CetechDeliveryEngine\Application\Runtime\VariationRelationshipInspectorInterface;
 use CetechDeliveryEngine\Application\Runtime\WooCommerceVariationRelationshipInspector;
@@ -254,6 +257,7 @@ final class Plugin {
 		$this->container->get( PaidOrderShipmentSubscriber::class )->register();
 		$this->container->get( OrderShippingItemPresentationGuard::class )->register();
 		$this->container->get( CustomerOrderDeliverySummaryRenderer::class )->register();
+		$this->container->get( CustomerShipmentRenderer::class )->register();
 		$this->container->get( CustomerOrderDeliveryEmailSummaryRenderer::class )->register();
 
 		if ( is_admin() ) {
@@ -667,6 +671,21 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			ShipmentTrackingService::class,
+			static fn ( ServiceContainer $container ): ShipmentTrackingService => new ShipmentTrackingService(
+				$container->get( ShipmentRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			CustomerShipmentQuery::class,
+			static fn ( ServiceContainer $container ): CustomerShipmentQuery => new CustomerShipmentQuery(
+				$container->get( FeatureFlags::class ),
+				$container->get( ShipmentRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
 			OrderDeliverySnapshotIntegrity::class,
 			static fn (): OrderDeliverySnapshotIntegrity => new OrderDeliverySnapshotIntegrity()
 		);
@@ -697,7 +716,17 @@ final class Plugin {
 			static fn ( ServiceContainer $container ): CustomerOrderDeliverySummaryRenderer => new CustomerOrderDeliverySummaryRenderer(
 				$container->get( FeatureFlags::class ),
 				$container->get( Requirements::class ),
-				$container->get( CustomerOrderDeliverySummaryBuilder::class )
+				$container->get( CustomerOrderDeliverySummaryBuilder::class ),
+				$container->get( CustomerShipmentQuery::class )
+			)
+		);
+
+		$this->container->singleton(
+			CustomerShipmentRenderer::class,
+			static fn ( ServiceContainer $container ): CustomerShipmentRenderer => new CustomerShipmentRenderer(
+				$container->get( FeatureFlags::class ),
+				$container->get( Requirements::class ),
+				$container->get( CustomerShipmentQuery::class )
 			)
 		);
 
@@ -963,7 +992,9 @@ final class Plugin {
 			ShipmentsPage::class,
 			static fn ( ServiceContainer $container ): ShipmentsPage => new ShipmentsPage(
 				$container->get( FeatureFlags::class ),
-				$container->get( ShipmentWorkspaceQuery::class )
+				$container->get( ShipmentWorkspaceQuery::class ),
+				$container->get( AdminActionHandler::class ),
+				$container->get( ShipmentTrackingService::class )
 			)
 		);
 

@@ -390,6 +390,99 @@ if ( ! function_exists( 'wc_price' ) ) {
 	}
 }
 
+if ( ! defined( 'MINUTE_IN_SECONDS' ) ) {
+	define( 'MINUTE_IN_SECONDS', 60 );
+}
+
+if ( ! function_exists( 'get_current_user_id' ) ) {
+	function get_current_user_id(): int {
+		return (int) ( $GLOBALS['cetech_de_test_user_id'] ?? 1 );
+	}
+}
+
+if ( ! function_exists( 'set_transient' ) ) {
+	function set_transient( string $transient, mixed $value, int $expiration = 0 ): bool {
+		unset( $expiration );
+		$GLOBALS['cetech_de_test_transients'][ $transient ] = $value;
+
+		return true;
+	}
+}
+
+if ( ! function_exists( 'get_transient' ) ) {
+	function get_transient( string $transient ): mixed {
+		return $GLOBALS['cetech_de_test_transients'][ $transient ] ?? false;
+	}
+}
+
+if ( ! function_exists( 'delete_transient' ) ) {
+	function delete_transient( string $transient ): bool {
+		unset( $GLOBALS['cetech_de_test_transients'][ $transient ] );
+
+		return true;
+	}
+}
+
+if ( ! function_exists( 'esc_textarea' ) ) {
+	function esc_textarea( string $text ): string {
+		return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );
+	}
+}
+
+if ( ! function_exists( 'sanitize_textarea_field' ) ) {
+	function sanitize_textarea_field( string $str ): string {
+		return trim( strip_tags( $str ) );
+	}
+}
+
+if ( ! function_exists( 'wp_nonce_field' ) ) {
+	function wp_nonce_field( string $action, string $name = '_wpnonce', bool $referer = true, bool $echo = true ): string {
+		unset( $referer );
+		$html = '<input type="hidden" name="' . esc_attr( $name ) . '" value="' . esc_attr( wp_create_nonce( $action ) ) . '" />';
+
+		if ( $echo ) {
+			echo $html;
+		}
+
+		return $html;
+	}
+}
+
+if ( ! function_exists( 'esc_url_raw' ) ) {
+	/**
+	 * @param list<string>|null $protocols
+	 */
+	function esc_url_raw( mixed $url, $protocols = null ): string {
+		$url     = trim( (string) $url );
+		$allowed = is_array( $protocols ) && [] !== $protocols ? $protocols : [ 'http', 'https' ];
+		$scheme  = strtolower( (string) ( parse_url( $url, PHP_URL_SCHEME ) ?? '' ) );
+
+		if ( '' === $url || ! in_array( $scheme, $allowed, true ) ) {
+			return '';
+		}
+
+		return $url;
+	}
+}
+
+if ( ! function_exists( 'is_view_order_page' ) ) {
+	function is_view_order_page(): bool {
+		return (bool) ( $GLOBALS['cetech_de_test_is_view_order'] ?? false );
+	}
+}
+
+if ( ! function_exists( 'is_order_received_page' ) ) {
+	function is_order_received_page(): bool {
+		return (bool) ( $GLOBALS['cetech_de_test_is_order_received'] ?? false );
+	}
+}
+
+if ( ! function_exists( 'is_account_page' ) ) {
+	function is_account_page(): bool {
+		return (bool) ( $GLOBALS['cetech_de_test_is_account'] ?? false );
+	}
+}
+
 require_once __DIR__ . '/stubs/woocommerce-product-stub.php';
 
 require_once __DIR__ . '/stubs/woocommerce-order-stub.php';

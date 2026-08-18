@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Admin;
 
+use CetechDeliveryEngine\Application\Shipment\ShipmentDispatchDate;
 use CetechDeliveryEngine\Application\Shipment\ShipmentListRow;
+use CetechDeliveryEngine\Application\Shipment\ShipmentTrackingInput;
+use CetechDeliveryEngine\Application\Shipment\ShipmentTrackingService;
 use CetechDeliveryEngine\Application\Shipment\ShipmentWorkspaceDetail;
 use CetechDeliveryEngine\Application\Shipment\ShipmentWorkspaceQuery;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
@@ -12,16 +15,65 @@ use CetechDeliveryEngine\Domain\Shipment\Shipment;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentItem;
 
 /**
- * WordPress-native staff Shipments list and read-only detail workspace.
+ * WordPress-native staff Shipments list and detail workspace.
+ *
+ * Tracking may be edited when shipment records are enabled. Status remains read-only in Stage 14E.
  */
 final class ShipmentsPage {
 
 	public const SLUG = 'cetech-delivery-engine-shipments';
 
+	public const ACTION_SAVE_TRACKING = 'cetech_de_save_shipment_tracking';
+
 	public function __construct(
 		private readonly FeatureFlags $flags,
-		private readonly ShipmentWorkspaceQuery $query
+		private readonly ShipmentWorkspaceQuery $query,
+		private readonly ?AdminActionHandler $actions = null,
+		private readonly ?ShipmentTrackingService $tracking = null
 	) {
+	}
+
+	public function handle_actions(): void {
+		if ( ! $this->actions instanceof AdminActionHandler || ! $this->tracking instanceof ShipmentTrackingService ) {
+			return;
+		}
+
+		if ( ! $this->actions->verify_post(
+			self::ACTION_SAVE_TRACKING,
+			self::ACTION_SAVE_TRACKING,
+			'manage_shipments',
+			self::SLUG
+		) ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified by AdminActionHandler::verify_post().
+		$shipment_id = isset( $_POST['shipment_id'] ) ? absint( wp_unslash( (string) $_POST['shipment_id'] ) ) : 0;
+
+		if ( ! $this->flags->is_enabled( 'enable_shipment_records' ) ) {
+			$this->actions->notices()->flash_error(
+				__( 'You do not have permission to perform this action.', 'cetech-woocommerce-delivery-engine' )
+			);
+			$this->actions->redirect( self::SLUG );
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified by AdminActionHandler::verify_post().
+		$result = $this->tracking->save(
+			$shipment_id,
+			ShipmentTrackingInput::from_post( $_POST ),
+			function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : null
+		);
+
+		if ( $result->ok ) {
+			$this->actions->notices()->flash_success( $result->message );
+		} else {
+			$this->actions->notices()->flash_error( $result->message );
+		}
+
+		$this->actions->redirect(
+			self::SLUG,
+			[ 'shipment' => (string) max( 0, $shipment_id ) ]
+		);
 	}
 
 	public function render(): void {
@@ -54,6 +106,9 @@ final class ShipmentsPage {
 		$result = $this->query->list( $search, $status, $page );
 
 		AdminPageLayout::open_page();
+		if ( $this->actions instanceof AdminActionHandler ) {
+			$this->actions->notices()->render_notices();
+		}
 		AdminPageLayout::render_page_header(
 			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Shipments', 'cetech-woocommerce-delivery-engine' ),
@@ -110,10 +165,13 @@ final class ShipmentsPage {
 		$detail = $this->query->detail( $shipment_id );
 
 		AdminPageLayout::open_page();
+		if ( $this->actions instanceof AdminActionHandler ) {
+			$this->actions->notices()->render_notices();
+		}
 		AdminPageLayout::render_page_header(
 			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Shipment', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Read-only shipment details from the historical paid-order record.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Shipment details from the historical paid-order record. Tracking can be updated here. Status stays unchanged until a later workflow stage.', 'cetech-woocommerce-delivery-engine' ),
 			null,
 			[
 				'label' => __( 'Back to shipments', 'cetech-woocommerce-delivery-engine' ),
@@ -154,7 +212,11 @@ final class ShipmentsPage {
 		AdminPageLayout::close_section();
 
 		AdminPageLayout::open_section( __( 'Tracking', 'cetech-woocommerce-delivery-engine' ) );
-		$this->render_definition_table( $this->tracking_rows( $shipment ) );
+		if ( $this->can_edit_tracking() ) {
+			$this->render_tracking_form( $shipment );
+		} else {
+			$this->render_definition_table( $this->tracking_rows( $shipment ) );
+		}
 		AdminPageLayout::close_section();
 
 		$operations = $this->operations_rows( $shipment );
@@ -256,7 +318,7 @@ final class ShipmentsPage {
 			$rows[] = [ __( 'Currency', 'cetech-woocommerce-delivery-engine' ), esc_html( $shipment->currency_code ) ];
 		}
 
-		if ( null !== $shipment->public_note && '' !== $shipment->public_note ) {
+		if ( null !== $shipment->public_note && '' !== $shipment->public_note && ! $this->can_edit_tracking() ) {
 			$rows[] = [ __( 'Public note', 'cetech-woocommerce-delivery-engine' ), esc_html( $shipment->public_note ) ];
 		}
 
@@ -479,6 +541,62 @@ final class ShipmentsPage {
 		echo '<nav class="tablenav bottom cetech-de-shipment-pagination" aria-label="' . esc_attr__( 'Shipment list pagination', 'cetech-woocommerce-delivery-engine' ) . '">';
 		echo '<div class="tablenav-pages">' . wp_kses( $links, $this->allowed_detail_html() ) . '</div>';
 		echo '</nav>';
+	}
+
+	private function can_edit_tracking(): bool {
+		return $this->tracking instanceof ShipmentTrackingService;
+	}
+
+	private function render_tracking_form( Shipment $shipment ): void {
+		echo '<form method="post" action="' . esc_url( admin_url( 'admin.php' ) ) . '" class="cetech-de-shipment-tracking-form">';
+		echo '<input type="hidden" name="page" value="' . esc_attr( self::SLUG ) . '" />';
+		echo '<input type="hidden" name="shipment_id" value="' . esc_attr( (string) $shipment->id ) . '" />';
+		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_SAVE_TRACKING ) . '" />';
+		AdminFormHelper::nonce_field( self::ACTION_SAVE_TRACKING );
+
+		AdminPageLayout::open_form_panel(
+			__( 'Tracking details', 'cetech-woocommerce-delivery-engine' ),
+			__( 'These details can be shown to the customer. Saving them does not change the shipment status.', 'cetech-woocommerce-delivery-engine' )
+		);
+		AdminFormHelper::text_field(
+			'tracking_carrier',
+			__( 'Carrier', 'cetech-woocommerce-delivery-engine' ),
+			(string) $shipment->tracking_carrier_display,
+			false,
+			__( 'Public carrier name shown to the customer. Leave blank if no carrier has been recorded.', 'cetech-woocommerce-delivery-engine' )
+		);
+		AdminFormHelper::text_field(
+			'tracking_number',
+			__( 'Tracking number', 'cetech-woocommerce-delivery-engine' ),
+			(string) $shipment->tracking_number,
+			false,
+			__( 'The identifier supplied by the carrier. This is not the shipment reference.', 'cetech-woocommerce-delivery-engine' )
+		);
+		AdminFormHelper::url_field(
+			'tracking_url',
+			__( 'Tracking URL', 'cetech-woocommerce-delivery-engine' ),
+			(string) $shipment->tracking_url,
+			__( 'Full web address starting with http or https. Leave blank if there is no tracking page.', 'cetech-woocommerce-delivery-engine' )
+		);
+		AdminFormHelper::date_field(
+			'dispatch_date',
+			__( 'Dispatch date', 'cetech-woocommerce-delivery-engine' ),
+			ShipmentDispatchDate::to_staff_date( $shipment->dispatch_at ),
+			__( 'The date the shipment left, if known. This does not mark the shipment as dispatched.', 'cetech-woocommerce-delivery-engine' )
+		);
+		AdminFormHelper::textarea_field(
+			'public_note',
+			__( 'Public shipment note', 'cetech-woocommerce-delivery-engine' ),
+			(string) $shipment->public_note,
+			4,
+			__( 'Visible to the customer. Private operational notes stay in the Delivery section and are never shown to customers.', 'cetech-woocommerce-delivery-engine' )
+		);
+		AdminPageLayout::close_form_panel();
+
+		echo '<p class="submit">';
+		echo '<button type="submit" class="button button-primary">' . esc_html__( 'Save tracking', 'cetech-woocommerce-delivery-engine' ) . '</button>';
+		echo '</p>';
+		echo '</form>';
 	}
 
 	private function list_url( ?string $search = null, ?string $status = null ): string {

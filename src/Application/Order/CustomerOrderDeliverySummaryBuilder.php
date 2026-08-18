@@ -107,7 +107,8 @@ final class CustomerOrderDeliverySummaryBuilder {
 			// line snapshot contract. Compact presentation supports them when present.
 			null,
 			null,
-			null
+			null,
+			$item->get_id()
 		);
 	}
 
@@ -205,7 +206,8 @@ final class CustomerOrderDeliveryLineSummary {
 		public readonly ?string $snapshotted_at_display,
 		public readonly ?string $pickup_location_label = null,
 		public readonly ?string $pickup_address = null,
-		public readonly ?string $pickup_instructions = null
+		public readonly ?string $pickup_instructions = null,
+		public readonly int $order_item_id = 0
 	) {
 	}
 }

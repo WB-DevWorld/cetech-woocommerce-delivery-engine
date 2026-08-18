@@ -11,6 +11,7 @@ enum ShipmentEventType: string {
 
 	case Created          = 'created';
 	case StatusChanged    = 'status_changed';
+	case TrackingAdded    = 'tracking_added';
 	case TrackingUpdated  = 'tracking_updated';
 	case NoteAdded        = 'note_added';
 }

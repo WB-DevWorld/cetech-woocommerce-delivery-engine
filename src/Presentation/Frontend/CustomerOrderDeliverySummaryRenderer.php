@@ -7,6 +7,7 @@ namespace CetechDeliveryEngine\Presentation\Frontend;
 use CetechDeliveryEngine\Application\Order\CustomerOrderDeliveryLineSummary;
 use CetechDeliveryEngine\Application\Order\CustomerOrderDeliverySummary;
 use CetechDeliveryEngine\Application\Order\CustomerOrderDeliverySummaryBuilder;
+use CetechDeliveryEngine\Application\Shipment\CustomerShipmentQuery;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
@@ -25,7 +26,8 @@ final class CustomerOrderDeliverySummaryRenderer {
 	public function __construct(
 		private FeatureFlags $feature_flags,
 		private Requirements $requirements,
-		private CustomerOrderDeliverySummaryBuilder $summary_builder
+		private CustomerOrderDeliverySummaryBuilder $summary_builder,
+		private ?CustomerShipmentQuery $shipment_query = null
 	) {
 	}
 
@@ -81,11 +83,30 @@ final class CustomerOrderDeliverySummaryRenderer {
 			return;
 		}
 
-		$this->render_summary( $summary );
+		$covered = $this->covered_delivery_item_ids( $order );
+		$this->render_summary( $summary, $covered );
 	}
 
-	private function render_summary( CustomerOrderDeliverySummary $summary ): void {
-		if ( [] === $summary->lines ) {
+	/**
+	 * @param array<int, true> $covered_item_ids
+	 */
+	private function render_summary( CustomerOrderDeliverySummary $summary, array $covered_item_ids = [] ): void {
+		$lines = [];
+
+		foreach ( $summary->lines as $line ) {
+			if ( $this->is_store_pickup_line( $line ) ) {
+				$lines[] = $line;
+				continue;
+			}
+
+			if ( $line->order_item_id > 0 && isset( $covered_item_ids[ $line->order_item_id ] ) ) {
+				continue;
+			}
+
+			$lines[] = $line;
+		}
+
+		if ( [] === $lines ) {
 			return;
 		}
 
@@ -94,9 +115,9 @@ final class CustomerOrderDeliverySummaryRenderer {
 		echo esc_html__( 'Delivery details', 'cetech-woocommerce-delivery-engine' );
 		echo '</h2>';
 
-		$multi = count( $summary->lines ) > 1;
+		$multi = count( $lines ) > 1;
 
-		foreach ( $summary->lines as $line ) {
+		foreach ( $lines as $line ) {
 			$this->render_line_block( $line, $multi );
 		}
 
@@ -155,5 +176,28 @@ final class CustomerOrderDeliverySummaryRenderer {
 		}
 
 		return null;
+	}
+
+	private function is_store_pickup_line( CustomerOrderDeliveryLineSummary $line ): bool {
+		return 'store_pickup' === $this->infer_choice_slug( $line->fulfilment_choice_label );
+	}
+
+	/**
+	 * @return array<int, true>
+	 */
+	private function covered_delivery_item_ids( WC_Order $order ): array {
+		if ( ! $this->shipment_query instanceof CustomerShipmentQuery ) {
+			return [];
+		}
+
+		if ( ! $this->feature_flags->is_enabled( 'enable_shipment_records' ) ) {
+			return [];
+		}
+
+		if ( ! function_exists( 'is_view_order_page' ) || ! is_view_order_page() ) {
+			return [];
+		}
+
+		return $this->shipment_query->covered_order_item_ids( (int) $order->get_id() );
 	}
 }

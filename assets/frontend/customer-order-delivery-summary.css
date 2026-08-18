@@ -29,3 +29,62 @@
 .cetech-de-order-delivery-summary__product:first-child {
 	margin-top: 0;
 }
+
+.cetech-de-customer-shipments {
+	margin: 1.5em 0;
+}
+
+.cetech-de-customer-shipment {
+	margin: 1em 0 0;
+	padding: 1em 0 0;
+	border-top: 1px solid rgba(0, 0, 0, 0.08);
+	overflow-wrap: anywhere;
+	word-break: break-word;
+}
+
+.cetech-de-customer-shipment:first-of-type {
+	border-top: 0;
+	padding-top: 0;
+}
+
+.cetech-de-customer-shipment__title {
+	margin: 0 0 0.5em;
+	font-size: 1.1em;
+}
+
+.cetech-de-customer-shipment__details {
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.cetech-de-customer-shipment__details li {
+	margin: 0.35em 0;
+}
+
+.cetech-de-customer-shipment__details .label {
+	font-weight: 600;
+	margin-right: 0.35em;
+}
+
+.cetech-de-customer-shipment__status {
+	font-weight: 600;
+}
+
+.cetech-de-customer-shipment__track {
+	margin: 0.85em 0 0;
+}
+
+.cetech-de-customer-shipment__track-link {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 44px;
+	min-width: 44px;
+	padding: 0.5em 0.85em;
+	box-sizing: border-box;
+}
+
+.cetech-de-customer-shipment__note {
+	margin: 0.75em 0 0;
+}

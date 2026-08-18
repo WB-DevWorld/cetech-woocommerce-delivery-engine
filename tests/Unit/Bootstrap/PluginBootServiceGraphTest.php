@@ -109,6 +109,7 @@ final class PluginBootServiceGraphTest extends TestCase {
 			PaidOrderShipmentSubscriber::class,
 			OrderDeliverySnapshotPersister::class,
 			CustomerOrderDeliverySummaryRenderer::class,
+			\CetechDeliveryEngine\Presentation\Frontend\CustomerShipmentRenderer::class,
 			CustomerOrderDeliveryEmailSummaryRenderer::class,
 			OrderDeliverySnapshotAdminDisplay::class,
 			ConfigurationHealthChecker::class,

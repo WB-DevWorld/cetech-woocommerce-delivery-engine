@@ -142,6 +142,12 @@ final class Shipment {
 		return new ShipmentIdentity( $this->order_id, $this->delivery_group_id );
 	}
 
+	public function hasPublicTracking(): bool {
+		return '' !== trim( (string) $this->tracking_number )
+			|| '' !== trim( (string) $this->tracking_url )
+			|| '' !== trim( (string) $this->tracking_carrier_display );
+	}
+
 	public function withId( int $id ): self {
 		return $this->with( id: $id );
 	}
@@ -173,6 +179,23 @@ final class Shipment {
 		);
 	}
 
+	public function withTrackingDetails(
+		?string $tracking_number,
+		?string $tracking_url,
+		?string $tracking_carrier_display,
+		?string $dispatch_at,
+		?string $public_note
+	): self {
+		return $this->with(
+			tracking_number: $tracking_number,
+			tracking_url: $tracking_url,
+			tracking_carrier_display: $tracking_carrier_display,
+			dispatch_at: $dispatch_at,
+			public_note: $public_note,
+			updated_at: gmdate( 'Y-m-d H:i:s' )
+		);
+	}
+
 	public function withNotes( ?string $public_note, ?string $private_note ): self {
 		return $this->with(
 			public_note: $public_note,
@@ -188,6 +211,7 @@ final class Shipment {
 		mixed $tracking_number = false,
 		mixed $tracking_url = false,
 		mixed $tracking_carrier_display = false,
+		mixed $dispatch_at = false,
 		mixed $public_note = false,
 		mixed $private_note = false,
 		?string $updated_at = null
@@ -221,7 +245,7 @@ final class Shipment {
 			false === $tracking_number ? $this->tracking_number : ( null === $tracking_number ? null : (string) $tracking_number ),
 			false === $tracking_url ? $this->tracking_url : ( null === $tracking_url ? null : (string) $tracking_url ),
 			false === $tracking_carrier_display ? $this->tracking_carrier_display : ( null === $tracking_carrier_display ? null : (string) $tracking_carrier_display ),
-			$this->dispatch_at,
+			false === $dispatch_at ? $this->dispatch_at : ( null === $dispatch_at ? null : (string) $dispatch_at ),
 			$this->delivered_at,
 			false === $public_note ? $this->public_note : ( null === $public_note ? null : (string) $public_note ),
 			false === $private_note ? $this->private_note : ( null === $private_note ? null : (string) $private_note ),

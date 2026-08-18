@@ -690,7 +690,7 @@ final class DeliverySettingsPage {
 			[
 				'flag'         => 'enable_shipment_records',
 				'label'        => __( 'Shipment records (future feature)', 'cetech-woocommerce-delivery-engine' ),
-				'description'  => __( 'Reserved for future shipment tracking features. Not required for checkout pricing.', 'cetech-woocommerce-delivery-engine' ),
+				'description'  => __( 'Reserved shipment workspace, tracking, and customer shipment cards. Not required for checkout pricing.', 'cetech-woocommerce-delivery-engine' ),
 				'unavailable'  => true,
 			],
 			[
@@ -702,7 +702,7 @@ final class DeliverySettingsPage {
 			[
 				'flag'         => 'enable_tracking_links',
 				'label'        => __( 'Carrier tracking links (future feature)', 'cetech-woocommerce-delivery-engine' ),
-				'description'  => __( 'Reserved for future carrier tracking link support.', 'cetech-woocommerce-delivery-engine' ),
+				'description'  => __( 'When shipment records are enabled, this controls the customer Track shipment control. Default off.', 'cetech-woocommerce-delivery-engine' ),
 				'unavailable'  => true,
 			],
 			[
