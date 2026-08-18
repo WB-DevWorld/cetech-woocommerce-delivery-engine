@@ -25,7 +25,10 @@ docs/woodmart/
 .DS_Store
 Thumbs.db
 desktop.ini
-.cursor/
+# Local Cursor state; keep shared project rules in version control.
+.cursor/*
+!.cursor/rules/
+!.cursor/rules/**
 
 # Local-only review screenshots / training media (not part of RC package)
 /docs/review/**/screenshots/

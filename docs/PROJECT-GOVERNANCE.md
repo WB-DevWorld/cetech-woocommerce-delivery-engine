@@ -6,7 +6,8 @@
 **Repository namespace:** `CetechDeliveryEngine\`
 **WooCommerce dependency:** Required
 **PHP minimum:** 8.1+
-**Current known implementation baseline:** `1.0.0-rc.3`, schema target `3`
+**Current known implementation baseline:** `1.0.0-rc.4`, schema target `3`  
+**Canonical maintained rulebook:** `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`
 
 ---
 
@@ -29,7 +30,9 @@ Its purpose is to define:
 * release gates;
 * prohibited shortcuts.
 
-Every coding session must comply with this document.
+Concrete, testable operating rules live in `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`. That file is the canonical maintained rulebook. This governance document remains mandatory for process and source-of-truth hierarchy.
+
+Every coding session must comply with this document **and** the canonical rulebook.
 
 If a requested implementation conflicts with this governance document, stop and identify the conflict before implementing it.
 
@@ -90,7 +93,11 @@ Do not claim that a feature exists merely because the design specification descr
 
 ## 2.3 Hard engineering rules
 
-`docs/PROJECT-RULES.md` contains existing engineering restrictions and must be preserved unless deliberately superseded by a newer documented project decision.
+`docs/DELIVERY-ENGINE-GOVERNING-RULES.md` is the canonical maintained rulebook for hard invariants (architecture, privacy, shipments, language, release, testing honesty).
+
+`docs/PROJECT-RULES.md` contains preserved detailed engineering restrictions derived from the original handoff. It must not be silently deleted. When it and the canonical rulebook appear to conflict, stop and reconcile explicitly; do not ignore either file.
+
+`.cursor/rules/000-delivery-engine-governance.mdc` is the always-apply Cursor enforcement wrapper. It must point at the canonical rulebook and must not become a second competing rulebook.
 
 ## 2.4 Architecture
 
@@ -125,7 +132,7 @@ Document the conflict and resolve it deliberately.
 
 At the current known baseline:
 
-* plugin version is `1.0.0-rc.2`;
+* plugin version is `1.0.0-rc.4`;
 * schema target is `3`;
 * the simple-product customer path through order delivery snapshots is implemented;
 * runtime customer-facing flags default off;
@@ -142,6 +149,15 @@ At the current known baseline:
 Never confuse intended future design with this implementation baseline.
 
 Before modifying an area, inspect its actual current code.
+
+Mandatory reading order for every implementation stage:
+
+1. `docs/PROJECT-GOVERNANCE.md` (this file)
+2. `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`
+3. current status block in `docs/AI-HANDOFF.md`
+4. current/previous stage documentation
+5. current Design and Expectations documentation where applicable
+6. actual repository implementation
 
 ---
 
@@ -1168,12 +1184,14 @@ READ
 Before coding:
 
 1. Read this `PROJECT-GOVERNANCE.md`.
-2. Read `docs/PROJECT-RULES.md`.
-3. Read `docs/AI-HANDOFF.md`.
-4. Read `docs/ARCHITECTURE-PLAN.md`.
-5. Read the latest Design and Expectations specification.
-6. Read all phase documents directly relevant to the requested area.
-7. Inspect actual current code.
+2. Read `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`.
+3. Read the current status block in `docs/AI-HANDOFF.md`.
+4. Read the immediately preceding stage report for the requested area.
+5. Read `docs/ARCHITECTURE-PLAN.md` when architecture or module boundaries are relevant.
+6. Read the latest Design and Expectations specification when intended product behaviour is relevant.
+7. Read all phase/stage documents directly relevant to the requested area.
+8. Inspect actual current code.
+9. Audit branch, HEAD, remote, working tree, tags, plugin version, and schema target.
 
 Do not assume a class/file/function exists because documentation mentions it.
 
@@ -1579,7 +1597,9 @@ And:
 
 # 56. Final instruction to coding agents
 
-Before changing code, understand the current implementation.
+Before changing code, follow the mandatory pre-task procedure in `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`.
+
+Understand the current implementation.
 
 Do not assume the full product vision already exists.
 

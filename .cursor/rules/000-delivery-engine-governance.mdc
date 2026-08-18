@@ -1,0 +1,26 @@
+---
+description: Mandatory Delivery Engine governing-rules enforcement wrapper
+alwaysApply: true
+---
+
+# CETECH Delivery Engine — Always-apply governance
+
+This repository is governed by `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`.
+
+Before modifying application code, schema, tests, build/release configuration, admin/customer UI, or authoritative documentation, read that file and the current status block in `docs/AI-HANDOFF.md`.
+
+Also read `docs/PROJECT-GOVERNANCE.md` for source-of-truth hierarchy and process.
+
+Treat the governing rules as mandatory unless the owner explicitly changes them.
+
+If a requested action conflicts with a rule, stop and report the conflict rather than silently violating it.
+
+Never infer permission to start a later stage.
+
+Preserve released tags/history (`v1.0.0-rc.2`, `v1.0.0-rc.3`, `v1.0.0-rc.4`).
+
+Never claim a test that was not run.
+
+Do not modify FLAIROC unless the current task explicitly authorises deployment/QA work.
+
+RC.4 (`1.0.0-rc.4`, schema `3`) is the protected runtime baseline until an approved implementation stage changes it.

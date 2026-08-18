@@ -1,6 +1,9 @@
 # CETECH WooCommerce Delivery Engine — Project Rules
 
-**Source of truth:** `docs/AI-HANDOFF.md`
+**Source of truth for current implementation:** `docs/AI-HANDOFF.md` current-status block plus repository code.  
+**Canonical maintained hard-rule authority:** `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`.
+
+This document is preserved detailed engineering rules derived from the original handoff. It is **not** deleted. When this file and `docs/DELIVERY-ENGINE-GOVERNING-RULES.md` appear to conflict, stop and reconcile explicitly — do not silently ignore either file.
 
 **Plugin name:** CETECH WooCommerce Delivery Engine  
 **Plugin slug:** `cetech-woocommerce-delivery-engine`  

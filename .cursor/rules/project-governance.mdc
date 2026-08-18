@@ -4,24 +4,28 @@ alwaysApply: true
 
 # CETECH Delivery Engine — Mandatory Project Governance
 
-For every task in this repository, you MUST treat `docs/PROJECT-GOVERNANCE.md` as mandatory project governance.
+For every task in this repository, you MUST treat `docs/DELIVERY-ENGINE-GOVERNING-RULES.md` as the canonical maintained rulebook and `docs/PROJECT-GOVERNANCE.md` as mandatory process governance.
 
 Before making code, schema, architecture, configuration, UI, integration, migration, test, or documentation changes:
 
 1. Read `docs/PROJECT-GOVERNANCE.md`.
-2. Read `docs/PROJECT-RULES.md`.
+2. Read `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`.
 3. Read the current implementation-status section of `docs/AI-HANDOFF.md`.
-4. Read `docs/ARCHITECTURE-PLAN.md` when architecture or module boundaries are relevant.
-5. Read the latest `Delivery Shipping Plugin Up-To-Date Design and Expectations.md` specification when intended product behavior is relevant.
-6. Read the matching `docs/PHASE-*-IMPLEMENTATION.md` files for any existing area you will modify.
-7. Inspect the actual current repository implementation before proposing changes.
+4. Read the immediately preceding stage report for the area being changed.
+5. Read `docs/ARCHITECTURE-PLAN.md` when architecture or module boundaries are relevant.
+6. Read the latest `Delivery Shipping Plugin Up-To-Date Design and Expectations.md` specification when intended product behavior is relevant.
+7. Read the matching `docs/PHASE-*-IMPLEMENTATION.md` / `docs/STAGE-*-*.md` files for any existing area you will modify.
+8. Inspect the actual current repository implementation before proposing changes.
+
+`docs/PROJECT-RULES.md` remains preserved detailed engineering rules. On conflict with the canonical rulebook, stop and reconcile explicitly — do not silently ignore either file.
 
 Source-of-truth rule:
 
 * Latest Design and Expectations specification = intended product/end-state authority.
 * Repository code + latest completed phase documentation = current implementation authority.
-* `docs/PROJECT-GOVERNANCE.md` = mandatory development/process/invariant authority.
-* `docs/PROJECT-RULES.md` = existing hard engineering rules.
+* `docs/DELIVERY-ENGINE-GOVERNING-RULES.md` = canonical maintained hard-rule authority.
+* `docs/PROJECT-GOVERNANCE.md` = mandatory development/process authority.
+* `docs/PROJECT-RULES.md` = preserved engineering rules (reconcile, do not silently replace).
 * Never assume visionary/future functionality already exists.
 
 Mandatory engineering behavior:

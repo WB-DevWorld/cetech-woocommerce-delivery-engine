@@ -7,7 +7,8 @@
 **Schema target:** `3` (`cetech_de_db_version`) — Stage 14A proposes schema `4` for a later implementation stage; **not applied**.  
 **Git:** `master` (in sync with `origin/master`); RC.2 tag `v1.0.0-rc.2` **untouched**; RC.3 tag `v1.0.0-rc.3` **untouched**; RC.4 tag `v1.0.0-rc.4` (peeled `6b70c29`) **untouched**  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
-**Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`
+**Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`  
+**Canonical maintained rulebook:** `docs/DELIVERY-ENGINE-GOVERNING-RULES.md` (mandatory for all implementation work)
 
 This handoff remains the **product vision and domain source of truth**. Much of the document describes the full intended engine (including shipment records and customer tracking). **Only the V1 RC scope below is implemented in code today.** Do not assume later sections are already built.
 
@@ -41,6 +42,7 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 13F-R1 owner QA package | **COMPLETE / ACCEPTED** — `1.0.0-rc.4-qa.1` owner physical FLAIROC retest **ALL PASS** (`docs/STAGE-13F-R1-OWNER-QA-PACKAGE.md`). No additional QA build required. |
 | Stage 13G RC.4 finalization | **COMPLETE** — version `1.0.0-rc.4`; tag `v1.0.0-rc.4`; artifact `docs/STAGE-13G-RC4-FINALIZATION.md`. FLAIROC not modified in finalization; owner short confirmation pending. |
 | Stage 14A shipment architecture audit | **COMPLETE** — documentation only. Artifact `docs/STAGE-14A-SHIPMENT-ARCHITECTURE-AUDIT.md`. Recommended V1: Delivery Engine schema-4 tables as canonical store behind `ShipmentRepositoryInterface`; WooCommerce Fulfillments adapter reserved, not canonical. **No runtime shipment functionality.** |
+| Governing rules hardening | **COMPLETE** — canonical rulebook `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`; Cursor always-apply wrapper `.cursor/rules/000-delivery-engine-governance.mdc`. Documentation/governance only. |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos; profile defaults use `global/0/{profile_key}` |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-profile site-wide root; primary default fallback; provenance; fingerprint; hard constraints |
 | New admin UX | **Overview** + first-time setup wizard + Site-wide Defaults + Product Exceptions + Needs Attention. Product/variation customization is progressive. Legacy Delivery Rules is **retired from the normal menu**. Technical Diagnostics is a hidden support destination. Administrator is a protected full-access role in Settings → Access. |
@@ -58,7 +60,7 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 
 **RC.3 package:** tagged and untouched. **RC.4 package:** locally finalized and tagged after owner QA.1 (`1.0.0-rc.4-qa.1`) acceptance of Stage 13F customer presentation polish. Do **not** claim FLAIROC final RC.4 runtime confirmation until the owner completes the short post-install check.
 
-Stage 14A is an audit/design gate only. Do **not** begin Stage 14B shipment implementation unless explicitly instructed. Leave required production Delivery Engine switches **ON** on the live site. COD remains **OFF**.
+Stage 14A is an audit/design gate only. Governing rules are now persistent in `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`. Do **not** begin Stage 14B shipment implementation unless explicitly instructed. Leave required production Delivery Engine switches **ON** on the live site. COD remains **OFF**.
 
 Administrator-language requirement: normal-user admin UI must use operational language throughout. Technical terminology belongs only in Technical details.
 
@@ -68,8 +70,9 @@ Administrator-language requirement: normal-user admin UI must use operational la
 
 | Doc | Role |
 |-----|------|
-| `docs/PROJECT-RULES.md` | Hard engineering rules derived from this handoff |
-| `docs/PROJECT-GOVERNANCE.md` | Mandatory process / invariant authority |
+| `docs/PROJECT-GOVERNANCE.md` | Mandatory process / source-of-truth hierarchy |
+| `docs/DELIVERY-ENGINE-GOVERNING-RULES.md` | **Canonical maintained rulebook** — mandatory hard invariants for architecture, privacy, shipments, language, release, and testing honesty |
+| `docs/PROJECT-RULES.md` | Preserved detailed engineering rules; reconcile against the canonical rulebook on conflict |
 | `docs/ARCHITECTURE-PLAN.md` | Modular-monolith architecture |
 | `docs/PHASE-1A-IMPLEMENTATION.md` … `docs/PHASE-2H4-IMPLEMENTATION.md` | Phase completion notes |
 | `docs/V1-RC-RELEASE-NOTES.md` | RC scope summary |
