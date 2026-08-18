@@ -8,13 +8,17 @@
 **FLAIROC:** not modified  
 **Feature flag defaults:** `enable_shipment_records`, `enable_tracking_links`, `enable_customer_timeline` remain **OFF**
 
+**Follow-up:** Stage 14G-R1 (`docs/STAGE-14G-R1-REAL-DATABASE-QUALIFICATION.md`) closed the real-DB blocker, pinned `ENGINE=InnoDB` on shipment tables, and added one schema regression test.
+
 ---
 
 ## Verdict
 
-**BLOCKED** — not qualified for an owner QA package.
+**PASS — STAGE 14 QUALIFIED FOR OWNER QA PACKAGE** (after Stage 14G-R1).
 
-The release-critical real MySQL/MariaDB schema 3→4 gate could not be run. No safe, supported local WordPress + MySQL/MariaDB environment was available. Docker Desktop is installed but the daemon is not running. There is no LocalWP site, no `mysql` client, nothing listening on port 3306, and no nearby `wp-config.php`. FLAIROC was not used to manufacture a pass.
+This document remains the Stage 14G PHPUnit / source-audit qualification record. At original 14G close the overall verdict was **BLOCKED** solely because the real MySQL/MariaDB schema 3→4 gate was unavailable. That gate is now **PASS** — see `docs/STAGE-14G-R1-REAL-DATABASE-QUALIFICATION.md`.
+
+This does **not** mean owner QA passed, Stage 14 released, or RC.5 released.
 
 All other Stage 14G gates were completed against the PHPUnit / fake-`wpdb` harness, source audit, and supported repository tooling.
 
@@ -29,8 +33,8 @@ All other Stage 14G gates were completed against the PHPUnit / fake-`wpdb` harne
 | Fake `wpdb` test double | Yes | Schema, persistence, workflow, security tests |
 | Node / Vitest 3.2.7 | Yes | Existing frontend JS tests |
 | Composer | Yes | `composer validate --no-check-publish` |
-| Local WordPress + MySQL/MariaDB | **No** | Not present |
-| Docker daemon / WP containers | **No** | Client present; daemon not running |
+| Local WordPress + MySQL/MariaDB | **No in 14G**; **Yes in 14G-R1** | See `docs/STAGE-14G-R1-REAL-DATABASE-QUALIFICATION.md` |
+| Docker daemon / WP containers | **No in 14G**; **Yes in 14G-R1** | Disposable MariaDB 11.4 + WordPress PHP 8.2; FLAIROC unused |
 | WPML / WCML | **No** | Not present |
 | Playwright | **No** | Stage 13B specs exist; not a current Stage 14 npm gate |
 | FLAIROC | **No** | Explicitly out of scope |
@@ -40,11 +44,13 @@ All other Stage 14G gates were completed against the PHPUnit / fake-`wpdb` harne
 
 ## 2. Real schema 3 → 4 migration
 
-**REAL MYSQL/MARIADB SCHEMA 3→4 QUALIFICATION: BLOCKED / NOT AVAILABLE**
+**REAL MYSQL/MARIADB SCHEMA 3→4 QUALIFICATION: PASS** (Stage 14G-R1).
 
-Not claimed PASS.
+Authoritative evidence: `docs/STAGE-14G-R1-REAL-DATABASE-QUALIFICATION.md`.
 
-What was proven instead (source + fake `wpdb` / `SchemaV4MigrationTest`):
+Method: tagged RC.4 (`v1.0.0-rc.4`) install → confirm `cetech_de_db_version=3` with no shipment tables → overlay current Stage 14 source → plugin `MigrationRunner` applied `20260818140000_create_shipment_tables`. Resulting version **4**. Zero shipment rows from migration. Existing marker/snapshot data preserved.
+
+What 14G already proved on source + fake `wpdb` / `SchemaV4MigrationTest` (still true):
 
 - Migration `20260818140000_create_shipment_tables` is schema `4` and `VerifiableMigrationInterface`
 - `dbDelta` CREATE TABLE for `shipments`, `shipment_items`, `shipment_events`
@@ -53,15 +59,14 @@ What was proven instead (source + fake `wpdb` / `SchemaV4MigrationTest`):
 - No `FOREIGN KEY` / `REFERENCES` in `src/`
 - Table names use WordPress `$wpdb->prefix` + `cetech_de_`
 - No `DROP TABLE` in the v4 migration
-- CREATE SQL does **not** pin `ENGINE=InnoDB`; WordPress/MySQL defaults are typically InnoDB, but the real engine was not inspected
 
-Fresh install 0→4, second-run idempotency, uniqueness, and transaction rollback against a real engine remain **unproven**.
+14G-R1 additionally pinned `ENGINE=InnoDB` on the three shipment CREATE TABLE statements and re-proved 3→4 from a clean schema-3 baseline. Unrelated tables were not rewritten.
 
 ---
 
 ## 3. Fresh install schema 4
 
-**NOT AVAILABLE** on real MySQL.
+**PASS** on real MariaDB (Stage 14G-R1): separate `wp_fresh` database, current Stage 14 source activated, schema **4**, shipment tables InnoDB and empty, flags OFF.
 
 PHPUnit schema inspection and repository tests still require empty shipment tables after CREATE; no runtime rows are invented by migration SQL.
 
@@ -69,16 +74,15 @@ PHPUnit schema inspection and repository tests still require empty shipment tabl
 
 ## 4. Real DB transaction / uniqueness
 
-**NOT AVAILABLE** on real MySQL.
+**PASS** on real MariaDB 11.4 (Stage 14G-R1).
 
-Fake-`wpdb` Stage 14C tests still cover:
+- All three shipment tables **ENGINE=InnoDB**
+- Unique `(order_id, delivery_group_id)` enforced at DB and repository
+- Item-insert failure after shipment insert **ROLLBACK** → no partial aggregate
+- Retry → one complete shipment + items + one `created` event
+- CREATE TABLE now pins `ENGINE=InnoDB` so a MyISAM host default cannot silently defeat rollback
 
-- duplicate `order_id + delivery_group_id` rejected
-- aggregate write uses `START TRANSACTION` / `COMMIT` / `ROLLBACK`
-- item or event failure rolls back
-- retry yields one complete aggregate (shipment + items + created event)
-
-Architecture assumption remains InnoDB/transaction-safe. If a future real engine is MyISAM, that is an architecture defect and must stop the release.
+Fake-`wpdb` Stage 14C tests still cover the same invariants in CI.
 
 ---
 
@@ -439,7 +443,7 @@ Unknown event type hydrates, history loads, raw code preserved internally, staff
 
 PASS.
 
-With all Stage 14 flags OFF: normal RC.4 customer experience, no Shipments menu, no creation, no tracking UI, no status workflow customer output, no operational side effects (cancel/refund subscriber returns no shipments when the flag is OFF). Schema 4 empty tables would exist only after a real migration, which was not run here.
+With all Stage 14 flags OFF: normal RC.4 customer experience, no Shipments menu, no creation, no tracking UI, no status workflow customer output, no operational side effects (cancel/refund subscriber returns no shipments when the flag is OFF). Schema 4 empty tables exist after a real 3→4 or fresh install (Stage 14G-R1); migration itself creates **zero** shipment rows.
 
 ---
 
@@ -499,35 +503,35 @@ No redesign. No new Stage 14 features. No version/tag/package/FLAIROC.
 
 Baseline before this stage: 472 tests / 2645 assertions / 3 deprecations. Delta: +4 tests / +13 assertions from the lifecycle repair.
 
+Stage 14G-R1 added `test_create_sql_pins_innodb_for_transactional_aggregates` and re-ran the full suite: **477 tests / 2667 assertions** (see `docs/STAGE-14G-R1-REAL-DATABASE-QUALIFICATION.md`).
+
 Recommendation (not done): test-only removal of `ReflectionMethod::setAccessible()` under PHP 8.5 is trivial and isolated, but it is unrelated cleanup and was not mixed into qualification.
 
 ---
 
 ## 41. Remaining limitations
 
-- Real MySQL/MariaDB 3→4, fresh 0→4, uniqueness, InnoDB/transaction proof
 - WPML-present and WCML-present qualification
 - Physical browser, keyboard, and mobile-device passes
 - Production query counts / benchmarks
 - Refund-after-delivered Needs Attention has no acknowledge action
-- CREATE TABLE does not pin `ENGINE=InnoDB`
 - No carrier APIs, emails, timeline, guest portal, labels, Fulfillments dual-write, Checkout Blocks, Stage 15
+
+Real MySQL/MariaDB 3→4, fresh 0→4, uniqueness, InnoDB, and transaction rollback are **PASS** in Stage 14G-R1. CREATE TABLE now pins `ENGINE=InnoDB` on the three shipment tables.
 
 ---
 
 ## 42. Blockers
 
-1. **No safe local WordPress + MySQL/MariaDB environment** for the release-critical schema 3→4 gate.
+**None** for owner QA package preparation. The original 14G real-DB blocker is closed by Stage 14G-R1.
 
 ---
 
 ## 43. Recommended next stage
 
-**Stage 14G-R1 — real MySQL/MariaDB schema 3→4 + uniqueness/transaction qualification** in a safe local WordPress environment (not FLAIROC).
+**Stage 14H** — controlled Stage 14 owner-QA package preparation and physical testing.
 
-Do **not** start Stage 14H until that gate passes.
-
-After 14G-R1 PASS, Stage 14H is: controlled Stage 14 QA package + owner physical testing + training documentation finalization.
+Do **not** start it from this document’s original 14G work; 14G-R1 is the gate that opened it. Do **not** package, tag, or modify FLAIROC until Stage 14H is explicitly instructed.
 
 ---
 

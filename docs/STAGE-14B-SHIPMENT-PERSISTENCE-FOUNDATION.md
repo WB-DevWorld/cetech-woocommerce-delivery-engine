@@ -61,7 +61,7 @@ Design is historical order truth, not live product settings. Columns include sta
 - KEY `shipment_items.order_item_id`
 - KEY `shipment_time (shipment_id, event_at)`
 
-No foreign keys to WooCommerce tables.
+No foreign keys to WooCommerce tables. CREATE TABLE statements pin `ENGINE=InnoDB` so aggregate transaction rollback cannot depend on the host `default_storage_engine`.
 
 ### Domain and repository
 

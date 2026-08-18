@@ -776,7 +776,8 @@ Historical paid shipping must not be reconverted because exchange rates changed.
 
 Stage 14A currently recommends (change only through an explicit reviewed architecture decision):
 
-- schema 4 for shipment persistence (not yet applied)
+- schema 4 for shipment persistence (applied in source; live RC.4/FLAIROC remain schema 3 until authorised deploy)
+- shipment tables pin `ENGINE=InnoDB` so aggregate writes cannot silently lose transactions on a MyISAM/host-default engine
 - Delivery Engine custom tables as V1 canonical shipment repository
 - repository abstraction
 - no WooCommerce Fulfillments dual-write in V1

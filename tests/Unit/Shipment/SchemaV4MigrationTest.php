@@ -40,6 +40,19 @@ final class SchemaV4MigrationTest extends TestCase {
 		self::assertStringContainsString( "assert_index_present( ShipmentSchema::EVENTS_SUFFIX, 'shipment_time' )", $source );
 	}
 
+	public function test_create_sql_pins_innodb_for_transactional_aggregates(): void {
+		$sql = ShipmentSchema::create_table_statements( 'DEFAULT CHARSET=utf8mb4' );
+
+		foreach ( ShipmentSchema::SUFFIXES as $suffix ) {
+			self::assertArrayHasKey( $suffix, $sql );
+			self::assertMatchesRegularExpression(
+				'/\) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;/',
+				$sql[ $suffix ],
+				$suffix . ' CREATE TABLE must pin InnoDB before charset'
+			);
+		}
+	}
+
 	public function test_v3_sql_still_excludes_shipment_tables(): void {
 		$plugin_root = dirname( __DIR__, 3 );
 		$v3          = (string) file_get_contents( $plugin_root . '/database/migrations/20260810160000_create_scoped_configuration_tables.php' );

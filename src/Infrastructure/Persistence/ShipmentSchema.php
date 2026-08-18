@@ -75,7 +75,7 @@ final class ShipmentSchema {
 				KEY order_id (order_id),
 				KEY status (status),
 				KEY status_updated (status, updated_at)
-			) {$charset_collate};",
+			) ENGINE=InnoDB {$charset_collate};",
 			self::ITEMS_SUFFIX => "CREATE TABLE {$items} (
 				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 				shipment_id bigint(20) unsigned NOT NULL,
@@ -90,7 +90,7 @@ final class ShipmentSchema {
 				UNIQUE KEY shipment_item (shipment_id, order_item_id),
 				KEY shipment_id (shipment_id),
 				KEY order_item_id (order_item_id)
-			) {$charset_collate};",
+			) ENGINE=InnoDB {$charset_collate};",
 			self::EVENTS_SUFFIX => "CREATE TABLE {$events} (
 				id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
 				shipment_id bigint(20) unsigned NOT NULL,
@@ -106,7 +106,7 @@ final class ShipmentSchema {
 				PRIMARY KEY  (id),
 				KEY shipment_id (shipment_id),
 				KEY shipment_time (shipment_id, event_at)
-			) {$charset_collate};",
+			) ENGINE=InnoDB {$charset_collate};",
 		];
 	}
 
@@ -152,6 +152,7 @@ final class ShipmentSchema {
 				'KEY order_id (order_id)',
 				'KEY status (status)',
 				'KEY status_updated (status, updated_at)',
+				'ENGINE=InnoDB',
 				'created_at',
 				'updated_at',
 			],
@@ -166,6 +167,7 @@ final class ShipmentSchema {
 				'UNIQUE KEY shipment_item (shipment_id, order_item_id)',
 				'KEY shipment_id (shipment_id)',
 				'KEY order_item_id (order_item_id)',
+				'ENGINE=InnoDB',
 			],
 			self::EVENTS_SUFFIX => [
 				'shipment_id',
@@ -179,6 +181,7 @@ final class ShipmentSchema {
 				'event_at',
 				'KEY shipment_id (shipment_id)',
 				'KEY shipment_time (shipment_id, event_at)',
+				'ENGINE=InnoDB',
 			],
 		];
 	}
