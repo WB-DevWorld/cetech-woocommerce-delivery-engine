@@ -194,6 +194,77 @@ final class OrderShipmentCancelRefundTest extends TestCase {
 		self::assertSame( [], $after );
 	}
 
+	public function test_cancel_after_progress_issue_clears_when_staff_marks_delivered(): void {
+		$order    = $this->order( 4427, 'cancelled' );
+		$shipment = $this->store_shipment( 4427, ShipmentStatus::InTransit, 501 );
+
+		$this->subscriber->handle_order_cancelled( $order->get_id(), $order );
+		self::assertArrayHasKey( $shipment->id, $this->issues->all() );
+
+		( new ShipmentStatusService( $this->repository, $this->issues ) )->change(
+			$shipment->id,
+			ShipmentStatus::Delivered,
+			\CetechDeliveryEngine\Application\Shipment\ShipmentStatusChangeRequest::staff_normal( '', 9 )
+		);
+
+		$query = new ShipmentOperationsIssueQuery( new FeatureFlags(), $this->repository, $this->issues );
+		self::assertSame( [], $this->issues->all() );
+		self::assertSame( [], $query->list() );
+		self::assertSame( ShipmentStatus::Delivered, $this->repository->findById( $shipment->id )?->status );
+		self::assertSame( '25.00', $this->repository->findById( $shipment->id )?->customer_paid_shipping_amount );
+	}
+
+	public function test_correction_to_delivered_clears_refund_review_issue(): void {
+		$order    = $this->order( 4428, 'processing' );
+		$shipment = $this->store_shipment( 4428, ShipmentStatus::InTransit, 501 );
+		$order->set_refunded_qty( 501, -1 );
+
+		$this->subscriber->handle_order_refunded( $order->get_id() );
+		self::assertContains(
+			ShipmentOperationsIssueStore::CODE_REFUND_REQUIRES_REVIEW,
+			$this->issues->all()[ $shipment->id ]['codes']
+		);
+
+		( new ShipmentStatusService( $this->repository, $this->issues ) )->change(
+			$shipment->id,
+			ShipmentStatus::Delivered,
+			\CetechDeliveryEngine\Application\Shipment\ShipmentStatusChangeRequest::staff_correction( 'Parcel already received', 9 )
+		);
+
+		self::assertSame( [], $this->issues->all() );
+		self::assertSame( ShipmentStatus::Delivered, $this->repository->findById( $shipment->id )?->status );
+	}
+
+	public function test_refund_after_delivered_still_needs_review(): void {
+		$order    = $this->order( 4429, 'processing' );
+		$shipment = $this->store_shipment( 4429, ShipmentStatus::Delivered, 501 );
+		$order->set_refunded_qty( 501, -1 );
+
+		$this->subscriber->handle_order_refunded( $order->get_id() );
+
+		self::assertSame( ShipmentStatus::Delivered, $this->repository->findById( $shipment->id )?->status );
+		self::assertContains(
+			ShipmentOperationsIssueStore::CODE_REFUND_REQUIRES_REVIEW,
+			$this->issues->all()[ $shipment->id ]['codes']
+		);
+
+		$query = new ShipmentOperationsIssueQuery( new FeatureFlags(), $this->repository, $this->issues );
+		self::assertSame( $shipment->id, $query->list()[0]['shipment_id'] ?? 0 );
+		self::assertContains( ShipmentOperationsIssueStore::CODE_REFUND_REQUIRES_REVIEW, $query->list()[0]['codes'] ?? [] );
+	}
+
+	public function test_cancelled_shipment_issue_is_not_listed(): void {
+		$shipment = $this->store_shipment( 4430, ShipmentStatus::Cancelled, 501 );
+		$this->issues->add(
+			$shipment->id,
+			4430,
+			ShipmentOperationsIssueStore::CODE_ORDER_CANCELLED_AFTER_PROGRESS
+		);
+
+		$query = new ShipmentOperationsIssueQuery( new FeatureFlags(), $this->repository, $this->issues );
+		self::assertSame( [], $query->list() );
+	}
+
 	public function test_flag_off_does_not_mutate_shipments(): void {
 		$GLOBALS['cetech_de_test_options']['cetech_de_enable_shipment_records'] = 0;
 		$subscriber = new OrderShipmentOperationsSubscriber(

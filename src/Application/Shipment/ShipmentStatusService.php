@@ -95,7 +95,7 @@ final class ShipmentStatusService {
 			)
 		);
 
-		if ( ShipmentStatus::Cancelled === $saved->status ) {
+		if ( $this->clears_operational_issues( $saved->status ) ) {
 			$this->issues->clear_shipment( $saved->id );
 		}
 
@@ -107,6 +107,10 @@ final class ShipmentStatusService {
 
 	public function target_from_request( string $raw ): ?ShipmentStatus {
 		return ShipmentStatus::tryFromMachineCode( sanitize_key( $raw ) );
+	}
+
+	private function clears_operational_issues( ShipmentStatus $status ): bool {
+		return ShipmentStatus::Cancelled === $status || ShipmentStatus::Delivered === $status;
 	}
 
 	private function sanitize_reason( string $raw ): ?string {

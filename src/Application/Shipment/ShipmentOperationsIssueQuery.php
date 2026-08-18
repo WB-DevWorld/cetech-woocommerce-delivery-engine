@@ -52,6 +52,10 @@ final class ShipmentOperationsIssueQuery {
 				continue;
 			}
 
+			if ( ShipmentStatus::Cancelled === $shipment->status ) {
+				continue;
+			}
+
 			$by_id[ $shipment_id ] = $this->item( $shipment, $row['codes'] );
 		}
 

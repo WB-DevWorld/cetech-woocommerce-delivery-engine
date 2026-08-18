@@ -47,16 +47,17 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 14D staff Shipments workspace | **COMPLETE** — flag-gated staff list + read-only detail. Artifact `docs/STAGE-14D-STAFF-SHIPMENTS-WORKSPACE.md`. Stage 14D-R1: unknown persisted event codes hydrate and present as “Shipment update” without rewriting rows. |
 | Stage 14E tracking + customer shipment presentation | **COMPLETE** — manual staff tracking save + customer View Order shipment cards, both behind feature flags. Artifact `docs/STAGE-14E-TRACKING-CUSTOMER-SHIPMENTS.md`. |
 | Stage 14F shipment operations workflow | **COMPLETE** — status transitions, current-ETA updates, conservative WooCommerce cancel/refund sync, operational Needs Attention, Access matrix shipment caps, audit/event hardening. Behind feature flags. Artifact `docs/STAGE-14F-SHIPMENT-OPERATIONS-WORKFLOW.md`. No carrier automation, customer timeline, shipment emails, package, tag, or FLAIROC deploy. |
+| Stage 14G full Stage 14 qualification | **COMPLETE / BLOCKED FOR OWNER QA PACKAGE** — PHPUnit, lint, JS, source audits, and a Needs Attention lifecycle repair passed. **Real MySQL/MariaDB schema 3→4 was not available** and is not claimed PASS. Artifact `docs/STAGE-14G-STAGE14-QUALIFICATION.md`. Do **not** start Stage 14H. |
 | Governing rules hardening | **COMPLETE** — canonical rulebook `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`; Cursor always-apply wrapper `.cursor/rules/000-delivery-engine-governance.mdc`. Documentation/governance only. |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos; profile defaults use `global/0/{profile_key}` |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-profile site-wide root; primary default fallback; provenance; fingerprint; hard constraints |
 | New admin UX | **Overview** + first-time setup wizard + Site-wide Defaults + Product Exceptions + **Shipments** (behind `enable_shipment_records`) + Needs Attention. Product/variation customization is progressive. Legacy Delivery Rules is **retired from the normal menu**. Technical Diagnostics is a hidden support destination. Administrator is a protected full-access role in Settings → Access. |
 | Runtime on FLAIROC | **Required production features ON**; deferred features **OFF**; **COD OFF**; schema **3** — owner installs final RC.4 for short confirmation. Master code schema target is **4** and is not on FLAIROC. |
 | Variable runtime capture | Verified live; WoodMart adapter **not required** |
-| Shipments / tracking / timeline | **Stage 14F operational shipment status/ETA/refund/access workflow implemented behind `enable_shipment_records` / `enable_tracking_links` (default OFF).** Manual tracking and customer View Order cards remain from 14E. **No** customer timeline, **no** shipment emails, **no** carrier automation. Do **not** start Stage 14G until instructed. |
+| Shipments / tracking / timeline | **Stage 14F operational shipment status/ETA/refund/access workflow implemented behind `enable_shipment_records` / `enable_tracking_links` (default OFF).** Manual tracking and customer View Order cards remain from 14E. **No** customer timeline, **no** shipment emails, **no** carrier automation. Stage 14G qualification is **BLOCKED** for owner QA package pending real MySQL schema 3→4. Do **not** start Stage 14H. |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Hidden compatibility route retained; Legacy management UI is not a normal workflow |
-| Next stage | **Stage 14G** (full Stage-14 integration / real-database / performance / security / language / regression qualification) only when explicitly instructed. Do **not** package, tag, deploy, or modify FLAIROC. RC.4 checkout/runtime remains the protected customer baseline. Plugin version stays `1.0.0-rc.4`. |
+| Next stage | **Stage 14G-R1** — real MySQL/MariaDB schema 3→4 + uniqueness/transaction qualification in a safe local WordPress environment. Do **not** start Stage 14H, package, tag, deploy, or modify FLAIROC. RC.4 checkout/runtime remains the protected customer baseline. Plugin version stays `1.0.0-rc.4`. |
 | Final PHP log (RC.2 smoke) | Marker **546** → inspected through **548** — **PASS**; no new Delivery Engine fatals |
 | Live QA orders | `#39721` (variable); `#39724` (multi-product grouping) |
 | Package | `cetech-woocommerce-delivery-engine-1.0.0-rc.4.zip` (see Stage 13G finalization report for SHA-256) |
@@ -65,7 +66,7 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 
 **RC.3 package:** tagged and untouched. **RC.4 package:** locally finalized and tagged after owner QA.1 (`1.0.0-rc.4-qa.1`) acceptance of Stage 13F customer presentation polish. Do **not** claim FLAIROC final RC.4 runtime confirmation until the owner completes the short post-install check.
 
-Stage 14C added historical-snapshot shipment planning and idempotent paid-order creation. Stage 14D added the staff Shipments list/detail workspace. Stage 14E added manual tracking management and customer View Order shipment cards. Stage 14F added operational shipment status/ETA/refund/access workflow. All remain **feature-gated OFF**. Customer timeline and shipment emails are **not** implemented. Do **not** begin Stage 14G unless explicitly instructed. Leave required production Delivery Engine switches **ON** on the live site. COD remains **OFF**.
+Stage 14C added historical-snapshot shipment planning and idempotent paid-order creation. Stage 14D added the staff Shipments list/detail workspace. Stage 14E added manual tracking management and customer View Order shipment cards. Stage 14F added operational shipment status/ETA/refund/access workflow. Stage 14G qualified 14B–14F on the PHPUnit harness and repaired stale Needs Attention rows after Delivered; **real MySQL schema 3→4 remains BLOCKED / NOT AVAILABLE**. All shipment features remain **feature-gated OFF**. Customer timeline and shipment emails are **not** implemented. Do **not** begin Stage 14H unless explicitly instructed. Leave required production Delivery Engine switches **ON** on the live site. COD remains **OFF**.
 
 Administrator-language requirement: normal-user admin UI must use operational language throughout. Technical terminology belongs only in Technical details.
 
@@ -118,6 +119,7 @@ Administrator-language requirement: normal-user admin UI must use operational la
 | `docs/STAGE-14D-STAFF-SHIPMENTS-WORKSPACE.md` | Stage 14D staff Shipments list/detail workspace (feature-gated OFF) |
 | `docs/STAGE-14E-TRACKING-CUSTOMER-SHIPMENTS.md` | Stage 14E manual tracking + customer View Order cards (feature-gated OFF) |
 | `docs/STAGE-14F-SHIPMENT-OPERATIONS-WORKFLOW.md` | Stage 14F status/ETA/refund/access operations workflow (feature-gated OFF) |
+| `docs/STAGE-14G-STAGE14-QUALIFICATION.md` | Stage 14G full Stage 14 qualification — **BLOCKED** for owner QA package (real MySQL 3→4 unavailable) |
 | `docs/CLASSIC-CHECKOUT-RELEASE-CANDIDATE-READINESS.md` | Pre-smoke Classic Checkout readiness (superseded for status by RC.2 readiness) |
 | `docs/RELEASE-1.0.0-RC.2-READINESS.md` | **Authoritative** live-verified `1.0.0-rc.2` release readiness |
 | `docs/ADMIN-UI-LANGUAGE-GUIDE.md` | Authoritative normal-administrator presentation language |

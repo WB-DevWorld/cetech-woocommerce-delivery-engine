@@ -112,6 +112,13 @@ $required_classes = [
 	'CetechDeliveryEngine\\Application\\Configuration\\ClassicCheckoutRuntimeActivation',
 	'CetechDeliveryEngine\\Application\\Configuration\\SetupWizardProgress',
 	'CetechDeliveryEngine\\Application\\Shipping\\WooCommerceShippingReadiness',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\ShipmentSchema',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\WpdbShipmentRepository',
+	'CetechDeliveryEngine\\Application\\Shipment\\ShipmentStatusService',
+	'CetechDeliveryEngine\\Application\\Shipment\\PaidOrderShipmentSubscriber',
+	'CetechDeliveryEngine\\Application\\Shipment\\CustomerShipmentQuery',
+	'CetechDeliveryEngine\\Presentation\\Admin\\ShipmentsPage',
+	'CetechDeliveryEngine\\Presentation\\Frontend\\CustomerShipmentRenderer',
 ];
 
 $required_interfaces = [
@@ -167,6 +174,14 @@ if ( class_exists( 'CetechDeliveryEngine\\Bootstrap\\FeatureFlags' ) ) {
 		$failures[] = 'FeatureFlags missing enable_variable_product_ecr_runtime default.';
 	} elseif ( true === $defaults['enable_variable_product_ecr_runtime'] ) {
 		$failures[] = 'enable_variable_product_ecr_runtime default must be false.';
+	}
+
+	foreach ( [ 'enable_shipment_records', 'enable_tracking_links', 'enable_customer_timeline' ] as $shipment_flag ) {
+		if ( ! is_array( $defaults ) || ! array_key_exists( $shipment_flag, $defaults ) ) {
+			$failures[] = "FeatureFlags missing {$shipment_flag} default.";
+		} elseif ( true === $defaults[ $shipment_flag ] ) {
+			$failures[] = "{$shipment_flag} default must be false.";
+		}
 	}
 }
 

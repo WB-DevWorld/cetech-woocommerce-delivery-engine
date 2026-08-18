@@ -152,7 +152,7 @@ Not flagged:
 - missing tracking before dispatch
 - pickup-only zero-shipment orders
 
-Each operational row links to shipment detail. Delayed rows clear when status leaves `delayed`. Cancel/refund review rows clear when the shipment is cancelled.
+Each operational row links to shipment detail. Delayed rows clear when status leaves `delayed`. Cancel/refund review rows clear when the shipment is cancelled or later marked delivered (Stage 14G lifecycle repair). A refund recorded after the shipment is already delivered still needs review until a later acknowledge action exists.
 
 Needs Attention remains visible to `manage_product_delivery_rules`, and also to `manage_shipments` when shipment records are enabled.
 
@@ -219,5 +219,6 @@ Schema 3→4 remains unverified against real MySQL/MariaDB.
 - No WooCommerce Fulfillments dual-write
 - No automatic WooCommerce order completion when a shipment is delivered
 - No package, version bump, tag, or FLAIROC deploy
-- Cancel/refund review issues stay until the shipment is cancelled
-- Schema 3→4 live migration is still unverified
+- Cancel/refund review issues clear when the shipment is cancelled or later marked delivered (Stage 14G)
+- A refund recorded after delivery still needs review (no acknowledge/dismiss action)
+- Schema 3→4 live migration is still unverified against real MySQL/MariaDB

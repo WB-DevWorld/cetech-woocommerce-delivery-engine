@@ -238,7 +238,7 @@ final class NeedsAttentionPage {
 		}
 
 		echo '<h2>' . esc_html__( 'Shipment operations', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
-		echo '<p class="description">' . esc_html__( 'These shipments need a fulfilment review. Delayed shipments appear here until they leave the delayed state. Refund and cancellation mismatches stay until the shipment is cancelled or otherwise resolved operationally.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'These shipments need a fulfilment review. Delayed shipments appear here until they leave the delayed state. Cancel-after-progress and refund-review rows clear when the shipment is cancelled or marked delivered. A refund recorded after delivery still needs review.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 
 		$rows = [];
 
