@@ -188,7 +188,7 @@ final class ShipmentRepositoryTest extends TestCase {
 
 		$events = $this->repository->findEvents( $shipment->id );
 		self::assertCount( 2, $events );
-		self::assertSame( ShipmentEventType::Created, $created_event->event_type );
+		self::assertSame( ShipmentEventType::Created, $created_event->event_type->knownType() );
 		self::assertSame( 'created', $created_event->event_type->value );
 		self::assertSame( 'staff', $changed->source->value );
 		self::assertSame( ShipmentStatus::Processing, $changed->to_status );

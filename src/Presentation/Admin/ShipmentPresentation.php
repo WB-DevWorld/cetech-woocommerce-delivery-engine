@@ -170,7 +170,7 @@ final class ShipmentPresentation {
 	public static function event_label( ShipmentEvent $event ): string {
 		$label = self::event_type_label( $event->event_type->value );
 
-		if ( ShipmentEventType::StatusChanged === $event->event_type && $event->to_status instanceof ShipmentStatus ) {
+		if ( $event->event_type->is( ShipmentEventType::StatusChanged ) && $event->to_status instanceof ShipmentStatus ) {
 			return $label . ' — ' . $event->to_status->label();
 		}
 

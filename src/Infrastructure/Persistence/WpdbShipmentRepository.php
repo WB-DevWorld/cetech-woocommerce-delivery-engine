@@ -10,6 +10,7 @@ use CetechDeliveryEngine\Domain\Enum\ShipmentStatus;
 use CetechDeliveryEngine\Domain\Shipment\Shipment;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentAggregateWriteResult;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentEvent;
+use CetechDeliveryEngine\Domain\Shipment\ShipmentEventCode;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentItem;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentListResult;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentRepositoryInterface;
@@ -529,7 +530,7 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 
 	private function ensure_created_event( int $shipment_id ): bool {
 		foreach ( $this->findEvents( $shipment_id ) as $event ) {
-			if ( ShipmentEventType::Created === $event->event_type ) {
+			if ( $event->event_type->is( ShipmentEventType::Created ) ) {
 				return false;
 			}
 		}
@@ -565,7 +566,7 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 		}
 
 		foreach ( $this->findEvents( $shipment_id ) as $event ) {
-			if ( ShipmentEventType::Created === $event->event_type ) {
+			if ( $event->event_type->is( ShipmentEventType::Created ) ) {
 				return true;
 			}
 		}
@@ -712,11 +713,11 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 	 * @param array<string, mixed> $row
 	 */
 	private function hydrate_event( array $row ): ShipmentEvent {
-		$type = ShipmentEventType::tryFrom( (string) ( $row['event_type'] ?? '' ) );
-		$source = ShipmentEventSource::tryFrom( (string) ( $row['source'] ?? '' ) );
+		$event_type = ShipmentEventCode::fromPersisted( (string) ( $row['event_type'] ?? '' ) );
+		$source     = ShipmentEventSource::tryFrom( (string) ( $row['source'] ?? '' ) );
 
-		if ( null === $type || null === $source ) {
-			throw new \RuntimeException( 'Persisted shipment event uses an unrecognised machine code.' );
+		if ( null === $source ) {
+			throw new \RuntimeException( 'Persisted shipment event source is not a recognised machine code.' );
 		}
 
 		$from = isset( $row['from_status'] ) && '' !== (string) $row['from_status']
@@ -734,7 +735,7 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 		return new ShipmentEvent(
 			(int) ( $row['id'] ?? 0 ),
 			(int) ( $row['shipment_id'] ?? 0 ),
-			$type,
+			$event_type,
 			$from,
 			$to,
 			$this->nullable_string( $row['public_note'] ?? null ),

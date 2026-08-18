@@ -96,7 +96,7 @@ Schema 4 indexes were **not** changed. Prefix `LIKE 'term%'` uses existing colum
 - **Items** — snapshot product name, variation id when present, SKU from the WooCommerce order item when available, quantity
 - **Tracking** — Not added, or existing carrier / number / URL / dispatch date (read-only)
 - **Operations** — omitted unless a stored private id/cost exists **and** the user may see it. Stored IDs are not resolved to today’s supplier/origin names
-- **History** — events newest-first; `created` presents as Awaiting fulfilment; unknown event codes present as “Shipment update”
+- **History** — events newest-first; `created` presents as Awaiting fulfilment; unknown persisted event codes still load and present as “Shipment update”. Raw machine codes stay in persistence/domain and are not shown as staff labels.
 
 ---
 
@@ -129,7 +129,7 @@ Needs Attention remains the problem queue (including Stage 14C creation failures
 
 ## 11. Tests
 
-Focused coverage includes feature flag menu visibility, unauthorized direct URL denial, menu position, paginated SQL, status machine-code filters, prefix search, empty state, historical public label, detail order/item/ETA/amount/history, unknown event fallback, private-note gating, no current-resolver lookup, and no customer-facing workspace leakage.
+Focused coverage includes feature flag menu visibility, unauthorized direct URL denial, menu position, paginated SQL, status machine-code filters, prefix search, empty state, historical public label, detail order/item/ETA/amount/history, unknown event hydrate-and-fallback, private-note gating, no current-resolver lookup, and no customer-facing workspace leakage.
 
 ---
 
@@ -138,8 +138,20 @@ Focused coverage includes feature flag menu visibility, unauthorized direct URL 
 - Tracking is display-only; Stage 14E owns editing and customer presentation
 - No status mutation, dispatch/delivered/delayed/cancel, or ETA-edit workflow
 - Real MySQL/MariaDB schema-4 migration remains unverified locally; FLAIROC was not used to prove it
-- Unknown persisted event machine codes still fail repository hydrate; the presentation renderer degrades for unknown codes if they reach it
+- Unknown current shipment **status** values remain rejected on hydrate; this is intentional and separate from unknown historical **event** codes
 - Feature remains OFF by default and unavailable in Settings
+
+### Stage 14D-R1 — unknown event resilience
+
+Unknown persisted shipment **event type** codes no longer fail repository hydrate. `ShipmentEventCode` stores the raw machine code. Known codes still resolve to `ShipmentEventType`. Unknown codes:
+
+- remain stored unchanged (read does not rewrite the row);
+- remain visible as a history row;
+- present as the generic staff label “Shipment update”;
+- do not become `created` or any other recognised workflow action;
+- do not expose serialized payloads.
+
+Unknown current shipment status is still invalid.
 
 ---
 

@@ -10,13 +10,16 @@ use CetechDeliveryEngine\Domain\Enum\ShipmentStatus;
 
 /**
  * Append-only shipment history row. Status fields are machine codes.
+ *
+ * event_type stores the persisted machine code. Known codes expose typed semantics
+ * via ShipmentEventCode::knownType(); unknown codes remain readable.
  */
 final class ShipmentEvent {
 
 	public function __construct(
 		public readonly int $id,
 		public readonly int $shipment_id,
-		public readonly ShipmentEventType $event_type,
+		public readonly ShipmentEventCode $event_type,
 		public readonly ?ShipmentStatus $from_status,
 		public readonly ?ShipmentStatus $to_status,
 		public readonly ?string $public_note,
@@ -49,7 +52,7 @@ final class ShipmentEvent {
 		return new self(
 			$id,
 			$shipment_id,
-			$event_type,
+			ShipmentEventCode::fromKnown( $event_type ),
 			$from_status,
 			$to_status,
 			$public_note,

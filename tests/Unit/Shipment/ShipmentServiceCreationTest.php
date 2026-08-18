@@ -133,7 +133,7 @@ final class ShipmentServiceCreationTest extends TestCase {
 
 		$events = $this->shipments->findEvents( $shipment->id );
 		self::assertCount( 1, $events );
-		self::assertSame( ShipmentEventType::Created, $events[0]->event_type );
+		self::assertSame( ShipmentEventType::Created, $events[0]->event_type->knownType() );
 		self::assertSame( 'created', $events[0]->event_type->value );
 		self::assertSame( ShipmentStatus::AwaitingFulfilment, $events[0]->to_status );
 	}

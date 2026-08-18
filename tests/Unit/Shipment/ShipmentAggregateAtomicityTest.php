@@ -32,7 +32,7 @@ final class ShipmentAggregateAtomicityTest extends TestCase {
 		self::assertCount( 1, $this->repository->findItems( $result->shipment->id ) );
 		$events = $this->repository->findEvents( $result->shipment->id );
 		self::assertCount( 1, $events );
-		self::assertSame( ShipmentEventType::Created, $events[0]->event_type );
+		self::assertSame( ShipmentEventType::Created, $events[0]->event_type->knownType() );
 	}
 
 	public function test_second_write_is_already_complete(): void {

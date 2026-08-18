@@ -50,6 +50,13 @@ final class FakeWpdb {
 		$this->auto_increment[ $table ] = 1;
 	}
 
+	/**
+	 * @return list<array<string, mixed>>
+	 */
+	public function table_rows( string $table ): array {
+		return $this->tables[ $table ] ?? [];
+	}
+
 	public function get_charset_collate(): string {
 		return 'DEFAULT CHARSET=utf8mb4';
 	}
