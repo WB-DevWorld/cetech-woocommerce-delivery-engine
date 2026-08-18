@@ -772,7 +772,7 @@ Approved implementation sequence after this rulebook:
 → 14H package + physical QA + training
 ```
 
-Do not implement 14D until explicitly instructed. Stage 14C planner/creation is complete and remains feature-gated OFF.
+Do not implement 14E until explicitly instructed. Stage 14D staff Shipments list/detail is complete and remains feature-gated OFF.
 
 ---
 

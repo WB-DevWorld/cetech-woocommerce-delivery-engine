@@ -43,17 +43,18 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 13G RC.4 finalization | **COMPLETE** — version `1.0.0-rc.4`; tag `v1.0.0-rc.4`; artifact `docs/STAGE-13G-RC4-FINALIZATION.md`. FLAIROC not modified in finalization; owner short confirmation pending. |
 | Stage 14A shipment architecture audit | **COMPLETE** — documentation only. Artifact `docs/STAGE-14A-SHIPMENT-ARCHITECTURE-AUDIT.md`. Recommended V1: Delivery Engine schema-4 tables as canonical store behind `ShipmentRepositoryInterface`; WooCommerce Fulfillments adapter reserved, not canonical. **No runtime shipment functionality.** |
 | Stage 14B shipment persistence foundation | **COMPLETE** — schema target `4`; domain + `WpdbShipmentRepository`. Artifact `docs/STAGE-14B-SHIPMENT-PERSISTENCE-FOUNDATION.md`. |
-| Stage 14C shipment planning/creation runtime | **COMPLETE** — historical snapshot planner + idempotent paid-order creation; **feature-gated OFF** (`enable_shipment_records`). Artifact `docs/STAGE-14C-SHIPMENT-CREATION.md`. No Shipments UI, tracking, or customer timeline. |
+| Stage 14C shipment planning/creation runtime | **COMPLETE** — historical snapshot planner + idempotent paid-order creation; **feature-gated OFF** (`enable_shipment_records`). Artifact `docs/STAGE-14C-SHIPMENT-CREATION.md`. No tracking editing or customer timeline. |
+| Stage 14D staff Shipments workspace | **COMPLETE** — flag-gated staff list + read-only detail. Artifact `docs/STAGE-14D-STAFF-SHIPMENTS-WORKSPACE.md`. No tracking editing, customer tracking, or status workflow. |
 | Governing rules hardening | **COMPLETE** — canonical rulebook `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`; Cursor always-apply wrapper `.cursor/rules/000-delivery-engine-governance.mdc`. Documentation/governance only. |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos; profile defaults use `global/0/{profile_key}` |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-profile site-wide root; primary default fallback; provenance; fingerprint; hard constraints |
-| New admin UX | **Overview** + first-time setup wizard + Site-wide Defaults + Product Exceptions + Needs Attention. Product/variation customization is progressive. Legacy Delivery Rules is **retired from the normal menu**. Technical Diagnostics is a hidden support destination. Administrator is a protected full-access role in Settings → Access. |
+| New admin UX | **Overview** + first-time setup wizard + Site-wide Defaults + Product Exceptions + **Shipments** (behind `enable_shipment_records`) + Needs Attention. Product/variation customization is progressive. Legacy Delivery Rules is **retired from the normal menu**. Technical Diagnostics is a hidden support destination. Administrator is a protected full-access role in Settings → Access. |
 | Runtime on FLAIROC | **Required production features ON**; deferred features **OFF**; **COD OFF**; schema **3** — owner installs final RC.4 for short confirmation. Master code schema target is **4** and is not on FLAIROC. |
 | Variable runtime capture | Verified live; WoodMart adapter **not required** |
-| Shipments / tracking / timeline | **Stage 14C creation runtime implemented, feature-gated OFF.** Planner + idempotent paid-order aggregates exist. **No** Shipments workspace, **no** tracking UI, **no** customer timeline. Flags remain OFF. Do **not** start Stage 14D until instructed. |
+| Shipments / tracking / timeline | **Stage 14D staff list/detail workspace implemented behind `enable_shipment_records` (default OFF).** Creation runtime exists from 14C. **No** tracking editing, **no** customer timeline, **no** status workflow. Do **not** start Stage 14E until instructed. |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Hidden compatibility route retained; Legacy management UI is not a normal workflow |
-| Next stage | **Stage 14D** (staff Shipments list + detail workspace) only when explicitly instructed. Do **not** package, tag, deploy, or modify FLAIROC. RC.4 checkout/runtime remains the protected customer baseline. Plugin version stays `1.0.0-rc.4`. |
+| Next stage | **Stage 14E** (manual tracking + customer shipment presentation) only when explicitly instructed. Do **not** package, tag, deploy, or modify FLAIROC. RC.4 checkout/runtime remains the protected customer baseline. Plugin version stays `1.0.0-rc.4`. |
 | Final PHP log (RC.2 smoke) | Marker **546** → inspected through **548** — **PASS**; no new Delivery Engine fatals |
 | Live QA orders | `#39721` (variable); `#39724` (multi-product grouping) |
 | Package | `cetech-woocommerce-delivery-engine-1.0.0-rc.4.zip` (see Stage 13G finalization report for SHA-256) |
@@ -62,7 +63,7 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 
 **RC.3 package:** tagged and untouched. **RC.4 package:** locally finalized and tagged after owner QA.1 (`1.0.0-rc.4-qa.1`) acceptance of Stage 13F customer presentation polish. Do **not** claim FLAIROC final RC.4 runtime confirmation until the owner completes the short post-install check.
 
-Stage 14C added historical-snapshot shipment planning and idempotent paid-order creation. It remains **feature-gated OFF**. Tracking, Shipments UI, and customer timeline are **not** implemented. Do **not** begin Stage 14D unless explicitly instructed. Leave required production Delivery Engine switches **ON** on the live site. COD remains **OFF**.
+Stage 14C added historical-snapshot shipment planning and idempotent paid-order creation. Stage 14D added the staff Shipments list/detail workspace. Both remain **feature-gated OFF**. Tracking editing, customer timeline, and status workflow are **not** implemented. Do **not** begin Stage 14E unless explicitly instructed. Leave required production Delivery Engine switches **ON** on the live site. COD remains **OFF**.
 
 Administrator-language requirement: normal-user admin UI must use operational language throughout. Technical terminology belongs only in Technical details.
 
@@ -112,6 +113,7 @@ Administrator-language requirement: normal-user admin UI must use operational la
 | `docs/STAGE-14A-SHIPMENT-ARCHITECTURE-AUDIT.md` | Stage 14A shipment/tracking architecture audit and persistence recommendation (docs only; no runtime) |
 | `docs/STAGE-14B-SHIPMENT-PERSISTENCE-FOUNDATION.md` | Stage 14B schema 4 + domain/repository |
 | `docs/STAGE-14C-SHIPMENT-CREATION.md` | Stage 14C planner + idempotent paid-order creation (feature-gated OFF) |
+| `docs/STAGE-14D-STAFF-SHIPMENTS-WORKSPACE.md` | Stage 14D staff Shipments list/detail workspace (feature-gated OFF) |
 | `docs/CLASSIC-CHECKOUT-RELEASE-CANDIDATE-READINESS.md` | Pre-smoke Classic Checkout readiness (superseded for status by RC.2 readiness) |
 | `docs/RELEASE-1.0.0-RC.2-READINESS.md` | **Authoritative** live-verified `1.0.0-rc.2` release readiness |
 | `docs/ADMIN-UI-LANGUAGE-GUIDE.md` | Authoritative normal-administrator presentation language |

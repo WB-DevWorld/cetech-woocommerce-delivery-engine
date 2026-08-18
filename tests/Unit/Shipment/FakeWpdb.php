@@ -17,6 +17,11 @@ final class FakeWpdb {
 
 	public string $last_error = '';
 
+	public int $query_count = 0;
+
+	/** @var list<string> */
+	public array $sql_log = [];
+
 	/** @var array<string, list<array<string, mixed>>> */
 	private array $tables = [];
 
@@ -49,7 +54,12 @@ final class FakeWpdb {
 		return 'DEFAULT CHARSET=utf8mb4';
 	}
 
+	public function esc_like( string $text ): string {
+		return addcslashes( $text, "_%\\" );
+	}
+
 	public function query( mixed $sql ): bool {
+		$this->record_sql( (string) $sql );
 		$normalized = strtoupper( trim( (string) $sql ) );
 
 		if ( 'START TRANSACTION' === $normalized ) {
@@ -117,6 +127,7 @@ final class FakeWpdb {
 	 */
 	public function insert( string $table, array $data, $format = null ) {
 		unset( $format );
+		$this->record_sql( 'INSERT ' . $table );
 		$this->last_error = '';
 
 		if ( ! isset( $this->tables[ $table ] ) ) {
@@ -204,6 +215,7 @@ final class FakeWpdb {
 	}
 
 	public function get_var( string $sql ) {
+		$this->record_sql( $sql );
 		$parsed = $this->parse_select( $sql );
 		$rows   = $this->filter_rows( $parsed );
 
@@ -226,6 +238,7 @@ final class FakeWpdb {
 	 */
 	public function get_row( string $sql, $output = ARRAY_A ) {
 		unset( $output );
+		$this->record_sql( $sql );
 		$parsed = $this->parse_select( $sql );
 		$rows   = $this->filter_rows( $parsed );
 
@@ -237,6 +250,14 @@ final class FakeWpdb {
 	 */
 	public function get_results( string $sql, $output = ARRAY_A ) {
 		unset( $output );
+		$this->record_sql( $sql );
+
+		$grouped = $this->grouped_counts( $sql );
+
+		if ( null !== $grouped ) {
+			return $grouped;
+		}
+
 		$parsed = $this->parse_select( $sql );
 
 		return $this->filter_rows( $parsed );
@@ -254,6 +275,25 @@ final class FakeWpdb {
 		}
 
 		return true;
+	}
+
+	/**
+	 * @param list<array{column: string, op: string, value: string}> $clauses
+	 */
+	private function row_matches_any( array $row, array $clauses ): bool {
+		foreach ( $clauses as $clause ) {
+			$actual = (string) ( $row[ $clause['column'] ] ?? '' );
+
+			if ( 'like' === $clause['op'] && $this->like_matches( $actual, $clause['value'] ) ) {
+				return true;
+			}
+
+			if ( '=' === $clause['op'] && $actual === (string) $clause['value'] ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -285,7 +325,7 @@ final class FakeWpdb {
 	}
 
 	/**
-	 * @return array{table: string, count: bool, where: array<string, mixed>, order: list<array{column: string, direction: string}>, limit: ?int, offset: int}
+	 * @return array{table: string, count: bool, where: array<string, mixed>, or_any: list<array{column: string, op: string, value: string}>, order: list<array{column: string, direction: string}>, limit: ?int, offset: int}
 	 */
 	private function parse_select( string $sql ): array {
 		if ( ! preg_match(
@@ -296,11 +336,20 @@ final class FakeWpdb {
 			throw new \RuntimeException( 'Unsupported SQL: ' . $sql );
 		}
 
+		$where_sql = (string) $matches[3];
+		$or_any    = [];
+
+		if ( preg_match( '/AND\s+\((.*)\)\s*$/is', $where_sql, $or_match ) ) {
+			$or_sql    = (string) $or_match[1];
+			$where_sql = substr( $where_sql, 0, -strlen( $or_match[0] ) );
+			$or_any    = $this->parse_or_clauses( $or_sql );
+		}
+
 		$where = [];
 
 		if ( preg_match_all(
 			'/(?:`([a-z0-9_]+)`|([a-z0-9_]+))\s*=\s*(?:\'((?:\\\\\'|[^\'])*)\'|(\d+)|NULL)/i',
-			(string) $matches[3],
+			$where_sql,
 			$condition_matches,
 			PREG_SET_ORDER
 		) ) {
@@ -336,17 +385,108 @@ final class FakeWpdb {
 		}
 
 		return [
-			'table'  => $matches[2],
-			'count'  => 0 === strcasecmp( $matches[1], 'COUNT(*)' ),
-			'where'  => $where,
-			'order'  => $order,
-			'limit'  => isset( $matches[5] ) && '' !== $matches[5] ? (int) $matches[5] : null,
-			'offset' => isset( $matches[6] ) && '' !== $matches[6] ? (int) $matches[6] : 0,
+			'table'   => $matches[2],
+			'count'   => 0 === strcasecmp( $matches[1], 'COUNT(*)' ),
+			'where'   => $where,
+			'or_any'  => $or_any,
+			'order'   => $order,
+			'limit'   => isset( $matches[5] ) && '' !== $matches[5] ? (int) $matches[5] : null,
+			'offset'  => isset( $matches[6] ) && '' !== $matches[6] ? (int) $matches[6] : 0,
 		];
 	}
 
 	/**
-	 * @param array{table: string, count: bool, where: array<string, mixed>, order: list<array{column: string, direction: string}>, limit: ?int, offset: int} $parsed
+	 * @return list<array{column: string, op: string, value: string}>
+	 */
+	private function parse_or_clauses( string $sql ): array {
+		$clauses = [];
+
+		if ( preg_match_all(
+			'/`([a-z0-9_]+)`\s+LIKE\s+\'((?:\\\\\'|[^\'])*)\'/i',
+			$sql,
+			$likes,
+			PREG_SET_ORDER
+		) ) {
+			foreach ( $likes as $like ) {
+				$clauses[] = [
+					'column' => $like[1],
+					'op'     => 'like',
+					'value'  => stripcslashes( $like[2] ),
+				];
+			}
+		}
+
+		if ( preg_match_all(
+			'/`([a-z0-9_]+)`\s*=\s*(?:\'((?:\\\\\'|[^\'])*)\'|(\d+))/i',
+			$sql,
+			$equals,
+			PREG_SET_ORDER
+		) ) {
+			foreach ( $equals as $equal ) {
+				$clauses[] = [
+					'column' => $equal[1],
+					'op'     => '=',
+					'value'  => ( $equal[2] ?? '' ) !== '' ? stripcslashes( $equal[2] ) : (string) ( $equal[3] ?? '' ),
+				];
+			}
+		}
+
+		return $clauses;
+	}
+
+	/**
+	 * @return list<array<string, mixed>>|null
+	 */
+	private function grouped_counts( string $sql ): ?array {
+		if ( ! preg_match(
+			'/SELECT\s+`shipment_id`,\s+COUNT\(\*\)\s+AS\s+`item_count`\s+FROM\s+`([^`]+)`\s+WHERE\s+`shipment_id`\s+IN\s+\(([\d,\s]+)\)\s+GROUP BY\s+`shipment_id`\s*$/is',
+			trim( $sql ),
+			$matches
+		) ) {
+			return null;
+		}
+
+		$ids = [];
+
+		foreach ( explode( ',', $matches[2] ) as $id ) {
+			$ids[] = (int) $id;
+		}
+
+		$counts = [];
+
+		foreach ( $this->tables[ $matches[1] ] ?? [] as $row ) {
+			$shipment_id = (int) ( $row['shipment_id'] ?? 0 );
+
+			if ( in_array( $shipment_id, $ids, true ) ) {
+				$counts[ $shipment_id ] = ( $counts[ $shipment_id ] ?? 0 ) + 1;
+			}
+		}
+
+		$result = [];
+
+		foreach ( $counts as $shipment_id => $count ) {
+			$result[] = [
+				'shipment_id' => $shipment_id,
+				'item_count'  => $count,
+			];
+		}
+
+		return $result;
+	}
+
+	private function record_sql( string $sql ): void {
+		++$this->query_count;
+		$this->sql_log[] = $sql;
+	}
+
+	private function like_matches( string $value, string $pattern ): bool {
+		$regex = '/^' . str_replace( '%', '.*', preg_quote( $pattern, '/' ) ) . '$/i';
+
+		return 1 === preg_match( $regex, $value );
+	}
+
+	/**
+	 * @param array{table: string, count: bool, where: array<string, mixed>, or_any: list<array{column: string, op: string, value: string}>, order: list<array{column: string, direction: string}>, limit: ?int, offset: int} $parsed
 	 * @return list<array<string, mixed>>
 	 */
 	private function filter_rows( array $parsed ): array {
@@ -354,18 +494,15 @@ final class FakeWpdb {
 		$filtered = [];
 
 		foreach ( $rows as $row ) {
-			$match = true;
-
-			foreach ( $parsed['where'] as $column => $value ) {
-				if ( (string) ( $row[ $column ] ?? '' ) !== (string) $value ) {
-					$match = false;
-					break;
-				}
+			if ( ! $this->row_matches( $row, $parsed['where'] ) ) {
+				continue;
 			}
 
-			if ( $match ) {
-				$filtered[] = $row;
+			if ( [] !== $parsed['or_any'] && ! $this->row_matches_any( $row, $parsed['or_any'] ) ) {
+				continue;
 			}
+
+			$filtered[] = $row;
 		}
 
 		if ( [] !== $parsed['order'] ) {

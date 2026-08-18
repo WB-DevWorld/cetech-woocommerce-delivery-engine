@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Configuration\SetupWizardProgress;
+use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Capabilities\Capabilities;
 
 /**
@@ -37,7 +38,9 @@ final class AdminMenu {
 		private SetupWizardPage $setup_wizard_page,
 		private ScopedConfigurationAdminAssets $scoped_configuration_admin_assets,
 		private AdminUxAssets $admin_ux_assets,
-		private SetupWizardProgress $wizard_progress
+		private SetupWizardProgress $wizard_progress,
+		private FeatureFlags $feature_flags,
+		private ShipmentsPage $shipments_page
 	) {
 	}
 
@@ -187,7 +190,20 @@ final class AdminMenu {
 				ProductExceptionsPage::SLUG,
 				[ $this->product_exceptions_page, 'render' ]
 			);
+		}
 
+		if ( $this->should_show_shipments_menu() ) {
+			add_submenu_page(
+				$parent_slug,
+				__( 'Shipments', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Shipments', 'cetech-woocommerce-delivery-engine' ),
+				'manage_shipments',
+				ShipmentsPage::SLUG,
+				[ $this->shipments_page, 'render' ]
+			);
+		}
+
+		if ( current_user_can( 'manage_product_delivery_rules' ) ) {
 			add_submenu_page(
 				$parent_slug,
 				__( 'Needs Attention', 'cetech-woocommerce-delivery-engine' ),
@@ -245,6 +261,7 @@ final class AdminMenu {
 			'Delivery Charges',
 			'Pickup Locations',
 			'Product Exceptions',
+			'Shipments',
 			'Needs Attention',
 			'Settings',
 		];
@@ -363,7 +380,13 @@ final class AdminMenu {
 			'manage_product_delivery_rules',
 			'manage_logistics_profiles',
 			'manage_private_sources',
+			'manage_shipments',
 		];
+	}
+
+	public function should_show_shipments_menu(): bool {
+		return $this->feature_flags->is_enabled( 'enable_shipment_records' )
+			&& current_user_can( 'manage_shipments' );
 	}
 
 	/**

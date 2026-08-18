@@ -29,9 +29,17 @@ interface ShipmentRepositoryInterface {
 	public function findByOrderId( int $order_id ): array;
 
 	/**
-	 * @param array{status?: string, order_id?: int} $criteria Status must be a machine code.
+	 * @param array{status?: string, order_id?: int, search?: string} $criteria Status must be a machine code.
 	 */
 	public function list( array $criteria = [], int $page = 1, int $per_page = 20 ): ShipmentListResult;
+
+	/**
+	 * Batch item counts for list pages. Keys are shipment ids.
+	 *
+	 * @param list<int> $shipment_ids
+	 * @return array<int, int>
+	 */
+	public function countItemsByShipmentIds( array $shipment_ids ): array;
 
 	public function update( Shipment $shipment ): Shipment;
 

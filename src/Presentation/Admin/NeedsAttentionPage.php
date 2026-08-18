@@ -9,6 +9,7 @@ use CetechDeliveryEngine\Application\Configuration\OperationalState;
 use CetechDeliveryEngine\Application\Configuration\OperationalStateService;
 use CetechDeliveryEngine\Application\Shipment\ShipmentCreationIssueQuery;
 use CetechDeliveryEngine\Application\Shipment\ShipmentService;
+use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
 use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
 use CetechDeliveryEngine\Domain\Enum\ShipmentEventSource;
@@ -28,7 +29,8 @@ final class NeedsAttentionPage {
 		private readonly AdminActionHandler $action_handler,
 		private readonly OperationalStateService $operational_state,
 		private readonly ShipmentCreationIssueQuery $shipment_issues,
-		private readonly ShipmentService $shipment_service
+		private readonly ShipmentService $shipment_service,
+		private readonly FeatureFlags $flags
 	) {
 	}
 
@@ -183,6 +185,17 @@ final class NeedsAttentionPage {
 				$action .= '<input type="hidden" name="order_id" value="' . esc_attr( (string) $issue['order_id'] ) . '" />';
 				$action .= '<button type="submit" class="button">' . esc_html__( 'Retry shipment creation', 'cetech-woocommerce-delivery-engine' ) . '</button>';
 				$action .= '</form>';
+			}
+
+			if ( $this->flags->is_enabled( 'enable_shipment_records' ) && current_user_can( 'manage_shipments' ) ) {
+				$view = add_query_arg(
+					[
+						'page' => ShipmentsPage::SLUG,
+						's'    => (string) $issue['order_id'],
+					],
+					admin_url( 'admin.php' )
+				);
+				$action .= ( '' !== $action ? '<br />' : '' ) . '<a href="' . esc_url( $view ) . '">' . esc_html__( 'View shipments', 'cetech-woocommerce-delivery-engine' ) . '</a>';
 			}
 
 			$rows[] = [

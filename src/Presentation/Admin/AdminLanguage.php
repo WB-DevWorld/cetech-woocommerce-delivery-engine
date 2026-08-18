@@ -64,6 +64,10 @@ final class AdminLanguage {
 		return 'Needs Attention';
 	}
 
+	public static function menu_shipments(): string {
+		return 'Shipments';
+	}
+
 	public static function run_setup_guide_again(): string {
 		return 'Run Setup Guide Again';
 	}

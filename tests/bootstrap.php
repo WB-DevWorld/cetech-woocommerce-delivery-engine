@@ -253,9 +253,30 @@ if ( ! function_exists( 'wc_format_decimal' ) ) {
 
 if ( ! function_exists( 'add_query_arg' ) ) {
 	function add_query_arg( mixed ...$args ): string {
-		unset( $args );
+		if ( [] === $args ) {
+			return 'https://example.test/wp-admin/admin.php';
+		}
 
-		return 'https://example.test/wp-admin/admin.php';
+		if ( is_array( $args[0] ) ) {
+			$params = $args[0];
+			$url    = isset( $args[1] ) ? (string) $args[1] : 'https://example.test/wp-admin/admin.php';
+		} elseif ( isset( $args[2] ) ) {
+			$params = [ (string) $args[0] => $args[1] ];
+			$url    = (string) $args[2];
+		} else {
+			$params = [ (string) $args[0] => $args[1] ?? '' ];
+			$url    = 'https://example.test/wp-admin/admin.php';
+		}
+
+		$query = [];
+
+		foreach ( $params as $key => $value ) {
+			$query[ (string) $key ] = (string) $value;
+		}
+
+		$separator = str_contains( $url, '?' ) ? '&' : '?';
+
+		return $url . $separator . http_build_query( $query );
 	}
 }
 
@@ -271,6 +292,101 @@ if ( ! function_exists( 'wp_safe_redirect' ) ) {
 if ( ! function_exists( 'is_user_logged_in' ) ) {
 	function is_user_logged_in(): bool {
 		return (bool) ( $GLOBALS['cetech_de_test_logged_in'] ?? false );
+	}
+}
+
+if ( ! function_exists( 'esc_url' ) ) {
+	function esc_url( mixed $url ): string {
+		return htmlspecialchars( (string) $url, ENT_QUOTES, 'UTF-8' );
+	}
+}
+
+if ( ! function_exists( 'wp_kses' ) ) {
+	/**
+	 * @param array<string, mixed> $allowed_html
+	 */
+	function wp_kses( mixed $content, $allowed_html, $allowed_protocols = [] ): string {
+		unset( $allowed_html, $allowed_protocols );
+
+		return (string) $content;
+	}
+}
+
+if ( ! function_exists( 'selected' ) ) {
+	function selected( mixed $selected, mixed $current = true, bool $display = true ): string {
+		$result = (string) $selected === (string) $current ? ' selected="selected"' : '';
+
+		if ( $display ) {
+			echo $result;
+		}
+
+		return $result;
+	}
+}
+
+if ( ! function_exists( 'wp_die' ) ) {
+	function wp_die( mixed $message = '', mixed $title = '', mixed $args = [] ): void {
+		unset( $title, $args );
+		$GLOBALS['cetech_de_test_wp_die'] = $message;
+
+		throw new RuntimeException( 'wp_die' );
+	}
+}
+
+if ( ! function_exists( 'paginate_links' ) ) {
+	/**
+	 * @param array<string, mixed> $args
+	 */
+	function paginate_links( $args = [] ): string {
+		$total   = (int) ( $args['total'] ?? 1 );
+		$current = (int) ( $args['current'] ?? 1 );
+
+		if ( $total <= 1 ) {
+			return '';
+		}
+
+		return '<span class="cetech-de-test-pagination">page ' . $current . ' of ' . $total . '</span>';
+	}
+}
+
+if ( ! function_exists( 'add_menu_page' ) ) {
+	function add_menu_page( mixed ...$args ): string {
+		$GLOBALS['cetech_de_test_menus'][] = $args;
+
+		return (string) ( $args[3] ?? 'cetech-delivery-engine' );
+	}
+}
+
+if ( ! function_exists( 'add_submenu_page' ) ) {
+	function add_submenu_page(
+		string $parent_slug,
+		string $page_title,
+		string $menu_title,
+		string $capability,
+		string $menu_slug,
+		mixed $callback = ''
+	): string {
+		$GLOBALS['cetech_de_test_submenus'][] = [
+			'parent'     => $parent_slug,
+			'page_title' => $page_title,
+			'menu_title' => $menu_title,
+			'capability' => $capability,
+			'menu_slug'  => $menu_slug,
+		];
+
+		return $menu_slug;
+	}
+}
+
+if ( ! function_exists( 'wc_price' ) ) {
+	/**
+	 * @param array<string, mixed> $args
+	 */
+	function wc_price( mixed $price, $args = [] ): string {
+		$currency  = isset( $args['currency'] ) ? (string) $args['currency'] : '';
+		$formatted = number_format( (float) $price, 2, '.', '' );
+
+		return ( '' !== $currency ? $currency . ' ' : '' ) . $formatted;
 	}
 }
 

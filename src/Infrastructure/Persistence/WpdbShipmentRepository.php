@@ -141,6 +141,23 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 			$args[] = $order_id;
 		}
 
+		$search = isset( $criteria['search'] ) ? trim( (string) $criteria['search'] ) : '';
+
+		if ( '' !== $search ) {
+			$like = $this->like_prefix( $search );
+			$where .= ' AND ( `shipment_number` LIKE %s OR `tracking_number` LIKE %s';
+			$args[] = $like;
+			$args[] = $like;
+
+			if ( ctype_digit( $search ) ) {
+				$where .= ' OR `id` = %d OR `order_id` = %d';
+				$args[] = (int) $search;
+				$args[] = (int) $search;
+			}
+
+			$where .= ' )';
+		}
+
 		$count_sql = "SELECT COUNT(*) FROM `{$table}` WHERE {$where}";
 		$list_sql  = "SELECT * FROM `{$table}` WHERE {$where} ORDER BY `updated_at` DESC, `id` DESC LIMIT %d OFFSET %d";
 
@@ -256,6 +273,48 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 		}
 
 		return $items;
+	}
+
+	public function countItemsByShipmentIds( array $shipment_ids ): array {
+		$ids = [];
+
+		foreach ( $shipment_ids as $id ) {
+			$id = (int) $id;
+
+			if ( $id > 0 ) {
+				$ids[ $id ] = $id;
+			}
+		}
+
+		if ( [] === $ids ) {
+			return [];
+		}
+
+		global $wpdb;
+
+		$ids           = array_values( $ids );
+		$placeholders  = implode( ', ', array_fill( 0, count( $ids ), '%d' ) );
+		$table         = TableNames::for( ShipmentSchema::ITEMS_SUFFIX );
+		$sql           = "SELECT `shipment_id`, COUNT(*) AS `item_count` FROM `{$table}` WHERE `shipment_id` IN ({$placeholders}) GROUP BY `shipment_id`";
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$ids ), ARRAY_A );
+
+		$counts = [];
+
+		foreach ( is_array( $rows ) ? $rows : [] as $row ) {
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+
+			$shipment_id = (int) ( $row['shipment_id'] ?? 0 );
+
+			if ( $shipment_id > 0 ) {
+				$counts[ $shipment_id ] = (int) ( $row['item_count'] ?? 0 );
+			}
+		}
+
+		return $counts;
 	}
 
 	public function appendEvent( ShipmentEvent $event ): ShipmentEvent {
@@ -711,5 +770,15 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 		}
 
 		return (int) $value;
+	}
+
+	private function like_prefix( string $term ): string {
+		global $wpdb;
+
+		$escaped = method_exists( $wpdb, 'esc_like' )
+			? (string) $wpdb->esc_like( $term )
+			: addcslashes( $term, "_%\\" );
+
+		return $escaped . '%';
 	}
 }

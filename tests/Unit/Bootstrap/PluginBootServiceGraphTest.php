@@ -118,6 +118,7 @@ final class PluginBootServiceGraphTest extends TestCase {
 			\CetechDeliveryEngine\Presentation\Admin\DeliverySettingsHomePage::class,
 			\CetechDeliveryEngine\Presentation\Admin\ProductExceptionsPage::class,
 			\CetechDeliveryEngine\Presentation\Admin\NeedsAttentionPage::class,
+			\CetechDeliveryEngine\Presentation\Admin\ShipmentsPage::class,
 			\CetechDeliveryEngine\Presentation\Admin\OverviewPage::class,
 			\CetechDeliveryEngine\Presentation\Admin\SetupWizardPage::class,
 			\CetechDeliveryEngine\Presentation\Admin\ProductDeliveryPanel::class,

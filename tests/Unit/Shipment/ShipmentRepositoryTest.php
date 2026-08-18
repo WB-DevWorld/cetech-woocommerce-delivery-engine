@@ -228,6 +228,34 @@ final class ShipmentRepositoryTest extends TestCase {
 		self::assertSame( 'g-c', $by_order->items[0]->delivery_group_id );
 	}
 
+	public function test_list_search_is_prefix_and_count_items_batches(): void {
+		$one = $this->repository->create(
+			Shipment::create( order_id: 44, delivery_group_id: 'g-1', shipment_number: '44-D1' )
+		);
+		$two = $this->repository->create(
+			Shipment::create( order_id: 55, delivery_group_id: 'g-2', shipment_number: '55-D1' )
+		);
+		$this->repository->update( $two->withTracking( 'TRK-555', null, null ) );
+		$this->repository->replaceItems(
+			$one->id,
+			[
+				ShipmentItem::create( $one->id, 44, 1, 1, 10, null, 'A' ),
+				ShipmentItem::create( $one->id, 44, 2, 1, 11, null, 'B' ),
+			]
+		);
+
+		$by_number = $this->repository->list( [ 'search' => '55-D' ], 1, 20 );
+		self::assertSame( 1, $by_number->total );
+		self::assertSame( '55-D1', $by_number->items[0]->shipment_number );
+
+		$by_tracking = $this->repository->list( [ 'search' => 'TRK-' ], 1, 20 );
+		self::assertSame( 1, $by_tracking->total );
+
+		$counts = $this->repository->countItemsByShipmentIds( [ $one->id, $two->id ] );
+		self::assertSame( 2, $counts[ $one->id ] );
+		self::assertArrayNotHasKey( $two->id, $counts );
+	}
+
 	public function test_corrupt_translated_status_is_rejected_on_hydrate(): void {
 		$this->wpdb->insert(
 			'wp_delivery_engine_shipments',

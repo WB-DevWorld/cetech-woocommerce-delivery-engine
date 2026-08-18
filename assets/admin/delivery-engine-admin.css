@@ -492,6 +492,50 @@
 	margin: 12px 0 0;
 }
 
+.cetech-de-badge {
+	display: inline-block;
+	border-radius: 999px;
+	padding: 2px 8px;
+	font-size: 12px;
+	line-height: 1.4;
+	border: 1px solid #c3c4c7;
+	background: #f6f7f7;
+	color: #1d2327;
+}
+
+.cetech-de-badge--ready {
+	background: #edfaef;
+	color: #1e4620;
+	border-color: #c3e6cb;
+}
+
+.cetech-de-badge--awaiting,
+.cetech-de-badge--processing {
+	background: #f0f6fc;
+	color: #1d2327;
+	border-color: #c5d9ed;
+}
+
+.cetech-de-badge--transit {
+	background: #f0f6fc;
+	color: #0a4b78;
+	border-color: #c5d9ed;
+}
+
+.cetech-de-badge--cancelled {
+	background: #fcf0f1;
+	color: #8a2424;
+	border-color: #f0c6c6;
+}
+
+.cetech-de-shipment-pagination {
+	margin: 12px 0 0;
+}
+
+.cetech-de-list-toolbar select {
+	max-width: 100%;
+}
+
 .cetech-de-badge--attention {
 	background: #fcf9e8;
 	color: #8a6d1d;

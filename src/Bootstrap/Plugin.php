@@ -111,6 +111,7 @@ use CetechDeliveryEngine\Presentation\Admin\DeliveryOffersPage;
 use CetechDeliveryEngine\Presentation\Admin\DeliverySettingsHomePage;
 use CetechDeliveryEngine\Presentation\Admin\NeedsAttentionPage;
 use CetechDeliveryEngine\Presentation\Admin\ProductExceptionsPage;
+use CetechDeliveryEngine\Presentation\Admin\ShipmentsPage;
 use CetechDeliveryEngine\Presentation\Admin\DestinationZoneTestMatcher;
 use CetechDeliveryEngine\Presentation\Admin\DestinationZonesPage;
 use CetechDeliveryEngine\Presentation\Admin\EffectiveConfigurationPreviewPage;
@@ -138,6 +139,7 @@ use CetechDeliveryEngine\Application\Shipment\PaidOrderShipmentSubscriber;
 use CetechDeliveryEngine\Application\Shipment\ShipmentCreationFailureStore;
 use CetechDeliveryEngine\Application\Shipment\ShipmentCreationIssueQuery;
 use CetechDeliveryEngine\Application\Shipment\ShipmentService;
+use CetechDeliveryEngine\Application\Shipment\ShipmentWorkspaceQuery;
 use CetechDeliveryEngine\Application\Runtime\VariationRelationshipInspectorInterface;
 use CetechDeliveryEngine\Application\Runtime\WooCommerceVariationRelationshipInspector;
 use CetechDeliveryEngine\Presentation\Admin\Validation\DeliveryOfferValidator;
@@ -658,6 +660,13 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			ShipmentWorkspaceQuery::class,
+			static fn ( ServiceContainer $container ): ShipmentWorkspaceQuery => new ShipmentWorkspaceQuery(
+				$container->get( ShipmentRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
 			OrderDeliverySnapshotIntegrity::class,
 			static fn (): OrderDeliverySnapshotIntegrity => new OrderDeliverySnapshotIntegrity()
 		);
@@ -945,7 +954,16 @@ final class Plugin {
 				$container->get( AdminActionHandler::class ),
 				$container->get( OperationalStateService::class ),
 				$container->get( ShipmentCreationIssueQuery::class ),
-				$container->get( ShipmentService::class )
+				$container->get( ShipmentService::class ),
+				$container->get( FeatureFlags::class )
+			)
+		);
+
+		$this->container->singleton(
+			ShipmentsPage::class,
+			static fn ( ServiceContainer $container ): ShipmentsPage => new ShipmentsPage(
+				$container->get( FeatureFlags::class ),
+				$container->get( ShipmentWorkspaceQuery::class )
 			)
 		);
 
@@ -1081,7 +1099,9 @@ final class Plugin {
 				$container->get( SetupWizardPage::class ),
 				$container->get( ScopedConfigurationAdminAssets::class ),
 				$container->get( AdminUxAssets::class ),
-				$container->get( SetupWizardProgress::class )
+				$container->get( SetupWizardProgress::class ),
+				$container->get( FeatureFlags::class ),
+				$container->get( ShipmentsPage::class )
 			)
 		);
 	}
