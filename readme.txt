@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-rc.4
+Stable tag: 1.0.0-rc.5-qa.1
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,9 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-rc.5-qa.1 =
+* Owner QA candidate for Stage 14 shipment records. Schema target 4. Shipment tables pin InnoDB. Feature flags remain off until enabled in Settings. Not the final RC.5 release.
 
 = 1.0.0-rc.4 =
 * Release candidate after Stage 13F customer-facing delivery presentation polish. Owner physical QA.1 (`1.0.0-rc.4-qa.1`) accepted on FLAIROC; no additional QA build required.
