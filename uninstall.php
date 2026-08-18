@@ -5,7 +5,7 @@
  * Safety policy:
  * - By default, uninstall does NOT delete plugin data.
  * - Data is removed only when cetech_de_delete_data_on_uninstall is explicitly true (1).
- * - Phase 2A: when delete-data is enabled, configuration-domain tables are dropped.
+ * - When delete-data is enabled, configuration and shipment tables are dropped.
  * - This file must not fatal when WooCommerce is absent.
  *
  * @package CetechDeliveryEngine
@@ -111,7 +111,7 @@ global $wpdb;
 
 $table_prefix = $wpdb->prefix . 'delivery_engine_';
 
-// Keep this list aligned with ConfigurationTables::SUFFIXES (see src/Infrastructure/Persistence/ConfigurationTables.php).
+// Keep this list aligned with ConfigurationTables::all_suffixes() (see src/Infrastructure/Persistence/ConfigurationTables.php).
 $table_suffixes = [
 	'delivery_offers',
 	'destination_zones',
@@ -127,6 +127,9 @@ $table_suffixes = [
 	'configuration_scopes',
 	'configuration_fields',
 	'configuration_collections',
+	'shipments',
+	'shipment_items',
+	'shipment_events',
 ];
 
 foreach ( $table_suffixes as $suffix ) {

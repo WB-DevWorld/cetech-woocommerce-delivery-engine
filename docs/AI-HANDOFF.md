@@ -4,8 +4,8 @@
 
 **Last updated:** 2026-08-18  
 **Plugin version:** `1.0.0-rc.4` (Stage 13 / 13B / 13C / 13D / 13D-R1 / 13F / 13G finalized; tagged release candidate). Owner QA.1 (`1.0.0-rc.4-qa.1`) **PASSED** on FLAIROC — no additional QA build required. Do not retag RC.3 or RC.4.  
-**Schema target:** `3` (`cetech_de_db_version`) — Stage 14A proposes schema `4` for a later implementation stage; **not applied**.  
-**Git:** `master` (in sync with `origin/master`); RC.2 tag `v1.0.0-rc.2` **untouched**; RC.3 tag `v1.0.0-rc.3` **untouched**; RC.4 tag `v1.0.0-rc.4` (peeled `6b70c29`) **untouched**  
+**Schema target:** `4` (`cetech_de_db_version`) — Stage 14B persistence tables are in this tree; **not deployed to FLAIROC** (live RC.4 remains schema `3` until a later authorised install).  
+**Git:** `master`; RC.2 tag `v1.0.0-rc.2` **untouched**; RC.3 tag `v1.0.0-rc.3` **untouched**; RC.4 tag `v1.0.0-rc.4` (peeled `6b70c29`) **untouched**  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`  
 **Canonical maintained rulebook:** `docs/DELIVERY-ENGINE-GOVERNING-RULES.md` (mandatory for all implementation work)
@@ -42,16 +42,17 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 13F-R1 owner QA package | **COMPLETE / ACCEPTED** — `1.0.0-rc.4-qa.1` owner physical FLAIROC retest **ALL PASS** (`docs/STAGE-13F-R1-OWNER-QA-PACKAGE.md`). No additional QA build required. |
 | Stage 13G RC.4 finalization | **COMPLETE** — version `1.0.0-rc.4`; tag `v1.0.0-rc.4`; artifact `docs/STAGE-13G-RC4-FINALIZATION.md`. FLAIROC not modified in finalization; owner short confirmation pending. |
 | Stage 14A shipment architecture audit | **COMPLETE** — documentation only. Artifact `docs/STAGE-14A-SHIPMENT-ARCHITECTURE-AUDIT.md`. Recommended V1: Delivery Engine schema-4 tables as canonical store behind `ShipmentRepositoryInterface`; WooCommerce Fulfillments adapter reserved, not canonical. **No runtime shipment functionality.** |
+| Stage 14B shipment persistence foundation | **COMPLETE** — schema target `4`; domain + `WpdbShipmentRepository`; **runtime shipment creation NOT implemented**. Artifact `docs/STAGE-14B-SHIPMENT-PERSISTENCE-FOUNDATION.md`. |
 | Governing rules hardening | **COMPLETE** — canonical rulebook `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`; Cursor always-apply wrapper `.cursor/rules/000-delivery-engine-governance.mdc`. Documentation/governance only. |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos; profile defaults use `global/0/{profile_key}` |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-profile site-wide root; primary default fallback; provenance; fingerprint; hard constraints |
 | New admin UX | **Overview** + first-time setup wizard + Site-wide Defaults + Product Exceptions + Needs Attention. Product/variation customization is progressive. Legacy Delivery Rules is **retired from the normal menu**. Technical Diagnostics is a hidden support destination. Administrator is a protected full-access role in Settings → Access. |
-| Runtime on FLAIROC | **Required production features ON**; deferred features **OFF**; **COD OFF**; schema **3** — owner installs final RC.4 for short confirmation |
+| Runtime on FLAIROC | **Required production features ON**; deferred features **OFF**; **COD OFF**; schema **3** — owner installs final RC.4 for short confirmation. Master code schema target is **4** and is not on FLAIROC. |
 | Variable runtime capture | Verified live; WoodMart adapter **not required** |
-| Shipments / tracking / timeline | **Not implemented.** Stage 14A architecture audit is complete; do **not** start Stage 14B until that audit is reviewed. |
+| Shipments / tracking / timeline | **Persistence foundation only.** Schema/domain/repository implemented; **runtime shipment creation NOT implemented.** Flags remain OFF. Do **not** start Stage 14C until instructed. |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Hidden compatibility route retained; Legacy management UI is not a normal workflow |
-| Next stage | **Stage 14B** (persistence foundation) only after Stage 14A is reviewed. Do **not** implement shipments, change schema, bump version, package, or modify FLAIROC until instructed. RC.4 checkout/runtime remains the protected baseline. |
+| Next stage | **Stage 14C** (planner + idempotent creation) only when explicitly instructed. Do **not** package, tag, deploy, or modify FLAIROC. RC.4 checkout/runtime remains the protected customer baseline. Plugin version stays `1.0.0-rc.4`. |
 | Final PHP log (RC.2 smoke) | Marker **546** → inspected through **548** — **PASS**; no new Delivery Engine fatals |
 | Live QA orders | `#39721` (variable); `#39724` (multi-product grouping) |
 | Package | `cetech-woocommerce-delivery-engine-1.0.0-rc.4.zip` (see Stage 13G finalization report for SHA-256) |
@@ -60,7 +61,7 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 
 **RC.3 package:** tagged and untouched. **RC.4 package:** locally finalized and tagged after owner QA.1 (`1.0.0-rc.4-qa.1`) acceptance of Stage 13F customer presentation polish. Do **not** claim FLAIROC final RC.4 runtime confirmation until the owner completes the short post-install check.
 
-Stage 14A is an audit/design gate only. Governing rules are now persistent in `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`. Do **not** begin Stage 14B shipment implementation unless explicitly instructed. Leave required production Delivery Engine switches **ON** on the live site. COD remains **OFF**.
+Stage 14B added schema/domain/persistence only. Runtime shipment creation is **not** implemented. Do **not** begin Stage 14C unless explicitly instructed. Leave required production Delivery Engine switches **ON** on the live site. COD remains **OFF**.
 
 Administrator-language requirement: normal-user admin UI must use operational language throughout. Technical terminology belongs only in Technical details.
 
@@ -108,6 +109,7 @@ Administrator-language requirement: normal-user admin UI must use operational la
 | `docs/STAGE-13F-R1-OWNER-QA-PACKAGE.md` | Stage 13F-R1 owner QA package `1.0.0-rc.4-qa.1` — owner **PASSED**; superseded by final RC.4 |
 | `docs/STAGE-13G-RC4-FINALIZATION.md` | Stage 13G final RC.4 release record (owner QA.1 accepted; no extra QA build) |
 | `docs/STAGE-14A-SHIPMENT-ARCHITECTURE-AUDIT.md` | Stage 14A shipment/tracking architecture audit and persistence recommendation (docs only; no runtime) |
+| `docs/STAGE-14B-SHIPMENT-PERSISTENCE-FOUNDATION.md` | Stage 14B schema 4 + domain/repository; **runtime creation not implemented** |
 | `docs/CLASSIC-CHECKOUT-RELEASE-CANDIDATE-READINESS.md` | Pre-smoke Classic Checkout readiness (superseded for status by RC.2 readiness) |
 | `docs/RELEASE-1.0.0-RC.2-READINESS.md` | **Authoritative** live-verified `1.0.0-rc.2` release readiness |
 | `docs/ADMIN-UI-LANGUAGE-GUIDE.md` | Authoritative normal-administrator presentation language |

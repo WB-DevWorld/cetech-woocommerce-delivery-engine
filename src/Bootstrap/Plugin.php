@@ -83,6 +83,7 @@ use CetechDeliveryEngine\Domain\ProductRule\ProductDeliveryRuleRepositoryInterfa
 use CetechDeliveryEngine\Domain\Supplier\OriginRepositoryInterface;
 use CetechDeliveryEngine\Domain\Supplier\SupplierRepositoryInterface;
 use CetechDeliveryEngine\Domain\RateCard\RateCardRepositoryInterface;
+use CetechDeliveryEngine\Domain\Shipment\ShipmentRepositoryInterface;
 use CetechDeliveryEngine\Domain\Zone\DestinationZoneRepositoryInterface;
 use CetechDeliveryEngine\Domain\Zone\DestinationRuleRepositoryInterface;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbAuditLogRepository;
@@ -94,6 +95,7 @@ use CetechDeliveryEngine\Infrastructure\Persistence\WpdbOriginRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbPickupLocationRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbProductDeliveryRuleRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbRateCardRepository;
+use CetechDeliveryEngine\Infrastructure\Persistence\WpdbShipmentRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbSupplierRepository;
 use CetechDeliveryEngine\Integrations\Registry\IntegrationRegistry;
 use CetechDeliveryEngine\Presentation\Admin\AdminActionHandler;
@@ -1080,6 +1082,11 @@ final class Plugin {
 		$this->container->singleton(
 			AuditLogRepositoryInterface::class,
 			static fn (): AuditLogRepositoryInterface => new WpdbAuditLogRepository()
+		);
+
+		$this->container->singleton(
+			ShipmentRepositoryInterface::class,
+			static fn (): ShipmentRepositoryInterface => new WpdbShipmentRepository()
 		);
 
 		$this->container->singleton(

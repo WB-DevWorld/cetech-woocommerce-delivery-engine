@@ -113,6 +113,10 @@ if ( ! function_exists( 'sanitize_text_field' ) ) {
 	}
 }
 
+if ( ! defined( 'ARRAY_A' ) ) {
+	define( 'ARRAY_A', 'ARRAY_A' );
+}
+
 if ( ! function_exists( '__' ) ) {
 	function __( string $text, string $domain = 'default' ): string {
 		return $text;

@@ -6,7 +6,7 @@
 **Repository namespace:** `CetechDeliveryEngine\`
 **WooCommerce dependency:** Required
 **PHP minimum:** 8.1+
-**Current known implementation baseline:** `1.0.0-rc.4`, schema target `3`  
+**Current known implementation baseline:** `1.0.0-rc.4`, schema target `4` (master; FLAIROC/tagged RC.4 remain schema `3` until a later deploy)  
 **Canonical maintained rulebook:** `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`
 
 ---
@@ -133,12 +133,12 @@ Document the conflict and resolve it deliberately.
 At the current known baseline:
 
 * plugin version is `1.0.0-rc.4`;
-* schema target is `3`;
+* schema target is `4` on master (tagged RC.4 / FLAIROC remain schema `3` until a later deploy);
 * the simple-product customer path through order delivery snapshots is implemented;
 * runtime customer-facing flags default off;
 * WooCommerce is the only hard dependency;
 * HPOS compatibility exists through WooCommerce CRUD;
-* shipment tables are not yet implemented;
+* shipment tables and repository exist as a persistence foundation; runtime shipment creation is not implemented;
 * shipment workspace is not yet implemented;
 * tracking runtime is not yet implemented;
 * customer shipment timeline is not yet implemented;

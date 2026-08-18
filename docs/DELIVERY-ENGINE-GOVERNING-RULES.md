@@ -3,7 +3,8 @@
 **Document status:** Canonical, mandatory, maintained rulebook  
 **Applies to:** All human developers, Cursor agents, AI coding agents, reviewers, and maintainers  
 **Plugin:** CETECH WooCommerce Delivery Engine  
-**Current protected runtime baseline:** `1.0.0-rc.4`, schema target `3`  
+**Current protected runtime baseline:** `1.0.0-rc.4` (tagged RC.4 / FLAIROC remain schema `3` until a later authorised deploy)  
+**Current master schema target:** `4` (Stage 14B shipment persistence tables; runtime creation not implemented)  
 **Text domain:** `cetech-woocommerce-delivery-engine`
 
 This file is the **canonical maintained rulebook**. It consolidates hard invariants from `docs/PROJECT-GOVERNANCE.md`, `docs/PROJECT-RULES.md`, owner-accepted RC.4 behaviour, and the Stage 14A architecture decisions.
@@ -29,7 +30,7 @@ Where this rulebook and an older rules file conflict on a **hard invariant**, th
 6. **Do not discard owner-tested behaviour** without explicit owner/authorisation.
 7. **Current implementation truth** = repository code + latest completed stage documentation. Visionary handoff sections are not proof that a feature exists.
 8. **Intended product/end-state** = latest `Delivery Shipping Plugin Up-To-Date Design and Expectations.md`. Do not implement a future vision merely because it appears there.
-9. Plugin version remains **`1.0.0-rc.4`** and schema remains **`3`** until an approved implementation stage changes them. Stage 14A proposed schema 4; it is **not applied** until Stage 14B (or a later approved stage) actually migrates.
+9. Plugin version remains **`1.0.0-rc.4`** until an approved release stage bumps it. There is no development-version policy requiring a version bump for internal schema/domain stages. Master schema target is **`4`** after Stage 14B. Runtime shipment creation is **not** implemented. Do not bump the plugin version, package, tag, or deploy unless explicitly instructed.
 
 Testable: a commit that retags RC.4, changes `CETECH_DE_VERSION` without authorisation, or rewrites checkout grouping “to prepare for shipments” violates this section.
 
@@ -771,7 +772,7 @@ Approved implementation sequence after this rulebook:
 → 14H package + physical QA + training
 ```
 
-Do not implement 14B until the owner reviews Stage 14A and this governance hardening.
+Do not implement 14C until explicitly instructed. Stage 14B persistence is complete; runtime creation is not.
 
 ---
 

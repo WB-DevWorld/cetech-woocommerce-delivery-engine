@@ -225,8 +225,8 @@ if ( is_readable( $plugin_header ) ) {
 
 if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 	$target = ( new ReflectionClass( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) )->getConstant( 'TARGET' );
-	if ( '3' !== $target ) {
-		$failures[] = 'SchemaVersion::TARGET must be 3 for this package.';
+	if ( '4' !== $target ) {
+		$failures[] = 'SchemaVersion::TARGET must be 4 for this package.';
 	}
 }
 

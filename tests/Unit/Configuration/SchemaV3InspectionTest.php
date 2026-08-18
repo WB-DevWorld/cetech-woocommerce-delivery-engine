@@ -4,15 +4,17 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Tests\Unit\Configuration;
 
-use CetechDeliveryEngine\Core\Versioning\SchemaVersion;
 use CetechDeliveryEngine\Infrastructure\Persistence\ConfigurationTables;
 use CetechDeliveryEngine\Infrastructure\Persistence\ScopedConfigurationSchema;
 use PHPUnit\Framework\TestCase;
 
 final class SchemaV3InspectionTest extends TestCase {
 
-	public function test_schema_target_is_three(): void {
-		self::assertSame( '3', SchemaVersion::TARGET );
+	public function test_v3_migration_version_remains_three(): void {
+		$plugin_root = dirname( __DIR__, 3 );
+		$migration   = require $plugin_root . '/database/migrations/20260810160000_create_scoped_configuration_tables.php';
+
+		self::assertSame( '3', $migration->get_version() );
 	}
 
 	public function test_v3_tables_are_registered_and_markers_present(): void {

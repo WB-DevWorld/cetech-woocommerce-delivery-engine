@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Infrastructure\Persistence;
 
 /**
- * Plugin configuration and product-rule tables.
+ * Plugin configuration, product-rule, scoped-configuration, and shipment tables.
  */
 final class ConfigurationTables {
 
@@ -31,6 +31,9 @@ final class ConfigurationTables {
 	/** @var list<string> Stage 2 scoped configuration table suffixes. */
 	public const SCOPED_CONFIGURATION_SUFFIXES = ScopedConfigurationSchema::SUFFIXES;
 
+	/** @var list<string> Stage 14 shipment persistence table suffixes. */
+	public const SHIPMENT_SUFFIXES = ShipmentSchema::SUFFIXES;
+
 	/**
 	 * @return list<string>
 	 */
@@ -38,7 +41,8 @@ final class ConfigurationTables {
 		return array_merge(
 			self::SUFFIXES,
 			self::PRODUCT_RULE_SUFFIXES,
-			self::SCOPED_CONFIGURATION_SUFFIXES
+			self::SCOPED_CONFIGURATION_SUFFIXES,
+			self::SHIPMENT_SUFFIXES
 		);
 	}
 

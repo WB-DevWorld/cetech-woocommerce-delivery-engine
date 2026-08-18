@@ -10,7 +10,9 @@ use CetechDeliveryEngine\Core\Versioning\SchemaVersion;
 use CetechDeliveryEngine\Infrastructure\Persistence\ConfigurationTables;
 
 /**
- * Removes plugin options, capabilities, and configuration tables when delete-data uninstall is enabled.
+ * Removes plugin options, capabilities, and plugin tables when delete-data uninstall is enabled.
+ *
+ * Shipment tables are dropped only on this explicit uninstall path, never on deactivation.
  */
 final class Uninstaller {
 

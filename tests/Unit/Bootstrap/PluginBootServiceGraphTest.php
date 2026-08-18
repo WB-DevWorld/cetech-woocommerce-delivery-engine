@@ -16,6 +16,8 @@ use CetechDeliveryEngine\Bootstrap\ServiceContainer;
 use CetechDeliveryEngine\Core\AdminNoticeManager;
 use CetechDeliveryEngine\Core\Health\HealthCheckRegistry;
 use CetechDeliveryEngine\Core\Versioning\MigrationRunner;
+use CetechDeliveryEngine\Domain\Shipment\ShipmentRepositoryInterface;
+use CetechDeliveryEngine\Infrastructure\Persistence\WpdbShipmentRepository;
 use CetechDeliveryEngine\Integrations\Registry\IntegrationRegistry;
 use CetechDeliveryEngine\Presentation\Admin\AdminMenu;
 use CetechDeliveryEngine\Presentation\Admin\EffectiveConfigurationPreviewPage;
@@ -81,6 +83,9 @@ final class PluginBootServiceGraphTest extends TestCase {
 
 		$checker = $container->get( ConfigurationHealthChecker::class );
 		self::assertInstanceOf( ConfigurationHealthChecker::class, $checker );
+
+		$shipments = $container->get( ShipmentRepositoryInterface::class );
+		self::assertInstanceOf( WpdbShipmentRepository::class, $shipments );
 	}
 
 	public function test_boot_eager_service_graph_constructs_without_class_not_found(): void {

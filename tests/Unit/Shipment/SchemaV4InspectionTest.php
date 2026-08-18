@@ -1,0 +1,69 @@
+<?php
+
+declare(strict_types=1);
+
+namespace CetechDeliveryEngine\Tests\Unit\Shipment;
+
+use CetechDeliveryEngine\Core\Versioning\SchemaVersion;
+use CetechDeliveryEngine\Infrastructure\Persistence\ConfigurationTables;
+use CetechDeliveryEngine\Infrastructure\Persistence\ShipmentSchema;
+use PHPUnit\Framework\TestCase;
+
+final class SchemaV4InspectionTest extends TestCase {
+
+	public function test_schema_target_is_four(): void {
+		self::assertSame( '4', SchemaVersion::TARGET );
+		self::assertSame( '4', SchemaVersion::target() );
+	}
+
+	public function test_plugin_version_remains_rc4(): void {
+		$plugin_root = dirname( __DIR__, 3 );
+		$header      = (string) file_get_contents( $plugin_root . '/cetech-woocommerce-delivery-engine.php' );
+
+		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-rc\\.4'\s*\)/", $header );
+	}
+
+	public function test_shipment_tables_are_registered_with_required_indexes(): void {
+		foreach ( ShipmentSchema::SUFFIXES as $suffix ) {
+			self::assertContains( $suffix, ConfigurationTables::all_suffixes() );
+			self::assertContains( $suffix, ConfigurationTables::SHIPMENT_SUFFIXES );
+		}
+
+		$statements = ShipmentSchema::create_table_statements( 'DEFAULT CHARSET=utf8mb4' );
+
+		foreach ( ShipmentSchema::required_markers() as $suffix => $markers ) {
+			self::assertArrayHasKey( $suffix, $statements );
+
+			foreach ( $markers as $marker ) {
+				self::assertStringContainsString( $marker, $statements[ $suffix ] );
+			}
+		}
+	}
+
+	public function test_schema_sql_does_not_store_translated_status_labels(): void {
+		$joined = implode( "\n", ShipmentSchema::create_table_statements( '' ) );
+
+		self::assertStringNotContainsString( 'Awaiting fulfilment', $joined );
+		self::assertStringNotContainsString( 'In transit', $joined );
+		self::assertStringNotContainsString( 'Dispatched', $joined );
+		self::assertStringContainsString( "status varchar(32) NOT NULL", $joined );
+	}
+
+	public function test_uninstall_fallback_includes_shipment_tables(): void {
+		$plugin_root = dirname( __DIR__, 3 );
+		$source      = (string) file_get_contents( $plugin_root . '/uninstall.php' );
+
+		self::assertStringContainsString( "'shipments'", $source );
+		self::assertStringContainsString( "'shipment_items'", $source );
+		self::assertStringContainsString( "'shipment_events'", $source );
+	}
+
+	public function test_deactivator_does_not_drop_tables(): void {
+		$plugin_root = dirname( __DIR__, 3 );
+		$source      = (string) file_get_contents( $plugin_root . '/src/Bootstrap/Deactivator.php' );
+
+		self::assertStringNotContainsString( 'DROP TABLE', $source );
+		self::assertStringNotContainsString( 'delete_option', $source );
+		self::assertStringNotContainsString( 'ConfigurationTables', $source );
+	}
+}
