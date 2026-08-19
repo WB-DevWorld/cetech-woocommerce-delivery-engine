@@ -154,7 +154,8 @@ final class ShipmentCreationFixtures {
 		bool $paid = true,
 		string $status = 'processing',
 		mixed $date_paid = false,
-		string $payment_method = 'bacs'
+		string $payment_method = 'bacs',
+		array $extra = []
 	): WC_Order {
 		$meta = [];
 
@@ -168,17 +169,20 @@ final class ShipmentCreationFixtures {
 			: $date_paid;
 
 		$order = new WC_Order(
-			[
-				'id'              => $order_id,
-				'order_number'    => (string) $order_id,
-				'paid'            => $paid,
-				'status'          => $status,
-				'date_paid'       => $resolved_date_paid,
-				'payment_method'  => $payment_method,
-				'items'           => $items,
-				'shipping_items'  => $shipping_items,
-				'meta'            => $meta,
-			]
+			array_merge(
+				[
+					'id'              => $order_id,
+					'order_number'    => (string) $order_id,
+					'paid'            => $paid,
+					'status'          => $status,
+					'date_paid'       => $resolved_date_paid,
+					'payment_method'  => $payment_method,
+					'items'           => $items,
+					'shipping_items'  => $shipping_items,
+					'meta'            => $meta,
+				],
+				$extra
+			)
 		);
 		$order->save();
 

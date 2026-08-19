@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Admin;
 
+use CetechDeliveryEngine\Application\Shipment\ManualShipmentCreationMessages;
+use CetechDeliveryEngine\Application\Shipment\ManualShipmentCreationPreview;
+use CetechDeliveryEngine\Application\Shipment\ManualShipmentCreationPreviewFactory;
 use CetechDeliveryEngine\Application\Shipment\ShipmentActivityCursor;
 use CetechDeliveryEngine\Application\Shipment\ShipmentDispatchDate;
 use CetechDeliveryEngine\Application\Shipment\ShipmentEtaService;
 use CetechDeliveryEngine\Application\Shipment\ShipmentListRow;
+use CetechDeliveryEngine\Application\Shipment\ShipmentService;
 use CetechDeliveryEngine\Application\Shipment\ShipmentStatusChangeRequest;
 use CetechDeliveryEngine\Application\Shipment\ShipmentStatusService;
 use CetechDeliveryEngine\Application\Shipment\ShipmentStatusTransitionPolicy;
@@ -30,10 +34,11 @@ final class ShipmentsPage {
 
 	public const SLUG = 'cetech-delivery-engine-shipments';
 
-	public const ACTION_SAVE_TRACKING   = 'cetech_de_save_shipment_tracking';
-	public const ACTION_CHANGE_STATUS   = 'cetech_de_change_shipment_status';
-	public const ACTION_CORRECT_STATUS  = 'cetech_de_correct_shipment_status';
-	public const ACTION_UPDATE_ETA      = 'cetech_de_update_shipment_eta';
+	public const ACTION_SAVE_TRACKING          = 'cetech_de_save_shipment_tracking';
+	public const ACTION_CHANGE_STATUS          = 'cetech_de_change_shipment_status';
+	public const ACTION_CORRECT_STATUS         = 'cetech_de_correct_shipment_status';
+	public const ACTION_UPDATE_ETA             = 'cetech_de_update_shipment_eta';
+	public const ACTION_CREATE_FROM_ORDER      = 'cetech_de_create_shipment_from_order';
 
 	public function __construct(
 		private readonly FeatureFlags $flags,
@@ -42,8 +47,20 @@ final class ShipmentsPage {
 		private readonly ?ShipmentTrackingService $tracking = null,
 		private readonly ?ShipmentStatusService $status = null,
 		private readonly ?ShipmentEtaService $eta = null,
-		private readonly ?ShipmentActivityCursor $activity = null
+		private readonly ?ShipmentActivityCursor $activity = null,
+		private readonly ?ShipmentService $creation = null,
+		private readonly ?ManualShipmentCreationPreviewFactory $preview = null
 	) {
+	}
+
+	public static function create_from_order_url( int $order_id ): string {
+		return add_query_arg(
+			[
+				'page' => self::SLUG,
+				ManualShipmentCreationPreviewFactory::ORDER_ID_QUERY => (string) max( 0, $order_id ),
+			],
+			admin_url( 'admin.php' )
+		);
 	}
 
 	public function handle_actions(): void {
@@ -55,6 +72,7 @@ final class ShipmentsPage {
 		$this->handle_status_action();
 		$this->handle_correction_action();
 		$this->handle_eta_action();
+		$this->handle_create_from_order_action();
 	}
 
 	private function handle_tracking_action(): void {
@@ -218,6 +236,73 @@ final class ShipmentsPage {
 		);
 	}
 
+	private function handle_create_from_order_action(): void {
+		if ( ! $this->creation instanceof ShipmentService || ! $this->actions instanceof AdminActionHandler ) {
+			return;
+		}
+
+		if ( ! $this->actions->verify_post(
+			self::ACTION_CREATE_FROM_ORDER,
+			self::ACTION_CREATE_FROM_ORDER,
+			'manage_shipments',
+			self::SLUG
+		) ) {
+			return;
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified by AdminActionHandler::verify_post().
+		$order_id = isset( $_POST['order_id'] ) ? absint( wp_unslash( (string) $_POST['order_id'] ) ) : 0;
+
+		if ( ! $this->flags->is_enabled( 'enable_shipment_records' ) ) {
+			$this->actions->notices()->flash_error(
+				__( 'You do not have permission to perform this action.', 'cetech-woocommerce-delivery-engine' )
+			);
+			$this->actions->redirect( self::SLUG );
+		}
+
+		$order = ( $order_id > 0 && function_exists( 'wc_get_order' ) ) ? wc_get_order( $order_id ) : null;
+
+		if ( ! $order instanceof \WC_Order ) {
+			$this->actions->notices()->flash_error( ManualShipmentCreationMessages::for_preview_code( ManualShipmentCreationPreview::CODE_ORDER_NOT_FOUND ) );
+			$this->actions->redirect( self::SLUG );
+		}
+
+		$result  = $this->creation->create_from_historical_order_for_staff( $order, $this->actor_id() );
+		$outcome = $result->outcome;
+		$first   = $result->shipments[0] ?? null;
+		$redirect_args = null !== $first
+			? [ 'shipment' => (string) $first->id ]
+			: [ ManualShipmentCreationPreviewFactory::ORDER_ID_QUERY => (string) $order_id ];
+
+		if ( \CetechDeliveryEngine\Domain\Enum\ShipmentCreationOutcome::Created === $outcome ) {
+			$this->actions->notices()->flash_success( ManualShipmentCreationMessages::created() );
+			$this->actions->redirect( self::SLUG, $redirect_args );
+		}
+
+		if (
+			\CetechDeliveryEngine\Domain\Enum\ShipmentCreationOutcome::AlreadyExistsComplete === $outcome
+			|| \CetechDeliveryEngine\Domain\Enum\ShipmentCreationOutcome::CompletedExistingIncomplete === $outcome
+		) {
+			$this->actions->notices()->flash_success( ManualShipmentCreationMessages::already_exists() );
+			$this->actions->redirect( self::SLUG, $redirect_args );
+		}
+
+		$message = match ( $outcome ) {
+			\CetechDeliveryEngine\Domain\Enum\ShipmentCreationOutcome::ZeroShipmentsPickupOnly => ManualShipmentCreationMessages::for_preview_code( ManualShipmentCreationPreview::CODE_PICKUP_ONLY ),
+			\CetechDeliveryEngine\Domain\Enum\ShipmentCreationOutcome::NotDeliveryEngineOrder => ManualShipmentCreationMessages::for_preview_code( ManualShipmentCreationPreview::CODE_NO_SNAPSHOT ),
+			\CetechDeliveryEngine\Domain\Enum\ShipmentCreationOutcome::Ineligible => ManualShipmentCreationMessages::for_preview_code( ManualShipmentCreationPreview::CODE_INELIGIBLE ),
+			\CetechDeliveryEngine\Domain\Enum\ShipmentCreationOutcome::FeatureDisabled => ManualShipmentCreationMessages::for_preview_code( ManualShipmentCreationPreview::CODE_FEATURE_DISABLED ),
+			\CetechDeliveryEngine\Domain\Enum\ShipmentCreationOutcome::InvalidSnapshot => ManualShipmentCreationMessages::for_preview_code( ManualShipmentCreationPreview::CODE_INVALID_SNAPSHOT ),
+			default => ManualShipmentCreationMessages::persistence_failed(),
+		};
+
+		$this->actions->notices()->flash_error( $message );
+		$this->actions->redirect(
+			self::SLUG,
+			[ ManualShipmentCreationPreviewFactory::ORDER_ID_QUERY => (string) $order_id ]
+		);
+	}
+
 	private function actor_id(): ?int {
 		return function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : null;
 	}
@@ -246,6 +331,16 @@ final class ShipmentsPage {
 			return;
 		}
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$order_id = isset( $_GET[ ManualShipmentCreationPreviewFactory::ORDER_ID_QUERY ] )
+			? absint( wp_unslash( (string) $_GET[ ManualShipmentCreationPreviewFactory::ORDER_ID_QUERY ] ) )
+			: 0;
+
+		if ( $order_id > 0 && $this->preview instanceof ManualShipmentCreationPreviewFactory ) {
+			$this->render_create_preview( $order_id );
+			return;
+		}
+
 		$this->render_list();
 	}
 
@@ -262,16 +357,17 @@ final class ShipmentsPage {
 		AdminPageLayout::render_page_header(
 			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Shipments', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Review delivery shipments created from paid WooCommerce orders.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Review delivery shipments created from paid WooCommerce orders, or create a shipment from a Cash on Delivery order using the historical order record.', 'cetech-woocommerce-delivery-engine' )
 		);
 
+		$this->render_create_from_order_lookup();
 		$this->render_filters( $search, $status );
 
 		if ( [] === $result->rows ) {
 			if ( '' === $search && '' === $status ) {
 				AdminPageLayout::render_empty_state(
 					__( 'No shipments have been created yet.', 'cetech-woocommerce-delivery-engine' ),
-					__( 'Paid Delivery Engine orders will appear here when shipment creation is enabled and succeeds.', 'cetech-woocommerce-delivery-engine' )
+					__( 'Paid Delivery Engine orders appear here automatically after payment is confirmed. Cash on Delivery orders need a shipment created from the order record.', 'cetech-woocommerce-delivery-engine' )
 				);
 			} else {
 				AdminPageLayout::render_empty_state(
@@ -390,6 +486,155 @@ final class ShipmentsPage {
 		AdminPageLayout::close_section();
 
 		AdminPageLayout::close_page();
+	}
+
+	private function render_create_from_order_lookup(): void {
+		$requested = $this->requested_create_order_id();
+
+		echo '<div class="cetech-de-create-from-order">';
+		echo '<h2>' . esc_html__( 'Create shipment from order', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
+		echo '<p class="description">' . esc_html__( 'Look up a WooCommerce order and create its delivery shipment from the historical Delivery Engine record. Current product settings are not used.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '<form method="get" action="' . esc_url( admin_url( 'admin.php' ) ) . '">';
+		echo '<input type="hidden" name="page" value="' . esc_attr( self::SLUG ) . '" />';
+		echo '<label for="cetech-de-create-order-id">' . esc_html__( 'WooCommerce Order ID', 'cetech-woocommerce-delivery-engine' ) . '</label> ';
+		echo '<input id="cetech-de-create-order-id" type="number" min="1" step="1" name="' . esc_attr( ManualShipmentCreationPreviewFactory::ORDER_ID_QUERY ) . '" value="' . esc_attr( $requested > 0 ? (string) $requested : '' ) . '" /> ';
+		echo '<button type="submit" class="button">' . esc_html__( 'Find order', 'cetech-woocommerce-delivery-engine' ) . '</button>';
+		echo '</form>';
+		echo '</div>';
+	}
+
+	private function render_create_preview( int $order_id ): void {
+		$preview = $this->preview->from_order_id( $order_id );
+
+		AdminPageLayout::open_page();
+		if ( $this->actions instanceof AdminActionHandler ) {
+			$this->actions->notices()->render_notices();
+		}
+		AdminPageLayout::render_page_header(
+			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Create shipment from order', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Confirm the historical order details before creating a delivery shipment. Customer payment and totals stay in WooCommerce.', 'cetech-woocommerce-delivery-engine' ),
+			null,
+			[
+				'label' => __( 'Back to shipments', 'cetech-woocommerce-delivery-engine' ),
+				'url'   => $this->list_url(),
+			]
+		);
+
+		echo '<p>' . esc_html( $preview->message ) . '</p>';
+
+		if ( null !== $preview->order_id ) {
+			$order_cell = esc_html( $preview->order_number );
+
+			if ( '' !== $preview->order_url ) {
+				$order_cell = '<a href="' . esc_url( $preview->order_url ) . '">' . $order_cell . '</a>';
+			}
+
+			AdminPageLayout::open_section( __( 'Order', 'cetech-woocommerce-delivery-engine' ) );
+			$this->render_definition_table(
+				[
+					[ __( 'WooCommerce order', 'cetech-woocommerce-delivery-engine' ), $order_cell ],
+					[ __( 'Customer', 'cetech-woocommerce-delivery-engine' ), esc_html( $preview->customer_name !== '' ? $preview->customer_name : '—' ) ],
+					[ __( 'Order date', 'cetech-woocommerce-delivery-engine' ), esc_html( $preview->order_date !== '' ? $preview->order_date : '—' ) ],
+					[ __( 'Payment method', 'cetech-woocommerce-delivery-engine' ), esc_html( $preview->payment_method_label !== '' ? $preview->payment_method_label : '—' ) ],
+					[ __( 'Destination', 'cetech-woocommerce-delivery-engine' ), esc_html( $preview->destination_summary !== '' ? $preview->destination_summary : '—' ) ],
+				]
+			);
+			AdminPageLayout::close_section();
+		}
+
+		if ( [] !== $preview->groups ) {
+			AdminPageLayout::open_section( __( 'Delivery groups', 'cetech-woocommerce-delivery-engine' ) );
+			$group_rows = [];
+
+			foreach ( $preview->groups as $group ) {
+				$state = esc_html__( 'Ready to create', 'cetech-woocommerce-delivery-engine' );
+
+				if ( $group->is_pickup ) {
+					$state = esc_html__( 'Store pickup — no delivery shipment', 'cetech-woocommerce-delivery-engine' );
+				} elseif ( null !== $group->existing_shipment_number ) {
+					$state = esc_html(
+						sprintf(
+							/* translators: %s: shipment reference */
+							__( 'Shipment already exists: %s', 'cetech-woocommerce-delivery-engine' ),
+							$group->existing_shipment_number
+						)
+					);
+
+					if ( null !== $group->existing_shipment_id && $group->existing_shipment_id > 0 ) {
+						$link  = add_query_arg(
+							[
+								'page'     => self::SLUG,
+								'shipment' => (string) $group->existing_shipment_id,
+							],
+							admin_url( 'admin.php' )
+						);
+						$state = '<a href="' . esc_url( $link ) . '">' . $state . '</a>';
+					}
+				}
+
+				$group_rows[] = [
+					esc_html( $group->delivery_option_label ),
+					esc_html( $group->fulfilment_label ),
+					esc_html( '' !== $group->eta_original ? $group->eta_original : '—' ),
+					$state,
+				];
+			}
+
+			AdminPageRenderer::render_table(
+				[
+					__( 'Delivery option', 'cetech-woocommerce-delivery-engine' ),
+					__( 'Fulfilment', 'cetech-woocommerce-delivery-engine' ),
+					__( 'Original estimated delivery', 'cetech-woocommerce-delivery-engine' ),
+					__( 'Shipment', 'cetech-woocommerce-delivery-engine' ),
+				],
+				$group_rows,
+				true
+			);
+			AdminPageLayout::close_section();
+		}
+
+		if ( [] !== $preview->items ) {
+			AdminPageLayout::open_section( __( 'Items', 'cetech-woocommerce-delivery-engine' ) );
+			$item_rows = [];
+
+			foreach ( $preview->items as $item ) {
+				$item_rows[] = [
+					esc_html( $item->name ),
+					esc_html( (string) $item->quantity ),
+					esc_html( $item->delivery_option_label ),
+				];
+			}
+
+			AdminPageRenderer::render_table(
+				[
+					__( 'Item', 'cetech-woocommerce-delivery-engine' ),
+					__( 'Quantity', 'cetech-woocommerce-delivery-engine' ),
+					__( 'Delivery option', 'cetech-woocommerce-delivery-engine' ),
+				],
+				$item_rows,
+				true
+			);
+			AdminPageLayout::close_section();
+		}
+
+		if ( $preview->can_create() && $this->creation instanceof ShipmentService ) {
+			echo '<form method="post" action="">';
+			echo AdminFormHelper::nonce_field_html( self::ACTION_CREATE_FROM_ORDER );
+			echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_CREATE_FROM_ORDER ) . '" />';
+			echo '<input type="hidden" name="order_id" value="' . esc_attr( (string) $preview->order_id ) . '" />';
+			echo '<p><button type="submit" class="button button-primary">' . esc_html__( 'Create shipment', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
+			echo '</form>';
+		}
+
+		AdminPageLayout::close_page();
+	}
+
+	private function requested_create_order_id(): int {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		return isset( $_GET[ ManualShipmentCreationPreviewFactory::ORDER_ID_QUERY ] )
+			? absint( wp_unslash( (string) $_GET[ ManualShipmentCreationPreviewFactory::ORDER_ID_QUERY ] ) )
+			: 0;
 	}
 
 	private function render_filters( string $search, string $status ): void {
@@ -633,7 +878,7 @@ final class ShipmentsPage {
 			$note = $this->history_note_html( $event );
 
 			$event_cell = esc_html( ShipmentPresentation::event_label( $event ) );
-			$event_cell .= '<br /><span class="description">' . esc_html( ShipmentPresentation::history_actor_label( $event ) ) . '</span>';
+			$event_cell .= '<br /><span class="description">' . ShipmentPresentation::history_actor_html( $event ) . '</span>';
 
 			$rows[] = [
 				esc_html( ShipmentPresentation::timestamp( $event->event_at ) ),

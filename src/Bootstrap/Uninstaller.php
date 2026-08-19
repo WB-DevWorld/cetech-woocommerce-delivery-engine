@@ -57,5 +57,6 @@ final class Uninstaller {
 		delete_option( \CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsSettings::OPTION_NAME );
 		delete_option( \CetechDeliveryEngine\Application\Configuration\SetupWizardProgress::OPTION_NAME );
 		delete_option( \CetechDeliveryEngine\Application\Shipment\ShipmentCreationFailureStore::INDEX_OPTION );
+		delete_option( \CetechDeliveryEngine\Application\Shipment\CodAwaitingShipmentStore::INDEX_OPTION );
 	}
 }

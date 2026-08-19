@@ -67,7 +67,12 @@ interface ShipmentRepositoryInterface {
 	 *
 	 * @param list<ShipmentItem> $items
 	 */
-	public function ensureCompleteAggregate( Shipment $draft, array $items ): ShipmentAggregateWriteResult;
+	public function ensureCompleteAggregate(
+		Shipment $draft,
+		array $items,
+		\CetechDeliveryEngine\Domain\Enum\ShipmentEventSource $created_source = \CetechDeliveryEngine\Domain\Enum\ShipmentEventSource::System,
+		?int $created_actor_user_id = null
+	): ShipmentAggregateWriteResult;
 
 	/**
 	 * Highest persisted shipment-event ID. 0 when no events exist.

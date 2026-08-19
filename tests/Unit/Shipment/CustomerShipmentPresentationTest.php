@@ -96,11 +96,16 @@ final class CustomerShipmentPresentationTest extends TestCase {
 
 		$html = $this->render_cards( $order );
 
+		self::assertStringContainsString( 'cetech-de-customer-shipments', $html );
+		self::assertStringContainsString( '<article class="cetech-de-customer-shipment"', $html );
+		self::assertEquals( 2, substr_count( $html, '<article class="cetech-de-customer-shipment"' ) );
 		self::assertStringContainsString( 'Shipment 904-D1', $html );
 		self::assertStringContainsString( 'Shipment 904-D2', $html );
 		self::assertStringContainsString( 'Air Shipping', $html );
 		self::assertStringContainsString( 'Sea Shipping', $html );
 		self::assertStringNotContainsString( 'Air Shipping, Sea Shipping', $html );
+		self::assertStringNotContainsString( 'Jane Love', $html );
+		self::assertStringNotContainsString( 'User #', $html );
 	}
 
 	public function test_tracking_number_without_url_has_no_track_button(): void {
@@ -152,8 +157,14 @@ final class CustomerShipmentPresentationTest extends TestCase {
 		self::assertStringContainsString( 'rel="noopener noreferrer"', $with_flag );
 		self::assertStringContainsString( 'cetech-de-customer-shipment__track-button', $with_flag );
 		self::assertStringContainsString( 'class="button cetech-de-customer-shipment__track-button"', $with_flag );
+		$article_end = strpos( $with_flag, '</article>' );
+		$track_pos   = strpos( $with_flag, 'cetech-de-customer-shipment__track-button' );
+		self::assertNotFalse( $article_end );
+		self::assertNotFalse( $track_pos );
+		self::assertLessThan( $article_end, $track_pos );
 		self::assertStringNotContainsString( 'Jane Love', $with_flag );
 		self::assertStringNotContainsString( 'Former or unknown staff account', $with_flag );
+		self::assertStringNotContainsString( 'User #', $with_flag );
 	}
 
 	public function test_tracking_links_alone_do_not_show_customer_shipments(): void {
@@ -255,6 +266,8 @@ final class CustomerShipmentPresentationTest extends TestCase {
 		self::assertStringContainsString( 'cetech-de-customer-shipment', $html );
 		self::assertStringContainsString( '<article', $html );
 		self::assertStringContainsString( '<h3', $html );
+		self::assertStringContainsString( 'cetech-de-customer-shipments', $html );
+		self::assertStringContainsString( 'aria-labelledby="cetech-de-customer-shipments-heading"', $html );
 	}
 
 	public function test_dto_never_exposes_private_fields(): void {
@@ -290,6 +303,19 @@ final class CustomerShipmentPresentationTest extends TestCase {
 		self::assertStringNotContainsString( 'Track shipment', $html );
 		self::assertStringNotContainsString( 'javascript:', $html );
 		self::assertStringNotContainsString( 'cetech-de-customer-shipment__track-button', $html );
+	}
+
+	public function test_customer_shipment_css_separates_section_and_contains_cards(): void {
+		$css = (string) file_get_contents(
+			dirname( __DIR__, 3 ) . '/assets/frontend/customer-order-delivery-summary.css'
+		);
+
+		self::assertStringContainsString( '.cetech-de-customer-shipments {', $css );
+		self::assertStringContainsString( 'margin: 2.75em 0 1.75em;', $css );
+		self::assertStringContainsString( '.cetech-de-customer-shipment {', $css );
+		self::assertStringContainsString( 'border: 1px solid rgba(0, 0, 0, 0.12);', $css );
+		self::assertStringContainsString( 'min-height: 44px;', $css );
+		self::assertStringNotContainsString( 'woocommerce-order-again', $css );
 	}
 
 	private function enable_shipment_records(): void {

@@ -135,6 +135,11 @@ use CetechDeliveryEngine\Presentation\Frontend\CustomerShipmentRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\ProductDeliverySelectorRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\VariableDeliverySelectorAssets;
 use CetechDeliveryEngine\Application\Selector\VariationDeliveryOptionsEndpoint;
+use CetechDeliveryEngine\Application\Shipment\CodAwaitingShipmentEvaluator;
+use CetechDeliveryEngine\Application\Shipment\CodAwaitingShipmentQuery;
+use CetechDeliveryEngine\Application\Shipment\CodAwaitingShipmentStore;
+use CetechDeliveryEngine\Application\Shipment\CodAwaitingShipmentSubscriber;
+use CetechDeliveryEngine\Application\Shipment\ManualShipmentCreationPreviewFactory;
 use CetechDeliveryEngine\Application\Shipment\ShipmentActivityCursor;
 use CetechDeliveryEngine\Application\Shipment\CustomerShipmentQuery;
 use CetechDeliveryEngine\Application\Shipment\HistoricalOrderShipmentContextFactory;
@@ -263,6 +268,7 @@ final class Plugin {
 		$this->container->get( SelectedOfferShippingIntegration::class )->register();
 		$this->container->get( OrderDeliverySnapshotPersister::class )->register();
 		$this->container->get( PaidOrderShipmentSubscriber::class )->register();
+		$this->container->get( CodAwaitingShipmentSubscriber::class )->register();
 		$this->container->get( OrderShipmentOperationsSubscriber::class )->register();
 		$this->container->get( OrderShippingItemPresentationGuard::class )->register();
 		$this->container->get( CustomerOrderDeliverySummaryRenderer::class )->register();
@@ -646,6 +652,22 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			CodAwaitingShipmentStore::class,
+			static fn (): CodAwaitingShipmentStore => new CodAwaitingShipmentStore()
+		);
+
+		$this->container->singleton(
+			CodAwaitingShipmentEvaluator::class,
+			static fn ( ServiceContainer $container ): CodAwaitingShipmentEvaluator => new CodAwaitingShipmentEvaluator(
+				$container->get( FeatureFlags::class ),
+				$container->get( HistoricalOrderShipmentContextFactory::class ),
+				$container->get( HistoricalShipmentPlanner::class ),
+				$container->get( ShipmentRepositoryInterface::class ),
+				$container->get( CodAwaitingShipmentStore::class )
+			)
+		);
+
+		$this->container->singleton(
 			ShipmentService::class,
 			static fn ( ServiceContainer $container ): ShipmentService => new ShipmentService(
 				$container->get( FeatureFlags::class ),
@@ -654,7 +676,19 @@ final class Plugin {
 				$container->get( ShipmentRepositoryInterface::class ),
 				$container->get( ShipmentCreationFailureStore::class ),
 				$container->get( AuditLogRepositoryInterface::class ),
-				$container->get( Logger::class )
+				$container->get( Logger::class ),
+				$container->get( CodAwaitingShipmentEvaluator::class )
+			)
+		);
+
+		$this->container->singleton(
+			ManualShipmentCreationPreviewFactory::class,
+			static fn ( ServiceContainer $container ): ManualShipmentCreationPreviewFactory => new ManualShipmentCreationPreviewFactory(
+				$container->get( FeatureFlags::class ),
+				$container->get( HistoricalOrderShipmentContextFactory::class ),
+				$container->get( HistoricalShipmentPlanner::class ),
+				$container->get( ShipmentRepositoryInterface::class ),
+				$container->get( CodAwaitingShipmentEvaluator::class )
 			)
 		);
 
@@ -662,6 +696,13 @@ final class Plugin {
 			PaidOrderShipmentSubscriber::class,
 			static fn ( ServiceContainer $container ): PaidOrderShipmentSubscriber => new PaidOrderShipmentSubscriber(
 				$container->get( ShipmentService::class )
+			)
+		);
+
+		$this->container->singleton(
+			CodAwaitingShipmentSubscriber::class,
+			static fn ( ServiceContainer $container ): CodAwaitingShipmentSubscriber => new CodAwaitingShipmentSubscriber(
+				$container->get( CodAwaitingShipmentEvaluator::class )
 			)
 		);
 
@@ -709,6 +750,14 @@ final class Plugin {
 			ShipmentCreationIssueQuery::class,
 			static fn ( ServiceContainer $container ): ShipmentCreationIssueQuery => new ShipmentCreationIssueQuery(
 				$container->get( ShipmentCreationFailureStore::class )
+			)
+		);
+
+		$this->container->singleton(
+			CodAwaitingShipmentQuery::class,
+			static fn ( ServiceContainer $container ): CodAwaitingShipmentQuery => new CodAwaitingShipmentQuery(
+				$container->get( CodAwaitingShipmentStore::class ),
+				$container->get( CodAwaitingShipmentEvaluator::class )
 			)
 		);
 
@@ -1042,7 +1091,8 @@ final class Plugin {
 				$container->get( ShipmentCreationIssueQuery::class ),
 				$container->get( ShipmentService::class ),
 				$container->get( FeatureFlags::class ),
-				$container->get( ShipmentOperationsIssueQuery::class )
+				$container->get( ShipmentOperationsIssueQuery::class ),
+				$container->get( CodAwaitingShipmentQuery::class )
 			)
 		);
 
@@ -1055,7 +1105,9 @@ final class Plugin {
 				$container->get( ShipmentTrackingService::class ),
 				$container->get( ShipmentStatusService::class ),
 				$container->get( ShipmentEtaService::class ),
-				$container->get( ShipmentActivityCursor::class )
+				$container->get( ShipmentActivityCursor::class ),
+				$container->get( ShipmentService::class ),
+				$container->get( ManualShipmentCreationPreviewFactory::class )
 			)
 		);
 
@@ -1353,7 +1405,8 @@ final class Plugin {
 				$container->get( NeedsAttentionQuery::class ),
 				$container->get( ShipmentCreationIssueQuery::class ),
 				$container->get( ShipmentOperationsIssueQuery::class ),
-				$container->get( FeatureFlags::class )
+				$container->get( FeatureFlags::class ),
+				$container->get( CodAwaitingShipmentQuery::class )
 			)
 		);
 

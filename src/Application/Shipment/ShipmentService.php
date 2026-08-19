@@ -38,7 +38,8 @@ final class ShipmentService {
 		private readonly ShipmentRepositoryInterface $shipments,
 		private readonly ShipmentCreationFailureStore $failures,
 		private readonly AuditLogRepositoryInterface $audit,
-		private readonly Logger $logger
+		private readonly Logger $logger,
+		private readonly ?CodAwaitingShipmentEvaluator $cod_awaiting = null
 	) {
 	}
 
@@ -56,10 +57,14 @@ final class ShipmentService {
 		}
 
 		if ( ! $this->is_payment_confirmed( $order, $from_payment_complete_event ) ) {
+			$this->refresh_cod_awaiting( $order );
+
 			return ShipmentCreationResult::of( ShipmentCreationOutcome::NotPaid );
 		}
 
 		if ( $this->is_ineligible( $order ) ) {
+			$this->refresh_cod_awaiting( $order );
+
 			return ShipmentCreationResult::of( ShipmentCreationOutcome::Ineligible );
 		}
 
@@ -80,6 +85,7 @@ final class ShipmentService {
 
 		if ( [] === $plan_result->plans ) {
 			$this->failures->mark_succeeded( $order );
+			$this->refresh_cod_awaiting( $order );
 			$this->audit_success( $order, ShipmentCreationOutcome::ZeroShipmentsPickupOnly, $source, [] );
 
 			return ShipmentCreationResult::of( ShipmentCreationOutcome::ZeroShipmentsPickupOnly );
@@ -90,12 +96,13 @@ final class ShipmentService {
 			$statuses  = [];
 
 			foreach ( $plan_result->plans as $plan ) {
-				$write       = $this->persist_plan( $plan );
+				$write       = $this->persist_plan( $plan, $source, null );
 				$shipments[] = $write->shipment;
 				$statuses[]  = $write->status;
 			}
 
 			$this->failures->mark_succeeded( $order );
+			$this->refresh_cod_awaiting( $order );
 
 			$outcome = $this->outcome_from_writes( $statuses );
 			$this->audit_success( $order, $outcome, $source, $shipments );
@@ -120,7 +127,90 @@ final class ShipmentService {
 		}
 	}
 
-	private function persist_plan( ShipmentPlan $plan ): ShipmentAggregateWriteResult {
+	/**
+	 * Staff-authorised creation from the historical order snapshot.
+	 *
+	 * Does not require payment confirmation. Does not use current product configuration.
+	 */
+	public function create_from_historical_order_for_staff( WC_Order $order, ?int $actor_user_id ): ShipmentCreationResult {
+		if ( ! $this->flags->is_enabled( 'enable_shipment_records' ) ) {
+			return ShipmentCreationResult::of( ShipmentCreationOutcome::FeatureDisabled );
+		}
+
+		if ( (int) $order->get_id() <= 0 ) {
+			return ShipmentCreationResult::of( ShipmentCreationOutcome::NotDeliveryEngineOrder );
+		}
+
+		if ( $this->is_ineligible( $order ) ) {
+			$this->refresh_cod_awaiting( $order );
+
+			return ShipmentCreationResult::of( ShipmentCreationOutcome::Ineligible );
+		}
+
+		$context = $this->context_factory->from_order( $order );
+
+		if ( ! $context->has_delivery_engine_snapshot() ) {
+			return ShipmentCreationResult::of( ShipmentCreationOutcome::NotDeliveryEngineOrder );
+		}
+
+		$plan_result = $this->planner->plan( $context );
+
+		if ( ! $plan_result->ok ) {
+			$error = $plan_result->error_code ?? ShipmentCreationErrorCode::MalformedGroupSnapshot;
+			$this->record_failure( $order, $error, ShipmentEventSource::Staff );
+
+			return ShipmentCreationResult::of( ShipmentCreationOutcome::InvalidSnapshot, [], $error );
+		}
+
+		if ( [] === $plan_result->plans ) {
+			$this->failures->mark_succeeded( $order );
+			$this->refresh_cod_awaiting( $order );
+			$this->audit_success( $order, ShipmentCreationOutcome::ZeroShipmentsPickupOnly, ShipmentEventSource::Staff, [] );
+
+			return ShipmentCreationResult::of( ShipmentCreationOutcome::ZeroShipmentsPickupOnly );
+		}
+
+		try {
+			$shipments = [];
+			$statuses  = [];
+
+			foreach ( $plan_result->plans as $plan ) {
+				$write       = $this->persist_plan( $plan, ShipmentEventSource::Staff, $actor_user_id );
+				$shipments[] = $write->shipment;
+				$statuses[]  = $write->status;
+			}
+
+			$this->failures->mark_succeeded( $order );
+			$this->refresh_cod_awaiting( $order );
+
+			$outcome = $this->outcome_from_writes( $statuses );
+			$this->audit_success( $order, $outcome, ShipmentEventSource::Staff, $shipments );
+
+			return ShipmentCreationResult::of( $outcome, $shipments );
+		} catch ( \Throwable $exception ) {
+			$this->logger->error(
+				'Manual shipment creation failed.',
+				[
+					'order_id'   => (int) $order->get_id(),
+					'error_code' => ShipmentCreationErrorCode::RepositoryWriteFailed->value,
+				]
+			);
+			unset( $exception );
+			$this->record_failure( $order, ShipmentCreationErrorCode::RepositoryWriteFailed, ShipmentEventSource::Staff );
+
+			return ShipmentCreationResult::of(
+				ShipmentCreationOutcome::CreationFailed,
+				[],
+				ShipmentCreationErrorCode::RepositoryWriteFailed
+			);
+		}
+	}
+
+	private function persist_plan(
+		ShipmentPlan $plan,
+		ShipmentEventSource $source = ShipmentEventSource::System,
+		?int $actor_user_id = null
+	): ShipmentAggregateWriteResult {
 		$draft = Shipment::create(
 			order_id: $plan->order_id,
 			delivery_group_id: $plan->delivery_group_id,
@@ -152,7 +242,20 @@ final class ShipmentService {
 			);
 		}
 
-		return $this->shipments->ensureCompleteAggregate( $draft, $items );
+		$created_source = ShipmentEventSource::Staff === $source
+			? ShipmentEventSource::Staff
+			: ShipmentEventSource::System;
+		$created_actor  = ShipmentEventSource::Staff === $source && null !== $actor_user_id && $actor_user_id > 0
+			? $actor_user_id
+			: null;
+
+		return $this->shipments->ensureCompleteAggregate( $draft, $items, $created_source, $created_actor );
+	}
+
+	private function refresh_cod_awaiting( WC_Order $order ): void {
+		if ( $this->cod_awaiting instanceof CodAwaitingShipmentEvaluator ) {
+			$this->cod_awaiting->sync( $order );
+		}
 	}
 
 	/**

@@ -7,6 +7,7 @@ namespace CetechDeliveryEngine\Presentation\Admin;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
 use CetechDeliveryEngine\Application\Configuration\OperationalState;
 use CetechDeliveryEngine\Application\Configuration\OperationalStateService;
+use CetechDeliveryEngine\Application\Shipment\CodAwaitingShipmentQuery;
 use CetechDeliveryEngine\Application\Shipment\ShipmentCreationIssueQuery;
 use CetechDeliveryEngine\Application\Shipment\ShipmentOperationsIssueQuery;
 use CetechDeliveryEngine\Application\Shipment\ShipmentService;
@@ -17,7 +18,8 @@ use CetechDeliveryEngine\Domain\Enum\ShipmentEventSource;
 
 /**
  * Products whose effective delivery configuration is incomplete, paid-order
- * shipment creation failures, and operational shipment review items.
+ * shipment creation failures, Cash on Delivery orders awaiting shipment
+ * creation, and operational shipment review items.
  */
 final class NeedsAttentionPage {
 
@@ -32,7 +34,8 @@ final class NeedsAttentionPage {
 		private readonly ShipmentCreationIssueQuery $shipment_issues,
 		private readonly ShipmentService $shipment_service,
 		private readonly FeatureFlags $flags,
-		private readonly ShipmentOperationsIssueQuery $operations_issues
+		private readonly ShipmentOperationsIssueQuery $operations_issues,
+		private readonly ?CodAwaitingShipmentQuery $cod_actions = null
 	) {
 	}
 
@@ -79,16 +82,17 @@ final class NeedsAttentionPage {
 
 		$this->action_handler->notices()->render_notices();
 
-		$items     = current_user_can( 'manage_product_delivery_rules' ) ? $this->query->list( 200 ) : [];
-		$shipments = $this->shipment_issues->list( 50 );
+		$items      = current_user_can( 'manage_product_delivery_rules' ) ? $this->query->list( 200 ) : [];
+		$shipments  = $this->shipment_issues->list( 50 );
 		$operations = $this->operations_issues->list( 50 );
-		$op        = $this->operational_state->current();
+		$cod        = $this->cod_action_items();
+		$op         = $this->operational_state->current();
 
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
 			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Needs Attention', 'cetech-woocommerce-delivery-engine' ),
-			__( 'An operational to-do list for products that are missing a usable delivery setup, paid orders whose delivery shipments could not be created, and shipments that need fulfilment review.', 'cetech-woocommerce-delivery-engine' )
+			__( 'An operational to-do list for products that are missing a usable delivery setup, Cash on Delivery orders that need a shipment created, paid orders whose delivery shipments could not be created, and shipments that need fulfilment review.', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		if ( $op->customers_still_use_previous_rules() && ! $op->sitewide_setup_complete ) {
@@ -101,13 +105,14 @@ final class NeedsAttentionPage {
 			);
 		}
 
+		$this->render_cod_actions( $cod );
 		$this->render_shipment_issues( $shipments );
 		$this->render_operations_issues( $operations );
 
-		if ( [] === $items && [] === $shipments && [] === $operations ) {
+		if ( [] === $items && [] === $shipments && [] === $operations && [] === $cod ) {
 			AdminPageLayout::render_empty_state(
 				__( 'Nothing needs attention', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Every listed product currently has a usable delivery setup, and no paid-order shipment creation or operational shipment problems are waiting.', 'cetech-woocommerce-delivery-engine' )
+				__( 'Every listed product currently has a usable delivery setup, and no Cash on Delivery shipment, paid-order shipment creation, or operational shipment problems are waiting.', 'cetech-woocommerce-delivery-engine' )
 			);
 			AdminPageLayout::close_page();
 			return;
@@ -155,6 +160,80 @@ final class NeedsAttentionPage {
 		);
 
 		AdminPageLayout::close_page();
+	}
+
+	/**
+	 * @return list<array{order_id: int, order_number: string, url: string, payment_method_label: string, title: string, detail: string}>
+	 */
+	private function cod_action_items(): array {
+		if ( ! $this->flags->is_enabled( 'enable_shipment_records' ) || ! current_user_can( 'manage_shipments' ) ) {
+			return [];
+		}
+
+		if ( ! $this->cod_actions instanceof CodAwaitingShipmentQuery ) {
+			return [];
+		}
+
+		return $this->cod_actions->list( 50 );
+	}
+
+	/**
+	 * @param list<array{order_id: int, order_number: string, url: string, payment_method_label: string, title: string, detail: string}> $items
+	 */
+	private function render_cod_actions( array $items ): void {
+		if ( [] === $items ) {
+			return;
+		}
+
+		echo '<h2>' . esc_html__( 'Cash on Delivery — action required', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
+		echo '<p class="description">' . esc_html__( 'These Cash on Delivery orders need a delivery shipment created from the historical order record. This is expected until staff create the shipment. Opening this page does not clear the task.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+
+		$rows = [];
+
+		foreach ( $items as $item ) {
+			$order = '<strong>' . esc_html(
+				sprintf(
+					/* translators: %s: order number */
+					__( 'Order %s', 'cetech-woocommerce-delivery-engine' ),
+					$item['order_number']
+				)
+			) . '</strong>';
+
+			if ( '' !== $item['url'] ) {
+				$order = '<a href="' . esc_url( $item['url'] ) . '">' . $order . '</a>';
+			}
+
+			$detail  = esc_html( $item['title'] );
+			$detail .= '<br /><span class="description">' . esc_html( $item['payment_method_label'] ) . '</span>';
+			$detail .= '<br /><span class="description">' . esc_html( $item['detail'] ) . '</span>';
+
+			$actions = '';
+
+			if ( '' !== $item['url'] ) {
+				$actions .= '<a class="button" href="' . esc_url( $item['url'] ) . '">' . esc_html__( 'View Order', 'cetech-woocommerce-delivery-engine' ) . '</a>';
+			}
+
+			if ( current_user_can( 'manage_shipments' ) ) {
+				$create = ShipmentsPage::create_from_order_url( $item['order_id'] );
+				$actions .= ( '' !== $actions ? ' ' : '' ) . '<a class="button button-primary" href="' . esc_url( $create ) . '">' . esc_html__( 'Create Shipment', 'cetech-woocommerce-delivery-engine' ) . '</a>';
+			}
+
+			$rows[] = [
+				$order,
+				$detail,
+				$actions,
+			];
+		}
+
+		AdminPageRenderer::render_table(
+			[
+				__( 'Order', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Action required', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Action', 'cetech-woocommerce-delivery-engine' ),
+			],
+			$rows,
+			true
+		);
 	}
 
 	/**

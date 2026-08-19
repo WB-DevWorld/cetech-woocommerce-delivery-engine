@@ -42,6 +42,28 @@ if ( ! class_exists( 'WC_Order', false ) ) {
 			return (string) ( $this->data['payment_method'] ?? '' );
 		}
 
+		public function get_payment_method_title(): string {
+			if ( isset( $this->data['payment_method_title'] ) ) {
+				return (string) $this->data['payment_method_title'];
+			}
+
+			return 'cod' === $this->get_payment_method() ? 'Cash on delivery' : $this->get_payment_method();
+		}
+
+		public function get_date_created( $context = 'view' ): mixed {
+			unset( $context );
+
+			return $this->data['date_created'] ?? '2026-08-19 10:00:00';
+		}
+
+		public function get_formatted_shipping_address(): string {
+			return (string) ( $this->data['shipping_address'] ?? '' );
+		}
+
+		public function get_formatted_billing_address(): string {
+			return (string) ( $this->data['billing_address'] ?? '' );
+		}
+
 		/**
 		 * @return array<int|string, object>
 		 */

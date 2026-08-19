@@ -128,7 +128,9 @@ final class StaffShipmentsWorkspaceTest extends TestCase {
 		$html = $this->render_html();
 
 		self::assertStringContainsString( 'No shipments have been created yet.', $html );
-		self::assertStringContainsString( 'Paid Delivery Engine orders will appear here', $html );
+		self::assertStringContainsString( 'Paid Delivery Engine orders appear here automatically after payment is confirmed', $html );
+		self::assertStringContainsString( 'Create shipment from order', $html );
+		self::assertStringContainsString( 'Find order', $html );
 	}
 
 	public function test_list_shows_historical_label_status_items_and_tracking_state(): void {
@@ -363,7 +365,7 @@ final class StaffShipmentsWorkspaceTest extends TestCase {
 		$html = $this->render_html( [ 'shipment' => (string) $shipment->id ] );
 
 		self::assertStringContainsString( 'History', $html );
-		self::assertStringContainsString( 'Jane Love (Staff)', $html );
+		self::assertStringContainsString( 'Jane Love (Staff · User #3)', $html );
 		self::assertStringContainsString( 'System', $html );
 		self::assertStringNotContainsString( 'Automatic', $html );
 	}

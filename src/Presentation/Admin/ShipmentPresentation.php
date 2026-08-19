@@ -204,7 +204,7 @@ final class ShipmentPresentation {
 	}
 
 	/**
-	 * Admin History actor line. Never rewrite stored events; never expose email.
+	 * Admin History actor line. Never rewrite stored events; never expose email or login.
 	 */
 	public static function history_actor_label( ShipmentEvent $event ): string {
 		if ( ShipmentEventSource::Staff !== $event->source ) {
@@ -217,17 +217,61 @@ final class ShipmentPresentation {
 			return self::source_label( ShipmentEventSource::Staff );
 		}
 
-		$name = self::staff_display_name( $actor_id );
+		$name = self::staff_person_name( $actor_id );
 
 		if ( null === $name ) {
-			return __( 'Former or unknown staff account', 'cetech-woocommerce-delivery-engine' )
-				. ' (' . self::source_label( ShipmentEventSource::Staff ) . ')';
+			return sprintf(
+				/* translators: %d: WordPress user ID */
+				__( 'Former or unknown staff account (User #%d)', 'cetech-woocommerce-delivery-engine' ),
+				$actor_id
+			);
 		}
 
-		return $name . ' (' . self::source_label( ShipmentEventSource::Staff ) . ')';
+		return sprintf(
+			/* translators: 1: staff name, 2: WordPress user ID */
+			__( '%1$s (Staff · User #%2$d)', 'cetech-woocommerce-delivery-engine' ),
+			$name,
+			$actor_id
+		);
 	}
 
-	private static function staff_display_name( int $user_id ): ?string {
+	/**
+	 * Escaped History actor markup. Links the human name to wp-admin user-edit when permitted.
+	 */
+	public static function history_actor_html( ShipmentEvent $event ): string {
+		$label = self::history_actor_label( $event );
+
+		if ( ShipmentEventSource::Staff !== $event->source ) {
+			return esc_html( $label );
+		}
+
+		$actor_id = $event->actor_user_id;
+
+		if ( null === $actor_id || $actor_id <= 0 ) {
+			return esc_html( $label );
+		}
+
+		$name = self::staff_person_name( $actor_id );
+
+		if ( null === $name || ! self::current_user_can_edit_staff( $actor_id ) ) {
+			return esc_html( $label );
+		}
+
+		$url = admin_url( 'user-edit.php?user_id=' . $actor_id );
+		$suffix = sprintf(
+			/* translators: %d: WordPress user ID */
+			__( '(Staff · User #%d)', 'cetech-woocommerce-delivery-engine' ),
+			$actor_id
+		);
+
+		return '<a href="' . esc_url( $url ) . '">' . esc_html( $name ) . '</a> ' . esc_html( $suffix );
+	}
+
+	private static function current_user_can_edit_staff( int $user_id ): bool {
+		return function_exists( 'current_user_can' ) && current_user_can( 'edit_user', $user_id );
+	}
+
+	private static function staff_person_name( int $user_id ): ?string {
 		if ( $user_id <= 0 || ! function_exists( 'get_userdata' ) ) {
 			return null;
 		}
@@ -242,9 +286,33 @@ final class ShipmentPresentation {
 			return null;
 		}
 
-		$name = trim( (string) ( $user->display_name ?? '' ) );
+		$first = '';
+		$last  = '';
 
-		return '' !== $name ? $name : null;
+		if ( function_exists( 'get_user_meta' ) ) {
+			$first = trim( (string) get_user_meta( $user_id, 'first_name', true ) );
+			$last  = trim( (string) get_user_meta( $user_id, 'last_name', true ) );
+		}
+
+		if ( '' === $first ) {
+			$first = trim( (string) ( $user->first_name ?? '' ) );
+		}
+
+		if ( '' === $last ) {
+			$last = trim( (string) ( $user->last_name ?? '' ) );
+		}
+
+		if ( '' !== $first && '' !== $last ) {
+			return $first . ' ' . $last;
+		}
+
+		$display = trim( (string) ( $user->display_name ?? '' ) );
+
+		return '' !== $display ? $display : null;
+	}
+
+	private static function staff_display_name( int $user_id ): ?string {
+		return self::staff_person_name( $user_id );
 	}
 
 	public static function operational_reason_label( string $reason ): string {

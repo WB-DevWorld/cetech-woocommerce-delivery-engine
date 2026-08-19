@@ -110,7 +110,14 @@ if ( ! function_exists( 'wp_strip_all_tags' ) ) {
 
 if ( ! function_exists( 'current_user_can' ) ) {
 	function current_user_can( string $capability, mixed ...$args ): bool {
-		unset( $args );
+		if ( 'edit_user' === $capability && isset( $args[0] ) ) {
+			$target = (int) $args[0];
+			$map    = $GLOBALS['cetech_de_test_edit_users'] ?? null;
+
+			if ( is_array( $map ) && array_key_exists( $target, $map ) ) {
+				return (bool) $map[ $target ];
+			}
+		}
 
 		return (bool) ( $GLOBALS['cetech_de_test_caps'][ $capability ] ?? $GLOBALS['cetech_de_test_caps']['*'] ?? false );
 	}
@@ -136,6 +143,14 @@ if ( ! function_exists( 'sanitize_key' ) ) {
 		$key = strtolower( $key );
 
 		return (string) preg_replace( '/[^a-z0-9_\-]/', '', $key );
+	}
+}
+
+if ( ! function_exists( 'sanitize_html_class' ) ) {
+	function sanitize_html_class( string $classname, string $fallback = '' ): string {
+		$sanitized = (string) preg_replace( '/[^A-Za-z0-9_-]/', '', $classname );
+
+		return '' !== $sanitized ? $sanitized : $fallback;
 	}
 }
 

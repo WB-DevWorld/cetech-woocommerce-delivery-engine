@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Tests\Unit\Shipment;
 
+use CetechDeliveryEngine\Application\Shipment\CodAwaitingShipmentEvaluator;
+use CetechDeliveryEngine\Application\Shipment\CodAwaitingShipmentStore;
 use CetechDeliveryEngine\Application\Shipment\HistoricalOrderShipmentContextFactory;
 use CetechDeliveryEngine\Application\Shipment\HistoricalShipmentPlanner;
 use CetechDeliveryEngine\Application\Shipment\PaidOrderShipmentSubscriber;
@@ -28,6 +30,8 @@ final class ShipmentServiceCreationTest extends TestCase {
 
 	private ShipmentCreationFailureStore $failures;
 
+	private CodAwaitingShipmentStore $cod;
+
 	private InMemoryAuditLogRepository $audit;
 
 	private ShipmentService $service;
@@ -40,15 +44,26 @@ final class ShipmentServiceCreationTest extends TestCase {
 		$this->flags     = new FeatureFlags();
 		$this->shipments = ShipmentCreationFixtures::repository();
 		$this->failures  = new ShipmentCreationFailureStore();
+		$this->cod       = new CodAwaitingShipmentStore();
 		$this->audit     = new InMemoryAuditLogRepository();
+		$factory         = new HistoricalOrderShipmentContextFactory( new OrderDeliverySnapshotReader() );
+		$planner         = new HistoricalShipmentPlanner();
+		$evaluator       = new CodAwaitingShipmentEvaluator(
+			$this->flags,
+			$factory,
+			$planner,
+			$this->shipments,
+			$this->cod
+		);
 		$this->service   = new ShipmentService(
 			$this->flags,
-			new HistoricalOrderShipmentContextFactory( new OrderDeliverySnapshotReader() ),
-			new HistoricalShipmentPlanner(),
+			$factory,
+			$planner,
 			$this->shipments,
 			$this->failures,
 			$this->audit,
-			new Logger()
+			new Logger(),
+			$evaluator
 		);
 	}
 
@@ -263,6 +278,8 @@ final class ShipmentServiceCreationTest extends TestCase {
 
 		self::assertSame( [], $this->shipments->findByOrderId( 2015 ) );
 		self::assertSame( ShipmentCreationOutcome::NotPaid, $direct->outcome );
+		self::assertTrue( $this->cod->is_awaiting( $order ) );
+		self::assertSame( [ 2015 ], $this->cod->awaiting_order_ids() );
 	}
 
 	public function test_cod_completed_without_paid_date_does_not_create(): void {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Configuration\Catalog;
 
+use CetechDeliveryEngine\Application\Shipment\CodAwaitingShipmentQuery;
 use CetechDeliveryEngine\Application\Shipment\ShipmentCreationIssueQuery;
 use CetechDeliveryEngine\Application\Shipment\ShipmentOperationsIssueQuery;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
@@ -11,14 +12,14 @@ use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 /**
  * Unresolved Needs Attention count for admin badges.
  *
- * Uses the same three sources as NeedsAttentionPage: incomplete product
- * delivery setup, paid-order shipment creation failures, and operational
- * shipment issues (delayed / cancel-after-progress / refund review / sync
- * failure). Does not invent a second definition of Needs Attention.
+ * Uses the same sources as NeedsAttentionPage: incomplete product delivery
+ * setup, paid-order shipment creation failures, operational shipment issues,
+ * and Cash on Delivery orders awaiting staff shipment creation. Does not
+ * invent a second definition of Needs Attention.
  *
- * Ordinary awaiting-fulfilment, processing, missing tracking, pickup-only,
- * and unpaid/unconfirmed COD orders are not counted unless those canonical
- * queries already treat them as issues.
+ * Ordinary awaiting-fulfilment, processing, missing tracking, and pickup-only
+ * orders are not counted unless those canonical queries already treat them as
+ * issues. Legitimate unpaid COD delivery orders are counted as action required.
  */
 final class NeedsAttentionCountQuery {
 
@@ -26,7 +27,8 @@ final class NeedsAttentionCountQuery {
 		private readonly NeedsAttentionQuery $catalog,
 		private readonly ShipmentCreationIssueQuery $creation,
 		private readonly ShipmentOperationsIssueQuery $operations,
-		private readonly FeatureFlags $flags
+		private readonly FeatureFlags $flags,
+		private readonly ?CodAwaitingShipmentQuery $cod_awaiting = null
 	) {
 	}
 
@@ -40,6 +42,9 @@ final class NeedsAttentionCountQuery {
 		if ( $this->can_see_shipment_attention() ) {
 			$count += $this->creation->count();
 			$count += $this->operations->count();
+			$count += $this->cod_awaiting instanceof CodAwaitingShipmentQuery
+				? $this->cod_awaiting->count()
+				: 0;
 		}
 
 		return $count;

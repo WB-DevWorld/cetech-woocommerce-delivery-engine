@@ -56,8 +56,8 @@ final class CustomerShipmentRenderer {
 			return;
 		}
 
-		echo '<section class="cetech-de-customer-shipments">';
-		echo '<h2>' . esc_html__( 'Delivery shipments', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
+		echo '<section class="cetech-de-customer-shipments" aria-labelledby="cetech-de-customer-shipments-heading">';
+		echo '<h2 id="cetech-de-customer-shipments-heading">' . esc_html__( 'Delivery shipments', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
 
 		foreach ( $cards as $card ) {
 			$this->render_card( $card );
@@ -67,8 +67,10 @@ final class CustomerShipmentRenderer {
 	}
 
 	private function render_card( CustomerShipmentCard $card ): void {
-		echo '<article class="cetech-de-customer-shipment">';
-		echo '<h3 class="cetech-de-customer-shipment__title">';
+		$heading_id = 'cetech-de-customer-shipment-' . sanitize_html_class( $card->reference );
+
+		echo '<article class="cetech-de-customer-shipment" aria-labelledby="' . esc_attr( $heading_id ) . '">';
+		echo '<h3 class="cetech-de-customer-shipment__title" id="' . esc_attr( $heading_id ) . '">';
 		echo esc_html(
 			sprintf(
 				/* translators: %s: customer-facing shipment reference */

@@ -99,7 +99,7 @@ final class AdminMenuOperationalBadgeTest extends TestCase {
 		unset( $after );
 	}
 
-	public function test_awaiting_fulfilment_and_unpaid_cod_are_not_needs_attention(): void {
+	public function test_awaiting_fulfilment_is_not_needs_attention(): void {
 		$this->store_shipment( 5102, ShipmentStatus::AwaitingFulfilment );
 		$this->store_shipment( 5103, ShipmentStatus::Processing );
 

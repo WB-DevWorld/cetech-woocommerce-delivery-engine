@@ -404,9 +404,14 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 		return (int) $wpdb->get_var( $wpdb->prepare( $sql, max( 0, $after_event_id ) ) );
 	}
 
-	public function ensureCompleteAggregate( Shipment $draft, array $items ): ShipmentAggregateWriteResult {
+	public function ensureCompleteAggregate(
+		Shipment $draft,
+		array $items,
+		ShipmentEventSource $created_source = ShipmentEventSource::System,
+		?int $created_actor_user_id = null
+	): ShipmentAggregateWriteResult {
 		return $this->transact(
-			function () use ( $draft, $items ): ShipmentAggregateWriteResult {
+			function () use ( $draft, $items, $created_source, $created_actor_user_id ): ShipmentAggregateWriteResult {
 				$existing = $this->findByOrderAndGroup( $draft->order_id, $draft->delivery_group_id );
 				$status   = ShipmentAggregateWriteResult::CREATED;
 
@@ -418,7 +423,7 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 
 				$changed = $this->ensure_items( $existing->id, $items );
 
-				if ( $this->ensure_created_event( $existing->id ) ) {
+				if ( $this->ensure_created_event( $existing->id, $created_source, $created_actor_user_id ) ) {
 					$changed = true;
 				}
 
@@ -548,20 +553,31 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 		}
 	}
 
-	private function ensure_created_event( int $shipment_id ): bool {
+	private function ensure_created_event(
+		int $shipment_id,
+		ShipmentEventSource $created_source = ShipmentEventSource::System,
+		?int $created_actor_user_id = null
+	): bool {
 		foreach ( $this->findEvents( $shipment_id ) as $event ) {
 			if ( $event->event_type->is( ShipmentEventType::Created ) ) {
 				return false;
 			}
 		}
 
+		$actor = ShipmentEventSource::Staff === $created_source && null !== $created_actor_user_id && $created_actor_user_id > 0
+			? $created_actor_user_id
+			: null;
+
 		$this->appendEvent(
 			ShipmentEvent::create(
 				$shipment_id,
 				ShipmentEventType::Created,
-				ShipmentEventSource::System,
+				$created_source,
 				null,
-				ShipmentStatus::AwaitingFulfilment
+				ShipmentStatus::AwaitingFulfilment,
+				null,
+				null,
+				$actor
 			)
 		);
 
