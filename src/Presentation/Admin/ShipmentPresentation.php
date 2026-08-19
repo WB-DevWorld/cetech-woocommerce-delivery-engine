@@ -196,11 +196,55 @@ final class ShipmentPresentation {
 
 	public static function source_label( ShipmentEventSource $source ): string {
 		return match ( $source ) {
-			ShipmentEventSource::System => __( 'Automatic', 'cetech-woocommerce-delivery-engine' ),
+			ShipmentEventSource::System => __( 'System', 'cetech-woocommerce-delivery-engine' ),
 			ShipmentEventSource::Staff => __( 'Staff', 'cetech-woocommerce-delivery-engine' ),
 			ShipmentEventSource::Retry => __( 'Retry', 'cetech-woocommerce-delivery-engine' ),
 			ShipmentEventSource::WooCommerce => __( 'WooCommerce order', 'cetech-woocommerce-delivery-engine' ),
 		};
+	}
+
+	/**
+	 * Admin History actor line. Never rewrite stored events; never expose email.
+	 */
+	public static function history_actor_label( ShipmentEvent $event ): string {
+		if ( ShipmentEventSource::Staff !== $event->source ) {
+			return self::source_label( $event->source );
+		}
+
+		$actor_id = $event->actor_user_id;
+
+		if ( null === $actor_id || $actor_id <= 0 ) {
+			return self::source_label( ShipmentEventSource::Staff );
+		}
+
+		$name = self::staff_display_name( $actor_id );
+
+		if ( null === $name ) {
+			return __( 'Former or unknown staff account', 'cetech-woocommerce-delivery-engine' )
+				. ' (' . self::source_label( ShipmentEventSource::Staff ) . ')';
+		}
+
+		return $name . ' (' . self::source_label( ShipmentEventSource::Staff ) . ')';
+	}
+
+	private static function staff_display_name( int $user_id ): ?string {
+		if ( $user_id <= 0 || ! function_exists( 'get_userdata' ) ) {
+			return null;
+		}
+
+		try {
+			$user = get_userdata( $user_id );
+		} catch ( \Throwable ) {
+			return null;
+		}
+
+		if ( ! is_object( $user ) ) {
+			return null;
+		}
+
+		$name = trim( (string) ( $user->display_name ?? '' ) );
+
+		return '' !== $name ? $name : null;
 	}
 
 	public static function operational_reason_label( string $reason ): string {

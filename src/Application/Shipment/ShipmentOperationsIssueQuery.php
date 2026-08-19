@@ -74,6 +74,10 @@ final class ShipmentOperationsIssueQuery {
 		return array_values( array_slice( $by_id, 0, $limit ) );
 	}
 
+	public function count(): int {
+		return count( $this->list( 50 ) );
+	}
+
 	/**
 	 * @param list<string> $codes
 	 * @return array{

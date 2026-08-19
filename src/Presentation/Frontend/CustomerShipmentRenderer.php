@@ -111,7 +111,7 @@ final class CustomerShipmentRenderer {
 			);
 
 			echo '<p class="cetech-de-customer-shipment__track">';
-			echo '<a class="cetech-de-customer-shipment__track-link" href="' . esc_url( $card->tracking_url ) . '" target="_blank" rel="noopener noreferrer" aria-label="' . esc_attr( $accessible ) . '">';
+			echo '<a class="button cetech-de-customer-shipment__track-button" href="' . esc_url( $card->tracking_url ) . '" target="_blank" rel="noopener noreferrer" aria-label="' . esc_attr( $accessible ) . '">';
 			echo esc_html__( 'Track shipment', 'cetech-woocommerce-delivery-engine' );
 			echo '</a>';
 			echo '</p>';

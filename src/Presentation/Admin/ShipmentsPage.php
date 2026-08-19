@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Admin;
 
+use CetechDeliveryEngine\Application\Shipment\ShipmentActivityCursor;
 use CetechDeliveryEngine\Application\Shipment\ShipmentDispatchDate;
 use CetechDeliveryEngine\Application\Shipment\ShipmentEtaService;
 use CetechDeliveryEngine\Application\Shipment\ShipmentListRow;
@@ -40,7 +41,8 @@ final class ShipmentsPage {
 		private readonly ?AdminActionHandler $actions = null,
 		private readonly ?ShipmentTrackingService $tracking = null,
 		private readonly ?ShipmentStatusService $status = null,
-		private readonly ?ShipmentEtaService $eta = null
+		private readonly ?ShipmentEtaService $eta = null,
+		private readonly ?ShipmentActivityCursor $activity = null
 	) {
 	}
 
@@ -230,6 +232,10 @@ final class ShipmentsPage {
 					'cetech-woocommerce-delivery-engine'
 				)
 			);
+		}
+
+		if ( $this->activity instanceof ShipmentActivityCursor ) {
+			$this->activity->mark_reviewed_for_current_user();
 		}
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
@@ -627,7 +633,7 @@ final class ShipmentsPage {
 			$note = $this->history_note_html( $event );
 
 			$event_cell = esc_html( ShipmentPresentation::event_label( $event ) );
-			$event_cell .= '<br /><span class="description">' . esc_html( ShipmentPresentation::source_label( $event->source ) ) . '</span>';
+			$event_cell .= '<br /><span class="description">' . esc_html( ShipmentPresentation::history_actor_label( $event ) ) . '</span>';
 
 			$rows[] = [
 				esc_html( ShipmentPresentation::timestamp( $event->event_at ) ),

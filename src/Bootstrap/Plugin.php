@@ -35,6 +35,7 @@ use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationSubm
 use CetechDeliveryEngine\Application\Configuration\ConfigurationFingerprintBuilder;
 use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogIndexInterface;
 use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogInheritanceClassifier;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionCountQuery;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
 use CetechDeliveryEngine\Application\Configuration\Catalog\ProductExceptionsQuery;
 use CetechDeliveryEngine\Application\Configuration\ClassicCheckoutRuntimeActivation;
@@ -134,6 +135,7 @@ use CetechDeliveryEngine\Presentation\Frontend\CustomerShipmentRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\ProductDeliverySelectorRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\VariableDeliverySelectorAssets;
 use CetechDeliveryEngine\Application\Selector\VariationDeliveryOptionsEndpoint;
+use CetechDeliveryEngine\Application\Shipment\ShipmentActivityCursor;
 use CetechDeliveryEngine\Application\Shipment\CustomerShipmentQuery;
 use CetechDeliveryEngine\Application\Shipment\HistoricalOrderShipmentContextFactory;
 use CetechDeliveryEngine\Application\Shipment\HistoricalShipmentPlanner;
@@ -711,6 +713,14 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			ShipmentActivityCursor::class,
+			static fn ( ServiceContainer $container ): ShipmentActivityCursor => new ShipmentActivityCursor(
+				$container->get( FeatureFlags::class ),
+				$container->get( ShipmentRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
 			ShipmentWorkspaceQuery::class,
 			static fn ( ServiceContainer $container ): ShipmentWorkspaceQuery => new ShipmentWorkspaceQuery(
 				$container->get( ShipmentRepositoryInterface::class )
@@ -1044,7 +1054,8 @@ final class Plugin {
 				$container->get( AdminActionHandler::class ),
 				$container->get( ShipmentTrackingService::class ),
 				$container->get( ShipmentStatusService::class ),
-				$container->get( ShipmentEtaService::class )
+				$container->get( ShipmentEtaService::class ),
+				$container->get( ShipmentActivityCursor::class )
 			)
 		);
 
@@ -1182,7 +1193,9 @@ final class Plugin {
 				$container->get( AdminUxAssets::class ),
 				$container->get( SetupWizardProgress::class ),
 				$container->get( FeatureFlags::class ),
-				$container->get( ShipmentsPage::class )
+				$container->get( ShipmentsPage::class ),
+				$container->get( NeedsAttentionCountQuery::class ),
+				$container->get( ShipmentActivityCursor::class )
 			)
 		);
 	}
@@ -1331,6 +1344,16 @@ final class Plugin {
 				$container->get( OperationalStateService::class ),
 				$container->get( CatalogInheritanceClassifier::class ),
 				$container->get( ScopedConfigurationRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			NeedsAttentionCountQuery::class,
+			static fn ( ServiceContainer $container ): NeedsAttentionCountQuery => new NeedsAttentionCountQuery(
+				$container->get( NeedsAttentionQuery::class ),
+				$container->get( ShipmentCreationIssueQuery::class ),
+				$container->get( ShipmentOperationsIssueQuery::class ),
+				$container->get( FeatureFlags::class )
 			)
 		);
 

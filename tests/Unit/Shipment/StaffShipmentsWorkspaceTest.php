@@ -336,6 +336,38 @@ final class StaffShipmentsWorkspaceTest extends TestCase {
 		self::assertSame( '2 items', ShipmentPresentation::item_count_label( 2 ) );
 	}
 
+	public function test_history_shows_staff_display_name_and_system_label(): void {
+		$this->enable_flag();
+		$GLOBALS['cetech_de_test_users'][3] = (object) [ 'display_name' => 'Jane Love' ];
+		$shipment = $this->store_shipment( 1301, 'g-air', '1301-D1', 'Air Shipping' );
+		$this->repository->appendEvent(
+			ShipmentEvent::create(
+				$shipment->id,
+				ShipmentEventType::Created,
+				ShipmentEventSource::System
+			)
+		);
+		$this->repository->appendEvent(
+			ShipmentEvent::create(
+				$shipment->id,
+				ShipmentEventType::StatusChanged,
+				ShipmentEventSource::Staff,
+				ShipmentStatus::AwaitingFulfilment,
+				ShipmentStatus::Processing,
+				null,
+				null,
+				3
+			)
+		);
+
+		$html = $this->render_html( [ 'shipment' => (string) $shipment->id ] );
+
+		self::assertStringContainsString( 'History', $html );
+		self::assertStringContainsString( 'Jane Love (Staff)', $html );
+		self::assertStringContainsString( 'System', $html );
+		self::assertStringNotContainsString( 'Automatic', $html );
+	}
+
 	public function test_workspace_query_does_not_reference_current_resolver(): void {
 		$source = (string) file_get_contents( dirname( __DIR__, 3 ) . '/src/Application/Shipment/ShipmentWorkspaceQuery.php' );
 		self::assertStringNotContainsString( 'use CetechDeliveryEngine\\Application\\Configuration\\EffectiveConfigurationResolver', $source );
@@ -465,6 +497,11 @@ final class StaffShipmentsWorkspaceTest extends TestCase {
 			}
 
 			$type = $property->getType();
+
+			if ( $type instanceof \ReflectionNamedType && $type->allowsNull() ) {
+				$property->setValue( $menu, null );
+				continue;
+			}
 
 			if ( $type instanceof \ReflectionNamedType && ! $type->isBuiltin() ) {
 				$property->setValue(

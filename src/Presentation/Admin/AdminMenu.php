@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Configuration\SetupWizardProgress;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionCountQuery;
+use CetechDeliveryEngine\Application\Shipment\ShipmentActivityCursor;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Capabilities\Capabilities;
 
@@ -40,7 +42,9 @@ final class AdminMenu {
 		private AdminUxAssets $admin_ux_assets,
 		private SetupWizardProgress $wizard_progress,
 		private FeatureFlags $feature_flags,
-		private ShipmentsPage $shipments_page
+		private ShipmentsPage $shipments_page,
+		private ?NeedsAttentionCountQuery $needs_attention_count = null,
+		private ?ShipmentActivityCursor $shipment_activity = null
 	) {
 	}
 
@@ -81,9 +85,20 @@ final class AdminMenu {
 			? __( 'Setup Guide', 'cetech-woocommerce-delivery-engine' )
 			: __( 'Overview', 'cetech-woocommerce-delivery-engine' );
 
+		$parent_menu_title = __( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' );
+		$attention_count   = $this->needs_attention_badge_count();
+
+		if ( $attention_count > 0 && $this->current_user_can_see_needs_attention_menu() ) {
+			$parent_menu_title = AdminMenuBadgeMarkup::append(
+				$parent_menu_title,
+				$attention_count,
+				AdminMenuBadgeMarkup::needs_attention_screen_reader( $attention_count )
+			);
+		}
+
 		add_menu_page(
 			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
+			$parent_menu_title,
 			$this->resolve_parent_menu_capability(),
 			$parent_slug,
 			$parent_cb,
@@ -194,10 +209,21 @@ final class AdminMenu {
 		}
 
 		if ( $this->should_show_shipments_menu() ) {
+			$shipments_title = __( 'Shipments', 'cetech-woocommerce-delivery-engine' );
+			$activity_count  = $this->shipments_activity_badge_count();
+
+			if ( $activity_count > 0 ) {
+				$shipments_title = AdminMenuBadgeMarkup::append(
+					$shipments_title,
+					$activity_count,
+					AdminMenuBadgeMarkup::shipments_activity_screen_reader( $activity_count )
+				);
+			}
+
 			add_submenu_page(
 				$parent_slug,
 				__( 'Shipments', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Shipments', 'cetech-woocommerce-delivery-engine' ),
+				$shipments_title,
 				'manage_shipments',
 				ShipmentsPage::SLUG,
 				[ $this->shipments_page, 'render' ]
@@ -205,14 +231,23 @@ final class AdminMenu {
 		}
 
 		if ( current_user_can( 'manage_product_delivery_rules' ) || $this->should_show_shipments_menu() ) {
-			$attention_cap = current_user_can( 'manage_product_delivery_rules' )
+			$attention_cap   = current_user_can( 'manage_product_delivery_rules' )
 				? 'manage_product_delivery_rules'
 				: 'manage_shipments';
+			$attention_title = __( 'Needs Attention', 'cetech-woocommerce-delivery-engine' );
+
+			if ( $attention_count > 0 ) {
+				$attention_title = AdminMenuBadgeMarkup::append(
+					$attention_title,
+					$attention_count,
+					AdminMenuBadgeMarkup::needs_attention_screen_reader( $attention_count )
+				);
+			}
 
 			add_submenu_page(
 				$parent_slug,
 				__( 'Needs Attention', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Needs Attention', 'cetech-woocommerce-delivery-engine' ),
+				$attention_title,
 				$attention_cap,
 				NeedsAttentionPage::SLUG,
 				[ $this->needs_attention_page, 'render' ]
@@ -392,6 +427,34 @@ final class AdminMenu {
 	public function should_show_shipments_menu(): bool {
 		return $this->feature_flags->is_enabled( 'enable_shipment_records' )
 			&& current_user_can( 'manage_shipments' );
+	}
+
+	private function needs_attention_badge_count(): int {
+		if ( ! $this->needs_attention_count instanceof NeedsAttentionCountQuery ) {
+			return 0;
+		}
+
+		if ( ! $this->needs_attention_count->current_user_can_see_needs_attention() ) {
+			return 0;
+		}
+
+		return max( 0, $this->needs_attention_count->unresolved_count_for_current_user() );
+	}
+
+	private function shipments_activity_badge_count(): int {
+		if ( ! $this->shipment_activity instanceof ShipmentActivityCursor ) {
+			return 0;
+		}
+
+		if ( ! $this->should_show_shipments_menu() ) {
+			return 0;
+		}
+
+		return max( 0, $this->shipment_activity->unreviewed_shipment_count_for_current_user() );
+	}
+
+	private function current_user_can_see_needs_attention_menu(): bool {
+		return current_user_can( 'manage_product_delivery_rules' ) || $this->should_show_shipments_menu();
 	}
 
 	/**

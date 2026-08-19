@@ -384,6 +384,26 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 		return $events;
 	}
 
+	public function maxEventId(): int {
+		global $wpdb;
+
+		$table = TableNames::for( ShipmentSchema::EVENTS_SUFFIX );
+		$sql   = "SELECT COALESCE(MAX(`id`), 0) FROM `{$table}`";
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return (int) $wpdb->get_var( $sql );
+	}
+
+	public function countDistinctShipmentsWithEventsAfter( int $after_event_id ): int {
+		global $wpdb;
+
+		$table = TableNames::for( ShipmentSchema::EVENTS_SUFFIX );
+		$sql   = "SELECT COUNT(DISTINCT `shipment_id`) FROM `{$table}` WHERE `id` > %d";
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return (int) $wpdb->get_var( $wpdb->prepare( $sql, max( 0, $after_event_id ) ) );
+	}
+
 	public function ensureCompleteAggregate( Shipment $draft, array $items ): ShipmentAggregateWriteResult {
 		return $this->transact(
 			function () use ( $draft, $items ): ShipmentAggregateWriteResult {

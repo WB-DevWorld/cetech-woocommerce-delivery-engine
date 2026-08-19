@@ -119,6 +119,9 @@ $required_classes = [
 	'CetechDeliveryEngine\\Application\\Shipment\\CustomerShipmentQuery',
 	'CetechDeliveryEngine\\Presentation\\Admin\\ShipmentsPage',
 	'CetechDeliveryEngine\\Presentation\\Frontend\\CustomerShipmentRenderer',
+	'CetechDeliveryEngine\\Application\\Shipment\\ShipmentActivityCursor',
+	'CetechDeliveryEngine\\Application\\Configuration\\Catalog\\NeedsAttentionCountQuery',
+	'CetechDeliveryEngine\\Presentation\\Admin\\AdminMenuBadgeMarkup',
 ];
 
 $required_interfaces = [

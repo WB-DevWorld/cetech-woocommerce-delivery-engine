@@ -150,7 +150,10 @@ final class CustomerShipmentPresentationTest extends TestCase {
 		self::assertStringContainsString( 'Track shipment', $with_flag );
 		self::assertStringContainsString( 'https://carrier.example/TRACK-906', $with_flag );
 		self::assertStringContainsString( 'rel="noopener noreferrer"', $with_flag );
-		self::assertStringContainsString( 'cetech-de-customer-shipment__track-link', $with_flag );
+		self::assertStringContainsString( 'cetech-de-customer-shipment__track-button', $with_flag );
+		self::assertStringContainsString( 'class="button cetech-de-customer-shipment__track-button"', $with_flag );
+		self::assertStringNotContainsString( 'Jane Love', $with_flag );
+		self::assertStringNotContainsString( 'Former or unknown staff account', $with_flag );
 	}
 
 	public function test_tracking_links_alone_do_not_show_customer_shipments(): void {
@@ -270,6 +273,23 @@ final class CustomerShipmentPresentationTest extends TestCase {
 		self::assertStringNotContainsString( 'supplier', $encoded );
 		self::assertStringNotContainsString( 'internal_cost', $encoded );
 		self::assertStringNotContainsString( 'rate_card', $encoded );
+	}
+
+	public function test_javascript_tracking_url_does_not_become_a_public_action(): void {
+		$this->enable_shipment_records();
+		$this->enable_tracking_links();
+		$order    = $this->order( 911 );
+		$shipment = $this->store_delivery_shipment( 911, 'g-air', '911-D1', 'Air Shipping', 781, 'Widget' );
+		$this->repository->update(
+			$shipment->withTracking( 'TRACK-911', 'javascript:alert(1)', 'Carrier' )
+		);
+
+		$html = $this->render_cards( $order );
+
+		self::assertStringContainsString( 'TRACK-911', $html );
+		self::assertStringNotContainsString( 'Track shipment', $html );
+		self::assertStringNotContainsString( 'javascript:', $html );
+		self::assertStringNotContainsString( 'cetech-de-customer-shipment__track-button', $html );
 	}
 
 	private function enable_shipment_records(): void {

@@ -223,6 +223,37 @@ final class FakeWpdb {
 
 	public function get_var( string $sql ) {
 		$this->record_sql( $sql );
+		$trimmed = trim( $sql );
+
+		if ( preg_match( '/SELECT\s+COALESCE\(\s*MAX\(\s*`id`\s*\)\s*,\s*0\s*\)\s+FROM\s+`([^`]+)`\s*$/is', $trimmed, $matches ) ) {
+			$max = 0;
+
+			foreach ( $this->tables[ $matches[1] ] ?? [] as $row ) {
+				$max = max( $max, (int) ( $row['id'] ?? 0 ) );
+			}
+
+			return (string) $max;
+		}
+
+		if ( preg_match( '/SELECT\s+COUNT\(\s*DISTINCT\s+`shipment_id`\s*\)\s+FROM\s+`([^`]+)`\s+WHERE\s+`id`\s*>\s*(\d+)\s*$/is', $trimmed, $matches ) ) {
+			$after = (int) $matches[2];
+			$ids   = [];
+
+			foreach ( $this->tables[ $matches[1] ] ?? [] as $row ) {
+				if ( (int) ( $row['id'] ?? 0 ) <= $after ) {
+					continue;
+				}
+
+				$shipment_id = (int) ( $row['shipment_id'] ?? 0 );
+
+				if ( $shipment_id > 0 ) {
+					$ids[ $shipment_id ] = true;
+				}
+			}
+
+			return (string) count( $ids );
+		}
+
 		$parsed = $this->parse_select( $sql );
 		$rows   = $this->filter_rows( $parsed );
 

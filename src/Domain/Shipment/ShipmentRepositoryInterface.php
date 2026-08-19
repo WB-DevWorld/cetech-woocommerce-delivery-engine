@@ -68,4 +68,15 @@ interface ShipmentRepositoryInterface {
 	 * @param list<ShipmentItem> $items
 	 */
 	public function ensureCompleteAggregate( Shipment $draft, array $items ): ShipmentAggregateWriteResult;
+
+	/**
+	 * Highest persisted shipment-event ID. 0 when no events exist.
+	 */
+	public function maxEventId(): int;
+
+	/**
+	 * Distinct shipments that have at least one event after the given event ID.
+	 * Uses the events primary key. Does not scan WooCommerce orders.
+	 */
+	public function countDistinctShipmentsWithEventsAfter( int $after_event_id ): int;
 }

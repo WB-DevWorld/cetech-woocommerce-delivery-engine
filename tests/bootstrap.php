@@ -515,6 +515,35 @@ if ( ! function_exists( 'is_account_page' ) ) {
 	}
 }
 
+if ( ! function_exists( 'get_userdata' ) ) {
+	/**
+	 * @return object|false
+	 */
+	function get_userdata( int $user_id ) {
+		return $GLOBALS['cetech_de_test_users'][ $user_id ] ?? false;
+	}
+}
+
+if ( ! function_exists( 'get_user_meta' ) ) {
+	/**
+	 * @return mixed
+	 */
+	function get_user_meta( int $user_id, string $key = '', bool $single = false ) {
+		$value = $GLOBALS['cetech_de_test_user_meta'][ $user_id ][ $key ] ?? ( $single ? '' : [] );
+
+		return $single && is_array( $value ) ? ( $value[0] ?? '' ) : $value;
+	}
+}
+
+if ( ! function_exists( 'update_user_meta' ) ) {
+	function update_user_meta( int $user_id, string $meta_key, mixed $meta_value, mixed $prev_value = '' ): bool {
+		unset( $prev_value );
+		$GLOBALS['cetech_de_test_user_meta'][ $user_id ][ $meta_key ] = $meta_value;
+
+		return true;
+	}
+}
+
 require_once __DIR__ . '/stubs/woocommerce-product-stub.php';
 
 require_once __DIR__ . '/stubs/woocommerce-order-stub.php';
