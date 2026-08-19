@@ -1,7 +1,7 @@
 # Staff Training Manual (self-paced)
 
 **Audience:** New and returning staff  
-**Version:** CETECH Delivery Engine 1.0.0-rc.4  
+**Version:** CETECH Delivery Engine 1.0.0-rc.5  
 **Everyday home:** Delivery Engine → Overview  
 **Practice products:** Simple QA **#39705**; Variable QA **#39717** / A **#39718** / B **#39719**
 
@@ -437,3 +437,5 @@ Pass/fail oral exam: explain Site-wide Defaults vs a Product Exception vs Legacy
 ## Course completion
 
 You are trained when you can demonstrate Modules 4, 5, 10, and 12 practical tests plus inheritance explanation (Module 3). Reading alone is not enough — see [06-TRAINER-GUIDE](06-TRAINER-GUIDE.md).
+
+If your role includes fulfilling orders, continue with [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md) after an Administrator has enabled shipment records.

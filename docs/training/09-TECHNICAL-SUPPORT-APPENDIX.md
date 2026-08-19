@@ -30,7 +30,7 @@ Required production switches (Classic Checkout environment):
 - Show delivery fees at checkout — ON  
 - Save delivery details on orders — ON  
 
-Deferred / OFF examples: shipment records, timeline, tracking links, Blocks adapter.
+Deferred / OFF until an Administrator enables them: shipment records, customer tracking links. Not in this release: customer timeline, Blocks adapter, carrier APIs.
 
 Do not flip Advanced cutover switches without a change window and owner approval. COD remains OFF.
 

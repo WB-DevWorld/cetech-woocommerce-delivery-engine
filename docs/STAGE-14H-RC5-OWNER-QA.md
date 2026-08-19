@@ -4,12 +4,13 @@
 **Failed QA identities:** `1.0.0-rc.5-qa.1`, `1.0.0-rc.5-qa.2`, and `1.0.0-rc.5-qa.5` (ZIPs immutable; do not overwrite)  
 **Inheritance-repair evidence build:** `1.0.0-rc.5-qa.3` (ZIP immutable; prepared but **not** physically installed/tested on FLAIROC)  
 **QA.4 identity:** `1.0.0-rc.5-qa.4` (ZIP immutable; **owner physical PASS** on FLAIROC)  
-**Current QA candidate:** `1.0.0-rc.5-qa.6`  
+**QA.6 identity:** `1.0.0-rc.5-qa.6` (ZIP immutable; **owner physical PASS** on FLAIROC)  
+**Final release:** `1.0.0-rc.5` — see `docs/STAGE-14H-FINAL.md`  
 **Schema:** `4`  
-**Protected published baseline:** `1.0.0-rc.4` / schema `3` / tag `v1.0.0-rc.4` (untouched)  
+**Protected published baseline:** tagged `1.0.0-rc.5` / schema `4` (RC.4 tag untouched)  
 **Branch:** `master`  
-**FLAIROC:** **not modified** by this QA.6 preparation. No SSH. No hotfix.  
-**Final RC.5 tag:** **none**
+**FLAIROC:** **not modified** by Stage 14H-FINAL. No SSH. No hotfix.  
+**Final RC.5 tag:** `v1.0.0-rc.5` (created in Stage 14H-FINAL)
 
 ---
 
@@ -20,9 +21,10 @@
 **RC.5-QA.3 PREPARED** (inheritance repair; not physically retested; ZIP immutable)  
 **RC.5-QA.4 OWNER PHYSICAL PASS** (inheritance, badges, Track button, staff actor, COD payment gate)  
 **RC.5-QA.5 FAILED OWNER QA** (amount-only refund did not create Needs Attention refund review)  
-**RC.5-QA.6 PREPARED FOR OWNER INSTALL** (refund-review repair; QA.5 COD/manual creation retained)
+**RC.5-QA.6 OWNER PHYSICAL PASS** (refund review, COD/manual creation, Air/Sea, pickup, cancellation, badges)  
+**RC.5 FINALIZED** — `docs/STAGE-14H-FINAL.md`
 
-This is **not** owner QA pass for QA.6, **not** Stage 14 released, and **not** final `1.0.0-rc.5`.
+Owner physical QA of QA.6 is **PASS**. Final identity is **`1.0.0-rc.5`**.
 
 ### Final COD rule
 
@@ -188,8 +190,9 @@ Do not overwrite `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.2.zip`.
 | Failed QA candidates | `1.0.0-rc.5-qa.1`, `1.0.0-rc.5-qa.2`, `1.0.0-rc.5-qa.5` (ZIPs immutable) |
 | Inheritance evidence ZIP | `1.0.0-rc.5-qa.3` (immutable; not physically retested) |
 | QA.4 physical PASS ZIP | `1.0.0-rc.5-qa.4` (immutable) |
-| Current QA candidate | `1.0.0-rc.5-qa.6` |
-| Plugin header / `CETECH_DE_VERSION` / readme Stable tag | `1.0.0-rc.5-qa.6` |
+| QA.6 physical PASS ZIP | `1.0.0-rc.5-qa.6` (immutable accepted baseline) |
+| Final release | `1.0.0-rc.5` |
+| Plugin header / `CETECH_DE_VERSION` / readme Stable tag | `1.0.0-rc.5` |
 | Eventual final identity | `1.0.0-rc.5` (only after owner QA pass + Stage 14H-FINAL) |
 | Schema | `4` |
 | Feature-flag defaults | all Stage 14 flags **OFF** |
@@ -630,7 +633,7 @@ If owner QA finds a further genuine defect: stop finalization; smallest repair; 
 
 **DRAFT ONLY.** Existing RC.4 training remains the published staff set until owner QA accepts the physical UI.
 
-Draft coverage: `docs/training/11-STAGE-14-SHIPMENTS-DRAFT.md`.
+Draft coverage: `docs/training/11-STAGE-14-SHIPMENTS.md` (finalized with RC.5).
 
 After owner QA PASS: recapture screenshots/wording in Stage 14H-FINAL.
 
@@ -779,7 +782,9 @@ Do not overwrite QA.1–QA.5 ZIPs. Do not finalize RC.5. Do not touch FLAIROC fr
 
 ## STOP
 
-QA.1 failed owner QA. QA.2 failed owner QA (Site-wide inheritance / ECR validity). QA.3 is an immutable inheritance-repair evidence build and was **not** physically retested. QA.4 is an immutable physical PASS. QA.5 failed owner QA (amount-only refund review). Do not overwrite those ZIPs. Do not finalize RC.5. Do not create `v1.0.0-rc.5`. Do not touch FLAIROC from this Cursor session.
+QA.1 failed owner QA. QA.2 failed owner QA. QA.3 is an immutable inheritance-repair evidence build. QA.4 is an immutable physical PASS. QA.5 failed owner QA (amount-only refund review). QA.6 is an immutable owner physical PASS and is the accepted functional baseline for **`1.0.0-rc.5`**.
 
-Owner install/test of **QA.6** must cover the proportional retest above before Stage 14H-FINAL.
+Do not overwrite QA.1–QA.6 ZIPs. Do not retag RC.4. Do not touch FLAIROC from Cursor.
+
+Owner remaining action: clean-folder install of the **final** `1.0.0-rc.5` ZIP, then **STOP**. Do not begin Stage 15.
 

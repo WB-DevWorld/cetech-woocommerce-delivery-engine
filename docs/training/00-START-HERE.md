@@ -1,8 +1,8 @@
-# Start here — CETECH Delivery Engine staff training (RC.4)
+# Start here — CETECH Delivery Engine staff training (RC.5)
 
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.4**  
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.5**  
 **Everyday home:** WordPress admin → **Delivery Engine → Overview**  
-**Screenshots / videos:** Not recaptured for RC.4 yet. Use these written guides on the live screens. Older RC.2 images or videos, if you still have them, are out of date.
+**Screenshots / videos:** Not recaptured for RC.5 yet. Use these written guides on the live screens. Older RC.2 images or videos, if you still have them, are out of date.
 
 You do **not** need to know PHP, databases, or plugin architecture.
 
@@ -16,6 +16,7 @@ The Delivery Engine helps the store:
 2. Show customers a clear **Delivery option** and **Estimated delivery**.
 3. Charge the correct **delivery fee** at checkout.
 4. Keep **Delivery information** on the WooCommerce order after payment.
+5. When shipment records are enabled, work **delivery shipments** from **Delivery Engine → Shipments**.
 
 Most products should follow the store defaults. Only genuinely different products or variations get exceptions.
 
@@ -38,8 +39,9 @@ Most products should follow the store defaults. Only genuinely different product
 ### Administrators
 
 1. [02 — Complete Administrator Guide](02-COMPLETE-ADMIN-GUIDE.md)
-2. [03 — Use-Case Playbook](03-USE-CASE-PLAYBOOK.md)
-3. [07 — Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md)
+2. [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md)
+3. [03 — Use-Case Playbook](03-USE-CASE-PLAYBOOK.md)
+4. [07 — Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md)
 
 ### Trainers
 
@@ -82,6 +84,7 @@ When setup is complete, staff should see:
 - Delivery Charges
 - Pickup Locations
 - Product Exceptions
+- **Shipments** (only after an Administrator turns on shipment records)
 - Needs Attention
 - Settings
 
@@ -106,6 +109,7 @@ You should **not** see these as everyday menu items:
 | Site-wide Defaults | Administrator / authorised configuration |
 | Delivery Options, Delivery Areas, Delivery Charges, Pickup Locations | Everyday configuration |
 | Product Exceptions / Needs Attention | Everyday staff |
+| **Shipments** (when enabled) | Authorised shipment staff — [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md) |
 | WooCommerce product editor → **Delivery** tab | Everyday catalog staff |
 | Preview Delivery | Everyday staff (contextual) |
 | Customer product page / cart / checkout | Everyday (customer journey) |
@@ -113,7 +117,7 @@ You should **not** see these as everyday menu items:
 | Settings (customer experience / Access) | Administrator |
 | Settings → Advanced switches | Administrator only |
 | Technical diagnostics / private sources | Technical support |
-| Shipments / tracking / Blocks checkout | Deferred — not this release |
+| Customer timeline / Blocks checkout / carrier APIs | Not this release |
 
 ---
 

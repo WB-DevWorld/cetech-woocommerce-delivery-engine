@@ -6,7 +6,7 @@
 **Repository namespace:** `CetechDeliveryEngine\`
 **WooCommerce dependency:** Required
 **PHP minimum:** 8.1+
-**Current known implementation baseline:** `1.0.0-rc.4`, schema target `4` (master; FLAIROC/tagged RC.4 remain schema `3` until a later deploy)  
+**Current known implementation baseline:** `1.0.0-rc.5`, schema target `4`  
 **Canonical maintained rulebook:** `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`
 
 ---
@@ -132,7 +132,7 @@ Document the conflict and resolve it deliberately.
 
 At the current known baseline:
 
-* plugin version is `1.0.0-rc.5-qa.6` on master (tagged/protected runtime remains `1.0.0-rc.4`);
+* plugin version is `1.0.0-rc.5` on master (tagged/protected runtime is `1.0.0-rc.5`, schema `4`; historical tag `1.0.0-rc.4` remains untouched);
 * schema target is `4` on master (tagged RC.4 / FLAIROC remain schema `3` until a later deploy);
 * the simple-product customer path through order delivery snapshots is implemented;
 * runtime customer-facing flags default off;

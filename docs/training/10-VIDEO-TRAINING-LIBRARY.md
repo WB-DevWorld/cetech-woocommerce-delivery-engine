@@ -1,6 +1,6 @@
-# Video Training Library — CETECH Delivery Engine (RC.4)
+# Video Training Library — CETECH Delivery Engine (RC.5)
 
-**Plugin version:** 1.0.0-rc.4  
+**Plugin version:** 1.0.0-rc.5  
 **Status:** Recapture **deferred**. Written guides are the teaching authority until new recordings exist.
 
 Older RC.2 scripts, transcripts, and any leftover `.webm` files describe the previous menus (Delivery Settings, Delivery Offers, Rate Cards, Legacy as a visible page) and the previous customer presentation. **Do not use them as current truth.**
@@ -15,6 +15,7 @@ When recordings are made later, replace binaries under [`assets/videos/`](assets
 |------|-------------|
 | New staff | [01-QUICK-START](01-QUICK-START.md) then [05-STAFF-TRAINING-MANUAL](05-STAFF-TRAINING-MANUAL.md) |
 | Everyday configuration | [02-COMPLETE-ADMIN-GUIDE](02-COMPLETE-ADMIN-GUIDE.md) + [03-USE-CASE-PLAYBOOK](03-USE-CASE-PLAYBOOK.md) |
+| Shipments (when enabled) | [11-STAGE-14-SHIPMENTS](11-STAGE-14-SHIPMENTS.md) |
 | Customer journey | Manual Module 8–9 + Visual Walkthrough sections 14–17 |
 | Problem solving | [07-TROUBLESHOOTING-FAQ](07-TROUBLESHOOTING-FAQ.md) |
 | Trainers | [06-TRAINER-GUIDE](06-TRAINER-GUIDE.md) with live demos |

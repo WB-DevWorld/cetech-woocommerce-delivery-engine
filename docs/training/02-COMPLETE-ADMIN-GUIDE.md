@@ -1,7 +1,7 @@
 # Complete Administrator Guide
 
 **Audience:** Administrators and authorised configuration staff  
-**Version:** CETECH Delivery Engine 1.0.0-rc.4  
+**Version:** CETECH Delivery Engine 1.0.0-rc.5  
 **Everyday home:** Delivery Engine → **Overview**  
 **Not everyday:** Legacy Delivery Rules, Technical Diagnostics, private logistics pages
 
@@ -428,7 +428,9 @@ General / Customer experience / Orders / Setup Guide / Access.
 - If Administrator access needs repair, a **Restore Administrator Access** notice can appear for users who can manage WordPress options. That repair does **not** live inside Technical Diagnostics.
 
 **Recommended production (Classic Checkout)**  
-Required customer/checkout features stay **ON**. Deferred features (shipments, tracking, timeline, Blocks) stay **OFF**. Cash on delivery stays **OFF**.
+Required customer/checkout features stay **ON**. Shipment records and customer tracking links stay **OFF** until an Administrator chooses to turn them on in Settings. Customer timeline, Blocks checkout, and carrier APIs are **not** in this release. Storefront Cash on delivery policy remains a store decision.
+
+Shipment staff training: [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md).
 
 **Do not change casually**  
 Advanced switches, Access matrix for subordinate roles without a policy decision.
