@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-rc.5-qa.2
+Stable tag: 1.0.0-rc.5-qa.3
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -49,8 +49,11 @@ No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
 
+= 1.0.0-rc.5-qa.3 =
+* Repair candidate after QA.2 owner FAIL. Untouched products inherit Site-wide required delivery fields even when optional supplier/origin/logistics/priority values are absent. Schema target remains 4. Not the final RC.5 release.
+
 = 1.0.0-rc.5-qa.2 =
-* Repair candidate after QA.1 owner FAIL. Checkout/email/View Order no longer fatal on customer delivery summary. Shipment creation requires payment-complete or a persisted paid date, not WooCommerce is_paid() status. Schema target remains 4. Not the final RC.5 release.
+* Repair candidate after QA.1 owner FAIL. Checkout/email/View Order no longer fatal on customer delivery summary. Shipment creation requires payment-complete or a persisted paid date, not WooCommerce is_paid() status. Failed owner QA on Site-wide inheritance; superseded by 1.0.0-rc.5-qa.3. Not the final RC.5 release.
 
 = 1.0.0-rc.5-qa.1 =
 * Owner QA candidate for Stage 14 shipment records. Schema target 4. Shipment tables pin InnoDB. Feature flags remain off until enabled in Settings. Failed owner QA; superseded by 1.0.0-rc.5-qa.2. Not the final RC.5 release.
