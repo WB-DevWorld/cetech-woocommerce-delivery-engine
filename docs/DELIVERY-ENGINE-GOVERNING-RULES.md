@@ -4,7 +4,7 @@
 **Applies to:** All human developers, Cursor agents, AI coding agents, reviewers, and maintainers  
 **Plugin:** CETECH WooCommerce Delivery Engine  
 **Current protected runtime baseline:** tagged `1.0.0-rc.4` (FLAIROC schema `3` until an authorised Stage 14 install)  
-**Current QA-candidate identity:** `1.0.0-rc.5-qa.1` (master; schema `4`; not a final RC.5 tag)  
+**Current QA-candidate identity:** `1.0.0-rc.5-qa.2` (master; schema `4`; not a final RC.5 tag)  
 **Current master schema target:** `4` (Stage 14B shipment persistence tables; Stage 14C creation runtime is implemented and feature-gated OFF)  
 **Text domain:** `cetech-woocommerce-delivery-engine`
 
@@ -31,7 +31,7 @@ Where this rulebook and an older rules file conflict on a **hard invariant**, th
 6. **Do not discard owner-tested behaviour** without explicit owner/authorisation.
 7. **Current implementation truth** = repository code + latest completed stage documentation. Visionary handoff sections are not proof that a feature exists.
 8. **Intended product/end-state** = latest `Delivery Shipping Plugin Up-To-Date Design and Expectations.md`. Do not implement a future vision merely because it appears there.
-9. Tagged **`1.0.0-rc.4`** remains the protected published baseline (schema **3** on FLAIROC until an authorised install). Master may carry an approved QA-candidate identity such as **`1.0.0-rc.5-qa.1`** during Stage 14H. Schema target is **`4`**. Stage 14 flags default **OFF**. Do not create the final `1.0.0-rc.5` tag, overwrite RC.4, or claim owner QA passed without the owner’s physical confirmation.
+9. Tagged **`1.0.0-rc.4`** remains the protected published baseline (schema **3** on FLAIROC until an authorised install). Master may carry an approved QA-candidate identity such as **`1.0.0-rc.5-qa.2`** during Stage 14H. Schema target is **`4`**. Stage 14 flags default **OFF**. Do not create the final `1.0.0-rc.5` tag, overwrite RC.4, or claim owner QA passed without the owner’s physical confirmation.
 
 Testable: a commit that retags RC.4, changes `CETECH_DE_VERSION` without authorisation, or rewrites checkout grouping “to prepare for shipments” violates this section.
 

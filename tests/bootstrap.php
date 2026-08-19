@@ -22,13 +22,30 @@ if ( ! function_exists( 'date_i18n' ) ) {
 	 * @param int|false $timestamp
 	 */
 	function date_i18n( string $format, $timestamp = false, bool $gmt = false ): string {
-		unset( $gmt );
-
 		if ( false === $timestamp ) {
 			$timestamp = time();
 		}
 
-		return date( $format, (int) $timestamp );
+		$timestamp = (int) $timestamp;
+
+		if ( $gmt ) {
+			return gmdate( $format, $timestamp );
+		}
+
+		$timezone_string = (string) ( $GLOBALS['cetech_de_test_options']['timezone_string'] ?? '' );
+
+		if ( '' !== $timezone_string ) {
+			try {
+				$local = ( new \DateTimeImmutable( '@' . $timestamp ) )->setTimezone( new \DateTimeZone( $timezone_string ) );
+
+				return $local->format( $format );
+			} catch ( \Exception ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement.DetectedCatch
+			}
+		}
+
+		$offset = (float) ( $GLOBALS['cetech_de_test_options']['gmt_offset'] ?? 0 );
+
+		return gmdate( $format, (int) round( $timestamp + ( $offset * 3600 ) ) );
 	}
 }
 

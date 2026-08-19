@@ -132,7 +132,7 @@ Document the conflict and resolve it deliberately.
 
 At the current known baseline:
 
-* plugin version is `1.0.0-rc.5-qa.1` on master (tagged/protected runtime remains `1.0.0-rc.4`);
+* plugin version is `1.0.0-rc.5-qa.2` on master (tagged/protected runtime remains `1.0.0-rc.4`);
 * schema target is `4` on master (tagged RC.4 / FLAIROC remain schema `3` until a later deploy);
 * the simple-product customer path through order delivery snapshots is implemented;
 * runtime customer-facing flags default off;
