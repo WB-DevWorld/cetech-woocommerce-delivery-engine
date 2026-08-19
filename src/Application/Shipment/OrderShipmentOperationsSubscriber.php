@@ -98,6 +98,8 @@ final class OrderShipmentOperationsSubscriber {
 			return;
 		}
 
+		// FULL quantity evidence is the only auto-cancel path. UNPROVEN
+		// (amount-only / no refund line items) and PARTIAL never change status.
 		if (
 			ShipmentRefundInspector::FULL === $state
 			&& ShipmentStatusTransitionPolicy::allows_automatic_cancel( $shipment->status )

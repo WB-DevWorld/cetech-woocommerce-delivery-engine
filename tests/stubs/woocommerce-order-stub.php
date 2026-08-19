@@ -103,6 +103,38 @@ if ( ! class_exists( 'WC_Order', false ) ) {
 			$this->data['refunded_qty'][ $item_id ] = $qty;
 		}
 
+		public function get_total_refunded(): float {
+			return (float) ( $this->data['total_refunded'] ?? 0 );
+		}
+
+		public function set_total_refunded( float $amount ): void {
+			$this->data['total_refunded'] = $amount;
+		}
+
+		/**
+		 * @return list<object>
+		 */
+		public function get_refunds(): array {
+			return is_array( $this->data['refunds'] ?? null ) ? $this->data['refunds'] : [];
+		}
+
+		/**
+		 * @param list<object> $refunds
+		 */
+		public function set_refunds( array $refunds ): void {
+			$this->data['refunds'] = $refunds;
+		}
+
+		public function add_product_item( int $item_id, int $quantity = 1, string $name = 'Item' ): void {
+			$this->data['items'][ $item_id ] = new WC_Order_Item_Product(
+				[
+					'id'       => $item_id,
+					'quantity' => $quantity,
+					'name'     => $name,
+				]
+			);
+		}
+
 		public function set_status( string $status ): void {
 			$this->data['status'] = $status;
 		}
@@ -133,6 +165,29 @@ if ( ! class_exists( 'WC_Order', false ) ) {
 
 		public function get_billing_company(): string {
 			return (string) ( $this->data['billing_company'] ?? '' );
+		}
+	}
+}
+
+if ( ! class_exists( 'WC_Order_Refund', false ) ) {
+	class WC_Order_Refund {
+
+		/** @param array<string, mixed> $data */
+		public function __construct( private array $data = [] ) {
+			$this->data['items'] = is_array( $this->data['items'] ?? null ) ? $this->data['items'] : [];
+		}
+
+		/**
+		 * @return array<int|string, object>
+		 */
+		public function get_items( string $type = '' ): array {
+			unset( $type );
+
+			return $this->data['items'];
+		}
+
+		public function get_amount(): string {
+			return (string) ( $this->data['amount'] ?? '0' );
 		}
 	}
 }
