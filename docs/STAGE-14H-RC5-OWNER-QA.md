@@ -398,13 +398,33 @@ Extracted to a disposable directory outside the git repo (`cetech-de-qa5-extract
 
 ---
 
+## 5d. Extracted QA.6 package verification
+
+Extracted to a disposable directory outside the git repo (`cetech-de-qa6-extract`). Re-ran `scripts/verify-production-package-autoload.php` against the **extracted** tree: **PASS** (exit 0). Verifier success text reports **Schema target 4**.
+
+| Check | Result |
+|-------|--------|
+| One plugin root | PASS |
+| Version `1.0.0-rc.5-qa.6` | PASS |
+| Schema target `4` | PASS |
+| Production autoload / Linux-case | PASS |
+| Packaged PHP lint | **323 files, 0 failures** |
+| No PHPUnit / `vendor/phpunit` / phpunit.xml / tests / node_modules / `.git` / `.env` / package.json | PASS |
+| `ENGINE=InnoDB` on all three shipment CREATE TABLE statements | PASS (verifier) |
+| Stage 14 critical classes present | PASS |
+| Flag defaults OFF | PASS |
+
+---
+
 ## 6. Pre-FLAIROC package verdict
 
 **QA.4 PACKAGE READY FOR OWNER RETEST INSTALL** — later **OWNER PHYSICAL PASS**. ZIP remains immutable.
 
-**QA.5 PACKAGE READY FOR OWNER INSTALL**
+**QA.5 PACKAGE READY FOR OWNER INSTALL** — later **OWNER PHYSICAL FAIL** (amount-only refund review). ZIP remains immutable.
 
-Do not call QA.5 owner QA passed. Do not install from this Cursor session. Do not overwrite QA.1, QA.2, QA.3, or QA.4 ZIPs. Do not finalize RC.5.
+**QA.6 PACKAGE READY FOR OWNER INSTALL**
+
+Do not call QA.6 owner QA passed. Do not install from this Cursor session. Do not overwrite QA.1–QA.5 ZIPs. Do not finalize RC.5.
 
 ---
 
@@ -412,7 +432,7 @@ Do not call QA.5 owner QA passed. Do not install from this Cursor session. Do no
 
 FLAIROC currently has **QA.5** installed (owner physical FAIL on amount-only refund review). Stage 14 flags follow the owner’s live settings. This QA.6 Cursor task did **not** SSH, hotfix, edit files, copy product meta, or repair the database.
 
-Preserved evidence (do not modify remotely): orders **39733 / 39734 / 39735** and shipments **39733-D1 / 39734-D1 / 39735-D1**. Canonical inheritance reproduction remains products **4156**, **39420** / **39422** / **39424** / **39426**, and explicit QA product **39705**.
+Preserved evidence (do not modify remotely): orders **39733 / 39734 / 39735 / 39749** and shipments **39733-D1 / 39734-D1 / 39735-D1 / 39749-D1**. Canonical inheritance reproduction remains products **4156**, **39420** / **39422** / **39424** / **39426**, and explicit QA product **39705**.
 
 ### Rollback ZIP (keep immediately available)
 
@@ -427,7 +447,7 @@ Preserved evidence (do not modify remotely): orders **39733 / 39734 / 39735** an
 | Immutable QA.3 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.3.zip` (keep; do not overwrite) |
 | Immutable QA.4 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.4.zip` (keep; physical PASS; do not overwrite) |
 | Immutable QA.5 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.5.zip` (keep; owner FAIL; do not overwrite) |
-| Current QA.6 ZIP | filled after package build |
+| Current QA.6 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.6.zip` (owner install candidate) |
 
 ### Owner clean-folder install of QA.4 (established procedure)
 
@@ -730,7 +750,18 @@ QA.5 baseline was 545 / 2992 / 11 JS / 3 deprecations. Delta +10 tests / +58 ass
 
 ### QA.6 package
 
-Filled after `scripts/build-v1-rc-package.ps1`.
+| Item | Value |
+|------|--------|
+| Filename | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.6.zip` |
+| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.6.zip` |
+| Desktop path | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.6.zip` |
+| Bytes | `1040195` |
+| SHA-256 | `bb7e284a75598a23d16f9ea6dd2e07377dcf01fd33b66ef615a68ecdd4338e3b` |
+| Sidecar | same hash + `  cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.6.zip` |
+| ZIP root | exactly one folder `cetech-woocommerce-delivery-engine/` |
+| Built from | committed clean `master` at `62825a7` (not `-AllowDirty`) |
+| Schema | `4` (no new migration) |
+| Source commit (package) | `62825a7` |
 
 ### Proportional owner retest for QA.6
 
