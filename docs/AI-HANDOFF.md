@@ -66,7 +66,7 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Next stage | **WAIT FOR OWNER PHYSICAL INSTALL/TEST** of `1.0.0-rc.5-qa.5`. Then Stage 14H-FINAL only if owner QA passes. Do not create `v1.0.0-rc.5` yet. Do not claim owner QA passed. |
 | Final PHP log (RC.2 smoke) | Marker **546** → inspected through **548** — **PASS**; no new Delivery Engine fatals |
 | Live QA orders | `#39721` (variable); `#39724` (multi-product grouping); owner-QA evidence **`#39733` / `#39734` / `#39735`** (preserve; do not modify remotely) |
-| Package | QA retest candidate `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.5.zip` (SHA-256 in `docs/STAGE-14H-RC5-OWNER-QA.md`). QA.4 ZIP remains immutable (physical PASS). Failed QA.1/QA.2 and evidence QA.3 ZIPs remain immutable. RC.4 rollback ZIP remains the protected published package. |
+| Package | QA retest candidate `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.5.zip` (`1037829` bytes, SHA-256 `8a142194bc548eab29213b953d37c7441684f78d2ebc1315d85e25d637735212`, source `9d92be6`). QA.4 ZIP remains immutable (physical PASS). Failed QA.1/QA.2 and evidence QA.3 ZIPs remain immutable. RC.4 rollback ZIP remains the protected published package. |
 
 **RC.2 final live smoke: PASS.** Plugin is **live and usable** on the current FLAIROC Classic Checkout environment with required production features enabled.
 

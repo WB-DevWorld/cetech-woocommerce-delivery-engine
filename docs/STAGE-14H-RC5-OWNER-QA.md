@@ -284,6 +284,32 @@ QA.4 contains the exact QA.3 inheritance repair plus:
 
 ---
 
+## 3e. QA.5 operational-completeness package
+
+| Item | Value |
+|------|--------|
+| Filename | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.5.zip` |
+| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.5.zip` |
+| Desktop path | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.5.zip` |
+| Bytes | `1037829` |
+| SHA-256 | `8a142194bc548eab29213b953d37c7441684f78d2ebc1315d85e25d637735212` |
+| Sidecar | same hash + `  cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.5.zip` |
+| ZIP root | exactly one folder `cetech-woocommerce-delivery-engine/` |
+| Built from | committed clean `master` at `9d92be6` (not `-AllowDirty`) |
+| Schema | `4` (no new migration) |
+
+This is a **QA.5 checksum**, not a final RC.5 checksum. Do not overwrite QA.1–QA.4.
+
+QA.5 keeps the QA.4 inheritance repair and polish, and adds:
+
+1. Legitimate Cash on Delivery orders appear as Needs Attention **action required** (not an error) until every eligible historical delivery group has its shipment.
+2. Staff create the shipment from the saved historical order snapshot (preview then confirm). Pickup groups are skipped. Automatic COD creation is not restored.
+3. Later `woocommerce_payment_complete` remains idempotent on a manually created COD shipment.
+4. Staff History uses unique identity `Jane Love (Staff · User #3)` (or display-name fallback + User ID). Customer pages never include actor identity.
+5. Customer View Order uses one contained card per shipment with scoped spacing from WooCommerce Order Again.
+
+---
+
 ## 4. Source gates (QA.3)
 
 | Gate | Result |
@@ -352,17 +378,38 @@ Extracted to a disposable directory outside the git repo (`cetech-de-qa4-extract
 
 ---
 
+## 5c. Extracted QA.5 package verification
+
+Extracted to a disposable directory outside the git repo (`cetech-de-qa5-extract`). Re-ran `scripts/verify-production-package-autoload.php` against the **extracted** tree: **PASS** (exit 0). Verifier success text reports **Schema target 4**.
+
+| Check | Result |
+|-------|--------|
+| One plugin root | PASS |
+| Version `1.0.0-rc.5-qa.5` | PASS |
+| Schema target `4` | PASS |
+| Production autoload / Linux-case | PASS |
+| Packaged PHP lint | **323 files, 0 failures** |
+| No PHPUnit / `vendor/phpunit` / phpunit.xml / tests / node_modules / `.git` / `.env` / package.json | PASS |
+| `ENGINE=InnoDB` on all three shipment CREATE TABLE statements | PASS (verifier) |
+| Stage 14 critical classes present | PASS |
+| QA.5 COD/manual-creation classes present | PASS |
+| Flag defaults OFF | PASS |
+
+---
+
 ## 6. Pre-FLAIROC package verdict
 
-**QA.4 PACKAGE READY FOR OWNER RETEST INSTALL**
+**QA.4 PACKAGE READY FOR OWNER RETEST INSTALL** — later **OWNER PHYSICAL PASS**. ZIP remains immutable.
 
-Do not call owner QA passed. Do not install from this Cursor session. Do not overwrite QA.1, QA.2, or QA.3 ZIPs.
+**QA.5 PACKAGE READY FOR OWNER INSTALL**
+
+Do not call QA.5 owner QA passed. Do not install from this Cursor session. Do not overwrite QA.1, QA.2, QA.3, or QA.4 ZIPs. Do not finalize RC.5.
 
 ---
 
 ## 7. FLAIROC baseline / installation
 
-FLAIROC still has a failed QA candidate installed (QA.1 and/or QA.2 depending on the last owner install). Stage 14 flags are **OFF**. This Cursor task did **not** SSH, hotfix, edit files, copy product meta, or repair the database.
+FLAIROC currently has **QA.4** installed (owner physical PASS). Stage 14 flags follow the owner’s live settings. This QA.5 Cursor task did **not** SSH, hotfix, edit files, copy product meta, or repair the database.
 
 Preserved evidence (do not modify remotely): orders **39733 / 39734 / 39735** and shipments **39733-D1 / 39734-D1 / 39735-D1**. Canonical inheritance reproduction remains products **4156**, **39420** / **39422** / **39424** / **39426**, and explicit QA product **39705**.
 
@@ -377,6 +424,8 @@ Preserved evidence (do not modify remotely): orders **39733 / 39734 / 39735** an
 | Failed QA.1 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.1.zip` (keep; do not overwrite) |
 | Failed QA.2 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.2.zip` (keep; do not overwrite) |
 | Immutable QA.3 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.3.zip` (keep; do not overwrite) |
+| Immutable QA.4 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.4.zip` (keep; physical PASS; do not overwrite) |
+| Current QA.5 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.5.zip` (owner install candidate) |
 
 ### Owner clean-folder install of QA.4 (established procedure)
 
@@ -400,6 +449,10 @@ Then:
 6. Do **not** call this final RC.5.
 7. Do **not** delete the three QA evidence orders/shipments.
 8. Do **not** create Product/Variation rows merely so products can inherit.
+
+### Owner clean-folder install of QA.5
+
+FLAIROC currently has **QA.4**. Use the same deactivate / delete-folder procedure, then install **only** `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.5.zip`. Preserve existing QA evidence orders/shipments. After activate, reported version must be `1.0.0-rc.5-qa.5`. Schema remains **4**. Follow the ten-point QA.5 plan in section 15. Do **not** call this final RC.5.
 
 ### Immediate post-install gates (flags still OFF)
 
@@ -589,17 +642,30 @@ Customer View Order: scoped section spacing from WooCommerce Order Again; one bo
 |------|--------|
 | `composer validate --no-check-publish` | valid |
 | Production PHP lint | **323 files, 0 failures** |
-| Focused QA.5 + inheritance + Stage 14 shipment suite | **104 tests, 543 assertions, OK** (CodAwaiting, ManualCreation, identity, customer cards, payment gate, badges, planner, aggregate) |
+| Focused QA.5 + inheritance/ECR + related Stage 14 subset | **140 tests, 659 assertions, OK** |
+| Inheritance / ECR suite | **47 tests, 186 assertions, OK** |
+| Stage 14 shipment suite | **205 tests, 1186 assertions, OK** |
 | PHPUnit | **545 tests, 2992 assertions** |
 | Deprecations | **3** (`ReflectionMethod::setAccessible()` PHP 8.5) — same type as QA.4; no new type |
 | `npm run test:js` | **11 passed** |
 | Playwright | **not run** |
 
-QA.4 baseline was 523 / 2869 / 11 JS / 3 deprecations.
+QA.4 baseline was 523 / 2869 / 11 JS / 3 deprecations. Delta +22 tests / +123 assertions.
 
 ### QA.5 package
 
-Filled after `scripts/build-v1-rc-package.ps1`. See the package table at the end of this section after build.
+| Item | Value |
+|------|--------|
+| Filename | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.5.zip` |
+| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.5.zip` |
+| Desktop path | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.5.zip` |
+| Bytes | `1037829` |
+| SHA-256 | `8a142194bc548eab29213b953d37c7441684f78d2ebc1315d85e25d637735212` |
+| Sidecar | same hash + `  cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.5.zip` |
+| ZIP root | exactly one folder `cetech-woocommerce-delivery-engine/` |
+| Built from | committed clean `master` at `9d92be6` (not `-AllowDirty`) |
+| Schema | `4` (no new migration) |
+| Source commit (package) | `9d92be6` |
 
 ### Combined owner QA plan for QA.5
 
