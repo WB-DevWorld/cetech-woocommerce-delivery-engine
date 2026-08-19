@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-rc.5-qa.3
+Stable tag: 1.0.0-rc.5-qa.4
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,9 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-rc.5-qa.4 =
+* Owner QA polish candidate. Staff Shipment History shows the WordPress account name. Customer Track shipment is a button-style control. Delivery Engine menu badges show unresolved Needs Attention and per-user unreviewed shipment activity. Includes the QA.3 Site-wide inheritance repair. Schema target remains 4. Not the final RC.5 release.
 
 = 1.0.0-rc.5-qa.3 =
 * Repair candidate after QA.2 owner FAIL. Untouched products inherit Site-wide required delivery fields even when optional supplier/origin/logistics/priority values are absent. Schema target remains 4. Not the final RC.5 release.
