@@ -2,9 +2,9 @@
 
 ## CURRENT IMPLEMENTATION STATUS — V1 RC (read first)
 
-**Last updated:** 2026-08-18  
-**Plugin version:** `1.0.0-rc.5-qa.1` on master (QA candidate). Tagged/protected published baseline remains `1.0.0-rc.4` (schema `3` on FLAIROC until owner installs QA.1). Do not retag RC.3 or RC.4. Do not create `v1.0.0-rc.5` yet.  
-**Schema target:** `4` (`cetech_de_db_version`) — in this tree and in the QA.1 ZIP; **not yet deployed to FLAIROC**.  
+**Last updated:** 2026-08-19  
+**Plugin version:** `1.0.0-rc.5-qa.2` on master (QA retest candidate). Tagged/protected published baseline remains `1.0.0-rc.4` (schema `3` tag). FLAIROC currently still has failed **`1.0.0-rc.5-qa.1`** installed with Stage 14 flags OFF. Do not retag RC.3 or RC.4. Do not create `v1.0.0-rc.5` yet.  
+**Schema target:** `4` (`cetech_de_db_version`) — in this tree and in the QA.2 ZIP. QA.1 already migrated FLAIROC to schema 4; do not create schema 5.  
 **Git:** `master`; RC.2 tag `v1.0.0-rc.2` **untouched**; RC.3 tag `v1.0.0-rc.3` **untouched**; RC.4 tag `v1.0.0-rc.4` (peeled `6b70c29`) **untouched**  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`  
@@ -49,26 +49,27 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 14F shipment operations workflow | **COMPLETE** — status transitions, current-ETA updates, conservative WooCommerce cancel/refund sync, operational Needs Attention, Access matrix shipment caps, audit/event hardening. Behind feature flags. Artifact `docs/STAGE-14F-SHIPMENT-OPERATIONS-WORKFLOW.md`. No carrier automation, customer timeline, shipment emails, package, tag, or FLAIROC deploy. |
 | Stage 14G full Stage 14 qualification | **COMPLETE** — PHPUnit, lint, JS, source audits, and a Needs Attention lifecycle repair passed. Original real-DB gate was deferred. Artifact `docs/STAGE-14G-STAGE14-QUALIFICATION.md`. |
 | Stage 14G-R1 real MariaDB schema 3→4 | **COMPLETE / PASS — STAGE 14 QUALIFIED FOR OWNER QA PACKAGE** — artifact `docs/STAGE-14G-R1-REAL-DATABASE-QUALIFICATION.md`. |
-| Stage 14H RC.5 QA.1 package | **RC.5-QA.1 READY FOR OWNER QA** — Settings activation for shipment records + tracking links; package `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.1.zip`. Artifact `docs/STAGE-14H-RC5-OWNER-QA.md`. **Not** owner QA pass. **Not** final RC.5. FLAIROC **not installed** in this stage. |
+| Stage 14H RC.5 QA.1 package | **RC.5-QA.1 FAILED OWNER QA** — checkout/email/View Order fatal in `CustomerOrderDeliverySummaryBuilder`; COD processing created shipments without `date_paid`. Artifact `docs/STAGE-14H-RC5-OWNER-QA.md`. ZIP immutable. |
+| Stage 14H-QA1-R1 QA.2 repair | **RC.5-QA.2 PREPARED FOR RETEST** — order-item ID passed explicitly into the customer summary mapper; shipment creation requires `woocommerce_payment_complete` or persisted `get_date_paid()`. Package `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.2.zip`. **Not** owner QA pass. **Not** final RC.5. FLAIROC **not modified** by this repair. |
 | Governing rules hardening | **COMPLETE** — canonical rulebook `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`; Cursor always-apply wrapper `.cursor/rules/000-delivery-engine-governance.mdc`. Documentation/governance only. |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos; profile defaults use `global/0/{profile_key}` |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-profile site-wide root; primary default fallback; provenance; fingerprint; hard constraints |
 | New admin UX | **Overview** + first-time setup wizard + Site-wide Defaults + Product Exceptions + **Shipments** (behind `enable_shipment_records`) + Needs Attention. Product/variation customization is progressive. Legacy Delivery Rules is **retired from the normal menu**. Technical Diagnostics is a hidden support destination. Administrator is a protected full-access role in Settings → Access. |
-| Runtime on FLAIROC | **Required production features ON**; deferred features **OFF**; **COD OFF**; schema **3**; plugin **`1.0.0-rc.4`** until the owner installs QA.1. Master/QA.1 schema target is **4**. |
-| Shipments / tracking / timeline | **Stage 14 V1 implemented and Settings-activatable** (`enable_shipment_records` / `enable_tracking_links`, default OFF). Timeline remains reserved. **RC.5-QA.1 READY FOR OWNER QA.** No carrier automation, no shipment emails, no customer timeline. |
+| Runtime on FLAIROC | **Required production features ON**; deferred features **OFF**; **COD OFF** on production storefront policy, but owner QA used COD and exposed the payment-confirmation defect. Schema **4** (QA.1 migration already ran). Plugin currently **`1.0.0-rc.5-qa.1`** until the owner installs QA.2. Master/QA.2 schema target remains **4**. |
+| Shipments / tracking / timeline | **Stage 14 V1 implemented and Settings-activatable** (`enable_shipment_records` / `enable_tracking_links`, default OFF). Timeline remains reserved. **RC.5-QA.1 FAILED OWNER QA. RC.5-QA.2 PREPARED FOR RETEST.** Flags currently OFF on FLAIROC. No carrier automation, no shipment emails, no customer timeline. |
 | Variable runtime capture | Verified live; WoodMart adapter **not required** |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Hidden compatibility route retained; Legacy management UI is not a normal workflow |
-| Next stage | **WAIT FOR OWNER PHYSICAL QA** of `1.0.0-rc.5-qa.1`. Then Stage 14H-FINAL only if owner QA passes. Do not create `v1.0.0-rc.5` yet. Do not claim owner QA passed. |
+| Next stage | **WAIT FOR OWNER PHYSICAL RETEST** of `1.0.0-rc.5-qa.2`. Then Stage 14H-FINAL only if owner QA passes. Do not create `v1.0.0-rc.5` yet. Do not claim owner QA passed. |
 | Final PHP log (RC.2 smoke) | Marker **546** → inspected through **548** — **PASS**; no new Delivery Engine fatals |
-| Live QA orders | `#39721` (variable); `#39724` (multi-product grouping) |
-| Package | QA candidate `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.1.zip` (SHA-256 in `docs/STAGE-14H-RC5-OWNER-QA.md`). RC.4 rollback ZIP remains the protected published package. |
+| Live QA orders | `#39721` (variable); `#39724` (multi-product grouping); owner-QA evidence **`#39733` / `#39734` / `#39735`** (preserve; do not modify remotely) |
+| Package | QA retest candidate `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.2.zip` (SHA-256 in `docs/STAGE-14H-RC5-OWNER-QA.md`). Failed QA.1 ZIP remains immutable. RC.4 rollback ZIP remains the protected published package. |
 
 **RC.2 final live smoke: PASS.** Plugin is **live and usable** on the current FLAIROC Classic Checkout environment with required production features enabled.
 
 **RC.3 package:** tagged and untouched. **RC.4 package:** locally finalized and tagged after owner QA.1 (`1.0.0-rc.4-qa.1`) acceptance of Stage 13F customer presentation polish. Do **not** claim FLAIROC final RC.4 runtime confirmation until the owner completes the short post-install check.
 
-Stage 14C–14F implemented shipment planning, staff workspace, tracking, customer cards, and operations behind flags. Stage 14G / G-R1 qualified the work, including real MariaDB schema 3→4. Stage 14H prepared **`1.0.0-rc.5-qa.1`**. Administrators can enable shipment records and customer tracking links in Settings; defaults remain **OFF**; timeline stays reserved. **RC.5-QA.1 READY FOR OWNER QA.** Do not claim owner QA passed. Do not finalize RC.5. Leave required production Delivery Engine switches **ON** on the live site until the owner performs the controlled install. COD remains **OFF**.
+Stage 14C–14F implemented shipment planning, staff workspace, tracking, customer cards, and operations behind flags. Stage 14G / G-R1 qualified the work, including real MariaDB schema 3→4. Stage 14H prepared **`1.0.0-rc.5-qa.1`**, which **FAILED** owner QA (false checkout failure from a customer-summary fatal; COD processing created shipments without payment confirmation). Stage 14H-QA1-R1 prepared **`1.0.0-rc.5-qa.2`**. Administrators can enable shipment records and customer tracking links in Settings; defaults remain **OFF**; timeline stays reserved. **RC.5-QA.2 PREPARED FOR RETEST.** Do not claim owner QA passed. Do not finalize RC.5. FLAIROC was not modified by this repair. Training remains draft.
 
 Administrator-language requirement: normal-user admin UI must use operational language throughout. Technical terminology belongs only in Technical details.
 
@@ -123,7 +124,7 @@ Administrator-language requirement: normal-user admin UI must use operational la
 | `docs/STAGE-14F-SHIPMENT-OPERATIONS-WORKFLOW.md` | Stage 14F status/ETA/refund/access operations workflow (feature-gated OFF) |
 | `docs/STAGE-14G-STAGE14-QUALIFICATION.md` | Stage 14G full Stage 14 qualification — PHPUnit/source audit; real-DB gate closed by 14G-R1 |
 | `docs/STAGE-14G-R1-REAL-DATABASE-QUALIFICATION.md` | Stage 14G-R1 real MariaDB schema 3→4 — PASS — STAGE 14 QUALIFIED FOR OWNER QA PACKAGE |
-| `docs/STAGE-14H-RC5-OWNER-QA.md` | Stage 14H RC.5 QA.1 package — **RC.5-QA.1 READY FOR OWNER QA** |
+| `docs/STAGE-14H-RC5-OWNER-QA.md` | Stage 14H RC.5 owner QA — **QA.1 FAIL**; **QA.2 PREPARED FOR RETEST** |
 | `docs/CLASSIC-CHECKOUT-RELEASE-CANDIDATE-READINESS.md` | Pre-smoke Classic Checkout readiness (superseded for status by RC.2 readiness) |
 | `docs/RELEASE-1.0.0-RC.2-READINESS.md` | **Authoritative** live-verified `1.0.0-rc.2` release readiness |
 | `docs/ADMIN-UI-LANGUAGE-GUIDE.md` | Authoritative normal-administrator presentation language |

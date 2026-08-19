@@ -2,7 +2,9 @@
 
 **Date:** 2026-08-19  
 **Failed QA identity:** `1.0.0-rc.5-qa.1` (immutable ZIP; do not overwrite)  
-**Repair candidate:** `1.0.0-rc.5-qa.2` (prepared after the repairs below)  
+**Repair candidate:** `1.0.0-rc.5-qa.2`  
+**Repair commit:** `5bf94e016c2c0bf6295032f4a10544e54635032b` (`fix: harden order summary and payment-confirmed shipment creation`)  
+**QA.2 package source commit:** `8d7c4f21e7c2fdb8c8b5e0710dadf4b1ca0826a3` (`chore: prepare rc.5 qa.2`)  
 **Schema:** `4`  
 **Protected published baseline:** `1.0.0-rc.4` / schema `3` / tag `v1.0.0-rc.4` (untouched)  
 **Branch:** `master`  
@@ -21,7 +23,9 @@ Physical FLAIROC checkout/email and My Account View Order fatals, plus COD shipm
 
 This is **not** owner QA pass, **not** Stage 14 released, and **not** final `1.0.0-rc.5`.
 
-**RC.5-QA.2 PREPARED FOR RETEST** only after the two repairs, automated gates, and the QA.2 ZIP are complete. Do not claim QA.2 owner QA passed.
+**RC.5-QA.2 PREPARED FOR RETEST**
+
+Do not claim QA.2 owner QA passed. FLAIROC was not modified by this repair. Owner must install QA.2 by controlled clean-folder replacement.
 
 ---
 
@@ -95,8 +99,9 @@ Do not overwrite `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.1.zip`.
 
 | Item | Value |
 |------|--------|
-| QA candidate | `1.0.0-rc.5-qa.1` |
-| Plugin header / `CETECH_DE_VERSION` / readme Stable tag | `1.0.0-rc.5-qa.1` |
+| Failed QA candidate | `1.0.0-rc.5-qa.1` (ZIP immutable) |
+| Current QA candidate | `1.0.0-rc.5-qa.2` |
+| Plugin header / `CETECH_DE_VERSION` / readme Stable tag | `1.0.0-rc.5-qa.2` |
 | Eventual final identity | `1.0.0-rc.5` (only after owner QA pass + Stage 14H-FINAL) |
 | Schema | `4` |
 | Feature-flag defaults | all Stage 14 flags **OFF** |
@@ -130,55 +135,73 @@ Upgrade from RC.4 does **not** enable Stage 14. `ensure_defaults()` writes `0` f
 | ZIP root | exactly one folder `cetech-woocommerce-delivery-engine/` |
 | Built from | committed clean `master` at `b8f0468` (not `-AllowDirty`) |
 
+This is a **failed QA.1 checksum**. Do not overwrite this ZIP.
+
+---
+
+## 3b. QA.2 repair package
+
+| Item | Value |
+|------|--------|
+| Filename | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.2.zip` |
+| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.2.zip` |
+| Desktop path | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.2.zip` |
+| Bytes | `1013252` |
+| SHA-256 | `399529e1b9d5989e991ada434f5e665325aeb85089b2584299996b94a9e02d59` |
+| Sidecar | same hash + `  cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.2.zip` |
+| ZIP root | exactly one folder `cetech-woocommerce-delivery-engine/` |
+| Built from | committed clean `master` at `8d7c4f2` (not `-AllowDirty`) |
+
 This is a **QA candidate checksum**, not a final RC.5 checksum.
 
 ---
 
-## 4. Source gates (before package)
+## 4. Source gates (QA.2)
 
 | Gate | Result |
 |------|--------|
 | `composer validate --no-check-publish` | valid |
 | Production PHP lint | **311 files, 0 failures** |
-| PHPUnit | **485 tests, 2703 assertions** |
-| Deprecations | **3** (`ReflectionMethod::setAccessible()` PHP 8.5) — same type as G-R1; no new type |
+| PHPUnit | **500 tests, 2753 assertions** |
+| Deprecations | **3** (`ReflectionMethod::setAccessible()` PHP 8.5) — same type as QA.1 / G-R1; no new type |
 | `npm run test:js` | **11 passed** |
 | Playwright | **not run** |
 
-G-R1 baseline was 477 / 2667 / 11 JS / 3 deprecations. Delta is Settings activation tests (+8 tests).
+QA.1 baseline was 485 / 2703 / 11 JS / 3 deprecations. Delta is customer-summary identity + payment-confirmation tests.
 
 ---
 
-## 5. Extracted package verification
+## 5. Extracted QA.2 package verification
 
-Extracted to a disposable directory outside the git repo. Re-ran `scripts/verify-production-package-autoload.php` against the **extracted** tree: **PASS** (exit 0). The verifier success line still prints a stale “Schema target 3” phrase; the actual assertion requires `SchemaVersion::TARGET === '4'` and passed.
+Extracted to a disposable directory outside the git repo (`cetech-de-qa2-extract`). Re-ran `scripts/verify-production-package-autoload.php` against the **extracted** tree: **PASS** (exit 0). Verifier success text now correctly reports **Schema target 4**.
 
 | Check | Result |
 |-------|--------|
 | One plugin root | PASS |
-| Version `1.0.0-rc.5-qa.1` | PASS |
+| Version `1.0.0-rc.5-qa.2` | PASS |
 | Schema target `4` | PASS |
 | Production autoload / Linux-case | PASS |
 | Packaged PHP lint | **311 files, 0 failures** |
 | No PHPUnit / `vendor/phpunit` / phpunit.xml / tests / node_modules / `.git` / `.env` / package.json | PASS |
-| `ENGINE=InnoDB` on all three shipment CREATE TABLE statements | PASS |
-| Stage 14 classes (schema, repository, planner, creation, workspace, tracking, customer cards, status/ETA, cancel-refund, Needs Attention, Settings) | PASS |
+| `ENGINE=InnoDB` on all three shipment CREATE TABLE statements | PASS (verifier) |
+| Stage 14 critical classes present | PASS |
 | Flag defaults OFF | PASS |
-| Settings expose records + tracking; timeline reserved | PASS |
 
 ---
 
 ## 6. Pre-FLAIROC package verdict
 
-**QA PACKAGE READY FOR OWNER INSTALL**
+**QA.2 PACKAGE READY FOR OWNER RETEST INSTALL**
 
-Do not call owner QA passed.
+Do not call owner QA passed. Do not install from this Cursor session.
 
 ---
 
 ## 7. FLAIROC baseline / installation
 
-**Not performed by this agent.** Cloudflare historically blocks automated wp-admin HTML; no local FLAIROC credentials were present in the workspace. Do not invent a live install.
+QA.1 **is already installed** on FLAIROC. Stage 14 flags are **OFF**. This Cursor task did **not** SSH, hotfix, edit files, or repair the database.
+
+Preserved evidence (do not modify remotely): orders **39733 / 39734 / 39735** and shipments **39733-D1 / 39734-D1 / 39735-D1**.
 
 ### Rollback ZIP (keep immediately available)
 
@@ -188,15 +211,16 @@ Do not call owner QA passed.
 | Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-rc.4.zip` |
 | Desktop path | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-rc.4.zip` |
 | Tag | `v1.0.0-rc.4` (do not modify) |
+| Failed QA.1 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.1.zip` (keep; do not overwrite) |
 
-### Owner clean-folder install (established procedure)
+### Owner clean-folder install of QA.2 (established procedure)
 
 Before replacement, record:
 
-1. Active plugin version is `1.0.0-rc.4`
-2. `cetech_de_db_version` is `3`
-3. Plugin is active; storefront reachable
-4. One known RC.4 product path is healthy
+1. Active plugin version is `1.0.0-rc.5-qa.1`
+2. `cetech_de_db_version` is `4`
+3. Stage 14 flags OFF
+4. Orders 39733 / 39734 / 39735 and shipments 39733-D1 / 39734-D1 / 39735-D1 still present
 5. PHP error-log timestamp / last marker
 6. Current plugin folder is enough for rollback, plus the RC.4 ZIP above
 
@@ -204,24 +228,34 @@ Then:
 
 1. Deactivate CETECH WooCommerce Delivery Engine.
 2. **Delete** the entire `wp-content/plugins/cetech-woocommerce-delivery-engine/` folder (do not overlay).
-3. Install **only** `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.1.zip`.
+3. Install **only** `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.2.zip`.
 4. Activate.
 5. Do **not** use Code Snippets or a helper plugin.
 6. Do **not** call this final RC.5.
+7. Do **not** delete the three QA evidence orders/shipments.
 
 ### Immediate post-install gates (flags still OFF)
 
 Stop and roll back if any fail:
 
-- Plugin active; reported version `1.0.0-rc.5-qa.1`
+- Plugin active; reported version `1.0.0-rc.5-qa.2`
 - `cetech_de_db_version` = **4**
-- Tables `*_delivery_engine_shipments`, `*_delivery_engine_shipment_items`, `*_delivery_engine_shipment_events` exist
-- All three **ENGINE=InnoDB**
-- Unique `(order_id, delivery_group_id)` and other Stage 14B indexes present
-- **Zero** shipment rows created by migration
-- Stage 14 flags still OFF
+- Existing QA shipments still present (3 / 3 / 3)
 - Storefront and wp-admin healthy
-- No new PHP fatal / migration SQL error
+- Order 39735 View Order does **not** fatal
+- No new PHP fatal from customer delivery summary
+
+### First QA.2 retest (before remaining Stage 14 checklist)
+
+1. existing Order 39735 View Order
+2. customer email-summary rendering
+3. one COD checkout — prove NO premature shipment
+4. one genuinely payment-confirmed checkout — prove exactly one shipment
+5. Thank You / View Order — prove no fatal
+
+Only after those pass resume the remaining Stage 14 owner QA checklist.
+
+Schema 4 tables and the three preserved QA shipments must still exist after folder replacement. Migration must not recreate or wipe them. Stage 14 flags stay **OFF** until the first five retests pass.
 
 ### Short RC.4 compatibility smoke (flags still OFF)
 
@@ -245,7 +279,7 @@ Owner-dependent. **Do not mark PASS without Jane’s confirmation.**
 
 ### A. Basic delivery shipment
 
-1. Place an eligible Delivery Engine delivery order and reach a paid/eligible state.
+1. Place an eligible Delivery Engine delivery order and reach a **genuinely payment-confirmed** state (`woocommerce_payment_complete` or a persisted paid date). COD `processing` with `date_paid` NULL must **not** create a shipment.
 2. Confirm **one** shipment created.
 3. Open **Delivery Engine → Shipments**.
 4. Confirm order, customer, items, Delivery Option, ETA.
