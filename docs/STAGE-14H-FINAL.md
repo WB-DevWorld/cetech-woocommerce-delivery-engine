@@ -151,11 +151,37 @@ QA.6 baseline: 555 tests / 3050 assertions; 323 PHP files / 0 lint failures; 11 
 
 Exact commit SHA, ZIP byte size, and SHA-256 are filled after the clean tagged build.
 
+### Completion table (post-build)
+
+| Item | Value |
+|------|--------|
+| Product finalize commit (package source) | `e0b4613` |
+| Tag `v1.0.0-rc.5` | annotated tag on the commit that records this completion table |
+| ZIP bytes | `1043995` |
+| SHA-256 | `7f9ad300a2d7198b7f0e70f1cd0819351e35430fd5ca843dac7c24ce9f96d66c` |
+| Sidecar | same hash + `  cetech-woocommerce-delivery-engine-1.0.0-rc.5.zip` |
+| Built from | committed clean `master` at `e0b4613` (not `-AllowDirty`) |
+
 ---
 
 ## 8. Extracted package verification
 
-Filled after independent extraction.
+Extracted to a disposable directory outside the git repo (`cetech-de-rc5-extract`). Re-ran `scripts/verify-production-package-autoload.php` against the **extracted** tree: **PASS** (exit 0). Verifier success text reports **Schema target 4**.
+
+| Check | Result |
+|-------|--------|
+| One plugin root | PASS |
+| Version `1.0.0-rc.5` | PASS |
+| Schema target `4` | PASS |
+| Production autoload / Linux-case | PASS |
+| Packaged PHP lint | **323 files, 0 failures** |
+| No PHPUnit / `vendor/phpunit` / phpunit.xml / tests / node_modules / `.git` / `.env` / package.json | PASS |
+| Stage 6/8/13 runtime classes and assets | PASS (verifier) |
+| Stage 14 shipment/admin/customer classes and CSS | PASS |
+| Administrator recovery / `RoleAccessService` | PASS (`src/Core/Capabilities/RoleAccessService.php`) |
+| Flag defaults OFF | PASS |
+| QA.1–QA.6 ZIPs unchanged | PASS |
+| RC.4 ZIP unchanged | PASS (`864059` bytes) |
 
 ---
 

@@ -68,7 +68,7 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Next stage | **WAIT FOR OWNER CLEAN-FOLDER INSTALL / SHORT CONFIRMATION** of tagged `1.0.0-rc.5`. Then **STOP**. Do not begin Stage 15. |
 | Final PHP log (RC.2 smoke) | Marker **546** → inspected through **548** — **PASS**; no new Delivery Engine fatals |
 | Live QA orders | `#39721` (variable); `#39724` (multi-product grouping); owner-QA evidence **`#39733` / `#39734` / `#39735`** (preserve; do not modify remotely) |
-| Package | Final RC.5 ZIP identity in `docs/STAGE-14H-FINAL.md`. QA.1–QA.6 ZIPs remain immutable. RC.4 rollback ZIP remains available. |
+| Package | Final `cetech-woocommerce-delivery-engine-1.0.0-rc.5.zip` (`1043995` bytes, SHA-256 `7f9ad300a2d7198b7f0e70f1cd0819351e35430fd5ca843dac7c24ce9f96d66c`, source `e0b4613`). QA.1–QA.6 ZIPs remain immutable. RC.4 rollback ZIP remains available. |
 
 **RC.2 final live smoke: PASS.** Plugin is **live and usable** on the current FLAIROC Classic Checkout environment with required production features enabled.
 
