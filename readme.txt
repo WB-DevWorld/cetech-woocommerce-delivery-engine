@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-rc.5-qa.6
+Stable tag: 1.0.0-rc.5
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,9 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-rc.5 =
+* Final Stage 14 release candidate. Shipment records, staff Shipments workspace, customer shipment cards, COD action-required queue, and quantity-aware refund review. Schema target 4. Feature flags remain off until an Administrator enables them in Settings. Owner-accepted from 1.0.0-rc.5-qa.6.
 
 = 1.0.0-rc.5-qa.6 =
 * Repair candidate after QA.5 owner FAIL. Amount-only WooCommerce refunds (no refund line items) keep shipment status and appear in Needs Attention as refund review. Explicit full item-quantity refunds before dispatch still auto-cancel. Schema target remains 4. Not the final RC.5 release.
