@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-rc.5-qa.4
+Stable tag: 1.0.0-rc.5-qa.5
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,9 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-rc.5-qa.5 =
+* Owner QA.5 candidate. Cash on Delivery orders that need delivery wait in Needs Attention for staff to create the shipment from the historical order record. Automatic COD creation remains off. Later payment confirmation stays idempotent. Staff History shows a unique name plus WordPress user ID. Customer View Order shows one contained card per shipment. Schema target remains 4. Not the final RC.5 release.
 
 = 1.0.0-rc.5-qa.4 =
 * Owner QA polish candidate. Staff Shipment History shows the WordPress account name. Customer Track shipment is a button-style control. Delivery Engine menu badges show unresolved Needs Attention and per-user unreviewed shipment activity. Includes the QA.3 Site-wide inheritance repair. Schema target remains 4. Not the final RC.5 release.
