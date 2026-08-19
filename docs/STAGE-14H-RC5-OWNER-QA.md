@@ -2,9 +2,11 @@
 
 **Date:** 2026-08-19  
 **Failed QA identities:** `1.0.0-rc.5-qa.1` and `1.0.0-rc.5-qa.2` (ZIPs immutable; do not overwrite)  
-**Repair candidate:** `1.0.0-rc.5-qa.3`  
-**Inheritance repair commit:** `709bea6bd3ceac27e324040e0d003e456ef43885` (`fix: treat optional ECR fields as valid when required delivery fields resolve`)  
-**QA.3 package source commit:** `2a98757b28ba47694f42fbc9cd69497c5c29b988` (`chore: prepare rc.5 qa.3`)  
+**Inheritance-repair evidence build:** `1.0.0-rc.5-qa.3` (ZIP immutable; prepared but **not** physically installed/tested on FLAIROC)  
+**Current QA candidate:** `1.0.0-rc.5-qa.4`  
+**Polish commit:** `93f72cb` (`feat: show staff identity, Track button, and operational admin badges`)  
+**QA.4 package source commit:** `0332ca0d4fadf0e78bc3e9339552b28e2ea83386` (`chore: prepare rc.5 qa.4`)  
+**Inheritance repair commit:** `709bea6bd3ceac27e324040e0d003e456ef43885` (included unchanged in QA.4)  
 **Schema:** `4`  
 **Protected published baseline:** `1.0.0-rc.4` / schema `3` / tag `v1.0.0-rc.4` (untouched)  
 **Branch:** `master`  
@@ -17,7 +19,8 @@
 
 **RC.5-QA.1 FAILED OWNER QA**  
 **RC.5-QA.2 FAILED OWNER QA** (additional release blocker: Site-wide inheritance / ECR validity)  
-**RC.5-QA.3 PREPARED FOR RETEST**
+**RC.5-QA.3 PREPARED** (inheritance repair; not physically retested; ZIP immutable)  
+**RC.5-QA.4 PREPARED FOR RETEST** (QA.3 inheritance repair + three owner-QA polish items)
 
 This is **not** owner QA pass, **not** Stage 14 released, and **not** final `1.0.0-rc.5`.
 
@@ -142,8 +145,9 @@ Do not overwrite `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.2.zip`.
 | Item | Value |
 |------|--------|
 | Failed QA candidates | `1.0.0-rc.5-qa.1`, `1.0.0-rc.5-qa.2` (ZIPs immutable) |
-| Current QA candidate | `1.0.0-rc.5-qa.3` |
-| Plugin header / `CETECH_DE_VERSION` / readme Stable tag | `1.0.0-rc.5-qa.3` |
+| Inheritance evidence ZIP | `1.0.0-rc.5-qa.3` (immutable; not physically retested) |
+| Current QA candidate | `1.0.0-rc.5-qa.4` |
+| Plugin header / `CETECH_DE_VERSION` / readme Stable tag | `1.0.0-rc.5-qa.4` |
 | Eventual final identity | `1.0.0-rc.5` (only after owner QA pass + Stage 14H-FINAL) |
 | Schema | `4` |
 | Feature-flag defaults | all Stage 14 flags **OFF** |
@@ -211,7 +215,31 @@ This is a **failed QA.2 checksum**. Do not overwrite this ZIP.
 | ZIP root | exactly one folder `cetech-woocommerce-delivery-engine/` |
 | Built from | committed clean `master` at `2a98757` (not `-AllowDirty`) |
 
+This is a **QA.3 checksum**. Do not overwrite this ZIP. QA.3 was not physically installed on FLAIROC; owner will retest inheritance together with polish on QA.4.
+
+---
+
+## 3d. QA.4 polish package
+
+| Item | Value |
+|------|--------|
+| Filename | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.4.zip` |
+| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.4.zip` |
+| Desktop path | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.4.zip` |
+| Bytes | `1020727` |
+| SHA-256 | `bb44074ee97dcead1fc2b772c162711a333d776a0cccf315fc0b44898ef2a7df` |
+| Sidecar | same hash + `  cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.4.zip` |
+| ZIP root | exactly one folder `cetech-woocommerce-delivery-engine/` |
+| Built from | committed clean `master` at `0332ca0` (not `-AllowDirty`) |
+| Schema | `4` (no new migration) |
+
 This is a **QA candidate checksum**, not a final RC.5 checksum.
+
+QA.4 contains the exact QA.3 inheritance repair plus:
+
+1. Admin Shipment History shows the WordPress display name for staff actors (`Jane Love (Staff)`). System events show `System`. Missing accounts degrade to `Former or unknown staff account (Staff)`. Customer cards never show actor identity. Stored `actor_user_id` is not rewritten.
+2. Customer **Track shipment** is a scoped button-style link (`a.button.cetech-de-customer-shipment__track-button`) when tracking links are ON and a safe http/https URL exists.
+3. WordPress-style menu badges: Needs Attention uses the canonical unresolved inbox count (catalog setup problems + shipment creation failures + delayed/cancel-after-progress/refund/sync issues). Shipments uses **distinct shipments** with persisted events after that user’s last-reviewed event ID (`_cetech_de_shipments_reviewed_event_id`). Opening the Shipments workspace acknowledges the cursor for the current user only. Counts display `1…99+`. Unauthorized users see no operational counts.
 
 ---
 
@@ -228,6 +256,22 @@ This is a **QA candidate checksum**, not a final RC.5 checksum.
 | Playwright | **not run** |
 
 QA.2 baseline was 500 / 2753 / 11 JS / 3 deprecations. Delta is Site-wide optional-field validity tests (+11).
+
+---
+
+## 4b. Source gates (QA.4)
+
+| Gate | Result |
+|------|--------|
+| `composer validate --no-check-publish` | valid |
+| Production PHP lint | **314 files, 0 failures** |
+| Focused polish + inheritance + Stage 14 shipment suite | **87 tests, 534 assertions, OK** |
+| PHPUnit | **523 tests, 2869 assertions** |
+| Deprecations | **3** (`ReflectionMethod::setAccessible()` PHP 8.5) — same type as QA.3; no new type |
+| `npm run test:js` | **11 passed** |
+| Playwright | **not run** |
+
+QA.3 baseline was 511 / 2823 / 11 JS / 3 deprecations. Delta is staff-identity / Track-button / menu-badge tests (+12).
 
 ---
 
@@ -249,11 +293,29 @@ Extracted to a disposable directory outside the git repo (`cetech-de-qa3-extract
 
 ---
 
+## 5b. Extracted QA.4 package verification
+
+Extracted to a disposable directory outside the git repo (`cetech-de-qa4-extract`). Re-ran `scripts/verify-production-package-autoload.php` against the **extracted** tree: **PASS** (exit 0). Verifier success text reports **Schema target 4**.
+
+| Check | Result |
+|-------|--------|
+| One plugin root | PASS |
+| Version `1.0.0-rc.5-qa.4` | PASS |
+| Schema target `4` | PASS |
+| Production autoload / Linux-case | PASS |
+| Packaged PHP lint | **314 files, 0 failures** |
+| No PHPUnit / `vendor/phpunit` / phpunit.xml / tests / node_modules / `.git` / `.env` / package.json | PASS |
+| `ENGINE=InnoDB` on all three shipment CREATE TABLE statements | PASS (verifier) |
+| Stage 14 critical classes present | PASS |
+| Flag defaults OFF | PASS |
+
+---
+
 ## 6. Pre-FLAIROC package verdict
 
-**QA.3 PACKAGE READY FOR OWNER RETEST INSTALL**
+**QA.4 PACKAGE READY FOR OWNER RETEST INSTALL**
 
-Do not call owner QA passed. Do not install from this Cursor session. Do not overwrite QA.1 or QA.2 ZIPs.
+Do not call owner QA passed. Do not install from this Cursor session. Do not overwrite QA.1, QA.2, or QA.3 ZIPs.
 
 ---
 
@@ -273,12 +335,13 @@ Preserved evidence (do not modify remotely): orders **39733 / 39734 / 39735** an
 | Tag | `v1.0.0-rc.4` (do not modify) |
 | Failed QA.1 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.1.zip` (keep; do not overwrite) |
 | Failed QA.2 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.2.zip` (keep; do not overwrite) |
+| Immutable QA.3 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.3.zip` (keep; do not overwrite) |
 
-### Owner clean-folder install of QA.3 (established procedure)
+### Owner clean-folder install of QA.4 (established procedure)
 
 Before replacement, record:
 
-1. Active plugin version (`1.0.0-rc.5-qa.1` or `1.0.0-rc.5-qa.2`)
+1. Active plugin version (`1.0.0-rc.5-qa.1` or `1.0.0-rc.5-qa.2`; QA.3 was not installed)
 2. `cetech_de_db_version` is `4`
 3. Stage 14 flags OFF
 4. Orders 39733 / 39734 / 39735 and shipments 39733-D1 / 39734-D1 / 39735-D1 still present
@@ -290,7 +353,7 @@ Then:
 
 1. Deactivate CETECH WooCommerce Delivery Engine.
 2. **Delete** the entire `wp-content/plugins/cetech-woocommerce-delivery-engine/` folder (do not overlay).
-3. Install **only** `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.3.zip`.
+3. Install **only** `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.4.zip`.
 4. Activate.
 5. Do **not** use Code Snippets or a helper plugin.
 6. Do **not** call this final RC.5.
@@ -301,16 +364,16 @@ Then:
 
 Stop and roll back if any fail:
 
-- Plugin active; reported version `1.0.0-rc.5-qa.3`
+- Plugin active; reported version `1.0.0-rc.5-qa.4`
 - `cetech_de_db_version` = **4**
 - Existing QA shipments still present (3 / 3 / 3)
 - Storefront and wp-admin healthy
 - Order 39735 View Order does **not** fatal
 - No new PHP fatal from customer delivery summary
 
-### First QA.3 retest (inheritance first; then remaining Stage 14 checklist)
+### First QA.4 retest (inheritance + polish in one FLAIROC pass)
 
-Inheritance acceptance (this repair):
+A. Inheritance (QA.3 repair, now in QA.4):
 
 1. Existing simple product 4156 automatically inherits Site-wide configuration and shows a usable customer Delivery Option.
 2. Variable parent 39420 and variations 39422 / 39424 / 39426 inherit correctly.
@@ -320,10 +383,18 @@ Inheritance acceptance (this repair):
 6. A new untouched simple product inherits immediately.
 7. A new untouched variation inherits immediately.
 8. Existing Product Exceptions remain exceptions.
+
+B. Staff History identity: a staff status/tracking/ETA action shows the WordPress display name (for example `Jane Love (Staff)`), not merely `Staff`. System events show `System`. Customer View Order must **not** show staff identity.
+
+C. Customer Track shipment is visibly a button on View Order when a safe tracking URL exists. Tracking number without URL remains number-only.
+
+D. Needs Attention badge: create/resolve a delayed (or other canonical) issue; the count appears, then clears when the issue is resolved. Ordinary awaiting fulfilment and unpaid COD must not create this badge.
+
+E. Shipments activity badge: new persisted activity shows a count; opening Shipments clears it for the current user; later activity restores it. Another staff account’s badge is unchanged.
+
+F. Stage 14 non-regression:
+
 9. Existing Stage 14 shipment/payment/tracking functionality is unchanged.
-
-Then confirm the earlier QA.1/QA.2 repairs still hold:
-
 10. existing Order 39735 View Order
 11. customer email-summary rendering
 12. one COD checkout — prove NO premature shipment
@@ -411,7 +482,7 @@ Customer must **not** see: supplier, origin, Logistics Profile, internal cost, R
 
 ## 9. Owner QA status
 
-**QA.1 FAIL.** **QA.2 FAIL** (Site-wide inheritance). **QA.3 PREPARED FOR RETEST.** Do not claim owner QA PASS.
+**QA.1 FAIL.** **QA.2 FAIL** (Site-wide inheritance). **QA.3 prepared, not physically retested.** **QA.4 PREPARED FOR RETEST.** Do not claim owner QA PASS.
 
 ---
 
@@ -435,7 +506,7 @@ Processing/completed fallback used `WC_Order::is_paid()`. Repair: `woocommerce_p
 
 `EffectiveConfigurationValidator` already skipped optional fields, but `ConfigurationFieldRegistry` marked `logistics_profile_id`, `supplier_id`, `origin_id`, and `priority` as required. Untouched products that inherited a complete Site-wide delivery policy therefore became whole-configuration Unresolved (`UNRESOLVED_GLOBAL_VALUE`). Repair: mark those four fields optional. Required delivery fields still fail closed. No product-meta copy. No extra Product scopes.
 
-If owner QA finds a further genuine defect: stop finalization; smallest repair; `1.0.0-rc.5-qa.4` only if another ZIP is required. Do not overwrite QA.1, QA.2, or QA.3. Do not finalize RC.5.
+If owner QA finds a further genuine defect: stop finalization; smallest repair; `1.0.0-rc.5-qa.5` only if another ZIP is required. Do not overwrite QA.1, QA.2, QA.3, or QA.4. Do not finalize RC.5.
 
 ---
 
@@ -459,31 +530,22 @@ RC.4 ZIP + tag retained. Procedure: deactivate, delete plugin folder, install RC
 
 Carrier APIs, tracking polling/webhooks, shipment emails, customer timeline, guest portal, labels, WooCommerce Fulfillments dual-write, historical backfill, Checkout Blocks, bulk import, GPS/OTP/QR/POD, driver app, Stage 15, final `1.0.0-rc.5` tag, GitHub release.
 
-Queued UX polish (do not include in this inheritance repair):
-
-- Shipment History should display the actual staff/account identity, not merely “Staff”.
-- Customer “Track shipment” must look clearly like a button.
-- Delivery Engine / Shipments / Needs Attention should have useful notification badges/count bubbles for new/unresolved activity.
+The three previously queued UX polish items are implemented in QA.4 (staff History identity, Track shipment button, Needs Attention / Shipments activity badges).
 
 ---
 
 ## STOP
 
-QA.1 failed owner QA. QA.2 failed owner QA (Site-wide inheritance / ECR validity). Do not finalize RC.5.
+QA.1 failed owner QA. QA.2 failed owner QA (Site-wide inheritance / ECR validity). QA.3 is an immutable inheritance-repair evidence build and was **not** physically retested. Do not finalize RC.5.
 
-Owner retest of QA.3 must start with:
+Owner retest of **QA.4** must cover, in one FLAIROC pass:
 
-1. Existing simple product 4156 automatically inherits Site-wide configuration.
-2. Variable parent 39420 and variations 39422 / 39424 / 39426 inherit correctly.
-3. Explicit QA product 39705 continues working unchanged.
-4. No Product/Variation rows need to be created merely to inherit.
-5. Delivery Areas and Delivery Charges continue resolving at cart/checkout.
-6. A new untouched simple product inherits immediately.
-7. A new untouched variation inherits immediately.
-8. Existing Product Exceptions remain exceptions.
-9. Existing Stage 14 shipment/payment/tracking functionality is unchanged.
-
-Then confirm the earlier repairs still hold (View Order 39735, email summary, COD no premature shipment, payment-confirmed one shipment, Thank You / View Order no fatal).
+A. Inheritance: 4156, 39420 / 39422 / 39424 / 39426, 39705, new simple, new variation, no artificial scopes, Delivery Areas/Charges at cart/checkout.
+B. Staff History identity.
+C. Customer Track shipment button presentation.
+D. Needs Attention badge appears and clears with canonical issues.
+E. Shipments activity badge is per-user (review clears; later activity restores).
+F. Stage 14 happy-path non-regression (View Order 39735, email summary, COD no premature shipment, payment-confirmed one shipment, Thank You / View Order no fatal).
 
 Only after those pass resume the remaining Stage 14 owner QA checklist.
 
