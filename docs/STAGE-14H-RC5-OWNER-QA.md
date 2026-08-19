@@ -1,14 +1,14 @@
 # Stage 14H — RC.5 owner QA
 
 **Date:** 2026-08-19  
-**Failed QA identities:** `1.0.0-rc.5-qa.1` and `1.0.0-rc.5-qa.2` (ZIPs immutable; do not overwrite)  
+**Failed QA identities:** `1.0.0-rc.5-qa.1`, `1.0.0-rc.5-qa.2`, and `1.0.0-rc.5-qa.5` (ZIPs immutable; do not overwrite)  
 **Inheritance-repair evidence build:** `1.0.0-rc.5-qa.3` (ZIP immutable; prepared but **not** physically installed/tested on FLAIROC)  
 **QA.4 identity:** `1.0.0-rc.5-qa.4` (ZIP immutable; **owner physical PASS** on FLAIROC)  
-**Current QA candidate:** `1.0.0-rc.5-qa.5`  
+**Current QA candidate:** `1.0.0-rc.5-qa.6`  
 **Schema:** `4`  
 **Protected published baseline:** `1.0.0-rc.4` / schema `3` / tag `v1.0.0-rc.4` (untouched)  
 **Branch:** `master`  
-**FLAIROC:** **not modified** by this QA.5 preparation. No SSH. No hotfix.  
+**FLAIROC:** **not modified** by this QA.6 preparation. No SSH. No hotfix.  
 **Final RC.5 tag:** **none**
 
 ---
@@ -19,9 +19,10 @@
 **RC.5-QA.2 FAILED OWNER QA** (additional release blocker: Site-wide inheritance / ECR validity)  
 **RC.5-QA.3 PREPARED** (inheritance repair; not physically retested; ZIP immutable)  
 **RC.5-QA.4 OWNER PHYSICAL PASS** (inheritance, badges, Track button, staff actor, COD payment gate)  
-**RC.5-QA.5 PREPARED FOR OWNER INSTALL** (COD action-required + manual historical shipment creation + unique staff identity + customer shipment cards)
+**RC.5-QA.5 FAILED OWNER QA** (amount-only refund did not create Needs Attention refund review)  
+**RC.5-QA.6 PREPARED FOR OWNER INSTALL** (refund-review repair; QA.5 COD/manual creation retained)
 
-This is **not** owner QA pass for QA.5, **not** Stage 14 released, and **not** final `1.0.0-rc.5`.
+This is **not** owner QA pass for QA.6, **not** Stage 14 released, and **not** final `1.0.0-rc.5`.
 
 ### Final COD rule
 
@@ -184,11 +185,11 @@ Do not overwrite `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.2.zip`.
 
 | Item | Value |
 |------|--------|
-| Failed QA candidates | `1.0.0-rc.5-qa.1`, `1.0.0-rc.5-qa.2` (ZIPs immutable) |
+| Failed QA candidates | `1.0.0-rc.5-qa.1`, `1.0.0-rc.5-qa.2`, `1.0.0-rc.5-qa.5` (ZIPs immutable) |
 | Inheritance evidence ZIP | `1.0.0-rc.5-qa.3` (immutable; not physically retested) |
 | QA.4 physical PASS ZIP | `1.0.0-rc.5-qa.4` (immutable) |
-| Current QA candidate | `1.0.0-rc.5-qa.5` |
-| Plugin header / `CETECH_DE_VERSION` / readme Stable tag | `1.0.0-rc.5-qa.5` |
+| Current QA candidate | `1.0.0-rc.5-qa.6` |
+| Plugin header / `CETECH_DE_VERSION` / readme Stable tag | `1.0.0-rc.5-qa.6` |
 | Eventual final identity | `1.0.0-rc.5` (only after owner QA pass + Stage 14H-FINAL) |
 | Schema | `4` |
 | Feature-flag defaults | all Stage 14 flags **OFF** |
@@ -409,7 +410,7 @@ Do not call QA.5 owner QA passed. Do not install from this Cursor session. Do no
 
 ## 7. FLAIROC baseline / installation
 
-FLAIROC currently has **QA.4** installed (owner physical PASS). Stage 14 flags follow the owner’s live settings. This QA.5 Cursor task did **not** SSH, hotfix, edit files, copy product meta, or repair the database.
+FLAIROC currently has **QA.5** installed (owner physical FAIL on amount-only refund review). Stage 14 flags follow the owner’s live settings. This QA.6 Cursor task did **not** SSH, hotfix, edit files, copy product meta, or repair the database.
 
 Preserved evidence (do not modify remotely): orders **39733 / 39734 / 39735** and shipments **39733-D1 / 39734-D1 / 39735-D1**. Canonical inheritance reproduction remains products **4156**, **39420** / **39422** / **39424** / **39426**, and explicit QA product **39705**.
 
@@ -425,7 +426,8 @@ Preserved evidence (do not modify remotely): orders **39733 / 39734 / 39735** an
 | Failed QA.2 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.2.zip` (keep; do not overwrite) |
 | Immutable QA.3 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.3.zip` (keep; do not overwrite) |
 | Immutable QA.4 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.4.zip` (keep; physical PASS; do not overwrite) |
-| Current QA.5 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.5.zip` (owner install candidate) |
+| Immutable QA.5 ZIP | `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.5.zip` (keep; owner FAIL; do not overwrite) |
+| Current QA.6 ZIP | filled after package build |
 
 ### Owner clean-folder install of QA.4 (established procedure)
 
@@ -450,9 +452,9 @@ Then:
 7. Do **not** delete the three QA evidence orders/shipments.
 8. Do **not** create Product/Variation rows merely so products can inherit.
 
-### Owner clean-folder install of QA.5
+### Owner clean-folder install of QA.6
 
-FLAIROC currently has **QA.4**. Use the same deactivate / delete-folder procedure, then install **only** `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.5.zip`. Preserve existing QA evidence orders/shipments. After activate, reported version must be `1.0.0-rc.5-qa.5`. Schema remains **4**. Follow the ten-point QA.5 plan in section 15. Do **not** call this final RC.5.
+FLAIROC currently has **QA.5**. Use the same deactivate / delete-folder procedure, then install **only** `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.6.zip`. Preserve existing QA evidence orders/shipments, including **39749 / 39749-D1**. After activate, reported version must be `1.0.0-rc.5-qa.6`. Schema remains **4**. Follow the proportional QA.6 retest in section 17. Do **not** call this final RC.5.
 
 ### Immediate post-install gates (flags still OFF)
 
@@ -600,7 +602,7 @@ Processing/completed fallback used `WC_Order::is_paid()`. Repair: `woocommerce_p
 
 `EffectiveConfigurationValidator` already skipped optional fields, but `ConfigurationFieldRegistry` marked `logistics_profile_id`, `supplier_id`, `origin_id`, and `priority` as required. Untouched products that inherited a complete Site-wide delivery policy therefore became whole-configuration Unresolved (`UNRESOLVED_GLOBAL_VALUE`). Repair: mark those four fields optional. Required delivery fields still fail closed. No product-meta copy. No extra Product scopes.
 
-If owner QA finds a further genuine defect: stop finalization; smallest repair; `1.0.0-rc.5-qa.5` only if another ZIP is required. Do not overwrite QA.1, QA.2, QA.3, or QA.4. Do not finalize RC.5.
+If owner QA finds a further genuine defect: stop finalization; smallest repair; `1.0.0-rc.5-qa.7` only if another ZIP is required. Do not overwrite QA.1, QA.2, QA.3, QA.4, or QA.5. Do not finalize RC.5.
 
 ---
 
@@ -686,9 +688,67 @@ Preserve existing Stage 14 evidence orders/shipments. Do not modify them remotel
 
 ---
 
+## 16. QA.5 owner failure — amount-only refund review
+
+Physical FLAIROC evidence. QA.5 ZIP remains **immutable**.
+
+Order **39749**:
+
+- WooCommerce status: refunded
+- Order total / refunded total: 269.99 / 269.99
+- Remaining total: 0
+- Shipment **39749-D1** remained `awaiting_fulfilment` (correct — no item-quantity evidence)
+- Refund **#39750** amount 269.99 with **no refund line items**
+- `WC_Order::get_qty_refunded_for_item(50) = 0`
+
+**Defect:** no `refund_requires_review` Needs Attention row was created.
+
+Root cause: `ShipmentRefundInspector::state()` returned `none` whenever refunded item quantity was 0, and `OrderShipmentOperationsSubscriber::sync_refund()` treated `none` as “no refund activity.” Amount-only refunds therefore neither auto-cancelled nor queued for review.
+
+QA.6 keeps quantity-aware auto-cancel for explicit full item-quantity refunds before dispatch, and creates `refund_requires_review` when a refund exists but physical quantity cannot be proven.
+
+---
+
+## 17. QA.6 refund-review repair
+
+Schema remains **4**. No new tables or migrations.
+
+### Source gates (QA.6)
+
+| Gate | Result |
+|------|--------|
+| `composer validate --no-check-publish` | valid |
+| Production PHP lint | **323 files, 0 failures** |
+| Focused refund / shipment operations | **52 tests, 352 assertions, OK** (`OrderShipmentCancelRefundTest`, `ShipmentStatusWorkflowTest`, `CustomerShipmentPresentationTest`) |
+| Stage 14 shipment suite | **215 tests, 1244 assertions, OK** |
+| PHPUnit | **555 tests, 3050 assertions** |
+| Deprecations | **3** (`ReflectionMethod::setAccessible()` PHP 8.5) — same type as QA.5; no new type |
+| `npm run test:js` | **11 passed** |
+| Playwright | **not run** |
+
+QA.5 baseline was 545 / 2992 / 11 JS / 3 deprecations. Delta +10 tests / +58 assertions.
+
+### QA.6 package
+
+Filled after `scripts/build-v1-rc-package.ps1`.
+
+### Proportional owner retest for QA.6
+
+Preserve existing evidence (including **39749-D1**, which should gain a refund-review row after install if the live refund evidence remains and the hook is not replayed — staff may need a **new** amount-only refund order if Woo will not re-fire `woocommerce_order_refunded`). Prefer a **fresh** refund order for the amount-only proof.
+
+1. **Amount-only refund:** Woo refund with no line items / refunded qty 0 on an awaiting shipment → status unchanged → Needs Attention refund review appears → Review shipment / View order links work.
+2. **Explicit full item-quantity refund before dispatch:** auto-cancels that shipment → no lingering refund-review row.
+3. **Refund after dispatch / in transit:** status stays progressed → Needs Attention refund review appears.
+4. **QA.5 COD/manual creation** still works: fresh COD order is not auto-shipped; Needs Attention action-required; staff create from historical snapshot; later `payment_complete()` remains idempotent.
+5. **QA.4 inheritance** still holds on 4156 / 39420 / 39422 / 39424 / 39426 / 39705.
+
+Do not overwrite QA.1–QA.5 ZIPs. Do not finalize RC.5. Do not touch FLAIROC from Cursor.
+
+---
+
 ## STOP
 
-QA.1 failed owner QA. QA.2 failed owner QA (Site-wide inheritance / ECR validity). QA.3 is an immutable inheritance-repair evidence build and was **not** physically retested. QA.4 is an immutable physical PASS. Do not overwrite those ZIPs. Do not finalize RC.5. Do not create `v1.0.0-rc.5`. Do not touch FLAIROC from this Cursor session.
+QA.1 failed owner QA. QA.2 failed owner QA (Site-wide inheritance / ECR validity). QA.3 is an immutable inheritance-repair evidence build and was **not** physically retested. QA.4 is an immutable physical PASS. QA.5 failed owner QA (amount-only refund review). Do not overwrite those ZIPs. Do not finalize RC.5. Do not create `v1.0.0-rc.5`. Do not touch FLAIROC from this Cursor session.
 
-Owner install/test of **QA.5** must cover the ten-point plan above before Stage 14H-FINAL.
+Owner install/test of **QA.6** must cover the proportional retest above before Stage 14H-FINAL.
 

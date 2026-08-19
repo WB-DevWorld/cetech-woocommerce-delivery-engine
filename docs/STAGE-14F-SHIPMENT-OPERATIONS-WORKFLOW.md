@@ -125,12 +125,13 @@ Shipment workflow never refunds money or edits order totals.
 
 Hook: `woocommerce_order_refunded`.
 
-Refunded quantity uses WooCommerce `WC_Order::get_qty_refunded_for_item()` (absolute value) compared with each shipment item quantity. This is not inferred from order status alone.
+Refunded quantity uses WooCommerce `WC_Order::get_qty_refunded_for_item()` (absolute value) compared with each shipment item quantity. This is not inferred from refund amount or order status alone.
 
 | Case | Behaviour |
 |------|-----------|
 | Full refund of every quantity on **one** not-yet-dispatched shipment | Automatic `cancelled`, reason `shipment_quantities_refunded` |
 | Partial refund of a shipment | Keep status. Needs Attention `refund_requires_review` |
+| Amount-only refund (no refund line items / refunded qty 0) | Keep status. Needs Attention `refund_requires_review` |
 | Any refund after `dispatched` / `in_transit` / `delayed` / `delivered` | Keep status. Needs Attention `refund_requires_review` |
 | Sibling shipment whose quantities were not refunded | Unchanged |
 | Repeated refund/cancel hooks | Idempotent |
