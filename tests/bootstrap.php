@@ -17,6 +17,21 @@ if ( ! function_exists( 'update_option' ) ) {
 	}
 }
 
+if ( ! function_exists( 'date_i18n' ) ) {
+	/**
+	 * @param int|false $timestamp
+	 */
+	function date_i18n( string $format, $timestamp = false, bool $gmt = false ): string {
+		unset( $gmt );
+
+		if ( false === $timestamp ) {
+			$timestamp = time();
+		}
+
+		return date( $format, (int) $timestamp );
+	}
+}
+
 if ( ! function_exists( 'get_option' ) ) {
 	/**
 	 * @param mixed $default_value

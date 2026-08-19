@@ -152,7 +152,9 @@ final class ShipmentCreationFixtures {
 		array $shipping_items = [],
 		?OrderDeliveryPackageSnapshot $package = null,
 		bool $paid = true,
-		string $status = 'processing'
+		string $status = 'processing',
+		mixed $date_paid = false,
+		string $payment_method = 'bacs'
 	): WC_Order {
 		$meta = [];
 
@@ -161,12 +163,18 @@ final class ShipmentCreationFixtures {
 			$meta[ OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION ] = OrderDeliverySnapshot::VERSION;
 		}
 
+		$resolved_date_paid = false === $date_paid
+			? ( $paid ? '2026-08-18 12:00:00' : null )
+			: $date_paid;
+
 		$order = new WC_Order(
 			[
 				'id'              => $order_id,
 				'order_number'    => (string) $order_id,
 				'paid'            => $paid,
 				'status'          => $status,
+				'date_paid'       => $resolved_date_paid,
+				'payment_method'  => $payment_method,
 				'items'           => $items,
 				'shipping_items'  => $shipping_items,
 				'meta'            => $meta,

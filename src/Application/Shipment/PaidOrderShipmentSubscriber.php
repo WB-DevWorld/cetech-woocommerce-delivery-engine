@@ -10,6 +10,8 @@ use WC_Order;
 /**
  * Post-payment hooks that create Delivery Engine shipments.
  *
+ * Primary: woocommerce_payment_complete (the event is confirmation).
+ * Fallback processing/completed: only when ShipmentService finds persisted paid-date evidence.
  * Never runs at order-created / cart / checkout. Feature-flag gated.
  */
 final class PaidOrderShipmentSubscriber {
@@ -36,7 +38,7 @@ final class PaidOrderShipmentSubscriber {
 			return;
 		}
 
-		$this->service->create_for_paid_order( $order, ShipmentEventSource::System );
+		$this->service->create_for_paid_order( $order, ShipmentEventSource::System, true );
 	}
 
 	public function handle_paid_status( mixed $order_id, mixed $order = null ): void {
@@ -48,11 +50,7 @@ final class PaidOrderShipmentSubscriber {
 			return;
 		}
 
-		if ( ! method_exists( $order, 'is_paid' ) || ! $order->is_paid() ) {
-			return;
-		}
-
-		$this->service->create_for_paid_order( $order, ShipmentEventSource::System );
+		$this->service->create_for_paid_order( $order, ShipmentEventSource::System, false );
 	}
 
 	private function resolve_order( mixed $order_id ): ?WC_Order {

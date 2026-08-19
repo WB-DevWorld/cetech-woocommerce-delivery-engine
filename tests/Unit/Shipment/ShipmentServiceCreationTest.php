@@ -210,7 +210,136 @@ final class ShipmentServiceCreationTest extends TestCase {
 		self::assertCount( 1, $this->shipments->findByOrderId( 2011 ) );
 	}
 
-	private function paid_delivery_order( int $order_id, bool $paid = true, string $status = 'processing' ): \WC_Order {
+	public function test_payment_complete_event_creates_once(): void {
+		$this->flags->set( 'enable_shipment_records', true );
+		$order      = $this->paid_delivery_order( 2012 );
+		$subscriber = new PaidOrderShipmentSubscriber( $this->service );
+
+		$subscriber->handle_payment_complete( 2012 );
+
+		self::assertCount( 1, $this->shipments->findByOrderId( 2012 ) );
+		self::assertSame( 'bacs', $order->get_payment_method() );
+		self::assertNotNull( $order->get_date_paid() );
+	}
+
+	public function test_payment_complete_repeated_does_not_duplicate(): void {
+		$this->flags->set( 'enable_shipment_records', true );
+		$this->paid_delivery_order( 2013 );
+		$subscriber = new PaidOrderShipmentSubscriber( $this->service );
+
+		$subscriber->handle_payment_complete( 2013 );
+		$subscriber->handle_payment_complete( 2013 );
+
+		self::assertCount( 1, $this->shipments->findByOrderId( 2013 ) );
+		self::assertCount( 1, $this->shipments->findEvents( $this->shipments->findByOrderId( 2013 )[0]->id ) );
+	}
+
+	public function test_processing_fallback_with_paid_date_creates(): void {
+		$this->flags->set( 'enable_shipment_records', true );
+		$order      = $this->paid_delivery_order( 2014, paid: true, status: 'processing' );
+		$subscriber = new PaidOrderShipmentSubscriber( $this->service );
+
+		$subscriber->handle_paid_status( 2014, $order );
+
+		self::assertCount( 1, $this->shipments->findByOrderId( 2014 ) );
+	}
+
+	public function test_cod_processing_without_paid_date_does_not_create(): void {
+		$this->flags->set( 'enable_shipment_records', true );
+		$order = $this->paid_delivery_order(
+			2015,
+			paid: true,
+			status: 'processing',
+			date_paid: null,
+			payment_method: 'cod'
+		);
+		$subscriber = new PaidOrderShipmentSubscriber( $this->service );
+
+		self::assertTrue( $order->is_paid() );
+		self::assertNull( $order->get_date_paid() );
+
+		$subscriber->handle_paid_status( 2015, $order );
+		$direct = $this->service->create_for_paid_order( $order );
+
+		self::assertSame( [], $this->shipments->findByOrderId( 2015 ) );
+		self::assertSame( ShipmentCreationOutcome::NotPaid, $direct->outcome );
+	}
+
+	public function test_cod_completed_without_paid_date_does_not_create(): void {
+		$this->flags->set( 'enable_shipment_records', true );
+		$order = $this->paid_delivery_order(
+			2016,
+			paid: true,
+			status: 'completed',
+			date_paid: null,
+			payment_method: 'cod'
+		);
+		$subscriber = new PaidOrderShipmentSubscriber( $this->service );
+
+		$subscriber->handle_paid_status( 2016, $order );
+
+		self::assertSame( [], $this->shipments->findByOrderId( 2016 ) );
+	}
+
+	public function test_processing_status_alone_does_not_prove_payment(): void {
+		$this->flags->set( 'enable_shipment_records', true );
+		$order = $this->paid_delivery_order(
+			2017,
+			paid: true,
+			status: 'processing',
+			date_paid: null,
+			payment_method: 'bacs'
+		);
+
+		$result = $this->service->create_for_paid_order( $order );
+
+		self::assertTrue( $order->is_paid() );
+		self::assertSame( 'processing', $order->get_status() );
+		self::assertSame( ShipmentCreationOutcome::NotPaid, $result->outcome );
+		self::assertSame( [], $this->shipments->findByOrderId( 2017 ) );
+	}
+
+	public function test_payment_complete_event_creates_even_without_paid_date(): void {
+		$this->flags->set( 'enable_shipment_records', true );
+		$order = $this->paid_delivery_order(
+			2018,
+			paid: true,
+			status: 'processing',
+			date_paid: null,
+			payment_method: 'cod'
+		);
+		$subscriber = new PaidOrderShipmentSubscriber( $this->service );
+
+		$subscriber->handle_payment_complete( 2018 );
+
+		self::assertNull( $order->get_date_paid() );
+		self::assertCount( 1, $this->shipments->findByOrderId( 2018 ) );
+	}
+
+	public function test_genuine_paid_non_cod_order_creates_normally(): void {
+		$this->flags->set( 'enable_shipment_records', true );
+		$order = $this->paid_delivery_order(
+			2019,
+			paid: true,
+			status: 'processing',
+			date_paid: '2026-08-19 09:00:00',
+			payment_method: 'bacs'
+		);
+
+		$result = $this->service->create_for_paid_order( $order );
+
+		self::assertSame( ShipmentCreationOutcome::Created, $result->outcome );
+		self::assertCount( 1, $this->shipments->findByOrderId( 2019 ) );
+		self::assertSame( 'bacs', $order->get_payment_method() );
+	}
+
+	private function paid_delivery_order(
+		int $order_id,
+		bool $paid = true,
+		string $status = 'processing',
+		mixed $date_paid = false,
+		string $payment_method = 'bacs'
+	): \WC_Order {
 		$group_id = 'international|delivery|12';
 		$line     = ShipmentCreationFixtures::line( $group_id );
 
@@ -220,7 +349,9 @@ final class ShipmentServiceCreationTest extends TestCase {
 			[ ShipmentCreationFixtures::wc_shipping_line( $group_id ) ],
 			ShipmentCreationFixtures::package( [ ShipmentCreationFixtures::group( $group_id ) ] ),
 			$paid,
-			$status
+			$status,
+			$date_paid,
+			$payment_method
 		);
 	}
 }

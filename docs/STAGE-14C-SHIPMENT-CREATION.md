@@ -153,9 +153,11 @@ Mismatch / missing order item → creation failure (`missing_order_item` / `grou
 
 ## 13. Creation triggers
 
-Primary: `woocommerce_payment_complete`.
+Primary: `woocommerce_payment_complete`. That WooCommerce event is itself payment confirmation.
 
-Fallback: `woocommerce_order_status_processing` and `woocommerce_order_status_completed` **only** when `WC_Order::is_paid()` is true.
+Fallback: `woocommerce_order_status_processing` and `woocommerce_order_status_completed` **only** when persisted payment-confirmation evidence exists (`WC_Order::get_date_paid()` is a real paid timestamp).
+
+`WC_Order::is_paid()` is **not** sufficient. WooCommerce treats `processing` / `completed` as paid statuses, so Cash on delivery can be `is_paid() === true` with `date_paid` still NULL. That must not create a shipment.
 
 Not hooked: order created, cart, checkout validation, shipping calculation, thank-you.
 
@@ -167,13 +169,15 @@ Before planning:
 
 - valid WooCommerce order
 - `enable_shipment_records` enabled
-- order is paid
+- payment is confirmed: either the `woocommerce_payment_complete` event, or a persisted paid date on status fallback / retry
 - status is not cancelled / refunded / failed / trash / checkout-draft
 - Delivery Engine historical snapshot exists (line and/or package)
 
 Non-Delivery-Engine orders: no-op, not an error.  
-Unpaid: no-op.  
+Unpaid / COD processing with no paid date: no-op.  
 Feature off: no-op.
+
+Do not treat pre-payment COD fulfilment as in-scope unless a later explicit policy decision says so.
 
 ---
 

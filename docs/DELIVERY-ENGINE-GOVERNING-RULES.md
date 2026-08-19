@@ -226,7 +226,7 @@ Stage 14 shipments **must consume** the saved RC.4 order/group snapshots (`deliv
 - Use stable codes/identifiers. Never use translated text for idempotency.
 - Retries must not create duplicate shipments.
 - Checkout must never depend on successful operational shipment creation after payment.
-- Primary trigger is paid-order (`woocommerce_payment_complete` plus paid `processing`/`completed` fallback). Not order-created.
+- Primary trigger is paid-order: `woocommerce_payment_complete` (the event is confirmation), plus `processing`/`completed` fallback only when persisted paid-date evidence exists. Do not treat `WC_Order::is_paid()` status as payment confirmation. Not order-created.
 
 If post-payment shipment creation fails:
 

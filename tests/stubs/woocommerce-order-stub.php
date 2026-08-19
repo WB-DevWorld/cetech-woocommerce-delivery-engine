@@ -32,6 +32,16 @@ if ( ! class_exists( 'WC_Order', false ) ) {
 			return (bool) ( $this->data['paid'] ?? false );
 		}
 
+		public function get_date_paid( $context = 'view' ): mixed {
+			unset( $context );
+
+			return $this->data['date_paid'] ?? null;
+		}
+
+		public function get_payment_method(): string {
+			return (string) ( $this->data['payment_method'] ?? '' );
+		}
+
 		/**
 		 * @return array<int|string, object>
 		 */
@@ -119,6 +129,10 @@ if ( ! class_exists( 'WC_Order_Item_Product', false ) ) {
 
 		public function get_name(): string {
 			return (string) ( $this->data['name'] ?? '' );
+		}
+
+		public function get_product(): mixed {
+			return $this->data['product'] ?? null;
 		}
 
 		public function get_sku(): string {

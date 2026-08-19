@@ -42,7 +42,11 @@ final class ShipmentService {
 	) {
 	}
 
-	public function create_for_paid_order( WC_Order $order, ShipmentEventSource $source = ShipmentEventSource::System ): ShipmentCreationResult {
+	public function create_for_paid_order(
+		WC_Order $order,
+		ShipmentEventSource $source = ShipmentEventSource::System,
+		bool $from_payment_complete_event = false
+	): ShipmentCreationResult {
 		if ( ! $this->flags->is_enabled( 'enable_shipment_records' ) ) {
 			return ShipmentCreationResult::of( ShipmentCreationOutcome::FeatureDisabled );
 		}
@@ -51,7 +55,7 @@ final class ShipmentService {
 			return ShipmentCreationResult::of( ShipmentCreationOutcome::NotPaid );
 		}
 
-		if ( ! $this->is_paid( $order ) ) {
+		if ( ! $this->is_payment_confirmed( $order, $from_payment_complete_event ) ) {
 			return ShipmentCreationResult::of( ShipmentCreationOutcome::NotPaid );
 		}
 
@@ -169,8 +173,46 @@ final class ShipmentService {
 		return ShipmentCreationOutcome::AlreadyExistsComplete;
 	}
 
-	private function is_paid( WC_Order $order ): bool {
-		return method_exists( $order, 'is_paid' ) && (bool) $order->is_paid();
+	/**
+	 * Payment-complete is the authoritative WooCommerce signal.
+	 * Status fallbacks require persisted paid-date evidence, not WC_Order::is_paid().
+	 */
+	private function is_payment_confirmed( WC_Order $order, bool $from_payment_complete_event ): bool {
+		if ( $from_payment_complete_event ) {
+			return true;
+		}
+
+		return $this->has_persisted_paid_date( $order );
+	}
+
+	private function has_persisted_paid_date( WC_Order $order ): bool {
+		if ( ! method_exists( $order, 'get_date_paid' ) ) {
+			return false;
+		}
+
+		$paid = $order->get_date_paid();
+
+		if ( $paid instanceof \DateTimeInterface ) {
+			return $paid->getTimestamp() > 0;
+		}
+
+		if ( is_numeric( $paid ) ) {
+			return (int) $paid > 0;
+		}
+
+		if ( ! is_string( $paid ) ) {
+			return false;
+		}
+
+		$trimmed = trim( $paid );
+
+		if ( '' === $trimmed || '0' === $trimmed || '0000-00-00 00:00:00' === $trimmed ) {
+			return false;
+		}
+
+		$timestamp = strtotime( $trimmed );
+
+		return false !== $timestamp && $timestamp > 0;
 	}
 
 	private function is_ineligible( WC_Order $order ): bool {

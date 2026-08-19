@@ -1,22 +1,93 @@
-# Stage 14H — RC.5 QA.1 owner QA package
+# Stage 14H — RC.5 owner QA
 
-**Date:** 2026-08-18  
-**QA identity:** `1.0.0-rc.5-qa.1`  
+**Date:** 2026-08-19  
+**Failed QA identity:** `1.0.0-rc.5-qa.1` (immutable ZIP; do not overwrite)  
+**Repair candidate:** `1.0.0-rc.5-qa.2` (prepared after the repairs below)  
 **Schema:** `4`  
 **Protected published baseline:** `1.0.0-rc.4` / schema `3` / tag `v1.0.0-rc.4` (untouched)  
 **Branch:** `master`  
-**Package source commit:** `b8f04682190fc7472bcf9f70bf1d19bab0c4b26d` (`chore: prepare rc.5 qa.1`)  
+**QA.1 package source commit:** `b8f04682190fc7472bcf9f70bf1d19bab0c4b26d` (`chore: prepare rc.5 qa.1`)  
 **G-R1:** `35a80ddac8b429e07b95015a1d84cff89cd5eddc` (pushed)  
-**FLAIROC:** **not installed in this stage**  
+**FLAIROC:** QA.1 **is installed**. Stage 14 shipment/tracking flags were turned **OFF** after the failure. This Cursor repair does **not** modify FLAIROC.  
 **Final RC.5 tag:** **none**
 
 ---
 
 ## Verdict
 
-**RC.5-QA.1 READY FOR OWNER QA**
+**RC.5-QA.1 FAILED OWNER QA**
+
+Physical FLAIROC checkout/email and My Account View Order fatals, plus COD shipment creation without payment confirmation.
 
 This is **not** owner QA pass, **not** Stage 14 released, and **not** final `1.0.0-rc.5`.
+
+**RC.5-QA.2 PREPARED FOR RETEST** only after the two repairs, automated gates, and the QA.2 ZIP are complete. Do not claim QA.2 owner QA passed.
+
+---
+
+## QA.1 owner failure (physical FLAIROC)
+
+### Checkout displayed a false failure
+
+Customer checked out **FLAIROC Delivery Engine QA Product** with **FLAIROC QA Standard Delivery**. WooCommerce created the order and Stage 14 created a shipment, then checkout displayed:
+
+> There was an error processing your order. Please check for any charges in your payment method and review your order history before placing the order again.
+
+Retries produced legitimate separate orders **39733**, **39734**, **39735** and shipments **39733-D1**, **39734-D1**, **39735-D1**. This was **not** shipment idempotency failure.
+
+### Exact fatal
+
+WooCommerce fatal log: `wp-content/uploads/wc-logs/fatal-errors-2026-08-19-....log`
+
+```text
+Uncaught Error: Call to a member function get_id() on null
+File: src/Application/Order/CustomerOrderDeliverySummaryBuilder.php
+Line: 111
+```
+
+QA.1 `map_line_snapshot()` called `$item->get_id()` even though `$item` is not a parameter of that method. PHP treated `$item` as null. RC.4 ended the constructor at three trailing `null` pickup fields and did not pass an order-item ID.
+
+This is **not** a deleted/missing product. Order **39735** line item **19** is `WC_Product_Simple` product **39705** with a valid `_cetech_de_delivery_snapshot`.
+
+### Path A — checkout / transactional email
+
+`CustomerOrderDeliverySummaryBuilder` → `CustomerOrderDeliveryEmailSummaryRenderer` → WooCommerce Processing Order email → COD `process_payment()` → `WC_Checkout` → WC AJAX checkout.
+
+The order already existed. Email rendering crashed. The customer was falsely told checkout failed.
+
+### Path B — My Account → View Order
+
+`CustomerOrderDeliverySummaryBuilder` → `CustomerOrderDeliverySummaryRenderer` → WooCommerce order-details → My Account View Order → WoodMart WooCommerce My Account template.
+
+Order details rendered, then: “There has been a critical error on this website.”
+
+### COD payment-confirmation finding
+
+Orders 39733 / 39734 / 39735:
+
+- status `processing`
+- payment method `cod` / Cash on delivery
+- `date_paid` NULL
+- `is_paid()` YES
+- `needs_payment()` NO
+
+Stage 14 still created a shipment for each order because the processing fallback treated `WC_Order::is_paid()` as payment confirmation. WooCommerce `is_paid()` is status-based (`processing`/`completed`), not “money collected”. COD typically does not fire `woocommerce_payment_complete` or set `date_paid`.
+
+### QA.1 owner verdict
+
+**FAIL**
+
+Do not overwrite `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.1.zip`.
+
+### Preserved FLAIROC evidence (do not modify remotely)
+
+| Item | Value |
+|------|--------|
+| Orders | 39733, 39734, 39735 |
+| Shipments | 39733-D1, 39734-D1, 39735-D1 |
+| Shipment / item / event counts | 3 / 3 / 3 |
+| Initial event | `created` → `awaiting_fulfilment` |
+| Flags after failure | shipment records OFF, tracking OFF |
 
 ---
 
@@ -229,21 +300,27 @@ Customer must **not** see: supplier, origin, Logistics Profile, internal cost, R
 
 ## 9. Owner QA status
 
-**PENDING**
+**QA.1 FAIL.** QA.2 retest pending after install of `1.0.0-rc.5-qa.2`. Do not claim owner QA PASS.
 
 ---
 
 ## 10. Log review
 
-**Not started** (no FLAIROC install this stage). After the owner session, inspect PHP log, shipment counts/duplicates, migration errors, and private-data leaks.
+Owner physical session on 2026-08-19 captured the fatal above from WooCommerce `fatal-errors-2026-08-19-....log`. Checkout/email and View Order both crashed in `CustomerOrderDeliverySummaryBuilder.php` line 111.
 
 ---
 
 ## 11. Defects
 
-None from local/source/package gates.
+### Defect 1 — checkout / email / View Order fatal (release-blocking)
 
-If owner QA finds a genuine defect: stop finalization; smallest repair; `1.0.0-rc.5-qa.2` only if another ZIP is required. Do not overwrite QA.1. Do not finalize RC.5.
+`map_line_snapshot()` dereferenced `$item` that it did not own. Repair: `build_line_from_item()` passes `(int) $item->get_id()` into the mapper. No snapshot rewrite. No current-product lookup.
+
+### Defect 2 — COD shipment without payment confirmation
+
+Processing/completed fallback used `WC_Order::is_paid()`. Repair: `woocommerce_payment_complete` remains eligible; status fallback and retry require persisted `get_date_paid()`. COD `processing` + `date_paid` NULL must not create a shipment.
+
+If owner QA finds a further genuine defect: stop finalization; smallest repair; `1.0.0-rc.5-qa.3` only if another ZIP is required. Do not overwrite QA.1 or QA.2. Do not finalize RC.5.
 
 ---
 
@@ -271,6 +348,15 @@ Carrier APIs, tracking polling/webhooks, shipment emails, customer timeline, gue
 
 ## STOP
 
-WAIT FOR OWNER PHYSICAL QA.
+QA.1 failed owner QA. Do not finalize RC.5.
 
-Do not finalize RC.5. Recommend Stage 14H-FINAL only after owner QA pass.
+Owner retest of QA.2 must start with:
+
+1. existing Order 39735 View Order;
+2. customer email-summary rendering;
+3. one COD checkout — prove NO premature shipment;
+4. one genuinely payment-confirmed checkout — prove exactly one shipment;
+5. Thank You / View Order — prove no fatal.
+
+Only after those pass resume the remaining Stage 14 owner QA checklist.
+

@@ -60,7 +60,7 @@ final class CustomerOrderDeliverySummaryBuilder {
 			return null;
 		}
 
-		return $this->map_line_snapshot( $read->snapshot, $product_name, $status );
+		return $this->map_line_snapshot( $read->snapshot, $product_name, $status, (int) $item->get_id() );
 	}
 
 	private function build_package_from_order( WC_Order $order ): ?CustomerOrderDeliveryPackageSummary {
@@ -77,7 +77,8 @@ final class CustomerOrderDeliverySummaryBuilder {
 	private function map_line_snapshot(
 		OrderDeliveryLineSnapshot $snapshot,
 		string $product_name,
-		string $integrity_status
+		string $integrity_status,
+		int $order_item_id
 	): CustomerOrderDeliveryLineSummary {
 		$is_quoted = OrderDeliverySnapshotIntegrity::STATUS_PRESENT_VALID === $integrity_status;
 
@@ -108,7 +109,7 @@ final class CustomerOrderDeliverySummaryBuilder {
 			null,
 			null,
 			null,
-			$item->get_id()
+			$order_item_id
 		);
 	}
 
