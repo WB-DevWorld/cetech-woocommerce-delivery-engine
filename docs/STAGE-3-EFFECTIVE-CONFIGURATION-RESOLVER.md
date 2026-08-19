@@ -125,7 +125,9 @@ GLOBAL → PRODUCT → VARIATION
 | OVERRIDE | Replace with typed value (`0` preserved) |
 | DISABLE | Explicit DISABLED/NONE (not missing, not inherit) |
 
-Global root missing → `UNRESOLVED` (`UNRESOLVED_GLOBAL_VALUE`). No invented defaults.
+Global root missing a **required** delivery field → `UNRESOLVED` (`UNRESOLVED_GLOBAL_VALUE`). No invented defaults.
+
+Optional/defaultable fields (`supplier_id`, `origin_id`, `logistics_profile_id`, `priority`, `estimated_delivery`) may remain field-level `UNRESOLVED` without making the whole EffectiveConfiguration unresolved. Runtime maps those to null / priority `100`. Required fields (`fulfilment_availability`, `fulfilment_choice`, `delivery_offer_ids`) still fail closed.
 
 Current registry has no boolean fields; zero-safety is covered by `priority = 0`.
 

@@ -9,6 +9,12 @@ use CetechDeliveryEngine\Domain\Configuration\ConfigurationValidationResult;
 use CetechDeliveryEngine\Domain\Configuration\EffectiveConfiguration;
 use CetechDeliveryEngine\Domain\Enum\EffectiveFieldState;
 
+/**
+ * Overall EffectiveConfiguration state.
+ *
+ * Required unresolved fields fail closed. Optional/defaultable unresolved fields
+ * (supplier, origin, logistics profile, priority, estimated delivery) do not.
+ */
 final class EffectiveConfigurationValidator {
 
 	public function validate( EffectiveConfiguration $configuration ): ConfigurationValidationResult {

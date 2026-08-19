@@ -84,7 +84,8 @@ final class ConfigurationFieldRegistry {
 				static fn ( mixed $value ): int => self::normalize_positive_int( $value ),
 				static function ( mixed $value ): void {
 					self::assert_positive_int( $value, ConfigurationFieldKey::LOGISTICS_PROFILE_ID );
-				}
+				},
+				true
 			),
 			ConfigurationFieldKey::SUPPLIER_ID => new ConfigurationFieldDefinition(
 				ConfigurationFieldKey::SUPPLIER_ID,
@@ -101,7 +102,8 @@ final class ConfigurationFieldRegistry {
 				static fn ( mixed $value ): int => self::normalize_positive_int( $value ),
 				static function ( mixed $value ): void {
 					self::assert_positive_int( $value, ConfigurationFieldKey::SUPPLIER_ID );
-				}
+				},
+				true
 			),
 			ConfigurationFieldKey::ORIGIN_ID => new ConfigurationFieldDefinition(
 				ConfigurationFieldKey::ORIGIN_ID,
@@ -118,7 +120,8 @@ final class ConfigurationFieldRegistry {
 				static fn ( mixed $value ): int => self::normalize_positive_int( $value ),
 				static function ( mixed $value ): void {
 					self::assert_positive_int( $value, ConfigurationFieldKey::ORIGIN_ID );
-				}
+				},
+				true
 			),
 			ConfigurationFieldKey::PRIORITY => new ConfigurationFieldDefinition(
 				ConfigurationFieldKey::PRIORITY,
@@ -131,7 +134,8 @@ final class ConfigurationFieldRegistry {
 				static fn ( mixed $value ): int => self::normalize_int_including_zero( $value ),
 				static function ( mixed $value ): void {
 					self::assert_int_including_zero( $value, ConfigurationFieldKey::PRIORITY );
-				}
+				},
+				true
 			),
 			ConfigurationFieldKey::ESTIMATED_DELIVERY => new ConfigurationFieldDefinition(
 				ConfigurationFieldKey::ESTIMATED_DELIVERY,
@@ -207,6 +211,10 @@ final class ConfigurationFieldRegistry {
 		self::$definitions = null;
 	}
 
+	/**
+	 * Optional/defaultable fields may remain unresolved without making the whole
+	 * EffectiveConfiguration unresolved. Required delivery fields still fail closed.
+	 */
 	public static function is_optional( string $field_key ): bool {
 		return self::has( $field_key ) && self::get( $field_key )->is_optional;
 	}
