@@ -4,7 +4,7 @@
 **Applies to:** All human developers, Cursor agents, AI coding agents, reviewers, and maintainers  
 **Plugin:** CETECH WooCommerce Delivery Engine  
 **Current protected runtime baseline:** tagged `1.0.0-rc.4` (FLAIROC schema `3` until an authorised Stage 14 install)  
-**Current QA-candidate identity:** `1.0.0-rc.5-qa.4` (master; schema `4`; not a final RC.5 tag)  
+**Current QA-candidate identity:** `1.0.0-rc.5-qa.5` (master; schema `4`; not a final RC.5 tag)  
 **Current master schema target:** `4` (Stage 14B shipment persistence tables; Stage 14C creation runtime is implemented and feature-gated OFF)  
 **Text domain:** `cetech-woocommerce-delivery-engine`
 
@@ -31,7 +31,7 @@ Where this rulebook and an older rules file conflict on a **hard invariant**, th
 6. **Do not discard owner-tested behaviour** without explicit owner/authorisation.
 7. **Current implementation truth** = repository code + latest completed stage documentation. Visionary handoff sections are not proof that a feature exists.
 8. **Intended product/end-state** = latest `Delivery Shipping Plugin Up-To-Date Design and Expectations.md`. Do not implement a future vision merely because it appears there.
-9. Tagged **`1.0.0-rc.4`** remains the protected published baseline (schema **3** on FLAIROC until an authorised install). Master may carry an approved QA-candidate identity such as **`1.0.0-rc.5-qa.4`** during Stage 14H. Schema target is **`4`**. Stage 14 flags default **OFF**. Do not create the final `1.0.0-rc.5` tag, overwrite RC.4, or claim owner QA passed without the owner’s physical confirmation.
+9. Tagged **`1.0.0-rc.4`** remains the protected published baseline (schema **3** on FLAIROC until an authorised install). Master may carry an approved QA-candidate identity such as **`1.0.0-rc.5-qa.5`** during Stage 14H. Schema target is **`4`**. Stage 14 flags default **OFF**. Do not create the final `1.0.0-rc.5` tag, overwrite RC.4, or claim owner QA passed without the owner’s physical confirmation.
 
 Testable: a commit that retags RC.4, changes `CETECH_DE_VERSION` without authorisation, or rewrites checkout grouping “to prepare for shipments” violates this section.
 
@@ -226,7 +226,8 @@ Stage 14 shipments **must consume** the saved RC.4 order/group snapshots (`deliv
 - Use stable codes/identifiers. Never use translated text for idempotency.
 - Retries must not create duplicate shipments.
 - Checkout must never depend on successful operational shipment creation after payment.
-- Primary trigger is paid-order: `woocommerce_payment_complete` (the event is confirmation), plus `processing`/`completed` fallback only when persisted paid-date evidence exists. Do not treat `WC_Order::is_paid()` status as payment confirmation. Not order-created.
+- Primary trigger for **prepaid / online payment** is paid-order: `woocommerce_payment_complete` (the event is confirmation), plus `processing`/`completed` fallback only when persisted paid-date evidence exists. Do not treat `WC_Order::is_paid()` status as payment confirmation. Not order-created.
+- **Cash on Delivery** does not auto-create a shipment while `date_paid` is empty. A legitimate COD delivery order is an operational **action required** task: staff create the shipment from the historical order snapshot. Later `woocommerce_payment_complete` must remain idempotent. Do not fake `date_paid` to create a shipment.
 
 If post-payment shipment creation fails:
 
@@ -411,8 +412,9 @@ Avoid unnecessary page hopping.
 
 ### Needs Attention
 
-Surface genuine operational shipment problems:
+Surface genuine operational shipment problems and expected operational tasks:
 
+- Cash on Delivery order awaiting staff shipment creation (action required, not an error)
 - paid order but shipment creation failed
 - broken shipment/order linkage
 - invalid tracking URL

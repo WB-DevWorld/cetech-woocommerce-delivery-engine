@@ -3,14 +3,12 @@
 **Date:** 2026-08-19  
 **Failed QA identities:** `1.0.0-rc.5-qa.1` and `1.0.0-rc.5-qa.2` (ZIPs immutable; do not overwrite)  
 **Inheritance-repair evidence build:** `1.0.0-rc.5-qa.3` (ZIP immutable; prepared but **not** physically installed/tested on FLAIROC)  
-**Current QA candidate:** `1.0.0-rc.5-qa.4`  
-**Polish commit:** `93f72cb` (`feat: show staff identity, Track button, and operational admin badges`)  
-**QA.4 package source commit:** `0332ca0d4fadf0e78bc3e9339552b28e2ea83386` (`chore: prepare rc.5 qa.4`)  
-**Inheritance repair commit:** `709bea6bd3ceac27e324040e0d003e456ef43885` (included unchanged in QA.4)  
+**QA.4 identity:** `1.0.0-rc.5-qa.4` (ZIP immutable; **owner physical PASS** on FLAIROC)  
+**Current QA candidate:** `1.0.0-rc.5-qa.5`  
 **Schema:** `4`  
 **Protected published baseline:** `1.0.0-rc.4` / schema `3` / tag `v1.0.0-rc.4` (untouched)  
 **Branch:** `master`  
-**FLAIROC:** **not modified** by this repair. No SSH. No hotfix. No product-meta copy.  
+**FLAIROC:** **not modified** by this QA.5 preparation. No SSH. No hotfix.  
 **Final RC.5 tag:** **none**
 
 ---
@@ -20,9 +18,51 @@
 **RC.5-QA.1 FAILED OWNER QA**  
 **RC.5-QA.2 FAILED OWNER QA** (additional release blocker: Site-wide inheritance / ECR validity)  
 **RC.5-QA.3 PREPARED** (inheritance repair; not physically retested; ZIP immutable)  
-**RC.5-QA.4 PREPARED FOR RETEST** (QA.3 inheritance repair + three owner-QA polish items)
+**RC.5-QA.4 OWNER PHYSICAL PASS** (inheritance, badges, Track button, staff actor, COD payment gate)  
+**RC.5-QA.5 PREPARED FOR OWNER INSTALL** (COD action-required + manual historical shipment creation + unique staff identity + customer shipment cards)
 
-This is **not** owner QA pass, **not** Stage 14 released, and **not** final `1.0.0-rc.5`.
+This is **not** owner QA pass for QA.5, **not** Stage 14 released, and **not** final `1.0.0-rc.5`.
+
+### Final COD rule
+
+**Prepaid / online payment**  
+Confirmed WooCommerce payment (`woocommerce_payment_complete`, or persisted `date_paid`) → automatic shipment creation.
+
+**Cash on Delivery**  
+Valid COD order → **no** automatic shipment → Needs Attention **action required** → staff-authorised manual creation from the historical order snapshot → later payment confirmation remains idempotent.
+
+Do not use `WC_Order::is_paid()`. Do not fake `date_paid`. Do not restore automatic COD shipment creation.
+
+---
+
+## QA.4 physical owner results (FLAIROC)
+
+Owner evidence. Do **not** overwrite the QA.4 ZIP. Do **not** treat this as QA.5 pass.
+
+**PASS:**
+
+- Site-wide inheritance repair works on existing simple product **4156**.
+- Existing variable parent **39420** / variations **39422**, **39424**, **39426** inherit.
+- Explicit QA product **39705** still works.
+- No artificial Product/Variation configuration rows were created merely to inherit.
+- Effective Configuration remains valid when optional `logistics_profile_id` / `supplier_id` / `origin_id` / `priority` are absent.
+- Staff History resolves a real user instead of generic "Staff" (shown as `Jane (Staff)` — still ambiguous; refined in QA.5).
+- Customer Track shipment is visibly button-like.
+- Needs Attention badge appears and clears from canonical issue state.
+- Parent Delivery Engine badge follows Needs Attention.
+- Shipments activity badge: initial backlog appeared; review cleared it; later new shipment activity restored it; review cleared it again.
+- COD Order **39741** with `date_paid=NULL` produced **no** premature shipment.
+- Controlled Woo `payment_complete()` produced exactly one shipment **39741-D1**.
+- Shipment event ID **27** was created.
+- Existing Stage 14 evidence was preserved.
+
+### Owner refinements recorded for QA.5
+
+- `Jane (Staff)` is still ambiguous if several staff are named Jane → unique actor display with User ID.
+- Customer shipment presentation needs clearer card hierarchy versus WooCommerce **Order Again**.
+- Legitimate COD orders require an operational action queue and staff manual shipment creation rather than remaining invisible until payment.
+
+QA.4 package (immutable): `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.4.zip`, `1020727` bytes, SHA-256 `bb44074ee97dcead1fc2b772c162711a333d776a0cccf315fc0b44898ef2a7df`, source `0332ca0`.
 
 ---
 
@@ -146,8 +186,9 @@ Do not overwrite `cetech-woocommerce-delivery-engine-1.0.0-rc.5-qa.2.zip`.
 |------|--------|
 | Failed QA candidates | `1.0.0-rc.5-qa.1`, `1.0.0-rc.5-qa.2` (ZIPs immutable) |
 | Inheritance evidence ZIP | `1.0.0-rc.5-qa.3` (immutable; not physically retested) |
-| Current QA candidate | `1.0.0-rc.5-qa.4` |
-| Plugin header / `CETECH_DE_VERSION` / readme Stable tag | `1.0.0-rc.5-qa.4` |
+| QA.4 physical PASS ZIP | `1.0.0-rc.5-qa.4` (immutable) |
+| Current QA candidate | `1.0.0-rc.5-qa.5` |
+| Plugin header / `CETECH_DE_VERSION` / readme Stable tag | `1.0.0-rc.5-qa.5` |
 | Eventual final identity | `1.0.0-rc.5` (only after owner QA pass + Stage 14H-FINAL) |
 | Schema | `4` |
 | Feature-flag defaults | all Stage 14 flags **OFF** |
@@ -530,22 +571,58 @@ RC.4 ZIP + tag retained. Procedure: deactivate, delete plugin folder, install RC
 
 Carrier APIs, tracking polling/webhooks, shipment emails, customer timeline, guest portal, labels, WooCommerce Fulfillments dual-write, historical backfill, Checkout Blocks, bulk import, GPS/OTP/QR/POD, driver app, Stage 15, final `1.0.0-rc.5` tag, GitHub release.
 
-The three previously queued UX polish items are implemented in QA.4 (staff History identity, Track shipment button, Needs Attention / Shipments activity badges).
+The three previously queued UX polish items are implemented in QA.4 (staff History identity, Track shipment button, Needs Attention / Shipments activity badges). QA.5 adds COD action-required Needs Attention, staff manual shipment creation from the historical order snapshot, unique staff History identity, and contained customer shipment cards.
+
+---
+
+## 15. QA.5 operational completeness
+
+Schema remains **4**. No new shipment tables. COD action-required uses order meta `_cetech_de_cod_awaiting_shipment` plus compact option `cetech_de_cod_awaiting_shipment_order_ids` (autoload false). Manual creation uses the same `ShipmentService` persist path and `order_id + delivery_group_id` idempotency as automatic paid creation.
+
+Staff History preferred format: `Jane Love (Staff · User #3)`. Name may link to `user-edit.php` only when the current user can `edit_user` that account. Customer pages never include actor identity.
+
+Customer View Order: scoped section spacing from WooCommerce Order Again; one bordered card per shipment; Track shipment stays inside its card.
+
+### Source gates (QA.5)
+
+| Gate | Result |
+|------|--------|
+| `composer validate --no-check-publish` | valid |
+| Production PHP lint | **323 files, 0 failures** |
+| Focused QA.5 + inheritance + Stage 14 shipment suite | **104 tests, 543 assertions, OK** (CodAwaiting, ManualCreation, identity, customer cards, payment gate, badges, planner, aggregate) |
+| PHPUnit | **545 tests, 2992 assertions** |
+| Deprecations | **3** (`ReflectionMethod::setAccessible()` PHP 8.5) — same type as QA.4; no new type |
+| `npm run test:js` | **11 passed** |
+| Playwright | **not run** |
+
+QA.4 baseline was 523 / 2869 / 11 JS / 3 deprecations.
+
+### QA.5 package
+
+Filled after `scripts/build-v1-rc-package.ps1`. See the package table at the end of this section after build.
+
+### Combined owner QA plan for QA.5
+
+Use a **fresh** COD order. Order **39741** already has shipment **39741-D1** from the QA.4 payment_complete proof; do not expect it to appear as a COD action-required task.
+
+1. **Fresh COD order:** normal Thank You; `date_paid` NULL; no automatic shipment; Needs Attention badge appears.
+2. **Needs Attention:** row clearly says Cash on Delivery / action required; Order ID opens the correct WooCommerce order.
+3. **Create Shipment:** preview is populated from the historical record; no re-entry of delivery data; confirm; one shipment created; COD task clears.
+4. **Manual creation idempotency:** repeating the action cannot duplicate the shipment.
+5. **Payment later:** invoke controlled `payment_complete()` on that dedicated QA order; still exactly one shipment.
+6. **Staff History:** `Jane Love (Staff · User #3)` or equivalent unique identity; internal user-edit link if permitted.
+7. **Customer View Order:** shipment displayed as a clear card; Track button belongs to that shipment; Order Again is visually separated; multiple shipment layout if available.
+8. **Needs Attention badge:** appears while the COD task is pending; clears after shipment creation. Opening Needs Attention does **not** clear it.
+9. **Shipments badge:** the new manual shipment is unreviewed activity for other eligible staff; review acknowledgment still works.
+10. **Existing QA.4 inheritance remains intact** on 4156 / 39420 / 39422 / 39424 / 39426 / 39705.
+
+Preserve existing Stage 14 evidence orders/shipments. Do not modify them remotely from Cursor.
 
 ---
 
 ## STOP
 
-QA.1 failed owner QA. QA.2 failed owner QA (Site-wide inheritance / ECR validity). QA.3 is an immutable inheritance-repair evidence build and was **not** physically retested. Do not finalize RC.5.
+QA.1 failed owner QA. QA.2 failed owner QA (Site-wide inheritance / ECR validity). QA.3 is an immutable inheritance-repair evidence build and was **not** physically retested. QA.4 is an immutable physical PASS. Do not overwrite those ZIPs. Do not finalize RC.5. Do not create `v1.0.0-rc.5`. Do not touch FLAIROC from this Cursor session.
 
-Owner retest of **QA.4** must cover, in one FLAIROC pass:
-
-A. Inheritance: 4156, 39420 / 39422 / 39424 / 39426, 39705, new simple, new variation, no artificial scopes, Delivery Areas/Charges at cart/checkout.
-B. Staff History identity.
-C. Customer Track shipment button presentation.
-D. Needs Attention badge appears and clears with canonical issues.
-E. Shipments activity badge is per-user (review clears; later activity restores).
-F. Stage 14 happy-path non-regression (View Order 39735, email summary, COD no premature shipment, payment-confirmed one shipment, Thank You / View Order no fatal).
-
-Only after those pass resume the remaining Stage 14 owner QA checklist.
+Owner install/test of **QA.5** must cover the ten-point plan above before Stage 14H-FINAL.
 

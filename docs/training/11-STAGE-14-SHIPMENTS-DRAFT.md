@@ -1,6 +1,6 @@
 # Stage 14 shipments — DRAFT staff notes (not final)
 
-**Status:** Draft for `1.0.0-rc.5-qa.4` owner retest. Do **not** treat this as the published RC.4 training set. Screenshots and final wording wait for owner QA PASS.
+**Status:** Draft for `1.0.0-rc.5-qa.5` owner retest. Do **not** treat this as the published RC.4 training set. Screenshots and final wording wait for owner QA PASS.
 
 **Everyday home remains:** WordPress admin → **Delivery Engine → Overview**
 
