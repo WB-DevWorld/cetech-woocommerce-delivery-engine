@@ -16,6 +16,7 @@ If WordPress shows a different plugin version, stop and confirm which package is
 If you are store staff configuring products day to day, use:
 
 - [00-START-HERE](00-START-HERE.md)
+- [12-SETUP-CONFIGURE-AND-TEST](12-SETUP-CONFIGURE-AND-TEST.md) (each menu, including how to do the work)
 - [05-STAFF-TRAINING-MANUAL](05-STAFF-TRAINING-MANUAL.md)
 - [03-USE-CASE-PLAYBOOK](03-USE-CASE-PLAYBOOK.md)
 - [07-TROUBLESHOOTING-FAQ](07-TROUBLESHOOTING-FAQ.md)

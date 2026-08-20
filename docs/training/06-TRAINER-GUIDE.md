@@ -23,7 +23,9 @@ For shipment staff, add playbook use cases 20–30 and [11 — Stage 14 shipment
 8. Modules 11–12 (troubleshooting + boundaries)  
 9. If Shipments is on: playbook 20–30 on the live Shipments screen (authorised staff only)
 
-Quick Start can be handed out before day one.
+For a store that is not configured yet, start with [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md) before the staff course.
+
+Quick Start can be handed out before day one once setup is complete.
 
 ---
 

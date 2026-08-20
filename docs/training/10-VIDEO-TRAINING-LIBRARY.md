@@ -13,6 +13,7 @@ When recordings are made later, replace binaries under [`assets/videos/`](assets
 
 | Role | Use instead |
 |------|-------------|
+| First-time setup / each menu | [12-SETUP-CONFIGURE-AND-TEST](12-SETUP-CONFIGURE-AND-TEST.md) |
 | New staff | [01-QUICK-START](01-QUICK-START.md) then [05-STAFF-TRAINING-MANUAL](05-STAFF-TRAINING-MANUAL.md) |
 | Everyday configuration | [02-COMPLETE-ADMIN-GUIDE](02-COMPLETE-ADMIN-GUIDE.md) + [03-USE-CASE-PLAYBOOK](03-USE-CASE-PLAYBOOK.md) |
 | Shipments (when enabled) | [11-STAGE-14-SHIPMENTS](11-STAGE-14-SHIPMENTS.md) |

@@ -24,7 +24,12 @@ Most products should follow the store defaults. Only genuinely different product
 
 ## Choose your path
 
-### New staff
+### First-time setup (plugin not configured yet)
+
+1. [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md) (each screen, with how to do the work)
+2. Then [01 — Quick Start](01-QUICK-START.md) for everyday work
+
+### New staff (store already set up)
 
 1. [01 — Quick Start](01-QUICK-START.md) (about 10 minutes)
 2. [05 — Staff Training Manual](05-STAFF-TRAINING-MANUAL.md) (self-paced course)
@@ -39,10 +44,11 @@ Most products should follow the store defaults. Only genuinely different product
 
 ### Administrators
 
-1. [02 — Complete Administrator Guide](02-COMPLETE-ADMIN-GUIDE.md)
-2. [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md)
-3. [03 — Use-Case Playbook](03-USE-CASE-PLAYBOOK.md)
-4. [07 — Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md)
+1. [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md) if you need each screen explained, including how to do the work
+2. [02 — Complete Administrator Guide](02-COMPLETE-ADMIN-GUIDE.md)
+3. [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md)
+4. [03 — Use-Case Playbook](03-USE-CASE-PLAYBOOK.md)
+5. [07 — Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md)
 
 ### Trainers
 

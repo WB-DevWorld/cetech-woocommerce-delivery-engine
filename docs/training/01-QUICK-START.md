@@ -131,6 +131,8 @@ Also escalate if **Needs Attention** still lists a product after Site-wide Defau
 
 ## Next
 
+If the plugin is **not** set up yet (Setup Guide is still in the menu, or Preview is not Ready), stop and follow [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md) first.
+
 Continue with the [Staff Training Manual](05-STAFF-TRAINING-MANUAL.md) or the [Visual Walkthrough](04-VISUAL-WALKTHROUGH.md).
 
 If **Delivery Engine → Shipments** is in the menu, also read [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md) and playbook use cases 20–30.

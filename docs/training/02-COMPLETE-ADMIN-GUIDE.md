@@ -92,7 +92,7 @@ Stopping before Finish; treating International as ordinary local delivery (Air a
 Re-running Apply without reading the exception-protection copy.
 
 **Related**  
-Site-wide Defaults, Settings.
+Site-wide Defaults, Settings. Click-by-click for each menu: [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md).
 
 **Expected result**  
 Overview shows setup complete. Setup Guide leaves the everyday menu and is reopenable from Settings.
