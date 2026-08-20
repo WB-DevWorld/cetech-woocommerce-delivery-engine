@@ -218,7 +218,7 @@ Correct fee for their destination (together with Delivery Charges).
 Overlapping unclear areas; areas with no charge defined.
 
 **Related**  
-Delivery Charges; WooCommerce shipping zones (method availability).
+Delivery Charges; WooCommerce shipping zones (method availability). Add **Delivery** to every zone, including Rest of the World: [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md#how-to-add-the-delivery-shipping-method-in-woocommerce).
 
 **Expected result**  
 Address tests match the intended area.
@@ -436,7 +436,7 @@ Shipment staff training: [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md). 
 Advanced switches, Access matrix for subordinate roles without a policy decision.
 
 **Related**  
-Technical Support Appendix.
+WooCommerce **Delivery** shipping method on every zone, including Rest of the World: [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md#how-to-add-the-delivery-shipping-method-in-woocommerce). Technical Support Appendix.
 
 ---
 

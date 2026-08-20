@@ -71,7 +71,7 @@ Use this guide first. Do **not** edit PHP, run SQL, clear Redis globally, change
 
 **Safe fixes:**
 - Re-select delivery on the product and return to cart/checkout.  
-- Ask an administrator to confirm Delivery Charges and that WooCommerce shipping still includes the Delivery Engine method.
+- Ask an administrator to confirm Delivery Charges and that **Delivery** is enabled on every WooCommerce shipping zone, including Rest of the World. Click-by-click: [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md#how-to-add-the-delivery-shipping-method-in-woocommerce).
 
 **Escalate when:** Selection is present but the fee is missing or $0 unexpectedly. Missing configuration must never silently become free shipping.
 

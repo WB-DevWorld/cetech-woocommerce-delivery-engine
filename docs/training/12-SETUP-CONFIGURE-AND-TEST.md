@@ -37,11 +37,13 @@ If a menu name is not in the list below, stop and ask an administrator.
 
 The product **Delivery** tab and **Preview Delivery** are plugin screens too. They live on the WooCommerce product editor, not in the left menu.
 
+WooCommerce also needs this plugin’s shipping method, named **Delivery**, on a shipping zone. That step is not a Delivery Engine left-menu item. See **How to add the Delivery shipping method in WooCommerce** below.
+
 ### First-time order
 
 Do the work in this order so each screen has what it needs:
 
-**Setup Guide** (if showing) → **Delivery Options** → **Delivery Areas** → **Delivery Charges** → **Pickup Locations** (only if you offer pickup) → **Site-wide Defaults** → **Settings** → **Overview** → product **Delivery** tab and **Preview** → shop check → **Product Exceptions** / **Needs Attention** as needed → **Shipments** last.
+**Setup Guide** (if showing) → **Delivery Options** → **Delivery Areas** → **Delivery Charges** → **Pickup Locations** (only if you offer pickup) → **Site-wide Defaults** → **Settings** → **add Delivery in WooCommerce shipping** → **Overview** → product **Delivery** tab and **Preview** → shop check → **Product Exceptions** / **Needs Attention** as needed → **Shipments** last.
 
 ---
 
@@ -121,7 +123,7 @@ For International, use **Create Air or Sea Shipping option** and choose Air or S
 
 ## How to do Step 6 — Finish
 
-1. If **WooCommerce shipping** is Action needed: click **Configure WooCommerce Shipping** → open your zone → **Add shipping method** → choose **Delivery** → save → return here and refresh.  
+1. If **WooCommerce shipping** is **Action needed**, click **Configure WooCommerce Shipping** and follow **How to add the Delivery shipping method in WooCommerce** (after Settings in this guide). Come back here and refresh until it says **Ready**.  
 2. If you see **Activate Delivery Engine**, click it.  
 3. Click **Go to Delivery Overview**.
 
@@ -345,7 +347,7 @@ Scroll to the bottom of the Settings form and click **Save Changes** after you t
 
 1. Open **Settings**.  
 2. Read **Delivery Engine status**, **Setup**, **WooCommerce shipping**.  
-3. If shipping is Action needed: click **Configure WooCommerce Shipping** → your zone → **Add shipping method** → **Delivery** → save. Return to Settings and refresh.  
+3. If **WooCommerce shipping** is **Action needed**, click **Configure WooCommerce Shipping** and follow **How to add the Delivery shipping method in WooCommerce** (next section). Return here and refresh until it says **Ready**.  
 4. If setup and shipping are ready and you see **Activate Delivery Engine**, click that button. It turns on the supported customer path in one go (product choices, cart memory, checkout check, fees, saving details on orders, Site-wide Defaults for simple and variable products).
 
 ## How to turn on customer order and email details
@@ -383,6 +385,100 @@ Under Setup Guide, click **Run Setup Guide Again**. Review mode does not wipe ex
 Leave it collapsed. Do not turn on Checkout Blocks.
 
 **Check:** General shows Active, Complete, Ready. A product on the shop shows delivery choices.
+
+---
+
+# How to add the Delivery shipping method in WooCommerce
+
+This is the WooCommerce step the plugin needs so checkout can show the real delivery fee. It is **not** a Delivery Engine left-menu item.
+
+WooCommerce shipping **zones** decide *whether* this method is offered for an address. Delivery Engine **Delivery Areas** and **Delivery Charges** decide *how much* the customer pays. You need both.
+
+The method to add is named **Delivery**. That is this plugin. Do not add **Flat rate**, **Free shipping**, or **Local pickup** as a stand-in.
+
+If a plugin warning says “CETECH Delivery shipping method”, that is the same **Delivery** row in WooCommerce’s list.
+
+## How to open the WooCommerce shipping screen
+
+Start from the plugin when you can:
+
+1. Open **Delivery Engine → Setup Guide** (Finish step) or **Delivery Engine → Settings**.  
+2. If **WooCommerce shipping** says **Action needed**, click **Configure WooCommerce Shipping**.  
+3. You land on WooCommerce **Shipping zones**.
+
+If that button is not showing, go to **WooCommerce → Settings → Shipping**.
+
+## Which zones need Delivery
+
+Add **Delivery** to **every existing shipping zone**, including the default **Rest of the World** zone.
+
+WooCommerce often lists Rest of the World as **Locations not covered by your other zones**. Open that row too — it is not optional.
+
+**Good enough for most stores**
+
+If the Shipping zones list already has:
+
+- **Everywhere** (or another zone that covers the countries you sell to), **and**
+- **Rest of the World** / **Locations not covered by your other zones**
+
+…add **Delivery** to **both**. You do not need extra zones for the plugin to work.
+
+**If you have more custom zones**
+
+If the store already has extra zones (for example a country zone, a region zone, or a named **Everywhere** zone), add **Delivery** to **each** of them as well. A zone without **Delivery** will not show this plugin’s fee for addresses in that zone.
+
+**If you still need a custom zone**
+
+Only add a new zone if the store does not already have one that covers how you sell:
+
+1. Click **Add zone**.  
+2. **Zone name:** a name staff will recognise, for example `Everywhere` or the country name.  
+3. **Zone regions:** choose the countries or regions that zone should cover.  
+4. Click **Save changes**.  
+5. Add **Delivery** to that new zone **and** still add it to **Rest of the World**.
+
+## How to add Delivery to one zone
+
+1. On the zone screen, find **Shipping methods**.  
+2. Click **Add shipping method**.  
+3. In the list, choose **Delivery**.  
+   - Description (if shown): uses the customer’s selected delivery option and configured charges.  
+   - Skip **Flat rate**, **Free shipping**, and **Local pickup** for this job.  
+4. Confirm with **Add shipping method** / **Continue** (the button WooCommerce shows).  
+5. **Delivery** should now appear in the zone’s method list.  
+6. Leave it **Enabled**. If there is an on/off control, it must be on.  
+7. Click **Save changes** if WooCommerce still shows unsaved zone changes.
+
+You do **not** type the delivery price here. The fee comes from **Delivery Engine → Delivery Charges**.
+
+Repeat these steps for **every** zone on the Shipping zones list, including **Rest of the World**. Go back to **WooCommerce → Settings → Shipping** (or the zones list) after each zone, then open the next one.
+
+## What you may open after adding it
+
+If you click the **Delivery** row, you may see:
+
+- **Method title** — leave as **Delivery** unless an administrator has a reason to change the fallback label. Checkout still prefers the public Delivery Option name for the shipping line.  
+- **Tax status** — leave as WooCommerce already set it unless tax staff told you otherwise.
+
+Then close and return to the plugin.
+
+## How to check it in the plugin
+
+1. Go back to **Delivery Engine → Settings** or Setup Guide **Finish**.  
+2. Refresh the page.  
+3. **WooCommerce shipping** should say **Ready**.  
+4. If it still says **Action needed**, **Delivery** is missing or disabled. Open **each** zone, including Rest of the World, and confirm **Delivery** is listed and enabled.
+
+## Do not
+
+- Do not use WooCommerce **Flat rate** to copy this plugin’s prices.  
+- Do not expect a missing Delivery Charge to become free shipping.  
+- Do not confuse this WooCommerce zone with **Delivery Engine → Delivery Areas**. Areas still need a matching charge.  
+- Do not turn on Checkout Blocks in Delivery Engine Settings to “fix” shipping. Classic Checkout is the supported path.
+
+If other methods (Flat rate, Free shipping) are already on the same zone, customers may see more than one WooCommerce shipping row. Ask an administrator before disabling those leftovers.
+
+**Check:** Every existing zone, plus Rest of the World, lists **Delivery** and it is enabled. Plugin **WooCommerce shipping** = **Ready**. On checkout, with a matching address and a selected Delivery option, the shipping amount matches the Delivery Charge.
 
 ---
 
@@ -580,6 +676,7 @@ Customers must not see “In Warehouse”, supplier names, or internal codes.
 - [ ] You can add a Delivery Option, Area, and Charge and save them  
 - [ ] Test an address matches your area  
 - [ ] Site-wide Defaults are saved; Preview is **Ready**  
+- [ ] **Delivery** is enabled on every existing WooCommerce zone, including Rest of the World  
 - [ ] Settings show Active / shipping Ready; Advanced left alone  
 - [ ] Shop shows option + estimate; checkout shows the real fee  
 - [ ] You can customize one product field and reset it  

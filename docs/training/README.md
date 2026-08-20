@@ -16,7 +16,7 @@ Screenshots and videos are not recaptured for RC.5 yet. Follow these written gui
 | Guide | Who it is for |
 |-------|----------------|
 | [00 — Start here](00-START-HERE.md) | Everyone — choose a path |
-| [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md) | Each Delivery Engine menu, plus how to add, save, test, and check |
+| [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md) | Each Delivery Engine menu, plus how to add, save, test, and check — including the WooCommerce **Delivery** shipping method |
 | [01 — Quick Start](01-QUICK-START.md) | New staff on an already-set-up store (about 10 minutes) |
 | [02 — Complete Administrator Guide](02-COMPLETE-ADMIN-GUIDE.md) | Administrators |
 | [03 — Use-Case Playbook](03-USE-CASE-PLAYBOOK.md) | Everyday jobs, including shipment jobs 20–30 |
