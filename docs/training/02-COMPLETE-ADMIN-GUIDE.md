@@ -203,10 +203,10 @@ Administrators / authorised staff.
 Expanding coverage or fixing address matching.
 
 **Key fields**  
-Area name, geography (countries / states / postcodes via the condition builder). Match mode and priority stay under **Advanced matching**. Optional **Test an Address**.
+Area name, geography (countries / states / postcodes via the condition builder). For **State / Region**, the WooCommerce checkout name and that country’s short code both match (for example Ghana `Greater Accra` and `AA`). Match mode and priority stay under **Advanced matching**. Optional **Test an Address**.
 
 **Recommended**  
-Areas that match how you sell; test tricky addresses.
+Areas that match how you sell; test tricky addresses with both the region name and the checkout short code when a State / Region condition is used.
 
 **Steps**  
 Add/edit area → define conditions → test an address → ensure a Delivery Charge exists for each sellable option in that area.

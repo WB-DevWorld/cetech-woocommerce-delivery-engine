@@ -53,7 +53,8 @@ Do not flip Advanced cutover switches without a change window and owner approval
 | Order delivery snapshots | Immutable post-payment delivery facts (`_cetech_de_*`) | Delivery information panel |
 | Public presentation contract | Compact option + estimate; shipping `rate_label` prefers public option name | Customer product / thank-you / email |
 | Older product-rule storage (hidden) | Compatibility rows may still exist; not a staff menu | Staff use Site-wide Defaults / Product Exceptions |
-| Shipping method `delivery_engine_selected_offer` | WC method; label prefers public Delivery Option | Checkout shipping line |
+| Shipping method `delivery_engine_selected_offer` | WC method listed in Add shipping method while the plugin is active; rates stay flag-gated; label prefers public Delivery Option | Checkout shipping line |
+| Region State / Region rules | Match WooCommerce state **code or** that country’s label (Ghana `AA` / Greater Accra); no area-data migration | Delivery Areas tester vs checkout |
 | Shipment records (default OFF) | Schema-4 shipment / item / event tables; built from the **saved order** delivery groups | **Delivery Engine → Shipments** after an Administrator enables shipment records |
 | Customer tracking links (default OFF) | Safe `http` / `https` URL only; no carrier polling | **Track shipment** on View Order when a safe URL is saved |
 | AdministratorAccessRecovery | `manage_options` + nonce; independent of diagnostics | Restore Administrator Access notice |
@@ -91,10 +92,10 @@ Administrator lockout repair is **Restore Administrator Access**, authorised by 
 
 ## Rollback / release identity
 
-- Current package: `cetech-woocommerce-delivery-engine-1.0.0-rc.6.zip` — bytes, SHA-256, and source commit are recorded in `docs/STAGE-14H-RC6-FINAL.md`  
+- Current package: `cetech-woocommerce-delivery-engine-1.0.0-rc.6.zip` (`1059918` bytes, SHA-256 `0d4adbef50462d798a4ff9bf802643bed92a35cdd332ceee13a985dbda2a689d`, source `7e52525`)  
+- Full RC.6 record: `docs/STAGE-14H-RC6-FINAL.md`  
 - Prior RC.6 QA packages `cetech-woocommerce-delivery-engine-1.0.0-rc.6-qa.1.zip` and `cetech-woocommerce-delivery-engine-1.0.0-rc.6-qa.2.zip` remain immutable  
 - Protected historical package `cetech-woocommerce-delivery-engine-1.0.0-rc.5.zip` (`1043995` bytes, SHA-256 `7f9ad300a2d7198b7f0e70f1cd0819351e35430fd5ca843dac7c24ce9f96d66c`, source `e0b4613`)  
-- Full RC.6 record: `docs/STAGE-14H-RC6-FINAL.md`  
 - Immediate prior published rollback: tagged `v1.0.0-rc.5` (RC.5 ZIP remains available)  
 - Do not alter tags `v1.0.0-rc.6`, `v1.0.0-rc.5`, `v1.0.0-rc.4`, `v1.0.0-rc.3`, or `v1.0.0-rc.2`.  
 - Do not retag RC.5 or earlier. Do not overwrite historical QA ZIPs.
@@ -113,8 +114,9 @@ Staff training markdown lives in `docs/training/` in the plugin repository. It i
 
 - `docs/PROJECT-GOVERNANCE.md`
 - `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`
-- `docs/ADMIN-UI-LANGUAGE-GUIDE.md` (some page names still describe earlier stages; **live RC.5 menus win**)
+- `docs/ADMIN-UI-LANGUAGE-GUIDE.md` (some page names still describe earlier stages; **live 1.0.0-rc.6 menus win**)
 - `docs/AI-HANDOFF.md` (current implementation status)
+- `docs/STAGE-14H-RC6-FINAL.md`
 - `docs/STAGE-14H-FINAL.md`
 - `docs/STAGE-14F-SHIPMENT-OPERATIONS-WORKFLOW.md`
 - Stage/phase implementation records under `docs/`

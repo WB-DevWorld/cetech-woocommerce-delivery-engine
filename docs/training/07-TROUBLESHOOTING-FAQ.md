@@ -71,7 +71,8 @@ Use this guide first. Do **not** edit PHP, run SQL, clear Redis globally, change
 
 **Safe fixes:**
 - Re-select delivery on the product and return to cart/checkout.  
-- Ask an administrator to confirm Delivery Charges and that **Delivery** is enabled on the WooCommerce shipping zones where this plugin should operate. Rest of the World is optional unless leftover addresses are intentionally supported. Click-by-click: [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md#how-to-add-the-delivery-shipping-method-in-woocommerce).
+- Ask an administrator to confirm Delivery Charges and that **Delivery** is enabled on the WooCommerce shipping zones where this plugin should operate. Rest of the World is optional unless leftover addresses are intentionally supported. Click-by-click: [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md#how-to-add-the-delivery-shipping-method-in-woocommerce).  
+- If the Delivery Area uses **State / Region**, run **Test an address** with the checkout name (for example `Greater Accra`) **and** with WooCommerce’s short code (for example `AA`). Both should name the same area. Do not rewrite the area unless the test still fails.
 
 **Escalate when:** Selection is present but the fee is missing or $0 unexpectedly. Missing configuration must never silently become free shipping.
 

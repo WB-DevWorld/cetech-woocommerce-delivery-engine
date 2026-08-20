@@ -210,6 +210,7 @@ Where you deliver. Together with a charge, this decides the fee for the customer
    - **Location:** choose **Country**  
    - **Value:** type the 2-letter country code that matches your store, for example `TT` or `GH` (the same country as WooCommerce store address)  
 7. To narrow it later, click **+ Add another location condition** and add **State / Region**, **City**, or **Postcode**.  
+   For **State / Region**, you may type the name customers see in WooCommerce checkout (for example `Greater Accra`) **or** WooCommerce’s short code for that state (for example `AA` in Ghana). Checkout uses the short code. The plugin matches both for that country, so you do **not** need to rewrite existing areas. Do not use another country’s region name.  
 8. Leave **Advanced matching** closed.  
 9. Leave **Advanced details** / reference code blank.  
 10. Click **Create Delivery Area**.
@@ -221,6 +222,7 @@ Where you deliver. Together with a charge, this decides the fee for the customer
 3. Fill:  
    - **Country code** (same 2-letter code)  
    - **Region**, **City**, **Postcode** if you used those conditions  
+   If the area uses **State / Region**, test once with the name (for example `Greater Accra`) and once with the checkout short code (for example `AA`). Both should name the **same** area.  
 4. Click **Run test**.  
 5. Read **Result.** It should name this area.
 
@@ -231,7 +233,7 @@ Where you deliver. Together with a charge, this decides the fee for the customer
 3. Click **Save Delivery Area**.  
 4. Run **Test an address** again.
 
-**Check:** The test matches. You can pick this area on a Delivery Charge.
+**Check:** The test matches, including both the region name and the checkout short code when you used a State / Region condition. You can pick this area on a Delivery Charge.
 
 ---
 
@@ -673,7 +675,7 @@ Customers must not see “In Warehouse”, supplier names, or internal codes.
 
 - [ ] You can open each everyday Delivery Engine menu and say what it does  
 - [ ] You can add a Delivery Option, Area, and Charge and save them  
-- [ ] Test an address matches your area  
+- [ ] Test an address matches your area (if you used State / Region, both the checkout name and the short code match the same area)  
 - [ ] Site-wide Defaults are saved; Preview is **Ready**  
 - [ ] **Delivery** is enabled on the WooCommerce zones where you want this plugin to operate (Rest of the World only if you intend to support leftover addresses)  
 - [ ] Settings show Active / shipping Ready; Advanced left alone  

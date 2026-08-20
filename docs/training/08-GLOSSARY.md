@@ -25,7 +25,7 @@ Terms match what you see in the Delivery Engine screens. Technical implementatio
 
 **Delivery Option** — A delivery choice shown to the customer (the public name they select).
 
-**Delivery Area** — Where the store delivers (geographic coverage used with Delivery Charges).
+**Delivery Area** — Where the store delivers (geographic coverage used with Delivery Charges). A **State / Region** condition may be the checkout name or that country’s short code (for example Ghana `Greater Accra` or `AA`); both match.
 
 **Delivery Charge** — How much the customer pays for a Delivery Area + Delivery Option combination.
 

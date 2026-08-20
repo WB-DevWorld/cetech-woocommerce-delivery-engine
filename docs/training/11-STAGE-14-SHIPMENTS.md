@@ -1,4 +1,4 @@
-# Stage 14 shipments — staff training (RC.5)
+# Stage 14 shipments — staff training
 
 **Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.6**  
 **Audience:** Administrators and authorised shipment staff  
@@ -7,7 +7,7 @@
 
 This guide uses everyday staff language. It does **not** teach PHP, databases, or carrier integrations.
 
-Screenshots are not recaptured for RC.5. Use these written steps on the live screens.
+Screenshots are not recaptured for 1.0.0-rc.6. Use these written steps on the live screens.
 
 ---
 

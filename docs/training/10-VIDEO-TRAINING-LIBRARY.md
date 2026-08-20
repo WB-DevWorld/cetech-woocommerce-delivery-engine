@@ -1,11 +1,11 @@
-# Video Training Library — CETECH Delivery Engine (RC.5)
+# Video Training Library — CETECH Delivery Engine
 
 **Plugin version:** 1.0.0-rc.6  
 **Status:** Recapture **deferred**. Written guides are the teaching authority until new recordings exist.
 
 Older recordings use different menu names and an older customer layout. **Do not use them as current truth.** If an old name appears in a leftover file, the mapping is only in the [Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md).
 
-When recordings are made later, replace binaries under [`assets/videos/`](assets/videos/) and update this index. Narration scripts in `video-scripts/` will need a rewrite to match the live RC.5 screens.
+When recordings are made later, replace binaries under [`assets/videos/`](assets/videos/) and update this index. Narration scripts in `video-scripts/` will need a rewrite to match the live 1.0.0-rc.6 screens.
 
 ---
 
@@ -27,7 +27,7 @@ Companion written tour: [04-VISUAL-WALKTHROUGH](04-VISUAL-WALKTHROUGH.md).
 
 ## Intended video index (for later recapture)
 
-Keep this list so future recordings match the staff course. Filenames may stay the same; **content must match RC.5**.
+Keep this list so future recordings match the staff course. Filenames may stay the same; **content must match 1.0.0-rc.6**.
 
 ### 01 — Getting started overview
 
@@ -114,7 +114,7 @@ Keep this list so future recordings match the staff course. Filenames may stay t
 
 | Field | Detail |
 |-------|--------|
-| **What they will learn** | End-to-end RC.5 path from Overview to order |
+| **What they will learn** | End-to-end 1.0.0-rc.6 path from Overview to order |
 | **Status** | Deferred |
 
 ### 13 — Shipments (when enabled)
@@ -133,4 +133,4 @@ Keep this list so future recordings match the staff course. Filenames may stay t
 - Do not place extra paid orders.  
 - Do not capture credentials, Cloudflare challenge, or customer PII.  
 - Auth state stays in gitignored `training/playwright/auth/`.  
-- Update this file’s Status column when a binary actually exists and matches RC.5.
+- Update this file’s Status column when a binary actually exists and matches 1.0.0-rc.6.
