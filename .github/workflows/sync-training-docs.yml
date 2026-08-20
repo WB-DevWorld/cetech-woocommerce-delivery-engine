@@ -20,37 +20,30 @@ jobs:
     steps:
       - name: Checkout plugin repository
         uses: actions/checkout@v4
+        with:
+          path: plugin
 
-      - name: Publish docs/training to the training repository
-        env:
-          TRAINING_REPO_SSH: git@github.com:wbdevworld/cetech-woocommerce-delivery-engine-training.git
-          SSH_PRIVATE_KEY: ${{ secrets.TRAINING_DOCS_DEPLOY_KEY }}
+      - name: Checkout training repository
+        uses: actions/checkout@v4
+        with:
+          repository: wbdevworld/cetech-woocommerce-delivery-engine-training
+          ssh-key: ${{ secrets.TRAINING_DOCS_DEPLOY_KEY }}
+          path: training-docs
+
+      - name: Publish docs/training
+        working-directory: training-docs
         run: |
           set -euo pipefail
 
-          if [ -z "${SSH_PRIVATE_KEY:-}" ]; then
-            echo "Missing TRAINING_DOCS_DEPLOY_KEY secret."
-            exit 1
-          fi
-
-          mkdir -p ~/.ssh
-          printf '%s\n' "$SSH_PRIVATE_KEY" > ~/.ssh/id_ed25519
-          chmod 600 ~/.ssh/id_ed25519
-          printf 'Host github.com\n  IdentityFile ~/.ssh/id_ed25519\n  IdentitiesOnly yes\n' > ~/.ssh/config
-          chmod 600 ~/.ssh/config
-          ssh-keyscan -t rsa,ed25519 github.com >> ~/.ssh/known_hosts
-
-          git clone --depth 1 "$TRAINING_REPO_SSH" /tmp/training-docs
           # Replace published guides, but keep training-repo media that the
           # plugin repo gitignores (screenshots/videos under assets/).
-          find /tmp/training-docs -mindepth 1 -maxdepth 1 ! -name '.git' ! -name 'assets' -exec rm -rf {} +
-          cp -a docs/training/. /tmp/training-docs/
-          if [ -d docs/training/assets ]; then
-            mkdir -p /tmp/training-docs/assets
-            cp -a docs/training/assets/. /tmp/training-docs/assets/
+          find . -mindepth 1 -maxdepth 1 ! -name '.git' ! -name 'assets' -exec rm -rf {} +
+          cp -a ../plugin/docs/training/. ./
+          if [ -d ../plugin/docs/training/assets ]; then
+            mkdir -p assets
+            cp -a ../plugin/docs/training/assets/. ./assets/
           fi
 
-          cd /tmp/training-docs
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
