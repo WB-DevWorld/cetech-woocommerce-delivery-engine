@@ -114,14 +114,14 @@ QA.2 baseline: 581 tests / 3117 assertions; 330 PHP files / 0 lint failures; 11 
 
 | Item | Value |
 |------|--------|
-| Product finalize commit (package source) | *recorded after package build* |
-| Tag `v1.0.0-rc.6` | *recorded after package verification* |
-| ZIP bytes | *recorded after package build* |
-| SHA-256 | *recorded after package build* |
+| Product finalize commit (package source) | `7e52525` (`7e52525cc126f0c4c1841c9bf4b3d7ea9b0bb03f`) |
+| Tag `v1.0.0-rc.6` | annotated tag created after package verification |
+| ZIP bytes | `1059918` |
+| SHA-256 | `0d4adbef50462d798a4ff9bf802643bed92a35cdd332ceee13a985dbda2a689d` |
 | Sidecar | same hash + `  cetech-woocommerce-delivery-engine-1.0.0-rc.6.zip` |
-| Built from | committed clean `master` (not `-AllowDirty`) |
+| Built from | committed clean `master` at `7e52525` (not `-AllowDirty`) |
 
-Do **not** rebuild the ZIP after the SHA-256 recording commit.
+Do **not** rebuild the ZIP after the SHA-256 recording commit. The source commit is `7e52525`, not the later docs-only hash record.
 
 ---
 
@@ -129,15 +129,15 @@ Do **not** rebuild the ZIP after the SHA-256 recording commit.
 
 | Check | Result |
 |-------|--------|
-| One plugin root | *recorded after extract* |
-| Version `1.0.0-rc.6` | *recorded after extract* |
-| Schema target `4` | *recorded after extract* |
-| Production autoload / Linux-case / forward-slash ZIP paths | *recorded after extract* |
-| Packaged PHP lint | *recorded after extract* |
-| No PHPUnit / tests / node_modules / `.git` | *recorded after extract* |
-| Registry repair present | *recorded after extract* |
-| Region code/label matcher present | *recorded after extract* |
-| QA.1 / QA.2 / RC.5 ZIPs unchanged | *recorded after extract* |
+| One plugin root | PASS |
+| Version `1.0.0-rc.6` | PASS |
+| Schema target `4` | PASS |
+| Production autoload / Linux-case / forward-slash ZIP paths | PASS (0 backslash entries; verifier exit 0) |
+| Packaged PHP lint | **333 files, 0 failures** |
+| No PHPUnit / tests / node_modules / `.git` | PASS |
+| Registry repair present | PASS |
+| Region code/label matcher present | PASS |
+| QA.1 / QA.2 / RC.5 ZIPs unchanged | PASS (`1049447` / `1056340` / `1043995` bytes) |
 
 ---
 
