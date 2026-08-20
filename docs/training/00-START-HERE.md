@@ -2,7 +2,7 @@
 
 **Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.5**  
 **Everyday home:** WordPress admin → **Delivery Engine → Overview**  
-**Screenshots / videos:** Not recaptured for RC.5 yet. Use these written guides on the live screens. Older RC.2 images or videos, if you still have them, are out of date.
+**Screenshots / videos:** Not recaptured for RC.5 yet. Use these written guides on the live screens. Older images or videos, if you still have them, are out of date.
 
 You do **not** need to know PHP, databases, or plugin architecture.
 
@@ -33,8 +33,9 @@ Most products should follow the store defaults. Only genuinely different product
 ### Experienced staff
 
 1. [03 — Use-Case Playbook](03-USE-CASE-PLAYBOOK.md)
-2. [07 — Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md)
-3. [08 — Glossary](08-GLOSSARY.md)
+2. [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md) (only if **Shipments** is in the menu)
+3. [07 — Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md)
+4. [08 — Glossary](08-GLOSSARY.md)
 
 ### Administrators
 
@@ -54,7 +55,7 @@ Most products should follow the store defaults. Only genuinely different product
 1. [09 — Technical Support Appendix](09-TECHNICAL-SUPPORT-APPENDIX.md)  
    **Not for normal staff.**
 
-Videos: [10 — Video Training Library](10-VIDEO-TRAINING-LIBRARY.md) lists the intended walkthroughs. Recapture for RC.4 is deferred.
+Videos: [10 — Video Training Library](10-VIDEO-TRAINING-LIBRARY.md) lists the intended walkthroughs. Recapture is deferred.
 
 ---
 
@@ -90,14 +91,9 @@ When setup is complete, staff should see:
 
 **Setup Guide** appears in the menu only while first-time setup is incomplete. After that, reopen it from **Settings → Run Setup Guide Again**.
 
-You should **not** see these as everyday menu items:
+**Preview Delivery** is not a left-menu item. Open it from a product’s **Delivery** tab or from Overview.
 
-- Legacy Delivery Rules
-- Technical Diagnostic Tools
-- Delivery Settings Preview (opens from Overview or a product’s **Preview Delivery**)
-- Logistics Profiles
-- Suppliers & Origins
-- Rate Cards / Destination Zones / Delivery Offers as internal names
+If a menu item is **not** on the everyday list above, do not use it. Ask an administrator. Old names from older guides are listed only in the [Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md).
 
 ---
 
@@ -130,3 +126,4 @@ You should **not** see these as everyday menu items:
 5. Do not change past orders’ delivery details to “fix” future settings — historical orders keep what the customer paid for.
 6. Ask an administrator before changing Settings switches, Access, or anything that is not in the everyday menu.
 7. Customers should see a public **Delivery option** and **Estimated delivery** — never supplier, origin, or internal codes.
+8. When **Shipments** is on, work the delivery job there. Do not rewrite the delivery details already saved on a paid order.

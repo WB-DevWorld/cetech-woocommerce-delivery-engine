@@ -1,7 +1,7 @@
 # Glossary (plain language)
 
 **Audience:** All staff  
-**Version:** 1.0.0-rc.4
+**Version:** 1.0.0-rc.5
 
 Terms match what you see in the Delivery Engine screens. Technical implementation words are avoided unless they appear in the UI.
 
@@ -43,7 +43,7 @@ Terms match what you see in the Delivery Engine screens. Technical implementatio
 
 **Estimated delivery** — Customer-facing timing text. Pickup uses **Ready for pickup** when that applies.
 
-**Needs Attention** — Operational to-do list for products missing a usable delivery setup. Also the badge on Product Exceptions.
+**Needs Attention** — To-do list for products missing a usable delivery setup, and (when shipment records are on) delivery jobs that need a person. Opening the list does not clear a task.
 
 **Ready** — The delivery setup for that view looks complete enough to apply.
 
@@ -55,6 +55,12 @@ Terms match what you see in the Delivery Engine screens. Technical implementatio
 
 **Primary default** — The fulfilment type products use when they have no special classification of their own.
 
-**Legacy Delivery Rules** — Older compatibility storage. **Not** in the everyday menu and **not** a normal workflow.
+**Shipment** — The staff work record for fulfilling a **delivery** group already saved on a WooCommerce order. It is not a new order and not a live carrier feed. Menu: **Delivery Engine → Shipments** (only after an Administrator turns shipment records on).
+
+**Original estimated delivery** — The timing the customer was given at checkout. It stays on the shipment.
+
+**Current estimated delivery** — Later operational timing. Updating it does not overwrite the original.
+
+**Track shipment** — Customer button that appears only when shipment records are on, tracking links are on, and a safe `http` or `https` tracking address is saved.
 
 **Technical Diagnostics** — Hidden support destination. Not for everyday staff.

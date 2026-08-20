@@ -1,12 +1,12 @@
 # Visual Walkthrough (written screen tour)
 
 **Audience:** New staff and trainers  
-**Version:** 1.0.0-rc.4  
-**Screenshots:** Deferred. This tour is written against the live RC.4 screens. Do not use leftover RC.2 images as teaching truth.
+**Version:** 1.0.0-rc.5  
+**Screenshots:** Deferred. This tour is written against the live RC.5 screens. Do not use leftover older images as teaching truth.
 
 Walk this path on the live site (read-only unless a trainer authorises a QA edit):
 
-WordPress admin → Overview → Site-wide Defaults → Delivery Options / Areas / Charges → Pickup Locations → Product Exceptions → Needs Attention → Settings → WooCommerce product Delivery tab → Preview Delivery → product page → cart → checkout → WooCommerce order Delivery information.
+WordPress admin → Overview → Site-wide Defaults → Delivery Options / Areas / Charges → Pickup Locations → Product Exceptions → Needs Attention → Settings → WooCommerce product Delivery tab → Preview Delivery → product page → cart → checkout → WooCommerce order Delivery information → Shipments (only if an Administrator has turned shipment records on).
 
 For each screen: what you are looking at, what matters, what you can safely change, what to leave alone, what happens after Save.
 
@@ -24,7 +24,7 @@ When setup is complete, the first screen is **Overview**. While setup is incompl
 Nothing here — this is navigation.
 
 **Leave alone**  
-Do not look for RC.2 names (Dashboard, Delivery Settings, Delivery Offers, Rate Cards) as everyday items.
+If a menu name is not on the everyday list in [00-START-HERE](00-START-HERE.md), stop and ask an administrator.
 
 **After Save**  
 Not applicable.
@@ -167,10 +167,10 @@ That product inherits or keeps only remaining exceptions. Other products are unt
 ## 9. Needs Attention
 
 **What you are looking at**  
-To-do list for incomplete product delivery setups.
+To-do list for incomplete product delivery setups. When shipment records are on, it can also list delivery jobs that need a person (for example Cash on Delivery waiting for a shipment, a delayed shipment, or a refund that needs a goods review).
 
 **What matters**  
-Fix these before promising a customer that delivery works.
+Fix product setup before promising a customer that delivery works. Opening the list does **not** clear a shipment task — completing the work does.
 
 **Safely change**  
 Open **Fix Now** and complete the product Delivery setup.
@@ -349,3 +349,24 @@ Rewriting the panel after Site-wide Defaults change; technical meta.
 
 **After Save**  
 Order delivery details are not updated by later default edits.
+
+---
+
+## 19. Delivery Engine → Shipments (when enabled)
+
+**What you are looking at**  
+The staff work list and detail screen for delivery shipments. It appears only after an Administrator turns on shipment records.
+
+**What matters**  
+A shipment is the job for moving the goods. It is built from the delivery details already saved on the WooCommerce order. It is not a new order and not a live carrier feed.
+
+**Safely change**  
+Authorised status actions, current estimated delivery, and tracking fields. **Create shipment from order** for a genuine Cash on Delivery (or similar) job after you have read the preview.
+
+**Leave alone**  
+Typing delivery prices, regrouping items, creating a fake Store pickup shipment, merging Air and Sea by hand, or marking an order paid just to force a shipment.
+
+**After Save**  
+History records who did the work. Customers may see status, current estimate, and **Track shipment** only when tracking links are on and the URL is a safe `http` or `https` address.
+
+Full how-to: [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md). Practice jobs: playbook use cases 20–30.

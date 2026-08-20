@@ -3,7 +3,7 @@
 **Audience:** Administrators and authorised configuration staff  
 **Version:** CETECH Delivery Engine 1.0.0-rc.5  
 **Everyday home:** Delivery Engine → **Overview**  
-**Not everyday:** Legacy Delivery Rules, Technical Diagnostics, private logistics pages
+**Not everyday:** Technical Diagnostics, private supply screens, Advanced Settings
 
 For each page: purpose, who, when, fields, recommended settings, steps, example, customer impact, mistakes, do-not-touch, related workflows, expected result.
 
@@ -37,7 +37,7 @@ Use as a hub. Do not treat it as a diagnostics console.
 None directly.
 
 **Common mistakes**  
-Looking for a Dashboard / Delivery Settings menu from RC.2. The everyday home is Overview.
+Looking for a different home than **Overview**. The everyday home is Overview.
 
 **Do not change casually**  
 Nothing on Overview is a hidden feature-flag editor.
@@ -249,7 +249,7 @@ Add/edit charge → Save → verify checkout with a QA product (stop before paym
 Checkout shipping amount. WooCommerce already shows this total — do not expect a second custom “Shipping summary” on thank-you.
 
 **Mistakes**  
-Missing charges; assuming free shipping; confusing fixed-per-shipment with per-item.
+Missing charges; assuming free shipping; confusing one shared delivery fee with a per-item fee.
 
 **Do not change casually**  
 Production prices without approval.
@@ -430,29 +430,13 @@ General / Customer experience / Orders / Setup Guide / Access.
 **Recommended production (Classic Checkout)**  
 Required customer/checkout features stay **ON**. Shipment records and customer tracking links stay **OFF** until an Administrator chooses to turn them on in Settings. Customer timeline, Blocks checkout, and carrier APIs are **not** in this release. Storefront Cash on delivery policy remains a store decision.
 
-Shipment staff training: [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md).
+Shipment staff training: [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md). Practice jobs: playbook use cases 20–30.
 
 **Do not change casually**  
 Advanced switches, Access matrix for subordinate roles without a policy decision.
 
 **Related**  
 Technical Support Appendix.
-
----
-
-## PAGE: Legacy Delivery Rules (retired from the normal product)
-
-**What this page is for**  
-It is **not** an everyday page. Historical compatibility rows may still exist in storage; staff cannot use Legacy as a second configuration workflow.
-
-**Who**  
-Nobody for normal work.
-
-**What to do**  
-Use Site-wide Defaults and Product Exceptions. If you somehow open a hidden compatibility screen, leave without saving and tell an administrator.
-
-**Expected result**  
-The everyday menu does not teach Legacy, “new vs old system”, or a second rules editor.
 
 ---
 

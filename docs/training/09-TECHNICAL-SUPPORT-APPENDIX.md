@@ -44,7 +44,7 @@ Do not flip Advanced cutover switches without a change window and owner approval
 | EffectiveConfigurationResolver | GLOBAL → PRODUCT → VARIATION field inheritance + hard constraints | Preview Delivery “Currently using” / Ready |
 | Order delivery snapshots | Immutable post-payment delivery facts (`_cetech_de_*`) | Delivery information panel |
 | Public presentation contract | Compact option + estimate; shipping `rate_label` prefers public option name | Customer product / thank-you / email |
-| Legacy product delivery rules | Hidden compatibility storage; no normal menu | Not an everyday workflow |
+| Older product-rule storage (hidden) | Compatibility rows may still exist; not a staff menu | Staff use Site-wide Defaults / Product Exceptions |
 | Shipping method `delivery_engine_selected_offer` | WC method; label prefers public Delivery Option | Checkout shipping line |
 | AdministratorAccessRecovery | `manage_options` + nonce; independent of diagnostics | Restore Administrator Access notice |
 

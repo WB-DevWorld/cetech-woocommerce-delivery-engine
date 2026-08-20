@@ -1,7 +1,7 @@
 # Troubleshooting FAQ (staff)
 
 **Audience:** Everyday staff and administrators  
-**Version:** 1.0.0-rc.4  
+**Version:** 1.0.0-rc.5  
 
 Use this guide first. Do **not** edit PHP, run SQL, clear Redis globally, change the database by hand, install Code Snippets, change Nginx, or use SSH. Those steps belong only in the [Technical Support Appendix](09-TECHNICAL-SUPPORT-APPENDIX.md).
 
@@ -115,7 +115,7 @@ Use this guide first. Do **not** edit PHP, run SQL, clear Redis globally, change
 
 ## Multiple products show delivery / share a charge
 
-**What it means:** Compatible items can share one delivery charge (fixed-per-shipment). Incompatible fulfilment paths are separated.
+**What it means:** Compatible items can share one delivery fee. Incompatible fulfilment paths are separated.
 
 **Check first:** Cart shipping lines and each line’s delivery choice.
 
@@ -125,7 +125,7 @@ Use this guide first. Do **not** edit PHP, run SQL, clear Redis globally, change
 
 ## Delivery charge appears wrong
 
-**Check first:** Selected option, Delivery Area, Delivery Charge amount, quantity, and whether items share one shipment charge. A live **250.00** (for example) can be a configured charge, not a quantity bug — confirm the Delivery Charge record.
+**Check first:** Selected option, Delivery Area, Delivery Charge amount, quantity, and whether items share one delivery fee. A live **250.00** (for example) can be a configured charge, not a quantity bug — confirm the Delivery Charge record.
 
 **Safe fixes:** Confirm the charge for area + option with an administrator. Do not invent a manual $0 workaround.
 
@@ -133,11 +133,11 @@ Use this guide first. Do **not** edit PHP, run SQL, clear Redis globally, change
 
 ## Customer sees fulfilment labels, a long description, or a duplicate shipping price
 
-**What it means:** RC.4 customer surfaces should show only Delivery option + Estimated delivery (plus pickup extras when present).
+**What it means:** Customer pages should show only Delivery option + Estimated delivery (plus pickup extras when present).
 
 **Check first:** You are looking at the live customer product / thank-you / email — not the staff order panel.
 
-**Escalate when:** Customers still see fulfilment headings, generic “Delivery method: Delivery”, or a second shipping-price block after RC.4 is installed.
+**Escalate when:** Customers still see fulfilment headings, generic “Delivery method: Delivery”, or a second shipping-price block.
 
 ---
 
@@ -149,14 +149,14 @@ Use this guide first. Do **not** edit PHP, run SQL, clear Redis globally, change
 
 ---
 
-## I cannot find Delivery Settings / Delivery Offers / Rate Cards / Legacy Delivery Rules
+## I cannot find an old menu name
 
-**What it means:** Those were RC.2 names or retired menus.
+**What it means:** An older guide used a different name. Use the current everyday pages instead. Do not hunt for the old screen.
 
 **What to do:**
 
-| Old name | Use now |
-|----------|---------|
+| If the old guide says | Use this now |
+|-----------------------|--------------|
 | Delivery Settings / Default Settings | Site-wide Defaults |
 | Product-Specific Settings | Product **Delivery** tab / Product Exceptions |
 | Variation-Specific Settings | Variation Delivery summary → Customize This Variation |
@@ -164,7 +164,45 @@ Use this guide first. Do **not** edit PHP, run SQL, clear Redis globally, change
 | Destination Zones | Delivery Areas |
 | Rate Cards | Delivery Charges |
 | Delivery Settings Preview | Preview Delivery (from the product tab or Overview) |
-| Legacy Delivery Rules | Not an everyday menu — do not hunt for it |
+| Legacy Delivery Rules | **Do not look for it.** Use Site-wide Defaults and the product **Delivery** tab. |
+
+If the name is not in this table, stay on the everyday menu in [00-START-HERE](00-START-HERE.md) and ask an administrator.
+
+---
+
+## I cannot find Shipments in the menu
+
+**What it means:** Shipment records are off until an Administrator turns them on.
+
+**Check first:** Ask an administrator whether **Enable shipment records** is on in **Delivery Engine → Settings**.
+
+**Safe fixes:** Administrators follow playbook use case 20. Ordinary staff should not turn Settings on or off.
+
+**Escalate when:** The setting is on but authorised staff still cannot see **Delivery Engine → Shipments**.
+
+---
+
+## Cash on Delivery order has no shipment
+
+**What it means:** Delivery Engine does not create a shipment automatically while payment is unconfirmed. That is expected.
+
+**Check first:** **Needs Attention** for “Cash on Delivery order awaiting shipment creation.”
+
+**Safe fixes:** Authorised staff create the shipment from the Order ID after reading the preview. Do **not** mark the order paid just to force a shipment. See playbook use case 24.
+
+**Escalate when:** The preview looks right but creation fails, or a second shipment appears after later payment.
+
+---
+
+## Customer has no Track shipment button
+
+**What it means:** The button appears only when shipment records are on, customer tracking links are on, and a safe `http` or `https` tracking address is saved.
+
+**Check first:** Settings (administrator), then the shipment tracking URL.
+
+**Safe fixes:** Save a safe tracking URL. Do not paste an unsafe link.
+
+**Escalate when:** All three conditions look true and the customer still has no button.
 
 ---
 
@@ -174,4 +212,4 @@ Use this guide first. Do **not** edit PHP, run SQL, clear Redis globally, change
 - What the customer sees (option name + estimate, or the problem)  
 - What you already tried  
 - Exact wording of Ready / Needs Attention  
-- Plugin version shown in WordPress (**1.0.0-rc.4** expected)
+- Plugin version shown in WordPress (**1.0.0-rc.5** expected)

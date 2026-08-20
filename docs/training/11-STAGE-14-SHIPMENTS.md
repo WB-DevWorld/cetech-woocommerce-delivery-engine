@@ -348,3 +348,5 @@ WooCommerce **Order Again** is a separate store action. The Delivery shipments s
 - Everyday home and golden rules: [00 — Start here](00-START-HERE.md)
 - Administrator configuration: [02 — Complete Administrator Guide](02-COMPLETE-ADMIN-GUIDE.md)
 - Staff course (catalogue and checkout): [05 — Staff Training Manual](05-STAFF-TRAINING-MANUAL.md)
+- Shipment jobs as use cases: [03 — Use-Case Playbook](03-USE-CASE-PLAYBOOK.md) (use cases 20–30)
+- Screen tour: [04 — Visual Walkthrough](04-VISUAL-WALKTHROUGH.md) section 19

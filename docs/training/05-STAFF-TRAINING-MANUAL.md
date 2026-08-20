@@ -37,20 +37,19 @@ Read [04-VISUAL-WALKTHROUGH](04-VISUAL-WALKTHROUGH.md) sections 1–2 (admin →
 1. Log into WordPress admin.  
 2. Open **Delivery Engine → Overview**.  
 3. Note Site-wide Defaults, Product Exceptions, and Needs Attention in the left menu.  
-4. Do **not** look for Legacy Delivery Rules as a normal menu item.
+4. If **Shipments** is in the menu, note it as the place to work delivery jobs — do not change anything yet.
 
 ## 5. Check your result
 You can name the everyday home (**Overview**) and explain that customers choose a Delivery option on the product page and staff later read **Delivery information** on the order.
 
 ## 6. Common mistakes
 - Treating **Settings** as the same page as **Site-wide Defaults**.  
-- Looking for RC.2 “Delivery Settings” as the everyday editor.
 
 ## 7. Short quiz
 1. Where do staff land for daily delivery work?  
 2. What does a customer choose on the product page?  
 3. Where do staff find delivery details after an order?  
-4. Should normal staff use Legacy Delivery Rules day to day?  
+4. Should normal staff change Advanced Settings without an administrator?  
 5. Name the three inheritance layers.
 
 **Answers:** (1) Overview (2) A Delivery option (3) Order → Delivery information (4) No (5) Site-wide Defaults, Product exception, Variation exception.
@@ -72,13 +71,13 @@ Wrong menu = wrong changes. Options, Areas, and Charges work together; Site-wide
 [04-VISUAL-WALKTHROUGH](04-VISUAL-WALKTHROUGH.md) sections 2–10. Skim [02-COMPLETE-ADMIN-GUIDE](02-COMPLETE-ADMIN-GUIDE.md).
 
 ## 4. Do it yourself
-Open each everyday page once (read-only): Overview, Site-wide Defaults, Delivery Options, Delivery Areas, Delivery Charges, Pickup Locations, Product Exceptions, Needs Attention. Do not change Settings switches.
+Open each everyday page once (read-only): Overview, Site-wide Defaults, Delivery Options, Delivery Areas, Delivery Charges, Pickup Locations, Product Exceptions, Needs Attention. If **Shipments** is in the menu, open the list read-only. Do not change Settings switches.
 
 ## 5. Check your result
 You can say which page sets store defaults, which lists customer-facing option names, and which sets fees.
 
 ## 6. Common mistakes
-Looking for Delivery Offers / Destination Zones / Rate Cards as menu titles; changing Settings flags; confusing Delivery Areas with WooCommerce shipping zones without checking both.
+Looking for a different menu than the everyday list in Start Here; changing Settings flags; confusing Delivery Areas with WooCommerce shipping zones without checking both.
 
 ## 7. Short quiz
 1. Which page sets the store-standard rules products inherit?  
@@ -158,7 +157,7 @@ Editing a live catalogue product instead of QA; customizing every field; forgett
 **Answers:** (1) WooCommerce product → Delivery tab (2) Customize This Product (3) When Site-wide Defaults are correct (4) Preview Delivery (5) Delivery option name + Estimated delivery.
 
 ## 8. Practical test
-Show Preview Ready for #39705 without using any Legacy screen.
+Show Preview Ready for #39705 using only the product **Delivery** tab and **Preview Delivery**.
 
 ---
 
@@ -248,7 +247,7 @@ Open Delivery Areas and Delivery Charges read-only. Find how an area and an opti
 You can describe: customer address → area match → charge for selected option → shipping line (public option label + amount).
 
 ## 6. Common mistakes
-Changing fees on the order instead of Delivery Charges; assuming quantity always multiplies a fixed-per-shipment fee.
+Changing fees on the order instead of Delivery Charges; assuming quantity always multiplies a shared delivery fee.
 
 ## 7. Short quiz
 1. What two things does a typical Delivery Charge connect?  
@@ -260,7 +259,7 @@ Changing fees on the order instead of Delivery Charges; assuming quantity always
 **Answers:** (1) Area + Delivery Option (2) Checkout shipping (3) No (4) The public Delivery Option name (fallback Delivery / Store pickup) (5) Administrator / authorised staff.
 
 ## 8. Practical test
-Explain why two compatible items might share one 25.00 charge in a fixed-per-shipment setup without using developer terms.
+Explain why two compatible items might share one 25.00 charge without using developer terms.
 
 ---
 
@@ -320,7 +319,7 @@ Creating many QA orders; enabling COD; changing payment methods for training.
 
 ## 7. Short quiz
 1. Does cart remember the delivery choice when enabled?  
-2. Can two compatible items share one fixed-per-shipment fee?  
+2. Can two compatible items share one delivery fee?  
 3. What should happen for incompatible fulfilment paths?  
 4. Should training enable COD?  
 5. Where is the fee finally charged?
@@ -384,7 +383,7 @@ Pick three FAQ topics. For each, write your first three checks. Practice opening
 Your checks stay inside Overview / Needs Attention / product Delivery / Preview / Options-Areas-Charges — no PHP/SQL/SSH.
 
 ## 6. Common mistakes
-Hunting for Legacy Rules; asking hosting to flush caches as a first step; guessing $0 shipping.
+Hunting for a screen that is not in the everyday menu; asking hosting to flush caches as a first step; guessing $0 shipping.
 
 ## 7. Short quiz
 1. First place to look for incomplete products?  
@@ -403,34 +402,34 @@ Role-play: trainer says “no delivery options on product”. You list safe chec
 # MODULE 12 — Boundaries: what normal staff should not touch
 
 ## 1. What you are learning
-Legacy Delivery Rules are **not** an everyday menu. Settings Advanced switches, Access, Technical Diagnostics, and private logistics pages are administrator/support territory.
+Settings Advanced switches, Access, Technical Diagnostics, and private supply screens are administrator or support territory. Everyday work is Overview, Site-wide Defaults, Product Exceptions, and (when enabled) Shipments.
 
 ## 2. Why it matters
-Editing the wrong system causes conflicting behaviour and hard-to-diagnose live issues.
+Editing the wrong screen can confuse checkout and is hard to undo.
 
 ## 3. Watch the walkthrough
-Visual Walkthrough section 10. Start Here golden rules. Administrator guide Settings / Legacy sections.
+Visual Walkthrough section 10. Start Here golden rules. Administrator guide Settings section.
 
 ## 4. Do it yourself
 Confirm the left Delivery Engine menu matches the everyday list in [00-START-HERE](00-START-HERE.md). Do not open hidden support destinations. Confirm you know who to ask before any Settings / Access change.
 
 ## 5. Check your result
-You can explain: everyday = Site-wide Defaults + Product Exceptions; Legacy = not a normal workflow; Administrator access is protected.
+You can explain: everyday = Site-wide Defaults + Product Exceptions; Settings / Access need an administrator; Administrator access is protected.
 
 ## 6. Common mistakes
-Training others to use Legacy; changing Advanced Settings flags; publishing supplier/origin details to customers.
+Changing Advanced Settings flags; publishing supplier/origin details to customers; rewriting old paid orders.
 
 ## 7. Short quiz
 1. Everyday defaults page name?  
-2. Is Legacy Delivery Rules in the normal menu?  
+2. Should you use a screen that is not on the everyday menu?  
 3. Name one Settings change that needs an administrator.  
 4. Are suppliers customer-facing?  
 5. Where do you send technical deep detail?
 
-**Answers:** (1) Site-wide Defaults (2) No (3) Feature switches / Access / Advanced (4) No — private (5) Technical Support Appendix / CETECH support.
+**Answers:** (1) Site-wide Defaults (2) No — ask an administrator (3) Feature switches / Access / Advanced (4) No — private (5) Technical Support Appendix / CETECH support.
 
 ## 8. Practical test
-Pass/fail oral exam: explain Site-wide Defaults vs a Product Exception vs Legacy, without mentioning databases or PHP.
+Pass/fail oral exam: explain Site-wide Defaults vs a Product Exception, without mentioning databases or PHP.
 
 ---
 
@@ -438,4 +437,4 @@ Pass/fail oral exam: explain Site-wide Defaults vs a Product Exception vs Legacy
 
 You are trained when you can demonstrate Modules 4, 5, 10, and 12 practical tests plus inheritance explanation (Module 3). Reading alone is not enough — see [06-TRAINER-GUIDE](06-TRAINER-GUIDE.md).
 
-If your role includes fulfilling orders, continue with [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md) after an Administrator has enabled shipment records.
+If your role includes fulfilling orders, continue with [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md) and playbook use cases 20–30 after an Administrator has enabled shipment records.

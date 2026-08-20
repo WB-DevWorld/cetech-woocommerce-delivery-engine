@@ -3,9 +3,9 @@
 **Plugin version:** 1.0.0-rc.5  
 **Status:** Recapture **deferred**. Written guides are the teaching authority until new recordings exist.
 
-Older RC.2 scripts, transcripts, and any leftover `.webm` files describe the previous menus (Delivery Settings, Delivery Offers, Rate Cards, Legacy as a visible page) and the previous customer presentation. **Do not use them as current truth.**
+Older recordings use different menu names and an older customer layout. **Do not use them as current truth.** If an old name appears in a leftover file, the mapping is only in the [Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md).
 
-When recordings are made later, replace binaries under [`assets/videos/`](assets/videos/) and update this index. Narration scripts in `video-scripts/` will need an RC.4 rewrite at that time.
+When recordings are made later, replace binaries under [`assets/videos/`](assets/videos/) and update this index. Narration scripts in `video-scripts/` will need a rewrite to match the live RC.5 screens.
 
 ---
 
@@ -26,7 +26,7 @@ Companion written tour: [04-VISUAL-WALKTHROUGH](04-VISUAL-WALKTHROUGH.md).
 
 ## Intended video index (for later recapture)
 
-Keep this list so future recordings match the staff course. Filenames may stay the same; **content must match RC.4**.
+Keep this list so future recordings match the staff course. Filenames may stay the same; **content must match RC.5**.
 
 ### 01 — Getting started overview
 
@@ -34,7 +34,7 @@ Keep this list so future recordings match the staff course. Filenames may stay t
 |-------|--------|
 | **What they will learn** | Overview as everyday home; Site-wide Defaults; Product Exceptions; Preview Delivery; compact customer selector |
 | **Related written guide** | [00-START-HERE](00-START-HERE.md), [01-QUICK-START](01-QUICK-START.md) |
-| **Practice** | Open Overview + Site-wide Defaults; confirm Legacy is not in the menu |
+| **Practice** | Open Overview + Site-wide Defaults; stay on the everyday menu |
 | **Status** | Deferred |
 
 ### 02 — Site-wide Defaults
@@ -102,18 +102,26 @@ Keep this list so future recordings match the staff course. Filenames may stay t
 | **What they will learn** | Needs Attention first checks; no PHP/SQL/SSH |
 | **Status** | Deferred |
 
-### 11 — Boundaries (Legacy retired)
+### 11 — Boundaries (Settings and Access)
 
 | Field | Detail |
 |-------|--------|
-| **What they will learn** | Everyday menu only; Legacy not a workflow; Settings/Access/diagnostics boundaries |
+| **What they will learn** | Everyday menu only; ask before Settings, Access, or hidden support screens |
 | **Status** | Deferred |
 
 ### 12 — Complete staff walkthrough
 
 | Field | Detail |
 |-------|--------|
-| **What they will learn** | End-to-end RC.4 path from Overview to order |
+| **What they will learn** | End-to-end RC.5 path from Overview to order |
+| **Status** | Deferred |
+
+### 13 — Shipments (when enabled)
+
+| Field | Detail |
+|-------|--------|
+| **What they will learn** | Shipments menu, status path, tracking, COD create-from-order, customer View Order card |
+| **Related written guide** | [11-STAGE-14-SHIPMENTS](11-STAGE-14-SHIPMENTS.md), playbook use cases 20–30 |
 | **Status** | Deferred |
 
 ---
@@ -124,4 +132,4 @@ Keep this list so future recordings match the staff course. Filenames may stay t
 - Do not place extra paid orders.  
 - Do not capture credentials, Cloudflare challenge, or customer PII.  
 - Auth state stays in gitignored `training/playwright/auth/`.  
-- Update this file’s Status column when a binary actually exists and matches RC.4.
+- Update this file’s Status column when a binary actually exists and matches RC.5.

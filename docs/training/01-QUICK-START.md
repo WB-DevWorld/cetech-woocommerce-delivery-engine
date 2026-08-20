@@ -1,7 +1,7 @@
 # Quick Start (about 10 minutes)
 
 **Audience:** New staff  
-**Plugin version:** 1.0.0-rc.4  
+**Plugin version:** 1.0.0-rc.5  
 **Goal:** Do the everyday tasks safely without technical detail.
 
 Screenshots are not included in this revision. Follow the live WordPress screens.
@@ -121,7 +121,7 @@ Stop and escalate if you need to:
 
 - change **Delivery Engine → Settings** (especially Advanced switches)  
 - change **Settings → Access**  
-- look for Legacy Delivery Rules or Technical Diagnostics  
+- open a screen that is not in the everyday menu  
 - “fix” delivery details on an old paid order  
 - change store-wide pricing or areas without authorisation  
 
@@ -132,3 +132,5 @@ Also escalate if **Needs Attention** still lists a product after Site-wide Defau
 ## Next
 
 Continue with the [Staff Training Manual](05-STAFF-TRAINING-MANUAL.md) or the [Visual Walkthrough](04-VISUAL-WALKTHROUGH.md).
+
+If **Delivery Engine → Shipments** is in the menu, also read [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md) and playbook use cases 20–30.
