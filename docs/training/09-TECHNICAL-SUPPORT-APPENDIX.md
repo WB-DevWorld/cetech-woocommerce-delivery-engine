@@ -3,9 +3,9 @@
 **Audience:** Technical support and developers **only**  
 **Normal staff should not require this document.**
 
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.6-qa.1**  
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.6-qa.2**  
 **Schema target:** `4`  
-**Release identity:** Current QA package `1.0.0-rc.6-qa.1` is a defect-fix after protected tagged `v1.0.0-rc.5` (do not rewrite that tag). Tags `v1.0.0-rc.5`, `v1.0.0-rc.4`, `v1.0.0-rc.3`, and `v1.0.0-rc.2` remain untouched.
+**Release identity:** Current QA package `1.0.0-rc.6-qa.2` is a defect-fix after protected tagged `v1.0.0-rc.5` (do not rewrite that tag). Tags `v1.0.0-rc.5`, `v1.0.0-rc.4`, `v1.0.0-rc.3`, and `v1.0.0-rc.2` remain untouched.
 
 If WordPress shows a different plugin version, stop and confirm which package is installed before following this appendix.
 
@@ -91,7 +91,8 @@ Administrator lockout repair is **Restore Administrator Access**, authorised by 
 
 ## Rollback / release identity
 
-- Current QA package: `cetech-woocommerce-delivery-engine-1.0.0-rc.6-qa.1.zip` — bytes, SHA-256, and source commit are recorded in `docs/STAGE-14H-RC6-QA1-OWNER-QA-PACKAGE.md`  
+- Current QA package: `cetech-woocommerce-delivery-engine-1.0.0-rc.6-qa.2.zip` — bytes, SHA-256, and source commit are recorded in `docs/STAGE-14H-RC6-QA2-OWNER-QA-PACKAGE.md`  
+- Prior RC.6 QA package `cetech-woocommerce-delivery-engine-1.0.0-rc.6-qa.1.zip` remains immutable  
 - Protected published package remains `cetech-woocommerce-delivery-engine-1.0.0-rc.5.zip` (`1043995` bytes, SHA-256 `7f9ad300a2d7198b7f0e70f1cd0819351e35430fd5ca843dac7c24ce9f96d66c`, source `e0b4613`)  
 - Full RC.5 record: `docs/STAGE-14H-FINAL.md`  
 - Immediate prior production rollback: tagged `v1.0.0-rc.4` (RC.4 ZIP remains available)  

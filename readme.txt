@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-rc.6-qa.1
+Stable tag: 1.0.0-rc.6-qa.2
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,9 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-rc.6-qa.2 =
+* Defect-fix QA after 1.0.0-rc.6-qa.1. Delivery Area Region rules match either the WooCommerce state code or the human-readable state label for that country (for example Ghana AA and Greater Accra). Existing code-saved rules still work. No Delivery Area data migration. Schema target remains 4. Keeps the QA.1 shipping-method registry repair. Not a replacement for tagged v1.0.0-rc.5.
 
 = 1.0.0-rc.6-qa.1 =
 * Defect-fix QA after protected 1.0.0-rc.5. Delivery is listed in WooCommerce Add shipping method while the plugin is active, even before checkout is activated. Rates stay flag-gated. Add Delivery only to the WooCommerce zones where this plugin should operate; Rest of the World is optional. Schema target remains 4. Not a replacement for tagged v1.0.0-rc.5.

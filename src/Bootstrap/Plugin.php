@@ -13,6 +13,9 @@ use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidator;
 use CetechDeliveryEngine\Application\Calculator\AdminRateCardTester;
 use CetechDeliveryEngine\Application\Destination\DestinationZoneMatcher;
 use CetechDeliveryEngine\Application\Destination\PackageDestinationZoneResolver;
+use CetechDeliveryEngine\Application\Destination\RegionCodeLabelMatcher;
+use CetechDeliveryEngine\Application\Destination\WooCommerceStateCatalogInterface;
+use CetechDeliveryEngine\Infrastructure\WooCommerce\Destination\WooCommerceStateCatalog;
 use CetechDeliveryEngine\Application\RateQuote\RateQuoteEngine;
 use CetechDeliveryEngine\Application\Order\CustomerOrderDeliverySummaryBuilder;
 use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotBuilder;
@@ -435,10 +438,23 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			WooCommerceStateCatalogInterface::class,
+			static fn (): WooCommerceStateCatalogInterface => new WooCommerceStateCatalog()
+		);
+
+		$this->container->singleton(
+			RegionCodeLabelMatcher::class,
+			static fn ( ServiceContainer $container ): RegionCodeLabelMatcher => new RegionCodeLabelMatcher(
+				$container->get( WooCommerceStateCatalogInterface::class )
+			)
+		);
+
+		$this->container->singleton(
 			DestinationZoneMatcher::class,
 			static fn ( ServiceContainer $container ): DestinationZoneMatcher => new DestinationZoneMatcher(
 				$container->get( DestinationZoneRepositoryInterface::class ),
-				$container->get( DestinationRuleRepositoryInterface::class )
+				$container->get( DestinationRuleRepositoryInterface::class ),
+				$container->get( RegionCodeLabelMatcher::class )
 			)
 		);
 

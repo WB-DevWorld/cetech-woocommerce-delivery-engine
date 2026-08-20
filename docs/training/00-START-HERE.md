@@ -1,8 +1,8 @@
 # Start here — CETECH Delivery Engine staff training
 
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.6-qa.1**  
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.6-qa.2**  
 **Everyday home:** WordPress admin → **Delivery Engine → Overview**  
-**Screenshots / videos:** Not recaptured for this 1.0.0-rc.6-qa.1 package yet. Use these written guides on the live screens. Older images or videos, if you still have them, are out of date.
+**Screenshots / videos:** Not recaptured for this 1.0.0-rc.6-qa.2 package yet. Use these written guides on the live screens. Older images or videos, if you still have them, are out of date.
 
 You do **not** need to know PHP, databases, or plugin architecture.
 

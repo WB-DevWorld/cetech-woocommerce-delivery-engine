@@ -17,8 +17,10 @@ final class DestinationZoneMatcher {
 
 	public function __construct(
 		private DestinationZoneRepositoryInterface $zone_repository,
-		private DestinationRuleRepositoryInterface $rule_repository
+		private DestinationRuleRepositoryInterface $rule_repository,
+		private ?RegionCodeLabelMatcher $region_matcher = null
 	) {
+		$this->region_matcher = $region_matcher ?? new RegionCodeLabelMatcher();
 	}
 
 	/**
@@ -128,13 +130,16 @@ final class DestinationZoneMatcher {
 		return match ( $rule_type ) {
 			DestinationRuleType::Country->value => '' !== $country_code
 				&& strtoupper( $rule_value ) === $country_code,
-			DestinationRuleType::Region->value => '' !== $region
-				&& strtolower( $rule_value ) === $region,
+			DestinationRuleType::Region->value => $this->region_matches( $country_code, $region, $rule_value ),
 			DestinationRuleType::City->value => '' !== $city
 				&& strtolower( $rule_value ) === $city,
 			DestinationRuleType::Postcode->value => '' !== $postcode && $this->postcode_matches( $postcode, strtoupper( $rule_value ), $match_mode ),
 			default => false,
 		};
+	}
+
+	private function region_matches( string $country_code, string $region, string $rule_value ): bool {
+		return $this->region_matcher->matches( $country_code, $region, $rule_value );
 	}
 
 	private function postcode_matches( string $postcode, string $rule_value, string $match_mode ): bool {

@@ -1,7 +1,7 @@
 # Visual Walkthrough (written screen tour)
 
 **Audience:** New staff and trainers  
-**Version:** 1.0.0-rc.6-qa.1  
+**Version:** 1.0.0-rc.6-qa.2  
 **Screenshots:** Deferred. This tour is written against the live RC.5 screens. Do not use leftover older images as teaching truth.
 
 Walk this path on the live site (read-only unless a trainer authorises a QA edit):

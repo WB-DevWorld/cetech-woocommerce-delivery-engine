@@ -1,7 +1,7 @@
 # Shipping-method registry listing repair (post-RC.5)
 
-**Status:** Packaged as owner QA `1.0.0-rc.6-qa.1` — not a replacement for tagged `v1.0.0-rc.5`; FLAIROC not deployed  
-**Plugin version in tree:** `1.0.0-rc.6-qa.1`  
+**Status:** Included in owner QA `1.0.0-rc.6-qa.2` (first packaged in `1.0.0-rc.6-qa.1`) — not a replacement for tagged `v1.0.0-rc.5`; FLAIROC not deployed  
+**Plugin version in tree:** `1.0.0-rc.6-qa.2`  
 **Schema:** `4` (unchanged)  
 **Date:** 2026-08-20  
 **Package record:** `docs/STAGE-14H-RC6-QA1-OWNER-QA-PACKAGE.md`
