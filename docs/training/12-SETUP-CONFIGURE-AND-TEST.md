@@ -1,7 +1,7 @@
 # How to use each Delivery Engine menu
 
 **Audience:** New staff — start here if you are new to this plugin  
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.5**  
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.6-qa.1**  
 **Open:** WordPress admin left menu → **Delivery Engine** (location-pin icon)
 
 This guide is only about the plugin. Each section is one menu. For every menu you get **how to open it, how to do the work, what to type, which button to press, and how to check it**.
@@ -396,6 +396,8 @@ WooCommerce shipping **zones** decide *whether* this method is offered for an ad
 
 The method to add is named **Delivery**. That is this plugin. Do not add **Flat rate**, **Free shipping**, or **Local pickup** as a stand-in.
 
+**Delivery** appears in WooCommerce’s **Add shipping method** list as soon as this plugin and WooCommerce are active. You can add it **before** Activate Delivery Engine. Checkout still will not charge a Delivery Engine fee until activation.
+
 If a plugin warning says “CETECH Delivery shipping method”, that is the same **Delivery** row in WooCommerce’s list.
 
 ## How to open the WooCommerce shipping screen
@@ -410,22 +412,19 @@ If that button is not showing, go to **WooCommerce → Settings → Shipping**.
 
 ## Which zones need Delivery
 
-Add **Delivery** to **every existing shipping zone**, including the default **Rest of the World** zone.
+Add **Delivery** only to the WooCommerce shipping zones where you want this plugin’s fee to appear.
 
-WooCommerce often lists Rest of the World as **Locations not covered by your other zones**. Open that row too — it is not optional.
+A zone without **Delivery** will not show this plugin’s fee for addresses in that zone. Leave it off if that zone should keep ordinary WooCommerce shipping, or no Delivery Engine shipping.
 
-**Good enough for most stores**
+**Rest of the World** (WooCommerce often labels it **Locations not covered by your other zones**) is **optional**. Add Delivery there only if you intend this plugin to quote addresses that do not match your other zones.
 
-If the Shipping zones list already has:
+**Typical store**
 
-- **Everywhere** (or another zone that covers the countries you sell to), **and**
-- **Rest of the World** / **Locations not covered by your other zones**
-
-…add **Delivery** to **both**. You do not need extra zones for the plugin to work.
+If the Shipping zones list already has a zone that covers how you sell (for example **Everywhere** or a country zone), add **Delivery** to that zone. You do not need extra zones for the plugin to work. Skip Rest of the World unless you also want this plugin to serve leftover addresses.
 
 **If you have more custom zones**
 
-If the store already has extra zones (for example a country zone, a region zone, or a named **Everywhere** zone), add **Delivery** to **each** of them as well. A zone without **Delivery** will not show this plugin’s fee for addresses in that zone.
+Add **Delivery** only to the zones that should use this plugin. You do not have to add it to every zone.
 
 **If you still need a custom zone**
 
@@ -435,7 +434,7 @@ Only add a new zone if the store does not already have one that covers how you s
 2. **Zone name:** a name staff will recognise, for example `Everywhere` or the country name.  
 3. **Zone regions:** choose the countries or regions that zone should cover.  
 4. Click **Save changes**.  
-5. Add **Delivery** to that new zone **and** still add it to **Rest of the World**.
+5. Add **Delivery** to that new zone if this plugin should serve those addresses. Rest of the World remains optional.
 
 ## How to add Delivery to one zone
 
@@ -451,7 +450,7 @@ Only add a new zone if the store does not already have one that covers how you s
 
 You do **not** type the delivery price here. The fee comes from **Delivery Engine → Delivery Charges**.
 
-Repeat these steps for **every** zone on the Shipping zones list, including **Rest of the World**. Go back to **WooCommerce → Settings → Shipping** (or the zones list) after each zone, then open the next one.
+Repeat these steps for each zone where you want Delivery Engine shipping. Go back to **WooCommerce → Settings → Shipping** (or the zones list) after each zone, then open the next intended zone.
 
 ## What you may open after adding it
 
@@ -467,7 +466,7 @@ Then close and return to the plugin.
 1. Go back to **Delivery Engine → Settings** or Setup Guide **Finish**.  
 2. Refresh the page.  
 3. **WooCommerce shipping** should say **Ready**.  
-4. If it still says **Action needed**, **Delivery** is missing or disabled. Open **each** zone, including Rest of the World, and confirm **Delivery** is listed and enabled.
+4. If it still says **Action needed**, **Delivery** is missing or disabled on the zone you intend to use. Open that zone and confirm **Delivery** is listed and enabled. Rest of the World is required only if you chose to support leftover addresses.
 
 ## Do not
 
@@ -478,7 +477,7 @@ Then close and return to the plugin.
 
 If other methods (Flat rate, Free shipping) are already on the same zone, customers may see more than one WooCommerce shipping row. Ask an administrator before disabling those leftovers.
 
-**Check:** Every existing zone, plus Rest of the World, lists **Delivery** and it is enabled. Plugin **WooCommerce shipping** = **Ready**. On checkout, with a matching address and a selected Delivery option, the shipping amount matches the Delivery Charge.
+**Check:** The WooCommerce zones you intend to use list **Delivery** and it is enabled. Rest of the World only if you chose to support it. Plugin **WooCommerce shipping** = **Ready**. On checkout, with a matching address and a selected Delivery option, the shipping amount matches the Delivery Charge.
 
 ---
 
@@ -676,7 +675,7 @@ Customers must not see “In Warehouse”, supplier names, or internal codes.
 - [ ] You can add a Delivery Option, Area, and Charge and save them  
 - [ ] Test an address matches your area  
 - [ ] Site-wide Defaults are saved; Preview is **Ready**  
-- [ ] **Delivery** is enabled on every existing WooCommerce zone, including Rest of the World  
+- [ ] **Delivery** is enabled on the WooCommerce zones where you want this plugin to operate (Rest of the World only if you intend to support leftover addresses)  
 - [ ] Settings show Active / shipping Ready; Advanced left alone  
 - [ ] Shop shows option + estimate; checkout shows the real fee  
 - [ ] You can customize one product field and reset it  

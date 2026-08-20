@@ -216,7 +216,7 @@ final class SystemStatusPage {
 				__( 'Rate quote mode', 'cetech-woocommerce-delivery-engine' ) => $this->describe_rate_quote_mode( $shipping_runtime_active ),
 				__( 'Rate quote admin check location', 'cetech-woocommerce-delivery-engine' ) => __( 'Delivery Engine → Technical Diagnostic Tools → Technical details', 'cetech-woocommerce-delivery-engine' ),
 				__( 'WooCommerce selected-offer shipping flag', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( $shipping_calculation_enabled ),
-				__( 'Selected-offer shipping method registered', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( $shipping_runtime_active && class_exists( SelectedOfferShippingMethod::class ) ),
+				__( 'Selected-offer shipping method registered', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( function_exists( 'WC' ) && class_exists( SelectedOfferShippingMethod::class ) ),
 				__( 'Shipping method ID', 'cetech-woocommerce-delivery-engine' ) => SelectedOfferShippingMethod::METHOD_ID,
 				__( 'Shipping calculation mode', 'cetech-woocommerce-delivery-engine' ) => $this->describe_shipping_calculation_mode( $shipping_calculation_enabled, $shipping_runtime_active ),
 				__( 'Destination zone resolver', 'cetech-woocommerce-delivery-engine' ) => $this->describe_destination_resolver(),
@@ -489,11 +489,15 @@ final class SystemStatusPage {
 	}
 
 	private function describe_shipping_method_registration( bool $shipping_runtime_active ): string {
-		if ( $shipping_runtime_active ) {
-			return __( 'Registered when runtime gates active', 'cetech-woocommerce-delivery-engine' );
+		if ( ! function_exists( 'WC' ) || ! class_exists( SelectedOfferShippingMethod::class ) ) {
+			return __( 'Not registered', 'cetech-woocommerce-delivery-engine' );
 		}
 
-		return __( 'Not registered', 'cetech-woocommerce-delivery-engine' );
+		if ( $shipping_runtime_active ) {
+			return __( 'Registered for shipping zones; checkout rates enabled', 'cetech-woocommerce-delivery-engine' );
+		}
+
+		return __( 'Registered for shipping zones; checkout rates not enabled', 'cetech-woocommerce-delivery-engine' );
 	}
 
 	private function describe_cart_checkout_totals( bool $shipping_runtime_active ): string {

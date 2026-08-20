@@ -1,7 +1,7 @@
 # Complete Administrator Guide
 
 **Audience:** Administrators and authorised configuration staff  
-**Version:** CETECH Delivery Engine 1.0.0-rc.5  
+**Version:** CETECH Delivery Engine 1.0.0-rc.6-qa.1  
 **Everyday home:** Delivery Engine → **Overview**  
 **Not everyday:** Technical Diagnostics, private supply screens, Advanced Settings
 
@@ -218,7 +218,7 @@ Correct fee for their destination (together with Delivery Charges).
 Overlapping unclear areas; areas with no charge defined.
 
 **Related**  
-Delivery Charges; WooCommerce shipping zones (method availability). Add **Delivery** to every zone, including Rest of the World: [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md#how-to-add-the-delivery-shipping-method-in-woocommerce).
+Delivery Charges; WooCommerce shipping zones (method availability). Add **Delivery** only to the zones where this plugin should operate; Rest of the World is optional: [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md#how-to-add-the-delivery-shipping-method-in-woocommerce).
 
 **Expected result**  
 Address tests match the intended area.
@@ -436,7 +436,7 @@ Shipment staff training: [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md). 
 Advanced switches, Access matrix for subordinate roles without a policy decision.
 
 **Related**  
-WooCommerce **Delivery** shipping method on every zone, including Rest of the World: [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md#how-to-add-the-delivery-shipping-method-in-woocommerce). Technical Support Appendix.
+WooCommerce **Delivery** shipping method on the zones where this plugin should operate (Rest of the World optional): [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md#how-to-add-the-delivery-shipping-method-in-woocommerce). Technical Support Appendix.
 
 ---
 

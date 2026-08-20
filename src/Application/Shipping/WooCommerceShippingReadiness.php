@@ -55,7 +55,7 @@ final class WooCommerceShippingReadiness {
 			return 'WooCommerce must be active before delivery fees can appear at checkout.';
 		}
 
-		return 'Add the CETECH Delivery shipping method to a WooCommerce shipping zone so customers can see delivery fees at checkout.';
+		return 'Add the CETECH Delivery shipping method to a WooCommerce shipping zone so customers can see delivery fees at checkout. In Add shipping method, choose Delivery. It is listed there while WooCommerce and this plugin are active, including before checkout is activated.';
 	}
 
 	private function method_is_assigned_to_a_zone(): bool {

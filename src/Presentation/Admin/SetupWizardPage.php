@@ -562,6 +562,7 @@ final class SetupWizardPage {
 
 		if ( ! $shipping_ready ) {
 			echo '<p>' . esc_html( $this->shipping_readiness->explanation() ) . '</p>';
+			echo '<p>' . esc_html__( 'Open the zone, click Add shipping method, and choose Delivery. You can do this before Activate Delivery Engine.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 			echo '<p><a class="button button-secondary" href="' . esc_url( $this->shipping_readiness->settings_url() ) . '">' . esc_html__( 'Configure WooCommerce Shipping', 'cetech-woocommerce-delivery-engine' ) . '</a></p>';
 		}
 

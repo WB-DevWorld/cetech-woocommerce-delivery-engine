@@ -30,5 +30,7 @@ final class WooCommerceShippingReadinessTest extends TestCase {
 		self::assertFalse( $readiness->is_ready() );
 		self::assertSame( 'Action needed', $readiness->status_label() );
 		self::assertStringContainsString( 'CETECH Delivery shipping method', $readiness->explanation() );
+		self::assertStringContainsString( 'Add shipping method', $readiness->explanation() );
+		self::assertStringContainsString( 'before checkout is activated', $readiness->explanation() );
 	}
 }

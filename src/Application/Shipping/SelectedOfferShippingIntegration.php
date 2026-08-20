@@ -7,7 +7,13 @@ namespace CetechDeliveryEngine\Application\Shipping;
 use CetechDeliveryEngine\Infrastructure\WooCommerce\Shipping\SelectedOfferShippingMethod;
 
 /**
- * Registers the selected-offer WooCommerce shipping method when runtime gates allow.
+ * Registers the selected-offer WooCommerce shipping method for zone assignment.
+ *
+ * Rate calculation and managed-package exclusivity remain behind
+ * ShippingRateCalculationGate. This class is listed in WooCommerce's
+ * shipping-method registry whenever WooCommerce and the Delivery Engine are
+ * active so administrators can add Delivery to a zone before activating
+ * storefront runtime. The method is never auto-inserted into a zone.
  */
 final class SelectedOfferShippingIntegration {
 
@@ -31,10 +37,6 @@ final class SelectedOfferShippingIntegration {
 	 * @return array<string, class-string>
 	 */
 	public function register_shipping_method( array $methods ): array {
-		if ( ! $this->gate->is_runtime_active() ) {
-			return $methods;
-		}
-
 		$methods[ SelectedOfferShippingMethod::METHOD_ID ] = SelectedOfferShippingMethod::class;
 
 		return $methods;

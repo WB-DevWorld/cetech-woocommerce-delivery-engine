@@ -3,9 +3,9 @@
 **Audience:** Technical support and developers **only**  
 **Normal staff should not require this document.**
 
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.5**  
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.6-qa.1**  
 **Schema target:** `4`  
-**Release identity:** Git tag `v1.0.0-rc.5` (do not rewrite). Tags `v1.0.0-rc.4`, `v1.0.0-rc.3`, and `v1.0.0-rc.2` remain untouched.
+**Release identity:** Current QA package `1.0.0-rc.6-qa.1` is a defect-fix after protected tagged `v1.0.0-rc.5` (do not rewrite that tag). Tags `v1.0.0-rc.5`, `v1.0.0-rc.4`, `v1.0.0-rc.3`, and `v1.0.0-rc.2` remain untouched.
 
 If WordPress shows a different plugin version, stop and confirm which package is installed before following this appendix.
 
@@ -91,14 +91,12 @@ Administrator lockout repair is **Restore Administrator Access**, authorised by 
 
 ## Rollback / release identity
 
-- Current package: `cetech-woocommerce-delivery-engine-1.0.0-rc.5.zip`  
-- ZIP bytes: `1043995`  
-- SHA-256: `7f9ad300a2d7198b7f0e70f1cd0819351e35430fd5ca843dac7c24ce9f96d66c`  
-- Package source commit: `e0b4613`  
-- Full record: `docs/STAGE-14H-FINAL.md`  
+- Current QA package: `cetech-woocommerce-delivery-engine-1.0.0-rc.6-qa.1.zip` — bytes, SHA-256, and source commit are recorded in `docs/STAGE-14H-RC6-QA1-OWNER-QA-PACKAGE.md`  
+- Protected published package remains `cetech-woocommerce-delivery-engine-1.0.0-rc.5.zip` (`1043995` bytes, SHA-256 `7f9ad300a2d7198b7f0e70f1cd0819351e35430fd5ca843dac7c24ce9f96d66c`, source `e0b4613`)  
+- Full RC.5 record: `docs/STAGE-14H-FINAL.md`  
 - Immediate prior production rollback: tagged `v1.0.0-rc.4` (RC.4 ZIP remains available)  
 - Do not alter tags `v1.0.0-rc.5`, `v1.0.0-rc.4`, `v1.0.0-rc.3`, or `v1.0.0-rc.2`.  
-- Do not retag RC.4 or earlier.
+- Do not retag RC.5 or earlier. Do not overwrite historical QA ZIPs.
 
 Staff training markdown lives in `docs/training/` in the plugin repository. It is **not** gitignored. Screenshot/video binaries and `training/playwright/` auth stay gitignored. Training docs are **not** part of the production plugin ZIP.
 
@@ -106,7 +104,7 @@ Staff training markdown lives in `docs/training/` in the plugin repository. It i
 
 ## Playwright documentation harness
 
-`training/playwright/` was built for older label/screenshot capture. It has **not** been rewritten for RC.5 menus. Auth storage is gitignored. Do not claim RC.5 visual capture from that harness until it is updated.
+`training/playwright/` was built for older label/screenshot capture. It has **not** been rewritten for current menus. Auth storage is gitignored. Do not claim visual capture from that harness until it is updated.
 
 ---
 

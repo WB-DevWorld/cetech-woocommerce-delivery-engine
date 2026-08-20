@@ -1,6 +1,6 @@
 # Video Training Library — CETECH Delivery Engine (RC.5)
 
-**Plugin version:** 1.0.0-rc.5  
+**Plugin version:** 1.0.0-rc.6-qa.1  
 **Status:** Recapture **deferred**. Written guides are the teaching authority until new recordings exist.
 
 Older recordings use different menu names and an older customer layout. **Do not use them as current truth.** If an old name appears in a leftover file, the mapping is only in the [Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md).

@@ -1,7 +1,7 @@
 # Use-Case Playbook
 
 **Audience:** Experienced staff and administrators  
-**Version:** 1.0.0-rc.5  
+**Version:** 1.0.0-rc.6-qa.1  
 **QA fixtures:** #39705 (simple), #39717 (parent), #39718 (A), #39719 (B)  
 **Everyday system:** Site-wide Defaults + Product Exceptions. When shipment records are on, also **Delivery Engine → Shipments**.
 

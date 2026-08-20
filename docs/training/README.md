@@ -1,13 +1,13 @@
 # CETECH Delivery Engine — Staff Training
 
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.5**  
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.6-qa.1**  
 **Everyday home:** WordPress admin → **Delivery Engine → Overview**
 
 Staff training for the current plugin. You do **not** need PHP, databases, or plugin architecture.
 
 **Start here:** [00-START-HERE.md](00-START-HERE.md)
 
-Screenshots and videos are not recaptured for RC.5 yet. Follow these written guides on the live screens. Older images or videos, if you still have them, are out of date.
+Screenshots and videos are not recaptured for this 1.0.0-rc.6-qa.1 package yet. Follow these written guides on the live screens. Older images or videos, if you still have them, are out of date.
 
 ---
 

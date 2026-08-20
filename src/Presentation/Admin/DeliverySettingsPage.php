@@ -558,7 +558,7 @@ final class DeliverySettingsPage {
 		echo '<li>' . esc_html__( 'Make sure at least one Delivery Area exists.', 'cetech-woocommerce-delivery-engine' ) . '</li>';
 		echo '<li>' . esc_html__( 'Make sure at least one Delivery Option exists.', 'cetech-woocommerce-delivery-engine' ) . '</li>';
 		echo '<li>' . esc_html__( 'Make sure at least one active Delivery Charge exists.', 'cetech-woocommerce-delivery-engine' ) . '</li>';
-		echo '<li>' . esc_html__( 'In WooCommerce Shipping, add the CETECH Delivery shipping method to the shipping zone that serves your customers.', 'cetech-woocommerce-delivery-engine' ) . '</li>';
+		echo '<li>' . esc_html__( 'In WooCommerce Shipping, add Delivery from Add shipping method to the zones where you want this plugin to operate. Rest of the World is optional unless you intend to support leftover addresses. You can do this before Activate Delivery Engine.', 'cetech-woocommerce-delivery-engine' ) . '</li>';
 		echo '<li>' . esc_html__( 'Activate Delivery Engine, then test with a customer address that matches a configured delivery area.', 'cetech-woocommerce-delivery-engine' ) . '</li>';
 		echo '</ol>';
 		printf(

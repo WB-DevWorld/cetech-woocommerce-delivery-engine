@@ -1,7 +1,7 @@
 # Troubleshooting FAQ (staff)
 
 **Audience:** Everyday staff and administrators  
-**Version:** 1.0.0-rc.5  
+**Version:** 1.0.0-rc.6-qa.1  
 
 Use this guide first. Do **not** edit PHP, run SQL, clear Redis globally, change the database by hand, install Code Snippets, change Nginx, or use SSH. Those steps belong only in the [Technical Support Appendix](09-TECHNICAL-SUPPORT-APPENDIX.md).
 
@@ -71,7 +71,7 @@ Use this guide first. Do **not** edit PHP, run SQL, clear Redis globally, change
 
 **Safe fixes:**
 - Re-select delivery on the product and return to cart/checkout.  
-- Ask an administrator to confirm Delivery Charges and that **Delivery** is enabled on every WooCommerce shipping zone, including Rest of the World. Click-by-click: [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md#how-to-add-the-delivery-shipping-method-in-woocommerce).
+- Ask an administrator to confirm Delivery Charges and that **Delivery** is enabled on the WooCommerce shipping zones where this plugin should operate. Rest of the World is optional unless leftover addresses are intentionally supported. Click-by-click: [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md#how-to-add-the-delivery-shipping-method-in-woocommerce).
 
 **Escalate when:** Selection is present but the fee is missing or $0 unexpectedly. Missing configuration must never silently become free shipping.
 
@@ -212,4 +212,4 @@ If the name is not in this table, stay on the everyday menu in [00-START-HERE](0
 - What the customer sees (option name + estimate, or the problem)  
 - What you already tried  
 - Exact wording of Ready / Needs Attention  
-- Plugin version shown in WordPress (**1.0.0-rc.5** expected)
+- Plugin version shown in WordPress (**1.0.0-rc.6-qa.1** expected)

@@ -1,6 +1,6 @@
 # Trainer Guide
 
-**Audience:** People teaching staff to use CETECH Delivery Engine 1.0.0-rc.5  
+**Audience:** People teaching staff to use CETECH Delivery Engine 1.0.0-rc.6-qa.1  
 **Companion course:** [05-STAFF-TRAINING-MANUAL](05-STAFF-TRAINING-MANUAL.md)
 
 Reading the guides is not enough. Trainees must demonstrate skills. Prefer: walk the [Visual Walkthrough](04-VISUAL-WALKTHROUGH.md) on live screens → practise on QA products.
