@@ -28,13 +28,14 @@ powershell -ExecutionPolicy Bypass -File scripts/build-v1-rc-package.ps1 -Versio
 |----------|------|
 | Dist ZIP | `dist/cetech-woocommerce-delivery-engine-1.0.0-rc.6-qa.1.zip` |
 | Desktop ZIP | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-rc.6-qa.1.zip` |
-| Bytes | *recorded after package build* |
-| SHA-256 | *recorded after package build* |
-| Source commit | *recorded after package build* |
+| Bytes | `1049447` |
+| SHA-256 | `d5dbc392bf6e170e411ac19ce9bb4a14e6ef5458d55583ed56b4e07fe9e2d3ff` |
+| Sidecar | same hash + `  cetech-woocommerce-delivery-engine-1.0.0-rc.6-qa.1.zip` |
+| Source commit | `116f67d` (`116f67d88c108fe2ce51bf1cbde7af405fc6445d`) |
 
 ZIP root folder: `cetech-woocommerce-delivery-engine/`
 
-Do **not** rebuild this ZIP after the SHA-256 recording commit. The source commit is the version/repair commit, not the later docs-only hash record.
+Do **not** rebuild this ZIP after the SHA-256 recording commit. The source commit is the version/repair commit `116f67d`, not the later docs-only hash record.
 
 ---
 
@@ -69,15 +70,16 @@ Playwright: not claimed. QA.6 baseline was 555 / 3050. Delta +6 tests / +22 asse
 
 | # | Check | Result |
 |---|--------|--------|
-| 1 | One plugin root `cetech-woocommerce-delivery-engine/` | *recorded after extract* |
-| 2 | Version identity `1.0.0-rc.6-qa.1` (header + `CETECH_DE_VERSION`) | *recorded after extract* |
-| 3 | `SchemaVersion::TARGET` = `4` | *recorded after extract* |
-| 4 | `vendor/autoload.php` works; production autoload verifier | *recorded after extract* |
-| 5 | Linux/forward-slash ZIP paths; PSR-4 casing | *recorded after extract* |
-| 6 | Runtime files: root PHP, `src/`, `database/`, uninstall | *recorded after extract* |
-| 7 | Dev artifacts excluded: tests, `.git`, phpunit.xml, node_modules | *recorded after extract* |
-| 8 | Registry repair present: `register_shipping_method()` does not early-return on `is_runtime_active()` | *recorded after extract* |
-| 9 | SHA-256 sidecar next to ZIP | *recorded after extract* |
+| 1 | One plugin root `cetech-woocommerce-delivery-engine/` | PASS |
+| 2 | Version identity `1.0.0-rc.6-qa.1` (header + `CETECH_DE_VERSION`) | PASS |
+| 3 | `SchemaVersion::TARGET` = `4` | PASS |
+| 4 | `vendor/autoload.php` works; production autoload verifier | PASS (exit 0; schema target 4) |
+| 5 | Linux/forward-slash ZIP paths; PSR-4 casing | PASS (0 backslash entries; verifier Linux-case classmap) |
+| 6 | Runtime files: root PHP, `src/`, `database/`, uninstall | PASS |
+| 7 | Dev artifacts excluded: tests, `.git`, phpunit.xml, node_modules, `vendor/phpunit` | PASS |
+| 8 | Registry repair present: `register_shipping_method()` does not early-return on `is_runtime_active()`; rate filter remains gated | PASS |
+| 9 | SHA-256 sidecar next to ZIP | PASS |
+| 10 | Packaged PHP lint (non-vendor) | **330 files, 0 failures** |
 
 ---
 
