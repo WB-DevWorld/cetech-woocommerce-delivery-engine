@@ -1,7 +1,7 @@
 # Glossary (plain language)
 
 **Audience:** All staff  
-**Version:** 1.0.0-rc.6-qa.2
+**Version:** 1.0.0-rc.6
 
 Terms match what you see in the Delivery Engine screens. Technical implementation words are avoided unless they appear in the UI.
 

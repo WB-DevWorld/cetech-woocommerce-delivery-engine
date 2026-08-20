@@ -2,6 +2,7 @@
 
 **Document status:** Packaging record for owner physical QA of country-scoped region code/label matching  
 **QA version:** `1.0.0-rc.6-qa.2`  
+**Owner physical QA:** **PASS** on training.cetechbpa.com (2026-08-20). Promoted to final `1.0.0-rc.6` in `docs/STAGE-14H-RC6-FINAL.md`. ZIP remains **immutable**.  
 **Schema target:** `4` (unchanged; no migration)  
 **Branch:** `master`  
 **Protected published baseline:** tagged `v1.0.0-rc.5` — **untouched**; do not retag or overwrite  

@@ -1,7 +1,7 @@
 # Staff Training Manual (self-paced)
 
 **Audience:** New and returning staff  
-**Version:** CETECH Delivery Engine 1.0.0-rc.6-qa.2  
+**Version:** CETECH Delivery Engine 1.0.0-rc.6  
 **Everyday home:** Delivery Engine → Overview  
 **Practice products:** Simple QA **#39705**; Variable QA **#39717** / A **#39718** / B **#39719**
 

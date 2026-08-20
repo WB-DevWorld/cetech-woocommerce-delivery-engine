@@ -1,7 +1,7 @@
 # Region code/label matching repair (post-RC.6-qa.1)
 
-**Status:** Packaged as owner QA `1.0.0-rc.6-qa.2` — not a replacement for tagged `v1.0.0-rc.5`; FLAIROC not deployed  
-**Plugin version in tree:** `1.0.0-rc.6-qa.2`  
+**Status:** Included in tagged `1.0.0-rc.6` (first packaged in `1.0.0-rc.6-qa.2`) — not a rewrite of tagged `v1.0.0-rc.5`; FLAIROC not deployed  
+**Plugin version in tree:** `1.0.0-rc.6`  
 **Schema:** `4` (unchanged; no migration)  
 **Date:** 2026-08-20  
 **Package record:** `docs/STAGE-14H-RC6-QA2-OWNER-QA-PACKAGE.md`

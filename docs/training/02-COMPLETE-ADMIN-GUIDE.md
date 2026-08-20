@@ -1,7 +1,7 @@
 # Complete Administrator Guide
 
 **Audience:** Administrators and authorised configuration staff  
-**Version:** CETECH Delivery Engine 1.0.0-rc.6-qa.2  
+**Version:** CETECH Delivery Engine 1.0.0-rc.6  
 **Everyday home:** Delivery Engine → **Overview**  
 **Not everyday:** Technical Diagnostics, private supply screens, Advanced Settings
 
