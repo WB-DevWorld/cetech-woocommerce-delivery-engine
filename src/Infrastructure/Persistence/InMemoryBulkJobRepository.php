@@ -89,6 +89,37 @@ final class InMemoryBulkJobRepository implements BulkJobRepositoryInterface {
 		return array_slice( $matches, 0, max( 1, $limit ) );
 	}
 
+	public function count_jobs( ?BulkJobStatus $status = null ): int {
+		$count = 0;
+		foreach ( $this->jobs as $job ) {
+			if ( null !== $status && $job->status !== $status ) {
+				continue;
+			}
+			++$count;
+		}
+
+		return $count;
+	}
+
+	public function list_jobs_page( int $page, int $per_page, ?BulkJobStatus $status = null ): array {
+		$per_page = max( 1, min( 100, $per_page ) );
+		$page     = max( 1, $page );
+		$matches  = [];
+		foreach ( $this->jobs as $job ) {
+			if ( null !== $status && $job->status !== $status ) {
+				continue;
+			}
+			$matches[] = $job;
+		}
+		usort(
+			$matches,
+			static fn ( BulkJob $a, BulkJob $b ): int => ( (int) $b->id ) <=> ( (int) $a->id )
+		);
+		$offset = ( $page - 1 ) * $per_page;
+
+		return array_slice( $matches, $offset, $per_page );
+	}
+
 	public function insert_items( array $items ): array {
 		$saved = [];
 		foreach ( $items as $item ) {
@@ -167,6 +198,28 @@ final class InMemoryBulkJobRepository implements BulkJobRepositoryInterface {
 		);
 
 		return array_slice( $matches, 0, max( 1, $limit ) );
+	}
+
+	public function list_items_page( int $job_id, int $page, int $per_page, ?BulkJobItemStatus $status = null ): array {
+		$per_page = max( 1, min( 100, $per_page ) );
+		$page     = max( 1, $page );
+		$matches  = [];
+		foreach ( $this->items as $item ) {
+			if ( $item->job_id !== $job_id ) {
+				continue;
+			}
+			if ( null !== $status && $item->status !== $status ) {
+				continue;
+			}
+			$matches[] = $item;
+		}
+		usort(
+			$matches,
+			static fn ( BulkJobItem $a, BulkJobItem $b ): int => ( (int) $a->id ) <=> ( (int) $b->id )
+		);
+		$offset = ( $page - 1 ) * $per_page;
+
+		return array_slice( $matches, $offset, $per_page );
 	}
 
 	public function count_items( int $job_id, ?BulkJobItemStatus $status = null ): int {

@@ -5,7 +5,7 @@
 **Plugin:** CETECH WooCommerce Delivery Engine  
 **Current protected runtime baseline:** tagged `1.0.0-rc.6` (schema `4`)  
 **Previous protected published tag:** `1.0.0-rc.5` (schema `4`; **do not retag**)  
-**Current development tree schema target:** `5` on the authorised post-RC.6 Bulk Tools branch (`1.0.0-dev.bulk.1`). Tagged RC.6 remains schema `4`.  
+**Current development tree schema target:** `5` on the authorised post-RC.6 Bulk Tools branch (`1.0.0-dev.bulk.2`). Tagged RC.6 remains schema `4`.  
 **Text domain:** `cetech-woocommerce-delivery-engine`
 
 This file is the **canonical maintained rulebook**. It consolidates hard invariants from `docs/PROJECT-GOVERNANCE.md`, `docs/PROJECT-RULES.md`, owner-accepted RC.4 behaviour, and the Stage 14A architecture decisions.

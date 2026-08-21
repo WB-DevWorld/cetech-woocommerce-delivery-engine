@@ -2,8 +2,10 @@
 
 **Date:** 2026-08-21  
 **Branch:** `feat/post-rc6-bulk-tools`  
-**Plugin identity:** `1.0.0-dev.bulk.1` (must not be packaged as RC.6)  
-**Result:** automated qualification **PASS** — not owner physical QA, not a package
+**Plugin identity:** `1.0.0-dev.bulk.2` (must not be packaged as RC.6)  
+**Result:** automated qualification **PASS**, plus pre-QA cleanup **PASS** — not owner physical QA, not RC.6
+
+This record describes what actually ran. Disposable stack: `C:\Users\Jane\Desktop\Learning 2026\Cursor\cetech-de-bulk-tools-qual` (not FLAIROC, not committed into this repository).
 
 This record describes what actually ran. Disposable stack: `C:\Users\Jane\Desktop\Learning 2026\Cursor\cetech-de-bulk-tools-qual` (not FLAIROC, not committed into this repository).
 
@@ -124,10 +126,75 @@ Physical: 40-product job, then 8 products edited through `CatalogScopeMutator`. 
 - FLAIROC not modified
 - Stage 15 not started
 
-## Remaining limitations
+## Remaining limitations (historical — superseded by §12)
 
-- Owner physical QA is not started.
-- No untagged QA ZIP was built.
-- `wp plugin delete` was not executed on bind-mounted plugin directories (would wipe source). Uninstall policy was exercised via `Uninstaller::uninstall()`.
-- Admin entity screens still paginate at 500 rows; complete export does not use that path.
-- 10k selected-id jobs store the ID list on the job row, not in Action Scheduler args.
+The original automated qualification stopped before owner physical QA and packaging. Admin entity **configuration** screens (Delivery Options / Areas / Rate Cards) still use the older 500-row admin `list()` cap; that is unchanged and is not the Bulk Tools job UI. Complete export does not use that path.
+
+## 12. Pre-QA cleanup (authorised follow-up)
+
+Owner accepted the §1–§11 automated qualification subject to the items below. The 10,000-target Action Scheduler campaign was **not** repeated; selected-ID storage still uses one job row at create time, then durable items, and worker ticks remain batch-bounded.
+
+### 12.1 Admin pagination
+
+Bulk Tools Job History and Job Items paginate in the repository (`list_jobs_page` / `list_items_page`). Default **25** rows. Screen Options allow **20 / 25 / 50 / 100** (`cetech_de_bulk_list_per_page`). Not 500. Not JavaScript hiding. Job detail still shows Total / Changed / Failed from job counters without loading every item. Item queries use `LIMIT`/`OFFSET` with `n ≤ 100` and KEY `job_status_id (job_id, status, id)`.
+
+### 12.2 Same-version reinstall (actual)
+
+On the disposable schema-5 upgrade site (`plugin-active` copy, not the git junction):
+
+1. Seeded Bulk Job `REINST-PROOF` (id 16) plus existing schema-4/5 data.
+2. Recorded markers (`schema4-baseline-keep`, site-wide marker, flags all 0, schema 5, 20 tables, 16 jobs, 14621 items).
+3. `wp plugin deactivate` (no uninstall).
+4. Removed plugin files from the bind mount and replaced them with the same development source.
+5. Activated.
+
+After activate (`evidence/reinstall-after.json`): schema **5**; schema-4 rows retained (shipments 1, offers 601, configuration scopes 11225); bulk jobs/items retained including `REINST-PROOF`; `index_dupes` empty; flags unchanged; `delivery_engine_selected_offer` registered **once**; `fatal_check` ok; plugin version `1.0.0-dev.bulk.2`. RC.6 was not modified.
+
+### 12.3 >500 Rate Card / Area-rule portability
+
+Same generic `EntityKeysetPager` exporter. Seeded **551** additional Rate Cards and **551** Destination/Area rules on the source (totals **552** / **552** including the original pair). `base_amount` for `bulk_rate_*` never 0.
+
+| | Rate Cards | Area/Destination rules |
+|--|------------|------------------------|
+| Source DB | 552 | 552 |
+| Exported | 552 | 552 |
+| Imported (clean sister, different IDs) | 552 | 552 |
+
+Source rate IDs 1–552; sister 3–554. Exported rows used `delivery_offer_code` / `destination_zone_code` / `zone_code` (no source IDs). Broken relations 0. Zero bulk amounts 0. Failed import items 0. No row-501 truncation. Import apply 91 ticks, batch 25, 2259 changed.
+
+### 12.4 Selected-ID manifest scaling
+
+Approximate compact JSON size of a `selected_ids` array (sequential integers, plus the JSON key):
+
+| IDs | Approx. size |
+|-----|----------------|
+| 10,000 | ~60 KB |
+| 50,000 | ~340 KB |
+| 100,000 | ~790 KB |
+
+**Before this cleanup:** `claim_job` loaded the full LONGTEXT and `CatalogTargetDefinition::from_array` copied the ID array on **every** tick, including process ticks after items already existed. Enumeration also filtered/sorted the whole list each page.
+
+**Decision / repair:** keep the ID list as compact immutable create-time metadata only while enumerating. Enumeration uses a binary search page (`O(log n + batch)`), materializes `bulk_job_items`, then **drops** `selected_ids` from the job row (`selected_ids_materialized` + `selected_id_count`). Process ticks decode slim JSON and claim a batch of items. Not autoloaded `wp_options`. The in-memory 10,000-target unit test now asserts the ID array is empty after enumeration and that admin item pages return 25 rows. The real 10k Action Scheduler campaign was not rerun.
+
+### 12.5 Host gates after cleanup
+
+| Gate | Result |
+|------|--------|
+| Focused Bulk Tools PHPUnit | PASS (includes 10k in-memory enumerate + pagination) |
+| PHPUnit default (Unit+Integration) | **643 tests, 3393 assertions, PASS** (5 deprecations) |
+| PHP lint `src/` + plugin root + uninstall | no syntax errors |
+| composer validate --no-check-publish | valid |
+| Vitest | **11 tests, 2 files, PASS** |
+| Security suite | **not run** |
+
+### 12.6 Owner-QA package
+
+Untagged identity `1.0.0-dev.bulk.2`. Schema target 5. Built from committed clean source after this cleanup. Checksums are recorded after the ZIP is built. Not RC.6. Not final. No release tag. Not deployed.
+
+## 13. Protected baselines (reconfirmed)
+
+- RC.6 tag `v1.0.0-rc.6` peeled commit `8f37fe826e23406c9035312e279699b65c1e72e4` **unchanged**
+- RC.6 ZIP not rebuilt or retagged
+- FLAIROC not modified
+- Stage 15 not started
+- Security-audit WIP remains on `wip/rc6-adversarial-security-audit` @ `a88f28048afcc84456e6933351c71b01a9838c5a`

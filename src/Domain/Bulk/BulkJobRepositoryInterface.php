@@ -22,6 +22,15 @@ interface BulkJobRepositoryInterface {
 	 */
 	public function list_jobs( int $limit = 50, int $after_id = 0, ?BulkJobStatus $status = null ): array;
 
+	public function count_jobs( ?BulkJobStatus $status = null ): int;
+
+	/**
+	 * Offset pagination for wp-admin. Per-page is clamped to 1–100.
+	 *
+	 * @return list<BulkJob>
+	 */
+	public function list_jobs_page( int $page, int $per_page, ?BulkJobStatus $status = null ): array;
+
 	/**
 	 * @param list<BulkJobItem> $items
 	 * @return list<BulkJobItem>
@@ -39,6 +48,13 @@ interface BulkJobRepositoryInterface {
 	 * @return list<BulkJobItem>
 	 */
 	public function list_items( int $job_id, int $limit = 50, int $after_id = 0, ?BulkJobItemStatus $status = null ): array;
+
+	/**
+	 * Offset pagination for wp-admin job items. Per-page is clamped to 1–100.
+	 *
+	 * @return list<BulkJobItem>
+	 */
+	public function list_items_page( int $job_id, int $page, int $per_page, ?BulkJobItemStatus $status = null ): array;
 
 	public function count_items( int $job_id, ?BulkJobItemStatus $status = null ): int;
 

@@ -173,8 +173,28 @@ final class BulkJobWorker {
 			(string) $last,
 			$job->summary
 		);
+		if ( $complete ) {
+			$job = $this->release_selection_manifest( $job );
+		}
 		$this->jobs->save_job( $job );
 		$this->requeue_if_needed( $job, $started );
+	}
+
+	/**
+	 * After durable job items exist, drop the selected-ID array from the job row
+	 * so later ticks do not decode a giant JSON list.
+	 */
+	private function release_selection_manifest( BulkJob $job ): BulkJob {
+		$definition = CatalogTargetDefinition::from_array( $job->target_definition );
+		if ( [] === $definition->selected_ids ) {
+			return $job;
+		}
+
+		return $job->with(
+			[
+				'target_definition' => $definition->after_materialization()->to_array(),
+			]
+		);
 	}
 
 	private function safe_count( CatalogTargetDefinition $definition, int $fallback ): int {

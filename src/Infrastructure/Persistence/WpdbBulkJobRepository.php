@@ -90,6 +90,43 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 		return $jobs;
 	}
 
+	public function count_jobs( ?BulkJobStatus $status = null ): int {
+		global $wpdb;
+		$table = $this->table_name();
+		if ( $status instanceof BulkJobStatus ) {
+			$sql = "SELECT COUNT(*) FROM `{$table}` WHERE status = %s";
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			return (int) $wpdb->get_var( $wpdb->prepare( $sql, $status->value ) );
+		}
+		$sql = "SELECT COUNT(*) FROM `{$table}`";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return (int) $wpdb->get_var( $sql );
+	}
+
+	public function list_jobs_page( int $page, int $per_page, ?BulkJobStatus $status = null ): array {
+		global $wpdb;
+		$table    = $this->table_name();
+		$per_page = max( 1, min( 100, $per_page ) );
+		$page     = max( 1, $page );
+		$offset   = ( $page - 1 ) * $per_page;
+		if ( $status instanceof BulkJobStatus ) {
+			$sql = "SELECT * FROM `{$table}` WHERE status = %s ORDER BY id DESC LIMIT %d OFFSET %d";
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$rows = $wpdb->get_results( $wpdb->prepare( $sql, $status->value, $per_page, $offset ), ARRAY_A );
+		} else {
+			$sql = "SELECT * FROM `{$table}` ORDER BY id DESC LIMIT %d OFFSET %d";
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$rows = $wpdb->get_results( $wpdb->prepare( $sql, $per_page, $offset ), ARRAY_A );
+		}
+
+		$jobs = [];
+		foreach ( is_array( $rows ) ? $rows : [] as $row ) {
+			$jobs[] = $this->hydrate_job( $row );
+		}
+
+		return $jobs;
+	}
+
 	public function insert_items( array $items ): array {
 		$saved = [];
 		foreach ( $items as $item ) {
@@ -181,6 +218,29 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 			$sql = "SELECT * FROM `{$table}` WHERE job_id = %d AND id > %d ORDER BY id ASC LIMIT %d";
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$rows = $wpdb->get_results( $wpdb->prepare( $sql, $job_id, $after_id, $limit ), ARRAY_A );
+		}
+		$items = [];
+		foreach ( is_array( $rows ) ? $rows : [] as $row ) {
+			$items[] = $this->hydrate_item( $row );
+		}
+
+		return $items;
+	}
+
+	public function list_items_page( int $job_id, int $page, int $per_page, ?BulkJobItemStatus $status = null ): array {
+		global $wpdb;
+		$table    = TableNames::for( BulkJobSchema::ITEMS_SUFFIX );
+		$per_page = max( 1, min( 100, $per_page ) );
+		$page     = max( 1, $page );
+		$offset   = ( $page - 1 ) * $per_page;
+		if ( $status instanceof BulkJobItemStatus ) {
+			$sql = "SELECT * FROM `{$table}` WHERE job_id = %d AND status = %s ORDER BY id ASC LIMIT %d OFFSET %d";
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$rows = $wpdb->get_results( $wpdb->prepare( $sql, $job_id, $status->value, $per_page, $offset ), ARRAY_A );
+		} else {
+			$sql = "SELECT * FROM `{$table}` WHERE job_id = %d ORDER BY id ASC LIMIT %d OFFSET %d";
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$rows = $wpdb->get_results( $wpdb->prepare( $sql, $job_id, $per_page, $offset ), ARRAY_A );
 		}
 		$items = [];
 		foreach ( is_array( $rows ) ? $rows : [] as $row ) {

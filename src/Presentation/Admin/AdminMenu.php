@@ -70,6 +70,7 @@ final class AdminMenu {
 		add_action( 'admin_init', [ $this->bulk_tools_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->overview_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->setup_wizard_page, 'handle_actions' ] );
+		add_filter( 'set_screen_option_' . BulkAdminListPreferences::OPTION, [ BulkToolsPage::class, 'filter_screen_option' ], 10, 3 );
 		$this->scoped_configuration_admin_assets->register();
 		$this->admin_ux_assets->register();
 	}
@@ -211,7 +212,7 @@ final class AdminMenu {
 		}
 
 		if ( current_user_can( 'manage_product_delivery_rules' ) || current_user_can( 'import_delivery_data' ) ) {
-			add_submenu_page(
+			$bulk_hook = add_submenu_page(
 				$parent_slug,
 				__( 'Bulk Tools', 'cetech-woocommerce-delivery-engine' ),
 				__( 'Bulk Tools', 'cetech-woocommerce-delivery-engine' ),
@@ -219,6 +220,9 @@ final class AdminMenu {
 				BulkToolsPage::SLUG,
 				[ $this->bulk_tools_page, 'render' ]
 			);
+			if ( is_string( $bulk_hook ) ) {
+				add_action( 'load-' . $bulk_hook, [ $this->bulk_tools_page, 'add_screen_options' ] );
+			}
 		}
 
 		if ( $this->should_show_shipments_menu() ) {

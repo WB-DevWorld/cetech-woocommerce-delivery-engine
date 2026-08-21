@@ -191,20 +191,12 @@ trait BulkJobWorkerDispatch {
 	}
 
 	private function enumerate_selected_ids( BulkJob $job, float $started, string $target_type ): void {
-		$ids   = array_map( 'intval', (array) ( $job->target_definition['selected_ids'] ?? [] ) );
-		$after = (int) $job->checkpoint_cursor;
-		$limit = $job->batch_size;
-		$page  = [];
-		foreach ( $ids as $id ) {
-			if ( $id > $after ) {
-				$page[] = $id;
-			}
-			if ( count( $page ) >= $limit ) {
-				break;
-			}
-		}
-		$items = [];
-		$last  = $after;
+		$definition = CatalogTargetDefinition::from_array( $job->target_definition );
+		$after      = (int) $job->checkpoint_cursor;
+		$limit      = $job->batch_size;
+		$page       = CatalogTargetDefinition::page_sorted_ids( $definition->selected_ids, $after, $limit );
+		$items      = [];
+		$last       = $after;
 		foreach ( $page as $id ) {
 			$items[] = BulkJobItem::pending( (int) $job->id, $target_type, $id, (string) $id );
 			$last    = $id;
@@ -214,7 +206,7 @@ trait BulkJobWorkerDispatch {
 		}
 		$complete = count( $page ) < $limit;
 		$job      = $job->with_progress(
-			count( $ids ),
+			$definition->selected_count(),
 			$job->enumerated_count + count( $items ),
 			$job->processed_count,
 			$job->changed_count,
@@ -225,6 +217,9 @@ trait BulkJobWorkerDispatch {
 			(string) $last,
 			$job->summary
 		);
+		if ( $complete ) {
+			$job = $this->release_selection_manifest( $job );
+		}
 		$this->jobs->save_job( $job );
 		$this->requeue_if_needed( $job, $started );
 	}

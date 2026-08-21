@@ -1,7 +1,7 @@
 # Post-RC.6 Bulk Tools — Implementation
 
 **Branch:** `feat/post-rc6-bulk-tools`  
-**Plugin version:** `1.0.0-dev.bulk.1` (must not be packaged as RC.6)  
+**Plugin version:** `1.0.0-dev.bulk.2` (must not be packaged as RC.6)  
 **Schema:** target `5` (`cetech_de_db_version`)
 
 ## Engine
@@ -50,16 +50,22 @@ Import conflict policy is explicit. Apply retries items that failed during dry-r
 
 Menu: Delivery Engine → Bulk Tools (`cetech-delivery-engine-bulk-tools`). Tabs: Catalog, Import / Export, Validation & Cleanup, Jobs / History, Charges.
 
+Job History and Job Items use **query/repository pagination**. Default page size is **25**. WordPress Screen Options persist `20` / `25` / `50` / `100` (option `cetech_de_bulk_list_per_page`). The wp-admin screen never defaults to 500 and does not hide extra rows in JavaScript after loading a large page. Job-item SQL is `ORDER BY id ASC LIMIT n OFFSET m` with `n ≤ 100`, using KEY `job_status_id (job_id, status, id)`. Job counters (Total / Changed / Failed) come from the job row, not from loading every item.
+
 Capabilities reused: `manage_product_delivery_rules`, `import_delivery_data`, `manage_delivery_rate_cards`, `manage_private_sources`, `manage_delivery_settings`.
 
 WP-CLI: `wp cetech-de bulk preview|apply|status|cancel|rollback`, `wp cetech-de config export|import`. Same engine as admin.
 
 Progress AJAX: `cetech_de_bulk_job_status`, polled every 5 seconds only on the job detail screen.
 
+## Selected-ID jobs
+
+A selected-ID job may store the ID list once on `bulk_jobs.target_definition_json` as compact create-time metadata (about 60 KB / 340 KB / 790 KB for 10k / 50k / 100k sequential IDs). Enumeration pages that sorted list with a binary search (`O(log n + batch)`), then inserts durable `bulk_job_items`. When enumeration completes, the ID array is dropped from the job row (`selected_ids_materialized`, `selected_id_count` retained). Later worker ticks load slim JSON and claim a batch of items. Worker cost stays approximately batch-bounded. IDs are not stored in autoloaded `wp_options`. The existing 10k Action Scheduler qualification remains valid for queue/batch behaviour.
+
 ## Known limitations
 
 - Cleanup mutations do not include a dedicated redundant-override detector beyond reset-entire-scope / clear-override actions.
 - Recurring automatic catalog rules are intentionally not implemented.
 - Shipment bulk status edits are intentionally not implemented.
-- Owner physical QA and packaging are **not** authorised until the owner reviews `docs/POST-RC6-BULK-TOOLS-QUALIFICATION.md`.
 - `assets/admin/bulk-tools.js` has no dedicated Vitest file; progress polling is 5 seconds on the job detail screen only.
+- Owner physical QA is not performed by Cursor. The untagged owner-QA identity is `1.0.0-dev.bulk.2`.

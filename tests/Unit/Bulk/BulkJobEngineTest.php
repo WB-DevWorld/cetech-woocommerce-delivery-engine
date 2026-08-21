@@ -194,12 +194,22 @@ final class BulkJobEngineTest extends TestCase {
 			$this->set_international(),
 			25
 		);
+		$jobId = (int) $job->id;
 		$ticks = $this->drain( 20000 );
-		$job   = $this->engine->find( (int) $job->id );
+		$job   = $this->engine->find( $jobId );
 		self::assertSame( 10000, $job?->total_count );
 		self::assertGreaterThan( 400, $ticks );
 		self::assertSame( BulkJobStatus::Ready, $job?->status );
 		self::assertSame( 10000, $this->jobs->item_storage_count() );
+		self::assertSame( [], $job?->target_definition['selected_ids'] ?? null );
+		self::assertTrue( (bool) ( $job?->target_definition['selected_ids_materialized'] ?? false ) );
+		self::assertSame( 10000, (int) ( $job?->target_definition['selected_id_count'] ?? 0 ) );
+		self::assertCount( 25, $this->jobs->list_items_page( $jobId, 1, 25 ) );
+		self::assertCount( 25, $this->jobs->list_items_page( $jobId, 2, 25 ) );
+		self::assertNotSame(
+			$this->jobs->list_items_page( $jobId, 1, 25 )[0]->id,
+			$this->jobs->list_items_page( $jobId, 2, 25 )[0]->id
+		);
 	}
 
 	public function test_reset_to_site_wide_writes_inheritance_not_copied_values(): void {

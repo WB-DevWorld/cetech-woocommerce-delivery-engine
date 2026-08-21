@@ -33,7 +33,7 @@ final class WooCommerceCatalogTargetQuery implements CatalogTargetQueryInterface
 
 	public function count( CatalogTargetDefinition $definition ): int {
 		if ( BulkTargetScope::SelectedIds === $definition->scope ) {
-			return count( $definition->selected_ids );
+			return $definition->selected_count();
 		}
 		if ( BulkTargetScope::MatchingFilters === $definition->scope && ! $definition->has_matching_criteria() ) {
 			return 0;
@@ -118,15 +118,7 @@ final class WooCommerceCatalogTargetQuery implements CatalogTargetQueryInterface
 	 */
 	private function matching_ids( CatalogTargetDefinition $definition, int $after_id, int $limit ): array {
 		if ( BulkTargetScope::SelectedIds === $definition->scope ) {
-			$ids = array_values(
-				array_filter(
-					$definition->selected_ids,
-					static fn ( int $id ): bool => $id > $after_id
-				)
-			);
-			sort( $ids );
-
-			return array_slice( $ids, 0, $limit );
+			return CatalogTargetDefinition::page_sorted_ids( $definition->selected_ids, $after_id, $limit );
 		}
 
 		if ( BulkTargetScope::MatchingFilters === $definition->scope && ! $definition->has_matching_criteria() ) {

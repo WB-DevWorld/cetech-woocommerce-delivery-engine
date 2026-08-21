@@ -59,6 +59,31 @@ final class BulkToolsPage {
 	) {
 	}
 
+	public function add_screen_options(): void {
+		add_screen_option(
+			'per_page',
+			[
+				'label'   => __( 'Rows per page', 'cetech-woocommerce-delivery-engine' ),
+				'default' => BulkAdminListPreferences::DEFAULT_PER_PAGE,
+				'option'  => BulkAdminListPreferences::OPTION,
+			]
+		);
+	}
+
+	/**
+	 * @param mixed $status
+	 * @param mixed $option
+	 * @param mixed $value
+	 * @return mixed
+	 */
+	public static function filter_screen_option( $status, $option, $value ) {
+		if ( BulkAdminListPreferences::OPTION !== (string) $option ) {
+			return $status;
+		}
+
+		return BulkAdminListPreferences::sanitize_per_page( (int) $value );
+	}
+
 	public function handle_actions(): void {
 		if ( $this->action_handler->verify_post( self::ACTION_PREVIEW, self::ACTION_PREVIEW, 'manage_product_delivery_rules', self::SLUG ) ) {
 			$this->create_preview_from_post();
@@ -293,6 +318,7 @@ final class BulkToolsPage {
 	}
 
 	private function render_jobs_tab(): void {
+		$per_page = BulkAdminListPreferences::per_page_for_current_user();
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$job_id = isset( $_GET['job'] ) ? absint( $_GET['job'] ) : 0;
 		if ( $job_id > 0 ) {
@@ -302,6 +328,7 @@ final class BulkToolsPage {
 				echo '<p role="status" data-cetech-de-job-id="' . esc_attr( (string) $job->id ) . '">' . esc_html( sprintf( '%s · %d / %d', $job->status->value, $job->processed_count, $job->total_count ) ) . '</p>';
 				AdminPageLayout::render_summary_stats(
 					[
+						[ 'label' => __( 'Total', 'cetech-woocommerce-delivery-engine' ), 'value' => $job->total_count ],
 						[ 'label' => __( 'Changed', 'cetech-woocommerce-delivery-engine' ), 'value' => $job->changed_count ],
 						[ 'label' => __( 'Unchanged / skipped', 'cetech-woocommerce-delivery-engine' ), 'value' => $job->skipped_count ],
 						[ 'label' => __( 'Failed', 'cetech-woocommerce-delivery-engine' ), 'value' => $job->failed_count ],
@@ -317,13 +344,24 @@ final class BulkToolsPage {
 				if ( $job->status->allows_rollback() ) {
 					$this->job_button( self::ACTION_ROLLBACK, $job->id, __( 'Roll back eligible items', 'cetech-woocommerce-delivery-engine' ), false );
 				}
+				$this->render_job_items_table( (int) $job->id, $per_page );
 				echo '<details><summary>' . esc_html__( 'Technical details', 'cetech-woocommerce-delivery-engine' ) . '</summary>';
 				echo '<pre>' . esc_html( wp_json_encode( $job->summary, JSON_PRETTY_PRINT ) ?: '' ) . '</pre></details>';
 			}
 		}
 
 		echo '<h2>' . esc_html__( 'Recent jobs', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
-		$jobs = $this->jobs->list_jobs( 25 );
+		$total_jobs = $this->jobs->count_jobs();
+		$page       = BulkAdminListPreferences::current_page( 'paged' );
+		$jobs       = $this->jobs->list_jobs_page( $page, $per_page );
+		echo '<p class="description">' . esc_html(
+			sprintf(
+				/* translators: 1: job count, 2: rows per page */
+				__( 'Showing a page of %2$d jobs. Total jobs: %1$d. Change the page size in Screen Options.', 'cetech-woocommerce-delivery-engine' ),
+				$total_jobs,
+				$per_page
+			)
+		) . '</p>';
 		echo '<table class="widefat striped"><thead><tr>';
 		echo '<th>' . esc_html__( 'Job', 'cetech-woocommerce-delivery-engine' ) . '</th>';
 		echo '<th>' . esc_html__( 'Type', 'cetech-woocommerce-delivery-engine' ) . '</th>';
@@ -341,6 +379,54 @@ final class BulkToolsPage {
 			echo '<tr><td colspan="4">' . esc_html__( 'No bulk jobs yet.', 'cetech-woocommerce-delivery-engine' ) . '</td></tr>';
 		}
 		echo '</tbody></table>';
+		$this->render_list_pagination(
+			'paged',
+			$page,
+			$total_jobs,
+			$per_page,
+			[ 'page' => self::SLUG, 'tab' => 'jobs' ],
+			__( 'Job history pagination', 'cetech-woocommerce-delivery-engine' )
+		);
+	}
+
+	private function render_job_items_table( int $job_id, int $per_page ): void {
+		$total_items = $this->jobs->count_items( $job_id );
+		$page        = BulkAdminListPreferences::current_page( 'item_paged' );
+		$items       = $this->jobs->list_items_page( $job_id, $page, $per_page );
+		echo '<h3>' . esc_html__( 'Job items', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
+		echo '<p class="description">' . esc_html(
+			sprintf(
+				/* translators: 1: item count, 2: rows per page */
+				__( 'This table loads at most %2$d rows from the database. Total items: %1$d. Totals in the summary above come from job counters, not this page.', 'cetech-woocommerce-delivery-engine' ),
+				$total_items,
+				$per_page
+			)
+		) . '</p>';
+		echo '<table class="widefat striped"><thead><tr>';
+		echo '<th>' . esc_html__( 'Target', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '<th>' . esc_html__( 'Type', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '<th>' . esc_html__( 'Status', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '<th>' . esc_html__( 'Result', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '</tr></thead><tbody>';
+		foreach ( $items as $item ) {
+			$label = '' !== $item->external_key ? $item->external_key : (string) $item->target_id;
+			echo '<tr><td>' . esc_html( $label ) . '</td>';
+			echo '<td>' . esc_html( $item->target_type ) . '</td>';
+			echo '<td>' . esc_html( $item->status->value ) . '</td>';
+			echo '<td>' . esc_html( (string) ( $item->error_code ?? $item->error_summary ?? '' ) ) . '</td></tr>';
+		}
+		if ( [] === $items ) {
+			echo '<tr><td colspan="4">' . esc_html__( 'No job items on this page.', 'cetech-woocommerce-delivery-engine' ) . '</td></tr>';
+		}
+		echo '</tbody></table>';
+		$this->render_list_pagination(
+			'item_paged',
+			$page,
+			$total_items,
+			$per_page,
+			[ 'page' => self::SLUG, 'tab' => 'jobs', 'job' => (string) $job_id ],
+			__( 'Job item pagination', 'cetech-woocommerce-delivery-engine' )
+		);
 	}
 
 	private function render_rates_tab(): void {
@@ -679,6 +765,47 @@ final class BulkToolsPage {
 		header( 'Content-Length: ' . (string) strlen( $json ) );
 		echo $json; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		exit;
+	}
+
+	/**
+	 * @param array<string, string> $query
+	 */
+	private function render_list_pagination( string $arg, int $page, int $total, int $per_page, array $query, string $aria_label ): void {
+		$pages = (int) ceil( $total / max( 1, $per_page ) );
+		if ( $pages <= 1 || ! function_exists( 'paginate_links' ) ) {
+			return;
+		}
+
+		$base = add_query_arg( array_merge( $query, [ $arg => '%#%' ] ), admin_url( 'admin.php' ) );
+		$links = paginate_links(
+			[
+				'base'      => esc_url_raw( $base ),
+				'format'    => '',
+				'current'   => $page,
+				'total'     => $pages,
+				'prev_text' => __( '&laquo; Previous', 'cetech-woocommerce-delivery-engine' ),
+				'next_text' => __( 'Next &raquo;', 'cetech-woocommerce-delivery-engine' ),
+				'type'      => 'plain',
+			]
+		);
+		if ( ! is_string( $links ) || '' === $links ) {
+			return;
+		}
+
+		echo '<nav class="tablenav bottom" aria-label="' . esc_attr( $aria_label ) . '">';
+		echo '<div class="tablenav-pages">' . wp_kses(
+			$links,
+			[
+				'a'    => [
+					'class' => true,
+					'href'  => true,
+				],
+				'span' => [
+					'class'        => true,
+					'aria-current' => true,
+				],
+			]
+		) . '</div></nav>';
 	}
 
 	private function create_csv_export_from_post(): void {
