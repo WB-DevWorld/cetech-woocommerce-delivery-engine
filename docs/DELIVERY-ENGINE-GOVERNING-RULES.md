@@ -5,7 +5,7 @@
 **Plugin:** CETECH WooCommerce Delivery Engine  
 **Current protected runtime baseline:** tagged `1.0.0-rc.6` (schema `4`)  
 **Previous protected published tag:** `1.0.0-rc.5` (schema `4`; **do not retag**)  
-**Current master schema target:** `4`  
+**Current development tree schema target:** `5` on the authorised post-RC.6 Bulk Tools branch (`1.0.0-dev.bulk.1`). Tagged RC.6 remains schema `4`.  
 **Text domain:** `cetech-woocommerce-delivery-engine`
 
 This file is the **canonical maintained rulebook**. It consolidates hard invariants from `docs/PROJECT-GOVERNANCE.md`, `docs/PROJECT-RULES.md`, owner-accepted RC.4 behaviour, and the Stage 14A architecture decisions.
@@ -31,7 +31,7 @@ Where this rulebook and an older rules file conflict on a **hard invariant**, th
 6. **Do not discard owner-tested behaviour** without explicit owner/authorisation.
 7. **Current implementation truth** = repository code + latest completed stage documentation. Visionary handoff sections are not proof that a feature exists.
 8. **Intended product/end-state** = latest `Delivery Shipping Plugin Up-To-Date Design and Expectations.md`. Do not implement a future vision merely because it appears there.
-9. Tagged **`1.0.0-rc.6`** is the current protected published baseline (schema **`4`**). Tagged **`1.0.0-rc.5`** remains a protected historical Stage 14 baseline (schema **`4`**). Tagged **`1.0.0-rc.4`** remains a protected historical baseline (schema **3** at tag time). Stage 14 flags default **OFF**. Do not retag RC.5 or earlier. Do not start Stage 15 without explicit owner authorisation.
+9. Tagged **`1.0.0-rc.6`** is the current protected published baseline (schema **`4`**). Tagged **`1.0.0-rc.5`** remains a protected historical Stage 14 baseline (schema **`4`**). Tagged **`1.0.0-rc.4`** remains a protected historical baseline (schema **3** at tag time). Stage 14 flags default **OFF**. Do not retag RC.5 or earlier. Do not start Stage 15 without explicit owner authorisation. Post-RC.6 Bulk Tools may advance the development tree to schema **`5`** under explicit owner authorisation; that tree must use a non-RC.6 version identity and must never retag or rebuild `v1.0.0-rc.6`.
 
 Testable: a commit that retags RC.4, changes `CETECH_DE_VERSION` without authorisation, or rewrites checkout grouping “to prepare for shipments” violates this section.
 
@@ -55,7 +55,7 @@ Stage 14 does **not** authorise:
 - signatures
 - recipient-ID verification
 - buyer receipt-confirmation workflows
-- bulk import
+- bulk import **as Stage 14 work** (catalog bulk tools are a separately authorised **post-RC.6** initiative; see section 26)
 - unrelated redesign
 - Stage 15 or later roadmap work
 
@@ -891,7 +891,35 @@ Do not silently expand scope.
 
 ---
 
-## 26. Related documents (do not fork)
+## 26. Post-RC.6 bulk operations and configuration portability
+
+Authorised only as a **post-RC.6** initiative. Not Stage 15. Not a rewrite of Classic Checkout.
+
+1. One user command may target a large set. The server must still process it in bounded, recoverable batches. The initiating HTTP request must not loop the catalog.
+2. There remains **one** `EffectiveConfigurationResolver`. Bulk tools must not introduce a second resolver.
+3. Reset to Site-wide writes inheritance. It must not copy today’s site-wide values onto thousands of product override rows.
+4. Delivery Option collections preserve INHERIT / ADD / REMOVE / REPLACE. REMOVE must not flatten the remaining collection unless REPLACE was chosen.
+5. Dry-run / impact preview is mandatory before wide-ranging apply.
+6. If the background queue is unavailable, fail safe. Never process tens of thousands of items synchronously as a fallback.
+7. Cancellation stops remaining work. It does not automatically undo completed items. Rollback is a separate conflict-aware job.
+8. Catalog CSV and general configuration packages are different workflows. CSV maps product/variation assignments primarily by SKU. Configuration packages use stable `internal_code` values, never source database IDs.
+9. Configuration import must not silently enable storefront runtime flags.
+10. Do not export orders, shipments, audit history, jobs, customers, or secrets as reusable configuration.
+11. Bulk jobs must not rewrite historical paid order snapshots or shipments.
+12. Missing/invalid amounts still fail closed. Explicit configured zero remains valid. Malformed numeric conversion must never become zero.
+13. Durable job/item persistence must not use autoloaded `wp_options` blobs.
+14. Recipes are filter → preview → apply. They are not a new inheritance layer and not unattended recurring mutations.
+15. Complete configuration export and catalog CSV export must iterate every matching entity with bounded keyset/cursor pages. Screen `list()` caps must never silently truncate a complete export or import.
+16. `MatchingFilters` with no SKUs and no filters match **nothing** unless Entire Catalog was deliberately confirmed.
+17. Apply must retry items that failed during dry-run preview when those failures were reference order (for example Delivery Area rules after areas exist in the same package). Completed mutations remain idempotent.
+18. Action Scheduler payloads contain only the job identifier. They must not carry the catalog or the configuration package.
+19. Catalog targeting may use SQL candidate narrowing plus batched EffectiveConfigurationResolver evaluation. It must not load the whole catalog into PHP memory.
+
+See `docs/POST-RC6-BULK-TOOLS-ARCHITECTURE.md` and the qualification record `docs/POST-RC6-BULK-TOOLS-QUALIFICATION.md`.
+
+---
+
+## 27. Related documents (do not fork)
 
 | Document | Role after this rulebook |
 |----------|--------------------------|
