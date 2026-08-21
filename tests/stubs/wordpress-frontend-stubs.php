@@ -57,7 +57,7 @@ if ( ! function_exists( 'wp_create_nonce' ) ) {
 	}
 }
 
-if ( ! class_exists( 'WooCommerce', false ) ) {
+if ( ! class_exists( 'WooCommerce', false ) && '1' !== getenv( 'CETECH_DE_DISABLE_WC_STUB' ) ) {
 	class WooCommerce {
 	}
 }

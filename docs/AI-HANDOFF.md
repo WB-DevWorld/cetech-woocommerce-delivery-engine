@@ -2,8 +2,8 @@
 
 ## CURRENT IMPLEMENTATION STATUS — V1 RC (read first)
 
-**Last updated:** 2026-08-20  
-**Plugin version:** `1.0.0-rc.6` on master. Tagged/protected published baseline is **`1.0.0-rc.6`** (schema `4`). Tagged **`1.0.0-rc.5`** remains a protected historical baseline. Owner physical QA of `1.0.0-rc.6-qa.2` on training.cetechbpa.com **PASSED**. Do not retag RC.2, RC.3, RC.4, RC.5, or RC.6. Do not begin Stage 15.  
+**Last updated:** 2026-08-21  
+**Plugin version:** `1.0.0-rc.6` on master. Tagged/protected published baseline is **`1.0.0-rc.6`** (schema `4`). Tagged **`1.0.0-rc.5`** remains a protected historical baseline. Owner physical QA of `1.0.0-rc.6-qa.2` on training.cetechbpa.com **PASSED**. Post-finalization lifecycle/compatibility qualification **PASS** (`docs/RC6-COMPATIBILITY-LIFECYCLE-QUALIFICATION.md`). Do not retag RC.2, RC.3, RC.4, RC.5, or RC.6. Do not begin Stage 15.  
 **Post-RC.5 defect-fix release:** `1.0.0-rc.6` keeps Delivery listed in Add shipping method while the plugin is active (rates flag-gated) and matches Delivery Area Region rules to WooCommerce state codes or that country’s labels (Ghana `AA` / Greater Accra) without migrating stored area data. Artifacts `docs/STAGE-14H-SHIPPING-METHOD-REGISTRY-REPAIR.md`, `docs/STAGE-14H-REGION-CODE-LABEL-MATCH.md`, `docs/STAGE-14H-RC6-FINAL.md`. QA.1 and QA.2 ZIPs remain immutable. Do not modify FLAIROC.  
 **Schema target:** `4` (`cetech_de_db_version`) — in this tree and in the RC.5 / RC.6 ZIPs. Do not create schema 5.  
 **Git:** `master`; RC.2 tag `v1.0.0-rc.2` **untouched**; RC.3 tag `v1.0.0-rc.3` **untouched locally**; RC.4 tag `v1.0.0-rc.4` (peeled `6b70c29`) **untouched**; RC.5 tag `v1.0.0-rc.5` **untouched**; RC.6 tag `v1.0.0-rc.6` created in Stage 14H-RC6-FINAL  
@@ -60,6 +60,7 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Post-RC.5 shipping-method registry listing | **INCLUDED IN TAGGED `1.0.0-rc.6`** (first packaged as `1.0.0-rc.6-qa.1`) — `delivery_engine_selected_offer` is listed for zone assignment whenever WooCommerce is active; storefront rates stay flag-gated. Add Delivery only to intended zones; Rest of the World is optional. Artifact `docs/STAGE-14H-SHIPPING-METHOD-REGISTRY-REPAIR.md`. QA.1 ZIP immutable. FLAIROC not modified. |
 | Post-RC.5 region code/label matching | **OWNER PHYSICAL PASS on `1.0.0-rc.6-qa.2`; INCLUDED IN TAGGED `1.0.0-rc.6`** — Delivery Area Region rules match WooCommerce state code or that country’s state label. No data migration. Artifact `docs/STAGE-14H-REGION-CODE-LABEL-MATCH.md`. QA.2 ZIP immutable. FLAIROC not modified. |
 | Stage 14H-RC6-FINAL | **COMPLETE** — version `1.0.0-rc.6`; tag `v1.0.0-rc.6`; artifact `docs/STAGE-14H-RC6-FINAL.md`. Owner-accepted from QA.2 on training.cetechbpa.com. FLAIROC not modified. |
+| RC.6 compatibility & lifecycle qualification | **PASS** — artifact `docs/RC6-COMPATIBILITY-LIFECYCLE-QUALIFICATION.md`. Tag `v1.0.0-rc.6` not changed. FLAIROC not modified. |
 | Governing rules hardening | **COMPLETE** — canonical rulebook `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`; Cursor always-apply wrapper `.cursor/rules/000-delivery-engine-governance.mdc`. Documentation/governance only. |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos; profile defaults use `global/0/{profile_key}` |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-profile site-wide root; primary default fallback; provenance; fingerprint; hard constraints |
@@ -140,6 +141,7 @@ Administrator-language requirement: normal-user admin UI must use operational la
 | `docs/STAGE-14H-REGION-CODE-LABEL-MATCH.md` | Post-RC.5 / post-QA.1 repair: Region rules match WooCommerce state code or country-scoped label |
 | `docs/STAGE-14H-RC6-QA2-OWNER-QA-PACKAGE.md` | Owner QA package `1.0.0-rc.6-qa.2` — region code/label matching; owner **PASSED**; FLAIROC not deployed |
 | `docs/STAGE-14H-RC6-FINAL.md` | Stage 14H-RC6-FINAL RC.6 release record |
+| `docs/RC6-COMPATIBILITY-LIFECYCLE-QUALIFICATION.md` | Post-RC.6 lifecycle + compatibility qualification — **PASS**; tag not changed; FLAIROC not modified |
 | `docs/CLASSIC-CHECKOUT-RELEASE-CANDIDATE-READINESS.md` | Pre-smoke Classic Checkout readiness (superseded for status by RC.2 readiness) |
 | `docs/RELEASE-1.0.0-RC.2-READINESS.md` | **Authoritative** live-verified `1.0.0-rc.2` release readiness |
 | `docs/ADMIN-UI-LANGUAGE-GUIDE.md` | Authoritative normal-administrator presentation language |

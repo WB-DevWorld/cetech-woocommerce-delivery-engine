@@ -470,6 +470,23 @@ if ( ! function_exists( 'delete_transient' ) ) {
 	}
 }
 
+if ( ! function_exists( 'flush_rewrite_rules' ) ) {
+	function flush_rewrite_rules( bool $hard = true ): void {
+		unset( $hard );
+		$GLOBALS['cetech_de_test_rewrite_flushes'] = (int) ( $GLOBALS['cetech_de_test_rewrite_flushes'] ?? 0 ) + 1;
+	}
+}
+
+if ( ! function_exists( 'deactivate_plugins' ) ) {
+	/**
+	 * @param string|list<string> $plugins
+	 */
+	function deactivate_plugins( $plugins, bool $silent = false, bool $network_wide = false ): void {
+		unset( $silent, $network_wide );
+		$GLOBALS['cetech_de_test_deactivated_plugins'][] = $plugins;
+	}
+}
+
 if ( ! function_exists( 'esc_textarea' ) ) {
 	function esc_textarea( string $text ): string {
 		return htmlspecialchars( $text, ENT_QUOTES, 'UTF-8' );

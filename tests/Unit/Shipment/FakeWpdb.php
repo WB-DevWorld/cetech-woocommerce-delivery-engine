@@ -65,9 +65,32 @@ final class FakeWpdb {
 		return addcslashes( $text, "_%\\" );
 	}
 
+	public function register_table( string $table, array $unique_indexes = [] ): void {
+		if ( ! isset( $this->tables[ $table ] ) ) {
+			$this->create_table( $table, $unique_indexes );
+		}
+	}
+
+	public function has_table( string $table ): bool {
+		return isset( $this->tables[ $table ] );
+	}
+
+	/**
+	 * @return list<string>
+	 */
+	public function table_names(): array {
+		return array_keys( $this->tables );
+	}
+
 	public function query( mixed $sql ): bool {
 		$this->record_sql( (string) $sql );
 		$normalized = strtoupper( trim( (string) $sql ) );
+
+		if ( preg_match( '/^DROP TABLE IF EXISTS `([^`]+)`\s*$/i', trim( (string) $sql ), $drop ) ) {
+			unset( $this->tables[ $drop[1] ], $this->unique_indexes[ $drop[1] ], $this->auto_increment[ $drop[1] ] );
+
+			return true;
+		}
 
 		if ( 'START TRANSACTION' === $normalized ) {
 			$this->transaction_tables         = unserialize( serialize( $this->tables ) );
@@ -225,6 +248,12 @@ final class FakeWpdb {
 		$this->record_sql( $sql );
 		$trimmed = trim( $sql );
 
+		if ( preg_match( '/^SHOW TABLES LIKE \'((?:\\\\\'|[^\'])*)\'\s*$/i', $trimmed, $like ) ) {
+			$name = stripcslashes( $like[1] );
+
+			return isset( $this->tables[ $name ] ) ? $name : null;
+		}
+
 		if ( preg_match( '/SELECT\s+COALESCE\(\s*MAX\(\s*`id`\s*\)\s*,\s*0\s*\)\s+FROM\s+`([^`]+)`\s*$/is', $trimmed, $matches ) ) {
 			$max = 0;
 
@@ -277,6 +306,22 @@ final class FakeWpdb {
 	public function get_row( string $sql, $output = ARRAY_A ) {
 		unset( $output );
 		$this->record_sql( $sql );
+		$trimmed = trim( $sql );
+
+		if ( preg_match( '/^SHOW INDEX FROM `([^`]+)` WHERE Key_name = \'((?:\\\\\'|[^\'])*)\'\s*$/i', $trimmed, $index ) ) {
+			$table = $index[1];
+			$name  = stripcslashes( $index[2] );
+
+			if ( isset( $this->tables[ $table ] ) ) {
+				return [
+					'Table'    => $table,
+					'Key_name' => $name,
+				];
+			}
+
+			return null;
+		}
+
 		$parsed = $this->parse_select( $sql );
 		$rows   = $this->filter_rows( $parsed );
 
