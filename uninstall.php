@@ -131,6 +131,9 @@ $table_suffixes = [
 	'shipments',
 	'shipment_items',
 	'shipment_events',
+	'bulk_jobs',
+	'bulk_job_items',
+	'bulk_recipes',
 ];
 
 foreach ( $table_suffixes as $suffix ) {

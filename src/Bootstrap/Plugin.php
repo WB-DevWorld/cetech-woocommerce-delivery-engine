@@ -102,8 +102,26 @@ use CetechDeliveryEngine\Infrastructure\Persistence\WpdbRateCardRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbShipmentRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbSupplierRepository;
 use CetechDeliveryEngine\Integrations\Registry\IntegrationRegistry;
-use CetechDeliveryEngine\Presentation\Admin\AdminActionHandler;
+use CetechDeliveryEngine\Application\Bulk\BulkJobEngine;
+use CetechDeliveryEngine\Application\Bulk\BulkJobWorker;
+use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogScopeMutator;
+use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogTargetQueryInterface;
+use CetechDeliveryEngine\Application\Bulk\Catalog\WooCommerceCatalogTargetQuery;
+use CetechDeliveryEngine\Application\Bulk\ImportExport\CatalogCsvExportService;
+use CetechDeliveryEngine\Application\Bulk\ImportExport\CatalogCsvMapper;
+use CetechDeliveryEngine\Application\Bulk\Portability\ConfigurationExporter;
+use CetechDeliveryEngine\Application\Bulk\Portability\ConfigurationImporter;
+use CetechDeliveryEngine\Application\Bulk\Portability\EntityCodeResolver;
+use CetechDeliveryEngine\Application\Bulk\Queue\ActionSchedulerQueue;
+use CetechDeliveryEngine\Application\Bulk\Queue\BackgroundQueueInterface;
+use CetechDeliveryEngine\Domain\Bulk\BulkJobRepositoryInterface;
+use CetechDeliveryEngine\Domain\RateCard\RateCardBulkMutator;
+use CetechDeliveryEngine\Infrastructure\Persistence\WpdbBulkJobRepository;
+use CetechDeliveryEngine\Presentation\Admin\BulkJobProgressEndpoint;
+use CetechDeliveryEngine\Presentation\Admin\BulkToolsPage;
+use CetechDeliveryEngine\Presentation\Cli\BulkJobCliCommand;
 use CetechDeliveryEngine\Presentation\Admin\AdminRecordDependencyChecker;
+use CetechDeliveryEngine\Presentation\Admin\AdminActionHandler;
 use CetechDeliveryEngine\Presentation\Admin\AdminMenu;
 use CetechDeliveryEngine\Presentation\Admin\AdminNoticeService;
 use CetechDeliveryEngine\Presentation\Admin\AdminUxAssets;
@@ -238,7 +256,16 @@ final class Plugin {
 			$this->container->get( AdministratorAccessRecovery::class )->register();
 			$this->container->get( ProductDeliveryPanel::class )->register();
 			$this->container->get( PreviewVariationsEndpoint::class )->register();
+			$this->container->get( BulkJobProgressEndpoint::class )->register();
 		}
+
+		$this->container->get( BulkJobCliCommand::class )->register();
+		add_action(
+			ActionSchedulerQueue::HOOK,
+			function ( $job_id ): void {
+				$this->container->get( BulkJobWorker::class )->tick( (int) $job_id );
+			}
+		);
 
 		if ( ! $requirements->is_woocommerce_active() ) {
 			$this->container->get( AdminNoticeManager::class )->register(
@@ -1239,6 +1266,145 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			BackgroundQueueInterface::class,
+			static fn (): BackgroundQueueInterface => new ActionSchedulerQueue()
+		);
+
+		$this->container->singleton(
+			CatalogTargetQueryInterface::class,
+			static fn ( ServiceContainer $container ): CatalogTargetQueryInterface => new WooCommerceCatalogTargetQuery(
+				$container->get( EffectiveConfigurationResolver::class ),
+				$container->get( OperationalReadinessAssessor::class )
+			)
+		);
+
+		$this->container->singleton(
+			CatalogCsvMapper::class,
+			static fn (): CatalogCsvMapper => new CatalogCsvMapper()
+		);
+
+		$this->container->singleton(
+			CatalogScopeMutator::class,
+			static fn ( ServiceContainer $container ): CatalogScopeMutator => new CatalogScopeMutator(
+				$container->get( ScopedConfigurationRepositoryInterface::class ),
+				$container->get( EffectiveConfigurationValidator::class ),
+				$container->get( FulfilmentConstraintServiceInterface::class ),
+				$container->get( SiteWideDefaultsPolicyInterface::class ),
+				$container->get( EntityCodeResolver::class )
+			)
+		);
+
+		$this->container->singleton(
+			EntityCodeResolver::class,
+			static fn ( ServiceContainer $container ): EntityCodeResolver => new EntityCodeResolver(
+				$container->get( DeliveryOfferRepositoryInterface::class ),
+				$container->get( LogisticsProfileRepositoryInterface::class ),
+				$container->get( SupplierRepositoryInterface::class ),
+				$container->get( OriginRepositoryInterface::class ),
+				$container->get( PickupLocationRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			RateCardBulkMutator::class,
+			static fn ( ServiceContainer $container ): RateCardBulkMutator => new RateCardBulkMutator(
+				$container->get( RateCardRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			ConfigurationImporter::class,
+			static fn ( ServiceContainer $container ): ConfigurationImporter => new ConfigurationImporter(
+				$container->get( DeliveryOfferRepositoryInterface::class ),
+				$container->get( DestinationZoneRepositoryInterface::class ),
+				$container->get( DestinationRuleRepositoryInterface::class ),
+				$container->get( RateCardRepositoryInterface::class ),
+				$container->get( LogisticsProfileRepositoryInterface::class ),
+				$container->get( PickupLocationRepositoryInterface::class ),
+				$container->get( SupplierRepositoryInterface::class ),
+				$container->get( OriginRepositoryInterface::class ),
+				$container->get( ScopedConfigurationRepositoryInterface::class ),
+				$container->get( SiteWideDefaultsSettings::class )
+			)
+		);
+
+		$this->container->singleton(
+			BulkJobWorker::class,
+			static fn ( ServiceContainer $container ): BulkJobWorker => new BulkJobWorker(
+				$container->get( BulkJobRepositoryInterface::class ),
+				$container->get( CatalogTargetQueryInterface::class ),
+				$container->get( CatalogScopeMutator::class ),
+				$container->get( BackgroundQueueInterface::class ),
+				8,
+				$container->get( RateCardBulkMutator::class ),
+				$container->get( ConfigurationImporter::class ),
+				$container->get( CatalogCsvMapper::class )
+			)
+		);
+
+		$this->container->singleton(
+			BulkJobEngine::class,
+			static fn ( ServiceContainer $container ): BulkJobEngine => new BulkJobEngine(
+				$container->get( BulkJobRepositoryInterface::class ),
+				$container->get( BackgroundQueueInterface::class ),
+				$container->get( BulkJobWorker::class )
+			)
+		);
+
+		$this->container->singleton(
+			ConfigurationExporter::class,
+			static fn ( ServiceContainer $container ): ConfigurationExporter => new ConfigurationExporter(
+				$container->get( DeliveryOfferRepositoryInterface::class ),
+				$container->get( DestinationZoneRepositoryInterface::class ),
+				$container->get( DestinationRuleRepositoryInterface::class ),
+				$container->get( RateCardRepositoryInterface::class ),
+				$container->get( LogisticsProfileRepositoryInterface::class ),
+				$container->get( PickupLocationRepositoryInterface::class ),
+				$container->get( SupplierRepositoryInterface::class ),
+				$container->get( OriginRepositoryInterface::class ),
+				$container->get( SiteWideDefaultsSettings::class ),
+				$container->get( ScopedConfigurationRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			CatalogCsvExportService::class,
+			static fn ( ServiceContainer $container ): CatalogCsvExportService => new CatalogCsvExportService(
+				$container->get( CatalogTargetQueryInterface::class ),
+				$container->get( ScopedConfigurationRepositoryInterface::class ),
+				$container->get( EffectiveConfigurationResolver::class ),
+				$container->get( EntityCodeResolver::class )
+			)
+		);
+
+		$this->container->singleton(
+			BulkToolsPage::class,
+			static fn ( ServiceContainer $container ): BulkToolsPage => new BulkToolsPage(
+				$container->get( BulkJobEngine::class ),
+				$container->get( BulkJobRepositoryInterface::class ),
+				$container->get( AdminActionHandler::class ),
+				$container->get( ConfigurationExporter::class ),
+				$container->get( CatalogCsvMapper::class ),
+				$container->get( CatalogCsvExportService::class )
+			)
+		);
+
+		$this->container->singleton(
+			BulkJobProgressEndpoint::class,
+			static fn ( ServiceContainer $container ): BulkJobProgressEndpoint => new BulkJobProgressEndpoint(
+				$container->get( BulkJobEngine::class )
+			)
+		);
+
+		$this->container->singleton(
+			BulkJobCliCommand::class,
+			static fn ( ServiceContainer $container ): BulkJobCliCommand => new BulkJobCliCommand(
+				$container->get( BulkJobEngine::class ),
+				$container->get( ConfigurationExporter::class )
+			)
+		);
+
+		$this->container->singleton(
 			AdminMenu::class,
 			static fn ( ServiceContainer $container ): AdminMenu => new AdminMenu(
 				$container->get( SystemStatusPage::class ),
@@ -1262,6 +1428,7 @@ final class Plugin {
 				$container->get( SetupWizardProgress::class ),
 				$container->get( FeatureFlags::class ),
 				$container->get( ShipmentsPage::class ),
+				$container->get( BulkToolsPage::class ),
 				$container->get( NeedsAttentionCountQuery::class ),
 				$container->get( ShipmentActivityCursor::class )
 			)
@@ -1327,6 +1494,11 @@ final class Plugin {
 		$this->container->singleton(
 			ScopedConfigurationRepositoryInterface::class,
 			static fn (): ScopedConfigurationRepositoryInterface => new WpdbScopedConfigurationRepository()
+		);
+
+		$this->container->singleton(
+			BulkJobRepositoryInterface::class,
+			static fn (): BulkJobRepositoryInterface => new WpdbBulkJobRepository()
 		);
 
 		$this->container->singleton(

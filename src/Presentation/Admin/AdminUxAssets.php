@@ -39,6 +39,25 @@ final class AdminUxAssets {
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( (string) $_GET['page'] ) ) : '';
+		if ( BulkToolsPage::SLUG === $page ) {
+			wp_enqueue_script(
+				'cetech-de-bulk-tools',
+				CETECH_DE_URL . 'assets/admin/bulk-tools.js',
+				[],
+				$version,
+				true
+			);
+			wp_localize_script(
+				'cetech-de-bulk-tools',
+				'cetechDeBulk',
+				[
+					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+					'action'  => BulkJobProgressEndpoint::ACTION,
+					'nonce'   => wp_create_nonce( BulkJobProgressEndpoint::ACTION ),
+				]
+			);
+		}
+
 		if ( EffectiveConfigurationPreviewPage::SLUG === $page ) {
 			wp_localize_script(
 				self::HANDLE,

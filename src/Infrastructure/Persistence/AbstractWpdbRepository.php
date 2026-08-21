@@ -79,6 +79,35 @@ abstract class AbstractWpdbRepository {
 		return is_array( $rows ) ? $rows : [];
 	}
 
+	/**
+	 * Keyset page for complete iteration. $limit is the page size only — it does not
+	 * cap the total matching set. Admin list() remains a separate bounded screen page.
+	 *
+	 * @param array<string, mixed> $criteria
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	public function page_after( int $after_id, int $limit = 100, array $criteria = [] ): array {
+		global $wpdb;
+
+		$table = $this->table_name();
+		$where = 'id > %d';
+		$args  = [ max( 0, $after_id ) ];
+
+		if ( isset( $criteria['status'] ) ) {
+			$where .= ' AND status = %s';
+			$args[] = (string) $criteria['status'];
+		}
+
+		$sql    = "SELECT * FROM `{$table}` WHERE {$where} ORDER BY id ASC LIMIT %d";
+		$args[] = max( 1, min( 250, $limit ) );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$args ), ARRAY_A );
+
+		return is_array( $rows ) ? $rows : [];
+	}
+
 	protected function mark_inactive( int $id ): bool {
 		$existing = $this->fetch_row_by_id( $id );
 
@@ -130,7 +159,8 @@ abstract class AbstractWpdbRepository {
 	protected function insert_row( array $row, array $formats ): int {
 		global $wpdb;
 
-		$table = $this->table_name();
+		[ $row, $formats ] = $this->without_nulls( $row, $formats );
+		$table             = $this->table_name();
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 		$inserted = $wpdb->insert( $table, $row, $formats );
@@ -209,5 +239,25 @@ abstract class AbstractWpdbRepository {
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return (int) $wpdb->get_var( $wpdb->prepare( $sql, $value ) );
+	}
+
+	/**
+	 * @param array<string, mixed> $row
+	 * @param list<string>         $formats
+	 * @return array{0: array<string, mixed>, 1: list<string>}
+	 */
+	private function without_nulls( array $row, array $formats ): array {
+		$clean = [];
+		$fmt   = [];
+		$index = 0;
+		foreach ( $row as $key => $value ) {
+			if ( null !== $value ) {
+				$clean[ $key ] = $value;
+				$fmt[]         = $formats[ $index ] ?? '%s';
+			}
+			++$index;
+		}
+
+		return [ $clean, $fmt ];
 	}
 }

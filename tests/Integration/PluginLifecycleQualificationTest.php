@@ -106,7 +106,7 @@ final class PluginLifecycleQualificationTest extends TestCase {
 
 	public function test_schema_three_to_four_is_idempotent_and_preserves_scoped_data(): void {
 		Activator::activate();
-		self::assertSame( '4', SchemaVersion::get() );
+		self::assertSame( SchemaVersion::TARGET, SchemaVersion::get() );
 
 		$wpdb = $GLOBALS['wpdb'];
 		$wpdb->register_table( 'wp_delivery_engine_configuration_scopes' );
@@ -122,7 +122,7 @@ final class PluginLifecycleQualificationTest extends TestCase {
 			]
 		);
 
-		foreach ( [ 'shipments', 'shipment_items', 'shipment_events' ] as $suffix ) {
+		foreach ( [ 'shipments', 'shipment_items', 'shipment_events', 'bulk_jobs', 'bulk_job_items', 'bulk_recipes' ] as $suffix ) {
 			$wpdb->query( 'DROP TABLE IF EXISTS `' . $wpdb->prefix . 'delivery_engine_' . $suffix . '`' );
 		}
 
@@ -131,8 +131,9 @@ final class PluginLifecycleQualificationTest extends TestCase {
 
 		Activator::activate();
 
-		self::assertSame( '4', SchemaVersion::get() );
+		self::assertSame( SchemaVersion::TARGET, SchemaVersion::get() );
 		self::assertTrue( ConfigurationTables::exists( 'shipments' ) );
+		self::assertTrue( ConfigurationTables::exists( 'bulk_jobs' ) );
 		self::assertTrue( ConfigurationTables::exists( 'configuration_scopes' ) );
 
 		$row = $wpdb->get_row(
@@ -144,7 +145,7 @@ final class PluginLifecycleQualificationTest extends TestCase {
 		$tables = LifecycleHarness::table_count();
 		Activator::activate();
 		self::assertSame( $tables, LifecycleHarness::table_count() );
-		self::assertSame( '4', SchemaVersion::get() );
+		self::assertSame( SchemaVersion::TARGET, SchemaVersion::get() );
 	}
 
 	public function test_failed_migration_does_not_advance_schema_and_retries_without_duplicate_success(): void {
@@ -274,7 +275,7 @@ final class PluginLifecycleQualificationTest extends TestCase {
 		self::assertFalse( $decoded['woocommerce_class'] );
 		self::assertFalse( $decoded['shipping_filter'] );
 		self::assertTrue( $decoded['notice'] );
-		self::assertSame( '4', $decoded['schema'] );
+		self::assertSame( SchemaVersion::TARGET, $decoded['schema'] );
 	}
 
 	public function test_capabilities_register_twice_does_not_duplicate_or_touch_unrelated_caps(): void {

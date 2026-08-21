@@ -34,6 +34,9 @@ final class ConfigurationTables {
 	/** @var list<string> Stage 14 shipment persistence table suffixes. */
 	public const SHIPMENT_SUFFIXES = ShipmentSchema::SUFFIXES;
 
+	/** @var list<string> Post-RC.6 bulk job engine table suffixes. */
+	public const BULK_JOB_SUFFIXES = BulkJobSchema::SUFFIXES;
+
 	/**
 	 * @return list<string>
 	 */
@@ -42,7 +45,8 @@ final class ConfigurationTables {
 			self::SUFFIXES,
 			self::PRODUCT_RULE_SUFFIXES,
 			self::SCOPED_CONFIGURATION_SUFFIXES,
-			self::SHIPMENT_SUFFIXES
+			self::SHIPMENT_SUFFIXES,
+			self::BULK_JOB_SUFFIXES
 		);
 	}
 

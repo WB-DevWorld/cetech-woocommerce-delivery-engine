@@ -11,17 +11,18 @@ use PHPUnit\Framework\TestCase;
 
 final class SchemaV4InspectionTest extends TestCase {
 
-	public function test_schema_target_is_four(): void {
-		self::assertSame( '4', SchemaVersion::TARGET );
-		self::assertSame( '4', SchemaVersion::target() );
+	public function test_schema_target_is_five_and_schema_four_tables_remain(): void {
+		self::assertSame( '5', SchemaVersion::TARGET );
+		self::assertSame( '5', SchemaVersion::target() );
 	}
 
-	public function test_plugin_version_is_rc6(): void {
+	public function test_plugin_version_is_post_rc6_development_identity(): void {
 		$plugin_root = dirname( __DIR__, 3 );
 		$header      = (string) file_get_contents( $plugin_root . '/cetech-woocommerce-delivery-engine.php' );
 
-		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-rc\\.6'\s*\)/", $header );
-		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-rc\\.6\s*$/m', $header );
+		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.bulk\\.1'\s*\)/", $header );
+		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.bulk\\.1\s*$/m', $header );
+		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-rc.6' )", $header );
 	}
 
 	public function test_shipment_tables_are_registered_with_required_indexes(): void {

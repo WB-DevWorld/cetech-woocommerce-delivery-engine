@@ -43,6 +43,7 @@ final class AdminMenu {
 		private SetupWizardProgress $wizard_progress,
 		private FeatureFlags $feature_flags,
 		private ShipmentsPage $shipments_page,
+		private BulkToolsPage $bulk_tools_page,
 		private ?NeedsAttentionCountQuery $needs_attention_count = null,
 		private ?ShipmentActivityCursor $shipment_activity = null
 	) {
@@ -66,6 +67,7 @@ final class AdminMenu {
 		add_action( 'admin_init', [ $this->product_exceptions_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->needs_attention_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->shipments_page, 'handle_actions' ] );
+		add_action( 'admin_init', [ $this->bulk_tools_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->overview_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->setup_wizard_page, 'handle_actions' ] );
 		$this->scoped_configuration_admin_assets->register();
@@ -205,6 +207,17 @@ final class AdminMenu {
 				'manage_product_delivery_rules',
 				ProductExceptionsPage::SLUG,
 				[ $this->product_exceptions_page, 'render' ]
+			);
+		}
+
+		if ( current_user_can( 'manage_product_delivery_rules' ) || current_user_can( 'import_delivery_data' ) ) {
+			add_submenu_page(
+				$parent_slug,
+				__( 'Bulk Tools', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Bulk Tools', 'cetech-woocommerce-delivery-engine' ),
+				current_user_can( 'manage_product_delivery_rules' ) ? 'manage_product_delivery_rules' : 'import_delivery_data',
+				BulkToolsPage::SLUG,
+				[ $this->bulk_tools_page, 'render' ]
 			);
 		}
 
@@ -418,6 +431,7 @@ final class AdminMenu {
 			Capabilities::PICKUP,
 			'manage_delivery_rate_cards',
 			'manage_product_delivery_rules',
+			'import_delivery_data',
 			'manage_logistics_profiles',
 			'manage_private_sources',
 			'manage_shipments',
