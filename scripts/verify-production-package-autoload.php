@@ -128,6 +128,11 @@ $required_classes = [
 	'CetechDeliveryEngine\\Application\\Shipment\\ShipmentActivityCursor',
 	'CetechDeliveryEngine\\Application\\Configuration\\Catalog\\NeedsAttentionCountQuery',
 	'CetechDeliveryEngine\\Presentation\\Admin\\AdminMenuBadgeMarkup',
+	'CetechDeliveryEngine\\Presentation\\Admin\\BulkToolsPage',
+	'CetechDeliveryEngine\\Presentation\\Admin\\BulkAdminListPreferences',
+	'CetechDeliveryEngine\\Application\\Bulk\\BulkJobEngine',
+	'CetechDeliveryEngine\\Application\\Bulk\\BulkJobWorker',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\BulkJobSchema',
 ];
 
 $required_interfaces = [
@@ -249,8 +254,32 @@ if ( is_readable( $plugin_header ) ) {
 
 if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 	$target = ( new ReflectionClass( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) )->getConstant( 'TARGET' );
-	if ( '4' !== $target ) {
+	$header_source = is_readable( $plugin_header ) ? (string) file_get_contents( $plugin_header ) : '';
+	if ( str_contains( $header_source, "1.0.0-dev.bulk" ) ) {
+		if ( '5' !== $target ) {
+			$failures[] = 'SchemaVersion::TARGET must be 5 for this Bulk Tools development package.';
+		}
+	} elseif ( '4' !== $target ) {
 		$failures[] = 'SchemaVersion::TARGET must be 4 for this package.';
+	}
+}
+
+$bulk_js = $package_root . '/assets/admin/bulk-tools.js';
+if ( str_contains( (string) ( $header_source ?? '' ), '1.0.0-dev.bulk' ) && ! is_readable( $bulk_js ) ) {
+	$failures[] = 'Missing assets/admin/bulk-tools.js';
+}
+
+$forbidden = [
+	'/tests',
+	'/phpunit.xml',
+	'/docs/RC6-ADVERSARIAL-SECURITY-AUDIT.md',
+	'/docs/audit',
+	'/.env',
+	'/.env.local',
+];
+foreach ( $forbidden as $rel ) {
+	if ( file_exists( $package_root . $rel ) ) {
+		$failures[] = 'Package must not include development/security-audit path: ' . $rel;
 	}
 }
 
