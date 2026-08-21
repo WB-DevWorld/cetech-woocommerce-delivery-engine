@@ -68,4 +68,4 @@ A selected-ID job may store the ID list once on `bulk_jobs.target_definition_jso
 - Recurring automatic catalog rules are intentionally not implemented.
 - Shipment bulk status edits are intentionally not implemented.
 - `assets/admin/bulk-tools.js` has no dedicated Vitest file; progress polling is 5 seconds on the job detail screen only.
-- Owner physical QA is not performed by Cursor. The untagged owner-QA identity is `1.0.0-dev.bulk.2`.
+- Owner physical QA is not performed by Cursor. Untagged owner-QA package: `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.2.zip` (`1159232` bytes, SHA-256 `a3150ebaa799c5af151f0c2a981e36905b6830e0f08ec468cca66a88fb7d5e2f`, source `8c0d872fa41d16f6a3eaccdbd2b87a0fcfa2ba53`, schema `5`).

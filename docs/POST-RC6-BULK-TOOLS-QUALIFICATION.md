@@ -189,7 +189,33 @@ Approximate compact JSON size of a `selected_ids` array (sequential integers, pl
 
 ### 12.6 Owner-QA package
 
-Untagged identity `1.0.0-dev.bulk.2`. Schema target 5. Built from committed clean source after this cleanup. Checksums are recorded after the ZIP is built. Not RC.6. Not final. No release tag. Not deployed.
+Untagged identity **`1.0.0-dev.bulk.2`**. Schema target **5**. Built from committed clean source `8c0d872fa41d16f6a3eaccdbd2b87a0fcfa2ba53`. Not RC.6. Not final. No release tag. Not deployed.
+
+| Item | Value |
+|------|--------|
+| Source commit | `8c0d872fa41d16f6a3eaccdbd2b87a0fcfa2ba53` |
+| Filename | `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.2.zip` |
+| Bytes | `1159232` |
+| SHA-256 | `a3150ebaa799c5af151f0c2a981e36905b6830e0f08ec468cca66a88fb7d5e2f` |
+| Schema target | `5` |
+| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.2.zip` |
+| Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.2.zip` |
+
+Extracted verification: version `1.0.0-dev.bulk.2`, `SchemaVersion::TARGET = 5`, production `vendor/autoload.php`, Linux-case PSR-4 classmap, packaged PHP lint clean, `assets/admin/bulk-tools.js` and Bulk Tools PHP classes present, no `tests/`, no `phpunit.xml`, no `.env`, no `docs/audit`, no `docs/RC6-ADVERSARIAL-SECURITY-AUDIT.md`.
+
+### 12.7 Short owner physical QA plan
+
+Cursor must not install this package. Owner should, on a disposable or training site they control:
+
+1. Install/replace with `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.2.zip` (do not use the RC.6 ZIP).
+2. Confirm schema 5, existing configuration retained on upgrade, Delivery method listed once.
+3. Open Delivery Engine → Bulk Tools → Jobs / History: Screen Options default 25; a large job shows Total/Changed/Failed without loading every row; paging stays on 20/50/100.
+4. Preview then apply a small catalog change; leave the page; confirm Action Scheduler continues.
+5. Export/import a configuration package between two sites; confirm codes not source IDs.
+6. Cancel and rollback on a small preview/apply; confirm completed items are not silently reversed.
+7. Confirm storefront checkout is unchanged while flags remain off.
+
+Do not treat this as a final/RC.6 release.
 
 ## 13. Protected baselines (reconfirmed)
 
