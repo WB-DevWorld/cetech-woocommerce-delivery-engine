@@ -40,10 +40,25 @@ final class AdminUxAssets {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( (string) $_GET['page'] ) ) : '';
 		if ( BulkToolsPage::SLUG === $page ) {
+			if ( wp_script_is( 'selectWoo', 'registered' ) ) {
+				wp_enqueue_script( 'selectWoo' );
+			}
+			if ( wp_style_is( 'select2', 'registered' ) ) {
+				wp_enqueue_style( 'select2' );
+			}
+			if ( wp_style_is( 'woocommerce_admin_styles', 'registered' ) ) {
+				wp_enqueue_style( 'woocommerce_admin_styles' );
+			}
+
+			$bulk_deps = [ 'jquery' ];
+			if ( wp_script_is( 'selectWoo', 'registered' ) ) {
+				$bulk_deps[] = 'selectWoo';
+			}
+
 			wp_enqueue_script(
 				'cetech-de-bulk-tools',
 				CETECH_DE_URL . 'assets/admin/bulk-tools.js',
-				[],
+				$bulk_deps,
 				$version,
 				true
 			);
@@ -51,9 +66,10 @@ final class AdminUxAssets {
 				'cetech-de-bulk-tools',
 				'cetechDeBulk',
 				[
-					'ajaxUrl' => admin_url( 'admin-ajax.php' ),
-					'action'  => BulkJobProgressEndpoint::ACTION,
-					'nonce'   => wp_create_nonce( BulkJobProgressEndpoint::ACTION ),
+					'ajaxUrl'             => admin_url( 'admin-ajax.php' ),
+					'action'              => BulkJobProgressEndpoint::ACTION,
+					'nonce'               => wp_create_nonce( BulkJobProgressEndpoint::ACTION ),
+					'searchProductsNonce' => wp_create_nonce( 'search-products' ),
 				]
 			);
 		}

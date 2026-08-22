@@ -129,6 +129,7 @@ $required_classes = [
 	'CetechDeliveryEngine\\Application\\Configuration\\Catalog\\NeedsAttentionCountQuery',
 	'CetechDeliveryEngine\\Presentation\\Admin\\AdminMenuBadgeMarkup',
 	'CetechDeliveryEngine\\Presentation\\Admin\\BulkToolsPage',
+	'CetechDeliveryEngine\\Presentation\\Admin\\BulkCatalogAdminChoices',
 	'CetechDeliveryEngine\\Presentation\\Admin\\BulkAdminListPreferences',
 	'CetechDeliveryEngine\\Application\\Bulk\\BulkJobEngine',
 	'CetechDeliveryEngine\\Application\\Bulk\\BulkJobWorker',

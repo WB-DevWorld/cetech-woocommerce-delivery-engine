@@ -1,9 +1,9 @@
 # Post-RC.6 Bulk Tools — Real database / large-operation qualification
 
-**Date:** 2026-08-21  
+**Date:** 2026-08-22  
 **Branch:** `feat/post-rc6-bulk-tools`  
-**Plugin identity:** `1.0.0-dev.bulk.2` (must not be packaged as RC.6)  
-**Result:** automated qualification **PASS**, plus pre-QA cleanup **PASS** — not owner physical QA, not RC.6
+**Plugin identity:** `1.0.0-dev.bulk.3` (must not be packaged as RC.6)  
+**Result:** automated qualification **PASS**, plus Catalog admin UX repair **PASS** — not owner physical QA, not RC.6
 
 This record describes what actually ran. Disposable stack: `C:\Users\Jane\Desktop\Learning 2026\Cursor\cetech-de-bulk-tools-qual` (not FLAIROC, not committed into this repository).
 
@@ -217,7 +217,51 @@ Cursor must not install this package. Owner should, on a disposable or training 
 
 Do not treat this as a final/RC.6 release.
 
-## 13. Protected baselines (reconfirmed)
+## 13. Catalog admin UX repair (`1.0.0-dev.bulk.3`)
+
+Owner physical QA of immutable `1.0.0-dev.bulk.2` passed install, schema 4→5, configuration preserve, Bulk Tools load, Jobs/History default 25. Catalog failed normal-administrator UX review.
+
+This repair is presentation-only. Bulk Job Engine, batching, Action Scheduler, schema 5, inheritance, resolver, rollback, import/export, RC.6, and historical snapshots were not changed.
+
+### 13.1 Automated gates
+
+Recorded after the repair tests in this session.
+
+| Gate | Result |
+|------|--------|
+| Focused Bulk admin UX + pagination PHPUnit | **PASS** (`tests/Unit/Bulk/BulkCatalogAdminUxTest.php`, `tests/Unit/Bulk/BulkAdminPaginationAndManifestTest.php` — 11 tests, 56 assertions) |
+| PHPUnit default (Unit+Integration) | **650 tests, 3432 assertions, PASS** (5 deprecations) |
+| PHP lint `src/` + plugin root + uninstall | no syntax errors |
+| Vitest | **12 tests, 3 files, PASS** (includes `tests/js/bulk-tools-catalog.test.js`) |
+| Security suite | **not run** |
+
+### 13.2 Owner-QA package
+
+Do **not** overwrite `1.0.0-dev.bulk.2`. Untagged identity **`1.0.0-dev.bulk.3`**. Schema target **5**. Not RC.6. Not final. No release tag. Not deployed. Checksums recorded after packaging from committed clean source.
+
+| Item | Value |
+|------|--------|
+| Source commit | pending packaging |
+| Filename | `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.3.zip` |
+| Bytes | pending packaging |
+| SHA-256 | pending packaging |
+| Schema target | `5` |
+| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.3.zip` |
+| Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.3.zip` |
+
+### 13.3 Short owner physical retest plan
+
+Cursor must not install this package. Owner should, on the training site they control:
+
+1. Install/replace with `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.3.zip` (do not use RC.6; do not reuse bulk.2 as the current package).
+2. Confirm schema still **5** and existing configuration retained.
+3. Catalog: search products by name/SKU; labelled Category/Tag/Shipping class/Delivery Option/Logistics/Pickup selectors; no raw “term taxonomy ID” fields in the normal workflow.
+4. Progressive disclosure: Fulfilment = No change hides the value; Delivery Options = Add reveals the named selector; Reset entire Product Exception explains Site-wide inheritance.
+5. Filters grouped and shorter on first load (Search and select products).
+6. Jobs / History Screen Options: entering 500/1000/negative/zero/nonnumeric does not persist those values; effective page size stays in 20/25/50/100, max 100.
+7. Confirm storefront checkout is unchanged while flags remain off.
+
+## 14. Protected baselines (reconfirmed)
 
 - RC.6 tag `v1.0.0-rc.6` peeled commit `8f37fe826e23406c9035312e279699b65c1e72e4` **unchanged**
 - RC.6 ZIP not rebuilt or retagged

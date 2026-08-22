@@ -55,7 +55,8 @@ final class BulkToolsPage {
 		private readonly AdminActionHandler $action_handler,
 		private readonly ConfigurationExporter $exporter,
 		private readonly CatalogCsvMapper $csv,
-		private readonly ?CatalogCsvExportService $csv_export = null
+		private readonly ?CatalogCsvExportService $csv_export = null,
+		private readonly BulkCatalogAdminChoices $catalog_choices = new BulkCatalogAdminChoices()
 	) {
 	}
 
@@ -81,7 +82,7 @@ final class BulkToolsPage {
 			return $status;
 		}
 
-		return BulkAdminListPreferences::sanitize_per_page( (int) $value );
+		return BulkAdminListPreferences::sanitize_per_page( $value );
 	}
 
 	public function handle_actions(): void {
@@ -203,53 +204,131 @@ final class BulkToolsPage {
 	}
 
 	private function render_catalog_tab(): void {
-		echo '<form method="post" class="cetech-de-bulk-form">';
+		echo '<form method="post" class="cetech-de-bulk-form" data-cetech-de-bulk-catalog>';
 		wp_nonce_field( self::ACTION_PREVIEW, 'cetech_de_nonce' );
 		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_PREVIEW ) . '" />';
-		echo '<h2>' . esc_html__( '1. Choose products', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
-		echo '<p><label for="cetech-de-target-scope">' . esc_html__( 'Target', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<select id="cetech-de-target-scope" name="target_scope">';
-		echo '<option value="' . esc_attr( BulkTargetScope::SelectedIds->value ) . '">' . esc_html__( 'Selected product IDs on this form', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '<option value="' . esc_attr( BulkTargetScope::MatchingFilters->value ) . '">' . esc_html__( 'All items matching these filters', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '<option value="' . esc_attr( BulkTargetScope::EntireCatalog->value ) . '">' . esc_html__( 'Entire catalog (requires confirmation)', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '</select></p>';
-		echo '<p><label for="cetech-de-product-ids">' . esc_html__( 'Product IDs (comma or newline separated)', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<textarea id="cetech-de-product-ids" name="product_ids" rows="4" class="large-text"></textarea></p>';
-		echo '<p><label for="cetech-de-skus">' . esc_html__( 'SKUs (paste a list)', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<textarea id="cetech-de-skus" name="skus" rows="3" class="large-text"></textarea></p>';
-		$this->render_catalog_filters();
-		echo '<p><label><input type="checkbox" name="entire_catalog_confirmed" value="1" /> ' . esc_html__( 'I confirm this should target the entire catalog', 'cetech-woocommerce-delivery-engine' ) . '</label></p>';
 
-		echo '<h2>' . esc_html__( '2. Choose action', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
-		echo '<p><label for="cetech-de-fulfilment-action">' . esc_html__( 'Fulfilment Availability', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<select id="cetech-de-fulfilment-action" name="fulfilment_action">';
+		AdminPageLayout::open_form_panel(
+			__( '1. Choose products', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Search by name or SKU for a few products. Use filters for a group, or confirm the entire catalog.', 'cetech-woocommerce-delivery-engine' )
+		);
+		$this->open_catalog_row( 'cetech-de-target-scope', __( 'Which products?', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<select id="cetech-de-target-scope" name="target_scope" class="cetech-de-bulk-select-wide">';
+		echo '<option value="' . esc_attr( BulkTargetScope::SelectedIds->value ) . '">' . esc_html__( 'Search and select products', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<option value="' . esc_attr( BulkTargetScope::MatchingFilters->value ) . '">' . esc_html__( 'All products matching filters', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<option value="' . esc_attr( BulkTargetScope::EntireCatalog->value ) . '">' . esc_html__( 'Entire catalog (requires confirmation)', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '</select>';
+		$this->close_catalog_row();
+
+		$this->open_catalog_row(
+			'cetech-de-selected-products',
+			__( 'Products', 'cetech-woocommerce-delivery-engine' ),
+			[ 'scope' => BulkTargetScope::SelectedIds->value ]
+		);
+		$this->render_product_search_select( 'cetech-de-selected-products', 'selected_product_ids' );
+		echo '<p class="description">' . esc_html__( 'Type a product name or SKU, then select it. You can choose more than one.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		$this->close_catalog_row();
+
+		$this->open_catalog_row(
+			'cetech-de-entire-confirm',
+			__( 'Confirm entire catalog', 'cetech-woocommerce-delivery-engine' ),
+			[ 'scope' => BulkTargetScope::EntireCatalog->value ],
+			true
+		);
+		echo '<label><input type="checkbox" name="entire_catalog_confirmed" value="1" /> ';
+		echo esc_html__( 'I confirm this should target the entire catalog', 'cetech-woocommerce-delivery-engine' );
+		echo '</label>';
+		$this->close_catalog_row();
+		AdminPageLayout::close_form_panel();
+
+		echo '<div class="cetech-de-bulk-reveal" data-reveal-scope="' . esc_attr( BulkTargetScope::SelectedIds->value . ',' . BulkTargetScope::MatchingFilters->value ) . '">';
+		AdminPageLayout::open_advanced( __( 'Paste a large SKU or ID list', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<p><label for="cetech-de-skus">' . esc_html__( 'Paste SKUs', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
+		echo '<textarea id="cetech-de-skus" name="skus" rows="3" class="large-text"></textarea></p>';
+		echo '<p class="description">' . esc_html__( 'Use this when you already have a SKU list. The product search above is enough for a few products.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '<p><label for="cetech-de-product-ids">' . esc_html__( 'Paste product IDs', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
+		echo '<textarea id="cetech-de-product-ids" name="product_ids" rows="3" class="large-text"></textarea></p>';
+		AdminPageLayout::close_advanced();
+		echo '</div>';
+
+		echo '<div class="cetech-de-bulk-reveal" data-reveal-scope="' . esc_attr( BulkTargetScope::MatchingFilters->value ) . '" hidden>';
+		$this->render_catalog_filters();
+		echo '</div>';
+
+		AdminPageLayout::open_form_panel(
+			__( '2. Choose action', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Only the fields you change are written. Leave an action on No change to skip it.', 'cetech-woocommerce-delivery-engine' )
+		);
+		$this->open_catalog_row( 'cetech-de-fulfilment-action', __( 'Fulfilment Availability', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<select id="cetech-de-fulfilment-action" name="fulfilment_action" class="cetech-de-bulk-select-wide">';
 		echo '<option value="' . esc_attr( CatalogFieldAction::NO_CHANGE ) . '">' . esc_html__( 'No change', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '<option value="' . esc_attr( CatalogFieldAction::SET_OVERRIDE ) . '">' . esc_html__( 'Set override', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '<option value="' . esc_attr( CatalogFieldAction::CLEAR_OVERRIDE ) . '">' . esc_html__( 'Reset to Site-wide (write inheritance)', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '</select></p>';
-		echo '<p><label for="cetech-de-fulfilment-value">' . esc_html__( 'Override value', 'cetech-woocommerce-delivery-engine' ) . '</label><br /><select id="cetech-de-fulfilment-value" name="fulfilment_value">';
+		echo '<option value="' . esc_attr( CatalogFieldAction::SET_OVERRIDE ) . '">' . esc_html__( 'Set a product-specific value', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<option value="' . esc_attr( CatalogFieldAction::CLEAR_OVERRIDE ) . '">' . esc_html__( 'Restore Site-wide inheritance for this field', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '</select>';
+		$this->close_catalog_row();
+
+		$this->open_catalog_row(
+			'cetech-de-fulfilment-value',
+			__( 'Fulfilment value', 'cetech-woocommerce-delivery-engine' ),
+			[ 'fulfilment' => CatalogFieldAction::SET_OVERRIDE ],
+			true
+		);
+		echo '<select id="cetech-de-fulfilment-value" name="fulfilment_value" class="cetech-de-bulk-select-wide">';
 		foreach ( FulfilmentProfileRegistry::all() as $profile ) {
 			echo '<option value="' . esc_attr( $profile->key ) . '">' . esc_html( $profile->label ) . '</option>';
 		}
-		echo '</select></p>';
-		echo '<p><label for="cetech-de-offers-action">' . esc_html__( 'Delivery Options', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<select id="cetech-de-offers-action" name="offers_action">';
+		echo '</select>';
+		$this->close_catalog_row();
+
+		$this->open_catalog_row( 'cetech-de-offers-action', __( 'Delivery Options', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<select id="cetech-de-offers-action" name="offers_action" class="cetech-de-bulk-select-wide">';
 		echo '<option value="' . esc_attr( CatalogFieldAction::NO_CHANGE ) . '">' . esc_html__( 'No change', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '<option value="add">' . esc_html__( 'Add', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '<option value="remove">' . esc_html__( 'Remove', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '<option value="replace">' . esc_html__( 'Replace', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '<option value="inherit">' . esc_html__( 'Reset to inherited', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '</select></p>';
-		echo '<p><label for="cetech-de-offer-ids">' . esc_html__( 'Delivery Option codes or IDs (comma separated)', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<input id="cetech-de-offer-ids" name="offer_ids" type="text" class="regular-text" /></p>';
-		echo '<p><label><input type="checkbox" name="reset_entire_scope" value="1" /> ' . esc_html__( 'Reset entire Product Exception to Site-wide', 'cetech-woocommerce-delivery-engine' ) . '</label></p>';
-		echo '<p><label for="cetech-de-variation-policy">' . esc_html__( 'Variation policy', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<select id="cetech-de-variation-policy" name="variation_policy">';
-		echo '<option value="' . esc_attr( BulkVariationPolicy::PreserveOverrides->value ) . '">' . esc_html__( 'Preserve existing variation overrides (recommended)', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '<option value="' . esc_attr( BulkVariationPolicy::ParentOnly->value ) . '">' . esc_html__( 'Parent products only', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '<option value="' . esc_attr( BulkVariationPolicy::ResetVariationsToParent->value ) . '">' . esc_html__( 'Reset variations to parent after the parent change', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '</select></p>';
-		echo '<p><button type="submit" class="button button-primary">' . esc_html__( 'Preview impact (dry run)', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
+		echo '<option value="' . esc_attr( CatalogFieldAction::COLLECTION_ADD ) . '">' . esc_html__( 'Add', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<option value="' . esc_attr( CatalogFieldAction::COLLECTION_REMOVE ) . '">' . esc_html__( 'Remove', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<option value="' . esc_attr( CatalogFieldAction::COLLECTION_REPLACE ) . '">' . esc_html__( 'Replace', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<option value="' . esc_attr( CatalogFieldAction::COLLECTION_INHERIT ) . '">' . esc_html__( 'Restore inherited Delivery Options', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '</select>';
+		$this->close_catalog_row();
+
+		$this->open_catalog_row(
+			'cetech-de-offer-ids',
+			__( 'Delivery Option', 'cetech-woocommerce-delivery-engine' ),
+			[ 'offers' => CatalogFieldAction::COLLECTION_ADD . ',' . CatalogFieldAction::COLLECTION_REMOVE . ',' . CatalogFieldAction::COLLECTION_REPLACE ],
+			true
+		);
+		$this->render_labeled_select(
+			'cetech-de-offer-ids',
+			'offer_ids',
+			$this->catalog_choices->delivery_options(),
+			__( 'Search for a Delivery Option', 'cetech-woocommerce-delivery-engine' ),
+			true
+		);
+		echo '<p class="description">' . esc_html__( 'Shown as names such as Air Shipping. The stable ID is stored internally.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '<details class="cetech-de-technical-details"><summary>' . esc_html__( 'Technical details', 'cetech-woocommerce-delivery-engine' ) . '</summary>';
+		echo '<p><label for="cetech-de-offer-ids-advanced">' . esc_html__( 'Delivery Option IDs or codes', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
+		echo '<input id="cetech-de-offer-ids-advanced" name="offer_ids_advanced" type="text" class="regular-text" /></p>';
+		echo '</details>';
+		$this->close_catalog_row();
+
+		$this->open_catalog_row( 'cetech-de-reset-scope', __( 'Reset entire Product Exception', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<label><input id="cetech-de-reset-scope" type="checkbox" name="reset_entire_scope" value="1" /> ';
+		echo esc_html__( 'Remove this product\'s Delivery Engine exception and restore Site-wide inheritance', 'cetech-woocommerce-delivery-engine' );
+		echo '</label>';
+		echo '<p class="description cetech-de-bulk-reveal" data-reveal-reset="1" hidden>';
+		echo esc_html__( 'Every product-specific Delivery Engine setting on the targeted products will be cleared. They will use Site-wide Defaults again. Variation-specific settings follow the variation setup below.', 'cetech-woocommerce-delivery-engine' );
+		echo '</p>';
+		$this->close_catalog_row();
+
+		$this->open_catalog_row( 'cetech-de-variation-policy', __( 'Variation setup', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<select id="cetech-de-variation-policy" name="variation_policy" class="cetech-de-bulk-select-wide">';
+		echo '<option value="' . esc_attr( BulkVariationPolicy::PreserveOverrides->value ) . '">' . esc_html__( 'Keep existing variation settings (recommended)', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<option value="' . esc_attr( BulkVariationPolicy::ParentOnly->value ) . '">' . esc_html__( 'Change parent products only', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<option value="' . esc_attr( BulkVariationPolicy::ResetVariationsToParent->value ) . '">' . esc_html__( 'After changing the parent, restore each variation to inherit from the parent', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '</select>';
+		$this->close_catalog_row();
+		AdminPageLayout::close_form_panel();
+
+		echo '<p class="cetech-de-form-actions"><button type="submit" class="button button-primary">' . esc_html__( 'Preview impact (dry run)', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
 		echo '</form>';
 		echo '<p class="description">' . esc_html__( 'Preview never writes catalog configuration. Apply starts a background job. Closing the browser does not stop the job.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 	}
@@ -310,8 +389,18 @@ final class BulkToolsPage {
 		echo '<form method="post" class="cetech-de-bulk-form">';
 		wp_nonce_field( self::ACTION_VALIDATION, 'cetech_de_nonce' );
 		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_VALIDATION ) . '" />';
-		echo '<p><label for="cetech-de-validation-ids">' . esc_html__( 'Product IDs to scan (comma or newline separated)', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
+		AdminPageLayout::open_form_panel(
+			__( 'Products to scan', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Search by name or SKU. Leave empty only if you paste a list below.', 'cetech-woocommerce-delivery-engine' )
+		);
+		$this->open_catalog_row( 'cetech-de-validation-products', __( 'Products', 'cetech-woocommerce-delivery-engine' ) );
+		$this->render_product_search_select( 'cetech-de-validation-products', 'selected_product_ids' );
+		$this->close_catalog_row();
+		AdminPageLayout::close_form_panel();
+		AdminPageLayout::open_advanced( __( 'Paste a product ID list', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<p><label for="cetech-de-validation-ids">' . esc_html__( 'Product IDs', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
 		echo '<textarea id="cetech-de-validation-ids" name="product_ids" rows="4" class="large-text"></textarea></p>';
+		AdminPageLayout::close_advanced();
 		echo '<p><button type="submit" class="button">' . esc_html__( 'Start validation scan (no writes)', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
 		echo '</form>';
 		echo '<p>' . esc_html__( 'Needs Attention remains the operational list for products that currently fail delivery resolution.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
@@ -452,8 +541,9 @@ final class BulkToolsPage {
 
 	private function create_preview_from_post(): void {
 		$scope = isset( $_POST['target_scope'] ) ? sanitize_key( wp_unslash( (string) $_POST['target_scope'] ) ) : BulkTargetScope::SelectedIds->value;
-		$ids   = $this->parse_id_list( (string) ( $_POST['product_ids'] ?? '' ) );
+		$ids   = BulkCatalogAdminChoices::merge_product_ids( wp_unslash( $_POST ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		$skus  = $this->parse_sku_list( (string) ( $_POST['skus'] ?? '' ) );
+		$scope = BulkCatalogAdminChoices::resolve_target_scope( $scope, $ids, $skus );
 		$confirmed = ! empty( $_POST['entire_catalog_confirmed'] );
 		$actions   = [];
 		$fulfilment_action = sanitize_key( (string) ( $_POST['fulfilment_action'] ?? CatalogFieldAction::NO_CHANGE ) );
@@ -469,7 +559,7 @@ final class BulkToolsPage {
 			$actions[] = [
 				'field_key' => ConfigurationFieldKey::DELIVERY_OFFER_IDS,
 				'action'    => $offers_action,
-				'members'   => $this->parse_member_list( (string) ( $_POST['offer_ids'] ?? '' ) ),
+				'members'   => BulkCatalogAdminChoices::merge_offer_members( wp_unslash( $_POST ) ), // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 			];
 		}
 		try {
@@ -630,7 +720,7 @@ final class BulkToolsPage {
 	}
 
 	private function create_validation_from_post(): void {
-		$ids = $this->parse_id_list( (string) ( $_POST['product_ids'] ?? '' ) );
+		$ids = BulkCatalogAdminChoices::merge_product_ids( wp_unslash( $_POST ) ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
 		try {
 			$job = $this->engine->create_preview(
 				BulkOperationType::ValidationScan,
@@ -666,64 +756,162 @@ final class BulkToolsPage {
 	}
 
 	private function render_catalog_filters(): void {
-		echo '<h3>' . esc_html__( 'Filters', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
-		echo '<p class="description">' . esc_html__( 'Matching filters with nothing selected match no products. Entire catalog still requires the confirmation checkbox.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
-		echo '<p><label for="cetech-de-product-type">' . esc_html__( 'WooCommerce product type', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<select id="cetech-de-product-type" name="product_type"><option value="">' . esc_html__( 'Any', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		foreach ( [ 'simple', 'variable', 'grouped', 'external' ] as $type ) {
-			echo '<option value="' . esc_attr( $type ) . '">' . esc_html( $type ) . '</option>';
+		AdminPageLayout::open_form_panel(
+			__( 'Basic product filters', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Matching filters with nothing selected match no products.', 'cetech-woocommerce-delivery-engine' )
+		);
+		$this->open_catalog_row( 'cetech-de-search', __( 'Name or SKU', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<input id="cetech-de-search" name="search" type="text" class="regular-text" />';
+		$this->close_catalog_row( __( 'Finds products whose name or SKU contains this text.', 'cetech-woocommerce-delivery-engine' ) );
+
+		$this->open_catalog_row( 'cetech-de-category-id', __( 'Category', 'cetech-woocommerce-delivery-engine' ) );
+		$this->render_taxonomy_select( 'cetech-de-category-id', 'category_id', 'product_cat', __( 'Any category', 'cetech-woocommerce-delivery-engine' ) );
+		$this->close_catalog_row();
+
+		$this->open_catalog_row( 'cetech-de-tag-id', __( 'Tag', 'cetech-woocommerce-delivery-engine' ) );
+		$this->render_taxonomy_select( 'cetech-de-tag-id', 'tag_id', 'product_tag', __( 'Any tag', 'cetech-woocommerce-delivery-engine' ) );
+		$this->close_catalog_row();
+
+		$this->open_catalog_row( 'cetech-de-shipping-class-id', __( 'Shipping class', 'cetech-woocommerce-delivery-engine' ) );
+		$this->render_taxonomy_select( 'cetech-de-shipping-class-id', 'shipping_class_id', 'product_shipping_class', __( 'Any shipping class', 'cetech-woocommerce-delivery-engine' ) );
+		$this->close_catalog_row();
+
+		$this->open_catalog_row( 'cetech-de-product-type', __( 'Product type', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<select id="cetech-de-product-type" name="product_type" class="cetech-de-bulk-select-wide">';
+		echo '<option value="">' . esc_html__( 'Any', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		foreach (
+			[
+				'simple'   => __( 'Simple product', 'cetech-woocommerce-delivery-engine' ),
+				'variable' => __( 'Variable product', 'cetech-woocommerce-delivery-engine' ),
+				'grouped'  => __( 'Grouped product', 'cetech-woocommerce-delivery-engine' ),
+				'external' => __( 'External/affiliate product', 'cetech-woocommerce-delivery-engine' ),
+			] as $type => $label
+		) {
+			echo '<option value="' . esc_attr( $type ) . '">' . esc_html( $label ) . '</option>';
 		}
-		echo '</select></p>';
-		echo '<p><label for="cetech-de-stock-status">' . esc_html__( 'Stock status', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<select id="cetech-de-stock-status" name="stock_status"><option value="">' . esc_html__( 'Any', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		foreach ( [ 'instock' => __( 'In stock', 'cetech-woocommerce-delivery-engine' ), 'outofstock' => __( 'Out of stock', 'cetech-woocommerce-delivery-engine' ), 'onbackorder' => __( 'On backorder', 'cetech-woocommerce-delivery-engine' ) ] as $value => $label ) {
+		echo '</select>';
+		$this->close_catalog_row();
+
+		$this->open_catalog_row( 'cetech-de-stock-status', __( 'Stock status', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<select id="cetech-de-stock-status" name="stock_status" class="cetech-de-bulk-select-wide">';
+		echo '<option value="">' . esc_html__( 'Any', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		foreach (
+			[
+				'instock'     => __( 'In stock', 'cetech-woocommerce-delivery-engine' ),
+				'outofstock'  => __( 'Out of stock', 'cetech-woocommerce-delivery-engine' ),
+				'onbackorder' => __( 'On backorder', 'cetech-woocommerce-delivery-engine' ),
+			] as $value => $label
+		) {
 			echo '<option value="' . esc_attr( $value ) . '">' . esc_html( $label ) . '</option>';
 		}
-		echo '</select></p>';
-		echo '<p><label for="cetech-de-search">' . esc_html__( 'Name or SKU contains', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<input id="cetech-de-search" name="search" type="text" class="regular-text" /></p>';
-		echo '<p><label for="cetech-de-category-id">' . esc_html__( 'Category term taxonomy ID', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<input id="cetech-de-category-id" name="category_id" type="number" min="0" class="small-text" /></p>';
-		echo '<p><label for="cetech-de-tag-id">' . esc_html__( 'Tag term taxonomy ID', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<input id="cetech-de-tag-id" name="tag_id" type="number" min="0" class="small-text" /></p>';
-		echo '<p><label for="cetech-de-shipping-class-id">' . esc_html__( 'Shipping class term taxonomy ID', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<input id="cetech-de-shipping-class-id" name="shipping_class_id" type="number" min="0" class="small-text" /></p>';
-		echo '<p><label for="cetech-de-configured-fulfilment">' . esc_html__( 'Configured Fulfilment Availability', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<select id="cetech-de-configured-fulfilment" name="configured_fulfilment"><option value="">' . esc_html__( 'Any', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		foreach ( FulfilmentProfileRegistry::all() as $profile ) {
-			echo '<option value="' . esc_attr( $profile->key ) . '">' . esc_html( $profile->label ) . '</option>';
+		echo '</select>';
+		$this->close_catalog_row();
+		AdminPageLayout::close_form_panel();
+
+		AdminPageLayout::open_form_panel( __( 'Delivery filters', 'cetech-woocommerce-delivery-engine' ) );
+		$this->open_catalog_row( 'cetech-de-configured-fulfilment', __( 'Product-specific fulfilment setting', 'cetech-woocommerce-delivery-engine' ) );
+		$this->render_fulfilment_filter_select( 'cetech-de-configured-fulfilment', 'configured_fulfilment' );
+		$this->close_catalog_row();
+
+		$this->open_catalog_row( 'cetech-de-effective-fulfilment', __( 'Current fulfilment', 'cetech-woocommerce-delivery-engine' ) );
+		$this->render_fulfilment_filter_select( 'cetech-de-effective-fulfilment', 'effective_fulfilment' );
+		$this->close_catalog_row();
+
+		$this->open_catalog_row( 'cetech-de-exception-state', __( 'Configuration source', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<select id="cetech-de-exception-state" name="exception_state" class="cetech-de-bulk-select-wide">';
+		echo '<option value="">' . esc_html__( 'Any', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<option value="' . esc_attr( CatalogTargetFilters::EXCEPTION_SITE_WIDE ) . '">' . esc_html__( 'Uses Site-wide Defaults', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<option value="' . esc_attr( CatalogTargetFilters::EXCEPTION_PRODUCT ) . '">' . esc_html__( 'Has Product Exception', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '</select>';
+		$this->close_catalog_row();
+
+		$this->open_catalog_row( 'cetech-de-variation-state', __( 'Variation setup', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<select id="cetech-de-variation-state" name="variation_state" class="cetech-de-bulk-select-wide">';
+		echo '<option value="">' . esc_html__( 'Any', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<option value="' . esc_attr( CatalogTargetFilters::VARIATION_INHERIT ) . '">' . esc_html__( 'Inherits product', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<option value="' . esc_attr( CatalogTargetFilters::VARIATION_OVERRIDE ) . '">' . esc_html__( 'Has variation override', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '</select>';
+		$this->close_catalog_row();
+
+		$this->open_catalog_row( 'cetech-de-delivery-option-id', __( 'Delivery Option', 'cetech-woocommerce-delivery-engine' ) );
+		$this->render_labeled_select(
+			'cetech-de-delivery-option-id',
+			'delivery_option_id',
+			$this->catalog_choices->delivery_options(),
+			__( 'Any Delivery Option', 'cetech-woocommerce-delivery-engine' )
+		);
+		$this->close_catalog_row();
+
+		$this->open_catalog_row( 'cetech-de-logistics-id', __( 'Logistics Profile', 'cetech-woocommerce-delivery-engine' ) );
+		$this->render_labeled_select(
+			'cetech-de-logistics-id',
+			'logistics_profile_id',
+			$this->catalog_choices->logistics_profiles(),
+			__( 'Any logistics profile', 'cetech-woocommerce-delivery-engine' )
+		);
+		$this->close_catalog_row();
+
+		$this->open_catalog_row( 'cetech-de-pickup-id', __( 'Pickup Location', 'cetech-woocommerce-delivery-engine' ) );
+		$this->render_labeled_select(
+			'cetech-de-pickup-id',
+			'pickup_location_id',
+			$this->catalog_choices->pickup_locations(),
+			__( 'Any pickup location', 'cetech-woocommerce-delivery-engine' )
+		);
+		$this->close_catalog_row();
+
+		$this->open_catalog_row( 'cetech-de-missing-rate', __( 'Validation state', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<label><input id="cetech-de-missing-rate" type="checkbox" name="missing_usable_rate" value="1" /> ';
+		echo esc_html__( 'Missing a usable rate or Delivery Option', 'cetech-woocommerce-delivery-engine' );
+		echo '</label><br />';
+		echo '<label><input type="checkbox" name="invalid_effective" value="1" /> ';
+		echo esc_html__( 'Current delivery setup is invalid or incomplete', 'cetech-woocommerce-delivery-engine' );
+		echo '</label>';
+		$this->close_catalog_row();
+		AdminPageLayout::close_form_panel();
+
+		if ( $this->catalog_choices->can_view_private_sources() ) {
+			AdminPageLayout::open_advanced( __( 'Private / advanced filters', 'cetech-woocommerce-delivery-engine' ) );
+			echo '<p><label for="cetech-de-supplier-id">' . esc_html__( 'Supplier', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
+			$this->render_labeled_select(
+				'cetech-de-supplier-id',
+				'supplier_id',
+				$this->catalog_choices->suppliers(),
+				__( 'Any supplier', 'cetech-woocommerce-delivery-engine' )
+			);
+			echo '</p>';
+			echo '<p><label for="cetech-de-origin-id">' . esc_html__( 'Origin', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
+			$this->render_labeled_select(
+				'cetech-de-origin-id',
+				'origin_id',
+				$this->catalog_choices->origins(),
+				__( 'Any origin', 'cetech-woocommerce-delivery-engine' )
+			);
+			echo '</p>';
+			AdminPageLayout::close_advanced();
 		}
-		echo '</select></p>';
-		echo '<p><label for="cetech-de-effective-fulfilment">' . esc_html__( 'Effective Fulfilment Availability', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<select id="cetech-de-effective-fulfilment" name="effective_fulfilment"><option value="">' . esc_html__( 'Any', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		foreach ( FulfilmentProfileRegistry::all() as $profile ) {
-			echo '<option value="' . esc_attr( $profile->key ) . '">' . esc_html( $profile->label ) . '</option>';
+
+		AdminPageLayout::open_technical_details( __( 'Advanced / Technical details', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<p class="description">' . esc_html__( 'Numeric IDs and codes for troubleshooting. Normal work should use the labelled selectors above.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '<p><label for="cetech-de-category-id-advanced">' . esc_html__( 'Category ID', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
+		echo '<input id="cetech-de-category-id-advanced" name="category_id_advanced" type="number" min="0" class="small-text" /></p>';
+		echo '<p><label for="cetech-de-tag-id-advanced">' . esc_html__( 'Tag ID', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
+		echo '<input id="cetech-de-tag-id-advanced" name="tag_id_advanced" type="number" min="0" class="small-text" /></p>';
+		echo '<p><label for="cetech-de-shipping-class-id-advanced">' . esc_html__( 'Shipping class ID', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
+		echo '<input id="cetech-de-shipping-class-id-advanced" name="shipping_class_id_advanced" type="number" min="0" class="small-text" /></p>';
+		echo '<p><label for="cetech-de-delivery-option-id-advanced">' . esc_html__( 'Delivery Option ID', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
+		echo '<input id="cetech-de-delivery-option-id-advanced" name="delivery_option_id_advanced" type="number" min="0" class="small-text" /></p>';
+		echo '<p><label for="cetech-de-logistics-id-advanced">' . esc_html__( 'Logistics Profile ID', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
+		echo '<input id="cetech-de-logistics-id-advanced" name="logistics_profile_id_advanced" type="number" min="0" class="small-text" /></p>';
+		echo '<p><label for="cetech-de-pickup-id-advanced">' . esc_html__( 'Pickup Location ID', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
+		echo '<input id="cetech-de-pickup-id-advanced" name="pickup_location_id_advanced" type="number" min="0" class="small-text" /></p>';
+		if ( $this->catalog_choices->can_view_private_sources() ) {
+			echo '<p><label for="cetech-de-supplier-id-advanced">' . esc_html__( 'Supplier ID', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
+			echo '<input id="cetech-de-supplier-id-advanced" name="supplier_id_advanced" type="number" min="0" class="small-text" /></p>';
+			echo '<p><label for="cetech-de-origin-id-advanced">' . esc_html__( 'Origin ID', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
+			echo '<input id="cetech-de-origin-id-advanced" name="origin_id_advanced" type="number" min="0" class="small-text" /></p>';
 		}
-		echo '</select></p>';
-		echo '<p><label for="cetech-de-exception-state">' . esc_html__( 'Site-wide vs Product Exception', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<select id="cetech-de-exception-state" name="exception_state"><option value="">' . esc_html__( 'Any', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '<option value="' . esc_attr( CatalogTargetFilters::EXCEPTION_SITE_WIDE ) . '">' . esc_html__( 'Site-wide / inherited', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '<option value="' . esc_attr( CatalogTargetFilters::EXCEPTION_PRODUCT ) . '">' . esc_html__( 'Product Exception', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '</select></p>';
-		echo '<p><label for="cetech-de-variation-state">' . esc_html__( 'Variation override vs parent inheritance', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<select id="cetech-de-variation-state" name="variation_state"><option value="">' . esc_html__( 'Any', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '<option value="' . esc_attr( CatalogTargetFilters::VARIATION_INHERIT ) . '">' . esc_html__( 'Inherit from parent', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '<option value="' . esc_attr( CatalogTargetFilters::VARIATION_OVERRIDE ) . '">' . esc_html__( 'Variation override', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '</select></p>';
-		echo '<p><label for="cetech-de-delivery-option-id">' . esc_html__( 'Delivery Option ID', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<input id="cetech-de-delivery-option-id" name="delivery_option_id" type="number" min="0" class="small-text" /></p>';
-		echo '<p><label for="cetech-de-logistics-id">' . esc_html__( 'Logistics Profile ID', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<input id="cetech-de-logistics-id" name="logistics_profile_id" type="number" min="0" class="small-text" /></p>';
-		echo '<p><label for="cetech-de-pickup-id">' . esc_html__( 'Pickup Location ID', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<input id="cetech-de-pickup-id" name="pickup_location_id" type="number" min="0" class="small-text" /></p>';
-		if ( current_user_can( 'manage_private_sources' ) || current_user_can( 'view_private_origins' ) ) {
-			echo '<p><label for="cetech-de-supplier-id">' . esc_html__( 'Supplier ID', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-			echo '<input id="cetech-de-supplier-id" name="supplier_id" type="number" min="0" class="small-text" /></p>';
-			echo '<p><label for="cetech-de-origin-id">' . esc_html__( 'Origin ID', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-			echo '<input id="cetech-de-origin-id" name="origin_id" type="number" min="0" class="small-text" /></p>';
-		}
-		echo '<p><label><input type="checkbox" name="missing_usable_rate" value="1" /> ' . esc_html__( 'Missing usable rate / delivery option', 'cetech-woocommerce-delivery-engine' ) . '</label></p>';
-		echo '<p><label><input type="checkbox" name="invalid_effective" value="1" /> ' . esc_html__( 'Invalid or unresolved effective configuration', 'cetech-woocommerce-delivery-engine' ) . '</label></p>';
+		AdminPageLayout::close_technical_details();
 	}
 
 	/**
@@ -731,25 +919,25 @@ final class BulkToolsPage {
 	 */
 	private function parse_filters_from_post(): array {
 		$raw = [
-			CatalogTargetFilters::PRODUCT_TYPE            => sanitize_key( (string) ( $_POST['product_type'] ?? '' ) ),
-			CatalogTargetFilters::STOCK_STATUS            => sanitize_key( (string) ( $_POST['stock_status'] ?? '' ) ),
-			CatalogTargetFilters::SEARCH                  => sanitize_text_field( (string) ( $_POST['search'] ?? '' ) ),
-			CatalogTargetFilters::CATEGORY_ID             => absint( $_POST['category_id'] ?? 0 ),
-			CatalogTargetFilters::TAG_ID                  => absint( $_POST['tag_id'] ?? 0 ),
-			CatalogTargetFilters::SHIPPING_CLASS_ID       => absint( $_POST['shipping_class_id'] ?? 0 ),
-			CatalogTargetFilters::CONFIGURED_FULFILMENT   => sanitize_key( (string) ( $_POST['configured_fulfilment'] ?? '' ) ),
-			CatalogTargetFilters::EFFECTIVE_FULFILMENT    => sanitize_key( (string) ( $_POST['effective_fulfilment'] ?? '' ) ),
-			CatalogTargetFilters::EXCEPTION_STATE         => sanitize_key( (string) ( $_POST['exception_state'] ?? '' ) ),
-			CatalogTargetFilters::VARIATION_STATE         => sanitize_key( (string) ( $_POST['variation_state'] ?? '' ) ),
-			CatalogTargetFilters::DELIVERY_OPTION_ID      => absint( $_POST['delivery_option_id'] ?? 0 ),
-			CatalogTargetFilters::LOGISTICS_PROFILE_ID    => absint( $_POST['logistics_profile_id'] ?? 0 ),
-			CatalogTargetFilters::PICKUP_LOCATION_ID      => absint( $_POST['pickup_location_id'] ?? 0 ),
-			CatalogTargetFilters::MISSING_USABLE_RATE     => ! empty( $_POST['missing_usable_rate'] ),
-			CatalogTargetFilters::INVALID_EFFECTIVE       => ! empty( $_POST['invalid_effective'] ),
+			CatalogTargetFilters::PRODUCT_TYPE          => sanitize_key( (string) ( $_POST['product_type'] ?? '' ) ),
+			CatalogTargetFilters::STOCK_STATUS          => sanitize_key( (string) ( $_POST['stock_status'] ?? '' ) ),
+			CatalogTargetFilters::SEARCH                => sanitize_text_field( (string) ( $_POST['search'] ?? '' ) ),
+			CatalogTargetFilters::CATEGORY_ID           => BulkCatalogAdminChoices::first_positive_id( $_POST['category_id'] ?? 0, $_POST['category_id_advanced'] ?? 0 ),
+			CatalogTargetFilters::TAG_ID                => BulkCatalogAdminChoices::first_positive_id( $_POST['tag_id'] ?? 0, $_POST['tag_id_advanced'] ?? 0 ),
+			CatalogTargetFilters::SHIPPING_CLASS_ID     => BulkCatalogAdminChoices::first_positive_id( $_POST['shipping_class_id'] ?? 0, $_POST['shipping_class_id_advanced'] ?? 0 ),
+			CatalogTargetFilters::CONFIGURED_FULFILMENT => sanitize_key( (string) ( $_POST['configured_fulfilment'] ?? '' ) ),
+			CatalogTargetFilters::EFFECTIVE_FULFILMENT  => sanitize_key( (string) ( $_POST['effective_fulfilment'] ?? '' ) ),
+			CatalogTargetFilters::EXCEPTION_STATE       => sanitize_key( (string) ( $_POST['exception_state'] ?? '' ) ),
+			CatalogTargetFilters::VARIATION_STATE       => sanitize_key( (string) ( $_POST['variation_state'] ?? '' ) ),
+			CatalogTargetFilters::DELIVERY_OPTION_ID    => BulkCatalogAdminChoices::first_positive_id( $_POST['delivery_option_id'] ?? 0, $_POST['delivery_option_id_advanced'] ?? 0 ),
+			CatalogTargetFilters::LOGISTICS_PROFILE_ID  => BulkCatalogAdminChoices::first_positive_id( $_POST['logistics_profile_id'] ?? 0, $_POST['logistics_profile_id_advanced'] ?? 0 ),
+			CatalogTargetFilters::PICKUP_LOCATION_ID    => BulkCatalogAdminChoices::first_positive_id( $_POST['pickup_location_id'] ?? 0, $_POST['pickup_location_id_advanced'] ?? 0 ),
+			CatalogTargetFilters::MISSING_USABLE_RATE   => ! empty( $_POST['missing_usable_rate'] ),
+			CatalogTargetFilters::INVALID_EFFECTIVE     => ! empty( $_POST['invalid_effective'] ),
 		];
-		if ( current_user_can( 'manage_private_sources' ) || current_user_can( 'view_private_origins' ) ) {
-			$raw[ CatalogTargetFilters::SUPPLIER_ID ] = absint( $_POST['supplier_id'] ?? 0 );
-			$raw[ CatalogTargetFilters::ORIGIN_ID ]   = absint( $_POST['origin_id'] ?? 0 );
+		if ( $this->catalog_choices->can_view_private_sources() ) {
+			$raw[ CatalogTargetFilters::SUPPLIER_ID ] = BulkCatalogAdminChoices::first_positive_id( $_POST['supplier_id'] ?? 0, $_POST['supplier_id_advanced'] ?? 0 );
+			$raw[ CatalogTargetFilters::ORIGIN_ID ]   = BulkCatalogAdminChoices::first_positive_id( $_POST['origin_id'] ?? 0, $_POST['origin_id_advanced'] ?? 0 );
 		}
 
 		return CatalogTargetFilters::sanitize( $raw );
@@ -806,6 +994,107 @@ final class BulkToolsPage {
 				],
 			]
 		) . '</div></nav>';
+	}
+
+	/**
+	 * @param array{scope?: string, fulfilment?: string, offers?: string} $reveal
+	 */
+	private function open_catalog_row( string $for, string $label, array $reveal = [], bool $hidden = false ): void {
+		$class = ( [] !== $reveal || $hidden ) ? ' class="cetech-de-bulk-reveal"' : '';
+		$attrs = '';
+		if ( isset( $reveal['scope'] ) ) {
+			$attrs .= ' data-reveal-scope="' . esc_attr( $reveal['scope'] ) . '"';
+		}
+		if ( isset( $reveal['fulfilment'] ) ) {
+			$attrs .= ' data-reveal-fulfilment="' . esc_attr( $reveal['fulfilment'] ) . '"';
+		}
+		if ( isset( $reveal['offers'] ) ) {
+			$attrs .= ' data-reveal-offers="' . esc_attr( $reveal['offers'] ) . '"';
+		}
+
+		echo '<tr' . $class . $attrs . ( $hidden ? ' hidden' : '' ) . '>';
+		echo '<th scope="row"><label for="' . esc_attr( $for ) . '">' . esc_html( $label ) . '</label></th><td>';
+	}
+
+	private function close_catalog_row( ?string $description = null ): void {
+		if ( null !== $description && '' !== $description ) {
+			echo '<p class="description">' . esc_html( $description ) . '</p>';
+		}
+		echo '</td></tr>';
+	}
+
+	private function render_product_search_select( string $id, string $name ): void {
+		printf(
+			'<select id="%s" name="%s[]" class="cetech-de-product-search cetech-de-bulk-select-wide" multiple="multiple" data-placeholder="%s"></select>',
+			esc_attr( $id ),
+			esc_attr( $name ),
+			esc_attr__( 'Search for a product by name or SKU', 'cetech-woocommerce-delivery-engine' )
+		);
+	}
+
+	/**
+	 * @param array<int|string, string> $options
+	 */
+	private function render_labeled_select( string $id, string $name, array $options, string $empty_label, bool $multiple = false ): void {
+		$name_attr = $multiple ? $name . '[]' : $name;
+		$multiple_attr = $multiple ? ' multiple="multiple"' : '';
+		printf(
+			'<select id="%s" name="%s" class="cetech-de-enhanced-select cetech-de-bulk-select-wide"%s data-placeholder="%s">',
+			esc_attr( $id ),
+			esc_attr( $name_attr ),
+			$multiple_attr, // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+			esc_attr( $empty_label )
+		);
+		if ( ! $multiple ) {
+			echo '<option value="">' . esc_html( $empty_label ) . '</option>';
+		}
+		foreach ( $options as $value => $label ) {
+			echo '<option value="' . esc_attr( (string) $value ) . '">' . esc_html( (string) $label ) . '</option>';
+		}
+		echo '</select>';
+	}
+
+	private function render_taxonomy_select( string $id, string $name, string $taxonomy, string $empty_label ): void {
+		$this->render_labeled_select( $id, $name, $this->taxonomy_options( $taxonomy ), $empty_label );
+	}
+
+	/**
+	 * @return array<int, string>
+	 */
+	private function taxonomy_options( string $taxonomy ): array {
+		if ( ! function_exists( 'get_terms' ) ) {
+			return [];
+		}
+
+		$terms = get_terms(
+			[
+				'taxonomy'   => $taxonomy,
+				'hide_empty' => false,
+				'number'     => 1000,
+			]
+		);
+		if ( ! is_array( $terms ) ) {
+			return [];
+		}
+
+		$options = [];
+		foreach ( $terms as $term ) {
+			if ( ! is_object( $term ) || ! isset( $term->term_id, $term->name ) ) {
+				continue;
+			}
+			$options[ (int) $term->term_id ] = (string) $term->name;
+		}
+
+		return $options;
+	}
+
+	private function render_fulfilment_filter_select( string $id, string $name ): void {
+		echo '<select id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '" class="cetech-de-bulk-select-wide">';
+		echo '<option value="">' . esc_html__( 'Any', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		foreach ( FulfilmentProfileRegistry::all() as $profile ) {
+			echo '<option value="' . esc_attr( $profile->key ) . '">' . esc_html( $profile->label ) . '</option>';
+		}
+		echo '</select>';
 	}
 
 	private function create_csv_export_from_post(): void {

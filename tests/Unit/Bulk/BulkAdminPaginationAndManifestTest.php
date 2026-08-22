@@ -7,18 +7,30 @@ namespace CetechDeliveryEngine\Tests\Unit\Bulk;
 use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogTargetDefinition;
 use CetechDeliveryEngine\Domain\Enum\BulkTargetScope;
 use CetechDeliveryEngine\Presentation\Admin\BulkAdminListPreferences;
+use CetechDeliveryEngine\Presentation\Admin\BulkToolsPage;
 use PHPUnit\Framework\TestCase;
 
 final class BulkAdminPaginationAndManifestTest extends TestCase {
 
-	public function test_admin_page_size_defaults_to_twenty_five_and_rejects_five_hundred(): void {
+	public function test_admin_page_size_defaults_to_twenty_five_and_bounds_unsafe_values(): void {
 		self::assertSame( 25, BulkAdminListPreferences::DEFAULT_PER_PAGE );
-		self::assertSame( 25, BulkAdminListPreferences::sanitize_per_page( 500 ) );
+		self::assertSame( 100, BulkAdminListPreferences::MAX_PER_PAGE );
+		self::assertSame( 100, BulkAdminListPreferences::sanitize_per_page( 500 ) );
+		self::assertSame( 100, BulkAdminListPreferences::sanitize_per_page( 1000 ) );
+		self::assertSame( 100, BulkAdminListPreferences::sanitize_per_page( '500' ) );
 		self::assertSame( 25, BulkAdminListPreferences::sanitize_per_page( 1 ) );
+		self::assertSame( 25, BulkAdminListPreferences::sanitize_per_page( 0 ) );
+		self::assertSame( 25, BulkAdminListPreferences::sanitize_per_page( -1 ) );
+		self::assertSame( 25, BulkAdminListPreferences::sanitize_per_page( 'abc' ) );
+		self::assertSame( 25, BulkAdminListPreferences::sanitize_per_page( '' ) );
+		self::assertSame( 25, BulkAdminListPreferences::sanitize_per_page( null ) );
 		self::assertSame( 20, BulkAdminListPreferences::sanitize_per_page( 20 ) );
 		self::assertSame( 50, BulkAdminListPreferences::sanitize_per_page( 50 ) );
 		self::assertSame( 100, BulkAdminListPreferences::sanitize_per_page( 100 ) );
 		self::assertSame( 100, BulkAdminListPreferences::clamp_query_limit( 500 ) );
+		self::assertSame( 100, BulkToolsPage::filter_screen_option( false, BulkAdminListPreferences::OPTION, '500' ) );
+		self::assertSame( 25, BulkToolsPage::filter_screen_option( false, BulkAdminListPreferences::OPTION, 'nope' ) );
+		self::assertFalse( BulkToolsPage::filter_screen_option( false, 'unrelated_option', '500' ) );
 	}
 
 	public function test_selected_id_pages_are_binary_searched_not_fully_scanned_for_the_slice(): void {

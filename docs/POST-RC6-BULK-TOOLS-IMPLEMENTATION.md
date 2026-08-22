@@ -1,7 +1,7 @@
 # Post-RC.6 Bulk Tools — Implementation
 
 **Branch:** `feat/post-rc6-bulk-tools`  
-**Plugin version:** `1.0.0-dev.bulk.2` (must not be packaged as RC.6)  
+**Plugin version:** `1.0.0-dev.bulk.3` (must not be packaged as RC.6)  
 **Schema:** target `5` (`cetech_de_db_version`)
 
 ## Engine
@@ -50,13 +50,24 @@ Import conflict policy is explicit. Apply retries items that failed during dry-r
 
 Menu: Delivery Engine → Bulk Tools (`cetech-delivery-engine-bulk-tools`). Tabs: Catalog, Import / Export, Validation & Cleanup, Jobs / History, Charges.
 
-Job History and Job Items use **query/repository pagination**. Default page size is **25**. WordPress Screen Options persist `20` / `25` / `50` / `100` (option `cetech_de_bulk_list_per_page`). The wp-admin screen never defaults to 500 and does not hide extra rows in JavaScript after loading a large page. Job-item SQL is `ORDER BY id ASC LIMIT n OFFSET m` with `n ≤ 100`, using KEY `job_status_id (job_id, status, id)`. Job counters (Total / Changed / Failed) come from the job row, not from loading every item.
+Job History and Job Items use **query/repository pagination**. Default page size is **25**. WordPress Screen Options persist a numeric field; the server sanitises to `20` / `25` / `50` / `100` (option `cetech_de_bulk_list_per_page`, max **100**). Values such as `500`, `1000`, `0`, negative, or non-numeric do not persist as entered: oversized values clamp to 100; invalid/too-small values become 25. HTML attributes are not the authority. The wp-admin screen never defaults to 500 and does not hide extra rows in JavaScript after loading a large page. Job-item SQL is `ORDER BY id ASC LIMIT n OFFSET m` with `n ≤ 100`, using KEY `job_status_id (job_id, status, id)`. Job counters (Total / Changed / Failed) come from the job row, not from loading every item.
 
 Capabilities reused: `manage_product_delivery_rules`, `import_delivery_data`, `manage_delivery_rate_cards`, `manage_private_sources`, `manage_delivery_settings`.
 
 WP-CLI: `wp cetech-de bulk preview|apply|status|cancel|rollback`, `wp cetech-de config export|import`. Same engine as admin.
 
 Progress AJAX: `cetech_de_bulk_job_status`, polled every 5 seconds only on the job detail screen.
+
+## Catalog admin UX (`1.0.0-dev.bulk.3`)
+
+Owner physical QA of `1.0.0-dev.bulk.2` found the Catalog screen too technical. This repair does **not** change Bulk Job Engine, batching, Action Scheduler, schema 5, inheritance, resolver, rollback, or import/export.
+
+- Category, tag, shipping class, Delivery Option, Logistics Profile, Pickup Location, Supplier, and Origin use labelled searchable/select controls. Stable IDs remain the posted values.
+- Product targeting: WooCommerce product search by name/SKU is primary. Paste SKU list and paste IDs remain under **Paste a large SKU or ID list**.
+- Progressive disclosure: fulfilment value, Delivery Option picker, entire-catalog confirmation, matching filters, and reset explanation appear only when relevant. Supplier/Origin only for authorised private-source users.
+- Filters are grouped: Basic product filters, Delivery filters, Private / advanced filters, Advanced / Technical details.
+- Normal labels avoid “term taxonomy ID”, “Configured Fulfilment Availability”, “Effective Fulfilment Availability”, and similar implementation wording.
+- Layout uses existing `AdminPageLayout` form panels / advanced / technical details. Variation setup uses a full-width select.
 
 ## Selected-ID jobs
 
@@ -67,5 +78,5 @@ A selected-ID job may store the ID list once on `bulk_jobs.target_definition_jso
 - Cleanup mutations do not include a dedicated redundant-override detector beyond reset-entire-scope / clear-override actions.
 - Recurring automatic catalog rules are intentionally not implemented.
 - Shipment bulk status edits are intentionally not implemented.
-- `assets/admin/bulk-tools.js` has no dedicated Vitest file; progress polling is 5 seconds on the job detail screen only.
-- Owner physical QA is not performed by Cursor. Untagged owner-QA package: `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.2.zip` (`1159232` bytes, SHA-256 `a3150ebaa799c5af151f0c2a981e36905b6830e0f08ec468cca66a88fb7d5e2f`, source `8c0d872fa41d16f6a3eaccdbd2b87a0fcfa2ba53`, schema `5`).
+- `assets/admin/bulk-tools.js` includes Catalog progressive disclosure plus 5-second job-detail polling (`tests/js/bulk-tools-catalog.test.js`).
+- Owner physical QA is not performed by Cursor. Previous untagged owner-QA package `1.0.0-dev.bulk.2` is immutable. Current untagged owner-QA package: see `docs/POST-RC6-BULK-TOOLS-QUALIFICATION.md` (`1.0.0-dev.bulk.3`).

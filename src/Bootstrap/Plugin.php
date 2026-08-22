@@ -117,6 +117,7 @@ use CetechDeliveryEngine\Application\Bulk\Queue\BackgroundQueueInterface;
 use CetechDeliveryEngine\Domain\Bulk\BulkJobRepositoryInterface;
 use CetechDeliveryEngine\Domain\RateCard\RateCardBulkMutator;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbBulkJobRepository;
+use CetechDeliveryEngine\Presentation\Admin\BulkCatalogAdminChoices;
 use CetechDeliveryEngine\Presentation\Admin\BulkJobProgressEndpoint;
 use CetechDeliveryEngine\Presentation\Admin\BulkToolsPage;
 use CetechDeliveryEngine\Presentation\Cli\BulkJobCliCommand;
@@ -1378,6 +1379,17 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			BulkCatalogAdminChoices::class,
+			static fn ( ServiceContainer $container ): BulkCatalogAdminChoices => new BulkCatalogAdminChoices(
+				$container->get( DeliveryOfferRepositoryInterface::class ),
+				$container->get( LogisticsProfileRepositoryInterface::class ),
+				$container->get( PickupLocationRepositoryInterface::class ),
+				$container->get( SupplierRepositoryInterface::class ),
+				$container->get( OriginRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
 			BulkToolsPage::class,
 			static fn ( ServiceContainer $container ): BulkToolsPage => new BulkToolsPage(
 				$container->get( BulkJobEngine::class ),
@@ -1385,7 +1397,8 @@ final class Plugin {
 				$container->get( AdminActionHandler::class ),
 				$container->get( ConfigurationExporter::class ),
 				$container->get( CatalogCsvMapper::class ),
-				$container->get( CatalogCsvExportService::class )
+				$container->get( CatalogCsvExportService::class ),
+				$container->get( BulkCatalogAdminChoices::class )
 			)
 		);
 

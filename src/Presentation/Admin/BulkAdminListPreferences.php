@@ -19,8 +19,44 @@ final class BulkAdminListPreferences {
 
 	public const MAX_PER_PAGE = 100;
 
-	public static function sanitize_per_page( int $value ): int {
-		return in_array( $value, self::ALLOWED, true ) ? $value : self::DEFAULT_PER_PAGE;
+	public const MIN_PER_PAGE = 20;
+
+	/**
+	 * Persist only 20 / 25 / 50 / 100. Oversized values clamp to 100.
+	 * Zero, negative, and non-numeric values become 25.
+	 */
+	public static function sanitize_per_page( mixed $value ): int {
+		if ( is_string( $value ) ) {
+			$value = trim( $value );
+			if ( '' === $value || ! is_numeric( $value ) ) {
+				return self::DEFAULT_PER_PAGE;
+			}
+		}
+
+		if ( is_bool( $value ) || ( ! is_int( $value ) && ! is_float( $value ) && ! is_numeric( $value ) ) ) {
+			return self::DEFAULT_PER_PAGE;
+		}
+
+		$n = (int) $value;
+		if ( $n < self::MIN_PER_PAGE ) {
+			return self::DEFAULT_PER_PAGE;
+		}
+
+		if ( $n >= self::MAX_PER_PAGE ) {
+			return self::MAX_PER_PAGE;
+		}
+
+		$nearest = self::ALLOWED[0];
+		$best    = PHP_INT_MAX;
+		foreach ( self::ALLOWED as $allowed ) {
+			$distance = abs( $n - $allowed );
+			if ( $distance < $best ) {
+				$best    = $distance;
+				$nearest = $allowed;
+			}
+		}
+
+		return $nearest;
 	}
 
 	public static function clamp_query_limit( int $limit ): int {
@@ -39,6 +75,6 @@ final class BulkAdminListPreferences {
 			return self::DEFAULT_PER_PAGE;
 		}
 
-		return self::sanitize_per_page( (int) get_user_option( self::OPTION ) );
+		return self::sanitize_per_page( get_user_option( self::OPTION ) );
 	}
 }

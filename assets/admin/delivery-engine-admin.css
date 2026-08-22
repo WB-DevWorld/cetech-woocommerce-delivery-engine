@@ -765,3 +765,39 @@
 .cetech-de-access-table input[type='checkbox']:disabled {
 	opacity: 0.7;
 }
+
+.cetech-de-bulk-form .cetech-de-form-table th {
+	width: 14rem;
+	white-space: normal;
+}
+
+.cetech-de-bulk-form .cetech-de-form-table td {
+	max-width: 48rem;
+}
+
+.cetech-de-bulk-form select.cetech-de-bulk-select-wide,
+.cetech-de-bulk-form .select2-container {
+	width: 100% !important;
+	max-width: 100%;
+}
+
+.cetech-de-bulk-form select.cetech-de-bulk-select-wide {
+	min-width: 16rem;
+}
+
+.cetech-de-bulk-form .select2-container .select2-selection--single,
+.cetech-de-bulk-form .select2-container .select2-selection--multiple {
+	min-height: 30px;
+}
+
+.cetech-de-bulk-form .select2-container .select2-selection__rendered {
+	white-space: normal;
+}
+
+.cetech-de-bulk-form .cetech-de-bulk-reveal[hidden] {
+	display: none !important;
+}
+
+.cetech-de-bulk-form .cetech-de-technical-details {
+	margin-top: 8px;
+}
