@@ -159,6 +159,7 @@
 	border: 0;
 	padding: 0;
 	width: 100%;
+	max-width: 100%;
 }
 
 .cetech-de-choice-legend {
@@ -259,6 +260,7 @@
 .cetech-de-choice-card-title,
 .cetech-de-choice-card-text {
 	display: block;
+	overflow-wrap: anywhere;
 }
 
 .cetech-de-choice-card-title {
@@ -333,9 +335,11 @@
 .cetech-de-next-steps,
 .cetech-de-profile-card-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
 	gap: 12px;
 	margin: 0 0 20px;
+	width: 100%;
+	max-width: 100%;
 }
 
 .cetech-de-stat-card,
@@ -345,6 +349,9 @@
 	border: 1px solid #dcdcde;
 	border-radius: 8px;
 	padding: 18px 16px;
+	min-width: 0;
+	max-width: 100%;
+	overflow-wrap: anywhere;
 }
 
 .cetech-de-stat-card.is-attention {
@@ -486,6 +493,17 @@
 
 .cetech-de-condition-builder {
 	margin: 0 0 16px;
+}
+
+.cetech-de-condition-value {
+	min-width: 0;
+}
+
+.cetech-de-country-select,
+.cetech-de-rule-text {
+	max-width: 100%;
+	min-width: 0;
+	width: 100%;
 }
 
 .cetech-de-advanced-matching {

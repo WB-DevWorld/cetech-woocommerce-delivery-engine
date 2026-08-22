@@ -243,6 +243,57 @@ final class AdminFormHelper {
 		return $code;
 	}
 
+	/**
+	 * Fill a blank reference code from the display name before validation.
+	 *
+	 * Blank means the staff left the field empty. A non-empty invalid value is
+	 * left for the validator. An existing stored code is reused on edit so a
+	 * later name change does not regenerate identity.
+	 *
+	 * @param array<string, mixed>   $input
+	 * @param callable(string): bool $code_taken True when another record already uses the candidate.
+	 * @param callable(int): string  $stored_code Returns the current stored code for this id, or ''.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function prepare_reference_code(
+		array $input,
+		string $name,
+		callable $code_taken,
+		callable $stored_code,
+		string $fallback = 'item'
+	): array {
+		$id  = isset( $input['id'] ) ? (int) $input['id'] : 0;
+		$raw = trim( (string) ( $input['code'] ?? '' ) );
+
+		if ( '' !== $raw ) {
+			$sanitized     = self::sanitize_code( $raw );
+			$input['code'] = '' !== $sanitized ? $sanitized : $raw;
+
+			return $input;
+		}
+
+		if ( $id > 0 ) {
+			$existing = self::sanitize_code( $stored_code( $id ) );
+			if ( '' !== $existing ) {
+				$input['code'] = $existing;
+
+				return $input;
+			}
+		}
+
+		$name = trim( $name );
+		if ( '' === $name ) {
+			$input['code'] = '';
+
+			return $input;
+		}
+
+		$input['code'] = self::generate_code_from_name( $name, $code_taken, $fallback );
+
+		return $input;
+	}
+
 	public static function checkbox_field(
 		string $name,
 		string $label,

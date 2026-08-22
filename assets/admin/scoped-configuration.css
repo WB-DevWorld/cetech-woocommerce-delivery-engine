@@ -94,9 +94,11 @@
 
 .wrap.cetech-de-admin-page .cetech-de-profile-card-grid {
 	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
 	gap: 1rem;
 	margin: 0 0 1.5rem;
+	width: 100%;
+	max-width: 100%;
 }
 
 .wrap.cetech-de-admin-page .cetech-de-profile-card {
@@ -104,6 +106,9 @@
 	border: 1px solid #dcdcde;
 	border-radius: 8px;
 	background: #fff;
+	min-width: 0;
+	max-width: 100%;
+	overflow-wrap: anywhere;
 }
 
 .wrap.cetech-de-admin-page .cetech-de-profile-card h3 {

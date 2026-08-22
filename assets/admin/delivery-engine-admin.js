@@ -108,7 +108,89 @@
 
 		tbody.appendChild(row);
 
+		syncConditionValueControls(row);
+
 	});
+
+
+
+	function syncConditionValueControls(row) {
+
+		if (!row) {
+
+			return;
+
+		}
+
+		var typeSelect = row.querySelector('[data-cetech-de-rule-type]');
+
+		var cell = row.querySelector('[data-cetech-de-condition-value]');
+
+		if (!typeSelect || !cell) {
+
+			return;
+
+		}
+
+		var name = cell.getAttribute('data-cetech-de-value-name') || '';
+
+		var country = cell.querySelector('[data-cetech-de-country-select]');
+
+		var text = cell.querySelector('[data-cetech-de-rule-text]');
+
+		var isCountry = typeSelect.value === 'country';
+
+		if (!country || !text || !name) {
+
+			return;
+
+		}
+
+		if (isCountry) {
+
+			country.hidden = false;
+
+			country.disabled = false;
+
+			country.setAttribute('name', name);
+
+			text.hidden = true;
+
+			text.disabled = true;
+
+			text.removeAttribute('name');
+
+			if (text.value && !country.value) {
+
+				country.value = String(text.value).toUpperCase();
+
+			}
+
+			return;
+
+		}
+
+		country.hidden = true;
+
+		country.disabled = true;
+
+		country.removeAttribute('name');
+
+		text.hidden = false;
+
+		text.disabled = false;
+
+		text.setAttribute('name', name);
+
+	}
+
+
+
+	function syncAllConditionValueControls(root) {
+
+		(root || document).querySelectorAll('.cetech-de-condition-row').forEach(syncConditionValueControls);
+
+	}
 
 
 
@@ -290,6 +372,14 @@
 
 		}
 
+		var ruleType = event.target.closest('[data-cetech-de-rule-type]');
+
+		if (ruleType) {
+
+			syncConditionValueControls(ruleType.closest('.cetech-de-condition-row') || ruleType.closest('tr'));
+
+		}
+
 	});
 
 
@@ -297,6 +387,8 @@
 	document.addEventListener('DOMContentLoaded', function () {
 
 		syncDeliveryTabLayout();
+
+		syncAllConditionValueControls(document);
 
 		var params = new URLSearchParams(window.location.search);
 

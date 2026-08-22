@@ -22,8 +22,8 @@ final class AdminPageLayout {
 	}
 
 	/**
-	 * @param array{label: string, url: string, class?: string}|null $primary_action
-	 * @param array{label: string, url: string}|null                 $secondary_action
+	 * @param array{label: string, url?: string, class?: string, type?: string}|null $primary_action
+	 * @param array{label: string, url?: string, class?: string, type?: string}|null $secondary_action
 	 */
 	public static function render_page_header(
 		string $eyebrow,
@@ -525,8 +525,13 @@ final class AdminPageLayout {
 			}
 			.cetech-de-form-table th { width: 220px; }
 			.cetech-de-form-actions {
-				margin: 8px 0 24px;
-				padding-top: 4px;
+				margin: 8px 0 0;
+				padding: 12px 0;
+				position: sticky;
+				bottom: 0;
+				z-index: 10;
+				background: #f0f0f1;
+				border-top: 1px solid var(--cetech-de-border);
 			}
 			.cetech-de-admin-table-wrap {
 				background: var(--cetech-de-bg);
@@ -665,7 +670,7 @@ final class AdminPageLayout {
 	}
 
 	/**
-	 * @param array{label: string, url: string, class?: string} $action
+	 * @param array{label: string, url?: string, class?: string, type?: string} $action
 	 */
 	private static function render_header_button( array $action, string $default_class = 'primary' ): void {
 		$class = $action['class'] ?? $default_class;
@@ -677,9 +682,19 @@ final class AdminPageLayout {
 			$button_class = 'button-link cetech-de-header-button';
 		}
 
+		if ( 'submit' === ( $action['type'] ?? '' ) ) {
+			printf(
+				'<button type="submit" class="%1$s">%2$s</button>',
+				esc_attr( $button_class ),
+				esc_html( $action['label'] )
+			);
+
+			return;
+		}
+
 		printf(
 			'<a href="%1$s" class="%2$s">%3$s</a>',
-			esc_url( $action['url'] ),
+			esc_url( (string) ( $action['url'] ?? '' ) ),
 			esc_attr( $button_class ),
 			esc_html( $action['label'] )
 		);

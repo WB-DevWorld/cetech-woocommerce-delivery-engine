@@ -2,8 +2,9 @@
 
 ## CURRENT IMPLEMENTATION STATUS — V1 RC (read first)
 
-**Last updated:** 2026-08-20  
+**Last updated:** 2026-08-22  
 **Plugin version:** `1.0.0-rc.6` on master. Tagged/protected published baseline is **`1.0.0-rc.6`** (schema `4`). Tagged **`1.0.0-rc.5`** remains a protected historical baseline. Owner physical QA of `1.0.0-rc.6-qa.2` on training.cetechbpa.com **PASSED**. Do not retag RC.2, RC.3, RC.4, RC.5, or RC.6. Do not begin Stage 15.  
+**This working tree (`fix/post-rc6-admin-setup-defects`):** Post-RC.6 Repair R1 implements tester-audit items 1–4 only (blank Reference Code generation, validation-error form recovery, responsive fulfilment cards, Delivery Area country picker). Version remains `1.0.0-rc.6`. Schema remains `4`. **Not a new RC.** Artifact `docs/POST-RC6-ADMIN-SETUP-REPAIR-R1.md`. In Store dual-choice, International ECR, Bulk Tools, FLAIROC, and tag `v1.0.0-rc.6` are untouched.  
 **Post-RC.5 defect-fix release:** `1.0.0-rc.6` keeps Delivery listed in Add shipping method while the plugin is active (rates flag-gated) and matches Delivery Area Region rules to WooCommerce state codes or that country’s labels (Ghana `AA` / Greater Accra) without migrating stored area data. Artifacts `docs/STAGE-14H-SHIPPING-METHOD-REGISTRY-REPAIR.md`, `docs/STAGE-14H-REGION-CODE-LABEL-MATCH.md`, `docs/STAGE-14H-RC6-FINAL.md`. QA.1 and QA.2 ZIPs remain immutable. Do not modify FLAIROC.  
 **Schema target:** `4` (`cetech_de_db_version`) — in this tree and in the RC.5 / RC.6 ZIPs. Do not create schema 5.  
 **Git:** `master`; RC.2 tag `v1.0.0-rc.2` **untouched**; RC.3 tag `v1.0.0-rc.3` **untouched locally**; RC.4 tag `v1.0.0-rc.4` (peeled `6b70c29`) **untouched**; RC.5 tag `v1.0.0-rc.5` **untouched**; RC.6 tag `v1.0.0-rc.6` created in Stage 14H-RC6-FINAL  
@@ -60,6 +61,8 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Post-RC.5 shipping-method registry listing | **INCLUDED IN TAGGED `1.0.0-rc.6`** (first packaged as `1.0.0-rc.6-qa.1`) — `delivery_engine_selected_offer` is listed for zone assignment whenever WooCommerce is active; storefront rates stay flag-gated. Add Delivery only to intended zones; Rest of the World is optional. Artifact `docs/STAGE-14H-SHIPPING-METHOD-REGISTRY-REPAIR.md`. QA.1 ZIP immutable. FLAIROC not modified. |
 | Post-RC.5 region code/label matching | **OWNER PHYSICAL PASS on `1.0.0-rc.6-qa.2`; INCLUDED IN TAGGED `1.0.0-rc.6`** — Delivery Area Region rules match WooCommerce state code or that country’s state label. No data migration. Artifact `docs/STAGE-14H-REGION-CODE-LABEL-MATCH.md`. QA.2 ZIP immutable. FLAIROC not modified. |
 | Stage 14H-RC6-FINAL | **COMPLETE** — version `1.0.0-rc.6`; tag `v1.0.0-rc.6`; artifact `docs/STAGE-14H-RC6-FINAL.md`. Owner-accepted from QA.2 on training.cetechbpa.com. FLAIROC not modified. |
+| Post-RC.6 tester-observations audit | **COMPLETE / READ-ONLY** — artifact `docs/POST-RC6-TESTER-OBSERVATIONS-AUDIT.md`. No RC.6 runtime repair in that stage. |
+| Post-RC.6 Repair R1 (this branch) | **IMPLEMENTED / NOT RELEASED** — branch `fix/post-rc6-admin-setup-defects`. Audit items 1–4 only. Version still `1.0.0-rc.6`; schema still `4`. Artifact `docs/POST-RC6-ADMIN-SETUP-REPAIR-R1.md`. Owner physical QA pending. No RC.7. |
 | Governing rules hardening | **COMPLETE** — canonical rulebook `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`; Cursor always-apply wrapper `.cursor/rules/000-delivery-engine-governance.mdc`. Documentation/governance only. |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos; profile defaults use `global/0/{profile_key}` |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-profile site-wide root; primary default fallback; provenance; fingerprint; hard constraints |
@@ -140,6 +143,8 @@ Administrator-language requirement: normal-user admin UI must use operational la
 | `docs/STAGE-14H-REGION-CODE-LABEL-MATCH.md` | Post-RC.5 / post-QA.1 repair: Region rules match WooCommerce state code or country-scoped label |
 | `docs/STAGE-14H-RC6-QA2-OWNER-QA-PACKAGE.md` | Owner QA package `1.0.0-rc.6-qa.2` — region code/label matching; owner **PASSED**; FLAIROC not deployed |
 | `docs/STAGE-14H-RC6-FINAL.md` | Stage 14H-RC6-FINAL RC.6 release record |
+| `docs/POST-RC6-TESTER-OBSERVATIONS-AUDIT.md` | Read-only training-site tester observations vs tagged RC.6 |
+| `docs/POST-RC6-ADMIN-SETUP-REPAIR-R1.md` | Post-RC.6 Repair R1 (items 1–4) on `fix/post-rc6-admin-setup-defects` |
 | `docs/CLASSIC-CHECKOUT-RELEASE-CANDIDATE-READINESS.md` | Pre-smoke Classic Checkout readiness (superseded for status by RC.2 readiness) |
 | `docs/RELEASE-1.0.0-RC.2-READINESS.md` | **Authoritative** live-verified `1.0.0-rc.2` release readiness |
 | `docs/ADMIN-UI-LANGUAGE-GUIDE.md` | Authoritative normal-administrator presentation language |
