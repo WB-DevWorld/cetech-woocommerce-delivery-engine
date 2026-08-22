@@ -10,7 +10,7 @@
 **Bulk Tools (`feat/post-rc6-bulk-tools`):** not modified, not mixed  
 **Stage 15:** not started
 
-This is a post-RC.6 repair branch only. No QA ZIP. No RC.7.
+This is a post-RC.6 repair branch only. No RC.7. Training QA package record: `docs/POST-RC6-ADMIN-SETUP-REPAIR-R1-QA1.md`.
 
 ---
 
@@ -261,11 +261,12 @@ A no-JS type switch that reveals the picker would be a later enhancement. It is 
 
 | Item | Status |
 |------|--------|
-| Plugin version | `1.0.0-rc.6` |
+| Plugin version (implementation commit) | `1.0.0-rc.6` |
+| Plugin version (QA identity commit) | `1.0.0-rc.6-r1-qa.1` |
 | Schema `SchemaVersion::TARGET` | `4` |
 | Tag `v1.0.0-rc.6` | **untouched** |
 | RC.7 | **not created** |
-| QA ZIP | **not packaged** |
+| QA ZIP | `docs/POST-RC6-ADMIN-SETUP-REPAIR-R1-QA1.md` |
 | In Store model | **untouched** |
 | International ECR | **untouched** |
 | Bulk Tools branch | **untouched** |
