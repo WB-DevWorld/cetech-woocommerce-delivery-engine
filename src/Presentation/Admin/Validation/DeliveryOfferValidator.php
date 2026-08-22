@@ -19,10 +19,13 @@ final class DeliveryOfferValidator {
 	public function validate( array $input, ?int $existing_id = null ): array {
 		$errors = [];
 
-		$code = AdminFormHelper::sanitize_code( (string) ( $input['code'] ?? '' ) );
+		$raw  = trim( (string) ( $input['code'] ?? '' ) );
+		$code = AdminFormHelper::sanitize_code( $raw );
 
 		if ( '' === $code ) {
-			$errors['code'] = __( 'Code is required.', 'cetech-woocommerce-delivery-engine' );
+			$errors['code'] = '' !== $raw
+				? __( 'Code may contain lowercase letters, numbers, underscores, and hyphens only.', 'cetech-woocommerce-delivery-engine' )
+				: __( 'Code is required.', 'cetech-woocommerce-delivery-engine' );
 		} elseif ( ! AdminFormHelper::is_valid_code( $code ) ) {
 			$errors['code'] = __( 'Code may contain lowercase letters, numbers, underscores, and hyphens only.', 'cetech-woocommerce-delivery-engine' );
 		}

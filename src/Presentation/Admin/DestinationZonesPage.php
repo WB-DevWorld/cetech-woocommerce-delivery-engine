@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Configuration\Admin\StoreAwareExamples;
+use CetechDeliveryEngine\Application\Destination\WooCommerceCountryCatalog;
 use CetechDeliveryEngine\Domain\Enum\DestinationRuleMatchMode;
 use CetechDeliveryEngine\Domain\Enum\DestinationRuleType;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
@@ -253,26 +254,34 @@ final class DestinationZonesPage {
 		$title = $is_edit
 			? __( 'Edit Delivery Area', 'cetech-woocommerce-delivery-engine' )
 			: __( 'Add Delivery Area', 'cetech-woocommerce-delivery-engine' );
+		$submit = $is_edit
+			? __( 'Save Delivery Area', 'cetech-woocommerce-delivery-engine' )
+			: __( 'Create Delivery Area', 'cetech-woocommerce-delivery-engine' );
 
 		AdminPageLayout::open_page();
-		AdminPageLayout::render_page_header(
-			__( 'Delivery coverage', 'cetech-woocommerce-delivery-engine' ),
-			$title,
-			__( 'Define an area where delivery is available. Add matching rules so customer addresses map to this delivery area.', 'cetech-woocommerce-delivery-engine' ),
-			[
-				'label' => __( 'Back to Delivery Areas', 'cetech-woocommerce-delivery-engine' ),
-				'url'   => AdminPageRenderer::list_url( self::SLUG ),
-				'class' => 'secondary',
-			]
-		);
-
-		echo '<form method="post" action="">';
+		echo '<form method="post" action="" class="cetech-de-entity-form">';
 		AdminFormHelper::nonce_field( self::ACTION_SAVE );
 		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_SAVE ) . '" />';
 
 		if ( $is_edit && ! empty( $record['id'] ) ) {
 			echo '<input type="hidden" name="id" value="' . esc_attr( (string) $record['id'] ) . '" />';
 		}
+
+		AdminPageLayout::render_page_header(
+			__( 'Delivery coverage', 'cetech-woocommerce-delivery-engine' ),
+			$title,
+			__( 'Define an area where delivery is available. Add matching rules so customer addresses map to this delivery area.', 'cetech-woocommerce-delivery-engine' ),
+			[
+				'label' => $submit,
+				'type'  => 'submit',
+				'class' => 'primary',
+			],
+			[
+				'label' => __( 'Back to Delivery Areas', 'cetech-woocommerce-delivery-engine' ),
+				'url'   => AdminPageRenderer::list_url( self::SLUG ),
+				'class' => 'secondary',
+			]
+		);
 
 		AdminPageLayout::open_form_panel(
 			__( 'Delivery area details', 'cetech-woocommerce-delivery-engine' ),
@@ -328,7 +337,7 @@ final class DestinationZonesPage {
 			'is_fallback',
 			__( 'Fallback delivery area', 'cetech-woocommerce-delivery-engine' ),
 			! empty( $record['is_fallback'] ),
-			__( 'Used when no other delivery area matches during address lookup.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Use this Delivery Area when no country or location rule matches. This is not a country named Everywhere.', 'cetech-woocommerce-delivery-engine' )
 		);
 		AdminFormHelper::checkbox_field(
 			'is_remote_area',
@@ -340,7 +349,7 @@ final class DestinationZonesPage {
 		AdminPageLayout::close_advanced();
 
 		echo '<div class="cetech-de-form-actions">';
-		submit_button( $is_edit ? __( 'Save Delivery Area', 'cetech-woocommerce-delivery-engine' ) : __( 'Create Delivery Area', 'cetech-woocommerce-delivery-engine' ) );
+		submit_button( $submit );
 		echo ' <a class="button" href="' . esc_url( AdminPageRenderer::list_url( self::SLUG ) ) . '">' . esc_html__( 'Cancel', 'cetech-woocommerce-delivery-engine' ) . '</a>';
 		echo '</div></form>';
 
@@ -361,6 +370,7 @@ final class DestinationZonesPage {
 	 */
 	private function render_rules_section( array $rules ): void {
 		echo '<p>' . esc_html__( 'Where should this delivery area apply?', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'Choose a country by name. This is a Delivery Engine Delivery Area, not a WooCommerce shipping zone. Continents and “Everywhere” are not countries.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 
 		$configured = [];
 		foreach ( $rules as $rule ) {
@@ -399,23 +409,55 @@ final class DestinationZonesPage {
 	 */
 	private function render_condition_row( int $index, array $rule, bool $template ): void {
 		$name_index = $template ? '{{index}}' : (string) $index;
+		$rule_type  = (string) ( $rule['rule_type'] ?? '' );
+		$rule_value = (string) ( $rule['rule_value'] ?? '' );
+		$is_country = DestinationRuleType::Country->value === $rule_type;
+		$field_name = 'destination_rules[' . $name_index . '][rule_value]';
+		$countries  = WooCommerceCountryCatalog::options();
+
 		echo $template ? '' : '<tr class="cetech-de-condition-row">';
-		echo '<td><select name="destination_rules[' . esc_attr( $name_index ) . '][rule_type]">';
+		echo '<td><select name="destination_rules[' . esc_attr( $name_index ) . '][rule_type]" data-cetech-de-rule-type>';
 		echo '<option value="">' . esc_html__( '— Select —', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		foreach ( $this->rule_type_options() as $value => $label ) {
 			printf(
 				'<option value="%1$s" %2$s>%3$s</option>',
 				esc_attr( $value ),
-				selected( (string) ( $rule['rule_type'] ?? '' ), $value, false ),
+				selected( $rule_type, $value, false ),
 				esc_html( $label )
 			);
 		}
 		echo '</select></td>';
+		echo '<td class="cetech-de-condition-value" data-cetech-de-condition-value data-cetech-de-value-name="' . esc_attr( $field_name ) . '">';
+		if ( [] !== $countries ) {
+			$stored = strtoupper( trim( $rule_value ) );
+			echo '<select class="cetech-de-country-select" data-cetech-de-country-select' . ( $is_country ? ' name="' . esc_attr( $field_name ) . '"' : ' hidden disabled' ) . ' aria-label="' . esc_attr__( 'Country', 'cetech-woocommerce-delivery-engine' ) . '">';
+			echo '<option value="">' . esc_html__( 'Select a country', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+			foreach ( $countries as $code => $label ) {
+				printf(
+					'<option value="%1$s"%2$s>%3$s</option>',
+					esc_attr( $code ),
+					selected( $stored, $code, false ),
+					esc_html( $label )
+				);
+			}
+			if ( $is_country && '' !== $stored && ! isset( $countries[ $stored ] ) ) {
+				printf(
+					'<option value="%1$s" selected="selected">%1$s</option>',
+					esc_attr( $stored )
+				);
+			}
+			echo '</select>';
+		}
+		$text_hidden = [] !== $countries && $is_country;
 		printf(
-			'<td><input type="text" class="regular-text" name="destination_rules[%1$s][rule_value]" value="%2$s" /></td>',
-			esc_attr( $name_index ),
-			esc_attr( (string) ( $rule['rule_value'] ?? '' ) )
+			'<input type="text" class="regular-text cetech-de-rule-text" data-cetech-de-rule-text value="%1$s"%2$s%3$s />',
+			esc_attr( $rule_value ),
+			$text_hidden ? ' hidden disabled' : ' name="' . esc_attr( $field_name ) . '"',
+			$is_country && [] === $countries
+				? ' placeholder="' . esc_attr__( '2-letter country code, for example GB', 'cetech-woocommerce-delivery-engine' ) . '"'
+				: ''
 		);
+		echo '</td>';
 		echo '<input type="hidden" name="destination_rules[' . esc_attr( $name_index ) . '][match_mode]" value="' . esc_attr( (string) ( $rule['match_mode'] ?? DestinationRuleMatchMode::Exact->value ) ) . '" class="cetech-de-condition-match" />';
 		echo '<input type="hidden" name="destination_rules[' . esc_attr( $name_index ) . '][priority]" value="' . esc_attr( (string) ( $rule['priority'] ?? 100 ) ) . '" class="cetech-de-condition-priority" />';
 		if ( ! $template ) {
@@ -424,7 +466,23 @@ final class DestinationZonesPage {
 	}
 
 	private function handle_save(): void {
-		$input      = $this->read_form_input();
+		$input = $this->read_form_input();
+		$input = AdminFormHelper::prepare_reference_code(
+			$input,
+			(string) ( $input['name'] ?? '' ),
+			function ( string $candidate ) use ( $input ): bool {
+				$id       = isset( $input['id'] ) ? (int) $input['id'] : 0;
+				$existing = $this->zone_repository->findByCode( $candidate );
+
+				return null !== $existing && (int) ( $existing['id'] ?? 0 ) !== $id;
+			},
+			function ( int $id ): string {
+				$row = $this->zone_repository->findById( $id );
+
+				return is_array( $row ) ? (string) ( $row['internal_code'] ?? '' ) : '';
+			},
+			'delivery-area'
+		);
 		$zone_errors = $this->zone_validator->validate( $input, isset( $input['id'] ) ? (int) $input['id'] : null );
 		$rule_result = $this->rule_validator->validate_and_normalize(
 			isset( $input['destination_rules'] ) && is_array( $input['destination_rules'] )
@@ -442,18 +500,6 @@ final class DestinationZonesPage {
 
 		$id   = isset( $input['id'] ) ? (int) $input['id'] : 0;
 		$code = AdminFormHelper::sanitize_code( (string) $input['code'] );
-		if ( '' === $code ) {
-			$code = AdminFormHelper::generate_code_from_name(
-				(string) ( $input['name'] ?? '' ),
-				function ( string $candidate ) use ( $id ): bool {
-					$existing = $this->zone_repository->findByCode( $candidate );
-
-					return null !== $existing && (int) ( $existing['id'] ?? 0 ) !== $id;
-				},
-				'delivery-area'
-			);
-			$input['code'] = $code;
-		}
 		$existing_by_code = $this->zone_repository->findByCode( $code );
 
 		if ( null !== $existing_by_code && (int) ( $existing_by_code['id'] ?? 0 ) !== $id ) {
@@ -814,15 +860,7 @@ final class DestinationZonesPage {
 	}
 
 	private function country_label( string $code ): string {
-		$code = strtoupper( trim( $code ) );
-		if ( function_exists( 'WC' ) ) {
-			$countries = WC()->countries->get_countries();
-			if ( is_array( $countries ) && isset( $countries[ $code ] ) ) {
-				return (string) $countries[ $code ];
-			}
-		}
-
-		return $code;
+		return WooCommerceCountryCatalog::label( $code );
 	}
 
 	private function render_actions( int $id ): string {

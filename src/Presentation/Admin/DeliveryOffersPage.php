@@ -161,12 +161,28 @@ final class DeliveryOffersPage {
 		$title  = $is_edit
 			? __( 'Edit Delivery Option', 'cetech-woocommerce-delivery-engine' )
 			: __( 'Add Delivery Option', 'cetech-woocommerce-delivery-engine' );
+		$submit = $is_edit
+			? __( 'Save Delivery Option', 'cetech-woocommerce-delivery-engine' )
+			: __( 'Create Delivery Option', 'cetech-woocommerce-delivery-engine' );
 
 		AdminPageLayout::open_page();
+		echo '<form method="post" action="" class="cetech-de-entity-form">';
+		AdminFormHelper::nonce_field( self::ACTION_SAVE );
+		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_SAVE ) . '" />';
+
+		if ( $is_edit && null !== $record && ! empty( $record['id'] ) ) {
+			echo '<input type="hidden" name="id" value="' . esc_attr( (string) $record['id'] ) . '" />';
+		}
+
 		AdminPageLayout::render_page_header(
 			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
 			$title,
 			__( 'Describe a delivery service customers can choose. Use a clear name they will recognize at checkout.', 'cetech-woocommerce-delivery-engine' ),
+			[
+				'label' => $submit,
+				'type'  => 'submit',
+				'class' => 'primary',
+			],
 			[
 				'label' => __( 'Back to Delivery Options', 'cetech-woocommerce-delivery-engine' ),
 				'url'   => AdminPageRenderer::list_url( self::SLUG ),
@@ -176,14 +192,6 @@ final class DeliveryOffersPage {
 		AdminPageLayout::render_example(
 			__( 'Same-Day, Next-Day, Standard Delivery, Pickup', 'cetech-woocommerce-delivery-engine' )
 		);
-
-		echo '<form method="post" action="">';
-		AdminFormHelper::nonce_field( self::ACTION_SAVE );
-		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_SAVE ) . '" />';
-
-		if ( $is_edit && null !== $record && ! empty( $record['id'] ) ) {
-			echo '<input type="hidden" name="id" value="' . esc_attr( (string) $record['id'] ) . '" />';
-		}
 
 		AdminPageLayout::open_form_panel(
 			__( 'What customers see', 'cetech-woocommerce-delivery-engine' ),
@@ -266,7 +274,7 @@ final class DeliveryOffersPage {
 		AdminPageLayout::close_advanced();
 
 		echo '<div class="cetech-de-form-actions">';
-		submit_button( $is_edit ? __( 'Save Delivery Option', 'cetech-woocommerce-delivery-engine' ) : __( 'Create Delivery Option', 'cetech-woocommerce-delivery-engine' ) );
+		submit_button( $submit );
 		echo ' <a class="button" href="' . esc_url( AdminPageRenderer::list_url( self::SLUG ) ) . '">' . esc_html__( 'Cancel', 'cetech-woocommerce-delivery-engine' ) . '</a>';
 		echo '</div></form>';
 
@@ -283,7 +291,23 @@ final class DeliveryOffersPage {
 	}
 
 	private function handle_save(): void {
-		$input  = $this->read_form_input();
+		$input = $this->read_form_input();
+		$input = AdminFormHelper::prepare_reference_code(
+			$input,
+			(string) ( $input['public_label'] ?? '' ),
+			function ( string $candidate ) use ( $input ): bool {
+				$id       = isset( $input['id'] ) ? (int) $input['id'] : 0;
+				$existing = $this->repository->findByCode( $candidate );
+
+				return null !== $existing && (int) ( $existing['id'] ?? 0 ) !== $id;
+			},
+			function ( int $id ): string {
+				$row = $this->repository->findById( $id );
+
+				return is_array( $row ) ? (string) ( $row['internal_code'] ?? '' ) : '';
+			},
+			'delivery-option'
+		);
 		$errors = $this->validator->validate( $input, isset( $input['id'] ) ? (int) $input['id'] : null );
 
 		if ( [] !== $errors ) {
@@ -300,18 +324,6 @@ final class DeliveryOffersPage {
 
 		$id   = isset( $input['id'] ) ? (int) $input['id'] : 0;
 		$code = AdminFormHelper::sanitize_code( (string) $input['code'] );
-		if ( '' === $code ) {
-			$code = AdminFormHelper::generate_code_from_name(
-				(string) ( $input['public_label'] ?? '' ),
-				function ( string $candidate ) use ( $id ): bool {
-					$existing = $this->repository->findByCode( $candidate );
-
-					return null !== $existing && (int) ( $existing['id'] ?? 0 ) !== $id;
-				},
-				'delivery-option'
-			);
-			$input['code'] = $code;
-		}
 		$existing_by_code = $this->repository->findByCode( $code );
 
 		if ( null !== $existing_by_code && (int) ( $existing_by_code['id'] ?? 0 ) !== $id ) {
