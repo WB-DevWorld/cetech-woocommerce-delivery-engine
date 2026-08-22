@@ -79,4 +79,4 @@ A selected-ID job may store the ID list once on `bulk_jobs.target_definition_jso
 - Recurring automatic catalog rules are intentionally not implemented.
 - Shipment bulk status edits are intentionally not implemented.
 - `assets/admin/bulk-tools.js` includes Catalog progressive disclosure plus 5-second job-detail polling (`tests/js/bulk-tools-catalog.test.js`).
-- Owner physical QA is not performed by Cursor. Previous untagged owner-QA package `1.0.0-dev.bulk.2` is immutable. Current untagged owner-QA package: see `docs/POST-RC6-BULK-TOOLS-QUALIFICATION.md` (`1.0.0-dev.bulk.3`).
+- Owner physical QA is not performed by Cursor. Previous untagged owner-QA package `1.0.0-dev.bulk.2` is immutable. Current untagged owner-QA package: `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.3.zip` (`1167830` bytes, SHA-256 `5aa19ffb201452dc463b01b015653365d0e78aabe8b0d53baa082777549d8da6`, source `a250b045c5783d0f4761fce99cda7b21f87e4337`, schema `5`).
