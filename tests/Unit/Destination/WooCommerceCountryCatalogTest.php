@@ -68,4 +68,26 @@ final class WooCommerceCountryCatalogTest extends TestCase {
 
 		self::assertSame( [ 'GH' => 'Ghana' ], $options );
 	}
+
+	public function test_canonical_iso2_maps_labels_and_codes(): void {
+		WooCommerceCountryCatalog::override_for_tests(
+			[
+				'GH' => 'Ghana',
+				'NG' => 'Nigeria',
+				'GB' => 'United Kingdom (UK)',
+				'US' => 'United States (US)',
+				'DE' => 'Germany',
+				'CN' => 'China',
+			]
+		);
+
+		self::assertSame( 'DE', WooCommerceCountryCatalog::canonical_iso2( 'Germany' ) );
+		self::assertSame( 'DE', WooCommerceCountryCatalog::canonical_iso2( 'de' ) );
+		self::assertSame( 'GH', WooCommerceCountryCatalog::canonical_iso2( 'Ghana' ) );
+		self::assertSame( 'NG', WooCommerceCountryCatalog::canonical_iso2( 'Nigeria' ) );
+		self::assertSame( 'GB', WooCommerceCountryCatalog::canonical_iso2( 'United Kingdom' ) );
+		self::assertSame( 'US', WooCommerceCountryCatalog::canonical_iso2( 'United States' ) );
+		self::assertSame( 'CN', WooCommerceCountryCatalog::canonical_iso2( 'China' ) );
+		self::assertSame( 'Africa', WooCommerceCountryCatalog::canonical_iso2( 'Africa' ) );
+	}
 }

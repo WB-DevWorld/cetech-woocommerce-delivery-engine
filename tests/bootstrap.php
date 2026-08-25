@@ -512,6 +512,14 @@ if ( ! function_exists( 'wp_nonce_field' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_nonce_url' ) ) {
+	function wp_nonce_url( string $actionurl, int|string $action = -1, string $name = '_wpnonce' ): string {
+		$separator = str_contains( $actionurl, '?' ) ? '&' : '?';
+
+		return $actionurl . $separator . rawurlencode( $name ) . '=' . rawurlencode( wp_create_nonce( (string) $action ) );
+	}
+}
+
 if ( ! function_exists( 'esc_url_raw' ) ) {
 	/**
 	 * @param list<string>|null $protocols
@@ -573,6 +581,51 @@ if ( ! function_exists( 'update_user_meta' ) ) {
 		$GLOBALS['cetech_de_test_user_meta'][ $user_id ][ $meta_key ] = $meta_value;
 
 		return true;
+	}
+}
+
+if ( ! function_exists( 'checked' ) ) {
+	function checked( mixed $checked, mixed $current = true, bool $display = true ): string {
+		$result = (string) $checked === (string) $current ? ' checked="checked"' : '';
+		if ( $display ) {
+			echo $result;
+		}
+
+		return $result;
+	}
+}
+
+if ( ! function_exists( 'submit_button' ) ) {
+	/**
+	 * @param mixed $other_attributes
+	 */
+	function submit_button( $text = null, $type = 'primary', $name = 'submit', $wrap = true, $other_attributes = null ): void {
+		unset( $other_attributes );
+		$class = 'primary' === $type || 'button-primary' === $type ? 'button button-primary' : 'button';
+		$html  = sprintf(
+			'<input type="submit" name="%1$s" class="%2$s" value="%3$s" />',
+			esc_attr( (string) $name ),
+			esc_attr( $class ),
+			esc_attr( (string) ( $text ?? 'Save Changes' ) )
+		);
+		echo $wrap ? '<p class="submit">' . $html . '</p>' : $html;
+	}
+}
+
+if ( ! function_exists( 'home_url' ) ) {
+	function home_url( string $path = '/', $scheme = null ): string {
+		unset( $scheme );
+
+		return 'https://example.test' . $path;
+	}
+}
+
+if ( ! function_exists( 'wp_parse_url' ) ) {
+	/**
+	 * @return mixed
+	 */
+	function wp_parse_url( string $url, int $component = -1 ) {
+		return parse_url( $url, $component );
 	}
 }
 

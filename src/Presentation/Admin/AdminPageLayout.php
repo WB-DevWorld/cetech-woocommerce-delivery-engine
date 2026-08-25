@@ -9,6 +9,8 @@ namespace CetechDeliveryEngine\Presentation\Admin;
  */
 final class AdminPageLayout {
 
+	public const ENTITY_FORM_ID = 'cetech-de-entity-form';
+
 	private static bool $styles_rendered = false;
 
 	public static function open_page( string $extra_class = '' ): void {
@@ -60,6 +62,23 @@ final class AdminPageLayout {
 		}
 
 		echo '</header>';
+	}
+
+	public static function open_entity_form( string $nonce_action, string $post_action, string $submit_label, ?int $record_id = null ): void {
+		printf(
+			'<form method="post" action="" class="cetech-de-entity-form" id="%s">',
+			esc_attr( self::ENTITY_FORM_ID )
+		);
+		AdminFormHelper::nonce_field( $nonce_action );
+		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( $post_action ) . '" />';
+
+		if ( null !== $record_id && $record_id > 0 ) {
+			echo '<input type="hidden" name="id" value="' . esc_attr( (string) $record_id ) . '" />';
+		}
+
+		echo '<div class="cetech-de-entity-form-toolbar">';
+		submit_button( $submit_label, 'primary', 'cetech_de_save', false );
+		echo '</div>';
 	}
 
 	/**
@@ -558,6 +577,25 @@ final class AdminPageLayout {
 				background: #f0f0f1;
 				border-top: 1px solid var(--cetech-de-border);
 			}
+			.cetech-de-entity-form-toolbar {
+				position: sticky;
+				top: 32px;
+				z-index: 20;
+				display: flex;
+				flex-wrap: wrap;
+				gap: 8px;
+				align-items: center;
+				margin: 0 0 16px;
+				padding: 10px 0 12px;
+				background: #f0f0f1;
+				border-bottom: 1px solid var(--cetech-de-border);
+			}
+			.cetech-de-dashboard-header-actions input.button-primary,
+			.cetech-de-dashboard-header-actions button.button-primary,
+			.cetech-de-entity-form-toolbar input.button-primary {
+				display: inline-block !important;
+				visibility: visible !important;
+			}
 			.cetech-de-admin-table-wrap {
 				background: var(--cetech-de-bg);
 				border: 1px solid var(--cetech-de-border);
@@ -708,10 +746,12 @@ final class AdminPageLayout {
 		}
 
 		if ( 'submit' === ( $action['type'] ?? '' ) ) {
+			$form_id = (string) ( $action['form'] ?? self::ENTITY_FORM_ID );
 			printf(
-				'<button type="submit" class="%1$s">%2$s</button>',
+				'<input type="submit" name="cetech_de_save" class="%1$s" value="%2$s" form="%3$s" />',
 				esc_attr( $button_class ),
-				esc_html( $action['label'] )
+				esc_attr( $action['label'] ),
+				esc_attr( $form_id )
 			);
 
 			return;

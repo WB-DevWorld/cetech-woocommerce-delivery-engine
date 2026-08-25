@@ -170,11 +170,9 @@ final class PostRc6AdminSetupRepairR1Test extends TestCase {
 		$layout = (string) file_get_contents( dirname( __DIR__, 4 ) . '/src/Presentation/Admin/AdminPageLayout.php' );
 
 		foreach ( [ $offers, $areas ] as $source ) {
-			$entity = strpos( $source, 'cetech-de-entity-form' );
-			$submit = strpos( $source, "'type'  => 'submit'" );
-			self::assertNotFalse( $entity );
-			self::assertNotFalse( $submit );
-			self::assertLessThan( $submit, $entity );
+			self::assertStringContainsString( 'AdminPageLayout::open_entity_form', $source );
+			self::assertStringContainsString( "'type'  => 'submit'", $source );
+			self::assertStringContainsString( "'form'  => AdminPageLayout::ENTITY_FORM_ID", $source );
 			self::assertStringContainsString( 'stash_form_draft', $source );
 			self::assertStringContainsString( 'cetech-de-form-actions', $source );
 			self::assertStringContainsString( 'submit_button( $submit )', $source );
@@ -186,6 +184,9 @@ final class PostRc6AdminSetupRepairR1Test extends TestCase {
 		self::assertStringContainsString( "__( 'Back to Delivery Areas'", $areas );
 		self::assertStringContainsString( "__( 'Create Delivery Area'", $areas );
 		self::assertStringContainsString( "__( 'Save Delivery Area'", $areas );
+		self::assertStringContainsString( 'ENTITY_FORM_ID', $layout );
+		self::assertStringContainsString( 'cetech-de-entity-form-toolbar', $layout );
+		self::assertStringContainsString( '<input type="submit" name="cetech_de_save"', $layout );
 		self::assertStringContainsString( "if ( 'submit' === ( \$action['type'] ?? '' ) )", $layout );
 	}
 
@@ -221,7 +222,8 @@ final class PostRc6AdminSetupRepairR1Test extends TestCase {
 		self::assertStringContainsString( 'WooCommerceCountryCatalog::options()', $source );
 		self::assertStringContainsString( 'data-cetech-de-country-select', $source );
 		self::assertStringContainsString( 'Select a country', $source );
-		self::assertStringContainsString( '! isset( $countries[ $stored ] )', $source );
+		self::assertStringContainsString( 'country_code', $source );
+		self::assertStringContainsString( 'canonical_iso2', $source );
 		self::assertStringContainsString( 'selected( $stored, $code, false )', $source );
 		self::assertStringContainsString( 'not a WooCommerce shipping zone', $source );
 	}
