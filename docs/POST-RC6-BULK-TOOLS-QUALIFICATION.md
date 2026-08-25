@@ -283,17 +283,19 @@ Recorded after the repair tests in this session.
 
 ### 14.2 Owner-QA package
 
-Do **not** overwrite `1.0.0-dev.bulk.3`. Untagged identity **`1.0.0-dev.bulk.4`**. Schema target **5**. Not RC.6. Not final. No release tag. Not deployed.
+Do **not** overwrite `1.0.0-dev.bulk.3`. Untagged identity **`1.0.0-dev.bulk.4`**. Schema target **5**. Built from committed clean source `bb2862266b513844172d0f6bee3c4bf26108c7b1`. Not RC.6. Not final. No release tag. Not deployed.
 
 | Item | Value |
 |------|--------|
-| Source commit | *recorded after commit* |
+| Source commit | `bb2862266b513844172d0f6bee3c4bf26108c7b1` |
 | Filename | `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.4.zip` |
-| Bytes | *recorded after package* |
-| SHA-256 | *recorded after package* |
+| Bytes | `1178646` |
+| SHA-256 | `7d30518094a77fac269c8e09f74dba9a89c6ee4b5ce9c228714492bc4aa5ad07` |
 | Schema target | `5` |
 | Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.4.zip` |
 | Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.4.zip` |
+
+Extracted verification: version `1.0.0-dev.bulk.4`, `SchemaVersion::TARGET = 5`, production `vendor/autoload.php`, packaged PHP lint via build verifier OK, `BulkJobAdminCopy.php` / `BulkJobItemResultPresenter.php` / `BulkJobTargetLabelResolver.php` and `assets/admin/bulk-tools.js` present, no `tests/`, no `phpunit.xml`, no `.env`, no `docs/RC6-ADVERSARIAL-SECURITY-AUDIT.md`.
 
 ### 14.3 Short owner physical retest plan
 
