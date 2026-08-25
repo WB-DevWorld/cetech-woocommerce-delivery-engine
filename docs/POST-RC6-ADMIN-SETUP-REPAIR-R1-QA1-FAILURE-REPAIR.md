@@ -6,7 +6,7 @@
 **Failed QA identity:** `1.0.0-rc.6-r1-qa.1` — **immutable**. Do not overwrite the ZIP.  
 **This repair is not:** R2, RC.7, Stage 15, schema 5, or a QA.2 package  
 **Schema:** `4`  
-**Plugin version on this tree:** still `1.0.0-rc.6-r1-qa.1` until a later authorised QA.2 identity commit  
+**Plugin version on this tree:** `1.0.0-rc.6-r1-qa.2` after the authorised identity commit. QA.1 ZIP remains immutable.  
 **FLAIROC:** not modified  
 **Bulk Tools:** not modified  
 **Tag `v1.0.0-rc.6`:** not modified  
@@ -208,9 +208,9 @@ Reproduction used the **real page controllers** with browser-shaped `$_POST` (`c
 | Item | Status |
 |------|--------|
 | Schema `SchemaVersion::TARGET` | `4` |
-| Plugin version | `1.0.0-rc.6-r1-qa.1` (unchanged; no QA.2 identity yet) |
+| Plugin version | `1.0.0-rc.6-r1-qa.2` after authorised identity commit |
 | Failed ZIP | immutable |
-| QA.2 | **not packaged** |
+| QA.2 | packaged; see `docs/POST-RC6-ADMIN-SETUP-REPAIR-R1-QA2.md` |
 | RC.7 | **not created** |
 
 ---
@@ -227,4 +227,4 @@ Reproduction used the **real page controllers** with browser-shaped `$_POST` (`c
 
 ## STOP
 
-Repair is implemented and gated locally. Do not package `1.0.0-rc.6-r1-qa.2` until the owner reviews this report and authorises QA.2.
+Owner reviewed and approved packaging. QA.2 identity and ZIP are recorded in `docs/POST-RC6-ADMIN-SETUP-REPAIR-R1-QA2.md`. Do not start R2. Cursor must not deploy.

@@ -266,7 +266,7 @@ A no-JS type switch that reveals the picker would be a later enhancement. It is 
 | Schema `SchemaVersion::TARGET` | `4` |
 | Tag `v1.0.0-rc.6` | **untouched** |
 | RC.7 | **not created** |
-| QA ZIP | `docs/POST-RC6-ADMIN-SETUP-REPAIR-R1-QA1.md` |
+| QA ZIP | `docs/POST-RC6-ADMIN-SETUP-REPAIR-R1-QA1.md` (FAIL); `docs/POST-RC6-ADMIN-SETUP-REPAIR-R1-QA2.md` |
 | In Store model | **untouched** |
 | International ECR | **untouched** |
 | Bulk Tools branch | **untouched** |
