@@ -11,9 +11,14 @@ final class AdminPageLayout {
 
 	private static bool $styles_rendered = false;
 
-	public static function open_page(): void {
+	public static function open_page( string $extra_class = '' ): void {
 		self::render_styles();
-		echo '<div class="wrap cetech-de-admin-page">';
+		$class = 'wrap cetech-de-admin-page';
+		$extra = sanitize_html_class( $extra_class );
+		if ( '' !== $extra ) {
+			$class .= ' ' . $extra;
+		}
+		echo '<div class="' . esc_attr( $class ) . '">';
 		echo '<hr class="wp-header-end" />';
 	}
 
@@ -236,6 +241,23 @@ final class AdminPageLayout {
 
 	public static function close_section(): void {
 		echo '</section>';
+	}
+
+	public static function open_content_panel( string $title, ?string $description = null ): void {
+		echo '<section class="cetech-de-form-panel cetech-de-content-panel">';
+		echo '<div class="cetech-de-form-panel-head">';
+		echo '<h2 class="cetech-de-form-panel-title">' . esc_html( $title ) . '</h2>';
+
+		if ( null !== $description && '' !== $description ) {
+			echo '<p class="cetech-de-form-panel-desc">' . esc_html( $description ) . '</p>';
+		}
+
+		echo '</div>';
+		echo '<div class="cetech-de-content-panel-body">';
+	}
+
+	public static function close_content_panel(): void {
+		echo '</div></section>';
 	}
 
 	public static function open_form_panel( string $title, ?string $description = null ): void {
@@ -522,6 +544,9 @@ final class AdminPageLayout {
 				color: var(--cetech-de-muted);
 				font-size: 13px;
 				line-height: 1.5;
+			}
+			.cetech-de-content-panel-body {
+				padding: 12px 0 16px;
 			}
 			.cetech-de-form-table th { width: 220px; }
 			.cetech-de-form-actions {

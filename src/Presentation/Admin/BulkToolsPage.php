@@ -162,14 +162,14 @@ final class BulkToolsPage {
 		AdminPageAccess::require_capability( 'manage_product_delivery_rules' );
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( (string) $_GET['tab'] ) ) : 'catalog';
-		AdminPageLayout::open_page();
+		AdminPageLayout::open_page( 'cetech-de-bulk-tools' );
 		AdminPageLayout::render_page_header(
 			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Bulk Tools', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Preview large catalog changes, then apply them in the background. One command can target many products; the server still processes them in small batches.', 'cetech-woocommerce-delivery-engine' )
 		);
 
-		echo '<nav class="nav-tab-wrapper wp-clearfix" aria-label="' . esc_attr__( 'Bulk Tools sections', 'cetech-woocommerce-delivery-engine' ) . '">';
+		echo '<nav class="nav-tab-wrapper wp-clearfix cetech-de-bulk-tabs" aria-label="' . esc_attr__( 'Bulk Tools sections', 'cetech-woocommerce-delivery-engine' ) . '">';
 		foreach ( $this->tabs() as $slug => $label ) {
 			$class = $tab === $slug ? ' nav-tab-active' : '';
 			printf(
@@ -181,6 +181,7 @@ final class BulkToolsPage {
 		}
 		echo '</nav>';
 
+		echo '<div class="cetech-de-bulk-workspace">';
 		match ( $tab ) {
 			'import' => $this->render_import_tab(),
 			'validation' => $this->render_validation_tab(),
@@ -188,6 +189,7 @@ final class BulkToolsPage {
 			'rates' => $this->render_rates_tab(),
 			default => $this->render_catalog_tab(),
 		};
+		echo '</div>';
 
 		AdminPageLayout::close_page();
 	}
@@ -330,82 +332,119 @@ final class BulkToolsPage {
 		$this->close_catalog_row();
 		AdminPageLayout::close_form_panel();
 
+		echo '<div class="cetech-de-bulk-actions">';
 		echo '<p class="cetech-de-form-actions"><button type="submit" class="button button-primary">' . esc_html__( 'Preview impact (dry run)', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
-		echo '</form>';
 		echo '<p class="description">' . esc_html__( 'Preview never writes catalog configuration. Apply starts a background job. Closing the browser does not stop the job.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '</div>';
+		echo '</form>';
 	}
 
 	private function render_import_tab(): void {
 		if ( ! current_user_can( 'import_delivery_data' ) && ! current_user_can( 'manage_product_delivery_rules' ) ) {
-			echo '<p>' . esc_html__( 'You do not have permission to import Delivery Engine data.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			AdminPageLayout::render_empty_state(
+				__( 'You do not have permission to import Delivery Engine data.', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Ask an administrator to grant import access if you need to preview a catalog CSV or configuration package.', 'cetech-woocommerce-delivery-engine' )
+			);
 			return;
 		}
-		echo '<h2>' . esc_html__( 'Catalog CSV', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
-		echo '<p>' . esc_html__( 'Assign Delivery Engine configuration by SKU. Blank cells mean no change. They do not reset a field to inherit and they never mean zero.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+
+		AdminPageLayout::open_content_panel(
+			__( 'Catalog CSV', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Assign Delivery Engine configuration by SKU. Blank cells mean no change. They do not reset a field to inherit and they never mean zero.', 'cetech-woocommerce-delivery-engine' )
+		);
 		if ( $this->csv_export instanceof CatalogCsvExportService ) {
-			echo '<form method="post">';
+			echo '<form method="post" class="cetech-de-bulk-form cetech-de-bulk-subform">';
 			wp_nonce_field( self::ACTION_CSV_EXPORT, 'cetech_de_nonce' );
 			echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_CSV_EXPORT ) . '" />';
-			echo '<p><label><input type="checkbox" name="entire_catalog_confirmed" value="1" /> ' . esc_html__( 'Export the entire catalog (required for a complete CSV)', 'cetech-woocommerce-delivery-engine' ) . '</label></p>';
-			echo '<p><button type="submit" class="button">' . esc_html__( 'Download catalog CSV', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
+			echo '<div class="cetech-de-bulk-field">';
+			echo '<label><input type="checkbox" name="entire_catalog_confirmed" value="1" /> ' . esc_html__( 'Export the entire catalog (required for a complete CSV)', 'cetech-woocommerce-delivery-engine' ) . '</label>';
+			echo '</div>';
+			echo '<div class="cetech-de-bulk-actions">';
+			echo '<p class="cetech-de-form-actions"><button type="submit" class="button">' . esc_html__( 'Download catalog CSV', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
+			echo '</div>';
 			echo '</form>';
 		}
-		echo '<form method="post" class="cetech-de-bulk-form">';
+		echo '<form method="post" class="cetech-de-bulk-form cetech-de-bulk-subform">';
 		wp_nonce_field( self::ACTION_CSV_PREVIEW, 'cetech_de_nonce' );
 		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_CSV_PREVIEW ) . '" />';
-		echo '<p><label for="cetech-de-csv">' . esc_html__( 'CSV (header row required)', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<textarea id="cetech-de-csv" name="csv" rows="8" class="large-text code"></textarea></p>';
-		echo '<p><button type="submit" class="button button-primary">' . esc_html__( 'Preview catalog import (dry run)', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
+		echo '<div class="cetech-de-bulk-field">';
+		echo '<label for="cetech-de-csv">' . esc_html__( 'CSV (header row required)', 'cetech-woocommerce-delivery-engine' ) . '</label>';
+		echo '<textarea id="cetech-de-csv" name="csv" rows="8" class="large-text code"></textarea>';
+		echo '<p class="description">' . esc_html( BulkJobAdminCopy::empty_csv_text() ) . '</p>';
+		echo '</div>';
+		echo '<div class="cetech-de-bulk-actions">';
+		echo '<p class="cetech-de-form-actions"><button type="submit" class="button button-primary">' . esc_html__( 'Preview catalog import (dry run)', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
+		echo '</div>';
 		echo '</form>';
+		AdminPageLayout::close_content_panel();
 
-		echo '<h2>' . esc_html__( 'General configuration package', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
-		echo '<p>' . esc_html__( 'This is not a full site clone and not a product CSV. It copies reusable Delivery Engine setup for a sister store. Orders, shipments, customers, secrets, and runtime storefront flags are never included. Importing does not activate checkout.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		AdminPageLayout::open_content_panel(
+			__( 'General configuration package', 'cetech-woocommerce-delivery-engine' ),
+			__( 'This is not a full site clone and not a product CSV. It copies reusable Delivery Engine setup for a sister store. Orders, shipments, customers, secrets, and runtime storefront flags are never included. Importing does not activate checkout.', 'cetech-woocommerce-delivery-engine' )
+		);
 		if ( current_user_can( 'manage_delivery_settings' ) ) {
-			echo '<form method="post">';
+			echo '<form method="post" class="cetech-de-bulk-form cetech-de-bulk-subform">';
 			wp_nonce_field( self::ACTION_CONFIG_EXPORT, 'cetech_de_nonce' );
 			echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_CONFIG_EXPORT ) . '" />';
 			if ( current_user_can( 'manage_private_sources' ) ) {
-				echo '<p><label><input type="checkbox" name="include_private_sources" value="1" /> ' . esc_html__( 'Include private suppliers and origins (off by default)', 'cetech-woocommerce-delivery-engine' ) . '</label></p>';
+				echo '<div class="cetech-de-bulk-field">';
+				echo '<label><input type="checkbox" name="include_private_sources" value="1" /> ' . esc_html__( 'Include private suppliers and origins (off by default)', 'cetech-woocommerce-delivery-engine' ) . '</label>';
+				echo '</div>';
 			}
-			echo '<p><button type="submit" class="button">' . esc_html__( 'Download complete configuration package', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
-			echo '</form>';
+			echo '<div class="cetech-de-bulk-actions">';
+			echo '<p class="cetech-de-form-actions"><button type="submit" class="button">' . esc_html__( 'Download complete configuration package', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
 			echo '<p class="description">' . esc_html__( 'This download iterates every matching entity in batches. It does not silently stop at 500 rows. Large stores should prefer WP-CLI: wp cetech-de config export --file=package.json', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			echo '</div>';
+			echo '</form>';
 		}
-		echo '<form method="post" class="cetech-de-bulk-form">';
+		echo '<form method="post" class="cetech-de-bulk-form cetech-de-bulk-subform">';
 		wp_nonce_field( self::ACTION_CONFIG_IMPORT, 'cetech_de_nonce' );
 		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_CONFIG_IMPORT ) . '" />';
-		echo '<p><label for="cetech-de-package">' . esc_html__( 'Paste a configuration package JSON', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<textarea id="cetech-de-package" name="package_json" rows="8" class="large-text code"></textarea></p>';
-		echo '<p><label for="cetech-de-conflict">' . esc_html__( 'If a stable code already exists', 'cetech-woocommerce-delivery-engine' ) . '</label><br /><select id="cetech-de-conflict" name="conflict_mode">';
+		echo '<div class="cetech-de-bulk-field">';
+		echo '<label for="cetech-de-package">' . esc_html__( 'Paste a configuration package JSON', 'cetech-woocommerce-delivery-engine' ) . '</label>';
+		echo '<textarea id="cetech-de-package" name="package_json" rows="8" class="large-text code"></textarea>';
+		echo '<p class="description">' . esc_html( BulkJobAdminCopy::empty_package_text() ) . '</p>';
+		echo '</div>';
+		echo '<div class="cetech-de-bulk-field">';
+		echo '<label for="cetech-de-conflict">' . esc_html__( 'If a stable code already exists', 'cetech-woocommerce-delivery-engine' ) . '</label>';
+		echo '<select id="cetech-de-conflict" name="conflict_mode" class="cetech-de-bulk-select-wide">';
 		echo '<option value="skip_conflicts">' . esc_html__( 'Skip conflicts (safer default)', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		echo '<option value="add_missing">' . esc_html__( 'Add missing only', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		echo '<option value="update_matching">' . esc_html__( 'Update matching codes', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		echo '<option value="replace">' . esc_html__( 'Replace (advanced / dangerous)', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '</select></p>';
-		echo '<p><button type="submit" class="button">' . esc_html__( 'Preview configuration import', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
+		echo '</select>';
+		echo '<p class="description">' . esc_html__( 'Replace overwrites matching setup. Preview first. This does not apply the package immediately.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '</div>';
+		echo '<div class="cetech-de-bulk-actions">';
+		echo '<p class="cetech-de-form-actions"><button type="submit" class="button button-primary">' . esc_html__( 'Preview configuration import', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
+		echo '</div>';
 		echo '</form>';
+		AdminPageLayout::close_content_panel();
 	}
 
 	private function render_validation_tab(): void {
-		echo '<p>' . esc_html__( 'Validation scans run as background jobs and do not change configuration until you confirm a cleanup job.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 		echo '<form method="post" class="cetech-de-bulk-form">';
 		wp_nonce_field( self::ACTION_VALIDATION, 'cetech_de_nonce' );
 		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_VALIDATION ) . '" />';
 		AdminPageLayout::open_form_panel(
 			__( 'Products to scan', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Search by name or SKU. Leave empty only if you paste a list below.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Validation scans run as background jobs and do not change configuration until you confirm a cleanup job. Search by name or SKU. Leave empty only if you paste a list below.', 'cetech-woocommerce-delivery-engine' )
 		);
 		$this->open_catalog_row( 'cetech-de-validation-products', __( 'Products', 'cetech-woocommerce-delivery-engine' ) );
 		$this->render_product_search_select( 'cetech-de-validation-products', 'selected_product_ids' );
 		$this->close_catalog_row();
 		AdminPageLayout::close_form_panel();
 		AdminPageLayout::open_advanced( __( 'Paste a product ID list', 'cetech-woocommerce-delivery-engine' ) );
-		echo '<p><label for="cetech-de-validation-ids">' . esc_html__( 'Product IDs', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<textarea id="cetech-de-validation-ids" name="product_ids" rows="4" class="large-text"></textarea></p>';
+		echo '<div class="cetech-de-bulk-field">';
+		echo '<label for="cetech-de-validation-ids">' . esc_html__( 'Product IDs', 'cetech-woocommerce-delivery-engine' ) . '</label>';
+		echo '<textarea id="cetech-de-validation-ids" name="product_ids" rows="4" class="large-text"></textarea>';
+		echo '</div>';
 		AdminPageLayout::close_advanced();
-		echo '<p><button type="submit" class="button">' . esc_html__( 'Start validation scan (no writes)', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
+		echo '<div class="cetech-de-bulk-actions">';
+		echo '<p class="cetech-de-form-actions"><button type="submit" class="button button-primary">' . esc_html__( 'Start validation scan (no writes)', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
+		echo '<p class="description">' . esc_html__( 'Needs Attention remains the operational list for products that currently fail delivery resolution.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '</div>';
 		echo '</form>';
-		echo '<p>' . esc_html__( 'Needs Attention remains the operational list for products that currently fail delivery resolution.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 	}
 
 	private function render_jobs_tab(): void {
@@ -419,18 +458,30 @@ final class BulkToolsPage {
 			}
 		}
 
-		echo '<h2>' . esc_html__( 'Recent jobs', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
 		$total_jobs = $this->jobs->count_jobs();
 		$page       = BulkAdminListPreferences::current_page( 'paged' );
 		$jobs       = $this->jobs->list_jobs_page( $page, $per_page );
-		echo '<p class="description">' . esc_html(
+		AdminPageLayout::open_content_panel(
+			__( 'Recent jobs', 'cetech-woocommerce-delivery-engine' ),
 			sprintf(
 				/* translators: 1: job count, 2: rows per page */
 				__( 'Showing a page of %2$d jobs. Total jobs: %1$d. Change the page size in Screen Options.', 'cetech-woocommerce-delivery-engine' ),
 				$total_jobs,
 				$per_page
 			)
-		) . '</p>';
+		);
+		if ( [] === $jobs ) {
+			$catalog_url = add_query_arg( [ 'page' => self::SLUG, 'tab' => 'catalog' ], admin_url( 'admin.php' ) );
+			AdminPageLayout::render_empty_state(
+				BulkJobAdminCopy::empty_jobs_title(),
+				BulkJobAdminCopy::empty_jobs_text(),
+				__( 'Go to Catalog', 'cetech-woocommerce-delivery-engine' ),
+				$catalog_url
+			);
+			AdminPageLayout::close_content_panel();
+			return;
+		}
+		echo '<div class="cetech-de-admin-table-wrap">';
 		echo '<table class="widefat striped"><thead><tr>';
 		echo '<th>' . esc_html__( 'Job', 'cetech-woocommerce-delivery-engine' ) . '</th>';
 		echo '<th>' . esc_html__( 'Type', 'cetech-woocommerce-delivery-engine' ) . '</th>';
@@ -444,10 +495,7 @@ final class BulkToolsPage {
 			echo '<td>' . esc_html( BulkJobAdminCopy::status_label( $job->status ) ) . '</td>';
 			echo '<td>' . esc_html( sprintf( '%d / %d', $job->processed_count, $job->total_count ) ) . '</td></tr>';
 		}
-		if ( [] === $jobs ) {
-			echo '<tr><td colspan="4">' . esc_html__( 'No bulk jobs yet.', 'cetech-woocommerce-delivery-engine' ) . '</td></tr>';
-		}
-		echo '</tbody></table>';
+		echo '</tbody></table></div>';
 		$this->render_list_pagination(
 			'paged',
 			$page,
@@ -456,21 +504,28 @@ final class BulkToolsPage {
 			[ 'page' => self::SLUG, 'tab' => 'jobs' ],
 			__( 'Job history pagination', 'cetech-woocommerce-delivery-engine' )
 		);
+		AdminPageLayout::close_content_panel();
 	}
 
 	private function render_job_detail( BulkJob $job, int $per_page ): void {
 		$heading = $job->dry_run
 			? __( 'Preview result', 'cetech-woocommerce-delivery-engine' )
 			: __( 'Applied result', 'cetech-woocommerce-delivery-engine' );
-		echo '<h2>' . esc_html( $heading ) . '</h2>';
-		echo '<p class="cetech-de-bulk-job-kicker"><strong>' . esc_html( $job->job_code ) . '</strong> · ';
-		echo esc_html( BulkJobAdminCopy::operation_label( $job->operation_type ) ) . '</p>';
+		AdminPageLayout::open_content_panel(
+			$heading,
+			sprintf(
+				/* translators: 1: job code, 2: job type label */
+				__( '%1$s · %2$s', 'cetech-woocommerce-delivery-engine' ),
+				$job->job_code,
+				BulkJobAdminCopy::operation_label( $job->operation_type )
+			)
+		);
 		if ( $job->dry_run ) {
-			echo '<p class="cetech-de-bulk-preview-banner" role="status">' . esc_html( BulkJobAdminCopy::preview_only_notice() ) . '</p>';
+			echo '<div class="notice notice-info inline cetech-de-bulk-notice" role="status"><p>' . esc_html( BulkJobAdminCopy::preview_only_notice() ) . '</p></div>';
 		} else {
-			echo '<p class="description">' . esc_html( BulkJobAdminCopy::applied_notice() ) . '</p>';
+			echo '<div class="notice notice-success inline cetech-de-bulk-notice" role="status"><p>' . esc_html( BulkJobAdminCopy::applied_notice() ) . '</p></div>';
 		}
-		echo '<p role="status" aria-live="polite" data-cetech-de-job-id="' . esc_attr( (string) $job->id ) . '">' . esc_html(
+		echo '<p class="cetech-de-bulk-job-status" role="status" aria-live="polite" data-cetech-de-job-id="' . esc_attr( (string) $job->id ) . '">' . esc_html(
 			sprintf(
 				'%s · %d / %d',
 				BulkJobAdminCopy::status_label( $job->status ),
@@ -496,10 +551,12 @@ final class BulkToolsPage {
 		AdminPageLayout::render_summary_stats( $stats );
 
 		$definition = CatalogTargetDefinition::from_array( $job->target_definition );
-		echo '<p class="description">' . esc_html( BulkJobAdminCopy::variation_policy_notice( $definition->variation_policy ) ) . '</p>';
+		echo '<p class="cetech-de-bulk-variation-note">' . esc_html( BulkJobAdminCopy::variation_policy_notice( $definition->variation_policy ) ) . '</p>';
 
+		echo '<div class="cetech-de-bulk-actions">';
+		echo '<div class="cetech-de-bulk-actions-primary">';
 		if ( $job->status->allows_apply() ) {
-			echo '<p>' . esc_html( BulkJobAdminCopy::apply_help() ) . '</p>';
+			echo '<p class="description">' . esc_html( BulkJobAdminCopy::apply_help() ) . '</p>';
 			$this->job_button(
 				self::ACTION_APPLY,
 				$job->id,
@@ -508,6 +565,8 @@ final class BulkToolsPage {
 				'data-cetech-de-apply-preview'
 			);
 		}
+		echo '</div>';
+		echo '<div class="cetech-de-bulk-actions-secondary">';
 		if ( BulkJobAdminCopy::shows_cancel_remaining( $job->status ) ) {
 			$this->job_button(
 				self::ACTION_CANCEL,
@@ -520,11 +579,16 @@ final class BulkToolsPage {
 		if ( $job->status->allows_rollback() ) {
 			$this->job_button( self::ACTION_ROLLBACK, $job->id, __( 'Roll back eligible items', 'cetech-woocommerce-delivery-engine' ), false );
 		}
+		echo '</div></div>';
+		AdminPageLayout::close_content_panel();
+
 		$this->render_job_items_table( $job, $per_page );
 		AdminPageLayout::open_technical_details();
+		echo '<div class="cetech-de-bulk-technical">';
 		echo '<p>' . esc_html__( 'Machine job type', 'cetech-woocommerce-delivery-engine' ) . ': <code>' . esc_html( $job->operation_type->value ) . '</code></p>';
 		echo '<p>' . esc_html__( 'Machine status', 'cetech-woocommerce-delivery-engine' ) . ': <code>' . esc_html( $job->status->value ) . '</code></p>';
 		echo '<pre>' . esc_html( wp_json_encode( $job->summary, JSON_PRETTY_PRINT ) ?: '' ) . '</pre>';
+		echo '</div>';
 		AdminPageLayout::close_technical_details();
 	}
 
@@ -538,54 +602,58 @@ final class BulkToolsPage {
 		$results     = new BulkJobItemResultPresenter( $this->catalog_choices->delivery_options() );
 		$definition  = CatalogTargetDefinition::from_array( $job->target_definition );
 
-		echo '<h3>' . esc_html__( 'Job items', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
-		echo '<p class="description">' . esc_html(
+		AdminPageLayout::open_content_panel(
+			__( 'Job items', 'cetech-woocommerce-delivery-engine' ),
 			sprintf(
 				/* translators: 1: item count, 2: rows per page */
 				__( 'This table loads at most %2$d rows from the database. Total items: %1$d. Totals in the summary above come from job counters, not this page.', 'cetech-woocommerce-delivery-engine' ),
 				$total_items,
 				$per_page
 			)
-		) . '</p>';
-		echo '<div class="cetech-de-admin-table-wrap cetech-de-bulk-items-wrap">';
+		);
 		$after_heading = $job->dry_run
 			? __( 'Proposed', 'cetech-woocommerce-delivery-engine' )
 			: __( 'Applied', 'cetech-woocommerce-delivery-engine' );
-		echo '<table class="widefat striped cetech-de-bulk-items-table"><thead><tr>';
-		echo '<th>' . esc_html__( 'Target', 'cetech-woocommerce-delivery-engine' ) . '</th>';
-		echo '<th>' . esc_html__( 'Type', 'cetech-woocommerce-delivery-engine' ) . '</th>';
-		echo '<th>' . esc_html__( 'Status', 'cetech-woocommerce-delivery-engine' ) . '</th>';
-		echo '<th>' . esc_html__( 'Current', 'cetech-woocommerce-delivery-engine' ) . '</th>';
-		echo '<th>' . esc_html( $after_heading ) . '</th>';
-		echo '</tr></thead><tbody>';
-		foreach ( $items as $item ) {
-			$display = $labels->display( $item );
-			$blocks  = $results->blocks( $item, $manifest );
-			echo '<tr>';
-			echo '<td data-label="' . esc_attr__( 'Target', 'cetech-woocommerce-delivery-engine' ) . '"><strong>' . esc_html( $display['primary'] ) . '</strong>';
-			if ( '' !== $display['secondary'] ) {
-				echo '<span class="cetech-de-bulk-target-secondary">' . esc_html( $display['secondary'] ) . '</span>';
-			}
-			if ( 'variation' !== $item->target_type ) {
-				$counts = $labels->variation_counts( $item->target_id );
-				$note   = BulkJobAdminCopy::variation_inherit_count_note( $counts['inherit'], $counts['override'] );
-				if ( '' !== $note && BulkVariationPolicy::PreserveOverrides === $definition->variation_policy ) {
-					echo '<span class="cetech-de-bulk-target-secondary">' . esc_html( $note ) . '</span>';
-				}
-			}
-			echo '</td>';
-			echo '<td data-label="' . esc_attr__( 'Type', 'cetech-woocommerce-delivery-engine' ) . '">' . esc_html( BulkJobAdminCopy::target_type_label( $item->target_type ) ) . '</td>';
-			echo '<td data-label="' . esc_attr__( 'Status', 'cetech-woocommerce-delivery-engine' ) . '">' . esc_html( BulkJobAdminCopy::item_status_label( $item->status, $job->dry_run ) ) . '</td>';
-			echo '<td data-label="' . esc_attr__( 'Current', 'cetech-woocommerce-delivery-engine' ) . '">';
-			$this->render_result_side( $blocks, 'current' );
-			echo '</td><td data-label="' . esc_attr( $after_heading ) . '">';
-			$this->render_result_side( $blocks, 'proposed' );
-			echo '</td></tr>';
-		}
 		if ( [] === $items ) {
-			echo '<tr><td colspan="5">' . esc_html__( 'No job items on this page.', 'cetech-woocommerce-delivery-engine' ) . '</td></tr>';
+			AdminPageLayout::render_empty_state(
+				__( 'No job items on this page.', 'cetech-woocommerce-delivery-engine' ),
+				BulkJobAdminCopy::empty_job_items_text()
+			);
+		} else {
+			echo '<div class="cetech-de-admin-table-wrap cetech-de-bulk-items-wrap">';
+			echo '<table class="widefat striped cetech-de-bulk-items-table"><thead><tr>';
+			echo '<th>' . esc_html__( 'Target', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+			echo '<th>' . esc_html__( 'Type', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+			echo '<th>' . esc_html__( 'Status', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+			echo '<th>' . esc_html__( 'Current', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+			echo '<th>' . esc_html( $after_heading ) . '</th>';
+			echo '</tr></thead><tbody>';
+			foreach ( $items as $item ) {
+				$display = $labels->display( $item );
+				$blocks  = $results->blocks( $item, $manifest );
+				echo '<tr>';
+				echo '<td data-label="' . esc_attr__( 'Target', 'cetech-woocommerce-delivery-engine' ) . '"><strong>' . esc_html( $display['primary'] ) . '</strong>';
+				if ( '' !== $display['secondary'] ) {
+					echo '<span class="cetech-de-bulk-target-secondary">' . esc_html( $display['secondary'] ) . '</span>';
+				}
+				if ( 'variation' !== $item->target_type ) {
+					$counts = $labels->variation_counts( $item->target_id );
+					$note   = BulkJobAdminCopy::variation_inherit_count_note( $counts['inherit'], $counts['override'] );
+					if ( '' !== $note && BulkVariationPolicy::PreserveOverrides === $definition->variation_policy ) {
+						echo '<span class="cetech-de-bulk-target-secondary">' . esc_html( $note ) . '</span>';
+					}
+				}
+				echo '</td>';
+				echo '<td data-label="' . esc_attr__( 'Type', 'cetech-woocommerce-delivery-engine' ) . '">' . esc_html( BulkJobAdminCopy::target_type_label( $item->target_type ) ) . '</td>';
+				echo '<td data-label="' . esc_attr__( 'Status', 'cetech-woocommerce-delivery-engine' ) . '">' . esc_html( BulkJobAdminCopy::item_status_label( $item->status, $job->dry_run ) ) . '</td>';
+				echo '<td data-label="' . esc_attr__( 'Current', 'cetech-woocommerce-delivery-engine' ) . '">';
+				$this->render_result_side( $blocks, 'current', __( 'Current', 'cetech-woocommerce-delivery-engine' ) );
+				echo '</td><td data-label="' . esc_attr( $after_heading ) . '">';
+				$this->render_result_side( $blocks, 'proposed', $after_heading );
+				echo '</td></tr>';
+			}
+			echo '</tbody></table></div>';
 		}
-		echo '</tbody></table></div>';
 		$this->render_list_pagination(
 			'item_paged',
 			$page,
@@ -594,12 +662,13 @@ final class BulkToolsPage {
 			[ 'page' => self::SLUG, 'tab' => 'jobs', 'job' => (string) $job_id ],
 			__( 'Job item pagination', 'cetech-woocommerce-delivery-engine' )
 		);
+		AdminPageLayout::close_content_panel();
 	}
 
 	/**
 	 * @param list<array{field: string, current: string, proposed: string}> $blocks
 	 */
-	private function render_result_side( array $blocks, string $side ): void {
+	private function render_result_side( array $blocks, string $side, string $heading ): void {
 		$shown = [];
 		foreach ( $blocks as $block ) {
 			$value = (string) ( $block[ $side ] ?? '' );
@@ -608,8 +677,12 @@ final class BulkToolsPage {
 			}
 			$shown[] = [ 'field' => (string) $block['field'], 'value' => $value ];
 		}
+		$pane = 'proposed' === $side ? ' cetech-de-bulk-compare-pane--proposed' : ' cetech-de-bulk-compare-pane--current';
+		echo '<div class="cetech-de-bulk-compare-pane' . $pane . '">';
+		echo '<p class="cetech-de-bulk-compare-heading">' . esc_html( $heading ) . '</p>';
 		if ( [] === $shown ) {
-			echo '—';
+			echo '<p class="cetech-de-bulk-compare-empty">—</p>';
+			echo '</div>';
 
 			return;
 		}
@@ -618,27 +691,42 @@ final class BulkToolsPage {
 			echo '<dt>' . esc_html( $row['field'] ) . '</dt>';
 			echo '<dd>' . esc_html( $row['value'] ) . '</dd>';
 		}
-		echo '</dl>';
+		echo '</dl></div>';
 	}
 
 	private function render_rates_tab(): void {
 		if ( ! current_user_can( 'manage_delivery_rate_cards' ) ) {
-			echo '<p>' . esc_html__( 'You do not have permission to change Delivery Charges in bulk.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			AdminPageLayout::render_empty_state(
+				__( 'You do not have permission to change Delivery Charges in bulk.', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Ask an administrator to grant Delivery Charge access if you need to preview amount changes.', 'cetech-woocommerce-delivery-engine' )
+			);
 			return;
 		}
-		echo '<p>' . esc_html__( 'Charge amount changes require a preview. A missing or invalid number never becomes 0. Explicit configured zero remains valid.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 		echo '<form method="post" class="cetech-de-bulk-form">';
 		wp_nonce_field( self::ACTION_RATE_PREVIEW, 'cetech_de_nonce' );
 		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_RATE_PREVIEW ) . '" />';
-		echo '<p><label for="cetech-de-rate-ids">' . esc_html__( 'Delivery Charge IDs', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<textarea id="cetech-de-rate-ids" name="rate_card_ids" rows="4" class="large-text"></textarea></p>';
-		echo '<p><label for="cetech-de-rate-op">' . esc_html__( 'Amount change', 'cetech-woocommerce-delivery-engine' ) . '</label><br /><select id="cetech-de-rate-op" name="amount_op">';
+		AdminPageLayout::open_form_panel(
+			__( 'Change Delivery Charges', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Charge amount changes require a preview. A missing or invalid number never becomes 0. Explicit configured zero remains valid.', 'cetech-woocommerce-delivery-engine' )
+		);
+		$this->open_catalog_row( 'cetech-de-rate-ids', __( 'Delivery Charge IDs', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<textarea id="cetech-de-rate-ids" name="rate_card_ids" rows="4" class="large-text"></textarea>';
+		echo '<p class="description">' . esc_html__( 'Enter one Delivery Charge ID per line.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		$this->close_catalog_row();
+		$this->open_catalog_row( 'cetech-de-rate-op', __( 'Amount change', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<select id="cetech-de-rate-op" name="amount_op" class="cetech-de-bulk-select-wide">';
 		echo '<option value="percent">' . esc_html__( 'Increase/decrease by percent', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		echo '<option value="fixed">' . esc_html__( 'Increase/decrease by fixed amount', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '</select></p>';
-		echo '<p><label for="cetech-de-rate-value">' . esc_html__( 'Value (for example 7.5 or -2.00)', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<input id="cetech-de-rate-value" name="amount_value" type="text" class="regular-text" /></p>';
-		echo '<p><button type="submit" class="button button-primary">' . esc_html__( 'Preview charge changes', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
+		echo '</select>';
+		$this->close_catalog_row();
+		$this->open_catalog_row( 'cetech-de-rate-value', __( 'Value', 'cetech-woocommerce-delivery-engine' ) );
+		echo '<input id="cetech-de-rate-value" name="amount_value" type="text" class="regular-text cetech-de-bulk-input-narrow" />';
+		echo '<p class="description">' . esc_html__( 'For example 7.5 or -2.00.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		$this->close_catalog_row();
+		AdminPageLayout::close_form_panel();
+		echo '<div class="cetech-de-bulk-actions">';
+		echo '<p class="cetech-de-form-actions"><button type="submit" class="button button-primary">' . esc_html__( 'Preview charge changes', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
+		echo '</div>';
 		echo '</form>';
 	}
 

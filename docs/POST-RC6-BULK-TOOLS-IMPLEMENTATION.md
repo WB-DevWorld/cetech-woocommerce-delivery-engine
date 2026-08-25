@@ -1,7 +1,7 @@
 # Post-RC.6 Bulk Tools — Implementation
 
 **Branch:** `feat/post-rc6-bulk-tools`  
-**Plugin version:** `1.0.0-dev.bulk.4` (must not be packaged as RC.6)  
+**Plugin version:** `1.0.0-dev.bulk.5` (must not be packaged as RC.6)  
 **Schema:** target `5` (`cetech_de_db_version`)
 
 ## Engine
@@ -79,7 +79,7 @@ A selected-ID job may store the ID list once on `bulk_jobs.target_definition_jso
 - Recurring automatic catalog rules are intentionally not implemented.
 - Shipment bulk status edits are intentionally not implemented.
 - `assets/admin/bulk-tools.js` includes Catalog progressive disclosure plus 5-second job-detail polling (`tests/js/bulk-tools-catalog.test.js`).
-- Owner physical QA is not performed by Cursor. Previous untagged owner-QA packages `1.0.0-dev.bulk.2` and `1.0.0-dev.bulk.3` are immutable. Current untagged owner-QA package: `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.4.zip` (`1178646` bytes, SHA-256 `7d30518094a77fac269c8e09f74dba9a89c6ee4b5ce9c228714492bc4aa5ad07`, source `bb2862266b513844172d0f6bee3c4bf26108c7b1`, schema `5`).
+- Owner physical QA is not performed by Cursor. Previous untagged owner-QA packages `1.0.0-dev.bulk.2`, `1.0.0-dev.bulk.3`, and `1.0.0-dev.bulk.4` are immutable. Current untagged owner-QA package is `1.0.0-dev.bulk.5` (see `docs/POST-RC6-BULK-TOOLS-QUALIFICATION.md`).
 
 ## Jobs/History preview presentation (`1.0.0-dev.bulk.4`)
 
@@ -97,3 +97,14 @@ This repair does **not** change Bulk Job Engine, batching, Action Scheduler, sch
 - Preview banner: “Preview only — no product settings have been changed yet.” Apply help: “Applying starts a background job. Changes are processed in small batches.” Button: **Apply these changes**. Apply still uses the stored preview manifest.
 - Progress AJAX adds `status_label`, `show_cancel`, and `allows_apply` without removing machine `status`.
 - Layout stacks on mobile wp-admin; text, not colour alone.
+
+## Admin UI consistency (`1.0.0-dev.bulk.5`)
+
+Owner accepted bulk.4 preview semantics and asked for a visual-consistency pass before Apply/mutation QA. This repair does **not** change Bulk Job Engine, batching, Action Scheduler, schema 5, inheritance, resolver, rollback, or import/export behaviour.
+
+- One Bulk Tools page class (`cetech-de-bulk-tools`) with a small spacing scale (8 / 12 / 16 / 24px) scoped so other wp-admin screens are unchanged.
+- Catalog, Import / Export, Validation & Cleanup, Jobs / History, and Charges share the same workspace, panel, field, action, and table patterns.
+- Preview-only uses a WordPress `notice notice-info inline`. Current / Proposed sit in labelled panes (not red/green).
+- Empty Jobs/History explains the next action (Go to Catalog). Import and Charges empty/permission states follow the same empty-state component.
+- Technical details remain collapsed; JSON wraps/scrolls inside a padded panel.
+- Apply remains grouped with its batch-help copy. Cancel remaining work stays secondary.

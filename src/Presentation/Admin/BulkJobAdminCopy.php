@@ -110,6 +110,26 @@ final class BulkJobAdminCopy {
 		};
 	}
 
+	public static function empty_jobs_title(): string {
+		return __( 'No bulk jobs yet.', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function empty_jobs_text(): string {
+		return __( 'Preview a Catalog change to create the first job. Apply runs afterwards as a separate background job.', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function empty_job_items_text(): string {
+		return __( 'No job items on this page. Try another page, or wait for the job to finish listing products.', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function empty_csv_text(): string {
+		return __( 'Paste a CSV with a header row to preview. Nothing is imported until you apply a preview job.', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function empty_package_text(): string {
+		return __( 'Paste a configuration package to preview. Importing does not activate checkout.', 'cetech-woocommerce-delivery-engine' );
+	}
+
 	public static function preview_only_notice(): string {
 		return __( 'Preview only — no product settings have been changed yet.', 'cetech-woocommerce-delivery-engine' );
 	}

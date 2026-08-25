@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-22  
 **Branch:** `feat/post-rc6-bulk-tools`  
-**Plugin identity:** `1.0.0-dev.bulk.4` (must not be packaged as RC.6)  
+**Plugin identity:** `1.0.0-dev.bulk.5` (must not be packaged as RC.6)  
 **Result:** automated qualification **PASS**, plus Catalog admin UX repair **PASS** — not owner physical QA, not RC.6
 
 This record describes what actually ran. Disposable stack: `C:\Users\Jane\Desktop\Learning 2026\Cursor\cetech-de-bulk-tools-qual` (not FLAIROC, not committed into this repository).
@@ -308,7 +308,47 @@ Cursor must not install this package. Owner should, on the training site they co
 5. **Cancel remaining work** is absent on the finished preview. **Apply these changes** remains, with the background-batch note.
 6. Confirm storefront checkout is unchanged while flags remain off.
 
-## 15. Protected baselines (reconfirmed)
+## 15. Admin UI consistency (`1.0.0-dev.bulk.5`)
+
+Owner physical QA of immutable `1.0.0-dev.bulk.4` accepted preview semantics and asked for spacing/visual consistency across Bulk Tools before Apply/mutation QA.
+
+This repair is presentation-only. Bulk Job Engine, batching, Action Scheduler, schema 5, inheritance, resolver, rollback, import/export, RC.6, and checkout were not changed.
+
+### 15.1 Automated gates
+
+| Gate | Result |
+|------|--------|
+| Focused Bulk Tools PHPUnit | **PASS** (`BulkToolsUiConsistencyTest`, `BulkJobPreviewPresentationTest`, `BulkCatalogAdminUxTest`, `BulkAdminPaginationAndManifestTest` — 30 tests, 139 assertions) |
+| PHPUnit default (Unit+Integration) | **669 tests, 3515 assertions, PASS** (5 deprecations) |
+| PHP lint `src/` + plugin root + uninstall | no syntax errors |
+| Vitest | **15 tests, 3 files, PASS** |
+| Security suite | **not run** |
+| Browser visual QA | **not run in Cursor** — owner physical QA required |
+
+### 15.2 Owner-QA package
+
+Do **not** overwrite `1.0.0-dev.bulk.4`. Untagged identity **`1.0.0-dev.bulk.5`**. Schema target **5**. Not RC.6. Not final. No release tag. Not deployed.
+
+| Item | Value |
+|------|--------|
+| Source commit | *recorded after commit* |
+| Filename | `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.5.zip` |
+| Bytes | *recorded after package* |
+| SHA-256 | *recorded after package* |
+| Schema target | `5` |
+| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.5.zip` |
+| Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.5.zip` |
+
+### 15.3 Short owner physical retest plan
+
+1. Install/replace with `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.5.zip` (do not use RC.6; do not reuse bulk.4 as the current package).
+2. Confirm schema still **5** and `BULK-000001` history still present.
+3. Walk Catalog, Import / Export, Validation & Cleanup, Jobs / History, and Charges: same width, panel padding, heading rhythm, button gaps.
+4. Completed preview: WordPress info notice for preview-only; counters still **Would change**; Current/Proposed panes; Apply grouped with batch help; no Cancel remaining work.
+5. Narrow the wp-admin window: tabs usable, counters wrap, Current/Proposed stack, no horizontal overflow.
+6. Confirm storefront checkout is unchanged while flags remain off.
+
+## 16. Protected baselines (reconfirmed)
 
 - RC.6 tag `v1.0.0-rc.6` peeled commit `8f37fe826e23406c9035312e279699b65c1e72e4` **unchanged**
 - RC.6 ZIP not rebuilt or retagged
