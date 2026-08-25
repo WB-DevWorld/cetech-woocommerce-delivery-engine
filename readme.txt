@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-rc.6-r1-qa.1
+Stable tag: 1.0.0-rc.6-r1-qa.2
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,9 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-rc.6-r1-qa.2 =
+* Repair candidate after R1 QA.1 owner physical FAIL. Blank Reference Codes generate from the posted name on the real wp-admin form. Header Create/Save targets the entity form without nesting. Delivery Area country pickers submit ISO-2 codes. Draft empty Advanced numbers no longer TypeError. Schema target remains 4. Not RC.7. Not a replacement for tagged v1.0.0-rc.6.
 
 = 1.0.0-rc.6-r1-qa.1 =
 * Post-RC.6 admin setup repair QA. Blank Reference Codes generate before validation for Delivery Options and Delivery Areas. Validation errors keep Create/Save visible. Fulfilment/profile cards wrap on narrow wp-admin. Delivery Area country rules use WooCommerce country names while storing ISO-2 codes. Schema target remains 4. Not RC.7. Not a replacement for tagged v1.0.0-rc.6.

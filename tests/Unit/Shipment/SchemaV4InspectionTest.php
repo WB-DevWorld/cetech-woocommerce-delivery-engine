@@ -16,12 +16,12 @@ final class SchemaV4InspectionTest extends TestCase {
 		self::assertSame( '4', SchemaVersion::target() );
 	}
 
-	public function test_plugin_version_is_rc6_r1_qa1(): void {
+	public function test_plugin_version_is_rc6_r1_qa2(): void {
 		$plugin_root = dirname( __DIR__, 3 );
 		$header      = (string) file_get_contents( $plugin_root . '/cetech-woocommerce-delivery-engine.php' );
 
-		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-rc\\.6-r1-qa\\.1'\s*\)/", $header );
-		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-rc\\.6-r1-qa\\.1\s*$/m', $header );
+		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-rc\\.6-r1-qa\\.2'\s*\)/", $header );
+		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-rc\\.6-r1-qa\\.2\s*$/m', $header );
 	}
 
 	public function test_shipment_tables_are_registered_with_required_indexes(): void {
