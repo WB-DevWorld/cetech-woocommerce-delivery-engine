@@ -116,13 +116,30 @@ final class AdminFormHelper {
 		echo '</td></tr>';
 	}
 
+	/**
+	 * Coerce a posted/draft number into ?int. Empty strings from wp-admin
+	 * number inputs must not reach a typed ?int parameter (TypeError).
+	 */
+	public static function int_or_null( mixed $value ): ?int {
+		if ( null === $value || '' === $value || false === $value ) {
+			return null;
+		}
+
+		if ( is_numeric( $value ) ) {
+			return (int) $value;
+		}
+
+		return null;
+	}
+
 	public static function number_field(
 		string $name,
 		string $label,
-		?int $value = null,
+		mixed $value = null,
 		int $min = 0,
 		string $description = ''
 	): void {
+		$value = self::int_or_null( $value );
 		echo '<tr><th scope="row"><label for="' . esc_attr( $name ) . '">' . esc_html( $label ) . '</label></th><td>';
 		printf(
 			'<input type="number" class="small-text" id="%1$s" name="%1$s" value="%2$s" min="%3$d" step="1" />',
@@ -283,6 +300,9 @@ final class AdminFormHelper {
 		}
 
 		$name = trim( $name );
+		if ( '' === $name ) {
+			$name = trim( (string) ( $input['public_label'] ?? $input['name'] ?? '' ) );
+		}
 		if ( '' === $name ) {
 			$input['code'] = '';
 

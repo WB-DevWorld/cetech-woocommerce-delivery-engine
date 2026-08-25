@@ -31,9 +31,10 @@ describe('Delivery Area country picker controls', () => {
 							</select>
 						</td>
 						<td class="cetech-de-condition-value" data-cetech-de-condition-value data-cetech-de-value-name="destination_rules[0][rule_value]">
-							<select class="cetech-de-country-select" data-cetech-de-country-select hidden disabled>
+							<select class="cetech-de-country-select" data-cetech-de-country-select name="destination_rules[0][country_code]" hidden>
 								<option value="">Select a country</option>
 								<option value="GH">Ghana</option>
+								<option value="DE">Germany</option>
 								<option value="GB">United Kingdom (UK)</option>
 							</select>
 							<input type="text" class="regular-text cetech-de-rule-text" data-cetech-de-rule-text name="destination_rules[0][rule_value]" value="" />
@@ -44,17 +45,17 @@ describe('Delivery Area country picker controls', () => {
 				<table class="hidden"><tbody>
 					<tr data-cetech-de-condition-template>
 						<td>
-							<select name="destination_rules[{{index}}][rule_type]" data-cetech-de-rule-type>
+							<select name="destination_rules[{{index}}][rule_type]" data-cetech-de-rule-type disabled>
 								<option value="">— Select —</option>
 								<option value="country">Country</option>
 							</select>
 						</td>
 						<td class="cetech-de-condition-value" data-cetech-de-condition-value data-cetech-de-value-name="destination_rules[{{index}}][rule_value]">
-							<select class="cetech-de-country-select" data-cetech-de-country-select hidden disabled>
+							<select class="cetech-de-country-select" data-cetech-de-country-select name="destination_rules[{{index}}][country_code]" hidden disabled>
 								<option value="">Select a country</option>
 								<option value="NG">Nigeria</option>
 							</select>
-							<input type="text" class="regular-text cetech-de-rule-text" data-cetech-de-rule-text name="destination_rules[{{index}}][rule_value]" value="" />
+							<input type="text" class="regular-text cetech-de-rule-text" data-cetech-de-rule-text name="destination_rules[{{index}}][rule_value]" value="" disabled />
 						</td>
 					</tr>
 				</tbody></table>
@@ -64,7 +65,37 @@ describe('Delivery Area country picker controls', () => {
 		document.dispatchEvent(new Event('DOMContentLoaded'));
 	});
 
-	it('moves the submitted name onto the country select when Country is chosen', () => {
+	it('keeps ISO-2 as the country select value and does not post the label', () => {
+		const builder = document.querySelector('[data-cetech-de-condition-builder]');
+		const form = document.createElement('form');
+		form.appendChild(builder);
+		document.body.appendChild(form);
+
+		const row = document.querySelector('.cetech-de-condition-row');
+		const type = row.querySelector('[data-cetech-de-rule-type]');
+		const country = row.querySelector('[data-cetech-de-country-select]');
+		const text = row.querySelector('[data-cetech-de-rule-text]');
+
+		type.value = 'country';
+		type.dispatchEvent(new Event('change', { bubbles: true }));
+
+		expect(country.hidden).toBe(false);
+		expect(country.getAttribute('name')).toBe('destination_rules[0][country_code]');
+		expect(text.hidden).toBe(true);
+		expect(text.getAttribute('name')).toBe('destination_rules[0][rule_value]');
+
+		const germany = [...country.options].find((option) => option.textContent === 'Germany');
+		expect(germany?.value).toBe('DE');
+		country.value = germany.value;
+		expect(country.value).toBe('DE');
+		expect(country.options[country.selectedIndex].textContent).toBe('Germany');
+
+		const posted = new FormData(form);
+		expect(posted.get('destination_rules[0][country_code]')).toBe('DE');
+		expect(posted.get('destination_rules[0][rule_value]')).not.toBe('Germany');
+	});
+
+	it('moves visibility onto the country select when Country is chosen', () => {
 		const row = document.querySelector('.cetech-de-condition-row');
 		const type = row.querySelector('[data-cetech-de-rule-type]');
 		const country = row.querySelector('[data-cetech-de-country-select]');
@@ -75,10 +106,9 @@ describe('Delivery Area country picker controls', () => {
 
 		expect(country.hidden).toBe(false);
 		expect(country.disabled).toBe(false);
-		expect(country.getAttribute('name')).toBe('destination_rules[0][rule_value]');
+		expect(country.getAttribute('name')).toBe('destination_rules[0][country_code]');
 		expect(text.hidden).toBe(true);
-		expect(text.disabled).toBe(true);
-		expect(text.hasAttribute('name')).toBe(false);
+		expect(text.getAttribute('name')).toBe('destination_rules[0][rule_value]');
 
 		country.value = 'GH';
 		expect(country.value).toBe('GH');
@@ -96,12 +126,17 @@ describe('Delivery Area country picker controls', () => {
 		type.dispatchEvent(new Event('change', { bubbles: true }));
 
 		expect(country.hidden).toBe(true);
-		expect(country.disabled).toBe(true);
 		expect(text.hidden).toBe(false);
 		expect(text.getAttribute('name')).toBe('destination_rules[0][rule_value]');
+		expect(country.getAttribute('name')).toBe('destination_rules[0][country_code]');
 	});
 
 	it('syncs cloned condition rows', () => {
+		const builder = document.querySelector('[data-cetech-de-condition-builder]');
+		const form = document.createElement('form');
+		form.appendChild(builder);
+		document.body.appendChild(form);
+
 		document.querySelector('[data-cetech-de-add-condition]').click();
 		const rows = document.querySelectorAll('.cetech-de-condition-table tbody .cetech-de-condition-row');
 		expect(rows).toHaveLength(2);
@@ -110,6 +145,13 @@ describe('Delivery Area country picker controls', () => {
 		const country = rows[1].querySelector('[data-cetech-de-country-select]');
 		type.value = 'country';
 		type.dispatchEvent(new Event('change', { bubbles: true }));
-		expect(country.getAttribute('name')).toBe('destination_rules[1][rule_value]');
+		expect(country.getAttribute('name')).toBe('destination_rules[1][country_code]');
+		expect(country.disabled).toBe(false);
+		expect([...country.options].some((option) => option.value === 'NG' && option.textContent === 'Nigeria')).toBe(true);
+
+		country.value = 'NG';
+		const posted = new FormData(form);
+		expect(posted.get('destination_rules[1][country_code]')).toBe('NG');
+		expect(posted.get('destination_rules[1][rule_value]')).not.toBe('Nigeria');
 	});
 });

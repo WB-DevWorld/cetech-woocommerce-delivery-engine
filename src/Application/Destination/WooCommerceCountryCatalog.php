@@ -56,6 +56,37 @@ final class WooCommerceCountryCatalog {
 	}
 
 	/**
+	 * Turn a posted country control into a canonical ISO-2 code.
+	 *
+	 * Accepts ISO-2 (`DE`, `de`) or a WooCommerce country label (`Germany`,
+	 * `United Kingdom`). Does not invent a second catalogue.
+	 */
+	public static function canonical_iso2( string $raw ): string {
+		$trimmed = trim( $raw );
+		if ( '' === $trimmed ) {
+			return '';
+		}
+
+		$upper = strtoupper( $trimmed );
+		if ( 1 === preg_match( '/^[A-Z]{2}$/', $upper ) ) {
+			return $upper;
+		}
+
+		foreach ( self::options() as $code => $label ) {
+			if ( 0 === strcasecmp( $label, $trimmed ) ) {
+				return $code;
+			}
+
+			$plain = trim( (string) preg_replace( '/\s*\([^)]*\)\s*/', '', $label ) );
+			if ( '' !== $plain && 0 === strcasecmp( $plain, $trimmed ) ) {
+				return $code;
+			}
+		}
+
+		return $trimmed;
+	}
+
+	/**
 	 * @param array<mixed, mixed> $raw
 	 *
 	 * @return array<string, string>

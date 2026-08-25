@@ -166,14 +166,6 @@ final class DeliveryOffersPage {
 			: __( 'Create Delivery Option', 'cetech-woocommerce-delivery-engine' );
 
 		AdminPageLayout::open_page();
-		echo '<form method="post" action="" class="cetech-de-entity-form">';
-		AdminFormHelper::nonce_field( self::ACTION_SAVE );
-		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_SAVE ) . '" />';
-
-		if ( $is_edit && null !== $record && ! empty( $record['id'] ) ) {
-			echo '<input type="hidden" name="id" value="' . esc_attr( (string) $record['id'] ) . '" />';
-		}
-
 		AdminPageLayout::render_page_header(
 			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
 			$title,
@@ -182,6 +174,7 @@ final class DeliveryOffersPage {
 				'label' => $submit,
 				'type'  => 'submit',
 				'class' => 'primary',
+				'form'  => AdminPageLayout::ENTITY_FORM_ID,
 			],
 			[
 				'label' => __( 'Back to Delivery Options', 'cetech-woocommerce-delivery-engine' ),
@@ -191,6 +184,12 @@ final class DeliveryOffersPage {
 		);
 		AdminPageLayout::render_example(
 			__( 'Same-Day, Next-Day, Standard Delivery, Pickup', 'cetech-woocommerce-delivery-engine' )
+		);
+		AdminPageLayout::open_entity_form(
+			self::ACTION_SAVE,
+			self::ACTION_SAVE,
+			$submit,
+			$is_edit && ! empty( $record['id'] ) ? (int) $record['id'] : null
 		);
 
 		AdminPageLayout::open_form_panel(
@@ -203,6 +202,13 @@ final class DeliveryOffersPage {
 			(string) ( $record['public_label'] ?? '' ),
 			true,
 			__( 'Example: Same-Day Delivery', 'cetech-woocommerce-delivery-engine' )
+		);
+		AdminFormHelper::text_field(
+			'code',
+			__( 'Reference code', 'cetech-woocommerce-delivery-engine' ),
+			(string) ( $record['code'] ?? '' ),
+			false,
+			__( 'Generated from the name if left blank. Staff do not need to invent a code.', 'cetech-woocommerce-delivery-engine' )
 		);
 		AdminFormHelper::textarea_field(
 			'description',
@@ -236,13 +242,6 @@ final class DeliveryOffersPage {
 
 		AdminPageLayout::open_advanced( __( 'Advanced details', 'cetech-woocommerce-delivery-engine' ) );
 		echo '<table class="form-table cetech-de-form-table" role="presentation"><tbody>';
-		AdminFormHelper::text_field(
-			'code',
-			__( 'Reference code', 'cetech-woocommerce-delivery-engine' ),
-			(string) ( $record['code'] ?? '' ),
-			false,
-			__( 'Generated from the name if left blank. Staff do not need to invent a code.', 'cetech-woocommerce-delivery-engine' )
-		);
 		AdminFormHelper::number_field(
 			'display_priority',
 			__( 'Sort order', 'cetech-woocommerce-delivery-engine' ),
@@ -585,14 +584,14 @@ final class DeliveryOffersPage {
 			'service_level'        => (string) ( $draft['service_level'] ?? '' ),
 			'carrier_visibility'   => (string) ( $draft['carrier_visibility'] ?? CarrierVisibility::AssignedByStore->value ),
 			'carrier_display_name' => (string) ( $draft['carrier_display_name'] ?? '' ),
-			'processing_min_days'  => $draft['processing_min_days'] ?? null,
-			'processing_max_days'  => $draft['processing_max_days'] ?? null,
-			'transit_min_days'     => $draft['transit_min_days'] ?? null,
-			'transit_max_days'     => $draft['transit_max_days'] ?? null,
-			'final_mile_min_days'  => $draft['final_mile_min_days'] ?? null,
-			'final_mile_max_days'  => $draft['final_mile_max_days'] ?? null,
-			'display_priority'     => isset( $draft['display_priority'] ) ? (int) $draft['display_priority'] : 100,
+			'display_priority'     => AdminFormHelper::int_or_null( $draft['display_priority'] ?? 100 ) ?? 100,
 			'status'               => (string) ( $draft['status'] ?? RecordStatus::Active->value ),
+			'processing_min_days'  => AdminFormHelper::int_or_null( $draft['processing_min_days'] ?? null ),
+			'processing_max_days'  => AdminFormHelper::int_or_null( $draft['processing_max_days'] ?? null ),
+			'transit_min_days'     => AdminFormHelper::int_or_null( $draft['transit_min_days'] ?? null ),
+			'transit_max_days'     => AdminFormHelper::int_or_null( $draft['transit_max_days'] ?? null ),
+			'final_mile_min_days'  => AdminFormHelper::int_or_null( $draft['final_mile_min_days'] ?? null ),
+			'final_mile_max_days'  => AdminFormHelper::int_or_null( $draft['final_mile_max_days'] ?? null ),
 		];
 	}
 

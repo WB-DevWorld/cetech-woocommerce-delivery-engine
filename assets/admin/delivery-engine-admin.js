@@ -106,6 +106,12 @@
 
 		row.innerHTML = html;
 
+		row.querySelectorAll('[disabled]').forEach(function (el) {
+
+			el.removeAttribute('disabled');
+
+		});
+
 		tbody.appendChild(row);
 
 		syncConditionValueControls(row);
@@ -150,19 +156,13 @@
 
 			country.hidden = false;
 
-			country.disabled = false;
-
-			country.setAttribute('name', name);
-
 			text.hidden = true;
-
-			text.disabled = true;
-
-			text.removeAttribute('name');
 
 			if (text.value && !country.value) {
 
-				country.value = String(text.value).toUpperCase();
+				var posted = String(text.value).trim();
+
+				country.value = posted.length === 2 ? posted.toUpperCase() : country.value;
 
 			}
 
@@ -172,15 +172,7 @@
 
 		country.hidden = true;
 
-		country.disabled = true;
-
-		country.removeAttribute('name');
-
 		text.hidden = false;
-
-		text.disabled = false;
-
-		text.setAttribute('name', name);
 
 	}
 

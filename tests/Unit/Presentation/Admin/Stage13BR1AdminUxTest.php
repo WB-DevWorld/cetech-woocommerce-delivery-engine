@@ -103,21 +103,19 @@ final class Stage13BR1AdminUxTest extends TestCase {
 		self::assertStringNotContainsString( 'Technical diagnostic tools', $charges );
 	}
 
-	public function test_reference_codes_live_under_advanced_and_can_be_generated(): void {
+	public function test_reference_codes_are_optional_visible_and_can_be_generated(): void {
 		$offers = (string) file_get_contents( dirname( __DIR__, 4 ) . '/src/Presentation/Admin/DeliveryOffersPage.php' );
 		$areas  = (string) file_get_contents( dirname( __DIR__, 4 ) . '/src/Presentation/Admin/DestinationZonesPage.php' );
 
-		self::assertStringContainsString( "__( 'Advanced details'", $offers );
-		self::assertStringContainsString( "__( 'Reference code'", $offers );
-		self::assertGreaterThan(
-			strpos( $offers, "__( 'Advanced details'" ),
-			strpos( $offers, "__( 'Reference code'" )
-		);
-		self::assertStringContainsString( "__( 'Advanced details'", $areas );
-		self::assertGreaterThan(
-			strpos( $areas, "__( 'Advanced details'" ),
-			strpos( $areas, "__( 'Reference code'" )
-		);
+		foreach ( [ $offers, $areas ] as $source ) {
+			self::assertStringContainsString( "__( 'Reference code'", $source );
+			self::assertStringContainsString( "__( 'Advanced details'", $source );
+			self::assertLessThan(
+				strpos( $source, "__( 'Advanced details'" ),
+				strpos( $source, "__( 'Reference code'" )
+			);
+			self::assertStringContainsString( 'Generated from the', $source );
+		}
 		self::assertSame( 'greater-accra', AdminFormHelper::generate_code_from_name( 'Greater Accra', static fn () => false ) );
 	}
 

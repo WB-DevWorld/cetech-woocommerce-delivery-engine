@@ -2,7 +2,7 @@
 
 **Document status:** Packaging record for owner physical QA on **training.cetechbpa.com**  
 **QA identity:** `1.0.0-rc.6-r1-qa.1`  
-**Owner physical QA:** **NOT RUN by Cursor.** Do not claim browser PASS.  
+**Owner physical QA:** **FAIL** (training.cetechbpa.com). ZIP is an **immutable FAILED** artifact. Do not overwrite.  
 **Schema target:** `4` (unchanged; no schema 5)  
 **Branch:** `fix/post-rc6-admin-setup-defects`  
 **Protected published baseline:** tagged `1.0.0-rc.6` / `v1.0.0-rc.6` — **untouched**  
@@ -108,6 +108,27 @@ Re-run against committed identity tree `41ca3e0` (PHP 8.5.0, PHPUnit 10.5.64) **
 | `npm run test:js` | **14 passed / 14** |
 
 Playwright / live wp-admin / training.cetechbpa.com / FLAIROC: **not run**. Do not treat CSS wrap or picker UX as live PASS.
+
+Those automated results were real against `41ca3e0`. They were **insufficient to prove browser wp-admin behavior**.
+
+---
+
+## 5b. Owner physical QA — **FAIL**
+
+R1-QA.1 — **OWNER PHYSICAL FAIL** on training.cetechbpa.com.
+
+| Failure | Physical evidence |
+|---------|-------------------|
+| Delivery Option blank Reference Code | `Code is required.` |
+| Delivery Area blank Reference Code | `Code is required.` |
+| Country picker | Germany visible; server `Country code must be a 2-letter ISO code.` |
+| WordPress critical error | Displayed inside Delivery Option Advanced details after failed submit |
+| Header primary Create/Save | After error, header showed only Back to Delivery Options / Areas |
+| Responsive fulfilment cards | **Not yet verified.** Do not claim Test 5 PASS. |
+
+ZIP `cetech-woocommerce-delivery-engine-1.0.0-rc.6-r1-qa.1.zip` is **immutable**. Do not overwrite.
+
+Repair record (not packaged as QA.2 yet): `docs/POST-RC6-ADMIN-SETUP-REPAIR-R1-QA1-FAILURE-REPAIR.md`
 
 ---
 
@@ -268,7 +289,9 @@ Do not use this R1 QA to judge/fix In Store XOR or the International report yet.
 
 ## STOP
 
-This task stops after the immutable `1.0.0-rc.6-r1-qa.1` training QA package and this checklist.
+Owner physical QA of `1.0.0-rc.6-r1-qa.1` **FAILED**. This ZIP is immutable. Do not rebuild or overwrite it.
+
+Follow-up repair (not QA.2 packaged): `docs/POST-RC6-ADMIN-SETUP-REPAIR-R1-QA1-FAILURE-REPAIR.md`.
 
 - FLAIROC untouched
 - Bulk Tools untouched
