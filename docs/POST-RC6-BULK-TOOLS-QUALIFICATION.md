@@ -327,17 +327,19 @@ This repair is presentation-only. Bulk Job Engine, batching, Action Scheduler, s
 
 ### 15.2 Owner-QA package
 
-Do **not** overwrite `1.0.0-dev.bulk.4`. Untagged identity **`1.0.0-dev.bulk.5`**. Schema target **5**. Not RC.6. Not final. No release tag. Not deployed.
+Do **not** overwrite `1.0.0-dev.bulk.4`. Untagged identity **`1.0.0-dev.bulk.5`**. Schema target **5**. Built from committed clean source `38a5fce24f1809657707e6c0b50f52e6b3fb5bfa`. Not RC.6. Not final. No release tag. Not deployed.
 
 | Item | Value |
 |------|--------|
-| Source commit | *recorded after commit* |
+| Source commit | `38a5fce24f1809657707e6c0b50f52e6b3fb5bfa` |
 | Filename | `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.5.zip` |
-| Bytes | *recorded after package* |
-| SHA-256 | *recorded after package* |
+| Bytes | `1177819` |
+| SHA-256 | `619345cf7dd52757a0f628d1018a70f534346f37b798e90cb1c8c420861698cc` |
 | Schema target | `5` |
 | Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.5.zip` |
 | Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.5.zip` |
+
+Extracted verification: version `1.0.0-dev.bulk.5`, `SchemaVersion::TARGET = 5`, production `vendor/autoload.php`, packaged PHP lint via build verifier OK, `BulkToolsPage.php` and `assets/admin/delivery-engine-admin.css` present, no `tests/`, no `phpunit.xml`, no `.env`, no `docs/POST-RC6-TESTER-OBSERVATIONS-AUDIT.md`.
 
 ### 15.3 Short owner physical retest plan
 
