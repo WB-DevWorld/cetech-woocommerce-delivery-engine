@@ -31,14 +31,18 @@ final class BulkJobProgressEndpoint {
 		}
 		wp_send_json_success(
 			[
-				'code'      => $job->job_code,
-				'status'    => $job->status->value,
-				'total'     => $job->total_count,
-				'processed' => $job->processed_count,
-				'changed'   => $job->changed_count,
-				'skipped'   => $job->skipped_count,
-				'failed'    => $job->failed_count,
-				'terminal'  => $job->status->is_terminal() || $job->status->allows_apply(),
+				'code'         => $job->job_code,
+				'status'       => $job->status->value,
+				'status_label' => BulkJobAdminCopy::status_label( $job->status ),
+				'total'        => $job->total_count,
+				'processed'    => $job->processed_count,
+				'changed'      => $job->changed_count,
+				'skipped'      => $job->skipped_count,
+				'failed'       => $job->failed_count,
+				'show_cancel'  => BulkJobAdminCopy::shows_cancel_remaining( $job->status ),
+				'allows_apply' => $job->status->allows_apply(),
+				'dry_run'      => $job->dry_run,
+				'terminal'     => $job->status->is_terminal() || $job->status->allows_apply(),
 			]
 		);
 	}

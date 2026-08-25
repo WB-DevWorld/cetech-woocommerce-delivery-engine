@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-22  
 **Branch:** `feat/post-rc6-bulk-tools`  
-**Plugin identity:** `1.0.0-dev.bulk.3` (must not be packaged as RC.6)  
+**Plugin identity:** `1.0.0-dev.bulk.4` (must not be packaged as RC.6)  
 **Result:** automated qualification **PASS**, plus Catalog admin UX repair **PASS** — not owner physical QA, not RC.6
 
 This record describes what actually ran. Disposable stack: `C:\Users\Jane\Desktop\Learning 2026\Cursor\cetech-de-bulk-tools-qual` (not FLAIROC, not committed into this repository).
@@ -263,7 +263,50 @@ Cursor must not install this package. Owner should, on the training site they co
 6. Jobs / History Screen Options: entering 500/1000/negative/zero/nonnumeric does not persist those values; effective page size stays in 20/25/50/100, max 100.
 7. Confirm storefront checkout is unchanged while flags remain off.
 
-## 14. Protected baselines (reconfirmed)
+## 14. Preview presentation repair (`1.0.0-dev.bulk.4`)
+
+Owner physical QA of immutable `1.0.0-dev.bulk.3` passed the first Catalog dry-run engine result (`BULK-000001`, `catalog_update`, dry-run, 1/1, ready, 1 proposed change, 0 failed, no catalog write). Jobs/History preview presentation failed normal-administrator review.
+
+This repair is presentation-only. Bulk Job Engine, batching, Action Scheduler, schema 5, inheritance, resolver, rollback, target enumeration, RC.6, and historical snapshots were not changed. Machine statuses remain `ready`, `catalog_update`, `changed`, and so on.
+
+### 14.1 Automated gates
+
+Recorded after the repair tests in this session.
+
+| Gate | Result |
+|------|--------|
+| Focused preview presentation PHPUnit | **PASS** (`tests/Unit/Bulk/BulkJobPreviewPresentationTest.php` — 15 tests, 62 assertions) |
+| PHPUnit default (Unit+Integration) | **665 tests, 3494 assertions, PASS** (5 deprecations) |
+| PHP lint `src/` + plugin root + uninstall | no syntax errors |
+| Vitest | **15 tests, 3 files, PASS** (includes `tests/js/bulk-tools-catalog.test.js`) |
+| Security suite | **not run** |
+
+### 14.2 Owner-QA package
+
+Do **not** overwrite `1.0.0-dev.bulk.3`. Untagged identity **`1.0.0-dev.bulk.4`**. Schema target **5**. Not RC.6. Not final. No release tag. Not deployed.
+
+| Item | Value |
+|------|--------|
+| Source commit | *recorded after commit* |
+| Filename | `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.4.zip` |
+| Bytes | *recorded after package* |
+| SHA-256 | *recorded after package* |
+| Schema target | `5` |
+| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.4.zip` |
+| Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.4.zip` |
+
+### 14.3 Short owner physical retest plan
+
+Cursor must not install this package. Owner should, on the training site they control:
+
+1. Install/replace with `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.4.zip` (do not use RC.6; do not reuse bulk.3 as the current package).
+2. Confirm schema still **5** and existing configuration retained. Previous `BULK-000001` history must still exist.
+3. Open the completed Catalog preview: counters say **Would change**, not Changed; status **Ready to apply**; type **Catalog update**; banner says preview only / no settings changed yet.
+4. Job item Target shows **T QA Beta Test Product** (or the product name), not a bare `49164`. Current / Proposed show Fulfilment Availability In Warehouse → International (or the equivalent proposed change).
+5. **Cancel remaining work** is absent on the finished preview. **Apply these changes** remains, with the background-batch note.
+6. Confirm storefront checkout is unchanged while flags remain off.
+
+## 15. Protected baselines (reconfirmed)
 
 - RC.6 tag `v1.0.0-rc.6` peeled commit `8f37fe826e23406c9035312e279699b65c1e72e4` **unchanged**
 - RC.6 ZIP not rebuilt or retagged

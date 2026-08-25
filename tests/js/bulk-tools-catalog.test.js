@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -62,5 +62,80 @@ describe('Bulk Tools Catalog progressive disclosure', () => {
 		expect(form.querySelector('[data-reveal-fulfilment]').hidden).toBe(false);
 		expect(form.querySelector('[data-reveal-offers]').hidden).toBe(false);
 		expect(form.querySelector('[data-reveal-reset]').hidden).toBe(false);
+	});
+});
+
+describe('Bulk Tools job preview polling presentation', () => {
+	beforeEach(() => {
+		document.body.innerHTML = `
+			<p role="status" data-cetech-de-job-id="1">Preparing preview · 0 / 1</p>
+			<form data-cetech-de-cancel-remaining>
+				<button type="submit">Cancel remaining work</button>
+			</form>
+		`;
+		// eslint-disable-next-line no-new-func
+		new Function(scriptSource)();
+	});
+
+	it('uses Ready to apply and hides cancel remaining when a preview finishes', () => {
+		const status = document.querySelector('[data-cetech-de-job-id]');
+		const cancel = document.querySelector('[data-cetech-de-cancel-remaining]');
+		document.body.insertAdjacentHTML(
+			'beforeend',
+			'<form data-cetech-de-apply-preview><button type="submit">Apply these changes</button></form>'
+		);
+
+		window.cetechDeBulkCatalog.applyJobPoll(status, {
+			status: 'ready',
+			status_label: 'Ready to apply',
+			processed: 1,
+			total: 1,
+			show_cancel: false,
+			allows_apply: true,
+			terminal: true
+		});
+
+		expect(status.textContent).toBe('Ready to apply · 1 / 1');
+		expect(status.textContent).not.toContain('ready ·');
+		expect(cancel.hidden).toBe(true);
+		expect(cancel.querySelector('button').disabled).toBe(true);
+	});
+
+	it('keeps cancel remaining available while a job is running', () => {
+		const status = document.querySelector('[data-cetech-de-job-id]');
+		const cancel = document.querySelector('[data-cetech-de-cancel-remaining]');
+
+		window.cetechDeBulkCatalog.applyJobPoll(status, {
+			status: 'running',
+			status_label: 'Running',
+			processed: 2,
+			total: 10,
+			show_cancel: true,
+			allows_apply: false,
+			terminal: false
+		});
+
+		expect(status.textContent).toBe('Running · 2 / 10');
+		expect(cancel.hidden).toBe(false);
+		expect(cancel.querySelector('button').disabled).toBe(false);
+	});
+
+	it('reloads when a finished preview has no Apply control yet', () => {
+		const reload = vi.fn();
+		const status = document.querySelector('[data-cetech-de-job-id]');
+		vi.stubGlobal('location', { reload });
+
+		window.cetechDeBulkCatalog.applyJobPoll(status, {
+			status: 'ready',
+			status_label: 'Ready to apply',
+			processed: 1,
+			total: 1,
+			show_cancel: false,
+			allows_apply: true,
+			terminal: true
+		});
+
+		expect(reload).toHaveBeenCalledTimes(1);
+		vi.unstubAllGlobals();
 	});
 });

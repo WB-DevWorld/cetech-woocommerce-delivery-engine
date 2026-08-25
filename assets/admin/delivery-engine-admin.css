@@ -801,3 +801,96 @@
 .cetech-de-bulk-form .cetech-de-technical-details {
 	margin-top: 8px;
 }
+
+.cetech-de-bulk-job-kicker {
+	margin: 0 0 0.5rem;
+}
+
+.cetech-de-bulk-preview-banner {
+	margin: 0 0 1rem;
+	padding: 0.75rem 1rem;
+	border: 1px solid #2271b1;
+	border-left-width: 4px;
+	background: #f0f6fc;
+	font-weight: 600;
+}
+
+.cetech-de-bulk-job-action {
+	display: inline-block;
+	margin: 0 8px 8px 0;
+}
+
+.cetech-de-bulk-job-action[hidden] {
+	display: none;
+}
+
+.cetech-de-bulk-items-wrap {
+	overflow: visible;
+}
+
+.cetech-de-bulk-items-table th,
+.cetech-de-bulk-items-table td {
+	vertical-align: top;
+	word-break: break-word;
+	overflow-wrap: anywhere;
+}
+
+.cetech-de-bulk-target-secondary {
+	display: block;
+	margin-top: 0.35rem;
+	font-size: 12px;
+	font-weight: 400;
+	color: #50575e;
+}
+
+.cetech-de-bulk-result {
+	margin: 0;
+}
+
+.cetech-de-bulk-result dt {
+	font-weight: 600;
+	margin: 0;
+}
+
+.cetech-de-bulk-result dd {
+	margin: 0 0 0.5rem;
+}
+
+@media screen and (max-width: 782px) {
+	.cetech-de-bulk-items-table thead {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		padding: 0;
+		margin: -1px;
+		overflow: hidden;
+		clip: rect(0, 0, 0, 0);
+		border: 0;
+	}
+
+	.cetech-de-bulk-items-table tbody,
+	.cetech-de-bulk-items-table tr,
+	.cetech-de-bulk-items-table td {
+		display: block;
+		width: 100%;
+		box-sizing: border-box;
+	}
+
+	.cetech-de-bulk-items-table tr {
+		margin-bottom: 1rem;
+		border-bottom: 1px solid #dcdcde;
+		padding-bottom: 0.75rem;
+	}
+
+	.cetech-de-bulk-items-table td {
+		padding-left: 0;
+		padding-right: 0;
+	}
+
+	.cetech-de-bulk-items-table td::before {
+		content: attr(data-label);
+		display: block;
+		font-weight: 600;
+		margin-bottom: 0.25rem;
+	}
+}

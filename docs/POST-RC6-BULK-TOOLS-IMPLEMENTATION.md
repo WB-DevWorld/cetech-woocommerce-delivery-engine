@@ -1,7 +1,7 @@
 # Post-RC.6 Bulk Tools — Implementation
 
 **Branch:** `feat/post-rc6-bulk-tools`  
-**Plugin version:** `1.0.0-dev.bulk.3` (must not be packaged as RC.6)  
+**Plugin version:** `1.0.0-dev.bulk.4` (must not be packaged as RC.6)  
 **Schema:** target `5` (`cetech_de_db_version`)
 
 ## Engine
@@ -50,7 +50,7 @@ Import conflict policy is explicit. Apply retries items that failed during dry-r
 
 Menu: Delivery Engine → Bulk Tools (`cetech-delivery-engine-bulk-tools`). Tabs: Catalog, Import / Export, Validation & Cleanup, Jobs / History, Charges.
 
-Job History and Job Items use **query/repository pagination**. Default page size is **25**. WordPress Screen Options persist a numeric field; the server sanitises to `20` / `25` / `50` / `100` (option `cetech_de_bulk_list_per_page`, max **100**). Values such as `500`, `1000`, `0`, negative, or non-numeric do not persist as entered: oversized values clamp to 100; invalid/too-small values become 25. HTML attributes are not the authority. The wp-admin screen never defaults to 500 and does not hide extra rows in JavaScript after loading a large page. Job-item SQL is `ORDER BY id ASC LIMIT n OFFSET m` with `n ≤ 100`, using KEY `job_status_id (job_id, status, id)`. Job counters (Total / Changed / Failed) come from the job row, not from loading every item.
+Job History and Job Items use **query/repository pagination**. Default page size is **25**. WordPress Screen Options persist a numeric field; the server sanitises to `20` / `25` / `50` / `100` (option `cetech_de_bulk_list_per_page`, max **100**). Values such as `500`, `1000`, `0`, negative, or non-numeric do not persist as entered: oversized values clamp to 100; invalid/too-small values become 25. HTML attributes are not the authority. The wp-admin screen never defaults to 500 and does not hide extra rows in JavaScript after loading a large page. Job-item SQL is `ORDER BY id ASC LIMIT n OFFSET m` with `n ≤ 100`, using KEY `job_status_id (job_id, status, id)`. Job counters come from the job row, not from loading every item. Dry-run counters use future wording (Would change / No change / would be skipped / Would fail). Applied jobs use Changed / Unchanged / skipped / Failed.
 
 Capabilities reused: `manage_product_delivery_rules`, `import_delivery_data`, `manage_delivery_rate_cards`, `manage_private_sources`, `manage_delivery_settings`.
 
@@ -79,4 +79,21 @@ A selected-ID job may store the ID list once on `bulk_jobs.target_definition_jso
 - Recurring automatic catalog rules are intentionally not implemented.
 - Shipment bulk status edits are intentionally not implemented.
 - `assets/admin/bulk-tools.js` includes Catalog progressive disclosure plus 5-second job-detail polling (`tests/js/bulk-tools-catalog.test.js`).
-- Owner physical QA is not performed by Cursor. Previous untagged owner-QA package `1.0.0-dev.bulk.2` is immutable. Current untagged owner-QA package: `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.3.zip` (`1167830` bytes, SHA-256 `5aa19ffb201452dc463b01b015653365d0e78aabe8b0d53baa082777549d8da6`, source `a250b045c5783d0f4761fce99cda7b21f87e4337`, schema `5`).
+- Owner physical QA is not performed by Cursor. Previous untagged owner-QA packages `1.0.0-dev.bulk.2` and `1.0.0-dev.bulk.3` are immutable. Current untagged owner-QA package is `1.0.0-dev.bulk.4` (see `docs/POST-RC6-BULK-TOOLS-QUALIFICATION.md`).
+
+## Jobs/History preview presentation (`1.0.0-dev.bulk.4`)
+
+Owner physical QA of `1.0.0-dev.bulk.3` passed the Catalog dry-run engine (`BULK-000001`, 1/1, ready, 1 proposed change, no catalog write) and failed normal-administrator preview presentation.
+
+This repair does **not** change Bulk Job Engine, batching, Action Scheduler, schema 5, inheritance, resolver, rollback, target enumeration, or stored machine statuses.
+
+- Dry-run counters: Total / Would change / No change / would be skipped / Would fail / Warnings.
+- Applied counters remain Changed / Unchanged / skipped / Failed.
+- Machine `ready` renders **Ready to apply**. Machine `catalog_update` renders **Catalog update**. Codes remain in Technical details.
+- Job items batch-load product/variation titles and SKUs for the current page only (`BulkJobTargetLabelResolver`, cap 200 IDs). Primary label is the product or parent — variation name. Raw IDs stay secondary/technical.
+- Current / Proposed (or Applied) columns reconstruct human field summaries from `before_snapshot` + the approved action manifest. Fulfilment uses registry labels. Collections use Add / Remove / Replace with / Restore inherited Delivery Options. Reset-to-Site-wide is inheritance, not a copied value.
+- Keep-existing-variation-settings copy and optional inherit/override counts distinguish direct writes from downstream inheritance.
+- **Cancel remaining work** is shown only in active worker states (`previewing`, `queued`, `running`, …). A finished preview (`ready`) hides it. `BulkJobStatus::allows_cancel()` is unchanged for engine/CLI.
+- Preview banner: “Preview only — no product settings have been changed yet.” Apply help: “Applying starts a background job. Changes are processed in small batches.” Button: **Apply these changes**. Apply still uses the stored preview manifest.
+- Progress AJAX adds `status_label`, `show_cancel`, and `allows_apply` without removing machine `status`.
+- Layout stacks on mobile wp-admin; text, not colour alone.

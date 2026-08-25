@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Bulk\BulkJobEngine;
+use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogActionManifest;
 use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogFieldAction;
 use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogTargetDefinition;
 use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogTargetFilters;
@@ -14,6 +15,7 @@ use CetechDeliveryEngine\Application\Bulk\Portability\ConfigImportConflictMode;
 use CetechDeliveryEngine\Application\Bulk\Portability\ConfigurationExporter;
 use CetechDeliveryEngine\Application\Bulk\Portability\ConfigurationPackage;
 use CetechDeliveryEngine\Application\Bulk\Portability\ImportPackageGuard;
+use CetechDeliveryEngine\Domain\Bulk\BulkJob;
 use CetechDeliveryEngine\Domain\Bulk\BulkJobRepositoryInterface;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey;
 use CetechDeliveryEngine\Domain\Enum\BulkOperationType;
@@ -413,29 +415,7 @@ final class BulkToolsPage {
 		if ( $job_id > 0 ) {
 			$job = $this->engine->find( $job_id );
 			if ( $job ) {
-				echo '<h2>' . esc_html( $job->job_code ) . '</h2>';
-				echo '<p role="status" data-cetech-de-job-id="' . esc_attr( (string) $job->id ) . '">' . esc_html( sprintf( '%s · %d / %d', $job->status->value, $job->processed_count, $job->total_count ) ) . '</p>';
-				AdminPageLayout::render_summary_stats(
-					[
-						[ 'label' => __( 'Total', 'cetech-woocommerce-delivery-engine' ), 'value' => $job->total_count ],
-						[ 'label' => __( 'Changed', 'cetech-woocommerce-delivery-engine' ), 'value' => $job->changed_count ],
-						[ 'label' => __( 'Unchanged / skipped', 'cetech-woocommerce-delivery-engine' ), 'value' => $job->skipped_count ],
-						[ 'label' => __( 'Failed', 'cetech-woocommerce-delivery-engine' ), 'value' => $job->failed_count ],
-						[ 'label' => __( 'Warnings', 'cetech-woocommerce-delivery-engine' ), 'value' => $job->warning_count ],
-					]
-				);
-				if ( $job->status->allows_apply() ) {
-					$this->job_button( self::ACTION_APPLY, $job->id, __( 'Apply this preview', 'cetech-woocommerce-delivery-engine' ), true );
-				}
-				if ( $job->status->allows_cancel() ) {
-					$this->job_button( self::ACTION_CANCEL, $job->id, __( 'Cancel remaining work', 'cetech-woocommerce-delivery-engine' ), false );
-				}
-				if ( $job->status->allows_rollback() ) {
-					$this->job_button( self::ACTION_ROLLBACK, $job->id, __( 'Roll back eligible items', 'cetech-woocommerce-delivery-engine' ), false );
-				}
-				$this->render_job_items_table( (int) $job->id, $per_page );
-				echo '<details><summary>' . esc_html__( 'Technical details', 'cetech-woocommerce-delivery-engine' ) . '</summary>';
-				echo '<pre>' . esc_html( wp_json_encode( $job->summary, JSON_PRETTY_PRINT ) ?: '' ) . '</pre></details>';
+				$this->render_job_detail( $job, $per_page );
 			}
 		}
 
@@ -460,8 +440,8 @@ final class BulkToolsPage {
 		foreach ( $jobs as $job ) {
 			$url = add_query_arg( [ 'page' => self::SLUG, 'tab' => 'jobs', 'job' => (string) $job->id ], admin_url( 'admin.php' ) );
 			echo '<tr><td><a href="' . esc_url( $url ) . '">' . esc_html( $job->job_code ) . '</a></td>';
-			echo '<td>' . esc_html( $job->operation_type->value ) . '</td>';
-			echo '<td>' . esc_html( $job->status->value ) . '</td>';
+			echo '<td>' . esc_html( BulkJobAdminCopy::operation_label( $job->operation_type ) ) . '</td>';
+			echo '<td>' . esc_html( BulkJobAdminCopy::status_label( $job->status ) ) . '</td>';
 			echo '<td>' . esc_html( sprintf( '%d / %d', $job->processed_count, $job->total_count ) ) . '</td></tr>';
 		}
 		if ( [] === $jobs ) {
@@ -478,10 +458,86 @@ final class BulkToolsPage {
 		);
 	}
 
-	private function render_job_items_table( int $job_id, int $per_page ): void {
+	private function render_job_detail( BulkJob $job, int $per_page ): void {
+		$heading = $job->dry_run
+			? __( 'Preview result', 'cetech-woocommerce-delivery-engine' )
+			: __( 'Applied result', 'cetech-woocommerce-delivery-engine' );
+		echo '<h2>' . esc_html( $heading ) . '</h2>';
+		echo '<p class="cetech-de-bulk-job-kicker"><strong>' . esc_html( $job->job_code ) . '</strong> · ';
+		echo esc_html( BulkJobAdminCopy::operation_label( $job->operation_type ) ) . '</p>';
+		if ( $job->dry_run ) {
+			echo '<p class="cetech-de-bulk-preview-banner" role="status">' . esc_html( BulkJobAdminCopy::preview_only_notice() ) . '</p>';
+		} else {
+			echo '<p class="description">' . esc_html( BulkJobAdminCopy::applied_notice() ) . '</p>';
+		}
+		echo '<p role="status" aria-live="polite" data-cetech-de-job-id="' . esc_attr( (string) $job->id ) . '">' . esc_html(
+			sprintf(
+				'%s · %d / %d',
+				BulkJobAdminCopy::status_label( $job->status ),
+				$job->processed_count,
+				$job->total_count
+			)
+		) . '</p>';
+
+		$counts = [
+			'total'    => $job->total_count,
+			'changed'  => $job->changed_count,
+			'skipped'  => $job->skipped_count,
+			'failed'   => $job->failed_count,
+			'warnings' => $job->warning_count,
+		];
+		$stats  = [];
+		foreach ( BulkJobAdminCopy::counter_labels( $job->dry_run ) as $counter ) {
+			$stats[] = [
+				'label' => $counter['label'],
+				'value' => $counts[ $counter['key'] ] ?? 0,
+			];
+		}
+		AdminPageLayout::render_summary_stats( $stats );
+
+		$definition = CatalogTargetDefinition::from_array( $job->target_definition );
+		echo '<p class="description">' . esc_html( BulkJobAdminCopy::variation_policy_notice( $definition->variation_policy ) ) . '</p>';
+
+		if ( $job->status->allows_apply() ) {
+			echo '<p>' . esc_html( BulkJobAdminCopy::apply_help() ) . '</p>';
+			$this->job_button(
+				self::ACTION_APPLY,
+				$job->id,
+				__( 'Apply these changes', 'cetech-woocommerce-delivery-engine' ),
+				true,
+				'data-cetech-de-apply-preview'
+			);
+		}
+		if ( BulkJobAdminCopy::shows_cancel_remaining( $job->status ) ) {
+			$this->job_button(
+				self::ACTION_CANCEL,
+				$job->id,
+				__( 'Cancel remaining work', 'cetech-woocommerce-delivery-engine' ),
+				false,
+				'data-cetech-de-cancel-remaining'
+			);
+		}
+		if ( $job->status->allows_rollback() ) {
+			$this->job_button( self::ACTION_ROLLBACK, $job->id, __( 'Roll back eligible items', 'cetech-woocommerce-delivery-engine' ), false );
+		}
+		$this->render_job_items_table( $job, $per_page );
+		AdminPageLayout::open_technical_details();
+		echo '<p>' . esc_html__( 'Machine job type', 'cetech-woocommerce-delivery-engine' ) . ': <code>' . esc_html( $job->operation_type->value ) . '</code></p>';
+		echo '<p>' . esc_html__( 'Machine status', 'cetech-woocommerce-delivery-engine' ) . ': <code>' . esc_html( $job->status->value ) . '</code></p>';
+		echo '<pre>' . esc_html( wp_json_encode( $job->summary, JSON_PRETTY_PRINT ) ?: '' ) . '</pre>';
+		AdminPageLayout::close_technical_details();
+	}
+
+	private function render_job_items_table( BulkJob $job, int $per_page ): void {
+		$job_id      = (int) $job->id;
 		$total_items = $this->jobs->count_items( $job_id );
 		$page        = BulkAdminListPreferences::current_page( 'item_paged' );
 		$items       = $this->jobs->list_items_page( $job_id, $page, $per_page );
+		$labels      = BulkJobTargetLabelResolver::for_page( $items );
+		$manifest    = CatalogActionManifest::from_array( $job->action_manifest );
+		$results     = new BulkJobItemResultPresenter( $this->catalog_choices->delivery_options() );
+		$definition  = CatalogTargetDefinition::from_array( $job->target_definition );
+
 		echo '<h3>' . esc_html__( 'Job items', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
 		echo '<p class="description">' . esc_html(
 			sprintf(
@@ -491,23 +547,45 @@ final class BulkToolsPage {
 				$per_page
 			)
 		) . '</p>';
-		echo '<table class="widefat striped"><thead><tr>';
+		echo '<div class="cetech-de-admin-table-wrap cetech-de-bulk-items-wrap">';
+		$after_heading = $job->dry_run
+			? __( 'Proposed', 'cetech-woocommerce-delivery-engine' )
+			: __( 'Applied', 'cetech-woocommerce-delivery-engine' );
+		echo '<table class="widefat striped cetech-de-bulk-items-table"><thead><tr>';
 		echo '<th>' . esc_html__( 'Target', 'cetech-woocommerce-delivery-engine' ) . '</th>';
 		echo '<th>' . esc_html__( 'Type', 'cetech-woocommerce-delivery-engine' ) . '</th>';
 		echo '<th>' . esc_html__( 'Status', 'cetech-woocommerce-delivery-engine' ) . '</th>';
-		echo '<th>' . esc_html__( 'Result', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '<th>' . esc_html__( 'Current', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '<th>' . esc_html( $after_heading ) . '</th>';
 		echo '</tr></thead><tbody>';
 		foreach ( $items as $item ) {
-			$label = '' !== $item->external_key ? $item->external_key : (string) $item->target_id;
-			echo '<tr><td>' . esc_html( $label ) . '</td>';
-			echo '<td>' . esc_html( $item->target_type ) . '</td>';
-			echo '<td>' . esc_html( $item->status->value ) . '</td>';
-			echo '<td>' . esc_html( (string) ( $item->error_code ?? $item->error_summary ?? '' ) ) . '</td></tr>';
+			$display = $labels->display( $item );
+			$blocks  = $results->blocks( $item, $manifest );
+			echo '<tr>';
+			echo '<td data-label="' . esc_attr__( 'Target', 'cetech-woocommerce-delivery-engine' ) . '"><strong>' . esc_html( $display['primary'] ) . '</strong>';
+			if ( '' !== $display['secondary'] ) {
+				echo '<span class="cetech-de-bulk-target-secondary">' . esc_html( $display['secondary'] ) . '</span>';
+			}
+			if ( 'variation' !== $item->target_type ) {
+				$counts = $labels->variation_counts( $item->target_id );
+				$note   = BulkJobAdminCopy::variation_inherit_count_note( $counts['inherit'], $counts['override'] );
+				if ( '' !== $note && BulkVariationPolicy::PreserveOverrides === $definition->variation_policy ) {
+					echo '<span class="cetech-de-bulk-target-secondary">' . esc_html( $note ) . '</span>';
+				}
+			}
+			echo '</td>';
+			echo '<td data-label="' . esc_attr__( 'Type', 'cetech-woocommerce-delivery-engine' ) . '">' . esc_html( BulkJobAdminCopy::target_type_label( $item->target_type ) ) . '</td>';
+			echo '<td data-label="' . esc_attr__( 'Status', 'cetech-woocommerce-delivery-engine' ) . '">' . esc_html( BulkJobAdminCopy::item_status_label( $item->status, $job->dry_run ) ) . '</td>';
+			echo '<td data-label="' . esc_attr__( 'Current', 'cetech-woocommerce-delivery-engine' ) . '">';
+			$this->render_result_side( $blocks, 'current' );
+			echo '</td><td data-label="' . esc_attr( $after_heading ) . '">';
+			$this->render_result_side( $blocks, 'proposed' );
+			echo '</td></tr>';
 		}
 		if ( [] === $items ) {
-			echo '<tr><td colspan="4">' . esc_html__( 'No job items on this page.', 'cetech-woocommerce-delivery-engine' ) . '</td></tr>';
+			echo '<tr><td colspan="5">' . esc_html__( 'No job items on this page.', 'cetech-woocommerce-delivery-engine' ) . '</td></tr>';
 		}
-		echo '</tbody></table>';
+		echo '</tbody></table></div>';
 		$this->render_list_pagination(
 			'item_paged',
 			$page,
@@ -516,6 +594,31 @@ final class BulkToolsPage {
 			[ 'page' => self::SLUG, 'tab' => 'jobs', 'job' => (string) $job_id ],
 			__( 'Job item pagination', 'cetech-woocommerce-delivery-engine' )
 		);
+	}
+
+	/**
+	 * @param list<array{field: string, current: string, proposed: string}> $blocks
+	 */
+	private function render_result_side( array $blocks, string $side ): void {
+		$shown = [];
+		foreach ( $blocks as $block ) {
+			$value = (string) ( $block[ $side ] ?? '' );
+			if ( '' === $value ) {
+				continue;
+			}
+			$shown[] = [ 'field' => (string) $block['field'], 'value' => $value ];
+		}
+		if ( [] === $shown ) {
+			echo '—';
+
+			return;
+		}
+		echo '<dl class="cetech-de-bulk-result">';
+		foreach ( $shown as $row ) {
+			echo '<dt>' . esc_html( $row['field'] ) . '</dt>';
+			echo '<dd>' . esc_html( $row['value'] ) . '</dd>';
+		}
+		echo '</dl>';
 	}
 
 	private function render_rates_tab(): void {
@@ -599,8 +702,12 @@ final class BulkToolsPage {
 		}
 	}
 
-	private function job_button( string $action, ?int $job_id, string $label, bool $primary ): void {
-		echo '<form method="post" style="display:inline-block;margin-right:8px;">';
+	private function job_button( string $action, ?int $job_id, string $label, bool $primary, string $marker = '' ): void {
+		$extra = '';
+		if ( 'data-cetech-de-apply-preview' === $marker || 'data-cetech-de-cancel-remaining' === $marker ) {
+			$extra = ' ' . $marker;
+		}
+		echo '<form method="post" class="cetech-de-bulk-job-action"' . $extra . '>';
 		wp_nonce_field( $action, 'cetech_de_nonce' );
 		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( $action ) . '" />';
 		echo '<input type="hidden" name="job_id" value="' . esc_attr( (string) $job_id ) . '" />';

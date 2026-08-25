@@ -124,6 +124,27 @@
 		});
 	}
 
+	function applyJobPoll(statusEl, data) {
+		if (!statusEl || !data) {
+			return false;
+		}
+		var label = data.status_label || data.status || '';
+		statusEl.textContent = label + ' · ' + data.processed + ' / ' + data.total;
+		var cancel = document.querySelector('[data-cetech-de-cancel-remaining]');
+		if (cancel) {
+			var hideCancel = data.show_cancel === false;
+			cancel.hidden = hideCancel;
+			cancel.querySelectorAll('button, input[type="submit"]').forEach(function (button) {
+				button.disabled = hideCancel;
+			});
+		}
+		if (data.allows_apply && !document.querySelector('[data-cetech-de-apply-preview]') && root.location && typeof root.location.reload === 'function') {
+			root.location.reload();
+			return true;
+		}
+		return !!data.terminal;
+	}
+
 	function initJobPolling() {
 		if (typeof root.cetechDeBulk === 'undefined') {
 			return;
@@ -149,8 +170,7 @@
 				if (!payload || !payload.success || !payload.data) {
 					return;
 				}
-				status.textContent = payload.data.code + ' · ' + payload.data.status + ' · ' + payload.data.processed + ' / ' + payload.data.total;
-				if (payload.data.terminal) {
+				if (applyJobPoll(status, payload.data)) {
 					root.clearInterval(interval);
 				}
 			}).catch(function () {
@@ -161,7 +181,8 @@
 
 	root.cetechDeBulkCatalog = {
 		sync: syncBulkCatalogForm,
-		init: initBulkCatalogForm
+		init: initBulkCatalogForm,
+		applyJobPoll: applyJobPoll
 	};
 
 	function boot() {
