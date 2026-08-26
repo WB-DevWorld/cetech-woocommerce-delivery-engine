@@ -368,17 +368,19 @@ Rollback conflict rules were not changed. Empty before snapshot still deletes th
 
 ### 16.2 Owner-QA package
 
-Do **not** overwrite `1.0.0-dev.bulk.5`. Untagged identity **`1.0.0-dev.bulk.6`**. Schema target **5**. Not RC.6. Not final. No release tag. Not deployed.
+Do **not** overwrite `1.0.0-dev.bulk.5`. Untagged identity **`1.0.0-dev.bulk.6`**. Schema target **5**. Built from committed clean source `fb16554a2484d63a82451410323137d88d187d87`. Not RC.6. Not final. No release tag. Not deployed.
 
 | Item | Value |
 |------|--------|
-| Source commit | *recorded after commit* |
+| Source commit | `fb16554a2484d63a82451410323137d88d187d87` |
 | Filename | `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.6.zip` |
-| Bytes | *recorded after package* |
-| SHA-256 | *recorded after package* |
+| Bytes | `1180297` |
+| SHA-256 | `41fcc68ea4638d530aa710d9f25931248ce8ec1a3183a3908709fb3ea53150f1` |
 | Schema target | `5` |
 | Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.6.zip` |
 | Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.6.zip` |
+
+Extracted verification: version `1.0.0-dev.bulk.6`, `SchemaVersion::TARGET = 5`, production `vendor/autoload.php`, packaged PHP lint via build verifier OK, `BulkJobWorker.php` / `BulkJobAdminCopy.php` present, no `tests/`, no `phpunit.xml`, no `.env`, no `docs/POST-RC6-TESTER-OBSERVATIONS-AUDIT.md`.
 
 ### 16.3 Short owner physical retest plan
 
