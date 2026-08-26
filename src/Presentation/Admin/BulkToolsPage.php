@@ -508,9 +508,8 @@ final class BulkToolsPage {
 	}
 
 	private function render_job_detail( BulkJob $job, int $per_page ): void {
-		$heading = $job->dry_run
-			? __( 'Preview result', 'cetech-woocommerce-delivery-engine' )
-			: __( 'Applied result', 'cetech-woocommerce-delivery-engine' );
+		$heading = BulkJobAdminCopy::job_result_heading( $job );
+		$phase   = BulkJobAdminCopy::copy_phase( $job );
 		AdminPageLayout::open_content_panel(
 			$heading,
 			sprintf(
@@ -520,7 +519,10 @@ final class BulkToolsPage {
 				BulkJobAdminCopy::operation_label( $job->operation_type )
 			)
 		);
-		if ( $job->dry_run ) {
+		if ( BulkOperationType::Rollback === $job->operation_type ) {
+			$notice_class = $job->status->is_terminal() ? 'notice notice-success inline' : 'notice notice-info inline';
+			echo '<div class="' . esc_attr( $notice_class ) . ' cetech-de-bulk-notice" role="status"><p>' . esc_html( BulkJobAdminCopy::rollback_notice( $job->status->is_terminal() ) ) . '</p></div>';
+		} elseif ( $job->dry_run ) {
 			echo '<div class="notice notice-info inline cetech-de-bulk-notice" role="status"><p>' . esc_html( BulkJobAdminCopy::preview_only_notice() ) . '</p></div>';
 		} else {
 			echo '<div class="notice notice-success inline cetech-de-bulk-notice" role="status"><p>' . esc_html( BulkJobAdminCopy::applied_notice() ) . '</p></div>';
@@ -534,15 +536,9 @@ final class BulkToolsPage {
 			)
 		) . '</p>';
 
-		$counts = [
-			'total'    => $job->total_count,
-			'changed'  => $job->changed_count,
-			'skipped'  => $job->skipped_count,
-			'failed'   => $job->failed_count,
-			'warnings' => $job->warning_count,
-		];
+		$counts = BulkJobAdminCopy::counter_values( $job );
 		$stats  = [];
-		foreach ( BulkJobAdminCopy::counter_labels( $job->dry_run ) as $counter ) {
+		foreach ( BulkJobAdminCopy::counter_labels_for_job( $job ) as $counter ) {
 			$stats[] = [
 				'label' => $counter['label'],
 				'value' => $counts[ $counter['key'] ] ?? 0,
@@ -551,7 +547,7 @@ final class BulkToolsPage {
 		AdminPageLayout::render_summary_stats( $stats );
 
 		$definition = CatalogTargetDefinition::from_array( $job->target_definition );
-		echo '<p class="cetech-de-bulk-variation-note">' . esc_html( BulkJobAdminCopy::variation_policy_notice( $definition->variation_policy ) ) . '</p>';
+		echo '<p class="cetech-de-bulk-variation-note">' . esc_html( BulkJobAdminCopy::variation_policy_notice( $definition->variation_policy, $phase ) ) . '</p>';
 
 		echo '<div class="cetech-de-bulk-actions">';
 		echo '<div class="cetech-de-bulk-actions-primary">';
@@ -611,9 +607,9 @@ final class BulkToolsPage {
 				$per_page
 			)
 		);
-		$after_heading = $job->dry_run
-			? __( 'Proposed', 'cetech-woocommerce-delivery-engine' )
-			: __( 'Applied', 'cetech-woocommerce-delivery-engine' );
+		$after_heading = BulkJobAdminCopy::compare_after_heading( $job );
+		$is_rollback   = BulkOperationType::Rollback === $job->operation_type;
+		$phase         = BulkJobAdminCopy::copy_phase( $job );
 		if ( [] === $items ) {
 			AdminPageLayout::render_empty_state(
 				__( 'No job items on this page.', 'cetech-woocommerce-delivery-engine' ),
@@ -638,18 +634,24 @@ final class BulkToolsPage {
 				}
 				if ( 'variation' !== $item->target_type ) {
 					$counts = $labels->variation_counts( $item->target_id );
-					$note   = BulkJobAdminCopy::variation_inherit_count_note( $counts['inherit'], $counts['override'] );
+					$note   = BulkJobAdminCopy::variation_inherit_count_note( $counts['inherit'], $counts['override'], $phase );
 					if ( '' !== $note && BulkVariationPolicy::PreserveOverrides === $definition->variation_policy ) {
 						echo '<span class="cetech-de-bulk-target-secondary">' . esc_html( $note ) . '</span>';
 					}
 				}
 				echo '</td>';
 				echo '<td data-label="' . esc_attr__( 'Type', 'cetech-woocommerce-delivery-engine' ) . '">' . esc_html( BulkJobAdminCopy::target_type_label( $item->target_type ) ) . '</td>';
-				echo '<td data-label="' . esc_attr__( 'Status', 'cetech-woocommerce-delivery-engine' ) . '">' . esc_html( BulkJobAdminCopy::item_status_label( $item->status, $job->dry_run ) ) . '</td>';
+				echo '<td data-label="' . esc_attr__( 'Status', 'cetech-woocommerce-delivery-engine' ) . '">' . esc_html( BulkJobAdminCopy::item_status_label( $item->status, $job->dry_run, $is_rollback ) ) . '</td>';
 				echo '<td data-label="' . esc_attr__( 'Current', 'cetech-woocommerce-delivery-engine' ) . '">';
-				$this->render_result_side( $blocks, 'current', __( 'Current', 'cetech-woocommerce-delivery-engine' ) );
-				echo '</td><td data-label="' . esc_attr( $after_heading ) . '">';
-				$this->render_result_side( $blocks, 'proposed', $after_heading );
+				if ( $is_rollback ) {
+					$this->render_result_side( $blocks, 'proposed', __( 'Current', 'cetech-woocommerce-delivery-engine' ), 'current' );
+					echo '</td><td data-label="' . esc_attr( $after_heading ) . '">';
+					$this->render_result_side( $blocks, 'current', $after_heading, 'proposed' );
+				} else {
+					$this->render_result_side( $blocks, 'current', __( 'Current', 'cetech-woocommerce-delivery-engine' ) );
+					echo '</td><td data-label="' . esc_attr( $after_heading ) . '">';
+					$this->render_result_side( $blocks, 'proposed', $after_heading );
+				}
 				echo '</td></tr>';
 			}
 			echo '</tbody></table></div>';
@@ -668,7 +670,7 @@ final class BulkToolsPage {
 	/**
 	 * @param list<array{field: string, current: string, proposed: string}> $blocks
 	 */
-	private function render_result_side( array $blocks, string $side, string $heading ): void {
+	private function render_result_side( array $blocks, string $side, string $heading, ?string $pane_kind = null ): void {
 		$shown = [];
 		foreach ( $blocks as $block ) {
 			$value = (string) ( $block[ $side ] ?? '' );
@@ -677,7 +679,8 @@ final class BulkToolsPage {
 			}
 			$shown[] = [ 'field' => (string) $block['field'], 'value' => $value ];
 		}
-		$pane = 'proposed' === $side ? ' cetech-de-bulk-compare-pane--proposed' : ' cetech-de-bulk-compare-pane--current';
+		$pane_kind = $pane_kind ?? $side;
+		$pane      = 'proposed' === $pane_kind ? ' cetech-de-bulk-compare-pane--proposed' : ' cetech-de-bulk-compare-pane--current';
 		echo '<div class="cetech-de-bulk-compare-pane' . $pane . '">';
 		echo '<p class="cetech-de-bulk-compare-heading">' . esc_html( $heading ) . '</p>';
 		if ( [] === $shown ) {

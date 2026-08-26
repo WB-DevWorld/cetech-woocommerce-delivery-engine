@@ -286,15 +286,7 @@ final class BulkJobWorker {
 			);
 			$this->jobs->save_item( $saved_item );
 
-			if ( count( $examples ) < 8 ) {
-				$examples[] = [
-					'target_type' => $item->target_type,
-					'target_id'   => $item->target_id,
-					'external_key'=> $item->external_key,
-					'outcome'     => $result['outcome'],
-					'error_code'  => $result['error_code'],
-				];
-			}
+			$examples = $this->append_representative_example( $examples, $item, $result );
 		}
 
 		$fresh = $this->jobs->find_job( (int) $job->id );
@@ -344,13 +336,21 @@ final class BulkJobWorker {
 				break;
 			}
 			$parent = $item->parent_target_id;
-			$result = $this->mutator->rollback(
-				$item->target_type,
-				$item->target_id,
-				$parent,
-				$item->before_snapshot,
-				$item->after_fingerprint
-			);
+			try {
+				$result = $this->mutator->rollback(
+					$item->target_type,
+					$item->target_id,
+					$parent,
+					$item->before_snapshot,
+					$item->after_fingerprint
+				);
+			} catch ( \Throwable ) {
+				$result = [
+					'outcome'       => 'rollback_failed',
+					'error_code'    => 'rollback_exception',
+					'error_summary' => 'This item could not be restored.',
+				];
+			}
 			$status = match ( $result['outcome'] ) {
 				'rolled_back'      => BulkJobItemStatus::RolledBack,
 				'rollback_skipped' => BulkJobItemStatus::RollbackSkipped,
@@ -383,7 +383,19 @@ final class BulkJobWorker {
 			$summary['rollback_restored'] = (int) ( $summary['rollback_restored'] ?? 0 ) + $rolled;
 			$summary['rollback_skipped']  = (int) ( $summary['rollback_skipped'] ?? 0 ) + $skipped;
 			$summary['rollback_failed']   = (int) ( $summary['rollback_failed'] ?? 0 ) + $failed;
-			$fresh = $fresh->with( [ 'summary' => $summary ] );
+			$processed                    = $summary['rollback_restored'] + $summary['rollback_skipped'] + $summary['rollback_failed'];
+			$fresh                        = $fresh->with_progress(
+				$fresh->total_count,
+				$fresh->enumerated_count,
+				$processed,
+				$fresh->changed_count,
+				$summary['rollback_skipped'],
+				$summary['rollback_failed'],
+				$fresh->warning_count,
+				true,
+				$fresh->checkpoint_cursor,
+				$summary
+			);
 			$this->jobs->save_job( $fresh );
 			$this->requeue_if_needed( $fresh, $started );
 		}
@@ -428,12 +440,45 @@ final class BulkJobWorker {
 	}
 
 	private function finalize_rollback( BulkJob $job ): void {
-		$summary = $job->summary;
+		$fresh   = $this->jobs->find_job( (int) $job->id ) ?? $job;
+		$summary = $fresh->summary;
 		$skipped = (int) ( $summary['rollback_skipped'] ?? 0 );
 		$failed  = (int) ( $summary['rollback_failed'] ?? 0 );
 		$status  = ( $skipped > 0 || $failed > 0 ) ? BulkJobStatus::PartiallyRolledBack : BulkJobStatus::RolledBack;
-		$this->jobs->save_job( $job->with_status( $status ) );
+		$this->jobs->save_job( $fresh->with_status( $status ) );
 		$this->queue->cancel_job_ticks( (int) $job->id );
+	}
+
+	/**
+	 * Keep one representative example per target. Preview then apply must not
+	 * append the same product twice.
+	 *
+	 * @param list<array<string, mixed>> $examples
+	 * @param array<string, mixed>       $result
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	private function append_representative_example( array $examples, BulkJobItem $item, array $result ): array {
+		foreach ( $examples as $example ) {
+			if (
+				(string) ( $example['target_type'] ?? '' ) === $item->target_type
+				&& (int) ( $example['target_id'] ?? 0 ) === $item->target_id
+			) {
+				return $examples;
+			}
+		}
+		if ( count( $examples ) >= 8 ) {
+			return $examples;
+		}
+		$examples[] = [
+			'target_type'  => $item->target_type,
+			'target_id'    => $item->target_id,
+			'external_key' => $item->external_key,
+			'outcome'      => $result['outcome'] ?? null,
+			'error_code'   => $result['error_code'] ?? null,
+		];
+
+		return $examples;
 	}
 
 	private function requeue_if_needed( BulkJob $job, float $started ): void {

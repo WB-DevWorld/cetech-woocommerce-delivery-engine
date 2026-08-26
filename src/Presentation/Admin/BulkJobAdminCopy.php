@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Admin;
 
+use CetechDeliveryEngine\Domain\Bulk\BulkJob;
 use CetechDeliveryEngine\Domain\Enum\BulkJobItemStatus;
 use CetechDeliveryEngine\Domain\Enum\BulkJobStatus;
 use CetechDeliveryEngine\Domain\Enum\BulkOperationType;
@@ -48,7 +49,19 @@ final class BulkJobAdminCopy {
 		};
 	}
 
-	public static function item_status_label( BulkJobItemStatus $status, bool $dry_run ): string {
+	public static function item_status_label( BulkJobItemStatus $status, bool $dry_run, bool $rollback = false ): string {
+		if ( $rollback ) {
+			return match ( $status ) {
+				BulkJobItemStatus::RolledBack => __( 'Restored', 'cetech-woocommerce-delivery-engine' ),
+				BulkJobItemStatus::RollbackSkipped => __( 'Skipped / conflict', 'cetech-woocommerce-delivery-engine' ),
+				BulkJobItemStatus::RollbackFailed => __( 'Failed', 'cetech-woocommerce-delivery-engine' ),
+				BulkJobItemStatus::Pending => __( 'Waiting', 'cetech-woocommerce-delivery-engine' ),
+				BulkJobItemStatus::Claimed => __( 'In progress', 'cetech-woocommerce-delivery-engine' ),
+				BulkJobItemStatus::Cancelled => __( 'Cancelled', 'cetech-woocommerce-delivery-engine' ),
+				default => self::item_status_label( $status, false ),
+			};
+		}
+
 		if ( $dry_run ) {
 			return match ( $status ) {
 				BulkJobItemStatus::Changed => __( 'Would change', 'cetech-woocommerce-delivery-engine' ),
@@ -99,6 +112,84 @@ final class BulkJobAdminCopy {
 		];
 	}
 
+	/**
+	 * @return list<array{key: string, label: string}>
+	 */
+	public static function counter_labels_for_job( BulkJob $job ): array {
+		if ( BulkOperationType::Rollback === $job->operation_type ) {
+			return [
+				[ 'key' => 'total', 'label' => __( 'Total', 'cetech-woocommerce-delivery-engine' ) ],
+				[ 'key' => 'restored', 'label' => __( 'Restored', 'cetech-woocommerce-delivery-engine' ) ],
+				[ 'key' => 'skipped', 'label' => __( 'Skipped / conflict', 'cetech-woocommerce-delivery-engine' ) ],
+				[ 'key' => 'failed', 'label' => __( 'Failed', 'cetech-woocommerce-delivery-engine' ) ],
+				[ 'key' => 'warnings', 'label' => __( 'Warnings', 'cetech-woocommerce-delivery-engine' ) ],
+			];
+		}
+
+		return self::counter_labels( $job->dry_run );
+	}
+
+	/**
+	 * Generic job-row counters plus rollback-specific summary fields.
+	 *
+	 * Rollback: processed_count = restored + skipped + failed. changed_count stays 0.
+	 *
+	 * @return array<string, int>
+	 */
+	public static function counter_values( BulkJob $job ): array {
+		if ( BulkOperationType::Rollback === $job->operation_type ) {
+			$restored = (int) ( $job->summary['rollback_restored'] ?? 0 );
+			$skipped  = (int) ( $job->summary['rollback_skipped'] ?? $job->skipped_count );
+			$failed   = (int) ( $job->summary['rollback_failed'] ?? $job->failed_count );
+
+			return [
+				'total'     => $job->total_count,
+				'restored'  => $restored,
+				'skipped'   => $skipped,
+				'failed'    => $failed,
+				'warnings'  => $job->warning_count,
+			];
+		}
+
+		return [
+			'total'    => $job->total_count,
+			'changed'  => $job->changed_count,
+			'skipped'  => $job->skipped_count,
+			'failed'   => $job->failed_count,
+			'warnings' => $job->warning_count,
+		];
+	}
+
+	public static function job_result_heading( BulkJob $job ): string {
+		if ( BulkOperationType::Rollback === $job->operation_type ) {
+			return __( 'Rollback result', 'cetech-woocommerce-delivery-engine' );
+		}
+
+		return $job->dry_run
+			? __( 'Preview result', 'cetech-woocommerce-delivery-engine' )
+			: __( 'Applied result', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function compare_after_heading( BulkJob $job ): string {
+		if ( BulkOperationType::Rollback === $job->operation_type ) {
+			return $job->status->is_terminal()
+				? __( 'Restored', 'cetech-woocommerce-delivery-engine' )
+				: __( 'Will restore', 'cetech-woocommerce-delivery-engine' );
+		}
+
+		return $job->dry_run
+			? __( 'Proposed', 'cetech-woocommerce-delivery-engine' )
+			: __( 'Applied', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function copy_phase( BulkJob $job ): string {
+		if ( BulkOperationType::Rollback === $job->operation_type ) {
+			return 'rollback';
+		}
+
+		return $job->dry_run ? 'preview' : 'applied';
+	}
+
 	public static function shows_cancel_remaining( BulkJobStatus $status ): bool {
 		return $status->is_active_worker_state();
 	}
@@ -142,9 +233,29 @@ final class BulkJobAdminCopy {
 		return __( 'These counters are the actual applied result.', 'cetech-woocommerce-delivery-engine' );
 	}
 
-	public static function variation_policy_notice( BulkVariationPolicy $policy ): string {
+	public static function rollback_notice( bool $completed ): string {
+		return $completed
+			? __( 'These counters are the rollback result. Restored items returned to their previous Delivery Engine settings.', 'cetech-woocommerce-delivery-engine' )
+			: __( 'Rollback is queued. Settings have not been restored yet.', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function variation_policy_notice( BulkVariationPolicy $policy, string $phase = 'preview' ): string {
+		if ( 'rollback' === $phase ) {
+			return __( 'Existing variation overrides were preserved. The Product configuration was restored to its previous inheritance state. Inheriting Variations again resolve through the restored Product/Site-wide configuration.', 'cetech-woocommerce-delivery-engine' );
+		}
+
+		if ( 'applied' === $phase ) {
+			return match ( $policy ) {
+				BulkVariationPolicy::PreserveOverrides => __( 'Existing variation overrides were preserved. Variations that inherit this Product now use the updated Product settings through inheritance. No Variation override rows were created unless a Variation was directly targeted.', 'cetech-woocommerce-delivery-engine' ),
+				BulkVariationPolicy::ParentOnly => __( 'Only parent product settings were targeted. Variation-specific settings were not written by this job.', 'cetech-woocommerce-delivery-engine' ),
+				BulkVariationPolicy::ResetVariationsToParent => __( 'After the parent change, variations were restored to inherit from the product. That is inheritance, not copying today’s product values into each variation.', 'cetech-woocommerce-delivery-engine' ),
+				BulkVariationPolicy::ParentAndInheriting => __( 'The parent product and variations that inherit it were affected. Variations with their own override stayed unchanged unless they were direct targets.', 'cetech-woocommerce-delivery-engine' ),
+				BulkVariationPolicy::SelectedVariations => __( 'Only the selected variations were targeted.', 'cetech-woocommerce-delivery-engine' ),
+			};
+		}
+
 		return match ( $policy ) {
-			BulkVariationPolicy::PreserveOverrides => __( 'Existing variation overrides will be preserved. Variations that inherit this product would use the proposed product settings through inheritance. This preview does not write variation rows unless a variation is a direct target.', 'cetech-woocommerce-delivery-engine' ),
+			BulkVariationPolicy::PreserveOverrides => __( 'Existing variation overrides will be preserved. Variations that inherit this product would use the proposed Product settings. This preview does not write variation rows.', 'cetech-woocommerce-delivery-engine' ),
 			BulkVariationPolicy::ParentOnly => __( 'Only parent product settings are targeted. Variation-specific settings are not written by this job.', 'cetech-woocommerce-delivery-engine' ),
 			BulkVariationPolicy::ResetVariationsToParent => __( 'After the parent change, variations would be restored to inherit from the product. That is inheritance, not copying today’s product values into each variation.', 'cetech-woocommerce-delivery-engine' ),
 			BulkVariationPolicy::ParentAndInheriting => __( 'The parent product and variations that inherit it would be affected. Variations with their own override stay unchanged unless they are direct targets.', 'cetech-woocommerce-delivery-engine' ),
@@ -152,31 +263,65 @@ final class BulkJobAdminCopy {
 		};
 	}
 
-	public static function variation_inherit_count_note( int $inherit, int $override ): string {
+	public static function variation_inherit_count_note( int $inherit, int $override, string $phase = 'preview' ): string {
 		$parts = [];
 		if ( $inherit > 0 ) {
-			$parts[] = sprintf(
-				/* translators: %d: variation count */
-				_n(
-					'%d variation inherits this product and would therefore be affected through inheritance.',
-					'%d variations inherit this product and would therefore be affected through inheritance.',
-					$inherit,
-					'cetech-woocommerce-delivery-engine'
+			$parts[] = match ( $phase ) {
+				'applied' => sprintf(
+					/* translators: %d: variation count */
+					_n(
+						'%d variation inherits this product and now uses the updated product settings through inheritance.',
+						'%d variations inherit this product and now use the updated product settings through inheritance.',
+						$inherit,
+						'cetech-woocommerce-delivery-engine'
+					),
+					$inherit
 				),
-				$inherit
-			);
+				'rollback' => sprintf(
+					/* translators: %d: variation count */
+					_n(
+						'%d inheriting variation again resolves through the restored Product or Site-wide configuration.',
+						'%d inheriting variations again resolve through the restored Product or Site-wide configuration.',
+						$inherit,
+						'cetech-woocommerce-delivery-engine'
+					),
+					$inherit
+				),
+				default => sprintf(
+					/* translators: %d: variation count */
+					_n(
+						'%d variation inherits this product and would therefore be affected through inheritance.',
+						'%d variations inherit this product and would therefore be affected through inheritance.',
+						$inherit,
+						'cetech-woocommerce-delivery-engine'
+					),
+					$inherit
+				),
+			};
 		}
 		if ( $override > 0 ) {
-			$parts[] = sprintf(
-				/* translators: %d: variation count */
-				_n(
-					'%d variation has its own override and will remain unchanged.',
-					'%d variations have their own override and will remain unchanged.',
-					$override,
-					'cetech-woocommerce-delivery-engine'
+			$parts[] = match ( $phase ) {
+				'applied', 'rollback' => sprintf(
+					/* translators: %d: variation count */
+					_n(
+						'%d variation has its own override and remained unchanged.',
+						'%d variations have their own override and remained unchanged.',
+						$override,
+						'cetech-woocommerce-delivery-engine'
+					),
+					$override
 				),
-				$override
-			);
+				default => sprintf(
+					/* translators: %d: variation count */
+					_n(
+						'%d variation has its own override and will remain unchanged.',
+						'%d variations have their own override and will remain unchanged.',
+						$override,
+						'cetech-woocommerce-delivery-engine'
+					),
+					$override
+				),
+			};
 		}
 
 		return implode( ' ', $parts );

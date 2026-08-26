@@ -2,7 +2,7 @@
 
 **Status:** Authorised post-RC.6 development on `feat/post-rc6-bulk-tools`  
 **Protected baseline:** tagged `v1.0.0-rc.6` / schema `4` (immutable)  
-**This tree:** plugin identity `1.0.0-dev.bulk.5`, schema target **`5`**  
+**This tree:** plugin identity `1.0.0-dev.bulk.6`, schema target **`5`**  
 **Does not authorise:** Checkout Blocks, carrier APIs, shipment mass-edit, Stage 15, FLAIROC, retagging RC.6
 
 ## Problem

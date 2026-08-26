@@ -99,6 +99,9 @@ final class BulkJobEngine {
 			BulkJobItemStatus::Pending
 		);
 
+		$summary             = $job->summary;
+		$summary['examples'] = [];
+
 		$job = $job->with(
 			[
 				'dry_run'          => false,
@@ -111,6 +114,7 @@ final class BulkJobEngine {
 				'completed_at'     => null,
 				'error_code'       => null,
 				'error_summary'    => null,
+				'summary'          => $summary,
 			]
 		);
 		$job = $this->jobs->save_job( $job );

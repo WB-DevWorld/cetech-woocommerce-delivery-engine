@@ -1,7 +1,7 @@
 # Post-RC.6 Bulk Tools — Implementation
 
 **Branch:** `feat/post-rc6-bulk-tools`  
-**Plugin version:** `1.0.0-dev.bulk.5` (must not be packaged as RC.6)  
+**Plugin version:** `1.0.0-dev.bulk.6` (must not be packaged as RC.6)  
 **Schema:** target `5` (`cetech_de_db_version`)
 
 ## Engine
@@ -79,7 +79,7 @@ A selected-ID job may store the ID list once on `bulk_jobs.target_definition_jso
 - Recurring automatic catalog rules are intentionally not implemented.
 - Shipment bulk status edits are intentionally not implemented.
 - `assets/admin/bulk-tools.js` includes Catalog progressive disclosure plus 5-second job-detail polling (`tests/js/bulk-tools-catalog.test.js`).
-- Owner physical QA is not performed by Cursor. Previous untagged owner-QA packages `1.0.0-dev.bulk.2`, `1.0.0-dev.bulk.3`, and `1.0.0-dev.bulk.4` are immutable. Current untagged owner-QA package is `1.0.0-dev.bulk.5` (`cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.5.zip`, `1177819` bytes, SHA-256 `619345cf7dd52757a0f628d1018a70f534346f37b798e90cb1c8c420861698cc`, source `38a5fce24f1809657707e6c0b50f52e6b3fb5bfa`, schema `5`).
+- Owner physical QA is not performed by Cursor. Previous untagged owner-QA packages `1.0.0-dev.bulk.2`, `1.0.0-dev.bulk.3`, `1.0.0-dev.bulk.4`, and `1.0.0-dev.bulk.5` are immutable. Current untagged owner-QA package is `1.0.0-dev.bulk.6` (see `docs/POST-RC6-BULK-TOOLS-QUALIFICATION.md`).
 
 ## Jobs/History preview presentation (`1.0.0-dev.bulk.4`)
 
@@ -108,3 +108,16 @@ Owner accepted bulk.4 preview semantics and asked for a visual-consistency pass 
 - Empty Jobs/History explains the next action (Go to Catalog). Import and Charges empty/permission states follow the same empty-state component.
 - Technical details remain collapsed; JSON wraps/scrolls inside a padded panel.
 - Apply remains grouped with its batch-help copy. Cancel remaining work stays secondary.
+
+## Rollback counters and execution presentation (`1.0.0-dev.bulk.6`)
+
+Owner physical QA of `1.0.0-dev.bulk.5` proved Apply and Rollback behaviour (empty before snapshot restored true Product inheritance; `edited_after_job` still skips). The rollback job row left `processed_count = 0` while the item was `rolled_back` and `summary.rollback_restored = 1`, so the admin showed **Rolled back · 0 / 1**.
+
+This repair does **not** change rollback conflict rules, schema 5, inheritance, the resolver, Action Scheduler, or batch size.
+
+- Rollback generic mapping: `processed_count = rollback_restored + rollback_skipped + rollback_failed`. `changed_count` stays 0.
+- Unexpected restore exceptions are recorded as `rollback_failed` (`rollback_exception`) instead of aborting the tick.
+- Normal admin rollback counters: Total / Restored / Skipped / conflict / Failed / Warnings.
+- Queued rollback compare heading is **Will restore**, not Applied. Completed rollback uses **Restored**.
+- Variation-impact copy is state-aware (preview / applied / rollback). Preview-only “does not write variation rows” is not shown after a write.
+- Apply clears `summary.examples` and the worker will not append the same target twice.

@@ -346,8 +346,138 @@ final class BulkJobEngineTest extends TestCase {
 		self::assertSame( BulkJobStatus::PartiallyRolledBack, $rollback?->status );
 		self::assertSame( 1, $rollback?->summary['rollback_restored'] ?? 0 );
 		self::assertSame( 1, $rollback?->summary['rollback_skipped'] ?? 0 );
+		self::assertSame( 2, $rollback?->processed_count );
+		self::assertSame( 2, $rollback?->total_count );
+		self::assertSame( 0, $rollback?->changed_count );
 		self::assertNull( $this->scopes->findByScopeAndSlice( ConfigurationScopeType::Product, 40, '' ) );
 		self::assertSame( 'manual', $this->scopes->findByScopeAndSlice( ConfigurationScopeType::Product, 41, '' )?->scalars[ ConfigurationFieldKey::ESTIMATED_DELIVERY ]->value );
+	}
+
+	public function test_successful_rollback_counts_processed_and_restores_empty_scope_inheritance(): void {
+		$this->add_products( [ 80 ] );
+		$job = $this->engine->create_preview(
+			BulkOperationType::CatalogUpdate,
+			1,
+			$this->selected( [ 80 ] ),
+			$this->set_international()
+		);
+		$this->drain();
+		$this->engine->apply( (int) $job->id, 1 );
+		$this->drain();
+		self::assertNotNull( $this->scopes->findByScopeAndSlice( ConfigurationScopeType::Product, 80, '' ) );
+
+		$rollback = $this->engine->rollback( (int) $job->id, 1 );
+		$this->drain();
+		$rollback = $this->engine->find( (int) $rollback->id );
+
+		self::assertSame( BulkJobStatus::RolledBack, $rollback?->status );
+		self::assertSame( 1, $rollback?->total_count );
+		self::assertSame( 1, $rollback?->enumerated_count );
+		self::assertSame( 1, $rollback?->processed_count );
+		self::assertSame( 0, $rollback?->changed_count );
+		self::assertSame( 1, $rollback?->summary['rollback_restored'] ?? 0 );
+		self::assertSame( 0, $rollback?->summary['rollback_skipped'] ?? 0 );
+		self::assertSame( 0, $rollback?->summary['rollback_failed'] ?? 0 );
+		self::assertNull( $this->scopes->findByScopeAndSlice( ConfigurationScopeType::Product, 80, '' ) );
+	}
+
+	public function test_mixed_rollback_processed_equals_restored_skipped_and_failed(): void {
+		$this->add_products( [ 81, 82, 83 ] );
+		$job = $this->engine->create_preview(
+			BulkOperationType::CatalogUpdate,
+			1,
+			$this->selected( [ 81, 82, 83 ] ),
+			$this->set_international()
+		);
+		$this->drain();
+		$this->engine->apply( (int) $job->id, 1 );
+		$this->drain();
+
+		$this->scopes->saveScopedConfiguration(
+			new ScopedConfiguration(
+				new ConfigurationScope( null, ConfigurationScopeType::Product, 82, '', null, RecordStatus::Active, 1, ConfigurationSource::Native, null ),
+				[
+					ConfigurationFieldKey::FULFILMENT_AVAILABILITY => ScalarFieldInstruction::override(
+						ConfigurationFieldKey::FULFILMENT_AVAILABILITY,
+						FulfilmentAvailability::InWarehouse->value
+					),
+					ConfigurationFieldKey::FULFILMENT_CHOICE => ScalarFieldInstruction::override(
+						ConfigurationFieldKey::FULFILMENT_CHOICE,
+						FulfilmentChoice::Delivery->value
+					),
+					ConfigurationFieldKey::LOGISTICS_PROFILE_ID => ScalarFieldInstruction::override( ConfigurationFieldKey::LOGISTICS_PROFILE_ID, 10 ),
+					ConfigurationFieldKey::SUPPLIER_ID => ScalarFieldInstruction::override( ConfigurationFieldKey::SUPPLIER_ID, 20 ),
+					ConfigurationFieldKey::ORIGIN_ID => ScalarFieldInstruction::override( ConfigurationFieldKey::ORIGIN_ID, 30 ),
+					ConfigurationFieldKey::PRIORITY => ScalarFieldInstruction::override( ConfigurationFieldKey::PRIORITY, 10 ),
+					ConfigurationFieldKey::ESTIMATED_DELIVERY => ScalarFieldInstruction::override( ConfigurationFieldKey::ESTIMATED_DELIVERY, 'manual' ),
+				],
+				[
+					ConfigurationFieldKey::DELIVERY_OFFER_IDS => CollectionFieldInstruction::replace( ConfigurationFieldKey::DELIVERY_OFFER_IDS, [ 11 ] ),
+				]
+			)
+		);
+
+		$rollback = $this->engine->rollback( (int) $job->id, 1 );
+		$broken   = $this->jobs->find_item( (int) $rollback->id, 'product', 83, 'SKU-83' );
+		self::assertNotNull( $broken );
+		$this->jobs->save_item(
+			$broken->with(
+				[
+					'before_snapshot' => [
+						'scalars'     => [
+							ConfigurationFieldKey::FULFILMENT_AVAILABILITY => [
+								'mode'  => 'not_a_real_mode',
+								'value' => 'x',
+							],
+						],
+						'collections' => [
+							ConfigurationFieldKey::DELIVERY_OFFER_IDS => [
+								'mode'    => 'replace',
+								'members' => [ 11 ],
+							],
+						],
+					],
+				]
+			)
+		);
+		$this->drain();
+		$rollback = $this->engine->find( (int) $rollback->id );
+
+		self::assertSame( BulkJobStatus::PartiallyRolledBack, $rollback?->status );
+		self::assertSame( 1, $rollback?->summary['rollback_restored'] ?? 0 );
+		self::assertSame( 1, $rollback?->summary['rollback_skipped'] ?? 0 );
+		self::assertSame( 1, $rollback?->summary['rollback_failed'] ?? 0 );
+		self::assertSame( 3, $rollback?->processed_count );
+		self::assertSame( 3, $rollback?->total_count );
+		self::assertSame( 0, $rollback?->changed_count );
+		self::assertNull( $this->scopes->findByScopeAndSlice( ConfigurationScopeType::Product, 81, '' ) );
+		self::assertSame( 'manual', $this->scopes->findByScopeAndSlice( ConfigurationScopeType::Product, 82, '' )?->scalars[ ConfigurationFieldKey::ESTIMATED_DELIVERY ]->value );
+		self::assertNotNull( $this->scopes->findByScopeAndSlice( ConfigurationScopeType::Product, 83, '' ) );
+	}
+
+	public function test_apply_does_not_append_duplicate_representative_examples(): void {
+		$this->add_products( [ 84 ] );
+		$job = $this->engine->create_preview(
+			BulkOperationType::CatalogUpdate,
+			1,
+			$this->selected( [ 84 ] ),
+			$this->set_international()
+		);
+		$this->drain();
+		$preview = $this->engine->find( (int) $job->id );
+		self::assertCount( 1, $preview?->summary['examples'] ?? [] );
+
+		$this->engine->apply( (int) $job->id, 1 );
+		$this->drain();
+		$applied  = $this->engine->find( (int) $job->id );
+		$examples = $applied?->summary['examples'] ?? [];
+		$keys     = [];
+		foreach ( $examples as $example ) {
+			$keys[] = (string) ( $example['target_type'] ?? '' ) . ':' . (string) ( $example['target_id'] ?? '' );
+		}
+
+		self::assertCount( 1, $examples );
+		self::assertSame( [ 'product:84' ], $keys );
 	}
 
 	public function test_duplicate_worker_claim_does_not_double_write(): void {

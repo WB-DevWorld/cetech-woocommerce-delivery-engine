@@ -199,6 +199,8 @@ final class BulkJobPreviewPresentationTest extends TestCase {
 		self::assertTrue( BulkJobStatus::Ready->allows_cancel() );
 		self::assertTrue( BulkJobStatus::Ready->allows_apply() );
 		self::assertStringContainsString( 'preserved', strtolower( BulkJobAdminCopy::variation_policy_notice( BulkVariationPolicy::PreserveOverrides ) ) );
+		self::assertStringContainsString( 'this preview does not write variation rows', strtolower( BulkJobAdminCopy::variation_policy_notice( BulkVariationPolicy::PreserveOverrides ) ) );
+		self::assertStringNotContainsString( 'now use the updated', strtolower( BulkJobAdminCopy::variation_policy_notice( BulkVariationPolicy::PreserveOverrides ) ) );
 	}
 
 	public function test_running_job_still_permits_cancel(): void {

@@ -2,7 +2,7 @@
 
 **Date:** 2026-08-22  
 **Branch:** `feat/post-rc6-bulk-tools`  
-**Plugin identity:** `1.0.0-dev.bulk.5` (must not be packaged as RC.6)  
+**Plugin identity:** `1.0.0-dev.bulk.6` (must not be packaged as RC.6)  
 **Result:** automated qualification **PASS**, plus Catalog admin UX repair **PASS** — not owner physical QA, not RC.6
 
 This record describes what actually ran. Disposable stack: `C:\Users\Jane\Desktop\Learning 2026\Cursor\cetech-de-bulk-tools-qual` (not FLAIROC, not committed into this repository).
@@ -350,7 +350,47 @@ Extracted verification: version `1.0.0-dev.bulk.5`, `SchemaVersion::TARGET = 5`,
 5. Narrow the wp-admin window: tabs usable, counters wrap, Current/Proposed stack, no horizontal overflow.
 6. Confirm storefront checkout is unchanged while flags remain off.
 
-## 16. Protected baselines (reconfirmed)
+## 16. Rollback counter / execution presentation (`1.0.0-dev.bulk.6`)
+
+Owner physical QA of immutable `1.0.0-dev.bulk.5` proved Apply and Rollback: `BULK-000001` applied 1/1; `BULK-000002` restored product `#49164` to true inheritance (no product scope, no Delivery Engine post meta). The rollback job row incorrectly kept `processed_count = 0`, so the UI showed **Rolled back · 0 / 1**. Preview wording also leaked onto applied/rollback screens, queued rollback used **Applied**, and `summary.examples` duplicated the same target.
+
+Rollback conflict rules were not changed. Empty before snapshot still deletes the Product override. `edited_after_job` still skips.
+
+### 16.1 Automated gates
+
+| Gate | Result |
+|------|--------|
+| Focused Bulk Tools PHPUnit | **PASS** (`BulkJobEngineTest`, `BulkJobRollbackPresentationTest`, `BulkJobPreviewPresentationTest`, `BulkToolsUiConsistencyTest`, `BulkCatalogAdminUxTest`, `BulkAdminPaginationAndManifestTest` — 51 tests, 243 assertions) |
+| PHPUnit default (Unit+Integration) | **677 tests, 3573 assertions, PASS** (5 deprecations) |
+| PHP lint `src/` + plugin root + uninstall | no syntax errors (375 files) |
+| Vitest | **15 tests, 3 files, PASS** |
+| Security suite | **not run** |
+
+### 16.2 Owner-QA package
+
+Do **not** overwrite `1.0.0-dev.bulk.5`. Untagged identity **`1.0.0-dev.bulk.6`**. Schema target **5**. Not RC.6. Not final. No release tag. Not deployed.
+
+| Item | Value |
+|------|--------|
+| Source commit | *recorded after commit* |
+| Filename | `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.6.zip` |
+| Bytes | *recorded after package* |
+| SHA-256 | *recorded after package* |
+| Schema target | `5` |
+| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.6.zip` |
+| Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.6.zip` |
+
+### 16.3 Short owner physical retest plan
+
+1. Install/replace with `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.6.zip` (do not use RC.6; do not reuse bulk.5 as the current package).
+2. Confirm schema still **5** and previous `BULK-000001` / `BULK-000002` history still present.
+3. Completed rollback job: **Rolled back · 1 / 1**; counters Total / Restored / Skipped / conflict / Failed; no **Changed** as the success label.
+4. Queued or waiting rollback item: **Current** shows the applied value; **Will restore** shows Site-wide / previous inheritance — not **Applied**.
+5. Applied catalog job variation note uses past tense and does not say “this preview does not write”.
+6. Confirm a later manual edit still skips rollback (`edited_after_job`).
+7. Confirm storefront checkout is unchanged while flags remain off.
+
+## 17. Protected baselines (reconfirmed)
 
 - RC.6 tag `v1.0.0-rc.6` peeled commit `8f37fe826e23406c9035312e279699b65c1e72e4` **unchanged**
 - RC.6 ZIP not rebuilt or retagged
