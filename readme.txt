@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-dev.bulk.7
+Stable tag: 1.0.0-dev.bulk.8
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,9 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-dev.bulk.8 =
+* Bulk Tools background-execution portability: async Action Scheduler enqueue, bounded admin continue, waiting/stale job states, and Needs Attention for stalled jobs. Schema remains 5. Not RC.6, not RC.7, not Stage 15. Historical 1.0.0-dev.bulk.7 is unchanged.
 
 = 1.0.0-dev.bulk.7 =
 * Combined post-RC.6 development stream: Bulk Tools schema 5 plus approved R1 admin/setup repairs, R1 QA.1 request-path repairs, and a single primary Create/Save action on Delivery Option and Delivery Area forms. Not RC.6, not RC.7, not Stage 15.

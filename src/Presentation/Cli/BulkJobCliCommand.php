@@ -77,6 +77,15 @@ final class BulkJobCliCommand {
 					\WP_CLI::success( $job->job_code . ' ' . $job->status->value );
 				}
 				/**
+				 * Process one bounded batch. Does not replace Action Scheduler.
+				 *
+				 * @param list<string> $args
+				 */
+				public function continue( array $args ): void {
+					$job = $this->engine->continue_job( (int) ( $args[0] ?? 0 ) );
+					\WP_CLI::success( $job->job_code . ' ' . $job->status->value . ' ' . $job->processed_count . '/' . $job->total_count );
+				}
+				/**
 				 * @param list<string> $args
 				 */
 				public function rollback( array $args ): void {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Admin;
 
+use CetechDeliveryEngine\Application\Bulk\BulkStaleJobQuery;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
 use CetechDeliveryEngine\Application\Configuration\OperationalState;
 use CetechDeliveryEngine\Application\Configuration\OperationalStateService;
@@ -35,7 +36,8 @@ final class NeedsAttentionPage {
 		private readonly ShipmentService $shipment_service,
 		private readonly FeatureFlags $flags,
 		private readonly ShipmentOperationsIssueQuery $operations_issues,
-		private readonly ?CodAwaitingShipmentQuery $cod_actions = null
+		private readonly ?CodAwaitingShipmentQuery $cod_actions = null,
+		private readonly ?BulkStaleJobQuery $bulk_stale = null
 	) {
 	}
 
@@ -86,13 +88,14 @@ final class NeedsAttentionPage {
 		$shipments  = $this->shipment_issues->list( 50 );
 		$operations = $this->operations_issues->list( 50 );
 		$cod        = $this->cod_action_items();
+		$bulk       = $this->bulk_stale_items();
 		$op         = $this->operational_state->current();
 
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
 			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Needs Attention', 'cetech-woocommerce-delivery-engine' ),
-			__( 'An operational to-do list for products that are missing a usable delivery setup, Cash on Delivery orders that need a shipment created, paid orders whose delivery shipments could not be created, and shipments that need fulfilment review.', 'cetech-woocommerce-delivery-engine' )
+			__( 'An operational to-do list for products that are missing a usable delivery setup, stalled Bulk Tools jobs, Cash on Delivery orders that need a shipment created, paid orders whose delivery shipments could not be created, and shipments that need fulfilment review.', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		if ( $op->customers_still_use_previous_rules() && ! $op->sitewide_setup_complete ) {
@@ -108,11 +111,12 @@ final class NeedsAttentionPage {
 		$this->render_cod_actions( $cod );
 		$this->render_shipment_issues( $shipments );
 		$this->render_operations_issues( $operations );
+		$this->render_bulk_stale( $bulk );
 
-		if ( [] === $items && [] === $shipments && [] === $operations && [] === $cod ) {
+		if ( [] === $items && [] === $shipments && [] === $operations && [] === $cod && [] === $bulk ) {
 			AdminPageLayout::render_empty_state(
 				__( 'Nothing needs attention', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Every listed product currently has a usable delivery setup, and no Cash on Delivery shipment, paid-order shipment creation, or operational shipment problems are waiting.', 'cetech-woocommerce-delivery-engine' )
+				__( 'Every listed product currently has a usable delivery setup, no stalled Bulk Tools jobs are waiting, and no Cash on Delivery shipment, paid-order shipment creation, or operational shipment problems are waiting.', 'cetech-woocommerce-delivery-engine' )
 			);
 			AdminPageLayout::close_page();
 			return;
@@ -175,6 +179,58 @@ final class NeedsAttentionPage {
 		}
 
 		return $this->cod_actions->list( 50 );
+	}
+
+	/**
+	 * @return list<\CetechDeliveryEngine\Domain\Bulk\BulkJob>
+	 */
+	private function bulk_stale_items(): array {
+		if ( ! current_user_can( 'manage_product_delivery_rules' ) || ! $this->bulk_stale instanceof BulkStaleJobQuery ) {
+			return [];
+		}
+
+		return $this->bulk_stale->list( 20 );
+	}
+
+	/**
+	 * @param list<\CetechDeliveryEngine\Domain\Bulk\BulkJob> $jobs
+	 */
+	private function render_bulk_stale( array $jobs ): void {
+		if ( [] === $jobs ) {
+			return;
+		}
+
+		echo '<h2>' . esc_html__( 'Bulk jobs waiting for background processing', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
+		echo '<p class="description">' . esc_html__( 'These catalog jobs have not advanced for ten minutes. Open the job and use Process next batch, or leave it for the site\'s background runner. Closing the browser did not cancel the job.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+
+		$rows = [];
+		foreach ( $jobs as $job ) {
+			$url = add_query_arg(
+				[
+					'page' => BulkToolsPage::SLUG,
+					'tab'  => 'jobs',
+					'job'  => (string) $job->id,
+				],
+				admin_url( 'admin.php' )
+			);
+			$rows[] = [
+				'<a href="' . esc_url( $url ) . '"><strong>' . esc_html( $job->job_code ) . '</strong></a>',
+				esc_html( BulkJobAdminCopy::public_status_label( $job ) ),
+				esc_html( (string) $job->processed_count . ' / ' . (string) $job->total_count ),
+				'<a class="button" href="' . esc_url( $url ) . '">' . esc_html__( 'Open job', 'cetech-woocommerce-delivery-engine' ) . '</a>',
+			];
+		}
+
+		AdminPageRenderer::render_table(
+			[
+				__( 'Job', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Status', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Progress', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Action', 'cetech-woocommerce-delivery-engine' ),
+			],
+			$rows,
+			true
+		);
 	}
 
 	/**

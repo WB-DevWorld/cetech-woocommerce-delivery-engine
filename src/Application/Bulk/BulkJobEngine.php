@@ -131,8 +131,10 @@ final class BulkJobEngine {
 		$job = $job->request_cancel();
 		$job = $this->jobs->save_job( $job );
 		$this->queue->enqueue_job_tick( $job_id );
+		$this->worker->tick( $job_id );
+		$fresh = $this->jobs->find_job( $job_id );
 
-		return $job;
+		return $fresh instanceof BulkJob ? $fresh : $job;
 	}
 
 	public function rollback( int $job_id, int $actor_user_id ): BulkJob {
@@ -203,6 +205,25 @@ final class BulkJobEngine {
 		if ( null !== $job_id ) {
 			$this->worker->tick( $job_id );
 		}
+	}
+
+	/**
+	 * Advance one bounded batch if the job is not claimed. Safe from wp-admin
+	 * AJAX / Resume. The browser never becomes the job store.
+	 */
+	public function continue_job( int $job_id ): BulkJob {
+		$job = $this->require_job( $job_id );
+		if ( $job->status->is_terminal() || $job->status->allows_apply() ) {
+			return $job;
+		}
+		if ( ! $job->status->is_active_worker_state() && BulkJobStatus::Draft !== $job->status ) {
+			return $job;
+		}
+
+		$this->worker->tick( $job_id );
+		$fresh = $this->jobs->find_job( $job_id );
+
+		return $fresh instanceof BulkJob ? $fresh : $job;
 	}
 
 	public function save_recipe( string $name, int $owner_user_id, array $target_definition, array $action_manifest ): BulkRecipe {

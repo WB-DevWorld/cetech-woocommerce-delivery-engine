@@ -57,6 +57,28 @@ if ( ! function_exists( 'wp_create_nonce' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_get_theme' ) ) {
+	function wp_get_theme() {
+		return new class() {
+			public function get_template(): string {
+				return (string) ( $GLOBALS['cetech_de_test_theme_template'] ?? 'default' );
+			}
+
+			public function get( string $header = '' ) {
+				return '';
+			}
+
+			public function get_stylesheet(): string {
+				return $this->get_template();
+			}
+
+			public function parent() {
+				return false;
+			}
+		};
+	}
+}
+
 if ( ! class_exists( 'WooCommerce', false ) && '1' !== getenv( 'CETECH_DE_DISABLE_WC_STUB' ) ) {
 	class WooCommerce {
 	}

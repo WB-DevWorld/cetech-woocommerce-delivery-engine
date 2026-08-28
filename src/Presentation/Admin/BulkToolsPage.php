@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Bulk\BulkJobEngine;
+use CetechDeliveryEngine\Application\Bulk\BulkJobRunnerState;
+use CetechDeliveryEngine\Application\Bulk\BulkQueueHealth;
 use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogActionManifest;
 use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogFieldAction;
 use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogTargetDefinition;
@@ -39,6 +41,8 @@ final class BulkToolsPage {
 
 	public const ACTION_ROLLBACK = 'cetech_de_bulk_rollback';
 
+	public const ACTION_CONTINUE = 'cetech_de_bulk_continue';
+
 	public const ACTION_CSV_PREVIEW = 'cetech_de_bulk_csv_preview';
 
 	public const ACTION_CONFIG_EXPORT = 'cetech_de_bulk_config_export';
@@ -58,7 +62,8 @@ final class BulkToolsPage {
 		private readonly ConfigurationExporter $exporter,
 		private readonly CatalogCsvMapper $csv,
 		private readonly ?CatalogCsvExportService $csv_export = null,
-		private readonly BulkCatalogAdminChoices $catalog_choices = new BulkCatalogAdminChoices()
+		private readonly BulkCatalogAdminChoices $catalog_choices = new BulkCatalogAdminChoices(),
+		private readonly ?BulkQueueHealth $queue_health = null
 	) {
 	}
 
@@ -132,6 +137,24 @@ final class BulkToolsPage {
 				$this->action_handler->notices()->flash_error( $exception->getMessage() );
 				$this->action_handler->redirect( self::SLUG, [ 'tab' => 'jobs' ] );
 			}
+			return;
+		}
+		if ( $this->action_handler->verify_post( self::ACTION_CONTINUE, self::ACTION_CONTINUE, 'manage_product_delivery_rules', self::SLUG ) ) {
+			$job_id = isset( $_POST['job_id'] ) ? absint( wp_unslash( (string) $_POST['job_id'] ) ) : 0;
+			try {
+				$job = $this->engine->continue_job( $job_id );
+				$this->action_handler->notices()->flash_success(
+					sprintf(
+						/* translators: %s job code */
+						__( 'Processed the next batch for %s. Remaining work stays in the background.', 'cetech-woocommerce-delivery-engine' ),
+						$job->job_code
+					)
+				);
+			} catch ( \Throwable $exception ) {
+				$this->action_handler->notices()->flash_error( $exception->getMessage() );
+			}
+			$this->action_handler->redirect( self::SLUG, [ 'job' => (string) $job_id, 'tab' => 'jobs' ] );
+			return;
 		}
 		if ( $this->action_handler->verify_post( self::ACTION_CSV_PREVIEW, self::ACTION_CSV_PREVIEW, 'import_delivery_data', self::SLUG ) ) {
 			$this->create_csv_preview_from_post();
@@ -492,7 +515,7 @@ final class BulkToolsPage {
 			$url = add_query_arg( [ 'page' => self::SLUG, 'tab' => 'jobs', 'job' => (string) $job->id ], admin_url( 'admin.php' ) );
 			echo '<tr><td><a href="' . esc_url( $url ) . '">' . esc_html( $job->job_code ) . '</a></td>';
 			echo '<td>' . esc_html( BulkJobAdminCopy::operation_label( $job->operation_type ) ) . '</td>';
-			echo '<td>' . esc_html( BulkJobAdminCopy::status_label( $job->status ) ) . '</td>';
+			echo '<td>' . esc_html( BulkJobAdminCopy::public_status_label( $job ) ) . '</td>';
 			echo '<td>' . esc_html( sprintf( '%d / %d', $job->processed_count, $job->total_count ) ) . '</td></tr>';
 		}
 		echo '</tbody></table></div>';
@@ -527,14 +550,18 @@ final class BulkToolsPage {
 		} else {
 			echo '<div class="notice notice-success inline cetech-de-bulk-notice" role="status"><p>' . esc_html( BulkJobAdminCopy::applied_notice() ) . '</p></div>';
 		}
+		$payload = BulkJobAdminCopy::progress_payload( $job );
+		$state   = BulkJobRunnerState::from_job( $job );
 		echo '<p class="cetech-de-bulk-job-status" role="status" aria-live="polite" data-cetech-de-job-id="' . esc_attr( (string) $job->id ) . '">' . esc_html(
 			sprintf(
 				'%s · %d / %d',
-				BulkJobAdminCopy::status_label( $job->status ),
+				$payload['status_label'],
 				$job->processed_count,
 				$job->total_count
 			)
 		) . '</p>';
+
+		echo '<div class="notice notice-info inline cetech-de-bulk-notice cetech-de-bulk-waiting-notice" role="status"' . ( $state->waiting_for_runner ? '' : ' hidden' ) . '><p>' . esc_html( BulkJobAdminCopy::waiting_notice() ) . '</p></div>';
 
 		$counts = BulkJobAdminCopy::counter_values( $job );
 		$stats  = [];
@@ -563,6 +590,17 @@ final class BulkToolsPage {
 		}
 		echo '</div>';
 		echo '<div class="cetech-de-bulk-actions-secondary">';
+		if ( $job->status->is_active_worker_state() ) {
+			$resume_hidden = $state->can_resume ? '' : ' hidden';
+			$this->job_button(
+				self::ACTION_CONTINUE,
+				$job->id,
+				BulkJobAdminCopy::resume_label(),
+				false,
+				'data-cetech-de-resume-now',
+				$resume_hidden
+			);
+		}
 		if ( BulkJobAdminCopy::shows_cancel_remaining( $job->status ) ) {
 			$this->job_button(
 				self::ACTION_CANCEL,
@@ -583,6 +621,15 @@ final class BulkToolsPage {
 		echo '<div class="cetech-de-bulk-technical">';
 		echo '<p>' . esc_html__( 'Machine job type', 'cetech-woocommerce-delivery-engine' ) . ': <code>' . esc_html( $job->operation_type->value ) . '</code></p>';
 		echo '<p>' . esc_html__( 'Machine status', 'cetech-woocommerce-delivery-engine' ) . ': <code>' . esc_html( $job->status->value ) . '</code></p>';
+		echo '<p>' . esc_html__( 'Last updated (UTC)', 'cetech-woocommerce-delivery-engine' ) . ': <code>' . esc_html( (string) $job->updated_at ) . '</code></p>';
+		echo '<p>' . esc_html__( 'Worker claim', 'cetech-woocommerce-delivery-engine' ) . ': <code>' . esc_html( $state->claimed ? 'active' : 'none' ) . '</code></p>';
+		if ( $this->queue_health instanceof BulkQueueHealth ) {
+			$health = $this->queue_health->snapshot();
+			echo '<p>' . esc_html__( 'Background queue', 'cetech-woocommerce-delivery-engine' ) . ': <code>' . esc_html( ! empty( $health['available'] ) ? 'available' : 'unavailable' ) . '</code></p>';
+			echo '<p>' . esc_html__( 'Immediate async enqueue', 'cetech-woocommerce-delivery-engine' ) . ': <code>' . esc_html( ! empty( $health['async_enqueue_supported'] ) ? 'yes' : 'no' ) . '</code></p>';
+			echo '<p>' . esc_html__( 'WordPress cron disabled', 'cetech-woocommerce-delivery-engine' ) . ': <code>' . esc_html( ! empty( $health['wp_cron_disabled'] ) ? 'yes' : 'no' ) . '</code></p>';
+			echo '<p>' . esc_html__( 'Stale bulk jobs', 'cetech-woocommerce-delivery-engine' ) . ': <code>' . esc_html( (string) ( $health['stale_job_count'] ?? 0 ) ) . '</code></p>';
+		}
 		echo '<pre>' . esc_html( wp_json_encode( $job->summary, JSON_PRETTY_PRINT ) ?: '' ) . '</pre>';
 		echo '</div>';
 		AdminPageLayout::close_technical_details();
@@ -793,12 +840,12 @@ final class BulkToolsPage {
 		}
 	}
 
-	private function job_button( string $action, ?int $job_id, string $label, bool $primary, string $marker = '' ): void {
+	private function job_button( string $action, ?int $job_id, string $label, bool $primary, string $marker = '', string $hidden = '' ): void {
 		$extra = '';
-		if ( 'data-cetech-de-apply-preview' === $marker || 'data-cetech-de-cancel-remaining' === $marker ) {
+		if ( in_array( $marker, [ 'data-cetech-de-apply-preview', 'data-cetech-de-cancel-remaining', 'data-cetech-de-resume-now' ], true ) ) {
 			$extra = ' ' . $marker;
 		}
-		echo '<form method="post" class="cetech-de-bulk-job-action"' . $extra . '>';
+		echo '<form method="post" class="cetech-de-bulk-job-action"' . $extra . $hidden . '>';
 		wp_nonce_field( $action, 'cetech_de_nonce' );
 		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( $action ) . '" />';
 		echo '<input type="hidden" name="job_id" value="' . esc_attr( (string) $job_id ) . '" />';

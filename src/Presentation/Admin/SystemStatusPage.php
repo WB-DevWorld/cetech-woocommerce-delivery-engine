@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Admin;
 
+use CetechDeliveryEngine\Application\Bulk\BulkQueueHealth;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
 use CetechDeliveryEngine\Application\Checkout\CheckoutDeliverySelectionValidator;
@@ -71,7 +72,8 @@ final class SystemStatusPage {
 		private OriginRepositoryInterface $origin_repository,
 		private RateCardRepositoryInterface $rate_card_repository,
 		private ProductDeliveryRuleRepositoryInterface $product_rule_repository,
-		private ConfigurationHealthChecker $configuration_health_checker
+		private ConfigurationHealthChecker $configuration_health_checker,
+		private ?BulkQueueHealth $bulk_queue_health = null
 	) {
 	}
 
@@ -258,6 +260,7 @@ final class SystemStatusPage {
 		);
 
 		$this->render_configuration_health();
+		$this->render_bulk_queue_health();
 
 		$flag_rows = [];
 
@@ -396,6 +399,34 @@ final class SystemStatusPage {
 		}
 
 		return implode( ' · ', $parts );
+	}
+
+	private function render_bulk_queue_health(): void {
+		if ( ! $this->bulk_queue_health instanceof BulkQueueHealth ) {
+			return;
+		}
+
+		$health = $this->bulk_queue_health->snapshot();
+		$scheduler = (string) ( $health['scheduler_health'] ?? 'unknown' );
+		$scheduler_label = match ( $scheduler ) {
+			'unavailable' => __( 'Unavailable', 'cetech-woocommerce-delivery-engine' ),
+			'not_running' => __( 'Apparently not running', 'cetech-woocommerce-delivery-engine' ),
+			default => __( 'Available', 'cetech-woocommerce-delivery-engine' ),
+		};
+
+		$this->render_table(
+			__( 'Bulk background processing', 'cetech-woocommerce-delivery-engine' ),
+			[
+				__( 'Background queue available', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( ! empty( $health['available'] ) ),
+				__( 'Immediate async enqueue supported', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( ! empty( $health['async_enqueue_supported'] ) ),
+				__( 'WordPress cron disabled', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( ! empty( $health['wp_cron_disabled'] ) ),
+				__( 'Queue scheduled (pending actions)', 'cetech-woocommerce-delivery-engine' ) => (string) ( $health['pending_actions'] ?? 0 ),
+				__( 'Active bulk jobs', 'cetech-woocommerce-delivery-engine' ) => (string) ( $health['active_jobs'] ?? 0 ),
+				__( 'Stale queued jobs', 'cetech-woocommerce-delivery-engine' ) => (string) ( $health['stale_job_count'] ?? 0 ),
+				__( 'Last worker activity (UTC)', 'cetech-woocommerce-delivery-engine' ) => (string) ( $health['last_worker_activity'] ?? '—' ),
+				__( 'Scheduler health', 'cetech-woocommerce-delivery-engine' ) => $scheduler_label,
+			]
+		);
 	}
 
 	private function render_table( string $title, array $rows ): void {
@@ -680,6 +711,20 @@ final class SystemStatusPage {
 				$title = is_object( $item ) && isset( $item->title ) ? (string) $item->title : (string) ( $item['title'] ?? 'Issue' );
 				$lines[] = '- ' . $title;
 			}
+		}
+
+		$lines[] = '';
+		$lines[] = 'Bulk background processing';
+		if ( $this->bulk_queue_health instanceof BulkQueueHealth ) {
+			$health = $this->bulk_queue_health->snapshot();
+			$lines[] = 'queue available: ' . ( ! empty( $health['available'] ) ? 'yes' : 'no' );
+			$lines[] = 'async enqueue: ' . ( ! empty( $health['async_enqueue_supported'] ) ? 'yes' : 'no' );
+			$lines[] = 'wp cron disabled: ' . ( ! empty( $health['wp_cron_disabled'] ) ? 'yes' : 'no' );
+			$lines[] = 'pending actions: ' . (string) ( $health['pending_actions'] ?? 0 );
+			$lines[] = 'stale jobs: ' . (string) ( $health['stale_job_count'] ?? 0 );
+			$lines[] = 'scheduler health: ' . (string) ( $health['scheduler_health'] ?? 'unknown' );
+		} else {
+			$lines[] = 'Not collected.';
 		}
 
 		$lines[] = '';

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Tests\Integration;
 
 use CetechDeliveryEngine\Bootstrap\Plugin;
+use CetechDeliveryEngine\Core\FeaturesCompatibility;
 use CetechDeliveryEngine\Infrastructure\Persistence\ConfigurationTables;
 use CetechDeliveryEngine\Tests\Unit\Shipment\FakeWpdb;
 use ReflectionClass;
@@ -49,6 +50,7 @@ final class LifecycleHarness {
 		$GLOBALS['wpdb'] = $wpdb;
 
 		self::reset_plugin_singleton();
+		self::reset_features_compatibility();
 
 		return $wpdb;
 	}
@@ -79,6 +81,17 @@ final class LifecycleHarness {
 		}
 
 		$instance->setValue( null, null );
+	}
+
+	private static function reset_features_compatibility(): void {
+		$reflection = new ReflectionClass( FeaturesCompatibility::class );
+		$registered = $reflection->getProperty( 'hpos_hook_registered' );
+
+		if ( \PHP_VERSION_ID < 80500 ) {
+			$registered->setAccessible( true );
+		}
+
+		$registered->setValue( null, false );
 	}
 
 	private static function define_paths(): void {

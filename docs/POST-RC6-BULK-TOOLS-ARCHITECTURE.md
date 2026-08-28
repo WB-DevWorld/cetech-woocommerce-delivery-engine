@@ -1,8 +1,8 @@
 # Post-RC.6 Bulk Tools — Architecture
 
-**Status:** Authorised post-RC.6 development on `feat/post-rc6-bulk-tools`  
+**Status:** Authorised post-RC.6 development on `integration/post-rc6-bulk-r1`  
 **Protected baseline:** tagged `v1.0.0-rc.6` / schema `4` (immutable)  
-**This tree:** plugin identity `1.0.0-dev.bulk.6`, schema target **`5`**  
+**This tree:** plugin identity `1.0.0-dev.bulk.8`, schema target **`5`**  
 **Does not authorise:** Checkout Blocks, carrier APIs, shipment mass-edit, Stage 15, FLAIROC, retagging RC.6
 
 ## Problem
@@ -38,9 +38,11 @@ There is **no second resolver**. Dry-run uses `OverlayScopedConfigurationReposit
 
 ### Logical operation vs physical batches
 
-Creating a job never walks the catalog. Workers process bounded batches (default **25**), keyset-paginate (`ID > cursor`), claim items with TTL, and requeue. The browser is not the runner. If Action Scheduler is unavailable the job **fails safe** (`background_queue_unavailable`) and does **not** fall back to a synchronous 20,000-item loop.
+Creating a job never walks the catalog. Workers process bounded batches (default **25**), keyset-paginate (`ID > cursor`), claim items with TTL, and requeue. The browser is **not** the authoritative job store. If Action Scheduler is unavailable the job **fails safe** (`background_queue_unavailable`) and does **not** fall back to a synchronous 20,000-item loop.
 
-Action Scheduler group: `cetech-delivery-engine-bulk`. Hook: `cetech_de_bulk_job_tick`. Payload: job ID only.
+Action Scheduler group: `cetech-delivery-engine-bulk`. Hook: `cetech_de_bulk_job_tick`. Payload: job ID only. Enqueue prefers `as_enqueue_async_action` and a best-effort async runner kick so ordinary jobs do not wait solely on an unknown host cron cadence. If a runner has not advanced an unclaimed job within a short threshold, the open Bulk Tools job page may advance **one** bounded batch (AJAX continue / Process next batch), including after a previous batch already ran. Closing the browser does not cancel the durable job.
+
+Portable execution details: `docs/POST-RC6-BULK-BACKGROUND-PORTABILITY.md`.
 
 Complete export uses `EntityKeysetPager` (`page_after`, page size 100, max 250). Admin `list()` remains a screen cap and is not the export path.
 

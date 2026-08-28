@@ -104,6 +104,8 @@ use CetechDeliveryEngine\Infrastructure\Persistence\WpdbSupplierRepository;
 use CetechDeliveryEngine\Integrations\Registry\IntegrationRegistry;
 use CetechDeliveryEngine\Application\Bulk\BulkJobEngine;
 use CetechDeliveryEngine\Application\Bulk\BulkJobWorker;
+use CetechDeliveryEngine\Application\Bulk\BulkQueueHealth;
+use CetechDeliveryEngine\Application\Bulk\BulkStaleJobQuery;
 use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogScopeMutator;
 use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogTargetQueryInterface;
 use CetechDeliveryEngine\Application\Bulk\Catalog\WooCommerceCatalogTargetQuery;
@@ -1136,7 +1138,8 @@ final class Plugin {
 				$container->get( ShipmentService::class ),
 				$container->get( FeatureFlags::class ),
 				$container->get( ShipmentOperationsIssueQuery::class ),
-				$container->get( CodAwaitingShipmentQuery::class )
+				$container->get( CodAwaitingShipmentQuery::class ),
+				$container->get( BulkStaleJobQuery::class )
 			)
 		);
 
@@ -1191,7 +1194,8 @@ final class Plugin {
 				$container->get( OriginRepositoryInterface::class ),
 				$container->get( RateCardRepositoryInterface::class ),
 				$container->get( ProductDeliveryRuleRepositoryInterface::class ),
-				$container->get( ConfigurationHealthChecker::class )
+				$container->get( ConfigurationHealthChecker::class ),
+				$container->get( BulkQueueHealth::class )
 			)
 		);
 
@@ -1353,6 +1357,22 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			BulkStaleJobQuery::class,
+			static fn ( ServiceContainer $container ): BulkStaleJobQuery => new BulkStaleJobQuery(
+				$container->get( BulkJobRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			BulkQueueHealth::class,
+			static fn ( ServiceContainer $container ): BulkQueueHealth => new BulkQueueHealth(
+				$container->get( BackgroundQueueInterface::class ),
+				$container->get( BulkJobRepositoryInterface::class ),
+				$container->get( BulkStaleJobQuery::class )
+			)
+		);
+
+		$this->container->singleton(
 			ConfigurationExporter::class,
 			static fn ( ServiceContainer $container ): ConfigurationExporter => new ConfigurationExporter(
 				$container->get( DeliveryOfferRepositoryInterface::class ),
@@ -1398,7 +1418,8 @@ final class Plugin {
 				$container->get( ConfigurationExporter::class ),
 				$container->get( CatalogCsvMapper::class ),
 				$container->get( CatalogCsvExportService::class ),
-				$container->get( BulkCatalogAdminChoices::class )
+				$container->get( BulkCatalogAdminChoices::class ),
+				$container->get( BulkQueueHealth::class )
 			)
 		);
 
@@ -1607,7 +1628,8 @@ final class Plugin {
 				$container->get( ShipmentCreationIssueQuery::class ),
 				$container->get( ShipmentOperationsIssueQuery::class ),
 				$container->get( FeatureFlags::class ),
-				$container->get( CodAwaitingShipmentQuery::class )
+				$container->get( CodAwaitingShipmentQuery::class ),
+				$container->get( BulkStaleJobQuery::class )
 			)
 		);
 

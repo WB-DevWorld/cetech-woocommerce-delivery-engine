@@ -5,7 +5,7 @@
 **Plugin:** CETECH WooCommerce Delivery Engine  
 **Current protected runtime baseline:** tagged `1.0.0-rc.6` (schema `4`)  
 **Previous protected published tag:** `1.0.0-rc.5` (schema `4`; **do not retag**)  
-**Current development tree schema target:** `5` on the authorised post-RC.6 combined Bulk Tools + R1 stream (`1.0.0-dev.bulk.7`, branch `integration/post-rc6-bulk-r1`). Tagged RC.6 remains schema `4`.  
+**Current development tree schema target:** `5` on the authorised post-RC.6 combined Bulk Tools + R1 stream (`1.0.0-dev.bulk.8`, branch `integration/post-rc6-bulk-r1`). Tagged RC.6 remains schema `4`.  
 **Text domain:** `cetech-woocommerce-delivery-engine`
 
 This file is the **canonical maintained rulebook**. It consolidates hard invariants from `docs/PROJECT-GOVERNANCE.md`, `docs/PROJECT-RULES.md`, owner-accepted RC.4 behaviour, and the Stage 14A architecture decisions.
@@ -914,6 +914,7 @@ Authorised only as a **post-RC.6** initiative. Not Stage 15. Not a rewrite of Cl
 17. Apply must retry items that failed during dry-run preview when those failures were reference order (for example Delivery Area rules after areas exist in the same package). Completed mutations remain idempotent.
 18. Action Scheduler payloads contain only the job identifier. They must not carry the catalog or the configuration package.
 19. Catalog targeting may use SQL candidate narrowing plus batched EffectiveConfigurationResolver evaluation. It must not load the whole catalog into PHP memory.
+20. Ordinary bulk jobs must not require a 1-minute host cron. Prefer Action Scheduler async enqueue plus a bounded admin continue. Host cron cadence is not product setup.
 
 See `docs/POST-RC6-BULK-TOOLS-ARCHITECTURE.md` and the qualification record `docs/POST-RC6-BULK-TOOLS-QUALIFICATION.md`.
 

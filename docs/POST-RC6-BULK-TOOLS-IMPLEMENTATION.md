@@ -1,14 +1,14 @@
 # Post-RC.6 Bulk Tools — Implementation
 
-**Branch:** `feat/post-rc6-bulk-tools`  
-**Plugin version:** `1.0.0-dev.bulk.6` (must not be packaged as RC.6)  
+**Historical identity:** `feat/post-rc6-bulk-tools` / `1.0.0-dev.bulk.6`  
+**Current tree:** `integration/post-rc6-bulk-r1` / `1.0.0-dev.bulk.8` (see `docs/POST-RC6-BULK-BACKGROUND-PORTABILITY.md` for the background-runner repair)  
 **Schema:** target `5` (`cetech_de_db_version`)
 
 ## Engine
 
 - `BulkJobEngine` — create preview, apply, cancel, rollback, recipes. Creating a job enqueues one tick; it does not mutate the catalog in the request.
 - `BulkJobWorker` + `BulkJobWorkerDispatch` — claim job, enumerate a page, claim items, mutate, checkpoint, requeue.
-- `InMemoryBoundedQueue` (tests) / `ActionSchedulerQueue` (production).
+- `InMemoryBoundedQueue` (tests) / `ActionSchedulerQueue` (production). Production enqueue prefers async Action Scheduler dispatch plus a bounded admin continue path; see `docs/POST-RC6-BULK-BACKGROUND-PORTABILITY.md`.
 - Default batch size 25; claim TTL 300s; time budget ~8s per tick.
 
 Job statuses are machine codes (`previewing`, `queued`, `running`, `completed_with_errors`, …), not translated labels.

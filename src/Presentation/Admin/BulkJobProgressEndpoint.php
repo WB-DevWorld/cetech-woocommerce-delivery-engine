@@ -29,21 +29,12 @@ final class BulkJobProgressEndpoint {
 		if ( ! $job ) {
 			wp_send_json_error( [ 'message' => 'unknown_job' ], 404 );
 		}
-		wp_send_json_success(
-			[
-				'code'         => $job->job_code,
-				'status'       => $job->status->value,
-				'status_label' => BulkJobAdminCopy::status_label( $job->status ),
-				'total'        => $job->total_count,
-				'processed'    => $job->processed_count,
-				'changed'      => $job->changed_count,
-				'skipped'      => $job->skipped_count,
-				'failed'       => $job->failed_count,
-				'show_cancel'  => BulkJobAdminCopy::shows_cancel_remaining( $job->status ),
-				'allows_apply' => $job->status->allows_apply(),
-				'dry_run'      => $job->dry_run,
-				'terminal'     => $job->status->is_terminal() || $job->status->allows_apply(),
-			]
-		);
+
+		$advance = isset( $_POST['advance'] ) && '1' === (string) wp_unslash( (string) $_POST['advance'] );
+		if ( $advance ) {
+			$job = $this->engine->continue_job( $job_id );
+		}
+
+		wp_send_json_success( BulkJobAdminCopy::progress_payload( $job ) );
 	}
 }

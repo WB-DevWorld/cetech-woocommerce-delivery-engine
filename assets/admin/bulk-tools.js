@@ -138,6 +138,18 @@
 				button.disabled = hideCancel;
 			});
 		}
+		var waiting = document.querySelector('.cetech-de-bulk-waiting-notice');
+		if (waiting) {
+			waiting.hidden = !data.waiting_for_runner;
+		}
+		var resume = document.querySelector('[data-cetech-de-resume-now]');
+		if (resume) {
+			var hideResume = data.can_resume !== true;
+			resume.hidden = hideResume;
+			resume.querySelectorAll('button, input[type="submit"]').forEach(function (button) {
+				button.disabled = hideResume;
+			});
+		}
 		if (data.allows_apply && !document.querySelector('[data-cetech-de-apply-preview]') && root.location && typeof root.location.reload === 'function') {
 			root.location.reload();
 			return true;
@@ -154,11 +166,13 @@
 			return;
 		}
 		var jobId = status.getAttribute('data-cetech-de-job-id');
-		var interval = root.setInterval(function () {
+		var interval = 0;
+		var poll = function () {
 			var body = new URLSearchParams();
 			body.set('action', root.cetechDeBulk.action);
 			body.set('nonce', root.cetechDeBulk.nonce);
 			body.set('job_id', jobId);
+			body.set('advance', '1');
 			root.fetch(root.cetechDeBulk.ajaxUrl, {
 				method: 'POST',
 				credentials: 'same-origin',
@@ -170,13 +184,17 @@
 				if (!payload || !payload.success || !payload.data) {
 					return;
 				}
-				if (applyJobPoll(status, payload.data)) {
+				if (applyJobPoll(status, payload.data) && interval) {
 					root.clearInterval(interval);
 				}
 			}).catch(function () {
-				root.clearInterval(interval);
+				if (interval) {
+					root.clearInterval(interval);
+				}
 			});
-		}, 5000);
+		};
+		poll();
+		interval = root.setInterval(poll, 5000);
 	}
 
 	root.cetechDeBulkCatalog = {

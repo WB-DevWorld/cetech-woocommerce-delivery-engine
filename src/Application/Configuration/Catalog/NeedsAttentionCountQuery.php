@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Configuration\Catalog;
 
+use CetechDeliveryEngine\Application\Bulk\BulkStaleJobQuery;
 use CetechDeliveryEngine\Application\Shipment\CodAwaitingShipmentQuery;
 use CetechDeliveryEngine\Application\Shipment\ShipmentCreationIssueQuery;
 use CetechDeliveryEngine\Application\Shipment\ShipmentOperationsIssueQuery;
@@ -14,8 +15,8 @@ use CetechDeliveryEngine\Bootstrap\FeatureFlags;
  *
  * Uses the same sources as NeedsAttentionPage: incomplete product delivery
  * setup, paid-order shipment creation failures, operational shipment issues,
- * and Cash on Delivery orders awaiting staff shipment creation. Does not
- * invent a second definition of Needs Attention.
+ * Cash on Delivery orders awaiting staff shipment creation, and genuinely
+ * stalled Bulk Tools jobs. Does not invent a second definition of Needs Attention.
  *
  * Ordinary awaiting-fulfilment, processing, missing tracking, and pickup-only
  * orders are not counted unless those canonical queries already treat them as
@@ -28,7 +29,8 @@ final class NeedsAttentionCountQuery {
 		private readonly ShipmentCreationIssueQuery $creation,
 		private readonly ShipmentOperationsIssueQuery $operations,
 		private readonly FeatureFlags $flags,
-		private readonly ?CodAwaitingShipmentQuery $cod_awaiting = null
+		private readonly ?CodAwaitingShipmentQuery $cod_awaiting = null,
+		private readonly ?BulkStaleJobQuery $bulk_stale = null
 	) {
 	}
 
@@ -37,6 +39,7 @@ final class NeedsAttentionCountQuery {
 
 		if ( $this->can_see_catalog() ) {
 			$count += $this->catalog->count();
+			$count += $this->bulk_stale instanceof BulkStaleJobQuery ? $this->bulk_stale->count() : 0;
 		}
 
 		if ( $this->can_see_shipment_attention() ) {

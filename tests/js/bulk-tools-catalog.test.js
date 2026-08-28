@@ -120,6 +120,85 @@ describe('Bulk Tools job preview polling presentation', () => {
 		expect(cancel.querySelector('button').disabled).toBe(false);
 	});
 
+	it('shows waiting copy and enables resume when the runner has not started', () => {
+		document.body.insertAdjacentHTML(
+			'beforeend',
+			'<div class="cetech-de-bulk-waiting-notice" hidden><p>waiting</p></div><form data-cetech-de-resume-now hidden><button type="submit">Process next batch</button></form>'
+		);
+		const status = document.querySelector('[data-cetech-de-job-id]');
+		const waiting = document.querySelector('.cetech-de-bulk-waiting-notice');
+		const resume = document.querySelector('[data-cetech-de-resume-now]');
+
+		window.cetechDeBulkCatalog.applyJobPoll(status, {
+			status: 'previewing',
+			status_label: "Waiting for the site's background runner",
+			processed: 0,
+			total: 1,
+			show_cancel: true,
+			allows_apply: false,
+			terminal: false,
+			waiting_for_runner: true,
+			can_resume: true
+		});
+
+		expect(status.textContent).toBe("Waiting for the site's background runner · 0 / 1");
+		expect(waiting.hidden).toBe(false);
+		expect(resume.hidden).toBe(false);
+		expect(resume.querySelector('button').disabled).toBe(false);
+	});
+
+	it('shows waiting copy again when a started job is waiting for the next batch', () => {
+		document.body.insertAdjacentHTML(
+			'beforeend',
+			'<div class="cetech-de-bulk-waiting-notice" hidden><p>waiting</p></div><form data-cetech-de-resume-now hidden><button type="submit">Process next batch</button></form>'
+		);
+		const status = document.querySelector('[data-cetech-de-job-id]');
+		const waiting = document.querySelector('.cetech-de-bulk-waiting-notice');
+		const resume = document.querySelector('[data-cetech-de-resume-now]');
+
+		window.cetechDeBulkCatalog.applyJobPoll(status, {
+			status: 'previewing',
+			status_label: "Waiting for the site's background runner",
+			processed: 25,
+			total: 80,
+			show_cancel: true,
+			allows_apply: false,
+			terminal: false,
+			waiting_for_runner: true,
+			can_resume: true
+		});
+
+		expect(status.textContent).toBe("Waiting for the site's background runner · 25 / 80");
+		expect(waiting.hidden).toBe(false);
+		expect(resume.hidden).toBe(false);
+	});
+
+	it('hides waiting copy once processing has started', () => {
+		document.body.insertAdjacentHTML(
+			'beforeend',
+			'<div class="cetech-de-bulk-waiting-notice"><p>waiting</p></div><form data-cetech-de-resume-now><button type="submit">Process next batch</button></form>'
+		);
+		const status = document.querySelector('[data-cetech-de-job-id]');
+		const waiting = document.querySelector('.cetech-de-bulk-waiting-notice');
+		const resume = document.querySelector('[data-cetech-de-resume-now]');
+
+		window.cetechDeBulkCatalog.applyJobPoll(status, {
+			status: 'previewing',
+			status_label: 'Processing',
+			processed: 4,
+			total: 40,
+			show_cancel: true,
+			allows_apply: false,
+			terminal: false,
+			waiting_for_runner: false,
+			can_resume: false
+		});
+
+		expect(status.textContent).toBe('Processing · 4 / 40');
+		expect(waiting.hidden).toBe(true);
+		expect(resume.hidden).toBe(true);
+	});
+
 	it('reloads when a finished preview has no Apply control yet', () => {
 		const reload = vi.fn();
 		const status = document.querySelector('[data-cetech-de-job-id]');

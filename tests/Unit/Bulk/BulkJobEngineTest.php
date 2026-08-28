@@ -559,6 +559,242 @@ final class BulkJobEngineTest extends TestCase {
 		);
 	}
 
+	public function test_delayed_scheduler_does_not_start_until_continue(): void {
+		$ids = range( 1, 40 );
+		$this->add_products( $ids );
+		$job = $this->engine->create_preview(
+			BulkOperationType::CatalogUpdate,
+			1,
+			$this->selected( $ids ),
+			$this->set_international(),
+			25
+		);
+
+		self::assertSame( BulkJobStatus::Previewing, $job->status );
+		self::assertSame( 0, $job->processed_count );
+		self::assertSame( 1, $this->queue->queued_count() );
+
+		$job = $this->engine->continue_job( (int) $job->id );
+		self::assertLessThanOrEqual( 25, $job->enumerated_count );
+		self::assertLessThanOrEqual( 25, $job->processed_count );
+		self::assertNotSame( BulkJobStatus::Ready, $job->status );
+		self::assertNull( $this->scopes->findByScopeAndSlice( ConfigurationScopeType::Product, 1, '' ) );
+	}
+
+	public function test_scheduler_never_running_leaves_durable_preview_unfailed(): void {
+		$this->add_products( [ 1, 2 ] );
+		$job = $this->engine->create_preview(
+			BulkOperationType::CatalogUpdate,
+			1,
+			$this->selected( [ 1, 2 ] ),
+			$this->set_international()
+		);
+
+		$again = $this->engine->find( (int) $job->id );
+		self::assertSame( BulkJobStatus::Previewing, $again?->status );
+		self::assertSame( 0, $again?->processed_count );
+		self::assertNull( $again?->error_code );
+		self::assertNull( $this->scopes->findByScopeAndSlice( ConfigurationScopeType::Product, 1, '' ) );
+	}
+
+	public function test_continue_is_blocked_while_another_worker_holds_the_claim(): void {
+		$this->add_products( range( 1, 10 ) );
+		$job = $this->engine->create_preview(
+			BulkOperationType::CatalogUpdate,
+			1,
+			$this->selected( range( 1, 10 ) ),
+			$this->set_international()
+		);
+		$job_id = (int) $job->id;
+		$held   = $this->jobs->claim_job( $job_id, 'held-worker', 300 );
+		self::assertNotNull( $held );
+
+		$after = $this->engine->continue_job( $job_id );
+		self::assertSame( 0, $after->processed_count );
+		self::assertSame( 'held-worker', $after->claim_token );
+
+		$this->jobs->release_job_claim( $job_id, 'held-worker' );
+		$resumed = $this->engine->continue_job( $job_id );
+		self::assertGreaterThan( 0, $resumed->enumerated_count + $resumed->processed_count );
+	}
+
+	public function test_reopening_bulk_tools_does_not_cancel_and_resume_is_idempotent(): void {
+		$this->add_products( [ 1 ] );
+		$job = $this->engine->create_preview(
+			BulkOperationType::CatalogUpdate,
+			1,
+			$this->selected( [ 1 ] ),
+			$this->set_international()
+		);
+		$job_id = (int) $job->id;
+
+		$reopened = $this->engine->find( $job_id );
+		self::assertSame( BulkJobStatus::Previewing, $reopened?->status );
+		self::assertFalse( $reopened?->cancel_requested );
+
+		$this->engine->continue_job( $job_id );
+		$ready = $this->engine->continue_job( $job_id );
+		self::assertSame( BulkJobStatus::Ready, $ready->status );
+		self::assertSame( 1, $ready->processed_count );
+
+		$again = $this->engine->continue_job( $job_id );
+		self::assertSame( BulkJobStatus::Ready, $again->status );
+		self::assertSame( 1, $again->processed_count );
+		self::assertSame( 1, $again->changed_count );
+	}
+
+	public function test_apply_resume_does_not_duplicate_mutations(): void {
+		$this->add_products( [ 90, 91 ] );
+		$preview = $this->engine->create_preview(
+			BulkOperationType::CatalogUpdate,
+			1,
+			$this->selected( [ 90, 91 ] ),
+			$this->set_international()
+		);
+		$this->drain();
+		$this->engine->apply( (int) $preview->id, 1 );
+
+		$first = $this->engine->continue_job( (int) $preview->id );
+		self::assertLessThanOrEqual( 25, $first->processed_count );
+		$fingerprint = $this->scopes->findByScopeAndSlice( ConfigurationScopeType::Product, 90, '' )?->fingerprint();
+
+		while ( $job = $this->engine->find( (int) $preview->id ) ) {
+			if ( $job->status->is_terminal() ) {
+				break;
+			}
+			$this->engine->continue_job( (int) $preview->id );
+		}
+
+		$done = $this->engine->find( (int) $preview->id );
+		self::assertSame( BulkJobStatus::Completed, $done?->status );
+		self::assertSame( 2, $done?->processed_count );
+		self::assertSame( 2, $done?->changed_count );
+		if ( null !== $fingerprint ) {
+			self::assertSame(
+				$fingerprint,
+				$this->scopes->findByScopeAndSlice( ConfigurationScopeType::Product, 90, '' )?->fingerprint()
+			);
+		}
+	}
+
+	public function test_rollback_resume_does_not_duplicate_restore(): void {
+		$this->add_products( [ 92, 93 ] );
+		$preview = $this->engine->create_preview(
+			BulkOperationType::CatalogUpdate,
+			1,
+			$this->selected( [ 92, 93 ] ),
+			$this->set_international()
+		);
+		$this->drain();
+		$this->engine->apply( (int) $preview->id, 1 );
+		$this->drain();
+		$child = $this->engine->rollback( (int) $preview->id, 1 );
+
+		$this->engine->continue_job( (int) $child->id );
+		$mid = $this->engine->find( (int) $child->id );
+		self::assertNotNull( $mid );
+		self::assertLessThanOrEqual( 2, $mid->processed_count );
+		self::assertLessThanOrEqual( 2, (int) ( $mid->summary['rollback_restored'] ?? 0 ) );
+
+		$this->drain();
+		$done = $this->engine->find( (int) $child->id );
+		self::assertTrue( in_array( $done?->status, [ BulkJobStatus::RolledBack, BulkJobStatus::PartiallyRolledBack ], true ) );
+		self::assertSame( 2, $done?->processed_count );
+		self::assertSame( 2, $done?->summary['rollback_restored'] ?? 0 );
+		self::assertNull( $this->scopes->findByScopeAndSlice( ConfigurationScopeType::Product, 92, '' ) );
+	}
+
+	public function test_cancel_while_waiting_does_not_require_a_later_runner(): void {
+		$this->add_products( [ 94, 95 ] );
+		$job = $this->engine->create_preview(
+			BulkOperationType::CatalogUpdate,
+			1,
+			$this->selected( [ 94, 95 ] ),
+			$this->set_international()
+		);
+		$cancelled = $this->engine->cancel( (int) $job->id );
+
+		self::assertSame( BulkJobStatus::Cancelled, $cancelled->status );
+		self::assertNull( $this->scopes->findByScopeAndSlice( ConfigurationScopeType::Product, 94, '' ) );
+	}
+
+	public function test_cancel_during_processing_keeps_counters_and_does_not_reverse(): void {
+		$ids = range( 1, 40 );
+		$this->add_products( $ids );
+		$job = $this->engine->create_preview(
+			BulkOperationType::CatalogUpdate,
+			1,
+			$this->selected( $ids ),
+			$this->set_international(),
+			25
+		);
+		$this->drain();
+		$this->engine->apply( (int) $job->id, 1 );
+		$this->engine->run_next_tick( (int) $job->id );
+		$mid = $this->engine->find( (int) $job->id );
+		self::assertNotNull( $mid );
+		self::assertGreaterThan( 0, $mid->processed_count );
+		self::assertLessThan( 40, $mid->processed_count );
+		$processed_before_cancel = $mid->processed_count;
+		$changed_before_cancel   = $mid->changed_count;
+
+		$cancelled = $this->engine->cancel( (int) $job->id );
+		self::assertTrue(
+			in_array( $cancelled->status, [ BulkJobStatus::Cancelled, BulkJobStatus::CancelRequested ], true )
+		);
+		self::assertGreaterThanOrEqual( $processed_before_cancel, $cancelled->processed_count );
+		self::assertGreaterThanOrEqual( $changed_before_cancel, $cancelled->changed_count );
+
+		$this->drain();
+		$final = $this->engine->find( (int) $job->id );
+		self::assertSame( BulkJobStatus::Cancelled, $final?->status );
+		self::assertSame( $cancelled->processed_count, $final?->processed_count );
+		self::assertSame( $cancelled->changed_count, $final?->changed_count );
+		self::assertNotNull( $this->scopes->findByScopeAndSlice( ConfigurationScopeType::Product, 1, '' ) );
+		self::assertNull( $this->scopes->findByScopeAndSlice( ConfigurationScopeType::Product, 40, '' ) );
+	}
+
+	public function test_preview_continue_does_not_lose_counters(): void {
+		$ids = range( 1, 40 );
+		$this->add_products( $ids );
+		$job = $this->engine->create_preview(
+			BulkOperationType::CatalogUpdate,
+			1,
+			$this->selected( $ids ),
+			$this->set_international(),
+			25
+		);
+		$first  = $this->engine->continue_job( (int) $job->id );
+		$second = $this->engine->continue_job( (int) $job->id );
+
+		self::assertGreaterThanOrEqual( $first->enumerated_count, $second->enumerated_count );
+		self::assertGreaterThanOrEqual( $first->processed_count, $second->processed_count );
+
+		$this->drain();
+		$ready = $this->engine->find( (int) $job->id );
+		self::assertSame( BulkJobStatus::Ready, $ready?->status );
+		self::assertSame( 40, $ready?->processed_count );
+		self::assertSame( 40, $ready?->total_count );
+		self::assertSame( $ready->changed_count + $ready->skipped_count + $ready->failed_count, $ready->processed_count );
+	}
+
+	public function test_continue_never_processes_an_unbounded_request(): void {
+		$ids = range( 200, 299 );
+		$this->add_products( $ids );
+		$job = $this->engine->create_preview(
+			BulkOperationType::CatalogUpdate,
+			1,
+			$this->selected( $ids ),
+			$this->set_international(),
+			25
+		);
+		$after = $this->engine->continue_job( (int) $job->id );
+
+		self::assertLessThanOrEqual( 25, $after->enumerated_count );
+		self::assertLessThanOrEqual( 25, $after->processed_count );
+		self::assertSame( BulkJobStatus::Previewing, $after->status );
+	}
+
 	private function drain( int $max = 2000 ): int {
 		$ticks = 0;
 		while ( $id = $this->queue->next_job_id() ) {

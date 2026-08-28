@@ -57,4 +57,16 @@ final class BulkToolsUiConsistencyTest extends TestCase {
 		self::assertStringContainsString( 'cetech-de-bulk-compare-pane', $source );
 		self::assertStringContainsString( 'Go to Catalog', $source );
 	}
+
+	public function test_job_page_exposes_waiting_copy_and_process_next_batch(): void {
+		$source = (string) file_get_contents( dirname( __DIR__, 3 ) . '/src/Presentation/Admin/BulkToolsPage.php' );
+
+		self::assertStringContainsString( 'ACTION_CONTINUE', $source );
+		self::assertStringContainsString( 'cetech_de_bulk_continue', $source );
+		self::assertStringContainsString( 'cetech-de-bulk-waiting-notice', $source );
+		self::assertStringContainsString( 'data-cetech-de-resume-now', $source );
+		self::assertStringContainsString( 'You can safely leave this page', BulkJobAdminCopy::waiting_notice() );
+		self::assertSame( 'Process next batch', BulkJobAdminCopy::resume_label() );
+		self::assertStringNotContainsString( 'Action Scheduler', BulkJobAdminCopy::waiting_notice() );
+	}
 }

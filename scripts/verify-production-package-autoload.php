@@ -136,6 +136,11 @@ $required_classes = [
 	'CetechDeliveryEngine\\Presentation\\Admin\\BulkAdminListPreferences',
 	'CetechDeliveryEngine\\Application\\Bulk\\BulkJobEngine',
 	'CetechDeliveryEngine\\Application\\Bulk\\BulkJobWorker',
+	'CetechDeliveryEngine\\Application\\Bulk\\BulkJobRunnerState',
+	'CetechDeliveryEngine\\Application\\Bulk\\BulkQueueHealth',
+	'CetechDeliveryEngine\\Application\\Bulk\\BulkStaleJobQuery',
+	'CetechDeliveryEngine\\Application\\Bulk\\Queue\\ActionSchedulerQueue',
+	'CetechDeliveryEngine\\Application\\Bulk\\Queue\\WpActionSchedulerGateway',
 	'CetechDeliveryEngine\\Infrastructure\\Persistence\\BulkJobSchema',
 ];
 
@@ -145,6 +150,7 @@ $required_interfaces = [
 	'CetechDeliveryEngine\\Core\\Versioning\\MigrationInterface',
 	'CetechDeliveryEngine\\Application\\Shipping\\CartLineShippingAssessorInterface',
 	'CetechDeliveryEngine\\Application\\Destination\\PackageDestinationZoneResolverInterface',
+	'CetechDeliveryEngine\\Application\\Bulk\\Queue\\ActionSchedulerGateway',
 ];
 
 foreach ( $required_classes as $class ) {
@@ -271,6 +277,23 @@ if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 $bulk_js = $package_root . '/assets/admin/bulk-tools.js';
 if ( str_contains( (string) ( $header_source ?? '' ), '1.0.0-dev.bulk' ) && ! is_readable( $bulk_js ) ) {
 	$failures[] = 'Missing assets/admin/bulk-tools.js';
+} elseif ( is_readable( $bulk_js ) && str_contains( (string) ( $header_source ?? '' ), '1.0.0-dev.bulk.8' ) ) {
+	$bulk_js_source = (string) file_get_contents( $bulk_js );
+	if ( ! str_contains( $bulk_js_source, "body.set('advance', '1')" ) ) {
+		$failures[] = 'bulk-tools.js missing bounded AJAX continue (advance=1).';
+	}
+	$as_gateway = $package_root . '/src/Application/Bulk/Queue/WpActionSchedulerGateway.php';
+	if ( ! is_readable( $as_gateway ) ) {
+		$failures[] = 'Missing WpActionSchedulerGateway.php';
+	} else {
+		$as_source = (string) file_get_contents( $as_gateway );
+		if ( ! str_contains( $as_source, 'as_enqueue_async_action' ) || ! str_contains( $as_source, 'maybe_dispatch' ) ) {
+			$failures[] = 'WpActionSchedulerGateway missing async enqueue or best-effort kick.';
+		}
+		if ( ! str_contains( $as_source, 'if ( null !== $args )' ) ) {
+			$failures[] = 'WpActionSchedulerGateway pending_count must not treat group diagnostics as empty args.';
+		}
+	}
 }
 
 $forbidden = [

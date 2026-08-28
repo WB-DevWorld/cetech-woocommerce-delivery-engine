@@ -243,4 +243,6 @@ Do **not** use this package to judge In Store Delivery + optional Store Pickup, 
 
 ## STOP
 
-Owner should install **only** `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.7.zip` for further training-site QA of R1 remainder **and** Bulk Tools. Cursor must not deploy it.
+Owner should install **only** `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.7.zip` for further training-site QA of R1 remainder **and** Bulk Tools **until a later authorised package is built**. Cursor must not deploy it.
+
+Later untagged runtime on this branch: `1.0.0-dev.bulk.8` background-execution portability (`docs/POST-RC6-BULK-BACKGROUND-PORTABILITY.md`). No ZIP unless the owner authorises packaging. The bulk.7 ZIP remains immutable and does not include that repair.

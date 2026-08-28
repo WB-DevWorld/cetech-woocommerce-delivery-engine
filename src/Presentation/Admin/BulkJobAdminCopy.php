@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Admin;
 
+use CetechDeliveryEngine\Application\Bulk\BulkJobRunnerState;
 use CetechDeliveryEngine\Domain\Bulk\BulkJob;
 use CetechDeliveryEngine\Domain\Enum\BulkJobItemStatus;
 use CetechDeliveryEngine\Domain\Enum\BulkJobStatus;
@@ -36,17 +37,69 @@ final class BulkJobAdminCopy {
 			BulkJobStatus::Previewing => __( 'Preparing preview', 'cetech-woocommerce-delivery-engine' ),
 			BulkJobStatus::Ready => __( 'Ready to apply', 'cetech-woocommerce-delivery-engine' ),
 			BulkJobStatus::Queued => __( 'Queued', 'cetech-woocommerce-delivery-engine' ),
-			BulkJobStatus::Running => __( 'Running', 'cetech-woocommerce-delivery-engine' ),
-			BulkJobStatus::CancelRequested => __( 'Cancel requested', 'cetech-woocommerce-delivery-engine' ),
+			BulkJobStatus::Running => __( 'Processing', 'cetech-woocommerce-delivery-engine' ),
+			BulkJobStatus::CancelRequested => __( 'Paused / needs attention', 'cetech-woocommerce-delivery-engine' ),
 			BulkJobStatus::Cancelled => __( 'Cancelled', 'cetech-woocommerce-delivery-engine' ),
 			BulkJobStatus::Completed => __( 'Completed', 'cetech-woocommerce-delivery-engine' ),
 			BulkJobStatus::CompletedWithErrors => __( 'Completed with errors', 'cetech-woocommerce-delivery-engine' ),
 			BulkJobStatus::Failed => __( 'Failed', 'cetech-woocommerce-delivery-engine' ),
-			BulkJobStatus::RollbackQueued => __( 'Rollback queued', 'cetech-woocommerce-delivery-engine' ),
-			BulkJobStatus::RollingBack => __( 'Rolling back', 'cetech-woocommerce-delivery-engine' ),
+			BulkJobStatus::RollbackQueued => __( 'Queued', 'cetech-woocommerce-delivery-engine' ),
+			BulkJobStatus::RollingBack => __( 'Processing', 'cetech-woocommerce-delivery-engine' ),
 			BulkJobStatus::RolledBack => __( 'Rolled back', 'cetech-woocommerce-delivery-engine' ),
 			BulkJobStatus::PartiallyRolledBack => __( 'Partially rolled back', 'cetech-woocommerce-delivery-engine' ),
 		};
+	}
+
+	public static function public_status_label( BulkJob $job ): string {
+		$state = BulkJobRunnerState::from_job( $job );
+
+		return match ( $state->phase ) {
+			BulkJobRunnerState::PHASE_QUEUED => __( 'Queued', 'cetech-woocommerce-delivery-engine' ),
+			BulkJobRunnerState::PHASE_STARTING => __( 'Starting background work', 'cetech-woocommerce-delivery-engine' ),
+			BulkJobRunnerState::PHASE_PROCESSING => __( 'Processing', 'cetech-woocommerce-delivery-engine' ),
+			BulkJobRunnerState::PHASE_WAITING => __( 'Waiting for the site\'s background runner', 'cetech-woocommerce-delivery-engine' ),
+			BulkJobRunnerState::PHASE_PAUSED => __( 'Paused / needs attention', 'cetech-woocommerce-delivery-engine' ),
+			BulkJobRunnerState::PHASE_COMPLETED => self::status_label( $job->status ),
+			BulkJobRunnerState::PHASE_FAILED => self::status_label( $job->status ),
+			BulkJobRunnerState::PHASE_READY => self::status_label( $job->status ),
+			BulkJobRunnerState::PHASE_CANCELLED => self::status_label( $job->status ),
+			default => self::status_label( $job->status ),
+		};
+	}
+
+	public static function waiting_notice(): string {
+		return __( 'This job is waiting for WordPress background processing. You can safely leave this page.', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function resume_label(): string {
+		return __( 'Process next batch', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	/**
+	 * @return array<string, mixed>
+	 */
+	public static function progress_payload( BulkJob $job ): array {
+		$state = BulkJobRunnerState::from_job( $job );
+
+		return [
+			'code'                => $job->job_code,
+			'status'              => $job->status->value,
+			'status_label'        => self::public_status_label( $job ),
+			'total'               => $job->total_count,
+			'processed'           => $job->processed_count,
+			'changed'             => $job->changed_count,
+			'skipped'             => $job->skipped_count,
+			'failed'              => $job->failed_count,
+			'show_cancel'         => self::shows_cancel_remaining( $job->status ),
+			'allows_apply'        => $job->status->allows_apply(),
+			'dry_run'             => $job->dry_run,
+			'terminal'            => $job->status->is_terminal() || $job->status->allows_apply(),
+			'waiting_for_runner'  => $state->waiting_for_runner,
+			'can_resume'          => $state->can_resume,
+			'waiting_notice'      => $state->waiting_for_runner ? self::waiting_notice() : '',
+			'resume_label'        => self::resume_label(),
+			'stale'               => $state->stale,
+		];
 	}
 
 	public static function item_status_label( BulkJobItemStatus $status, bool $dry_run, bool $rollback = false ): string {
