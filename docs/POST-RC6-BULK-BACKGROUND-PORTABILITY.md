@@ -148,7 +148,7 @@ Disposable WordPress: `tests/Integration/BulkBackgroundPortabilityIntegrationTes
 
 There is **no** docker-compose / wp-env live WooCommerce Action Scheduler runner in this repository. A real host runner still depends on loopback/cron and is owner physical QA. That is not a 1-minute cron requirement.
 
-**Tests run (2026-08-28, this tree, pre-package):** PHPUnit **735 / 4157 OK** (5 pre-existing deprecations); focused Bulk + integration **108 / 510 OK**; JS **22/22**; PHP lint on 29 changed files **0 errors**. No ZIP packaged in this document revision.
+**Tests run (2026-08-28, pre-package source `ed57664`):** PHPUnit **735 / 4157 OK** (5 pre-existing deprecations); focused Bulk + integration **108 / 510 OK**; JS **22/22**; PHP lint on 29 changed files **0 errors**. Packaged as `1.0.0-dev.bulk.8` — see `docs/POST-RC6-BULK-BACKGROUND-PORTABILITY-QA.md`. **No physical PASS.**
 
 ---
 
@@ -157,3 +157,19 @@ There is **no** docker-compose / wp-env live WooCommerce Action Scheduler runner
 Action 387: created `2026-08-28 15:50:33`; started `2026-08-28 15:54:01` via WP Cron; completed `2026-08-28 15:54:01` via WP Cron.
 
 Temporary training systemd override is operational QA relief only. Do not document it as product setup.
+
+---
+
+## 10. Package identity
+
+Packaging record: `docs/POST-RC6-BULK-BACKGROUND-PORTABILITY-QA.md`.
+
+| Item | Value |
+|------|--------|
+| Filename | `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.8.zip` |
+| Source | `ed57664e61087aca09eda58b904b9edf0e78aac2` |
+| Schema | `5` |
+| Bytes | `1240853` |
+| SHA-256 | `d8db4669e7a85ba178b9d8b7b6ab6a22e015562fe81cdc8e15262df55b263ea1` |
+
+Historical `1.0.0-dev.bulk.7` remains immutable. **No physical PASS.** Cursor must not install the ZIP.
