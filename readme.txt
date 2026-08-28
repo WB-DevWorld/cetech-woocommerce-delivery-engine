@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-dev.bulk.6
+Stable tag: 1.0.0-dev.bulk.7
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,9 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-dev.bulk.7 =
+* Combined post-RC.6 development stream: Bulk Tools schema 5 plus approved R1 admin/setup repairs, R1 QA.1 request-path repairs, and a single primary Create/Save action on Delivery Option and Delivery Area forms. Not RC.6, not RC.7, not Stage 15.
 
 = 1.0.0-rc.6 =
 * Final post-RC.5 defect-fix release candidate. Delivery is listed in WooCommerce Add shipping method while the plugin is active; rates stay flag-gated. Delivery Area Region rules match WooCommerce state codes or that country’s labels (Ghana AA / Greater Accra) without migrating stored area data. Schema target remains 4. Owner-accepted from 1.0.0-rc.6-qa.2. Not a rewrite of tagged v1.0.0-rc.5.

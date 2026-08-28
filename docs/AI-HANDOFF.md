@@ -2,11 +2,11 @@
 
 ## CURRENT IMPLEMENTATION STATUS — V1 RC (read first)
 
-**Last updated:** 2026-08-25  
-**Plugin version:** `1.0.0-dev.bulk.6` on `feat/post-rc6-bulk-tools` (post-RC.6 Bulk Tools development). Tagged/protected published baseline remains **`1.0.0-rc.6`** (schema `4`). Do not retag RC.2–RC.6. Do not rebuild the RC.6 ZIP. Do not begin Stage 15. FLAIROC must not be modified.  
-**Post-RC.6 Bulk Tools:** authorised separately from Stage 14/15. Schema target in **this tree** is **`5`**. Architecture: `docs/POST-RC6-BULK-TOOLS-ARCHITECTURE.md`. Implementation: `docs/POST-RC6-BULK-TOOLS-IMPLEMENTATION.md`. Qualification: `docs/POST-RC6-BULK-TOOLS-QUALIFICATION.md`. Previous untagged owner-QA packages **`1.0.0-dev.bulk.2`**, **`1.0.0-dev.bulk.3`**, **`1.0.0-dev.bulk.4`**, and **`1.0.0-dev.bulk.5`** (`cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.5.zip`, `1177819` bytes, SHA-256 `619345cf7dd52757a0f628d1018a70f534346f37b798e90cb1c8c420861698cc`, source `38a5fce24f1809657707e6c0b50f52e6b3fb5bfa`, schema `5`) remain immutable. Current untagged owner-QA package **`1.0.0-dev.bulk.6`** (`cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.6.zip`, `1180297` bytes, SHA-256 `41fcc68ea4638d530aa710d9f25931248ce8ec1a3183a3908709fb3ea53150f1`, source `fb16554a2484d63a82451410323137d88d187d87`, schema `5`). Cursor must not install it on training.cetechbpa.com, FLAIROC, or another owner site.  
+**Last updated:** 2026-08-28  
+**Plugin version:** `1.0.0-dev.bulk.7` on `integration/post-rc6-bulk-r1` (combined post-RC.6 Bulk Tools + R1 admin-repair development). Tagged/protected published baseline remains **`1.0.0-rc.6`** (schema `4`). Do not retag RC.2–RC.6. Do not rebuild the RC.6 ZIP. Do not begin Stage 15. FLAIROC must not be modified.  
+**Post-RC.6 combined stream:** Bulk Tools schema **`5`** plus approved R1 admin/setup runtime repairs and QA.1 request-path repairs. Canonical record: `docs/POST-RC6-CONSOLIDATED-DEVELOPMENT-STREAM.md`. Historical Bulk branch `feat/post-rc6-bulk-tools` @ `720b513` and R1 branch `fix/post-rc6-admin-setup-defects` remain preserved. Previous untagged owner-QA packages **`1.0.0-dev.bulk.2`**–**`1.0.0-dev.bulk.6`** remain immutable (`1.0.0-dev.bulk.6.zip`, `1180297` bytes, SHA-256 `41fcc68ea4638d530aa710d9f25931248ce8ec1a3183a3908709fb3ea53150f1`, source `fb16554a2484d63a82451410323137d88d187d87`, schema `5`). R1 QA.1/QA.2 ZIPs remain immutable. Current untagged owner-QA package **`1.0.0-dev.bulk.7`** — checksum recorded after packaging. Cursor must not install it on training.cetechbpa.com, FLAIROC, or another owner site.  
 **Schema target:** tagged RC.6 = `4`. This development branch = `5`.  
-**Git:** `feat/post-rc6-bulk-tools`. Unrelated RC.6 security-audit leftovers preserved on `wip/rc6-adversarial-security-audit` @ `a88f28048afcc84456e6933351c71b01a9838c5a`. RC.6 tag `v1.0.0-rc.6` **untouched**.  
+**Git:** `integration/post-rc6-bulk-r1`. Historical `feat/post-rc6-bulk-tools` and `fix/post-rc6-admin-setup-defects` not rewritten. Unrelated RC.6 security-audit leftovers preserved on `wip/rc6-adversarial-security-audit` @ `a88f28048afcc84456e6933351c71b01a9838c5a`. RC.6 tag `v1.0.0-rc.6` **untouched**.  
 **Hard dependency:** WooCommerce only (PHP 8.1+, HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`  
 **Canonical maintained rulebook:** `docs/DELIVERY-ENGINE-GOVERNING-RULES.md` (mandatory for all implementation work)
@@ -64,6 +64,9 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Stage 14H-RC6-FINAL | **COMPLETE** — version `1.0.0-rc.6`; tag `v1.0.0-rc.6`; artifact `docs/STAGE-14H-RC6-FINAL.md`. Owner-accepted from QA.2 on training.cetechbpa.com. FLAIROC not modified. |
 | RC.6 compatibility & lifecycle qualification | **PASS** — artifact `docs/RC6-COMPATIBILITY-LIFECYCLE-QUALIFICATION.md`. Tag `v1.0.0-rc.6` not changed. FLAIROC not modified. |
 | RC.6 adversarial security audit | **NOT ADVERSARIAL SECURITY QUALIFIED** — artifact `docs/RC6-ADVERSARIAL-SECURITY-AUDIT.md`. P0 AUTH-009/LIFE-015. No RC.6 runtime repair. Tag not changed. FLAIROC not modified. |
+| Post-RC.6 tester-observations audit | **COMPLETE / READ-ONLY** — artifact `docs/POST-RC6-TESTER-OBSERVATIONS-AUDIT.md`. No RC.6 runtime repair in that stage. |
+| Post-RC.6 Repair R1 | **IMPLEMENTED on historical branch `fix/post-rc6-admin-setup-defects`** — audit items 1–4. QA.1 **OWNER PHYSICAL FAIL**; QA.1 request-path repairs packaged as `1.0.0-rc.6-r1-qa.2` (schema `4`). Artifacts `docs/POST-RC6-ADMIN-SETUP-REPAIR-R1*.md`. ZIPs immutable. Now layered into the combined stream; do not keep installing R1 ZIPs beside Bulk ZIPs. |
+| Post-RC.6 combined Bulk + R1 stream | **THIS TREE** — `integration/post-rc6-bulk-r1`, `1.0.0-dev.bulk.7`, schema `5`. Artifact `docs/POST-RC6-CONSOLIDATED-DEVELOPMENT-STREAM.md`. Not RC.7. Not Stage 15. |
 | Governing rules hardening | **COMPLETE** — canonical rulebook `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`; Cursor always-apply wrapper `.cursor/rules/000-delivery-engine-governance.mdc`. Documentation/governance only. |
 | New storage | `configuration_scopes` / `configuration_fields` / `configuration_collections` + domain/repos; profile defaults use `global/0/{profile_key}` |
 | New resolver | GLOBAL→PRODUCT→VARIATION field inheritance; per-profile site-wide root; primary default fallback; provenance; fingerprint; hard constraints |
@@ -73,7 +76,7 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Variable runtime capture | Verified live; WoodMart adapter **not required** |
 | Hard constraints | **Implemented** for representable International / In Store / In Warehouse rules |
 | Category legacy parity | Hidden compatibility route retained; Legacy management UI is not a normal workflow |
-| Next stage | **STOP for owner physical retest of untagged `1.0.0-dev.bulk.6`** (rollback counters / execution presentation). Tagged `1.0.0-rc.6` remains the protected published baseline. Development identity is `1.0.0-dev.bulk.6` / schema `5`. Qualification: `docs/POST-RC6-BULK-TOOLS-QUALIFICATION.md`. Do **not** begin Stage 15. Do **not** modify FLAIROC. Do **not** retag `v1.0.0-rc.5` or `v1.0.0-rc.6`. Cursor must **not** install the owner-QA package. Previous `1.0.0-dev.bulk.2`–`1.0.0-dev.bulk.5` ZIPs are immutable. |
+| Next stage | **STOP for owner physical QA of untagged `1.0.0-dev.bulk.7`** on training (one combined install: remaining R1 checks + Bulk Tools). Snapshot the database first (schema 4→5). Tagged `1.0.0-rc.6` remains the protected published baseline. Development identity is `1.0.0-dev.bulk.7` / schema `5`. Artifact `docs/POST-RC6-CONSOLIDATED-DEVELOPMENT-STREAM.md`. Do **not** begin Stage 15. Do **not** modify FLAIROC. Do **not** retag `v1.0.0-rc.5` or `v1.0.0-rc.6`. Cursor must **not** install the owner-QA package. Previous `1.0.0-dev.bulk.2`–`1.0.0-dev.bulk.6` and R1 QA.1/QA.2 ZIPs are immutable. Do **not** keep swapping R1 ZIP ↔ Bulk ZIP. |
 | Final PHP log (RC.2 smoke) | Marker **546** → inspected through **548** — **PASS**; no new Delivery Engine fatals |
 | Live QA orders | `#39721` (variable); `#39724` (multi-product grouping); owner-QA evidence **`#39733` / `#39734` / `#39735`** (preserve; do not modify remotely) |
 | Package | Final `cetech-woocommerce-delivery-engine-1.0.0-rc.6.zip` (`1059918` bytes, SHA-256 `0d4adbef50462d798a4ff9bf802643bed92a35cdd332ceee13a985dbda2a689d`, source `7e52525`, tag `v1.0.0-rc.6`). Immutable `1.0.0-rc.6-qa.2.zip` (`1056340` bytes, SHA-256 `e4a904fd6660e5d8f88b5ce03504f7c6ab470e04802361908e47be3b1b794313`, source `132afcb`). Immutable `1.0.0-rc.6-qa.1.zip` (`1049447` bytes, SHA-256 `d5dbc392bf6e170e411ac19ce9bb4a14e6ef5458d55583ed56b4e07fe9e2d3ff`, source `116f67d`). Protected historical `cetech-woocommerce-delivery-engine-1.0.0-rc.5.zip` (`1043995` bytes, SHA-256 `7f9ad300a2d7198b7f0e70f1cd0819351e35430fd5ca843dac7c24ce9f96d66c`, source `e0b4613`, tag `v1.0.0-rc.5`). RC.5 QA.1–QA.6 ZIPs remain immutable. |
@@ -95,6 +98,7 @@ Administrator-language requirement: normal-user admin UI must use operational la
 | `docs/PROJECT-GOVERNANCE.md` | Mandatory process / source-of-truth hierarchy |
 | `docs/POST-RC6-BULK-TOOLS-ARCHITECTURE.md` | Post-RC.6 Bulk Tools + configuration portability architecture |
 | `docs/POST-RC6-BULK-TOOLS-IMPLEMENTATION.md` | Post-RC.6 Bulk Tools implementation record |
+| `docs/POST-RC6-CONSOLIDATED-DEVELOPMENT-STREAM.md` | Canonical combined post-RC.6 Bulk Tools + R1 development stream (`1.0.0-dev.bulk.7`) |
 | `docs/DELIVERY-ENGINE-GOVERNING-RULES.md` | **Canonical maintained rulebook** — mandatory hard invariants for architecture, privacy, shipments, language, release, and testing honesty |
 | `docs/PROJECT-RULES.md` | Preserved detailed engineering rules; reconcile against the canonical rulebook on conflict |
 | `docs/ARCHITECTURE-PLAN.md` | Modular-monolith architecture |
@@ -148,6 +152,11 @@ Administrator-language requirement: normal-user admin UI must use operational la
 | `docs/STAGE-14H-RC6-FINAL.md` | Stage 14H-RC6-FINAL RC.6 release record |
 | `docs/RC6-COMPATIBILITY-LIFECYCLE-QUALIFICATION.md` | Post-RC.6 lifecycle + compatibility qualification — **PASS**; tag not changed; FLAIROC not modified |
 | `docs/RC6-ADVERSARIAL-SECURITY-AUDIT.md` | Master RC.6 adversarial security audit — **NOT ADVERSARIAL SECURITY QUALIFIED**; no RC.6 runtime repair; FLAIROC not modified |
+| `docs/POST-RC6-TESTER-OBSERVATIONS-AUDIT.md` | Read-only training-site tester observations vs tagged RC.6 |
+| `docs/POST-RC6-ADMIN-SETUP-REPAIR-R1.md` | Historical R1 implementation (items 1–4) on `fix/post-rc6-admin-setup-defects` |
+| `docs/POST-RC6-ADMIN-SETUP-REPAIR-R1-QA1.md` | Historical R1 QA.1 package — **OWNER PHYSICAL FAIL**; ZIP immutable |
+| `docs/POST-RC6-ADMIN-SETUP-REPAIR-R1-QA1-FAILURE-REPAIR.md` | Historical R1 QA.1 request-path repair record |
+| `docs/POST-RC6-ADMIN-SETUP-REPAIR-R1-QA2.md` | Historical R1 QA.2 package — schema 4; ZIP immutable; superseded for training installs by bulk.7 |
 | `docs/CLASSIC-CHECKOUT-RELEASE-CANDIDATE-READINESS.md` | Pre-smoke Classic Checkout readiness (superseded for status by RC.2 readiness) |
 | `docs/RELEASE-1.0.0-RC.2-READINESS.md` | **Authoritative** live-verified `1.0.0-rc.2` release readiness |
 | `docs/ADMIN-UI-LANGUAGE-GUIDE.md` | Authoritative normal-administrator presentation language |

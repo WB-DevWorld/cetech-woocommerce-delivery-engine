@@ -338,20 +338,36 @@ final class PostRc6AdminSetupRepairR1RenderedFormOwnershipTest extends TestCase 
 
 		$header_submits = $xpath->query( '//header//input[@type="submit"][@name="cetech_de_save"]' );
 		self::assertNotFalse( $header_submits );
-		self::assertGreaterThan( 0, $header_submits->length, 'Header Create/Save submit is missing.' );
+		self::assertSame( 1, $header_submits->length, 'Exactly one header Create/Save submit is required.' );
 		$header_submit = $header_submits->item( 0 );
 		self::assertInstanceOf( DOMElement::class, $header_submit );
 		self::assertSame( self::FORM_ID, $header_submit->getAttribute( 'form' ) );
 		self::assertSame( $primary_label, $header_submit->getAttribute( 'value' ) );
 		self::assertNull( $this->ancestor_form( $header_submit ), 'Header submit must sit outside the entity form and use the form attribute.' );
+		self::assertStringContainsString( 'button-primary', $header_submit->getAttribute( 'class' ) );
+
+		$visible_primaries = $xpath->query( '//input[@type="submit"][@name="cetech_de_save"][contains(concat(" ", normalize-space(@class), " "), " button-primary ")]' );
+		self::assertNotFalse( $visible_primaries );
+		self::assertSame( 1, $visible_primaries->length, 'Only one visible primary Create/Save action is allowed.' );
 
 		$toolbar = $xpath->query( './/div[contains(concat(" ", normalize-space(@class), " "), " cetech-de-entity-form-toolbar ")]//input[@type="submit"][@name="cetech_de_save"]', $entity_form );
 		self::assertNotFalse( $toolbar );
-		self::assertGreaterThan( 0, $toolbar->length, 'Sticky in-form Create/Save is missing.' );
+		self::assertSame( 0, $toolbar->length, 'Duplicate in-form toolbar Create/Save must not be present.' );
 
-		$footer = $xpath->query( './/div[contains(concat(" ", normalize-space(@class), " "), " cetech-de-form-actions ")]//input[@type="submit"]', $entity_form );
-		self::assertNotFalse( $footer );
-		self::assertGreaterThan( 0, $footer->length, 'Footer submit is missing from the entity form.' );
+		$footer_submits = $xpath->query( './/div[contains(concat(" ", normalize-space(@class), " "), " cetech-de-form-actions ")]//input[@type="submit"]', $entity_form );
+		self::assertNotFalse( $footer_submits );
+		self::assertSame( 0, $footer_submits->length, 'Footer must not show a competing primary submit.' );
+
+		$native = $xpath->query( './/input[@type="submit"][@name="cetech_de_save"][contains(concat(" ", normalize-space(@class), " "), " cetech-de-entity-form-native-submit ")]', $entity_form );
+		self::assertNotFalse( $native );
+		self::assertSame( 1, $native->length, 'A hidden native submit must remain inside the entity form.' );
+		$native_submit = $native->item( 0 );
+		self::assertInstanceOf( DOMElement::class, $native_submit );
+		self::assertStringNotContainsString( 'button-primary', $native_submit->getAttribute( 'class' ) );
+
+		$cancel = $xpath->query( './/div[contains(concat(" ", normalize-space(@class), " "), " cetech-de-form-actions ")]//a[contains(normalize-space(.), "Cancel")]', $entity_form );
+		self::assertNotFalse( $cancel );
+		self::assertGreaterThan( 0, $cancel->length, 'Cancel must remain as a secondary action.' );
 
 		$back_links = $xpath->query( '//header//a[contains(normalize-space(.), "' . $back_label . '")]' );
 		self::assertNotFalse( $back_links );

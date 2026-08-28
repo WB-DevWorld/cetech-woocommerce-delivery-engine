@@ -175,7 +175,8 @@ final class PostRc6AdminSetupRepairR1Test extends TestCase {
 			self::assertStringContainsString( "'form'  => AdminPageLayout::ENTITY_FORM_ID", $source );
 			self::assertStringContainsString( 'stash_form_draft', $source );
 			self::assertStringContainsString( 'cetech-de-form-actions', $source );
-			self::assertStringContainsString( 'submit_button( $submit )', $source );
+			self::assertStringContainsString( "esc_html__( 'Cancel'", $source );
+			self::assertStringNotContainsString( 'submit_button( $submit )', $source );
 		}
 
 		self::assertStringContainsString( "__( 'Back to Delivery Options'", $offers );
@@ -185,7 +186,9 @@ final class PostRc6AdminSetupRepairR1Test extends TestCase {
 		self::assertStringContainsString( "__( 'Create Delivery Area'", $areas );
 		self::assertStringContainsString( "__( 'Save Delivery Area'", $areas );
 		self::assertStringContainsString( 'ENTITY_FORM_ID', $layout );
-		self::assertStringContainsString( 'cetech-de-entity-form-toolbar', $layout );
+		self::assertStringContainsString( 'cetech-de-page-header--sticky-actions', $layout );
+		self::assertStringContainsString( 'cetech-de-entity-form-native-submit', $layout );
+		self::assertStringNotContainsString( 'cetech-de-entity-form-toolbar', $layout );
 		self::assertStringContainsString( '<input type="submit" name="cetech_de_save"', $layout );
 		self::assertStringContainsString( "if ( 'submit' === ( \$action['type'] ?? '' ) )", $layout );
 	}

@@ -39,7 +39,12 @@ final class AdminPageLayout {
 		?array $primary_action = null,
 		?array $secondary_action = null
 	): void {
-		echo '<header class="cetech-de-dashboard-header cetech-de-page-header">';
+		$header_class = 'cetech-de-dashboard-header cetech-de-page-header';
+		if ( 'submit' === ( $primary_action['type'] ?? '' ) ) {
+			$header_class .= ' cetech-de-page-header--sticky-actions';
+		}
+
+		echo '<header class="' . esc_attr( $header_class ) . '">';
 		echo '<div class="cetech-de-dashboard-header-text">';
 		echo '<p class="cetech-de-dashboard-eyebrow">' . esc_html( $eyebrow ) . '</p>';
 		echo '<h1 class="cetech-de-dashboard-title">' . esc_html( $title ) . '</h1>';
@@ -76,9 +81,10 @@ final class AdminPageLayout {
 			echo '<input type="hidden" name="id" value="' . esc_attr( (string) $record_id ) . '" />';
 		}
 
-		echo '<div class="cetech-de-entity-form-toolbar">';
-		submit_button( $submit_label, 'primary', 'cetech_de_save', false );
-		echo '</div>';
+		printf(
+			'<input type="submit" name="cetech_de_save" class="cetech-de-entity-form-native-submit screen-reader-text" value="%s" tabindex="-1" />',
+			esc_attr( $submit_label )
+		);
 	}
 
 	/**
@@ -568,31 +574,29 @@ final class AdminPageLayout {
 				padding: 12px 0 16px;
 			}
 			.cetech-de-form-table th { width: 220px; }
-			.cetech-de-form-actions {
-				margin: 8px 0 0;
-				padding: 12px 0;
-				position: sticky;
-				bottom: 0;
-				z-index: 10;
-				background: #f0f0f1;
-				border-top: 1px solid var(--cetech-de-border);
-			}
-			.cetech-de-entity-form-toolbar {
+			.cetech-de-page-header--sticky-actions {
 				position: sticky;
 				top: 32px;
-				z-index: 20;
-				display: flex;
-				flex-wrap: wrap;
-				gap: 8px;
-				align-items: center;
-				margin: 0 0 16px;
-				padding: 10px 0 12px;
-				background: #f0f0f1;
-				border-bottom: 1px solid var(--cetech-de-border);
+				z-index: 21;
+			}
+			.cetech-de-form-actions {
+				margin: 8px 0 24px;
+				padding-top: 4px;
+			}
+			.cetech-de-entity-form-native-submit {
+				position: absolute !important;
+				width: 1px !important;
+				height: 1px !important;
+				padding: 0 !important;
+				margin: -1px !important;
+				overflow: hidden !important;
+				clip: rect(0, 0, 0, 0) !important;
+				clip-path: inset(50%) !important;
+				border: 0 !important;
+				white-space: nowrap !important;
 			}
 			.cetech-de-dashboard-header-actions input.button-primary,
-			.cetech-de-dashboard-header-actions button.button-primary,
-			.cetech-de-entity-form-toolbar input.button-primary {
+			.cetech-de-dashboard-header-actions button.button-primary {
 				display: inline-block !important;
 				visibility: visible !important;
 			}
@@ -720,6 +724,9 @@ final class AdminPageLayout {
 			@media (max-width: 782px) {
 				.cetech-de-dashboard-header,
 				.cetech-de-page-header { padding: 18px; }
+				.cetech-de-page-header--sticky-actions {
+					top: 46px;
+				}
 				.cetech-de-dashboard-header-actions {
 					align-items: stretch;
 					min-width: 100%;
