@@ -169,9 +169,13 @@ Recorded after the identity commit (see §11). ZIP is built from committed clean
 | Version | `1.0.0-dev.bulk.7` |
 | Schema | `5` |
 | Branch | `integration/post-rc6-bulk-r1` |
-| Source commit | *recorded in the checksum follow-up* |
-| Bytes | *recorded in the checksum follow-up* |
-| SHA-256 | *recorded in the checksum follow-up* |
+| Source commit | `8fb99c9b43f16cbe96f478347af9601a6581fb80` |
+| Bytes | `1226695` |
+| SHA-256 | `15ae60d059ef68cebae29329012a5b1e11373e7452c723701d39b5e86e5b50b1` |
+| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.7.zip` |
+| Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.7.zip` |
+
+Extracted verification (`C:\Users\Jane\Desktop\Learning 2026\Cursor\cetech-de-bulk7-verify-extract\`): version `1.0.0-dev.bulk.7`, `SchemaVersion::TARGET = 5`, production `vendor/autoload.php`, `BulkJobEngine.php` / `WooCommerceCountryCatalog.php` / `assets/admin/bulk-tools.js` present, header `form=` + sticky Create/Save + hidden native submit, no `cetech-de-entity-form-toolbar`, no `tests/`, no `phpunit.xml`, no `node_modules`, no `.git`, no `.env`, no `vendor/phpunit`, no nested ZIPs, packaged PHP lint **383 files / 0 failures**. Identity is **not** `1.0.0-rc.6-r1-qa.2`.
 
 Do **not** overwrite historical `1.0.0-dev.bulk.6`, R1 QA.1/QA.2, or RC.6 ZIPs.
 
