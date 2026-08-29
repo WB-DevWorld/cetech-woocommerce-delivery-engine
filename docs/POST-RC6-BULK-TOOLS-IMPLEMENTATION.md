@@ -1,7 +1,7 @@
 # Post-RC.6 Bulk Tools — Implementation
 
 **Historical identity:** `feat/post-rc6-bulk-tools` / `1.0.0-dev.bulk.6`  
-**Current tree:** `integration/post-rc6-bulk-r1` / `1.0.0-dev.bulk.9` (Bulk.8 physical-QA repairs: `docs/POST-RC6-BULK8-PHYSICAL-QA-REPAIR.md`; background-runner: `docs/POST-RC6-BULK-BACKGROUND-PORTABILITY.md`)  
+**Current tree:** `integration/post-rc6-bulk-r1` / `1.0.0-rc.7` (promoted from owner-accepted `1.0.0-dev.bulk.9`; Bulk.8 physical-QA repairs: `docs/POST-RC6-BULK8-PHYSICAL-QA-REPAIR.md`; background-runner: `docs/POST-RC6-BULK-BACKGROUND-PORTABILITY.md`)  
 **Schema:** target `5` (`cetech_de_db_version`)
 
 ## Engine

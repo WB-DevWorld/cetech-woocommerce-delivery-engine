@@ -1,14 +1,44 @@
 # POST-RC.6 Bulk Tools — `1.0.0-dev.bulk.9` Owner QA Package
 
-**Document status:** Packaging / owner-physical-QA record  
+**Document status:** Owner physical QA record — **ACCEPTED**  
 **Date:** 2026-08-29  
 **Branch:** `integration/post-rc6-bulk-r1`  
-**Plugin identity:** `1.0.0-dev.bulk.9`  
+**Tested identity:** `1.0.0-dev.bulk.9`  
 **Schema:** `5`  
-**Protected published baseline:** tagged `v1.0.0-rc.6` / schema `4` **untouched**  
-**This is not:** RC.6, RC.7, Stage 15, or a physical PASS  
+**Training site:** training.cetechbpa.com  
+**Protected published baseline at QA time:** tagged `v1.0.0-rc.6` / schema `4` **untouched**  
+**This package is not:** RC.6, Stage 15, or a new feature stream  
 **FLAIROC:** not modified  
-**Cursor must not install this ZIP** on training.cetechbpa.com, FLAIROC, or any other owner site.
+**Cursor did not install this ZIP**
+
+---
+
+## OWNER PHYSICAL QA: ALL SIX ACCEPTANCE CHECKS PASSED
+
+Owner physical QA of **`1.0.0-dev.bulk.9`** on **training.cetechbpa.com** is complete and accepted.
+
+| Item | Value |
+|------|--------|
+| Site | training.cetechbpa.com |
+| Tested identity | `1.0.0-dev.bulk.9` |
+| Schema | `5` |
+| Date | 2026-08-29 |
+| Verdict | **ALL SIX ACCEPTANCE CHECKS PASSED** |
+
+| Check | Result |
+|-------|--------|
+| Catalog preview → Apply → rollback | **PASS** |
+| Multi-batch/background processing | **PASS** |
+| Validation Scan | **PASS** |
+| Remove-last-valid-option safety gate | **PASS** |
+| Delivery Charge GHS 50 → 55 → rollback to 50 | **PASS** |
+| R1 admin smoke — blank Reference Code, WooCommerce country picker, single clear Create/Save | **PASS** |
+
+### Known non-blocking presentation issue (not repaired)
+
+A Catalog preview where every target fails proposed-state validation correctly reports **Would fail**, but the page may still display **Ready to apply** and an **Apply these changes** button. The unsafe configuration itself is rejected by the resolver/safety gate. This is a known UI/presentation issue, not an accepted proof that invalid configuration can be applied.
+
+Do **not** repair this as part of RC.7 promotion. The physically accepted Bulk.9 runtime is frozen as `1.0.0-rc.7`.
 
 ---
 
@@ -98,7 +128,7 @@ Extracted outside the repository to `C:\Users\Jane\Desktop\Learning 2026\Cursor\
 | Packaged PHP lint excluding vendor | **388 files / 0 failures** |
 | Identity is not `1.0.0-dev.bulk.8` or `1.0.0-rc.7` | PASS |
 
-**No physical PASS.** Owner must install and test on training.cetechbpa.com.
+Owner physical QA of this extracted package on training.cetechbpa.com is recorded above: **ALL SIX ACCEPTANCE CHECKS PASSED**.
 
 ---
 
@@ -123,14 +153,17 @@ Do **not** use this package to judge In Store Delivery + optional Store Pickup, 
 
 - Historical `1.0.0-dev.bulk.7` ZIP **unchanged**
 - Historical `1.0.0-dev.bulk.8` ZIP **unchanged**
+- Historical Bulk.9 ZIP **unchanged** after this QA record
 - Tag `v1.0.0-rc.6` **unchanged** (peeled `8f37fe826e23406c9035312e279699b65c1e72e4`)
 - FLAIROC **untouched**
 - Schema still **5** (no schema 6)
-- **No RC.7**
 - Cursor did **not** install the ZIP
+- The known Catalog preview Ready-to-apply presentation issue was **not** repaired
 
 ---
 
 ## STOP
 
-Owner should install **only** `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.9.zip` for the six-check training-site acceptance run. Cursor must not deploy it. Do not begin Stage 15.
+**OWNER PHYSICAL QA: ALL SIX ACCEPTANCE CHECKS PASSED** on training.cetechbpa.com for `1.0.0-dev.bulk.9` / schema `5` on 2026-08-29.
+
+This document records the accepted Bulk.9 package. Promotion of that exact runtime to tagged `1.0.0-rc.7` is a separate identity/finalization step. Do not begin Stage 15. Do not modify FLAIROC. Do not repair the known non-blocking Catalog preview presentation issue as part of that freeze.

@@ -3,10 +3,10 @@
 **Document status:** Integration record for one combined post-RC.6 training-site development stream  
 **Date:** 2026-08-28  
 **Canonical development branch:** `integration/post-rc6-bulk-r1`  
-**Plugin identity:** `1.0.0-dev.bulk.9` (historical packaged identities `1.0.0-dev.bulk.7` and `1.0.0-dev.bulk.8` remain immutable; Bulk.9 packaged as `docs/POST-RC6-BULK9-OWNER-QA.md`)  
+**Plugin identity:** `1.0.0-rc.7` (promoted from owner-accepted `1.0.0-dev.bulk.9`; historical packaged identities `1.0.0-dev.bulk.7`–`1.0.0-dev.bulk.9` remain immutable)  
 **Schema target:** `5` (Bulk Tools migration; R1 added no migration)  
-**Protected published baseline:** tagged `1.0.0-rc.6` / schema `4` / `v1.0.0-rc.6` **untouched**  
-**This is not:** RC.6, RC.6 R1 QA.3, RC.7, or Stage 15  
+**Protected published baseline:** tagged `1.0.0-rc.7` / schema `5`. Historical tagged `1.0.0-rc.6` / schema `4` / `v1.0.0-rc.6` **untouched**  
+**This is not:** RC.6, RC.6 R1 QA.3, Stage 15, or a new feature stream  
 **FLAIROC:** not modified  
 **History:** not rewritten. Historical Bulk and R1 branches, commits, QA ZIPs, and the RC.6 tag remain preserved.
 
@@ -236,7 +236,8 @@ Do **not** use this package to judge In Store Delivery + optional Store Pickup, 
 - Historical R1 QA.2 ZIP (`1092406` bytes, SHA-256 `62c1fea94bcdea60540ea422220ea9c6f275b16a0c08d806091a5538598c3610`) **unchanged**
 - Historical Bulk `1.0.0-dev.bulk.2`–`1.0.0-dev.bulk.7` ZIPs **unchanged**
 - Packaged `1.0.0-dev.bulk.8` from `ed57664e61087aca09eda58b904b9edf0e78aac2` (`docs/POST-RC6-BULK-BACKGROUND-PORTABILITY-QA.md`) remains **immutable**. Physical QA of Bulk.8 was stopped; confirmed defects were repaired as Bulk.9.
-- Packaged `1.0.0-dev.bulk.9` from `85194cb86ab3d906e6642a3f15b1027767a12da8` (`docs/POST-RC6-BULK9-OWNER-QA.md`) — **no physical PASS**
+- Packaged `1.0.0-dev.bulk.9` from `85194cb86ab3d906e6642a3f15b1027767a12da8` (`docs/POST-RC6-BULK9-OWNER-QA.md`) — **OWNER PHYSICAL QA: ALL SIX ACCEPTANCE CHECKS PASSED** on training.cetechbpa.com (2026-08-29)
+- Promoted to tagged identity **`1.0.0-rc.7`** / schema `5` (`docs/RC7-FINALIZATION.md`) without changing Bulk.9 runtime behaviour
 - Tag `v1.0.0-rc.6` **unchanged**
 - FLAIROC **untouched**
 - Branches `feat/post-rc6-bulk-tools` and `fix/post-rc6-admin-setup-defects` **not rewritten**
@@ -245,6 +246,6 @@ Do **not** use this package to judge In Store Delivery + optional Store Pickup, 
 
 ## STOP
 
-Owner should install **only** `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.9.zip` for the six-check training-site acceptance run. Cursor must not deploy it.
+**OWNER PHYSICAL QA of `1.0.0-dev.bulk.9`: ALL SIX ACCEPTANCE CHECKS PASSED** on training.cetechbpa.com (2026-08-29). That exact runtime is promoted to tagged `1.0.0-rc.7` / schema `5`. Record: `docs/RC7-FINALIZATION.md`.
 
-Historical `1.0.0-dev.bulk.7` and `1.0.0-dev.bulk.8` remain immutable. Record: `docs/POST-RC6-BULK9-OWNER-QA.md`. **No physical PASS yet.** Do not begin Stage 15. Do not modify FLAIROC.
+Historical `1.0.0-dev.bulk.7`, `1.0.0-dev.bulk.8`, and `1.0.0-dev.bulk.9` remain immutable. Do not begin Stage 15. Do not modify FLAIROC. Do not repair the known non-blocking Catalog preview presentation issue as part of this freeze.
