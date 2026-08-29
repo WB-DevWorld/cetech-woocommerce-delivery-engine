@@ -1,13 +1,13 @@
 # POST-RC.6 Bulk.8 Physical QA — Consolidated Bulk.9 Repair
 
-**Document status:** Implementation + test record. **Not packaged.**  
+**Document status:** Implementation + test record. Packaged after owner review as `1.0.0-dev.bulk.9` — see `docs/POST-RC6-BULK9-OWNER-QA.md`.  
 **Date:** 2026-08-29  
 **Branch:** `integration/post-rc6-bulk-r1`  
 **Development identity after repair:** `1.0.0-dev.bulk.9`  
 **Schema target:** `5` (unchanged; schema 6 was not created)  
 **Protected published baseline:** tagged `v1.0.0-rc.6` / schema `4` **untouched**  
 **This is not:** RC.6, RC.7, Stage 15, In Store redesign, International ECR rewrite, Return/Refund, Blocks, carrier work, or FLAIROC deploy  
-**Packaging:** STOP. Do not build `1.0.0-dev.bulk.9.zip` until this report has been reviewed.
+**Packaging:** Owner-reviewed. Package record: `docs/POST-RC6-BULK9-OWNER-QA.md`.
 
 Protected artifacts **not modified and not retagged:**
 
@@ -231,4 +231,4 @@ Protected RC.6, immutable Bulk.7, immutable Bulk.8, FLAIROC, and unrelated featu
 
 ## STOP
 
-Implementation and tests are complete. **Do not package `1.0.0-dev.bulk.9` until this report has been reviewed.** After approval, package one consolidated Bulk.9 ZIP only.
+Implementation and tests are complete. Packaged after owner review as `cetech-woocommerce-delivery-engine-1.0.0-dev.bulk.9.zip`. Record: `docs/POST-RC6-BULK9-OWNER-QA.md`.
