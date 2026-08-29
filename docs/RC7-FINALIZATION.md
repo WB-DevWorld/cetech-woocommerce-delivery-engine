@@ -105,29 +105,35 @@ Accepted Bulk.9 baseline: PHPUnit **745 tests / 4223 assertions**; JS **24 / 24*
 
 | Item | Value |
 |------|--------|
-| Product finalize commit (package source) | TBD |
-| Tag `v1.0.0-rc.7` | TBD |
-| ZIP bytes | TBD |
-| SHA-256 | TBD |
-| Built from | committed clean `integration/post-rc6-bulk-r1` (not `-AllowDirty`) |
+| Product finalize commit (package source) | `ad3feeb` (`ad3feebfd1aa92d078caaa557c0c0d11c090a0c6`) |
+| Tag `v1.0.0-rc.7` | annotated `8cba2e877d949c83fd18a0d67b4831d2012d47cd`; peeled `ad3feebfd1aa92d078caaa557c0c0d11c090a0c6` |
+| ZIP bytes | `1262689` |
+| SHA-256 | `1881c0d89e288a14436e14a26f1ae359504a06cf2a77ef32b07f48e32797dbff` |
+| Sidecar | same hash + `  cetech-woocommerce-delivery-engine-1.0.0-rc.7.zip` |
+| Built from | committed clean `integration/post-rc6-bulk-r1` at `ad3feeb` (not `-AllowDirty`) |
 
-Do **not** rebuild the ZIP after the SHA-256 recording commit. The source commit is the tagged RC.7 identity commit, not the later docs-only hash record.
+Do **not** rebuild the ZIP after the SHA-256 recording commit. The source commit is `ad3feeb`, not the later docs-only hash record.
 
 ---
 
 ## 7. Extracted package verification
 
+Extracted outside the repository to `C:\Users\Jane\Desktop\Learning 2026\Cursor\cetech-de-rc7-verify-extract\`.
+
 | Check | Result |
 |-------|--------|
-| One plugin root | TBD |
-| Version `1.0.0-rc.7` | TBD |
-| Schema target `5` | TBD |
-| Production autoload / Linux-case classmap | TBD |
-| R1 runtime present | TBD |
-| Bulk Tools runtime present | TBD |
-| Packaged PHP lint | TBD |
-| No PHPUnit / tests / node_modules / `.git` / `.env` / nested ZIPs | TBD |
-| Historical Bulk.7 / Bulk.8 / Bulk.9 / RC.6 ZIPs unchanged | TBD |
+| One plugin root `cetech-woocommerce-delivery-engine/` | PASS |
+| Version `1.0.0-rc.7` | PASS |
+| `SchemaVersion::TARGET = 5` | PASS |
+| Production `vendor/autoload.php` + Linux-case classmap | PASS (verifier exit 0) |
+| R1 runtime (`WooCommerceCountryCatalog`, header `form=` Create/Save) | PASS |
+| Bulk Tools runtime (`BulkJobEngine`, `CatalogScopeMutator::scan()`, `RateCardBulkMutator`, `advance=1` JS, `WpActionSchedulerGateway`) | PASS |
+| Packaged PHP lint excluding vendor | **388 files / 0 failures** |
+| No `tests/`, no `phpunit.xml`, no `node_modules`, no `.git`, no `.env`, no `vendor/phpunit`, no nested ZIPs, no secrets | PASS |
+| Historical Bulk.7 / Bulk.8 / Bulk.9 / RC.6 ZIPs unchanged | PASS (`1226695` / `1240853` / `1256253` / `1059918` bytes; SHA-256 unchanged) |
+| Tag `v1.0.0-rc.6` object unchanged | PASS (`1d3252199f45371ec4229808155f6017ee3da9ea`) |
+| FLAIROC | **untouched** |
+| No new feature stream started | PASS |
 
 ---
 
