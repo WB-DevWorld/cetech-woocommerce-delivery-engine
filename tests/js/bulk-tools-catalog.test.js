@@ -217,4 +217,50 @@ describe('Bulk Tools job preview polling presentation', () => {
 		expect(reload).toHaveBeenCalledTimes(1);
 		vi.unstubAllGlobals();
 	});
+
+	it('does not claim completion while counters are still finalizing', () => {
+		const reload = vi.fn();
+		const status = document.querySelector('[data-cetech-de-job-id]');
+		vi.stubGlobal('location', { reload });
+
+		const done = window.cetechDeBulkCatalog.applyJobPoll(status, {
+			status: 'completed',
+			status_label: 'Finalizing',
+			processed: 1,
+			total: 1,
+			changed: 0,
+			show_cancel: false,
+			allows_apply: false,
+			terminal: false,
+			coherent: false
+		});
+
+		expect(done).toBe(false);
+		expect(reload).not.toHaveBeenCalled();
+		expect(status.textContent).toBe('Finalizing · 1 / 1');
+		vi.unstubAllGlobals();
+	});
+
+	it('reloads once a coherent terminal snapshot is available', () => {
+		const reload = vi.fn();
+		const status = document.querySelector('[data-cetech-de-job-id]');
+		vi.stubGlobal('location', { reload });
+
+		const done = window.cetechDeBulkCatalog.applyJobPoll(status, {
+			status: 'completed',
+			status_label: 'Completed',
+			processed: 1,
+			total: 1,
+			changed: 1,
+			show_cancel: false,
+			allows_apply: false,
+			terminal: true,
+			coherent: true,
+			reload: true
+		});
+
+		expect(done).toBe(true);
+		expect(reload).toHaveBeenCalledTimes(1);
+		vi.unstubAllGlobals();
+	});
 });

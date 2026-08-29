@@ -57,6 +57,7 @@ final class BulkJobAdminCopy {
 			BulkJobRunnerState::PHASE_QUEUED => __( 'Queued', 'cetech-woocommerce-delivery-engine' ),
 			BulkJobRunnerState::PHASE_STARTING => __( 'Starting background work', 'cetech-woocommerce-delivery-engine' ),
 			BulkJobRunnerState::PHASE_PROCESSING => __( 'Processing', 'cetech-woocommerce-delivery-engine' ),
+			BulkJobRunnerState::PHASE_FINALIZING => __( 'Finalizing', 'cetech-woocommerce-delivery-engine' ),
 			BulkJobRunnerState::PHASE_WAITING => __( 'Waiting for the site\'s background runner', 'cetech-woocommerce-delivery-engine' ),
 			BulkJobRunnerState::PHASE_PAUSED => __( 'Paused / needs attention', 'cetech-woocommerce-delivery-engine' ),
 			BulkJobRunnerState::PHASE_COMPLETED => self::status_label( $job->status ),
@@ -79,7 +80,10 @@ final class BulkJobAdminCopy {
 	 * @return array<string, mixed>
 	 */
 	public static function progress_payload( BulkJob $job ): array {
-		$state = BulkJobRunnerState::from_job( $job );
+		$state     = BulkJobRunnerState::from_job( $job );
+		$coherent  = BulkJobRunnerState::counters_coherent( $job );
+		$terminal  = ( $job->status->is_terminal() || $job->status->allows_apply() ) && $coherent
+			&& BulkJobRunnerState::PHASE_FINALIZING !== $state->phase;
 
 		return [
 			'code'                => $job->job_code,
@@ -91,18 +95,29 @@ final class BulkJobAdminCopy {
 			'skipped'             => $job->skipped_count,
 			'failed'              => $job->failed_count,
 			'show_cancel'         => self::shows_cancel_remaining( $job->status ),
-			'allows_apply'        => $job->status->allows_apply(),
+			'allows_apply'        => $job->status->allows_apply() && $coherent && BulkOperationType::ValidationScan !== $job->operation_type,
 			'dry_run'             => $job->dry_run,
-			'terminal'            => $job->status->is_terminal() || $job->status->allows_apply(),
+			'terminal'            => $terminal,
+			'coherent'            => $coherent,
+			'reload'              => $terminal,
 			'waiting_for_runner'  => $state->waiting_for_runner,
 			'can_resume'          => $state->can_resume,
 			'waiting_notice'      => $state->waiting_for_runner ? self::waiting_notice() : '',
 			'resume_label'        => self::resume_label(),
 			'stale'               => $state->stale,
+			'counters'            => self::counter_values( $job ),
 		];
 	}
 
-	public static function item_status_label( BulkJobItemStatus $status, bool $dry_run, bool $rollback = false ): string {
+	public static function item_status_label( BulkJobItemStatus $status, bool $dry_run, bool $rollback = false, ?string $scan_verdict = null ): string {
+		if ( null !== $scan_verdict && '' !== $scan_verdict ) {
+			return match ( $scan_verdict ) {
+				'invalid' => __( 'Invalid / Needs Attention', 'cetech-woocommerce-delivery-engine' ),
+				'warning' => __( 'Warning', 'cetech-woocommerce-delivery-engine' ),
+				'valid' => __( 'Valid / Healthy', 'cetech-woocommerce-delivery-engine' ),
+				default => self::item_status_label( $status, $dry_run, $rollback ),
+			};
+		}
 		if ( $rollback ) {
 			return match ( $status ) {
 				BulkJobItemStatus::RolledBack => __( 'Restored', 'cetech-woocommerce-delivery-engine' ),
@@ -179,6 +194,15 @@ final class BulkJobAdminCopy {
 			];
 		}
 
+		if ( BulkOperationType::ValidationScan === $job->operation_type ) {
+			return [
+				[ 'key' => 'total', 'label' => __( 'Total', 'cetech-woocommerce-delivery-engine' ) ],
+				[ 'key' => 'skipped', 'label' => __( 'Valid', 'cetech-woocommerce-delivery-engine' ) ],
+				[ 'key' => 'warnings', 'label' => __( 'Warnings', 'cetech-woocommerce-delivery-engine' ) ],
+				[ 'key' => 'failed', 'label' => __( 'Invalid / Needs Attention', 'cetech-woocommerce-delivery-engine' ) ],
+			];
+		}
+
 		return self::counter_labels( $job->dry_run );
 	}
 
@@ -217,6 +241,9 @@ final class BulkJobAdminCopy {
 		if ( BulkOperationType::Rollback === $job->operation_type ) {
 			return __( 'Rollback result', 'cetech-woocommerce-delivery-engine' );
 		}
+		if ( BulkOperationType::ValidationScan === $job->operation_type ) {
+			return __( 'Scan result', 'cetech-woocommerce-delivery-engine' );
+		}
 
 		return $job->dry_run
 			? __( 'Preview result', 'cetech-woocommerce-delivery-engine' )
@@ -228,6 +255,9 @@ final class BulkJobAdminCopy {
 			return $job->status->is_terminal()
 				? __( 'Restored', 'cetech-woocommerce-delivery-engine' )
 				: __( 'Will restore', 'cetech-woocommerce-delivery-engine' );
+		}
+		if ( BulkOperationType::ValidationScan === $job->operation_type ) {
+			return __( 'Finding', 'cetech-woocommerce-delivery-engine' );
 		}
 
 		return $job->dry_run
@@ -247,9 +277,27 @@ final class BulkJobAdminCopy {
 		return $status->is_active_worker_state();
 	}
 
+	public static function shows_rollback( BulkJob $job ): bool {
+		if ( BulkOperationType::ValidationScan === $job->operation_type ) {
+			return false;
+		}
+
+		return $job->status->allows_rollback() && $job->changed_count > 0;
+	}
+
 	public static function target_type_label( string $target_type ): string {
 		return match ( $target_type ) {
 			'variation' => __( 'Variation', 'cetech-woocommerce-delivery-engine' ),
+			'rate_card', 'rate_cards' => __( 'Delivery Charge', 'cetech-woocommerce-delivery-engine' ),
+			'delivery_option', 'delivery_options' => __( 'Delivery Option', 'cetech-woocommerce-delivery-engine' ),
+			'delivery_area', 'delivery_areas', 'destination_zone', 'destination_zones' => __( 'Delivery Area', 'cetech-woocommerce-delivery-engine' ),
+			'delivery_area_rule', 'delivery_area_rules', 'destination_rule', 'destination_rules' => __( 'Delivery Area Rule', 'cetech-woocommerce-delivery-engine' ),
+			'logistics_profile', 'logistics_profiles' => __( 'Logistics Profile', 'cetech-woocommerce-delivery-engine' ),
+			'pickup_location', 'pickup_locations' => __( 'Pickup Location', 'cetech-woocommerce-delivery-engine' ),
+			'supplier', 'suppliers' => __( 'Supplier', 'cetech-woocommerce-delivery-engine' ),
+			'origin', 'origins' => __( 'Origin', 'cetech-woocommerce-delivery-engine' ),
+			'site_wide_defaults' => __( 'Site-wide defaults', 'cetech-woocommerce-delivery-engine' ),
+			'profile_defaults' => __( 'Fulfilment defaults', 'cetech-woocommerce-delivery-engine' ),
 			default => __( 'Product', 'cetech-woocommerce-delivery-engine' ),
 		};
 	}
@@ -276,6 +324,10 @@ final class BulkJobAdminCopy {
 
 	public static function preview_only_notice(): string {
 		return __( 'Preview only — no product settings have been changed yet.', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function scan_only_notice(): string {
+		return __( 'Read-only validation scan — no Delivery Engine settings were changed.', 'cetech-woocommerce-delivery-engine' );
 	}
 
 	public static function apply_help(): string {

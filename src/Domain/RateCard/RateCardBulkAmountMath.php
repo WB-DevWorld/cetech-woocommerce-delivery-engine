@@ -35,4 +35,50 @@ final class RateCardBulkAmountMath {
 
 		return RateCardAmountFormatter::format( $result );
 	}
+
+	/**
+	 * Translate an administrator amount operation into the internal signed percent/fixed pair.
+	 * Missing or non-numeric values never become zero. Explicit numeric zero remains valid.
+	 *
+	 * @return array{op: string, value: string}
+	 */
+	public static function normalize_operation( string $operation, mixed $value ): array {
+		if ( null === $value || '' === $value ) {
+			throw new \InvalidArgumentException( 'Amount value is required and must be numeric.' );
+		}
+		if ( ! is_numeric( $value ) ) {
+			throw new \InvalidArgumentException( 'Amount value must be numeric.' );
+		}
+
+		$operation = strtolower( trim( $operation ) );
+		$magnitude = (float) $value;
+
+		if ( in_array( $operation, [ 'increase_percent', 'decrease_percent', 'increase_fixed', 'decrease_fixed' ], true ) && $magnitude < 0 ) {
+			throw new \InvalidArgumentException( 'Enter a positive amount. The selected operation already chooses increase or decrease.' );
+		}
+
+		return match ( $operation ) {
+			'increase_percent' => [
+				'op'    => 'percent',
+				'value' => (string) abs( $magnitude ),
+			],
+			'decrease_percent' => [
+				'op'    => 'percent',
+				'value' => (string) ( 0 - abs( $magnitude ) ),
+			],
+			'increase_fixed' => [
+				'op'    => 'fixed',
+				'value' => (string) abs( $magnitude ),
+			],
+			'decrease_fixed' => [
+				'op'    => 'fixed',
+				'value' => (string) ( 0 - abs( $magnitude ) ),
+			],
+			'percent', 'fixed' => [
+				'op'    => $operation,
+				'value' => (string) $value,
+			],
+			default => throw new \InvalidArgumentException( 'Unknown Delivery Charge amount operation.' ),
+		};
+	}
 }

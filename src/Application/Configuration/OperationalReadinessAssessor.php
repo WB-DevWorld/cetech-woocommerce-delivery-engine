@@ -139,7 +139,11 @@ final class OperationalReadinessAssessor {
 		return OperationalReadiness::ready();
 	}
 
-	private function reason_for_configuration( \CetechDeliveryEngine\Domain\Configuration\EffectiveConfiguration $configuration ): ?string {
+	/**
+	 * Shared authority for bulk preview/apply and validation scans.
+	 * Does not construct a second resolver; callers pass an already-resolved configuration.
+	 */
+	public static function reason_for_effective( \CetechDeliveryEngine\Domain\Configuration\EffectiveConfiguration $configuration ): ?string {
 		if ( EffectiveFieldState::Invalid === $configuration->state ) {
 			return 'This product has a fulfilment combination that is not allowed.';
 		}
@@ -149,7 +153,7 @@ final class OperationalReadinessAssessor {
 			return 'Fulfilment type is incomplete.';
 		}
 
-		$offer_reason = $this->offer_field_readiness( $configuration )->reason;
+		$offer_reason = self::offer_field_readiness_for( $configuration )->reason;
 		if ( null !== $offer_reason ) {
 			return $offer_reason;
 		}
@@ -169,7 +173,17 @@ final class OperationalReadinessAssessor {
 		return null;
 	}
 
+	private function reason_for_configuration( \CetechDeliveryEngine\Domain\Configuration\EffectiveConfiguration $configuration ): ?string {
+		return self::reason_for_effective( $configuration );
+	}
+
 	private function offer_field_readiness(
+		\CetechDeliveryEngine\Domain\Configuration\EffectiveConfiguration $configuration
+	): OperationalReadiness {
+		return self::offer_field_readiness_for( $configuration );
+	}
+
+	private static function offer_field_readiness_for(
 		\CetechDeliveryEngine\Domain\Configuration\EffectiveConfiguration $configuration
 	): OperationalReadiness {
 		$offers = $configuration->collection( ConfigurationFieldKey::DELIVERY_OFFER_IDS );

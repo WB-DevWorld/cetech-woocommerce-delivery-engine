@@ -261,8 +261,14 @@ final class BulkJobWorker {
 				++$skipped;
 			} elseif ( BulkJobItemStatus::Changed === $status ) {
 				++$changed;
+				if ( ! empty( $result['warning'] ) ) {
+					++$warnings;
+				}
 			} elseif ( BulkJobItemStatus::Unchanged === $status || BulkJobItemStatus::Skipped === $status ) {
 				++$skipped;
+				if ( ! empty( $result['warning'] ) ) {
+					++$warnings;
+				}
 			} else {
 				++$failed;
 			}
@@ -337,13 +343,29 @@ final class BulkJobWorker {
 			}
 			$parent = $item->parent_target_id;
 			try {
-				$result = $this->mutator->rollback(
-					$item->target_type,
-					$item->target_id,
-					$parent,
-					$item->before_snapshot,
-					$item->after_fingerprint
-				);
+				if ( 'rate_card' === $item->target_type ) {
+					if ( ! $this->rate_mutator instanceof RateCardBulkMutator ) {
+						$result = [
+							'outcome'       => 'rollback_failed',
+							'error_code'    => 'rate_processor_unavailable',
+							'error_summary' => 'Delivery Charge rollback is not available.',
+						];
+					} else {
+						$result = $this->rate_mutator->rollback(
+							$item->target_id,
+							$item->before_snapshot,
+							$item->after_fingerprint
+						);
+					}
+				} else {
+					$result = $this->mutator->rollback(
+						$item->target_type,
+						$item->target_id,
+						$parent,
+						$item->before_snapshot,
+						$item->after_fingerprint
+					);
+				}
 			} catch ( \Throwable ) {
 				$result = [
 					'outcome'       => 'rollback_failed',
@@ -409,7 +431,9 @@ final class BulkJobWorker {
 		}
 
 		$failed = $job->failed_count;
-		if ( $job->dry_run ) {
+		if ( BulkOperationType::ValidationScan === $job->operation_type ) {
+			$job = $job->with_status( BulkJobStatus::Completed )->with( [ 'dry_run' => true ] );
+		} elseif ( $job->dry_run ) {
 			$job = $job->with_status( BulkJobStatus::Ready )->with( [ 'dry_run' => true ] );
 		} else {
 			$job = $job->with_status( $failed > 0 ? BulkJobStatus::CompletedWithErrors : BulkJobStatus::Completed );

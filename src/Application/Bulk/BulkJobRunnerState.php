@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Application\Bulk;
 
 use CetechDeliveryEngine\Domain\Bulk\BulkJob;
 use CetechDeliveryEngine\Domain\Enum\BulkJobStatus;
+use CetechDeliveryEngine\Domain\Enum\BulkOperationType;
 
 /**
  * Derived runner presentation. Not a persisted job status and not a schema change.
@@ -30,6 +31,8 @@ final class BulkJobRunnerState {
 
 	public const PHASE_CANCELLED = 'cancelled';
 
+	public const PHASE_FINALIZING = 'finalizing';
+
 	public const WAITING_THRESHOLD_SECONDS = 12;
 
 	public const STALE_THRESHOLD_SECONDS = 600;
@@ -47,6 +50,10 @@ final class BulkJobRunnerState {
 		$now = $now ?? time();
 
 		if ( BulkJobStatus::Ready === $job->status ) {
+			if ( ! self::counters_coherent( $job ) ) {
+				return new self( self::PHASE_FINALIZING, false, false, false, false );
+			}
+
 			return new self( self::PHASE_READY, false, false, false, false );
 		}
 		if ( BulkJobStatus::Failed === $job->status ) {
@@ -56,6 +63,10 @@ final class BulkJobRunnerState {
 			return new self( self::PHASE_CANCELLED, false, false, false, false );
 		}
 		if ( $job->status->is_terminal() ) {
+			if ( ! self::counters_coherent( $job ) ) {
+				return new self( self::PHASE_FINALIZING, false, false, false, false );
+			}
+
 			return new self( self::PHASE_COMPLETED, false, false, false, false );
 		}
 		if ( BulkJobStatus::CancelRequested === $job->status ) {
@@ -113,5 +124,32 @@ final class BulkJobRunnerState {
 		}
 
 		return max( 0, $now - $unix );
+	}
+
+	/**
+	 * Terminal/ready presentation is allowed only when job-row counters add up.
+	 * Partial counter writes must not be shown as Completed/Ready.
+	 */
+	public static function counters_coherent( BulkJob $job ): bool {
+		$accounted = $job->changed_count + $job->skipped_count + $job->failed_count;
+		if ( BulkOperationType::Rollback === $job->operation_type ) {
+			$accounted = (int) ( $job->summary['rollback_restored'] ?? 0 )
+				+ (int) ( $job->summary['rollback_skipped'] ?? $job->skipped_count )
+				+ (int) ( $job->summary['rollback_failed'] ?? $job->failed_count );
+		}
+
+		if ( $job->processed_count !== $accounted ) {
+			return false;
+		}
+
+		if ( BulkJobStatus::Cancelled === $job->status ) {
+			return true;
+		}
+
+		if ( $job->total_count > 0 && $job->processed_count !== $job->total_count ) {
+			return false;
+		}
+
+		return true;
 	}
 }

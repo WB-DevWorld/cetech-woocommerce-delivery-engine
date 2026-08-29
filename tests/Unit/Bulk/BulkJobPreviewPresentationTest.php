@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Tests\Unit\Bulk;
 
 use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogActionManifest;
 use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogFieldAction;
+use CetechDeliveryEngine\Domain\Bulk\BulkJob;
 use CetechDeliveryEngine\Domain\Bulk\BulkJobItem;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey;
 use CetechDeliveryEngine\Domain\Enum\BulkJobItemStatus;
@@ -242,6 +243,31 @@ final class BulkJobPreviewPresentationTest extends TestCase {
 			'Applying starts a background job. Changes are processed in small batches.',
 			BulkJobAdminCopy::apply_help()
 		);
+	}
+
+	public function test_validation_scan_copy_is_read_only_and_hides_apply_language(): void {
+		$job = BulkJob::create(
+			BulkOperationType::ValidationScan,
+			1,
+			[ 'scope' => 'selected_ids', 'selected_ids' => [ 1 ] ],
+			[]
+		)->with(
+			[
+				'id'              => 18,
+				'status'          => BulkJobStatus::Completed,
+				'dry_run'         => true,
+				'total_count'     => 1,
+				'processed_count' => 1,
+				'skipped_count'   => 1,
+			]
+		);
+
+		self::assertSame( 'Scan result', BulkJobAdminCopy::job_result_heading( $job ) );
+		self::assertSame( 'Finding', BulkJobAdminCopy::compare_after_heading( $job ) );
+		self::assertFalse( $job->status->allows_apply() );
+		self::assertFalse( BulkJobAdminCopy::shows_rollback( $job ) );
+		self::assertSame( 'Valid / Healthy', BulkJobAdminCopy::item_status_label( BulkJobItemStatus::Unchanged, true, false, 'valid' ) );
+		self::assertSame( 'Invalid / Needs Attention', BulkJobAdminCopy::item_status_label( BulkJobItemStatus::Failed, true, false, 'invalid' ) );
 	}
 
 	/**

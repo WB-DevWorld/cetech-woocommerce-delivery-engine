@@ -451,7 +451,7 @@ final class BulkToolsPage {
 		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_VALIDATION ) . '" />';
 		AdminPageLayout::open_form_panel(
 			__( 'Products to scan', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Validation scans run as background jobs and do not change configuration until you confirm a cleanup job. Search by name or SKU. Leave empty only if you paste a list below.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Validation scans are read-only. They resolve each product through the existing delivery configuration and never apply changes.', 'cetech-woocommerce-delivery-engine' )
 		);
 		$this->open_catalog_row( 'cetech-de-validation-products', __( 'Products', 'cetech-woocommerce-delivery-engine' ) );
 		$this->render_product_search_select( 'cetech-de-validation-products', 'selected_product_ids' );
@@ -465,7 +465,7 @@ final class BulkToolsPage {
 		AdminPageLayout::close_advanced();
 		echo '<div class="cetech-de-bulk-actions">';
 		echo '<p class="cetech-de-form-actions"><button type="submit" class="button button-primary">' . esc_html__( 'Start validation scan (no writes)', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
-		echo '<p class="description">' . esc_html__( 'Needs Attention remains the operational list for products that currently fail delivery resolution.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'Results show Valid / Healthy, Warning, or Invalid / Needs Attention. There is no Apply step.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 		echo '</div>';
 		echo '</form>';
 	}
@@ -545,6 +545,8 @@ final class BulkToolsPage {
 		if ( BulkOperationType::Rollback === $job->operation_type ) {
 			$notice_class = $job->status->is_terminal() ? 'notice notice-success inline' : 'notice notice-info inline';
 			echo '<div class="' . esc_attr( $notice_class ) . ' cetech-de-bulk-notice" role="status"><p>' . esc_html( BulkJobAdminCopy::rollback_notice( $job->status->is_terminal() ) ) . '</p></div>';
+		} elseif ( BulkOperationType::ValidationScan === $job->operation_type ) {
+			echo '<div class="notice notice-info inline cetech-de-bulk-notice" role="status"><p>' . esc_html( BulkJobAdminCopy::scan_only_notice() ) . '</p></div>';
 		} elseif ( $job->dry_run ) {
 			echo '<div class="notice notice-info inline cetech-de-bulk-notice" role="status"><p>' . esc_html( BulkJobAdminCopy::preview_only_notice() ) . '</p></div>';
 		} else {
@@ -552,7 +554,7 @@ final class BulkToolsPage {
 		}
 		$payload = BulkJobAdminCopy::progress_payload( $job );
 		$state   = BulkJobRunnerState::from_job( $job );
-		echo '<p class="cetech-de-bulk-job-status" role="status" aria-live="polite" data-cetech-de-job-id="' . esc_attr( (string) $job->id ) . '">' . esc_html(
+		echo '<p class="cetech-de-bulk-job-status" role="status" aria-live="polite" data-cetech-de-job-id="' . esc_attr( (string) $job->id ) . '" data-cetech-de-coherent="' . esc_attr( ! empty( $payload['coherent'] ) ? '1' : '0' ) . '">' . esc_html(
 			sprintf(
 				'%s · %d / %d',
 				$payload['status_label'],
@@ -578,7 +580,7 @@ final class BulkToolsPage {
 
 		echo '<div class="cetech-de-bulk-actions">';
 		echo '<div class="cetech-de-bulk-actions-primary">';
-		if ( $job->status->allows_apply() ) {
+		if ( $job->status->allows_apply() && BulkOperationType::ValidationScan !== $job->operation_type ) {
 			echo '<p class="description">' . esc_html( BulkJobAdminCopy::apply_help() ) . '</p>';
 			$this->job_button(
 				self::ACTION_APPLY,
@@ -610,7 +612,7 @@ final class BulkToolsPage {
 				'data-cetech-de-cancel-remaining'
 			);
 		}
-		if ( $job->status->allows_rollback() ) {
+		if ( BulkJobAdminCopy::shows_rollback( $job ) ) {
 			$this->job_button( self::ACTION_ROLLBACK, $job->id, __( 'Roll back eligible items', 'cetech-woocommerce-delivery-engine' ), false );
 		}
 		echo '</div></div>';
@@ -679,7 +681,7 @@ final class BulkToolsPage {
 				if ( '' !== $display['secondary'] ) {
 					echo '<span class="cetech-de-bulk-target-secondary">' . esc_html( $display['secondary'] ) . '</span>';
 				}
-				if ( 'variation' !== $item->target_type ) {
+				if ( 'variation' !== $item->target_type && in_array( $item->target_type, [ 'product', '' ], true ) ) {
 					$counts = $labels->variation_counts( $item->target_id );
 					$note   = BulkJobAdminCopy::variation_inherit_count_note( $counts['inherit'], $counts['override'], $phase );
 					if ( '' !== $note && BulkVariationPolicy::PreserveOverrides === $definition->variation_policy ) {
@@ -688,7 +690,14 @@ final class BulkToolsPage {
 				}
 				echo '</td>';
 				echo '<td data-label="' . esc_attr__( 'Type', 'cetech-woocommerce-delivery-engine' ) . '">' . esc_html( BulkJobAdminCopy::target_type_label( $item->target_type ) ) . '</td>';
-				echo '<td data-label="' . esc_attr__( 'Status', 'cetech-woocommerce-delivery-engine' ) . '">' . esc_html( BulkJobAdminCopy::item_status_label( $item->status, $job->dry_run, $is_rollback ) ) . '</td>';
+				echo '<td data-label="' . esc_attr__( 'Status', 'cetech-woocommerce-delivery-engine' ) . '">' . esc_html(
+					BulkJobAdminCopy::item_status_label(
+						$item->status,
+						$job->dry_run,
+						$is_rollback,
+						isset( $item->result['scan_verdict'] ) ? (string) $item->result['scan_verdict'] : null
+					)
+				) . '</td>';
 				echo '<td data-label="' . esc_attr__( 'Current', 'cetech-woocommerce-delivery-engine' ) . '">';
 				if ( $is_rollback ) {
 					$this->render_result_side( $blocks, 'proposed', __( 'Current', 'cetech-woocommerce-delivery-engine' ), 'current' );
@@ -765,13 +774,15 @@ final class BulkToolsPage {
 		$this->close_catalog_row();
 		$this->open_catalog_row( 'cetech-de-rate-op', __( 'Amount change', 'cetech-woocommerce-delivery-engine' ) );
 		echo '<select id="cetech-de-rate-op" name="amount_op" class="cetech-de-bulk-select-wide">';
-		echo '<option value="percent">' . esc_html__( 'Increase/decrease by percent', 'cetech-woocommerce-delivery-engine' ) . '</option>';
-		echo '<option value="fixed">' . esc_html__( 'Increase/decrease by fixed amount', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<option value="increase_percent">' . esc_html__( 'Increase by percentage', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<option value="decrease_percent">' . esc_html__( 'Decrease by percentage', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<option value="increase_fixed">' . esc_html__( 'Increase by fixed amount', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<option value="decrease_fixed">' . esc_html__( 'Decrease by fixed amount', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		echo '</select>';
 		$this->close_catalog_row();
 		$this->open_catalog_row( 'cetech-de-rate-value', __( 'Value', 'cetech-woocommerce-delivery-engine' ) );
 		echo '<input id="cetech-de-rate-value" name="amount_value" type="text" class="regular-text cetech-de-bulk-input-narrow" />';
-		echo '<p class="description">' . esc_html__( 'For example 7.5 or -2.00.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'Enter a positive number. 10 means 10 percent or 10 of the store currency, depending on the operation above. A missing or invalid number is rejected and never becomes 0.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 		$this->close_catalog_row();
 		AdminPageLayout::close_form_panel();
 		echo '<div class="cetech-de-bulk-actions">';

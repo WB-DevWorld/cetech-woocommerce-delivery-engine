@@ -154,7 +154,18 @@
 			root.location.reload();
 			return true;
 		}
-		return !!data.terminal;
+		if (data.terminal && data.coherent === false) {
+			return false;
+		}
+		var pageCoherent = statusEl.getAttribute('data-cetech-de-coherent') === '1';
+		if (data.terminal) {
+			if (!pageCoherent && data.reload && root.location && typeof root.location.reload === 'function') {
+				root.location.reload();
+				return true;
+			}
+			return true;
+		}
+		return false;
 	}
 
 	function initJobPolling() {

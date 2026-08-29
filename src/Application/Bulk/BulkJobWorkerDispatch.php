@@ -32,6 +32,16 @@ trait BulkJobWorkerDispatch {
 			return $this->rate_mutator->process( $item->target_id, $job->action_manifest, $job->dry_run );
 		}
 
+		if ( BulkOperationType::ValidationScan === $job->operation_type ) {
+			$target_id = $item->target_id;
+			$parent    = $item->parent_target_id;
+			if ( CatalogTargetDefinition::TARGET_VARIATION === $item->target_type && null === $parent ) {
+				$parent = $this->targets->parent_product_id( $target_id );
+			}
+
+			return $this->mutator->scan( $item->target_type, $target_id, $parent );
+		}
+
 		if ( BulkOperationType::ConfigImport === $job->operation_type ) {
 			if ( ! $this->importer instanceof ConfigurationImporter ) {
 				return $this->missing_processor( 'importer_unavailable', 'Configuration import is not available.' );
@@ -40,16 +50,25 @@ trait BulkJobWorkerDispatch {
 			$allow_private = ! empty( $job->action_manifest['include_private_sources'] );
 			$row           = is_array( $item->result['row'] ?? null ) ? $item->result['row'] : [];
 			$applied       = $this->importer->apply_item( $item->target_type, $row, $mode, $job->dry_run, $allow_private );
+			$presentation  = [
+				'section'           => $item->target_type,
+				'code'              => $item->external_key,
+				'entity_type'       => (string) ( $applied['entity_type'] ?? $item->target_type ),
+				'entity_label'      => (string) ( $applied['entity_label'] ?? $item->external_key ),
+				'current_summary'   => (string) ( $applied['current_summary'] ?? '' ),
+				'proposed_summary'  => (string) ( $applied['proposed_summary'] ?? ( $applied['error_summary'] ?? '' ) ),
+				'action_label'      => (string) ( $applied['action_label'] ?? '' ),
+			];
 
 			return [
 				'outcome'                  => $applied['outcome'],
 				'error_code'               => $applied['error_code'],
 				'error_summary'            => $applied['error_summary'],
 				'warning'                  => false,
-				'before_snapshot'          => [],
+				'before_snapshot'          => is_array( $applied['before_snapshot'] ?? null ) ? $applied['before_snapshot'] : $presentation,
 				'precondition_fingerprint' => '',
 				'after_fingerprint'        => '',
-				'result'                   => [ 'section' => $item->target_type, 'code' => $item->external_key ],
+				'result'                   => $presentation,
 			];
 		}
 
@@ -82,7 +101,7 @@ trait BulkJobWorkerDispatch {
 			$parent = $this->targets->parent_product_id( $target_id );
 		}
 
-		$dry_run = $job->dry_run || BulkOperationType::ValidationScan === $job->operation_type;
+		$dry_run = $job->dry_run;
 
 		return $this->mutator->process(
 			$item->target_type,

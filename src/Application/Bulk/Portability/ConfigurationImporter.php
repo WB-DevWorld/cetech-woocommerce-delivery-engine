@@ -97,27 +97,35 @@ final class ConfigurationImporter {
 
 	/**
 	 * @param array<string, mixed> $row
-	 * @return array{outcome: string, error_code: ?string, error_summary: ?string}
+	 * @return array<string, mixed>
 	 */
 	public function apply_item( string $section, array $row, ConfigImportConflictMode $mode, bool $dry_run, bool $allow_private ): array {
 		if ( in_array( $section, [ 'suppliers', 'origins' ], true ) && ! $allow_private ) {
-			return [
-				'outcome'       => 'skipped',
-				'error_code'    => 'private_source_omitted',
-				'error_summary' => 'Private supplier/origin rows were omitted.',
-			];
+			return $this->with_entity(
+				[
+					'outcome'       => 'skipped',
+					'error_code'    => 'private_source_omitted',
+					'error_summary' => 'Private supplier/origin rows were omitted.',
+				],
+				$section,
+				$row
+			);
 		}
 
 		if ( in_array( $section, [ 'orders', 'shipments', 'audit_log', 'bulk_jobs', 'feature_flags' ], true ) ) {
-			return [
-				'outcome'       => 'skipped',
-				'error_code'    => 'non_portable_section',
-				'error_summary' => 'Transactional history and runtime flags are not imported.',
-			];
+			return $this->with_entity(
+				[
+					'outcome'       => 'skipped',
+					'error_code'    => 'non_portable_section',
+					'error_summary' => 'Transactional history and runtime flags are not imported.',
+				],
+				$section,
+				$row
+			);
 		}
 
 		try {
-			return match ( $section ) {
+			$applied = match ( $section ) {
 				'delivery_options' => $this->upsert_coded( $this->offers, $row, $mode, $dry_run ),
 				'delivery_areas' => $this->upsert_coded( $this->zones, $row, $mode, $dry_run ),
 				'logistics_profiles' => $this->upsert_coded( $this->logistics, $row, $mode, $dry_run ),
@@ -134,12 +142,18 @@ final class ConfigurationImporter {
 					'error_summary' => 'Unknown configuration section.',
 				],
 			};
+
+			return $this->with_entity( $applied, $section, $row );
 		} catch ( \Throwable $exception ) {
-			return [
-				'outcome'       => 'failed',
-				'error_code'    => 'import_failed',
-				'error_summary' => $exception->getMessage(),
-			];
+			return $this->with_entity(
+				[
+					'outcome'       => 'failed',
+					'error_code'    => 'import_failed',
+					'error_summary' => $exception->getMessage(),
+				],
+				$section,
+				$row
+			);
 		}
 	}
 
@@ -349,6 +363,90 @@ final class ConfigurationImporter {
 		$this->scopes->saveScopedConfiguration( new ScopedConfiguration( $scope, $scalars, $collections ) );
 
 		return $this->changed();
+	}
+
+	/**
+	 * @param array<string, mixed> $applied
+	 * @param array<string, mixed> $row
+	 * @return array<string, mixed>
+	 */
+	private function with_entity( array $applied, string $section, array $row ): array {
+		$outcome = (string) ( $applied['outcome'] ?? '' );
+		$applied['entity_type']      = $section;
+		$applied['entity_label']     = $this->entity_label( $section, $row );
+		$applied['action_label']     = match ( $outcome ) {
+			'changed' => 'conflict_skipped' === (string) ( $applied['error_code'] ?? '' )
+				? 'Would skip'
+				: ( $this->looks_like_update( $applied, $row ) ? 'Would update' : 'Would add' ),
+			'skipped' => (string) ( $applied['error_summary'] ?? 'Would skip' ),
+			'failed' => (string) ( $applied['error_summary'] ?? 'Would fail' ),
+			default => (string) ( $applied['error_summary'] ?? '' ),
+		};
+		$applied['current_summary']  = $this->current_summary( $section, $row, $outcome, (string) ( $applied['error_code'] ?? '' ) );
+		$applied['proposed_summary'] = $this->proposed_summary( $section, $row, $outcome, (string) ( $applied['error_code'] ?? '' ), (string) ( $applied['error_summary'] ?? '' ) );
+
+		return $applied;
+	}
+
+	/**
+	 * @param array<string, mixed> $row
+	 */
+	private function entity_label( string $section, array $row ): string {
+		foreach ( [ 'name', 'label', 'public_label', 'internal_code', 'profile_key', 'zone_code' ] as $key ) {
+			$value = trim( (string) ( $row[ $key ] ?? '' ) );
+			if ( '' !== $value ) {
+				return $value;
+			}
+		}
+		if ( 'delivery_area_rules' === $section ) {
+			$parts = array_filter(
+				[
+					(string) ( $row['zone_code'] ?? '' ),
+					(string) ( $row['rule_type'] ?? '' ),
+					(string) ( $row['rule_value'] ?? '' ),
+				]
+			);
+
+			return implode( ' / ', $parts );
+		}
+
+		return $section;
+	}
+
+	/**
+	 * @param array<string, mixed> $applied
+	 * @param array<string, mixed> $row
+	 */
+	private function looks_like_update( array $applied, array $row ): bool {
+		return isset( $row['id'] ) || 'conflict_skipped' === (string) ( $applied['error_code'] ?? '' );
+	}
+
+	/**
+	 * @param array<string, mixed> $row
+	 */
+	private function current_summary( string $section, array $row, string $outcome, string $error_code ): string {
+		if ( 'conflict_skipped' === $error_code ) {
+			return 'Already present';
+		}
+		if ( 'changed' === $outcome ) {
+			return 'Missing locally';
+		}
+
+		return $this->entity_label( $section, $row );
+	}
+
+	/**
+	 * @param array<string, mixed> $row
+	 */
+	private function proposed_summary( string $section, array $row, string $outcome, string $error_code, string $error_summary ): string {
+		if ( '' !== $error_summary ) {
+			return $error_summary;
+		}
+		if ( 'changed' === $outcome ) {
+			return $this->entity_label( $section, $row );
+		}
+
+		return $this->entity_label( $section, $row );
 	}
 
 	/**

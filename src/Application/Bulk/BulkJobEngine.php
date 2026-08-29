@@ -81,6 +81,9 @@ final class BulkJobEngine {
 
 	public function apply( int $job_id, int $actor_user_id ): BulkJob {
 		$job = $this->require_job( $job_id );
+		if ( BulkOperationType::ValidationScan === $job->operation_type ) {
+			throw new \InvalidArgumentException( 'Validation scans are read-only and cannot be applied.' );
+		}
 		if ( ! $job->status->allows_apply() ) {
 			throw new \InvalidArgumentException( 'This job is not ready to apply.' );
 		}
@@ -139,7 +142,10 @@ final class BulkJobEngine {
 
 	public function rollback( int $job_id, int $actor_user_id ): BulkJob {
 		$job = $this->require_job( $job_id );
-		if ( ! $job->status->allows_rollback() ) {
+		if ( BulkOperationType::ValidationScan === $job->operation_type ) {
+			throw new \InvalidArgumentException( 'Validation scans cannot be rolled back.' );
+		}
+		if ( ! $job->status->allows_rollback() || $job->changed_count < 1 ) {
 			throw new \InvalidArgumentException( 'This job cannot be rolled back.' );
 		}
 		if ( ! $this->queue->is_available() ) {
@@ -174,6 +180,7 @@ final class BulkJobEngine {
 						'before_snapshot'          => $item->before_snapshot,
 						'after_fingerprint'        => $item->after_fingerprint,
 						'precondition_fingerprint' => $item->after_fingerprint,
+						'result'                   => $item->result,
 					]
 				);
 				$after_id = (int) $item->id;

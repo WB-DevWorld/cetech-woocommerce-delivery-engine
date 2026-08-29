@@ -9,13 +9,16 @@ use CetechDeliveryEngine\Application\Bulk\Portability\EntityCodeResolver;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationValidator;
 use CetechDeliveryEngine\Application\Configuration\FulfilmentConstraintServiceInterface;
+use CetechDeliveryEngine\Application\Configuration\OperationalReadinessAssessor;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsPolicyInterface;
 use CetechDeliveryEngine\Domain\Configuration\CollectionFieldInstruction;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldRegistry;
+use CetechDeliveryEngine\Domain\Configuration\ConfigurationReasonCode;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
 use CetechDeliveryEngine\Domain\Configuration\EffectiveConfiguration;
 use CetechDeliveryEngine\Domain\Configuration\EffectiveConfigurationRequest;
+use CetechDeliveryEngine\Domain\Configuration\FieldProvenance;
 use CetechDeliveryEngine\Domain\Configuration\InvalidConfigurationException;
 use CetechDeliveryEngine\Domain\Configuration\ScopedConfiguration;
 use CetechDeliveryEngine\Domain\Configuration\ScopedConfigurationRepositoryInterface;
@@ -130,6 +133,18 @@ final class CatalogScopeMutator {
 			);
 		}
 
+		if ( $effective instanceof EffectiveConfiguration ) {
+			$unusable = OperationalReadinessAssessor::reason_for_effective( $effective );
+			if ( null !== $unusable ) {
+				return $this->fail(
+					'no_valid_delivery_path',
+					$unusable,
+					$before_snapshot,
+					$precondition
+				);
+			}
+		}
+
 		if ( $dry_run ) {
 			return [
 				'outcome'                   => 'changed',
@@ -170,6 +185,135 @@ final class CatalogScopeMutator {
 				'config_version'  => $saved?->scope->config_version ?? 0,
 			],
 		];
+	}
+
+	/**
+	 * Read-only resolver validation for a catalog target. Never writes configuration.
+	 *
+	 * @return array{
+	 *   outcome: string,
+	 *   error_code: ?string,
+	 *   error_summary: ?string,
+	 *   warning: bool,
+	 *   before_snapshot: array<string, mixed>,
+	 *   precondition_fingerprint: string,
+	 *   after_fingerprint: string,
+	 *   result: array<string, mixed>
+	 * }
+	 */
+	public function scan(
+		string $target_type,
+		int $target_id,
+		?int $parent_product_id
+	): array {
+		$scope_type = CatalogTargetDefinition::TARGET_VARIATION === $target_type
+			? ConfigurationScopeType::Variation
+			: ConfigurationScopeType::Product;
+
+		if ( ConfigurationScopeType::Variation === $scope_type && ( null === $parent_product_id || $parent_product_id <= 0 ) ) {
+			return $this->fail( 'missing_parent', 'Variation configuration requires a parent product.', [], '' );
+		}
+
+		$existing        = $this->scopes->findByScopeAndSlice(
+			$scope_type,
+			$target_id,
+			ConfigurationScope::DEFAULT_SLICE_KEY
+		);
+		$before_snapshot = $this->snapshot( $existing );
+		$precondition    = $existing instanceof ScopedConfiguration ? $existing->fingerprint() : '';
+
+		$product_id   = ConfigurationScopeType::Product === $scope_type ? $target_id : (int) $parent_product_id;
+		$variation_id = ConfigurationScopeType::Variation === $scope_type ? $target_id : null;
+		if ( $product_id <= 0 ) {
+			return $this->fail( 'invalid_target', 'A product is required for validation.', $before_snapshot, $precondition );
+		}
+
+		$resolver  = new EffectiveConfigurationResolver(
+			$this->scopes,
+			$this->validator,
+			$this->constraints,
+			$this->sitewide_policy
+		);
+		$effective = $resolver->resolve(
+			new EffectiveConfigurationRequest( $product_id, $variation_id, ConfigurationScope::DEFAULT_SLICE_KEY, $parent_product_id )
+		);
+
+		$reason        = OperationalReadinessAssessor::reason_for_effective( $effective );
+		$warning_codes = array_values(
+			array_filter(
+				$effective->reason_codes,
+				static fn ( string $code ): bool => ConfigurationReasonCode::CONSTRAINT_ROUTE_FILTERED === $code
+			)
+		);
+		$verdict       = 'valid';
+		if ( EffectiveFieldState::Invalid === $effective->state || null !== $reason ) {
+			$verdict = 'invalid';
+		} elseif ( [] !== $warning_codes ) {
+			$verdict = 'warning';
+		}
+
+		$fulfilment = $effective->scalar( ConfigurationFieldKey::FULFILMENT_AVAILABILITY );
+		$offers     = $effective->collection( ConfigurationFieldKey::DELIVERY_OFFER_IDS );
+		$source     = $this->scan_source_label( $fulfilment?->provenance );
+
+		$result = [
+			'scan'                  => true,
+			'scan_verdict'          => $verdict,
+			'scan_label'            => match ( $verdict ) {
+				'invalid' => 'Invalid / Needs Attention',
+				'warning' => 'Warning',
+				default   => 'Valid / Healthy',
+			},
+			'reason_code'           => 'invalid' === $verdict
+				? ( $effective->reason_codes[0] ?? ( null !== $reason ? 'no_valid_delivery_path' : 'invalid_configuration' ) )
+				: ( $warning_codes[0] ?? null ),
+			'reason'                => $reason ?? ( 'warning' === $verdict ? 'Some Delivery Options were filtered by fulfilment rules.' : null ),
+			'effective_state'       => $effective->state->value,
+			'effective_fulfilment'  => is_string( $fulfilment?->value ) ? (string) $fulfilment->value : '',
+			'effective_source'      => $source,
+			'effective_offer_count' => is_array( $offers?->members ) ? count( $offers->members ) : 0,
+		];
+
+		if ( 'invalid' === $verdict ) {
+			$failed                      = $this->fail(
+				(string) $result['reason_code'],
+				(string) ( $result['reason'] ?? 'This product needs attention.' ),
+				$before_snapshot,
+				$precondition
+			);
+			$failed['result']            = $result;
+			$failed['after_fingerprint'] = '';
+
+			return $failed;
+		}
+
+		return [
+			'outcome'                  => 'unchanged',
+			'error_code'               => null,
+			'error_summary'            => null,
+			'warning'                  => 'warning' === $verdict,
+			'before_snapshot'          => $before_snapshot,
+			'precondition_fingerprint' => $precondition,
+			'after_fingerprint'        => '',
+			'result'                   => $result,
+		];
+	}
+
+	private function scan_source_label( ?FieldProvenance $provenance ): string {
+		if ( ! $provenance instanceof FieldProvenance ) {
+			return '';
+		}
+		if ( ConfigurationScopeType::Global === $provenance->source_scope ) {
+			return 'Site-wide';
+		}
+		if ( ConfigurationScopeType::Product === $provenance->source_scope ) {
+			return 'Product';
+		}
+		if ( ConfigurationScopeType::Variation === $provenance->source_scope ) {
+			return 'Variation';
+		}
+
+		return $provenance->source_label;
 	}
 
 	/**

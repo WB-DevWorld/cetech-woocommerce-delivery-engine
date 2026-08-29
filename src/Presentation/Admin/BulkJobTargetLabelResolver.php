@@ -119,6 +119,10 @@ final class BulkJobTargetLabelResolver {
 	 * @return array{primary: string, secondary: string, raw_id: string}
 	 */
 	public function display( BulkJobItem $item ): array {
+		if ( ! in_array( $item->target_type, [ 'product', 'variation', '' ], true ) ) {
+			return $this->entity_display( $item );
+		}
+
 		$row = $this->catalog[ $item->target_id ] ?? null;
 		$sku = '' !== $item->external_key ? $item->external_key : (string) ( $row['sku'] ?? '' );
 
@@ -179,6 +183,30 @@ final class BulkJobTargetLabelResolver {
 
 		return [
 			'primary'   => $primary,
+			'secondary' => implode( ' · ', $secondary_parts ),
+			'raw_id'    => (string) $item->target_id,
+		];
+	}
+
+	/**
+	 * @return array{primary: string, secondary: string, raw_id: string}
+	 */
+	private function entity_display( BulkJobItem $item ): array {
+		$label = trim( (string) ( $item->result['entity_label'] ?? $item->before_snapshot['display_name'] ?? '' ) );
+		if ( '' === $label ) {
+			$label = '' !== $item->external_key ? $item->external_key : sprintf( '#%d', $item->target_id );
+		}
+		$type = BulkJobAdminCopy::target_type_label( $item->target_type );
+		$secondary_parts = [ $type ];
+		if ( '' !== $item->external_key && $item->external_key !== $label ) {
+			$secondary_parts[] = $item->external_key;
+		}
+		if ( $item->target_id > 0 ) {
+			$secondary_parts[] = sprintf( '#%d', $item->target_id );
+		}
+
+		return [
+			'primary'   => $label,
 			'secondary' => implode( ' · ', $secondary_parts ),
 			'raw_id'    => (string) $item->target_id,
 		];

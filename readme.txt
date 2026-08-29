@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-dev.bulk.8
+Stable tag: 1.0.0-dev.bulk.9
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,9 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-dev.bulk.9 =
+* Consolidated Bulk.8 physical-QA repair: real read-only validation scans, catalog safety for the last valid Delivery Option, Rate Card rollback fingerprinting, entity presentation, coherent async status, and explicit charge increase/decrease operations. Schema remains 5. Not RC.6, not RC.7, not Stage 15. Historical 1.0.0-dev.bulk.7 and 1.0.0-dev.bulk.8 packages are unchanged.
 
 = 1.0.0-dev.bulk.8 =
 * Bulk Tools background-execution portability: async Action Scheduler enqueue, bounded admin continue, waiting/stale job states, and Needs Attention for stalled jobs. Schema remains 5. Not RC.6, not RC.7, not Stage 15. Historical 1.0.0-dev.bulk.7 is unchanged.

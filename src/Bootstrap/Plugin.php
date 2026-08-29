@@ -1313,7 +1313,9 @@ final class Plugin {
 		$this->container->singleton(
 			RateCardBulkMutator::class,
 			static fn ( ServiceContainer $container ): RateCardBulkMutator => new RateCardBulkMutator(
-				$container->get( RateCardRepositoryInterface::class )
+				$container->get( RateCardRepositoryInterface::class ),
+				$container->get( DeliveryOfferRepositoryInterface::class ),
+				$container->get( DestinationZoneRepositoryInterface::class )
 			)
 		);
 

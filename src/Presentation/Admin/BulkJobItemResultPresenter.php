@@ -29,6 +29,24 @@ final class BulkJobItemResultPresenter {
 	 * @return list<array{field: string, current: string, proposed: string}>
 	 */
 	public function blocks( BulkJobItem $item, CatalogActionManifest $manifest ): array {
+		if ( ! empty( $item->result['scan'] ) || isset( $item->result['scan_verdict'] ) ) {
+			return $this->scan_blocks( $item );
+		}
+
+		if ( 'rate_card' === $item->target_type || ! empty( $item->result['entity_type'] ) && 'rate_card' === $item->result['entity_type'] ) {
+			$rate_blocks = $this->rate_card_blocks( $item );
+			if ( [] !== $rate_blocks ) {
+				return $rate_blocks;
+			}
+		}
+
+		if ( isset( $item->result['entity_type'] ) && 'product' !== $item->result['entity_type'] && 'variation' !== $item->result['entity_type'] && 'rate_card' !== $item->result['entity_type'] ) {
+			$config_blocks = $this->config_entity_blocks( $item );
+			if ( [] !== $config_blocks ) {
+				return $config_blocks;
+			}
+		}
+
 		if ( BulkJobItemStatus::Failed === $item->status ) {
 			$summary = trim( (string) ( $item->error_summary ?? $item->error_code ?? '' ) );
 
@@ -72,6 +90,91 @@ final class BulkJobItemResultPresenter {
 		}
 
 		return $blocks;
+	}
+
+	/**
+	 * @return list<array{field: string, current: string, proposed: string}>
+	 */
+	private function scan_blocks( BulkJobItem $item ): array {
+		$fulfilment = (string) ( $item->result['effective_fulfilment'] ?? '' );
+		$source     = (string) ( $item->result['effective_source'] ?? '' );
+		$current    = '' !== $fulfilment
+			? trim( $this->fulfilment_label( $fulfilment ) . ( '' !== $source ? ' · ' . $source : '' ) )
+			: (string) ( $item->result['effective_state'] ?? '' );
+		$finding    = (string) ( $item->result['scan_label'] ?? '' );
+		$reason     = trim( (string) ( $item->result['reason'] ?? $item->error_summary ?? '' ) );
+		if ( '' !== $reason ) {
+			$finding = '' !== $finding ? $finding . ' — ' . $reason : $reason;
+		}
+
+		return [
+			[
+				'field'    => __( 'Resolver health', 'cetech-woocommerce-delivery-engine' ),
+				'current'  => $current,
+				'proposed' => $finding,
+			],
+		];
+	}
+
+	/**
+	 * @return list<array{field: string, current: string, proposed: string}>
+	 */
+	private function rate_card_blocks( BulkJobItem $item ): array {
+		$current  = $this->money_label(
+			(string) ( $item->result['current_amount'] ?? $item->before_snapshot['base_amount'] ?? '' ),
+			(string) ( $item->result['currency'] ?? $item->before_snapshot['currency'] ?? '' )
+		);
+		$proposed = $this->money_label(
+			(string) ( $item->result['proposed_amount'] ?? '' ),
+			(string) ( $item->result['currency'] ?? $item->before_snapshot['currency'] ?? '' )
+		);
+		if ( '' === $proposed && isset( $item->before_snapshot['base_amount'] ) && BulkJobItemStatus::Unchanged === $item->status ) {
+			$proposed = $current;
+		}
+
+		if ( '' === $current && '' === $proposed ) {
+			return [];
+		}
+
+		return [
+			[
+				'field'    => __( 'Delivery Charge', 'cetech-woocommerce-delivery-engine' ),
+				'current'  => $current,
+				'proposed' => $proposed,
+			],
+		];
+	}
+
+	/**
+	 * @return list<array{field: string, current: string, proposed: string}>
+	 */
+	private function config_entity_blocks( BulkJobItem $item ): array {
+		$current  = (string) ( $item->result['current_summary'] ?? '' );
+		$proposed = (string) ( $item->result['proposed_summary'] ?? $item->result['action_label'] ?? $item->error_summary ?? '' );
+		if ( '' === $current && '' === $proposed ) {
+			return [];
+		}
+
+		return [
+			[
+				'field'    => BulkJobAdminCopy::target_type_label( (string) ( $item->result['entity_type'] ?? $item->target_type ) ),
+				'current'  => $current,
+				'proposed' => $proposed,
+			],
+		];
+	}
+
+	private function money_label( string $amount, string $currency ): string {
+		if ( '' === $amount ) {
+			return '';
+		}
+		$formatted = $amount;
+		if ( is_numeric( $amount ) ) {
+			$formatted = number_format( (float) $amount, 2, '.', '' );
+		}
+		$currency = strtoupper( trim( $currency ) );
+
+		return '' !== $currency ? $currency . ' ' . $formatted : $formatted;
 	}
 
 	/**
