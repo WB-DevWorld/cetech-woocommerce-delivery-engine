@@ -8,7 +8,6 @@ use CetechDeliveryEngine\Application\Checkout\CheckoutDeliverySelectionValidator
 use CetechDeliveryEngine\Application\Checkout\CheckoutDeliveryValidationResult;
 use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
 use CetechDeliveryEngine\Application\Shipping\ShippingRateCalculationGate;
-use CetechDeliveryEngine\Infrastructure\WooCommerce\Shipping\SelectedOfferShippingMethod;
 use WP_Error;
 
 /**
@@ -113,41 +112,75 @@ final class BlocksCheckoutValidation {
 			return true;
 		}
 
-		$calculated = [];
+		$calculated = $this->calculated_shipping_packages( $packages );
 
-		if ( WC()->shipping() && method_exists( WC()->shipping(), 'calculate_shipping' ) ) {
-			$calculated = WC()->shipping()->calculate_shipping( $packages );
-		}
+		$rows = is_array( $calculated ) && [] !== $calculated ? $calculated : $packages;
 
-		foreach ( $packages as $index => $package ) {
-			if ( ! is_array( $package ) || ! DeliveryGroupIdentity::is_managed_package( $package ) ) {
+		foreach ( $rows as $index => $row ) {
+			$package = is_array( $row ) ? $row : [];
+
+			if ( [] === $package && is_array( $packages[ $index ] ?? null ) ) {
+				$package = $packages[ $index ];
+			}
+
+			if ( ! DeliveryGroupIdentity::is_managed_package( $package ) ) {
 				continue;
 			}
 
-			$rates = [];
+			$rates = BlocksStoreApiExtension::rates_from_calculated_entry( $row, $package );
 
-			if ( is_array( $calculated ) && isset( $calculated[ $index ] ) && is_object( $calculated[ $index ] ) && isset( $calculated[ $index ]->rates ) ) {
-				$rates = (array) $calculated[ $index ]->rates;
-			} elseif ( is_array( $package['rates'] ?? null ) ) {
-				$rates = $package['rates'];
-			}
-
-			if ( ! $this->store_api->managed_package_has_delivery_engine_rate( $package, $rates ) ) {
+			if ( ! $this->store_api->managed_package_is_validly_quoted( $package, $rates ) ) {
 				return false;
-			}
-
-			foreach ( $rates as $rate ) {
-				$method_id = is_object( $rate ) && method_exists( $rate, 'get_method_id' )
-					? (string) $rate->get_method_id()
-					: '';
-
-				if ( '' !== $method_id && SelectedOfferShippingMethod::METHOD_ID !== $method_id ) {
-					return false;
-				}
 			}
 		}
 
 		return true;
+	}
+
+	/**
+	 * Prefer already-calculated WC packages (array rows with `rates`) over a
+	 * second calculate_shipping() pass. Do not require object-shaped rows.
+	 *
+	 * @param array<int|string, mixed> $packages
+	 *
+	 * @return array<int|string, mixed>
+	 */
+	private function calculated_shipping_packages( array $packages ): array {
+		if ( ! function_exists( 'WC' ) || ! WC()->shipping() ) {
+			return [];
+		}
+
+		$shipping = WC()->shipping();
+		$existing = method_exists( $shipping, 'get_packages' ) ? $shipping->get_packages() : [];
+
+		if ( is_array( $existing ) && $this->packages_include_rate_rows( $existing ) ) {
+			return $existing;
+		}
+
+		if ( ! method_exists( $shipping, 'calculate_shipping' ) ) {
+			return is_array( $existing ) ? $existing : [];
+		}
+
+		$calculated = $shipping->calculate_shipping( $packages );
+
+		return is_array( $calculated ) ? $calculated : [];
+	}
+
+	/**
+	 * @param array<int|string, mixed> $packages
+	 */
+	private function packages_include_rate_rows( array $packages ): bool {
+		foreach ( $packages as $row ) {
+			if ( is_array( $row ) && array_key_exists( 'rates', $row ) ) {
+				return true;
+			}
+
+			if ( is_object( $row ) && isset( $row->rates ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private function reject( string $message ): void {

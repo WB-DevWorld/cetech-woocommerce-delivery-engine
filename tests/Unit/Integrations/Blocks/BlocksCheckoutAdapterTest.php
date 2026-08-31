@@ -194,6 +194,97 @@ final class BlocksCheckoutAdapterTest extends TestCase {
 		);
 	}
 
+	public function test_array_shaped_calculated_packages_are_read_as_rates(): void {
+		$extension = ( new ReflectionClass( BlocksStoreApiExtension::class ) )->newInstanceWithoutConstructor();
+		$managed   = [
+			DeliveryGroupIdentity::PACKAGE_META_KEY => [ 'managed' => true, 'is_pickup' => false ],
+		];
+		$rate      = $this->de_rate( 50.0 );
+
+		$from_object_only = BlocksStoreApiExtension::rates_from_calculated_entry(
+			(object) [],
+			$managed
+		);
+		self::assertSame( [], $from_object_only );
+
+		$from_wc_array = BlocksStoreApiExtension::rates_from_calculated_entry(
+			[ 'rates' => [ SelectedOfferShippingMethod::METHOD_ID . ':0' => $rate ] ],
+			$managed
+		);
+		self::assertNotEmpty( $from_wc_array );
+		self::assertTrue( $extension->managed_package_is_validly_quoted( $managed, $from_wc_array ) );
+	}
+
+	public function test_valid_delivery_only_package_has_no_fail_closed_warning(): void {
+		$extension = ( new ReflectionClass( BlocksStoreApiExtension::class ) )->newInstanceWithoutConstructor();
+		$delivery  = [
+			DeliveryGroupIdentity::PACKAGE_META_KEY => [ 'managed' => true, 'is_pickup' => false ],
+		];
+		$rate      = $this->de_rate( 50.0 );
+
+		self::assertTrue(
+			$extension->managed_package_is_validly_quoted(
+				$delivery,
+				[ SelectedOfferShippingMethod::METHOD_ID . ':0' => $rate ]
+			)
+		);
+	}
+
+	public function test_valid_pickup_only_zero_charge_is_not_fail_closed(): void {
+		$extension = ( new ReflectionClass( BlocksStoreApiExtension::class ) )->newInstanceWithoutConstructor();
+		$pickup    = [
+			DeliveryGroupIdentity::PACKAGE_META_KEY => [ 'managed' => true, 'is_pickup' => true ],
+		];
+		$rate      = $this->de_rate( 0.0 );
+
+		self::assertSame( 0.0, $extension->delivery_engine_rate_cost( $rate, SelectedOfferShippingMethod::METHOD_ID . ':p' ) );
+		self::assertTrue(
+			$extension->managed_package_is_validly_quoted(
+				$pickup,
+				[ SelectedOfferShippingMethod::METHOD_ID . ':p' => $rate ]
+			)
+		);
+	}
+
+	public function test_valid_mixed_delivery_and_pickup_is_not_fail_closed(): void {
+		$extension = ( new ReflectionClass( BlocksStoreApiExtension::class ) )->newInstanceWithoutConstructor();
+		$delivery  = [
+			DeliveryGroupIdentity::PACKAGE_META_KEY => [ 'managed' => true, 'is_pickup' => false ],
+		];
+		$pickup    = [
+			DeliveryGroupIdentity::PACKAGE_META_KEY => [ 'managed' => true, 'is_pickup' => true ],
+		];
+
+		self::assertTrue(
+			$extension->managed_packages_are_validly_quoted(
+				[
+					[
+						'package' => $delivery,
+						'rates'   => [ SelectedOfferShippingMethod::METHOD_ID . ':0' => $this->de_rate( 50.0 ) ],
+					],
+					[
+						'package' => $pickup,
+						'rates'   => [ SelectedOfferShippingMethod::METHOD_ID . ':p' => $this->de_rate( 0.0 ) ],
+					],
+				]
+			)
+		);
+	}
+
+	public function test_unquoted_managed_delivery_fails_closed_and_strips_native_fallback(): void {
+		$extension = ( new ReflectionClass( BlocksStoreApiExtension::class ) )->newInstanceWithoutConstructor();
+		$managed   = [
+			DeliveryGroupIdentity::PACKAGE_META_KEY => [ 'managed' => true, 'is_pickup' => false ],
+		];
+		$unmanaged = [ 'contents' => [] ];
+		$native    = [ 'flat_rate:1' => $this->native_rate() ];
+
+		self::assertFalse( $extension->managed_package_is_validly_quoted( $managed, [] ) );
+		self::assertFalse( $extension->managed_package_is_validly_quoted( $managed, $native ) );
+		self::assertTrue( $extension->has_native_shipping_fallback( $native ) );
+		self::assertTrue( $extension->managed_package_is_validly_quoted( $unmanaged, $native ) );
+	}
+
 	public function test_store_api_schema_has_no_private_fields(): void {
 		$extension = ( new ReflectionClass( BlocksStoreApiExtension::class ) )->newInstanceWithoutConstructor();
 		$schema    = array_merge( $extension->cart_item_schema(), $extension->cart_schema() );
@@ -204,5 +295,28 @@ final class BlocksCheckoutAdapterTest extends TestCase {
 				(string) $key
 			);
 		}
+	}
+
+	private function de_rate( float $cost ): object {
+		return new class( $cost ) {
+			public function __construct( private float $cost ) {
+			}
+
+			public function get_method_id(): string {
+				return SelectedOfferShippingMethod::METHOD_ID;
+			}
+
+			public function get_cost(): string {
+				return (string) $this->cost;
+			}
+		};
+	}
+
+	private function native_rate(): object {
+		return new class() {
+			public function get_method_id(): string {
+				return 'flat_rate';
+			}
+		};
 	}
 }

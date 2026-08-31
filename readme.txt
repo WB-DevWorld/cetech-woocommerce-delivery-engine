@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-dev.blocks.1
+Stable tag: 1.0.0-dev.blocks.2
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,9 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-dev.blocks.2 =
+* Blocks mixed Delivery + Pickup: a valid GHS 0 Store Pickup quote is no longer treated as a missing Delivery Engine rate. Fail-closed remains for unquoted managed Delivery packages. Schema remains 5.
 
 = 1.0.0-dev.blocks.1 =
 * Settings honesty: Site-wide Defaults and variation inheritance are no longer experimental checkboxes. Dead Bulk/category/fallback/demo checkboxes removed. Integrations report detection status instead of blind toggles. Real WooCommerce Cart and Checkout Blocks adapter (Store API, validation, snapshots) with Classic checkout unchanged. Schema remains 5. Tagged 1.0.0-rc.8 is unchanged.

@@ -133,7 +133,74 @@ final class BlocksStoreApiExtension {
 	}
 
 	/**
+	 * WooCommerce {@see WC_Shipping::calculate_shipping()} returns package arrays
+	 * with a `rates` key, not objects with `->rates`. Reading the wrong shape
+	 * makes a valid GHS 0 Pickup look like a managed package with no DE quote.
+	 *
+	 * @param mixed                $calculated_entry Package row from WC shipping, or null.
+	 * @param array<string, mixed> $fallback_package Package from get_shipping_packages().
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function rates_from_calculated_entry( mixed $calculated_entry, array $fallback_package = [] ): array {
+		if ( is_array( $calculated_entry ) && isset( $calculated_entry['rates'] ) && is_array( $calculated_entry['rates'] ) ) {
+			return $calculated_entry['rates'];
+		}
+
+		if ( is_object( $calculated_entry ) && isset( $calculated_entry->rates ) ) {
+			$object_rates = $calculated_entry->rates;
+
+			if ( is_array( $object_rates ) ) {
+				return $object_rates;
+			}
+		}
+
+		if ( is_array( $fallback_package['rates'] ?? null ) ) {
+			return $fallback_package['rates'];
+		}
+
+		return [];
+	}
+
+	/**
+	 * @param list<array{package?: array<string, mixed>, rates?: array<string, mixed>}> $rows
+	 */
+	public function managed_packages_are_validly_quoted( array $rows ): bool {
+		foreach ( $rows as $row ) {
+			$package = is_array( $row['package'] ?? null ) ? $row['package'] : [];
+			$rates   = is_array( $row['rates'] ?? null ) ? $row['rates'] : [];
+
+			if ( ! $this->managed_package_is_validly_quoted( $package, $rates ) ) {
+				return false;
+			}
+		}
+
+		return true;
+	}
+
+	/**
+	 * A valid Store Pickup quote is GHS 0 on the Delivery Engine method.
+	 * Native WooCommerce rates on a managed package still fail closed.
+	 * Unmanaged packages are not judged here.
+	 *
+	 * @param array<string, mixed> $package
+	 * @param array<string, mixed> $rates
+	 */
+	public function managed_package_is_validly_quoted( array $package, array $rates ): bool {
+		if ( ! DeliveryGroupIdentity::is_managed_package( $package ) ) {
+			return true;
+		}
+
+		if ( $this->has_native_shipping_fallback( $rates ) ) {
+			return false;
+		}
+
+		return $this->managed_package_has_delivery_engine_rate( $package, $rates );
+	}
+
+	/**
 	 * Fail-closed: a managed package must expose a Delivery Engine rate, never native fallback.
+	 * A Pickup DE rate with cost 0 is a valid priced fulfilment path.
 	 *
 	 * @param array<string, mixed> $package
 	 * @param array<string, mixed> $rates
@@ -144,20 +211,65 @@ final class BlocksStoreApiExtension {
 		}
 
 		foreach ( $rates as $rate_id => $rate ) {
-			$method_id = '';
-
-			if ( is_object( $rate ) && method_exists( $rate, 'get_method_id' ) ) {
-				$method_id = (string) $rate->get_method_id();
-			} elseif ( is_string( $rate_id ) && str_starts_with( $rate_id, SelectedOfferShippingMethod::METHOD_ID ) ) {
-				$method_id = SelectedOfferShippingMethod::METHOD_ID;
-			}
-
-			if ( SelectedOfferShippingMethod::METHOD_ID === $method_id ) {
+			if ( SelectedOfferShippingMethod::METHOD_ID === $this->rate_method_id( $rate_id, $rate ) ) {
 				return true;
 			}
 		}
 
 		return false;
+	}
+
+	/**
+	 * @param array<string, mixed> $rates
+	 */
+	public function has_native_shipping_fallback( array $rates ): bool {
+		foreach ( $rates as $rate_id => $rate ) {
+			$method_id = $this->rate_method_id( $rate_id, $rate );
+
+			if ( '' !== $method_id && SelectedOfferShippingMethod::METHOD_ID !== $method_id ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * @param array<string, mixed>|int|string $rate_id
+	 * @param mixed                           $rate
+	 */
+	public function rate_method_id( mixed $rate_id, mixed $rate ): string {
+		if ( is_object( $rate ) && method_exists( $rate, 'get_method_id' ) ) {
+			return (string) $rate->get_method_id();
+		}
+
+		if ( is_string( $rate_id ) && str_starts_with( $rate_id, SelectedOfferShippingMethod::METHOD_ID ) ) {
+			return SelectedOfferShippingMethod::METHOD_ID;
+		}
+
+		return '';
+	}
+
+	/**
+	 * Cost of a Delivery Engine rate, or null when the rate is not a DE method.
+	 *
+	 * @param mixed $rate
+	 * @param mixed $rate_id
+	 */
+	public function delivery_engine_rate_cost( mixed $rate, mixed $rate_id = '' ): ?float {
+		if ( SelectedOfferShippingMethod::METHOD_ID !== $this->rate_method_id( $rate_id, $rate ) ) {
+			return null;
+		}
+
+		if ( is_object( $rate ) && method_exists( $rate, 'get_cost' ) ) {
+			return (float) $rate->get_cost();
+		}
+
+		if ( is_array( $rate ) && isset( $rate['cost'] ) && is_numeric( $rate['cost'] ) ) {
+			return (float) $rate['cost'];
+		}
+
+		return 0.0;
 	}
 
 	/**
