@@ -49,10 +49,10 @@ Filled after packaging.
 | Version | `1.0.0-dev.fulfilment.3` |
 | Schema | `5` |
 | Branch | `feat/post-rc7-fulfilment-correctness` |
-| Implementation/source SHA | *(filled after packaging)* |
-| Package-source commit | *(filled after packaging)* |
-| Bytes | *(filled after packaging)* |
-| SHA-256 | *(filled after packaging)* |
+| Implementation/source SHA | `6a2091c28b7d32bae5e857dfb4ef4032dae5922b` |
+| Package-source commit | `6a2091c28b7d32bae5e857dfb4ef4032dae5922b` |
+| Bytes | `1303042` |
+| SHA-256 | `6b9337bd9a8f5ffb57dde8fa4ea8bb5e7406280df52609fdb49c4845d0f30285` |
 | Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.3.zip` |
 | Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.3.zip` |
 | Build | `scripts/build-v1-rc-package.ps1 -Version 1.0.0-dev.fulfilment.3 -ZipFileName cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.3.zip` (clean tree; **not** `-AllowDirty`) |
