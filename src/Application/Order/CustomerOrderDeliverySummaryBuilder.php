@@ -104,11 +104,9 @@ final class CustomerOrderDeliverySummaryBuilder {
 			$this->customer_quote_status_label( $snapshot->quote_status, $is_quoted ),
 			$quoted_amount,
 			$this->format_snapshotted_at( $snapshot->snapshotted_at ),
-			// Pickup location/address/instructions are not part of the V1 protected
-			// line snapshot contract. Compact presentation supports them when present.
-			null,
-			null,
-			null,
+			$snapshot->pickup_location_label,
+			$snapshot->pickup_address,
+			$snapshot->pickup_instructions,
 			$order_item_id
 		);
 	}

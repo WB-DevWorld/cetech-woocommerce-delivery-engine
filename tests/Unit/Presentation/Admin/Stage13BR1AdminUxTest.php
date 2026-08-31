@@ -47,6 +47,10 @@ final class Stage13BR1AdminUxTest extends TestCase {
 		self::assertNotContains( DeliveryRoute::StorePickup->value, $warehouse->allowed_routes );
 		self::assertNotContains( DeliveryRoute::Air->value, $warehouse->allowed_routes );
 		self::assertTrue( $in_store->pickup_allowed );
+		self::assertSame(
+			[ DeliveryRoute::LocalDelivery->value, DeliveryRoute::StorePickup->value ],
+			$in_store->allowed_routes
+		);
 		self::assertNotContains( DeliveryRoute::Air->value, $in_store->allowed_routes );
 		self::assertSame( [ DeliveryRoute::Air->value, DeliveryRoute::Sea->value ], $international->allowed_routes );
 		self::assertFalse( $international->pickup_allowed );

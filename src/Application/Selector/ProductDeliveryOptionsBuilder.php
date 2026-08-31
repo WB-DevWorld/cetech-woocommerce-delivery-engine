@@ -7,19 +7,23 @@ namespace CetechDeliveryEngine\Application\Selector;
 use CetechDeliveryEngine\Application\ProductRule\ProductRuleResolutionResult;
 use CetechDeliveryEngine\Application\ProductRule\ResolvedProductDeliveryRule;
 use CetechDeliveryEngine\Domain\DeliveryOffer\DeliveryOfferRepositoryInterface;
+use CetechDeliveryEngine\Domain\Enum\DeliveryRoute;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentAvailability;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
+use CetechDeliveryEngine\Domain\Pickup\PickupLocationRepositoryInterface;
 
 /**
  * Builds customer-safe delivery options from resolver output and active delivery offers.
  *
  * Display-only; does not persist selections or calculate prices.
+ * Fulfilment choice on the resolved rule is the default preselection, not a path lock.
  */
 final class ProductDeliveryOptionsBuilder {
 
 	public function __construct(
-		private DeliveryOfferRepositoryInterface $delivery_offer_repository
+		private DeliveryOfferRepositoryInterface $delivery_offer_repository,
+		private ?PickupLocationRepositoryInterface $pickup_locations = null
 	) {
 	}
 
@@ -27,14 +31,15 @@ final class ProductDeliveryOptionsBuilder {
 	 * @return list<ProductDeliveryOption>
 	 */
 	public function buildFromResolution( ProductRuleResolutionResult $result ): array {
-		$options = [];
+		$options          = [];
+		$preferred_choice = FulfilmentChoice::Delivery->value;
 
 		foreach ( $result->chosen_rules as $availability => $rule ) {
 			if ( ! $rule instanceof ResolvedProductDeliveryRule ) {
 				continue;
 			}
 
-			$availability_slug = (string) $availability;
+			$availability_slug  = (string) $availability;
 			$availability_label = $this->availability_label( $availability_slug );
 
 			if ( null === $availability_label ) {
@@ -48,48 +53,236 @@ final class ProductDeliveryOptionsBuilder {
 				continue;
 			}
 
-			if ( FulfilmentChoice::StorePickup->value === $choice_slug ) {
-				$options[] = $this->store_pickup_option( $availability_slug, $availability_label, $choice_slug, $choice_label );
-				continue;
-			}
-
-			if ( FulfilmentChoice::Delivery->value !== $choice_slug ) {
-				continue;
-			}
-
-			$offer_options = $this->delivery_offer_options(
+			$split             = $this->split_offer_ids( $rule->delivery_offer_ids );
+			$delivery_options  = $this->delivery_offer_options(
 				$availability_slug,
 				$availability_label,
-				$choice_slug,
-				$choice_label,
-				$rule->delivery_offer_ids
+				$split['delivery']
 			);
+			$emit_pickup       = $this->should_emit_pickup( $availability_slug, $choice_slug, $split['pickup'] );
 
-			if ( [] === $offer_options ) {
+			if ( [] !== $delivery_options ) {
+				foreach ( $delivery_options as $option ) {
+					$options[] = $option;
+				}
+			} elseif ( ! $emit_pickup && FulfilmentChoice::Delivery->value === $choice_slug ) {
 				$options[] = $this->unavailable_delivery_option(
 					$availability_slug,
-					$availability_label,
-					$choice_slug,
-					$choice_label
+					$availability_label
 				);
-				continue;
 			}
 
-			foreach ( $offer_options as $option ) {
-				$options[] = $option;
+			if ( $emit_pickup ) {
+				$options[] = $this->store_pickup_option( $availability_slug, $availability_label );
+			}
+
+			if (
+				FulfilmentAvailability::InStore->value === $availability_slug
+				&& FulfilmentChoice::StorePickup->value === $choice_slug
+				&& $emit_pickup
+			) {
+				$preferred_choice = FulfilmentChoice::StorePickup->value;
 			}
 		}
 
-		return $options;
+		return $this->mark_default( $options, $preferred_choice );
+	}
+
+	/**
+	 * @param list<ProductDeliveryOption> $options
+	 *
+	 * @return list<ProductDeliveryOption>
+	 */
+	public function mark_default( array $options, string $preferred_choice ): array {
+		$key = self::defaultDisplayKey( $options, $preferred_choice );
+
+		if ( '' === $key ) {
+			return array_values( $options );
+		}
+
+		$marked = [];
+
+		foreach ( $options as $option ) {
+			$marked[] = $option->withDefault( $option->display_key === $key );
+		}
+
+		return $marked;
+	}
+
+	/**
+	 * @param list<ProductDeliveryOption> $options
+	 */
+	public static function defaultDisplayKey( array $options, ?string $preferred_choice = null ): string {
+		$available = array_values(
+			array_filter(
+				$options,
+				static fn ( ProductDeliveryOption $option ): bool => $option->is_available
+			)
+		);
+
+		if ( [] === $available ) {
+			return '';
+		}
+
+		if ( 1 === count( $available ) ) {
+			return $available[0]->display_key;
+		}
+
+		$preferred = $preferred_choice;
+		$has_delivery = false;
+		$has_pickup   = false;
+
+		foreach ( $available as $option ) {
+			if ( FulfilmentChoice::StorePickup->value === $option->fulfilment_choice ) {
+				$has_pickup = true;
+			} else {
+				$has_delivery = true;
+			}
+		}
+
+		if ( null === $preferred || '' === $preferred ) {
+			$preferred = $has_delivery
+				? FulfilmentChoice::Delivery->value
+				: FulfilmentChoice::StorePickup->value;
+		}
+
+		if ( FulfilmentChoice::StorePickup->value === $preferred && ! $has_pickup ) {
+			$preferred = FulfilmentChoice::Delivery->value;
+		}
+
+		if ( FulfilmentChoice::Delivery->value === $preferred && ! $has_delivery ) {
+			$preferred = FulfilmentChoice::StorePickup->value;
+		}
+
+		$of_choice = array_values(
+			array_filter(
+				$available,
+				static fn ( ProductDeliveryOption $option ): bool => $option->fulfilment_choice === $preferred
+			)
+		);
+
+		if ( 1 === count( $of_choice ) ) {
+			return $of_choice[0]->display_key;
+		}
+
+		if ( FulfilmentChoice::StorePickup->value === $preferred && [] !== $of_choice ) {
+			return $of_choice[0]->display_key;
+		}
+
+		return '';
+	}
+
+	/**
+	 * @param list<ProductDeliveryOption> $options
+	 *
+	 * @return array{delivery: list<ProductDeliveryOption>, store_pickup: list<ProductDeliveryOption>}
+	 */
+	public static function groupByChoice( array $options ): array {
+		$groups = [
+			FulfilmentChoice::Delivery->value    => [],
+			FulfilmentChoice::StorePickup->value => [],
+		];
+
+		foreach ( $options as $option ) {
+			if ( FulfilmentChoice::StorePickup->value === $option->fulfilment_choice ) {
+				$groups[ FulfilmentChoice::StorePickup->value ][] = $option;
+			} else {
+				$groups[ FulfilmentChoice::Delivery->value ][] = $option;
+			}
+		}
+
+		return $groups;
+	}
+
+	/**
+	 * @param list<int> $offer_ids
+	 *
+	 * @return array{delivery: list<int>, pickup: list<int>}
+	 */
+	private function split_offer_ids( array $offer_ids ): array {
+		$delivery = [];
+		$pickup   = [];
+
+		foreach ( $offer_ids as $offer_id ) {
+			$row = $this->delivery_offer_repository->findById( (int) $offer_id );
+
+			if ( null === $row ) {
+				continue;
+			}
+
+			if ( RecordStatus::Active->value !== (string) ( $row['status'] ?? '' ) ) {
+				continue;
+			}
+
+			$route = (string) ( $row['route'] ?? '' );
+
+			if ( DeliveryRoute::StorePickup->value === $route ) {
+				$pickup[] = (int) $offer_id;
+				continue;
+			}
+
+			$delivery[] = (int) $offer_id;
+		}
+
+		return [
+			'delivery' => $delivery,
+			'pickup'   => $pickup,
+		];
+	}
+
+	/**
+	 * @param list<int> $pickup_offer_ids
+	 */
+	private function should_emit_pickup( string $availability, string $choice, array $pickup_offer_ids ): bool {
+		if ( FulfilmentAvailability::InStore->value !== $availability ) {
+			return false;
+		}
+
+		if ( [] !== $pickup_offer_ids ) {
+			return true;
+		}
+
+		return FulfilmentChoice::StorePickup->value === $choice;
 	}
 
 	private function store_pickup_option(
 		string $availability_slug,
-		string $availability_label,
-		string $choice_slug,
-		string $choice_label
+		string $availability_label
 	): ProductDeliveryOption {
-		$label = __( 'Store pickup available', 'cetech-woocommerce-delivery-engine' );
+		$choice_slug  = FulfilmentChoice::StorePickup->value;
+		$choice_label = $this->choice_label( $choice_slug ) ?? __( 'Store pickup', 'cetech-woocommerce-delivery-engine' );
+		$location     = $this->default_pickup_location();
+		$label        = __( 'Store pickup', 'cetech-woocommerce-delivery-engine' );
+		$estimate     = null;
+		$instructions = null;
+		$address      = null;
+		$location_label = null;
+
+		if ( is_array( $location ) ) {
+			$name = trim( (string) ( $location['location_name'] ?? '' ) );
+
+			if ( '' !== $name ) {
+				$location_label = $name;
+			}
+
+			$address_text = trim( (string) ( $location['public_address'] ?? '' ) );
+
+			if ( '' !== $address_text ) {
+				$address = $address_text;
+			}
+
+			$instruction_text = trim( (string) ( $location['public_pickup_instructions'] ?? '' ) );
+
+			if ( '' !== $instruction_text ) {
+				$instructions = $instruction_text;
+			}
+
+			$readiness = trim( (string) ( $location['readiness_estimate'] ?? '' ) );
+
+			if ( '' !== $readiness ) {
+				$estimate = $readiness;
+			}
+		}
 
 		return new ProductDeliveryOption(
 			$this->display_key( $availability_slug, $choice_slug, 'pickup' ),
@@ -99,11 +292,37 @@ final class ProductDeliveryOptionsBuilder {
 			$choice_label,
 			null,
 			$label,
-			null,
-			null,
+			$instructions,
+			$estimate,
 			true,
-			null
+			null,
+			ProductDeliveryOption::CONTRACT_VERSION,
+			false,
+			$location_label,
+			$address,
+			$instructions
 		);
+	}
+
+	/**
+	 * @return array<string, mixed>|null
+	 */
+	private function default_pickup_location(): ?array {
+		if ( null === $this->pickup_locations ) {
+			return null;
+		}
+
+		$rows = $this->pickup_locations->list( [ 'status' => RecordStatus::Active->value, 'limit' => 20 ] );
+
+		foreach ( $rows as $row ) {
+			if ( RecordStatus::Active->value !== (string) ( $row['status'] ?? '' ) ) {
+				continue;
+			}
+
+			return $row;
+		}
+
+		return null;
 	}
 
 	/**
@@ -114,11 +333,11 @@ final class ProductDeliveryOptionsBuilder {
 	private function delivery_offer_options(
 		string $availability_slug,
 		string $availability_label,
-		string $choice_slug,
-		string $choice_label,
 		array $offer_ids
 	): array {
-		$options = [];
+		$options      = [];
+		$choice_slug  = FulfilmentChoice::Delivery->value;
+		$choice_label = $this->choice_label( $choice_slug ) ?? __( 'Delivery', 'cetech-woocommerce-delivery-engine' );
 
 		foreach ( $offer_ids as $offer_id ) {
 			$row = $this->delivery_offer_repository->findById( (int) $offer_id );
@@ -128,6 +347,10 @@ final class ProductDeliveryOptionsBuilder {
 			}
 
 			if ( RecordStatus::Active->value !== (string) ( $row['status'] ?? '' ) ) {
+				continue;
+			}
+
+			if ( DeliveryRoute::StorePickup->value === (string) ( $row['route'] ?? '' ) ) {
 				continue;
 			}
 
@@ -159,10 +382,11 @@ final class ProductDeliveryOptionsBuilder {
 
 	private function unavailable_delivery_option(
 		string $availability_slug,
-		string $availability_label,
-		string $choice_slug,
-		string $choice_label
+		string $availability_label
 	): ProductDeliveryOption {
+		$choice_slug  = FulfilmentChoice::Delivery->value;
+		$choice_label = $this->choice_label( $choice_slug ) ?? __( 'Delivery', 'cetech-woocommerce-delivery-engine' );
+
 		return new ProductDeliveryOption(
 			$this->display_key( $availability_slug, $choice_slug, 'unavailable' ),
 			$availability_slug,

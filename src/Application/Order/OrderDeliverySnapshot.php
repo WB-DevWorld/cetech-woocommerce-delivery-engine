@@ -59,7 +59,10 @@ final class OrderDeliveryLineSnapshot {
 		public readonly ?int $rate_card_id,
 		public readonly ?string $rate_card_code,
 		public readonly string $snapshotted_at,
-		public readonly ?string $delivery_group_id = null
+		public readonly ?string $delivery_group_id = null,
+		public readonly ?string $pickup_location_label = null,
+		public readonly ?string $pickup_address = null,
+		public readonly ?string $pickup_instructions = null
 	) {
 	}
 
@@ -91,6 +94,18 @@ final class OrderDeliveryLineSnapshot {
 
 		if ( null !== $this->delivery_group_id && '' !== $this->delivery_group_id ) {
 			$data['delivery_group_id'] = $this->delivery_group_id;
+		}
+
+		if ( null !== $this->pickup_location_label && '' !== $this->pickup_location_label ) {
+			$data['pickup_location_label'] = $this->pickup_location_label;
+		}
+
+		if ( null !== $this->pickup_address && '' !== $this->pickup_address ) {
+			$data['pickup_address'] = $this->pickup_address;
+		}
+
+		if ( null !== $this->pickup_instructions && '' !== $this->pickup_instructions ) {
+			$data['pickup_instructions'] = $this->pickup_instructions;
 		}
 
 		return $data;

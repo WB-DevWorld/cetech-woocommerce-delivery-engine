@@ -75,7 +75,8 @@ final class SelectedOfferShippingIntegration {
 			}
 		}
 
-		// If DE produced a rate, hide conflicting native methods for this managed package.
-		return [] !== $managed ? $managed : $rates;
+		// DE-managed packages must never fall back to native WooCommerce methods.
+		// An empty result fails closed (no Flat Rate / Local Pickup / leftover methods).
+		return $managed;
 	}
 }

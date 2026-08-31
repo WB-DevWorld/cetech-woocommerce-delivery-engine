@@ -7,6 +7,10 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
+const productSelectorSource = readFileSync(
+	resolve(root, 'assets/frontend/product-delivery-selector.js'),
+	'utf8'
+);
 const scriptSource = readFileSync(
 	resolve(root, 'assets/frontend/variable-delivery-selector.js'),
 	'utf8'
@@ -67,6 +71,12 @@ function loadController() {
 			title: 'Delivery options',
 			estimatedDelivery: 'Estimated delivery',
 			readyForPickup: 'Ready for pickup',
+			delivery: 'Delivery',
+			storePickup: 'Store pickup',
+			pickupLocation: 'Pickup location',
+			pickupAddress: 'Pickup address',
+			pickupInstructions: 'Pickup instructions',
+			fulfilment: 'Fulfilment',
 		},
 	};
 
@@ -108,6 +118,8 @@ function loadController() {
 	}, { ajax, fn: {} });
 
 	// eslint-disable-next-line no-eval
+	eval(productSelectorSource);
+	// eslint-disable-next-line no-eval
 	eval(scriptSource);
 
 	return {
@@ -145,6 +157,7 @@ describe('Variable delivery selector controller', () => {
 	beforeEach(() => {
 		vi.restoreAllMocks();
 		delete window.CetechDeVariableDeliveryController;
+		delete window.CetechDeProductDeliverySelector;
 		delete window.cetechDeVariableDelivery;
 		delete window.jQuery;
 		document.body.innerHTML = '';
@@ -346,5 +359,69 @@ describe('Variable delivery selector controller', () => {
 		expect(html).not.toContain('supplier_id');
 		expect(html).not.toContain('EffectiveConfigurationResolver');
 		expect(html).not.toContain('slice_key');
+	});
+
+	it('renders Delivery and Store Pickup switcher and hides delivery ETA when pickup is selected', async () => {
+		const { controller, $form, ajax } = loadController();
+		ajax.mockReturnValue(
+			createDeferred({
+				type: 'success',
+				payload: {
+					success: true,
+					data: {
+						status: 'ok',
+						product_id: 100,
+						variation_id: 11,
+						message: '',
+						options: [
+							{
+								display_key: 'in_store:delivery:11',
+								fulfilment_choice: 'delivery',
+								fulfilment_choice_label: 'Delivery',
+								delivery_offer_public_label: 'Standard Delivery',
+								estimate_text: 'Estimated 2–4 business days',
+								is_available: true,
+								is_default: true,
+							},
+							{
+								display_key: 'in_store:store_pickup:pickup',
+								fulfilment_choice: 'store_pickup',
+								fulfilment_choice_label: 'Store pickup',
+								delivery_offer_public_label: 'Store pickup',
+								estimate_text: 'Ready in 2 hours',
+								is_available: true,
+								is_default: false,
+								pickup_location_label: 'Main showroom',
+								pickup_instructions: 'Bring your order number',
+							},
+						],
+					},
+				},
+			})
+		);
+
+		$form.trigger('found_variation', { variation_id: 11 });
+		await flush();
+
+		expect(controller.optionsEl.textContent).toContain('Standard Delivery');
+		expect(controller.optionsEl.textContent).toContain('Estimated delivery: 2–4 business days');
+		expect(controller.optionsEl.querySelector('[data-cetech-de-choice-switch][value="delivery"]').checked).toBe(true);
+
+		const pickupPanel = controller.optionsEl.querySelector('[data-cetech-de-choice-panel="store_pickup"]');
+		const deliveryPanel = controller.optionsEl.querySelector('[data-cetech-de-choice-panel="delivery"]');
+		expect(pickupPanel.hidden).toBe(true);
+		expect(deliveryPanel.hidden).toBe(false);
+
+		const pickupSwitch = controller.optionsEl.querySelector('[data-cetech-de-choice-switch][value="store_pickup"]');
+		pickupSwitch.checked = true;
+		pickupSwitch.dispatchEvent(new Event('change', { bubbles: true }));
+
+		expect(deliveryPanel.hidden).toBe(true);
+		expect(pickupPanel.hidden).toBe(false);
+		expect(pickupPanel.textContent).toContain('Main showroom');
+		expect(pickupPanel.textContent).toContain('Ready in 2 hours');
+		expect(pickupPanel.querySelector('.cetech-de-delivery-option__estimate')).toBeNull();
+		expect(deliveryPanel.querySelector('input[type="radio"]').disabled).toBe(true);
+		expect(pickupPanel.querySelector('input[name="cetech_de_delivery_option_key"]').checked).toBe(true);
 	});
 });

@@ -77,8 +77,9 @@ final class OrderDeliverySnapshotBuilder {
 		$quote_status      = OrderDeliverySnapshot::QUOTE_STATUS_SELECTION_ONLY;
 		$rate_card_id      = null;
 		$rate_card_code    = null;
+		$choice            = sanitize_key( (string) ( $intent['fulfilment_choice'] ?? '' ) );
 
-		if ( $delivery_offer_id > 0 ) {
+		if ( $delivery_offer_id > 0 && FulfilmentChoice::StorePickup->value !== $choice ) {
 			if ( null === $destination_zone_id ) {
 				return null;
 			}
@@ -104,9 +105,16 @@ final class OrderDeliverySnapshotBuilder {
 			}
 		}
 
+		$summary = is_array( $summary ) ? $summary : [];
 		$offer_label = $summary['delivery_offer_public_label'] ?? null;
 		$estimate    = $summary['estimate_text'] ?? null;
 		$group_id    = DeliveryGroupIdentity::fromIntent( $intent );
+		$description = $this->public_description( $delivery_offer_id > 0 ? $delivery_offer_id : null );
+
+		if ( FulfilmentChoice::StorePickup->value === $choice ) {
+			$instructions = isset( $summary['pickup_instructions'] ) ? (string) $summary['pickup_instructions'] : '';
+			$description  = '' !== $instructions ? sanitize_text_field( $instructions ) : $description;
+		}
 
 		return new OrderDeliveryLineSnapshot(
 			ProductDeliverySelectionIntent::CONTRACT_VERSION,
@@ -114,10 +122,10 @@ final class OrderDeliverySnapshotBuilder {
 			(int) ( $intent['product_id'] ?? $cart_item_values['product_id'] ?? 0 ),
 			$this->nullable_positive_int( $intent['variation_id'] ?? $cart_item_values['variation_id'] ?? null ),
 			sanitize_key( (string) ( $intent['fulfilment_availability'] ?? '' ) ),
-			sanitize_key( (string) ( $intent['fulfilment_choice'] ?? '' ) ),
+			$choice,
 			$delivery_offer_id > 0 ? $delivery_offer_id : null,
 			null !== $offer_label ? sanitize_text_field( (string) $offer_label ) : null,
-			$this->public_description( $delivery_offer_id > 0 ? $delivery_offer_id : null ),
+			$description,
 			null !== $estimate ? sanitize_text_field( (string) $estimate ) : null,
 			$this->nullable_positive_int( $intent['rule_id'] ?? null ),
 			$destination_zone_id,
@@ -128,7 +136,16 @@ final class OrderDeliverySnapshotBuilder {
 			$rate_card_id,
 			null !== $rate_card_code ? sanitize_text_field( $rate_card_code ) : null,
 			gmdate( 'c' ),
-			$group_id
+			$group_id,
+			FulfilmentChoice::StorePickup->value === $choice
+				? $this->nullable_summary_text( $summary['pickup_location_label'] ?? null )
+				: null,
+			FulfilmentChoice::StorePickup->value === $choice
+				? $this->nullable_summary_text( $summary['pickup_address'] ?? null )
+				: null,
+			FulfilmentChoice::StorePickup->value === $choice
+				? $this->nullable_summary_text( $summary['pickup_instructions'] ?? null )
+				: null
 		);
 	}
 
@@ -273,5 +290,15 @@ final class OrderDeliverySnapshotBuilder {
 		$int = (int) $value;
 
 		return $int > 0 ? $int : null;
+	}
+
+	private function nullable_summary_text( mixed $value ): ?string {
+		if ( null === $value || '' === $value ) {
+			return null;
+		}
+
+		$text = sanitize_text_field( (string) $value );
+
+		return '' !== $text ? $text : null;
 	}
 }

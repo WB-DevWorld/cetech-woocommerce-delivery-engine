@@ -143,14 +143,31 @@ final class SelectedOfferShippingRegistrationTest extends TestCase {
 		self::assertCount( 1, $filtered );
 	}
 
-	public function test_flags_on_without_a_delivery_engine_rate_do_not_strip_native_methods(): void {
+	public function test_flags_on_managed_package_without_de_rate_hides_native_methods(): void {
+		$integration = $this->integration( $this->runtime_flags_on() );
+		$native      = $this->rate( 'flat_rate:1', 'flat_rate' );
+		$pickup      = $this->rate( 'local_pickup:1', 'local_pickup' );
+		$rates       = [
+			'flat_rate:1'    => $native,
+			'local_pickup:1' => $pickup,
+		];
+
+		$filtered = $integration->filter_managed_package_rates( $rates, $this->managed_package() );
+
+		self::assertSame( [], $filtered );
+		self::assertArrayNotHasKey( 'flat_rate:1', $filtered );
+		self::assertArrayNotHasKey( 'local_pickup:1', $filtered );
+	}
+
+	public function test_flags_on_unmanaged_package_keeps_native_methods(): void {
 		$integration = $this->integration( $this->runtime_flags_on() );
 		$native      = $this->rate( 'flat_rate:1', 'flat_rate' );
 		$rates       = [ 'flat_rate:1' => $native ];
 
-		$filtered = $integration->filter_managed_package_rates( $rates, $this->managed_package() );
+		$filtered = $integration->filter_managed_package_rates( $rates, [ 'contents' => [] ] );
 
 		self::assertSame( $rates, $filtered );
+		self::assertArrayNotHasKey( SelectedOfferShippingMethod::METHOD_ID, $filtered );
 	}
 
 	/**

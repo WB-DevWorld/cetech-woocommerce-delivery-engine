@@ -52,6 +52,10 @@ final class VariableDeliverySelectorAssetsTest extends TestCase {
 		$assets->enqueue();
 
 		self::assertContains( VariableDeliverySelectorAssets::HANDLE, $GLOBALS['cetech_de_test_enqueued_scripts'] );
+		self::assertContains(
+			\CetechDeliveryEngine\Presentation\Frontend\ProductDeliverySelectorRenderer::SCRIPT_HANDLE,
+			$GLOBALS['cetech_de_test_enqueued_scripts']
+		);
 		self::assertContains( VariableDeliverySelectorAssets::HANDLE, $GLOBALS['cetech_de_test_enqueued_styles'] );
 		self::assertContains(
 			\CetechDeliveryEngine\Presentation\Frontend\ProductDeliverySelectorRenderer::STYLE_HANDLE,
@@ -110,6 +114,10 @@ final class VariableDeliverySelectorAssetsTest extends TestCase {
 
 		self::assertTrue( $this->should_enqueue( $assets ) );
 		self::assertContains( VariableDeliverySelectorAssets::HANDLE, $GLOBALS['cetech_de_test_enqueued_scripts'] );
+		self::assertContains(
+			\CetechDeliveryEngine\Presentation\Frontend\ProductDeliverySelectorRenderer::SCRIPT_HANDLE,
+			$GLOBALS['cetech_de_test_enqueued_scripts']
+		);
 	}
 
 	private function enable_variable_product_page_flags(): void {

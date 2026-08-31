@@ -37,6 +37,7 @@ final class HardFulfilmentConstraintServiceTest extends TestCase {
 		$this->offers->seed( 1, [ 'route' => DeliveryRoute::Air->value, 'status' => 'active' ] );
 		$this->offers->seed( 2, [ 'route' => DeliveryRoute::Sea->value, 'status' => 'active' ] );
 		$this->offers->seed( 3, [ 'route' => DeliveryRoute::LocalDelivery->value, 'status' => 'active' ] );
+		$this->offers->seed( 4, [ 'route' => DeliveryRoute::StorePickup->value, 'status' => 'active' ] );
 	}
 
 	public function test_international_rejects_pickup_and_keeps_air_sea(): void {
@@ -60,11 +61,11 @@ final class HardFulfilmentConstraintServiceTest extends TestCase {
 		self::assertContains( ConfigurationReasonCode::CONSTRAINT_ROUTE_FILTERED, $config->reason_codes );
 	}
 
-	public function test_in_store_filters_air_sea_and_allows_pickup(): void {
+	public function test_in_store_filters_air_sea_and_keeps_local_and_pickup(): void {
 		$this->seed_slice(
 			FulfilmentAvailability::InStore->value,
 			FulfilmentChoice::StorePickup->value,
-			[ 1, 2, 3 ]
+			[ 1, 2, 3, 4 ]
 		);
 
 		$config = $this->resolver()->resolve(
@@ -73,7 +74,8 @@ final class HardFulfilmentConstraintServiceTest extends TestCase {
 
 		self::assertSame( EffectiveFieldState::Valid, $config->state );
 		self::assertSame( FulfilmentChoice::StorePickup->value, $config->scalar( ConfigurationFieldKey::FULFILMENT_CHOICE )?->value );
-		self::assertSame( [ 3 ], $config->collection( ConfigurationFieldKey::DELIVERY_OFFER_IDS )?->members );
+		self::assertSame( [ 3, 4 ], $config->collection( ConfigurationFieldKey::DELIVERY_OFFER_IDS )?->members );
+		self::assertContains( ConfigurationReasonCode::CONSTRAINT_ROUTE_FILTERED, $config->reason_codes );
 	}
 
 	public function test_in_warehouse_rejects_pickup_and_air_sea(): void {

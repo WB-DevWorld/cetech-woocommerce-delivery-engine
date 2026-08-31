@@ -3,6 +3,7 @@
  *
  * Theme-independent: listens to found_variation / reset_data on .variations_form.
  * Does not resolve delivery rules client-side. Server remains authoritative.
+ * Compact product selector: public label + estimated delivery; no option descriptions.
  */
 (function (window, document, $) {
 	'use strict';
@@ -187,68 +188,210 @@
 			this.setVariationBinding(variationId);
 		},
 
-			renderOptions: function (options, variationId) {
+		renderOptions: function (options, variationId) {
 			if (!this.optionsEl) {
 				return;
 			}
 
 			this.optionsEl.innerHTML = '';
+			if (this.root) {
+				this.root.removeAttribute('data-cetech-de-switch-bound');
+			}
 			var fieldName = config.postField || 'cetech_de_delivery_option_key';
 			var fragment = document.createDocumentFragment();
 			var estimatePrefix = (config.i18n && config.i18n.estimatedDelivery) || 'Estimated delivery';
-			var pickupPrefix = (config.i18n && config.i18n.readyForPickup) || 'Ready for pickup';
+			var i18n = config.i18n || {};
+			var groups = { delivery: [], store_pickup: [] };
 
 			options.forEach(function (option) {
-				var displayKey = String(option.display_key || '');
-				if (!displayKey) {
+				if (!option || !option.display_key) {
 					return;
 				}
-
-				var p = document.createElement('p');
-				p.className = 'cetech-de-delivery-option cetech-de-delivery-option--radio';
-
-				var inputId = 'cetech-de-delivery-option-' + displayKey.replace(/[^a-zA-Z0-9_-]/g, '-');
-				var label = document.createElement('label');
-				label.className = 'cetech-de-delivery-option__label-wrap';
-				label.setAttribute('for', inputId);
-
-				var input = document.createElement('input');
-				input.type = 'radio';
-				input.name = fieldName;
-				input.id = inputId;
-				input.value = displayKey;
-				input.required = true;
-				input.setAttribute('data-cetech-de-variation-bound', String(variationId));
-
-				var body = document.createElement('span');
-				body.className = 'cetech-de-delivery-option__body';
-
-				var labelText = document.createElement('span');
-				labelText.className = 'cetech-de-delivery-option__label';
-				labelText.textContent = String(option.delivery_offer_public_label || '');
-				body.appendChild(labelText);
-
-				// Compact product selector: public label + estimate only.
-				// Public description remains in the data contract but is omitted here.
-				if (option.estimate_text) {
-					var rawEstimate = String(option.estimate_text).replace(/^Estimated\s+/i, '').trim();
-					if (rawEstimate) {
-						var isPickup = String(option.fulfilment_choice || '').toLowerCase() === 'store_pickup'
-							|| String(option.fulfilment_choice_label || '').toLowerCase().indexOf('pickup') !== -1;
-						var eta = document.createElement('span');
-						eta.className = 'cetech-de-delivery-option__estimate';
-						eta.textContent = (isPickup ? pickupPrefix : estimatePrefix) + ': ' + rawEstimate;
-						body.appendChild(eta);
-					}
+				if (String(option.fulfilment_choice || '') === 'store_pickup') {
+					groups.store_pickup.push(option);
+				} else {
+					groups.delivery.push(option);
 				}
-
-				label.appendChild(input);
-				label.appendChild(body);
-				p.appendChild(label);
-				fragment.appendChild(p);
 			});
 
+			var hasSwitch = groups.delivery.length > 0 && groups.store_pickup.length > 0;
+			var defaultKey = '';
+			options.forEach(function (option) {
+				if (option && option.is_default && option.display_key) {
+					defaultKey = String(option.display_key);
+				}
+			});
+			if (!defaultKey && options.length === 1) {
+				defaultKey = String(options[0].display_key || '');
+			}
+			var activeChoice = 'delivery';
+			if (hasSwitch) {
+				options.forEach(function (option) {
+					if (option && String(option.display_key || '') === defaultKey) {
+						activeChoice = String(option.fulfilment_choice || 'delivery');
+					}
+				});
+				if (activeChoice !== 'store_pickup') {
+					activeChoice = 'delivery';
+				}
+			} else if (groups.delivery.length === 0) {
+				activeChoice = 'store_pickup';
+			}
+
+			if (hasSwitch) {
+				fragment.appendChild(this.renderChoiceSwitch(activeChoice, i18n));
+			}
+
+			if (groups.delivery.length) {
+				fragment.appendChild(
+					this.renderChoicePanel('delivery', groups.delivery, variationId, fieldName, defaultKey, hasSwitch && activeChoice !== 'delivery', estimatePrefix, i18n)
+				);
+			}
+			if (groups.store_pickup.length) {
+				fragment.appendChild(
+					this.renderChoicePanel('store_pickup', groups.store_pickup, variationId, fieldName, defaultKey, hasSwitch && activeChoice !== 'store_pickup', estimatePrefix, i18n)
+				);
+			}
+
 			this.optionsEl.appendChild(fragment);
+			if (window.CetechDeProductDeliverySelector && this.root) {
+				window.CetechDeProductDeliverySelector.bind(this.root);
+			}
+		},
+
+		renderChoiceSwitch: function (activeChoice, i18n) {
+			var wrap = document.createElement('div');
+			wrap.className = 'cetech-de-fulfilment-choice';
+			wrap.setAttribute('role', 'radiogroup');
+			wrap.setAttribute('aria-label', i18n.fulfilment || 'Fulfilment');
+			[
+				{ value: 'delivery', label: i18n.delivery || 'Delivery' },
+				{ value: 'store_pickup', label: i18n.storePickup || 'Store pickup' },
+			].forEach(function (choice) {
+				var p = document.createElement('p');
+				p.className = 'cetech-de-fulfilment-choice__option';
+				var label = document.createElement('label');
+				var input = document.createElement('input');
+				input.type = 'radio';
+				input.name = 'cetech_de_fulfilment_ui';
+				input.value = choice.value;
+				input.setAttribute('data-cetech-de-choice-switch', '1');
+				if (activeChoice === choice.value) {
+					input.checked = true;
+				}
+				label.appendChild(input);
+				label.appendChild(document.createTextNode(' ' + choice.label));
+				p.appendChild(label);
+				wrap.appendChild(p);
+			});
+			return wrap;
+		},
+
+		renderChoicePanel: function (choice, options, variationId, fieldName, defaultKey, hidden, estimatePrefix, i18n) {
+			var panel = document.createElement('div');
+			panel.className = 'cetech-de-delivery-option-group';
+			if (choice === 'store_pickup') {
+				panel.className += ' cetech-de-delivery-option-group--pickup';
+			}
+			panel.setAttribute('data-cetech-de-choice-panel', choice);
+			if (hidden) {
+				panel.hidden = true;
+			}
+
+			var self = this;
+			options.forEach(function (option) {
+				panel.appendChild(self.renderOptionRadio(option, variationId, fieldName, defaultKey, hidden, estimatePrefix, i18n));
+				if (choice === 'store_pickup') {
+					var details = self.renderPickupDetails(option, i18n);
+					if (details) {
+						panel.appendChild(details);
+					}
+				}
+			});
+			return panel;
+		},
+
+		renderOptionRadio: function (option, variationId, fieldName, defaultKey, hidden, estimatePrefix, i18n) {
+			var displayKey = String(option.display_key || '');
+			var p = document.createElement('p');
+			p.className = 'cetech-de-delivery-option cetech-de-delivery-option--radio';
+			p.setAttribute('data-cetech-de-choice', String(option.fulfilment_choice || ''));
+
+			var inputId = 'cetech-de-delivery-option-' + displayKey.replace(/[^a-zA-Z0-9_-]/g, '-');
+			var label = document.createElement('label');
+			label.className = 'cetech-de-delivery-option__label-wrap';
+			label.setAttribute('for', inputId);
+
+			var input = document.createElement('input');
+			input.type = 'radio';
+			input.name = fieldName;
+			input.id = inputId;
+			input.value = displayKey;
+			input.required = !hidden;
+			input.disabled = !!hidden;
+			input.checked = defaultKey !== '' && defaultKey === displayKey;
+			input.setAttribute('data-cetech-de-variation-bound', String(variationId));
+
+			var body = document.createElement('span');
+			body.className = 'cetech-de-delivery-option__body';
+
+			var labelText = document.createElement('span');
+			labelText.className = 'cetech-de-delivery-option__label';
+			labelText.textContent = String(option.delivery_offer_public_label || '');
+			body.appendChild(labelText);
+
+			if (option.estimate_text && String(option.fulfilment_choice || '') !== 'store_pickup') {
+				var rawEstimate = String(option.estimate_text).replace(/^Estimated\s+/i, '').trim();
+				if (rawEstimate) {
+					var eta = document.createElement('span');
+					eta.className = 'cetech-de-delivery-option__estimate';
+					eta.textContent = estimatePrefix + ': ' + rawEstimate;
+					body.appendChild(eta);
+				}
+			}
+
+			label.appendChild(input);
+			label.appendChild(body);
+			p.appendChild(label);
+			return p;
+		},
+
+		renderPickupDetails: function (option, i18n) {
+			var rows = [];
+			if (option.pickup_location_label) {
+				rows.push([i18n.pickupLocation || 'Pickup location', option.pickup_location_label]);
+			}
+			if (option.pickup_address) {
+				rows.push([i18n.pickupAddress || 'Pickup address', option.pickup_address]);
+			}
+			if (option.estimate_text) {
+				rows.push([i18n.readyForPickup || 'Ready for pickup', String(option.estimate_text).replace(/^Estimated\s+/i, '').trim()]);
+			}
+			if (option.pickup_instructions) {
+				rows.push([i18n.pickupInstructions || 'Pickup instructions', option.pickup_instructions]);
+			}
+			if (!rows.length) {
+				return null;
+			}
+			var wrap = document.createElement('div');
+			wrap.className = 'cetech-de-pickup-details';
+			rows.forEach(function (row) {
+				if (!row[1]) {
+					return;
+				}
+				var p = document.createElement('p');
+				p.className = 'cetech-de-pickup-details__row';
+				var label = document.createElement('span');
+				label.className = 'cetech-de-pickup-details__label';
+				label.textContent = row[0];
+				var value = document.createElement('span');
+				value.className = 'cetech-de-pickup-details__value';
+				value.textContent = ' ' + row[1];
+				p.appendChild(label);
+				p.appendChild(value);
+				wrap.appendChild(p);
+			});
+			return wrap;
 		},
 
 		setVariationBinding: function (variationId) {

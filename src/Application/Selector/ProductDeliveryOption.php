@@ -8,6 +8,7 @@ namespace CetechDeliveryEngine\Application\Selector;
  * Customer-safe product-page delivery option (display-only contract).
  *
  * Does not contain supplier/origin data, prices, rate cards, or cart persistence fields.
+ * Pickup location fields are public catalog copy only — not per-item location architecture.
  */
 final class ProductDeliveryOption {
 
@@ -25,7 +26,11 @@ final class ProductDeliveryOption {
 		public readonly ?string $estimate_text,
 		public readonly bool $is_available,
 		public readonly ?string $unavailable_reason,
-		public readonly string $contract_version = self::CONTRACT_VERSION
+		public readonly string $contract_version = self::CONTRACT_VERSION,
+		public readonly bool $is_default = false,
+		public readonly ?string $pickup_location_label = null,
+		public readonly ?string $pickup_address = null,
+		public readonly ?string $pickup_instructions = null
 	) {
 	}
 
@@ -46,6 +51,10 @@ final class ProductDeliveryOption {
 			'estimate_text'                     => $this->estimate_text,
 			'is_available'                      => $this->is_available,
 			'unavailable_reason'                => $this->unavailable_reason,
+			'is_default'                        => $this->is_default,
+			'pickup_location_label'             => $this->pickup_location_label,
+			'pickup_address'                    => $this->pickup_address,
+			'pickup_instructions'               => $this->pickup_instructions,
 		];
 	}
 
@@ -65,7 +74,32 @@ final class ProductDeliveryOption {
 			isset( $data['estimate_text'] ) ? (string) $data['estimate_text'] : null,
 			! empty( $data['is_available'] ),
 			isset( $data['unavailable_reason'] ) ? (string) $data['unavailable_reason'] : null,
-			(string) ( $data['contract_version'] ?? self::CONTRACT_VERSION )
+			(string) ( $data['contract_version'] ?? self::CONTRACT_VERSION ),
+			! empty( $data['is_default'] ),
+			isset( $data['pickup_location_label'] ) ? (string) $data['pickup_location_label'] : null,
+			isset( $data['pickup_address'] ) ? (string) $data['pickup_address'] : null,
+			isset( $data['pickup_instructions'] ) ? (string) $data['pickup_instructions'] : null
+		);
+	}
+
+	public function withDefault( bool $is_default ): self {
+		return new self(
+			$this->display_key,
+			$this->fulfilment_availability,
+			$this->fulfilment_availability_label,
+			$this->fulfilment_choice,
+			$this->fulfilment_choice_label,
+			$this->delivery_offer_id,
+			$this->delivery_offer_public_label,
+			$this->delivery_offer_public_description,
+			$this->estimate_text,
+			$this->is_available,
+			$this->unavailable_reason,
+			$this->contract_version,
+			$is_default,
+			$this->pickup_location_label,
+			$this->pickup_address,
+			$this->pickup_instructions
 		);
 	}
 }

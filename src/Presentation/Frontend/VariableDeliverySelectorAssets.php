@@ -46,6 +46,14 @@ final class VariableDeliverySelectorAssets {
 			$version
 		);
 
+		wp_enqueue_script(
+			ProductDeliverySelectorRenderer::SCRIPT_HANDLE,
+			$base . 'assets/frontend/product-delivery-selector.js',
+			[],
+			$version,
+			true
+		);
+
 		wp_enqueue_style(
 			self::HANDLE,
 			$base . 'assets/frontend/variable-delivery-selector.css',
@@ -56,7 +64,7 @@ final class VariableDeliverySelectorAssets {
 		wp_enqueue_script(
 			self::HANDLE,
 			$base . 'assets/frontend/variable-delivery-selector.js',
-			[ 'jquery' ],
+			[ 'jquery', ProductDeliverySelectorRenderer::SCRIPT_HANDLE ],
 			$version,
 			true
 		);
@@ -81,6 +89,12 @@ final class VariableDeliverySelectorAssets {
 					'title'             => __( 'Delivery options', 'cetech-woocommerce-delivery-engine' ),
 					'estimatedDelivery' => __( 'Estimated delivery', 'cetech-woocommerce-delivery-engine' ),
 					'readyForPickup'    => __( 'Ready for pickup', 'cetech-woocommerce-delivery-engine' ),
+					'delivery'          => __( 'Delivery', 'cetech-woocommerce-delivery-engine' ),
+					'storePickup'       => __( 'Store pickup', 'cetech-woocommerce-delivery-engine' ),
+					'pickupLocation'    => __( 'Pickup location', 'cetech-woocommerce-delivery-engine' ),
+					'pickupAddress'     => __( 'Pickup address', 'cetech-woocommerce-delivery-engine' ),
+					'pickupInstructions'=> __( 'Pickup instructions', 'cetech-woocommerce-delivery-engine' ),
+					'fulfilment'        => __( 'Fulfilment', 'cetech-woocommerce-delivery-engine' ),
 				],
 				'postField'           => 'cetech_de_delivery_option_key',
 				'postVariationField'  => 'cetech_de_delivery_variation_id',

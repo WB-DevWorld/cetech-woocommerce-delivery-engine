@@ -133,6 +133,7 @@ final class HardFulfilmentConstraintService implements FulfilmentConstraintServi
 				'pickup_allowed' => true,
 				'allowed_routes' => [
 					DeliveryRoute::LocalDelivery->value,
+					DeliveryRoute::StorePickup->value,
 				],
 			],
 			FulfilmentAvailability::InWarehouse->value => [

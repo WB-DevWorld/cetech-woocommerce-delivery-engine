@@ -98,7 +98,10 @@ final class OrderDeliverySnapshotReader {
 			$this->nullable_positive_int( $decoded['rate_card_id'] ?? null ),
 			$this->nullable_string( $decoded['rate_card_code'] ?? null ),
 			sanitize_text_field( (string) $decoded['snapshotted_at'] ),
-			$this->nullable_string( $decoded['delivery_group_id'] ?? null )
+			$this->nullable_string( $decoded['delivery_group_id'] ?? null ),
+			$this->nullable_string( $decoded['pickup_location_label'] ?? null ),
+			$this->nullable_string( $decoded['pickup_address'] ?? null ),
+			$this->nullable_string( $decoded['pickup_instructions'] ?? null )
 		);
 
 		return new OrderDeliveryLineReadResult( true, $snapshot, OrderDeliveryLineReadResult::ERROR_NONE, $stored_version_normalized );

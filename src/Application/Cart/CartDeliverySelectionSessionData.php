@@ -35,6 +35,9 @@ final class CartDeliverySelectionSessionData {
 		'fulfilment_choice_label',
 		'delivery_offer_public_label',
 		'estimate_text',
+		'pickup_location_label',
+		'pickup_address',
+		'pickup_instructions',
 	];
 
 	/**

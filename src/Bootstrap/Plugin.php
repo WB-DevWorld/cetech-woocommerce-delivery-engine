@@ -563,7 +563,8 @@ final class Plugin {
 		$this->container->singleton(
 			ProductDeliveryOptionsBuilder::class,
 			static fn ( ServiceContainer $container ): ProductDeliveryOptionsBuilder => new ProductDeliveryOptionsBuilder(
-				$container->get( DeliveryOfferRepositoryInterface::class )
+				$container->get( DeliveryOfferRepositoryInterface::class ),
+				$container->get( PickupLocationRepositoryInterface::class )
 			)
 		);
 

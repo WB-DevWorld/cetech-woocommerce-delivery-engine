@@ -315,6 +315,15 @@ final class CartDeliverySelectionCapture {
 			'estimate_text'                 => isset( $matched_option['estimate_text'] )
 				? (string) $matched_option['estimate_text']
 				: null,
+			'pickup_location_label'         => isset( $matched_option['pickup_location_label'] )
+				? (string) $matched_option['pickup_location_label']
+				: null,
+			'pickup_address'                => isset( $matched_option['pickup_address'] )
+				? (string) $matched_option['pickup_address']
+				: null,
+			'pickup_instructions'           => isset( $matched_option['pickup_instructions'] )
+				? (string) $matched_option['pickup_instructions']
+				: null,
 		];
 
 		return CartDeliverySelectionSessionData::normalizeSummary( $raw ) ?? [];

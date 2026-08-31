@@ -11,6 +11,7 @@ use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
+use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Domain\Enum\ProductTargetType;
 use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
 use WC_Product;
@@ -25,6 +26,8 @@ use WC_Product;
 final class ProductDeliverySelectorRenderer {
 
 	public const STYLE_HANDLE = 'cetech-de-product-delivery-selector';
+
+	public const SCRIPT_HANDLE = 'cetech-de-product-delivery-selector';
 
 	public function __construct(
 		private FeatureFlags $feature_flags,
@@ -66,6 +69,14 @@ final class ProductDeliverySelectorRenderer {
 			$base . 'assets/frontend/product-delivery-selector.css',
 			[],
 			$version
+		);
+
+		wp_enqueue_script(
+			self::SCRIPT_HANDLE,
+			$base . 'assets/frontend/product-delivery-selector.js',
+			[],
+			$version,
+			true
 		);
 	}
 
@@ -185,7 +196,7 @@ final class ProductDeliverySelectorRenderer {
 		$product = $this->resolve_product();
 		$product_id = $product instanceof WC_Product ? (int) $product->get_id() : 0;
 
-		echo '<div class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--variable" data-cetech-de-variable-selector="1" data-product-id="' . esc_attr( (string) $product_id ) . '">';
+		echo '<div class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--variable" data-cetech-de-variable-selector="1" data-cetech-de-selector="1" data-product-id="' . esc_attr( (string) $product_id ) . '">';
 		echo '<fieldset class="cetech-de-delivery-selector__fieldset">';
 		echo '<legend class="cetech-de-delivery-selector__title">' . esc_html__( 'Delivery options', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
 		echo '<div class="cetech-de-delivery-selector__status" role="status" aria-live="polite" data-cetech-de-status>';
@@ -234,9 +245,11 @@ final class ProductDeliverySelectorRenderer {
 	 * @param list<ProductDeliveryOption> $options
 	 */
 	private function render_interactive_options( array $options ): void {
-		$available = array_filter(
-			$options,
-			static fn ( ProductDeliveryOption $option ): bool => $option->is_available
+		$available = array_values(
+			array_filter(
+				$options,
+				static fn ( ProductDeliveryOption $option ): bool => $option->is_available
+			)
 		);
 
 		if ( [] === $available ) {
@@ -248,18 +261,80 @@ final class ProductDeliverySelectorRenderer {
 		}
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- display-only repopulation of customer choice.
-		$selected = isset( $_POST[ CartDeliverySelectionCapture::POST_FIELD ] )
+		$posted = isset( $_POST[ CartDeliverySelectionCapture::POST_FIELD ] )
 			? ProductDeliveryOptionsBuilder::normalizeDisplayKey( wp_unslash( (string) $_POST[ CartDeliverySelectionCapture::POST_FIELD ] ) )
 			: '';
+		$selected = '' !== $posted ? $posted : ProductDeliveryOptionsBuilder::defaultDisplayKey( $available );
+		$groups     = ProductDeliveryOptionsBuilder::groupByChoice( $available );
+		$has_switch = [] !== $groups[ FulfilmentChoice::Delivery->value ]
+			&& [] !== $groups[ FulfilmentChoice::StorePickup->value ];
+		$active_choice = $this->active_choice( $available, $selected, $has_switch );
 
-		echo '<fieldset class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--interactive">';
+		echo '<fieldset class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--interactive" data-cetech-de-selector="1">';
 		echo '<legend class="cetech-de-delivery-selector__title">' . esc_html__( 'Delivery options', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
 
-		foreach ( $available as $option ) {
-			$this->render_radio_option( $option, $selected );
+		if ( $has_switch ) {
+			$this->render_choice_switch( $active_choice );
+		}
+
+		if ( [] !== $groups[ FulfilmentChoice::Delivery->value ] ) {
+			$hidden = $has_switch && FulfilmentChoice::Delivery->value !== $active_choice;
+			echo '<div class="cetech-de-delivery-option-group" data-cetech-de-choice-panel="' . esc_attr( FulfilmentChoice::Delivery->value ) . '"' . ( $hidden ? ' hidden' : '' ) . '>';
+			foreach ( $groups[ FulfilmentChoice::Delivery->value ] as $option ) {
+				$this->render_radio_option( $option, $selected, $hidden );
+			}
+			echo '</div>';
+		}
+
+		if ( [] !== $groups[ FulfilmentChoice::StorePickup->value ] ) {
+			$hidden = $has_switch && FulfilmentChoice::StorePickup->value !== $active_choice;
+			echo '<div class="cetech-de-delivery-option-group cetech-de-delivery-option-group--pickup" data-cetech-de-choice-panel="' . esc_attr( FulfilmentChoice::StorePickup->value ) . '"' . ( $hidden ? ' hidden' : '' ) . '>';
+			foreach ( $groups[ FulfilmentChoice::StorePickup->value ] as $option ) {
+				$this->render_radio_option( $option, $selected, $hidden );
+				$this->render_pickup_details( $option );
+			}
+			echo '</div>';
 		}
 
 		echo '</fieldset>';
+	}
+
+	/**
+	 * @param list<ProductDeliveryOption> $available
+	 */
+	private function active_choice( array $available, string $selected, bool $has_switch ): string {
+		if ( '' !== $selected ) {
+			foreach ( $available as $option ) {
+				if ( $option->display_key === $selected ) {
+					return $option->fulfilment_choice;
+				}
+			}
+		}
+
+		if ( $has_switch ) {
+			return FulfilmentChoice::Delivery->value;
+		}
+
+		return $available[0]->fulfilment_choice;
+	}
+
+	private function render_choice_switch( string $active_choice ): void {
+		echo '<div class="cetech-de-fulfilment-choice" role="radiogroup" aria-label="' . esc_attr__( 'Fulfilment', 'cetech-woocommerce-delivery-engine' ) . '">';
+		foreach (
+			[
+				FulfilmentChoice::Delivery->value    => __( 'Delivery', 'cetech-woocommerce-delivery-engine' ),
+				FulfilmentChoice::StorePickup->value => __( 'Store pickup', 'cetech-woocommerce-delivery-engine' ),
+			] as $value => $label
+		) {
+			$id      = 'cetech-de-fulfilment-ui-' . sanitize_html_class( $value );
+			$checked = $active_choice === $value;
+			echo '<p class="cetech-de-fulfilment-choice__option">';
+			echo '<label for="' . esc_attr( $id ) . '">';
+			echo '<input type="radio" name="cetech_de_fulfilment_ui" id="' . esc_attr( $id ) . '" value="' . esc_attr( $value ) . '" data-cetech-de-choice-switch="1"' . ( $checked ? ' checked="checked"' : '' ) . ' /> ';
+			echo esc_html( $label );
+			echo '</label></p>';
+		}
+		echo '</div>';
 	}
 
 	private function render_display_option( ProductDeliveryOption $option ): void {
@@ -286,7 +361,7 @@ final class ProductDeliverySelectorRenderer {
 		echo '</li>';
 	}
 
-	private function render_radio_option( ProductDeliveryOption $option, string $selected ): void {
+	private function render_radio_option( ProductDeliveryOption $option, string $selected, bool $disabled = false ): void {
 		$label = $option->delivery_offer_public_label ?? '';
 
 		if ( '' === $label ) {
@@ -295,16 +370,49 @@ final class ProductDeliverySelectorRenderer {
 
 		$input_id = 'cetech-de-delivery-option-' . sanitize_html_class( $option->display_key );
 		$checked  = $selected === $option->display_key;
+		$choice   = sanitize_html_class( $option->fulfilment_choice );
 
-		echo '<p class="cetech-de-delivery-option cetech-de-delivery-option--radio">';
+		echo '<p class="cetech-de-delivery-option cetech-de-delivery-option--radio" data-cetech-de-choice="' . esc_attr( $choice ) . '">';
 		echo '<label for="' . esc_attr( $input_id ) . '" class="cetech-de-delivery-option__label-wrap">';
-		echo '<input type="radio" name="' . esc_attr( CartDeliverySelectionCapture::POST_FIELD ) . '" id="' . esc_attr( $input_id ) . '" value="' . esc_attr( $option->display_key ) . '"' . ( $checked ? ' checked="checked"' : '' ) . ' required="required" />';
+		echo '<input type="radio" name="' . esc_attr( CartDeliverySelectionCapture::POST_FIELD ) . '" id="' . esc_attr( $input_id ) . '" value="' . esc_attr( $option->display_key ) . '"' . ( $checked ? ' checked="checked"' : '' ) . ( $disabled ? ' disabled="disabled"' : '' ) . ' required="required" />';
 		echo '<span class="cetech-de-delivery-option__body">';
 		echo '<span class="cetech-de-delivery-option__label">' . esc_html( $label ) . '</span>';
-		$this->render_estimate_line( $option );
+		if ( FulfilmentChoice::StorePickup->value !== $option->fulfilment_choice ) {
+			$this->render_estimate_line( $option );
+		}
 		echo '</span>';
 		echo '</label>';
 		echo '</p>';
+	}
+
+	private function render_pickup_details( ProductDeliveryOption $option ): void {
+		if ( FulfilmentChoice::StorePickup->value !== $option->fulfilment_choice ) {
+			return;
+		}
+
+		echo '<div class="cetech-de-pickup-details">';
+
+		if ( null !== $option->pickup_location_label && '' !== $option->pickup_location_label ) {
+			echo '<p class="cetech-de-pickup-details__row"><span class="cetech-de-pickup-details__label">' . esc_html( DeliveryPresentationLabels::pickup_location() ) . '</span> ';
+			echo '<span class="cetech-de-pickup-details__value">' . esc_html( $option->pickup_location_label ) . '</span></p>';
+		}
+
+		if ( null !== $option->pickup_address && '' !== $option->pickup_address ) {
+			echo '<p class="cetech-de-pickup-details__row"><span class="cetech-de-pickup-details__label">' . esc_html( DeliveryPresentationLabels::pickup_address() ) . '</span> ';
+			echo '<span class="cetech-de-pickup-details__value">' . esc_html( $option->pickup_address ) . '</span></p>';
+		}
+
+		if ( null !== $option->estimate_text && '' !== trim( $option->estimate_text ) ) {
+			echo '<p class="cetech-de-pickup-details__row"><span class="cetech-de-pickup-details__label">' . esc_html( DeliveryPresentationLabels::ready_for_pickup() ) . '</span> ';
+			echo '<span class="cetech-de-pickup-details__value">' . esc_html( DeliveryPresentationLabels::strip_estimated_prefix( $option->estimate_text ) ) . '</span></p>';
+		}
+
+		if ( null !== $option->pickup_instructions && '' !== $option->pickup_instructions ) {
+			echo '<p class="cetech-de-pickup-details__row"><span class="cetech-de-pickup-details__label">' . esc_html( DeliveryPresentationLabels::pickup_instructions() ) . '</span> ';
+			echo '<span class="cetech-de-pickup-details__value">' . esc_html( $option->pickup_instructions ) . '</span></p>';
+		}
+
+		echo '</div>';
 	}
 
 	private function render_estimate_line( ProductDeliveryOption $option ): void {

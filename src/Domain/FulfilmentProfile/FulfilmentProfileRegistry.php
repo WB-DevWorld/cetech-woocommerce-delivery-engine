@@ -51,7 +51,7 @@ final class FulfilmentProfileRegistry {
 				false,
 				'In Store',
 				'Local store stock. Delivery and/or store pickup. No air or sea shipping.',
-				[ DeliveryRoute::LocalDelivery->value ]
+				[ DeliveryRoute::LocalDelivery->value, DeliveryRoute::StorePickup->value ]
 			)
 		);
 		self::register(

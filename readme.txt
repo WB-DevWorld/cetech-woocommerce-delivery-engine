@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-rc.7
+Stable tag: 1.0.0-dev.fulfilment.1
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,9 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-dev.fulfilment.1 =
+* Post-RC.7 fulfilment correctness: In Store Delivery + Store Pickup as concurrent customer choices, International single-offer auto-select, and fail-closed native-rate filtering on Delivery Engine-managed packages. Schema remains 5. Tagged 1.0.0-rc.7 is unchanged.
 
 = 1.0.0-rc.7 =
 * Promotes the owner-accepted 1.0.0-dev.bulk.9 Bulk Tools + R1 training-site runtime to the tagged release candidate. Schema remains 5. No new features. Not Stage 15. Historical 1.0.0-dev.bulk.7–bulk.9 packages and tagged 1.0.0-rc.6 remain unchanged.
