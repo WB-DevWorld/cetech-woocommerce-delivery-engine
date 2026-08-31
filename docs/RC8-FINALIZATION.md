@@ -82,7 +82,7 @@ Run on the RC.8 identity source immediately before packaging:
 | Fulfilment-focused PHPUnit | **53 tests, 290 assertions, OK** |
 | `npm run test:js` | **28 passed / 28** |
 | Identity / schema | `CETECH_DE_VERSION` = `1.0.0-rc.8`; `SchemaVersion::TARGET` = `5`; not `1.0.0-dev.fulfilment.4`; not `1.0.0-rc.7` |
-| `scripts/verify-production-package-autoload.php` | run on staged package during ZIP build |
+| `scripts/verify-production-package-autoload.php` | **PASS** on staged package and extracted ZIP |
 | Playwright / FLAIROC | **not run** |
 
 Accepted Fulfilment.4 baseline: PHPUnit **783 tests / 4544 assertions**; JS **28 / 28**; changed PHP lint **0 errors**. RC.8 remains green. The extra PHPUnit assertion is the identity check that the plugin is no longer `1.0.0-dev.fulfilment.4`. No assertions were weakened.
@@ -105,10 +105,10 @@ Accepted Fulfilment.4 baseline: PHPUnit **783 tests / 4544 assertions**; JS **28
 
 | Item | Value |
 |------|--------|
-| Product finalize commit (package source) | TBD |
-| Tag `v1.0.0-rc.8` | TBD |
-| ZIP bytes | TBD |
-| SHA-256 | TBD |
+| Product finalize commit (package source) | `6d166227998d4b0f5047fea91944ff024b389810` |
+| Tag `v1.0.0-rc.8` | local annotated tag `2c211eb5b8a3a6af23e67b4d254a6c19c4e4b8ae` peeling to package-source `6d166227998d4b0f5047fea91944ff024b389810` (**not pushed**) |
+| ZIP bytes | `1307532` |
+| SHA-256 | `70ae635e71741663d5084e3cccd0d2246871d7c485efb919310267d7c9d46b03` |
 | Built from | committed clean `feat/post-rc7-fulfilment-correctness` (not `-AllowDirty`) |
 
 Do **not** rebuild the ZIP after the SHA-256 recording commit. The source commit is the tagged RC.8 identity commit, not the later docs-only hash record.
@@ -119,15 +119,15 @@ Do **not** rebuild the ZIP after the SHA-256 recording commit. The source commit
 
 | Check | Result |
 |-------|--------|
-| One plugin root | TBD |
-| Version `1.0.0-rc.8` | TBD |
-| Schema target `5` | TBD |
-| Production autoload / Linux-case classmap | TBD |
-| Bulk/R1 runtime present | TBD |
-| Accepted Fulfilment Correctness runtime present | TBD |
-| Packaged PHP lint | TBD |
-| No PHPUnit / tests / node_modules / `.git` / `.env` / nested ZIPs | TBD |
-| Historical Bulk / fulfilment QA / RC.7 ZIPs unchanged | TBD |
+| One plugin root | **PASS** — `cetech-woocommerce-delivery-engine/` |
+| Version `1.0.0-rc.8` | **PASS** |
+| Schema target `5` | **PASS** |
+| Production autoload / Linux-case classmap | **PASS** (`scripts/verify-production-package-autoload.php`) |
+| Bulk/R1 runtime present | **PASS** — `assets/admin/bulk-tools.js`, `WpActionSchedulerGateway.php` |
+| Accepted Fulfilment Correctness runtime present | **PASS** — `CartFulfilmentPackagePresentation.php`, `PickupLocationAddressFormatter.php`, `InStoreMethodSelection.php` |
+| Packaged PHP lint | **391 files, 0 failures** (excluding vendor) |
+| No PHPUnit / tests / node_modules / `.git` / `.env` / nested ZIPs | **PASS** |
+| Historical Bulk / fulfilment QA / RC.7 ZIPs unchanged | **PASS** — Fulfilment.4 Desktop `1303884` bytes unchanged; RC.7 Desktop present |
 
 ---
 
