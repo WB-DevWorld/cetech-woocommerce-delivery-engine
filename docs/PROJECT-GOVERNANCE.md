@@ -6,7 +6,7 @@
 **Repository namespace:** `CetechDeliveryEngine\`
 **WooCommerce dependency:** Required
 **PHP minimum:** 8.1+
-**Current known implementation baseline:** tagged `1.0.0-rc.7`, schema target `5`; protected published tags `1.0.0-rc.7` and historical `1.0.0-rc.6` / `1.0.0-rc.5`  
+**Current known implementation baseline:** tagged `1.0.0-rc.8`, schema target `5`; protected published tags `1.0.0-rc.8` and historical `1.0.0-rc.7` / `1.0.0-rc.6` / `1.0.0-rc.5`  
 **Canonical maintained rulebook:** `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`
 
 ---

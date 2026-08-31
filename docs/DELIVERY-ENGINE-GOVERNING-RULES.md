@@ -3,9 +3,9 @@
 **Document status:** Canonical, mandatory, maintained rulebook  
 **Applies to:** All human developers, Cursor agents, AI coding agents, reviewers, and maintainers  
 **Plugin:** CETECH WooCommerce Delivery Engine  
-**Current protected runtime baseline:** tagged `1.0.0-rc.7` (schema `5`)  
-**Previous protected published tag:** `1.0.0-rc.6` (schema `4`; **do not retag**)  
-**Schema target:** `5` on tagged `1.0.0-rc.7`. Tagged RC.6 remains schema `4`.  
+**Current protected runtime baseline:** tagged `1.0.0-rc.8` (schema `5`)  
+**Previous protected published tag:** `1.0.0-rc.7` (schema `5`; **do not retag**)  
+**Schema target:** `5` on tagged `1.0.0-rc.8` and `1.0.0-rc.7`. Tagged RC.6 remains schema `4`.  
 **Text domain:** `cetech-woocommerce-delivery-engine`
 
 This file is the **canonical maintained rulebook**. It consolidates hard invariants from `docs/PROJECT-GOVERNANCE.md`, `docs/PROJECT-RULES.md`, owner-accepted RC.4 behaviour, and the Stage 14A architecture decisions.
@@ -24,14 +24,14 @@ Where this rulebook and an older rules file conflict on a **hard invariant**, th
 ## 1. Authority and release baseline
 
 1. **RC.4 is a protected completed baseline.** Do not treat it as disposable scaffolding.
-2. **Never amend or move a released tag** (`v1.0.0-rc.2`, `v1.0.0-rc.3`, `v1.0.0-rc.4`, `v1.0.0-rc.5`, `v1.0.0-rc.6`, `v1.0.0-rc.7`, or any later release tag).
+2. **Never amend or move a released tag** (`v1.0.0-rc.2`, `v1.0.0-rc.3`, `v1.0.0-rc.4`, `v1.0.0-rc.5`, `v1.0.0-rc.6`, `v1.0.0-rc.7`, `v1.0.0-rc.8`, or any later release tag).
 3. **Never silently replace a released package.** QA/release ZIPs must come from identified committed source.
 4. **New work is additive** unless an explicitly proven defect requires modification of existing behaviour.
 5. **Do not rewrite stable RC.4 architecture casually** (selector, cart capture, checkout validation, genuine WooCommerce shipping, grouping, snapshots, compact customer presentation, Administrator recovery).
 6. **Do not discard owner-tested behaviour** without explicit owner/authorisation.
 7. **Current implementation truth** = repository code + latest completed stage documentation. Visionary handoff sections are not proof that a feature exists.
 8. **Intended product/end-state** = latest `Delivery Shipping Plugin Up-To-Date Design and Expectations.md`. Do not implement a future vision merely because it appears there.
-9. Tagged **`1.0.0-rc.7`** is the current protected published baseline (schema **`5`**). Tagged **`1.0.0-rc.6`** remains a protected historical baseline (schema **`4`**). Tagged **`1.0.0-rc.5`** remains a protected historical Stage 14 baseline (schema **`4`**). Tagged **`1.0.0-rc.4`** remains a protected historical baseline (schema **`3`** at tag time). Stage 14 flags default **OFF**. Do not retag RC.6 or earlier. Do not start Stage 15 without explicit owner authorisation. Do not retag or rebuild `v1.0.0-rc.6` or `v1.0.0-rc.7`.
+9. Tagged **`1.0.0-rc.8`** is the current protected published baseline (schema **`5`**). Tagged **`1.0.0-rc.7`** remains a protected historical baseline (schema **`5`**). Tagged **`1.0.0-rc.6`** remains a protected historical baseline (schema **`4`**). Tagged **`1.0.0-rc.5`** remains a protected historical Stage 14 baseline (schema **`4`**). Tagged **`1.0.0-rc.4`** remains a protected historical baseline (schema **`3`** at tag time). Stage 14 flags default **OFF**. Do not retag RC.7 or earlier. Do not start Stage 15 without explicit owner authorisation. Do not retag or rebuild `v1.0.0-rc.6`, `v1.0.0-rc.7`, or `v1.0.0-rc.8`.
 
 Testable: a commit that retags RC.4, changes `CETECH_DE_VERSION` without authorisation, or rewrites checkout grouping “to prepare for shipments” violates this section.
 

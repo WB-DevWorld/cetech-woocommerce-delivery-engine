@@ -1,6 +1,6 @@
 # POST-RC.7 Fulfilment Correctness — `1.0.0-dev.fulfilment.4` Owner QA Package
 
-**Document status:** Packaged for owner physical QA. **Not deployed. Not RC.8.**  
+**Document status:** Packaged for owner physical QA. **OWNER PHYSICAL QA: ALL THREE FULFILMENT CORRECTNESS SCENARIOS PASSED** on training.cetechbpa.com. Promoted to tagged `1.0.0-rc.8`. **Not deployed by Cursor. Not a live FLAIROC change.**  
 **Date:** 2026-08-31  
 **Branch:** `feat/post-rc7-fulfilment-correctness`  
 **QA identity:** `1.0.0-dev.fulfilment.4`  
