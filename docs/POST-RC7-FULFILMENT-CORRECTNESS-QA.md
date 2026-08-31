@@ -32,7 +32,7 @@ Accepted audit: `docs/POST-RC7-FULFILMENT-CORRECTNESS-AUDIT.md`.
 
 ## 2. Source and ZIP
 
-Filled after packaging. See the checksum commit on this branch if this file still says pending at read time.
+Filled after packaging.
 
 | Item | Value |
 |------|--------|
@@ -40,10 +40,10 @@ Filled after packaging. See the checksum commit on this branch if this file stil
 | Version | `1.0.0-dev.fulfilment.2` |
 | Schema | `5` |
 | Branch | `feat/post-rc7-fulfilment-correctness` |
-| Implementation/source SHA | pending package |
-| Package-source commit | pending package |
-| Bytes | pending package |
-| SHA-256 | pending package |
+| Implementation/source SHA | `48fc2d22464c76256cdbc85c47bc8e2f368a8582` |
+| Package-source commit | `48fc2d22464c76256cdbc85c47bc8e2f368a8582` |
+| Bytes | `1297020` |
+| SHA-256 | `a946723ca94588155681660285fda1778ac16fac987c8f317a080395e84383ec` |
 | Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.2.zip` |
 | Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.2.zip` |
 | Build | `scripts/build-v1-rc-package.ps1 -Version 1.0.0-dev.fulfilment.2 -ZipFileName cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.2.zip` (clean tree; **not** `-AllowDirty`) |
