@@ -1,6 +1,6 @@
 # POST-RC.7 Fulfilment Correctness Implementation
 
-**Document status:** Implementation record. Packaging not started.  
+**Document status:** Implementation record. QA ZIP packaged; not deployed.  
 **Date:** 2026-08-31  
 **Branch:** `feat/post-rc7-fulfilment-correctness`  
 **Starting source:** tagged `1.0.0-rc.7` / `ad3feebfd1aa92d078caaa557c0c0d11c090a0c6`  
@@ -8,7 +8,7 @@
 **Schema target:** `5` (unchanged; no schema 6)  
 **Protected tag:** `v1.0.0-rc.7` still peels to `ad3feebfd1aa92d078caaa557c0c0d11c090a0c6`  
 **FLAIROC:** not modified  
-**Package:** not built  
+**Package:** `cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.1.zip` — see `docs/POST-RC7-FULFILMENT-CORRECTNESS-QA.md`. Not deployed. Not RC.8.  
 **Audit accepted:** `docs/POST-RC7-FULFILMENT-CORRECTNESS-AUDIT.md`
 
 ```text
@@ -167,7 +167,7 @@ Existing assertions were not weakened. The previous managed-package fail-open te
 
 ## Scope intentionally excluded
 
-- Packaging / ZIP / tag / FLAIROC install
+- Packaging / ZIP / tag / FLAIROC install **at implementation time**. The QA ZIP is recorded in `docs/POST-RC7-FULFILMENT-CORRECTNESS-QA.md`; Cursor did not install it.
 - Schema 6 or pickup-location ECR fields
 - Live checkout fulfilment switcher (PDP switch + recapture remains the V1 path)
 - Per-item pickup location architecture (catalog default location only)
@@ -205,7 +205,7 @@ Existing assertions were not weakened. The previous managed-package fail-open te
 - Pickup location is the first active catalog location, not a per-item/ECR field.
 - Training catalog cleanup (Air-labelled local routes) remains owner/data work. The resolver was not weakened to accommodate those rows.
 - The known Bulk Catalog “Ready to apply” wording issue remains backlog.
-- Owner physical QA has not been run. It remains the three authorised scenarios only, after packaging is explicitly approved.
+- Owner physical QA has not been run. It remains the three authorised scenarios only (`docs/POST-RC7-FULFILMENT-CORRECTNESS-QA.md`).
 
 ---
 
@@ -221,4 +221,4 @@ Do **not** expand owner QA unless one of these three fails:
 
 ## Recommended next phase
 
-**STOP.** Do not package until the owner authorises packaging. Do not retag RC.7. Do not modify FLAIROC. Do not start Stage 15.
+**STOP.** Owner physical QA is the three authorised scenarios only. Do not create RC.8. Do not modify FLAIROC. Do not start Stage 15.
