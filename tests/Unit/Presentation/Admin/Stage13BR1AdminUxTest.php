@@ -133,8 +133,9 @@ final class Stage13BR1AdminUxTest extends TestCase {
 		self::assertStringContainsString( "__( 'Advanced'", $source );
 		self::assertStringContainsString( 'runtime_settings()', $source );
 		self::assertStringContainsString( "__( 'Activate Delivery Engine'", $source );
-		self::assertStringContainsString( 'enable_product_delivery_selector', $source );
+		self::assertStringNotContainsString( 'enable_product_delivery_selector', $source );
 		self::assertTrue( str_contains( $source, 'private function runtime_settings()' ) );
+		self::assertMatchesRegularExpression( '/private function runtime_settings\(\): array \{\s+return \[\];/s', $source );
 	}
 
 	public function test_product_exceptions_distinguish_variation_from_product(): void {

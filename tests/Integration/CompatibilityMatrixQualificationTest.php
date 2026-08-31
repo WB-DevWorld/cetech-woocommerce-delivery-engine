@@ -206,6 +206,9 @@ final class CompatibilityMatrixQualificationTest extends TestCase {
 		FeaturesCompatibility::register_hpos_declaration( CETECH_DE_FILE );
 
 		self::assertTrue( FeaturesCompatibility::hpos_declaration_attempted() );
+		self::assertTrue( FeaturesCompatibility::blocks_declaration_attempted() );
+		$compat = (string) file_get_contents( dirname( __DIR__, 2 ) . '/src/Core/FeaturesCompatibility.php' );
+		self::assertStringContainsString( "'cart_checkout_blocks'", $compat );
 		$before = count( $GLOBALS['cetech_de_test_actions']['before_woocommerce_init'] ?? [] );
 		self::assertSame( 1, $before );
 	}

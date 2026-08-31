@@ -30,6 +30,8 @@ final class OrderDeliverySnapshotPersister {
 
 		add_action( 'woocommerce_checkout_create_order_line_item', [ $this, 'handle_create_order_line_item' ], 10, 4 );
 		add_action( 'woocommerce_checkout_order_created', [ $this, 'handle_order_created' ], 10, 1 );
+		add_action( 'woocommerce_store_api_checkout_order_processed', [ $this, 'handle_order_created' ], 10, 1 );
+		add_action( 'woocommerce_store_api_checkout_update_order_from_request', [ $this, 'handle_store_api_order_update' ], 20, 2 );
 		add_filter( 'woocommerce_hidden_order_itemmeta', [ $this, 'hide_protected_order_item_meta' ] );
 		add_filter( 'woocommerce_order_item_get_formatted_meta_data', [ $this, 'strip_protected_formatted_meta' ], 10, 2 );
 	}
@@ -147,6 +149,22 @@ final class OrderDeliverySnapshotPersister {
 		$order->update_meta_data( OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, $encoded );
 		$order->update_meta_data( OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION, OrderDeliverySnapshot::VERSION );
 		$order->save();
+	}
+
+	/**
+	 * Store API checkout may not fire woocommerce_checkout_order_created.
+	 *
+	 * @param mixed $order
+	 * @param mixed $request
+	 */
+	public function handle_store_api_order_update( $order, $request ): void {
+		unset( $request );
+
+		if ( ! $order instanceof WC_Order ) {
+			return;
+		}
+
+		$this->handle_order_created( $order );
 	}
 
 	private function order_has_line_snapshots( WC_Order $order ): bool {

@@ -101,7 +101,13 @@ use CetechDeliveryEngine\Infrastructure\Persistence\WpdbProductDeliveryRuleRepos
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbRateCardRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbShipmentRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbSupplierRepository;
+use CetechDeliveryEngine\Integrations\Blocks\BlocksAddToCartBridge;
+use CetechDeliveryEngine\Integrations\Blocks\BlocksCheckoutAdapter;
+use CetechDeliveryEngine\Integrations\Blocks\BlocksCheckoutValidation;
+use CetechDeliveryEngine\Integrations\Blocks\BlocksStoreApiExtension;
+use CetechDeliveryEngine\Integrations\Blocks\BlocksUsageDetector;
 use CetechDeliveryEngine\Integrations\Registry\IntegrationRegistry;
+use CetechDeliveryEngine\Integrations\Status\IntegrationStatusCatalog;
 use CetechDeliveryEngine\Application\Bulk\BulkJobEngine;
 use CetechDeliveryEngine\Application\Bulk\BulkJobWorker;
 use CetechDeliveryEngine\Application\Bulk\BulkQueueHealth;
@@ -360,9 +366,64 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			BlocksUsageDetector::class,
+			static fn (): BlocksUsageDetector => new BlocksUsageDetector()
+		);
+
+		$this->container->singleton(
+			BlocksStoreApiExtension::class,
+			static fn ( ServiceContainer $container ): BlocksStoreApiExtension => new BlocksStoreApiExtension(
+				$container->get( CartDeliverySelectionCapture::class ),
+				$container->get( CartDeliverySelectionRevalidator::class ),
+				$container->get( ShippingRateCalculationGate::class )
+			)
+		);
+
+		$this->container->singleton(
+			BlocksCheckoutValidation::class,
+			static fn ( ServiceContainer $container ): BlocksCheckoutValidation => new BlocksCheckoutValidation(
+				$container->get( CheckoutDeliverySelectionValidator::class ),
+				$container->get( BlocksStoreApiExtension::class ),
+				$container->get( ShippingRateCalculationGate::class )
+			)
+		);
+
+		$this->container->singleton(
+			BlocksAddToCartBridge::class,
+			static fn ( ServiceContainer $container ): BlocksAddToCartBridge => new BlocksAddToCartBridge(
+				$container->get( CartDeliverySelectionCapture::class )
+			)
+		);
+
+		$this->container->singleton(
+			BlocksCheckoutAdapter::class,
+			static fn ( ServiceContainer $container ): BlocksCheckoutAdapter => new BlocksCheckoutAdapter(
+				$container->get( Requirements::class ),
+				$container->get( BlocksStoreApiExtension::class ),
+				$container->get( BlocksCheckoutValidation::class ),
+				$container->get( BlocksAddToCartBridge::class ),
+				$container->get( BlocksUsageDetector::class )
+			)
+		);
+
+		$this->container->singleton(
 			IntegrationRegistry::class,
-			static fn ( ServiceContainer $container ): IntegrationRegistry => new IntegrationRegistry(
-				$container->get( Logger::class )
+			static function ( ServiceContainer $container ): IntegrationRegistry {
+				$registry = new IntegrationRegistry(
+					$container->get( Logger::class )
+				);
+				$registry->register( $container->get( BlocksCheckoutAdapter::class ) );
+
+				return $registry;
+			}
+		);
+
+		$this->container->singleton(
+			IntegrationStatusCatalog::class,
+			static fn ( ServiceContainer $container ): IntegrationStatusCatalog => new IntegrationStatusCatalog(
+				$container->get( IntegrationRegistry::class ),
+				$container->get( BlocksUsageDetector::class ),
+				$container->get( BlocksCheckoutAdapter::class )
 			)
 		);
 
@@ -1184,7 +1245,8 @@ final class Plugin {
 				$container->get( WooCommerceShippingReadiness::class ),
 				$container->get( SiteWideDefaultsSettings::class ),
 				$container->get( OperationalStateService::class ),
-				$container->get( RoleAccessService::class )
+				$container->get( RoleAccessService::class ),
+				$container->get( IntegrationStatusCatalog::class )
 			)
 		);
 

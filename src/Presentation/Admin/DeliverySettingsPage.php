@@ -10,6 +10,7 @@ use CetechDeliveryEngine\Core\Capabilities\RoleAccessService;
 use CetechDeliveryEngine\Application\Configuration\OperationalStateService;
 use CetechDeliveryEngine\Application\Configuration\SetupWizardProgress;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsSettings;
+use CetechDeliveryEngine\Application\Runtime\ProductDeliveryRuntimeConfigurationRouter;
 use CetechDeliveryEngine\Application\Shipping\ShippingRateCalculationGate;
 use CetechDeliveryEngine\Application\Shipping\WooCommerceShippingReadiness;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
@@ -18,6 +19,8 @@ use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Domain\FulfilmentProfile\FulfilmentProfileRegistry;
 use CetechDeliveryEngine\Domain\RateCard\RateCardRepositoryInterface;
+use CetechDeliveryEngine\Integrations\Status\IntegrationStatus;
+use CetechDeliveryEngine\Integrations\Status\IntegrationStatusCatalog;
 
 /**
  * Friendly delivery settings page for store administrators.
@@ -35,7 +38,19 @@ final class DeliverySettingsPage {
 	/** @var list<string> */
 	private const UNAVAILABLE_EXPERIMENTAL_FLAGS = [
 		'enable_customer_timeline',
-		'enable_bulk_import',
+	];
+
+	/**
+	 * Ordinary Settings checkboxes. Internal runtime/compatibility flags are not written from this form.
+	 *
+	 * @var list<string>
+	 */
+	private const ADMINISTRATOR_EDITABLE_FLAGS = [
+		'enable_customer_order_delivery_summary',
+		'enable_customer_email_delivery_summary',
+		'enable_order_delivery_snapshot_persistence',
+		'enable_shipment_records',
+		'enable_tracking_links',
 	];
 
 	public function __construct(
@@ -49,7 +64,8 @@ final class DeliverySettingsPage {
 		private ?WooCommerceShippingReadiness $shipping_readiness = null,
 		private ?SiteWideDefaultsSettings $defaults_settings = null,
 		private ?OperationalStateService $operational_state = null,
-		private ?RoleAccessService $role_access = null
+		private ?RoleAccessService $role_access = null,
+		private ?IntegrationStatusCatalog $integration_status = null
 	) {
 	}
 
@@ -206,11 +222,14 @@ final class DeliverySettingsPage {
 
 		$this->render_access_section();
 
+		$this->render_storefront_status_section( $flags );
+		$this->render_integrations_status_section();
+
 		AdminPageLayout::open_advanced(
 			__( 'Advanced', 'cetech-woocommerce-delivery-engine' )
 		);
 		echo '<p class="description">' . esc_html__(
-			'Technical runtime controls. Normal stores do not need to change these. Completing setup activates the supported checkout chain automatically.',
+			'Reserved and support-only details. Normal stores do not need to change these.',
 			'cetech-woocommerce-delivery-engine'
 		) . '</p>';
 
@@ -220,30 +239,21 @@ final class DeliverySettingsPage {
 		}
 
 		AdminPageLayout::open_form_panel(
-			__( 'Checkout runtime', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Low-level checkout stages. Leave these to the setup guide unless CETECH support asks you to change them.', 'cetech-woocommerce-delivery-engine' )
-		);
-		foreach ( $this->runtime_settings() as $setting ) {
-			$this->render_setting_checkbox( $setting, $flags, true );
-		}
-		AdminPageLayout::close_form_panel();
-
-		AdminPageLayout::open_form_panel(
-			__( 'Integrations', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Optional adapters for themes, multilingual stores, and third-party plugins.', 'cetech-woocommerce-delivery-engine' )
-		);
-		foreach ( $this->integration_settings() as $setting ) {
-			$this->render_setting_checkbox( $setting, $flags, true );
-		}
-		AdminPageLayout::close_form_panel();
-
-		AdminPageLayout::open_form_panel(
 			__( 'Experimental and future features', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Not required for basic delivery pricing at checkout.', 'cetech-woocommerce-delivery-engine' )
+			__( 'These items are not part of the supported storefront in this release.', 'cetech-woocommerce-delivery-engine' )
 		);
 		foreach ( $this->experimental_settings() as $setting ) {
 			$this->render_setting_checkbox( $setting, $flags, true, ! empty( $setting['unavailable'] ) );
 		}
+		AdminPageLayout::close_form_panel();
+
+		AdminPageLayout::open_form_panel(
+			__( 'Development and testing', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Information only. This release does not seed demo catalog data.', 'cetech-woocommerce-delivery-engine' )
+		);
+		echo '<tr><th scope="row">' . esc_html__( 'Demo data on activation', 'cetech-woocommerce-delivery-engine' ) . '</th><td>';
+		echo '<p>' . esc_html__( 'Not used. This release does not create demo Delivery Areas, Delivery Options, or Delivery Charges on activation or upgrade.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '</td></tr>';
 		AdminPageLayout::close_form_panel();
 
 		AdminPageLayout::open_form_panel(
@@ -291,7 +301,7 @@ final class DeliverySettingsPage {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
 		$raw_flags = isset( $_POST['flags'] ) && is_array( $_POST['flags'] ) ? wp_unslash( $_POST['flags'] ) : [];
 
-		foreach ( array_keys( $this->feature_flags->defaults() ) as $flag ) {
+		foreach ( self::ADMINISTRATOR_EDITABLE_FLAGS as $flag ) {
 			if ( in_array( $flag, self::UNAVAILABLE_EXPERIMENTAL_FLAGS, true ) ) {
 				continue;
 			}
@@ -328,7 +338,7 @@ final class DeliverySettingsPage {
 		}
 
 		$this->runtime->activate();
-		$this->action_handler->notices()->flash_success( __( 'Delivery Engine is active for Classic Checkout.', 'cetech-woocommerce-delivery-engine' ) );
+		$this->action_handler->notices()->flash_success( __( 'Delivery Engine is active for Classic Checkout and Cart & Checkout Blocks.', 'cetech-woocommerce-delivery-engine' ) );
 		$this->action_handler->redirect( self::SLUG );
 	}
 
@@ -427,19 +437,96 @@ final class DeliverySettingsPage {
 	private function advanced_flag_keys(): array {
 		$keys = [];
 
-		foreach ( $this->runtime_settings() as $setting ) {
-			$keys[] = $setting['flag'];
-		}
-
-		foreach ( $this->integration_settings() as $setting ) {
-			$keys[] = $setting['flag'];
-		}
-
 		foreach ( $this->experimental_settings() as $setting ) {
 			$keys[] = $setting['flag'];
 		}
 
 		return $keys;
+	}
+
+	/**
+	 * @param array<string, bool> $flags
+	 */
+	private function render_storefront_status_section( array $flags ): void {
+		$ecr_active      = ! empty( $flags[ ProductDeliveryRuntimeConfigurationRouter::CUTOVER_FLAG ] );
+		$variable_active = $ecr_active && ! empty( $flags[ ProductDeliveryRuntimeConfigurationRouter::VARIABLE_CUTOVER_FLAG ] );
+		$blocks          = $this->integration_status?->blocks();
+		$runtime_active  = $this->runtime?->is_active() ?? false;
+
+		AdminPageLayout::open_section(
+			__( 'Checkout and storefront', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Supported checkout paths. These are not ordinary on/off switches.', 'cetech-woocommerce-delivery-engine' )
+		);
+
+		echo '<table class="widefat striped cetech-de-integration-status"><thead><tr>';
+		echo '<th>' . esc_html__( 'Capability', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '<th>' . esc_html__( 'Status', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '<th>' . esc_html__( 'Currently in use', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '</tr></thead><tbody>';
+
+		echo '<tr><th scope="row">' . esc_html__( 'Classic WooCommerce checkout', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '<td>' . esc_html__( 'Supported', 'cetech-woocommerce-delivery-engine' ) . '</td>';
+		echo '<td>' . esc_html__( 'Automatically available', 'cetech-woocommerce-delivery-engine' ) . '</td></tr>';
+
+		echo '<tr><th scope="row">' . esc_html__( 'Site-wide Defaults at checkout', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '<td>' . esc_html( $ecr_active ? __( 'Active', 'cetech-woocommerce-delivery-engine' ) : __( 'Not active — use Activate Delivery Engine', 'cetech-woocommerce-delivery-engine' ) ) . '</td>';
+		echo '<td>' . esc_html( $runtime_active ? __( 'Yes', 'cetech-woocommerce-delivery-engine' ) : __( 'No', 'cetech-woocommerce-delivery-engine' ) ) . '</td></tr>';
+
+		echo '<tr><th scope="row">' . esc_html__( 'Product variation inheritance', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '<td>' . esc_html( $variable_active ? __( 'Inherent when Site-wide Defaults are active', 'cetech-woocommerce-delivery-engine' ) : __( 'Follows Site-wide Defaults activation', 'cetech-woocommerce-delivery-engine' ) ) . '</td>';
+		echo '<td>' . esc_html( $variable_active ? __( 'Yes', 'cetech-woocommerce-delivery-engine' ) : __( 'No', 'cetech-woocommerce-delivery-engine' ) ) . '</td></tr>';
+
+		$blocks_status = $blocks?->state_label() ?? __( 'Supported', 'cetech-woocommerce-delivery-engine' );
+		$blocks_in_use = $blocks?->currently_in_use_label() ?? __( 'No', 'cetech-woocommerce-delivery-engine' );
+		echo '<tr><th scope="row">' . esc_html__( 'WooCommerce Cart & Checkout Blocks', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '<td>' . esc_html( $blocks_status ) . '</td>';
+		echo '<td>' . esc_html( $blocks_in_use ) . '</td></tr>';
+
+		echo '</tbody></table>';
+		echo '<p class="description">' . esc_html__(
+			'Classic checkout remains available. Cart and Checkout Blocks use the same Delivery Engine pricing, validation, and order snapshots. Turning off Site-wide Defaults is a support rollback, not a Settings checkbox.',
+			'cetech-woocommerce-delivery-engine'
+		) . '</p>';
+		AdminPageLayout::close_section();
+	}
+
+	private function render_integrations_status_section(): void {
+		AdminPageLayout::open_section(
+			__( 'Optional integrations', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Detected dependencies and whether a Delivery Engine adapter exists. These are not compatibility switches.', 'cetech-woocommerce-delivery-engine' )
+		);
+
+		$statuses = $this->integration_status?->all() ?? [];
+
+		echo '<table class="widefat striped cetech-de-integration-status"><thead><tr>';
+		echo '<th>' . esc_html__( 'Integration', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '<th>' . esc_html__( 'Status', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '<th>' . esc_html__( 'Version', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '<th>' . esc_html__( 'Adapter', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '<th>' . esc_html__( 'Currently in use', 'cetech-woocommerce-delivery-engine' ) . '</th>';
+		echo '</tr></thead><tbody>';
+
+		if ( [] === $statuses ) {
+			echo '<tr><td colspan="5">' . esc_html__( 'Integration status is unavailable on this screen.', 'cetech-woocommerce-delivery-engine' ) . '</td></tr>';
+		}
+
+		foreach ( $statuses as $status ) {
+			if ( ! $status instanceof IntegrationStatus || 'blocks' === $status->key ) {
+				continue;
+			}
+
+			echo '<tr>';
+			echo '<th scope="row">' . esc_html( $status->label ) . '</th>';
+			echo '<td>' . esc_html( $status->state_label() ) . '</td>';
+			echo '<td>' . esc_html( $status->version ?? '—' ) . '</td>';
+			echo '<td>' . esc_html( $status->adapter_label() ) . '</td>';
+			echo '<td>' . esc_html( $status->currently_in_use_label() ) . '</td>';
+			echo '</tr>';
+			echo '<tr class="cetech-de-integration-status__detail"><td colspan="5"><p class="description">' . esc_html( $status->detail ) . '</p></td></tr>';
+		}
+
+		echo '</tbody></table>';
+		AdminPageLayout::close_section();
 	}
 
 	/**
@@ -463,7 +550,7 @@ final class DeliverySettingsPage {
 		echo '<p class="description">' . esc_html( $setting['description'] ) . '</p>';
 
 		if ( $disabled ) {
-			echo '<p class="description"><em>' . esc_html__( 'Unavailable in this release. Reserved for a future Delivery Engine version.', 'cetech-woocommerce-delivery-engine' ) . '</em></p>';
+			echo '<p class="description"><em>' . esc_html__( 'Future / unavailable', 'cetech-woocommerce-delivery-engine' ) . '</em></p>';
 		}
 
 		if ( ! empty( $setting['caution'] ) ) {
@@ -626,129 +713,19 @@ final class DeliverySettingsPage {
 	}
 
 	private function runtime_settings(): array {
-		return array_merge(
-			[
-				[
-					'flag'        => 'enable_product_delivery_selector',
-					'label'       => __( 'Product-page delivery choices', 'cetech-woocommerce-delivery-engine' ),
-					'description' => __( 'Lets shoppers choose a delivery service when adding a product to the cart.', 'cetech-woocommerce-delivery-engine' ),
-				],
-				[
-					'flag'        => 'enable_cart_delivery_selection_capture',
-					'label'       => __( 'Remember the customer’s delivery choice in the cart', 'cetech-woocommerce-delivery-engine' ),
-					'description' => __( 'Keeps the selected delivery service attached to cart items through checkout.', 'cetech-woocommerce-delivery-engine' ),
-				],
-				[
-					'flag'        => 'enable_checkout_delivery_selection_validation',
-					'label'       => __( 'Validate delivery choice at checkout', 'cetech-woocommerce-delivery-engine' ),
-					'description' => __( 'Checks that the customer selected a valid delivery service before checkout completes.', 'cetech-woocommerce-delivery-engine' ),
-				],
-				[
-					'flag'        => ShippingRateCalculationGate::SHIPPING_FLAG,
-					'label'       => __( 'Show delivery fees at checkout', 'cetech-woocommerce-delivery-engine' ),
-					'description' => __( 'Calculates delivery pricing and shows it as a WooCommerce shipping rate.', 'cetech-woocommerce-delivery-engine' ),
-				],
-			],
-			$this->checkout_settings()
-		);
+		return [];
 	}
 
 	/**
-	 * @return list<array{flag: string, label: string, description: string, caution?: string}>
-	 */
-	private function checkout_settings(): array {
-		return [
-			[
-				'flag'        => 'enable_classic_checkout_adapter',
-				'label'       => __( 'Support classic WooCommerce checkout', 'cetech-woocommerce-delivery-engine' ),
-				'description' => __( 'Recommended for most stores using the standard checkout page.', 'cetech-woocommerce-delivery-engine' ),
-			],
-			[
-				'flag'        => 'enable_blocks_adapter',
-				'label'       => __( 'Support WooCommerce Blocks checkout', 'cetech-woocommerce-delivery-engine' ),
-				'description' => __( 'Turn on only if your store uses the block-based checkout experience.', 'cetech-woocommerce-delivery-engine' ),
-				'caution'     => __( 'Experimental. Test thoroughly before using on a live store.', 'cetech-woocommerce-delivery-engine' ),
-			],
-		];
-	}
-
-	/**
-	 * @return list<array{flag: string, label: string, description: string, caution?: string}>
-	 */
-	private function integration_settings(): array {
-		return [
-			[
-				'flag'        => 'enable_wpml_adapter',
-				'label'       => __( 'WPML integration', 'cetech-woocommerce-delivery-engine' ),
-				'description' => __( 'Enable only when WPML is installed and CETECH support has confirmed compatibility.', 'cetech-woocommerce-delivery-engine' ),
-			],
-			[
-				'flag'        => 'enable_wcml_adapter',
-				'label'       => __( 'WooCommerce Multilingual integration', 'cetech-woocommerce-delivery-engine' ),
-				'description' => __( 'Enable only when WCML is installed and configured.', 'cetech-woocommerce-delivery-engine' ),
-			],
-			[
-				'flag'        => 'enable_woodmart_adapter',
-				'label'       => __( 'Woodmart theme integration', 'cetech-woocommerce-delivery-engine' ),
-				'description' => __( 'Optional adapter for Woodmart theme compatibility.', 'cetech-woocommerce-delivery-engine' ),
-			],
-			[
-				'flag'        => 'enable_wcfm_adapter',
-				'label'       => __( 'WCFM Marketplace integration', 'cetech-woocommerce-delivery-engine' ),
-				'description' => __( 'Enable only when WCFM Marketplace is in use.', 'cetech-woocommerce-delivery-engine' ),
-			],
-			[
-				'flag'        => 'enable_vitepos_adapter',
-				'label'       => __( 'VitePOS integration', 'cetech-woocommerce-delivery-engine' ),
-				'description' => __( 'Enable only when VitePOS is in use.', 'cetech-woocommerce-delivery-engine' ),
-			],
-		];
-	}
-
-	/**
-	 * @return list<array{flag: string, label: string, description: string, caution?: string}>
+	 * @return list<array{flag: string, label: string, description: string, caution?: string, unavailable?: bool}>
 	 */
 	private function experimental_settings(): array {
 		return [
-			[
-				'flag'        => 'enable_effective_configuration_runtime',
-				'label'       => __( 'Use Site-wide Defaults at checkout', 'cetech-woocommerce-delivery-engine' ),
-				'description' => __( 'When enabled, eligible products use Site-wide Defaults and Product Exceptions for live checkout.', 'cetech-woocommerce-delivery-engine' ),
-				'caution'     => __( 'Deployment switch. Leave off unless CETECH support has asked you to turn it on for a controlled test.', 'cetech-woocommerce-delivery-engine' ),
-			],
-			[
-				'flag'        => 'enable_variable_product_ecr_runtime',
-				'label'       => __( 'Use Site-wide Defaults for product variations', 'cetech-woocommerce-delivery-engine' ),
-				'description' => __( 'Allows individual WooCommerce variations to inherit or override delivery settings. Requires Site-wide Defaults at checkout.', 'cetech-woocommerce-delivery-engine' ),
-				'caution'     => __( 'Deployment switch. Leave off unless CETECH support has asked you to turn it on for a controlled test.', 'cetech-woocommerce-delivery-engine' ),
-			],
 			[
 				'flag'         => 'enable_customer_timeline',
 				'label'        => __( 'Customer delivery timeline (future feature)', 'cetech-woocommerce-delivery-engine' ),
 				'description'  => __( 'Reserved for a future customer-facing tracking timeline. Not part of this release.', 'cetech-woocommerce-delivery-engine' ),
 				'unavailable'  => true,
-			],
-			[
-				'flag'         => 'enable_bulk_import',
-				'label'        => __( 'Bulk import tools', 'cetech-woocommerce-delivery-engine' ),
-				'description'  => __( 'Enables bulk import utilities when available.', 'cetech-woocommerce-delivery-engine' ),
-				'unavailable'  => true,
-			],
-			[
-				'flag'        => 'enable_category_rules',
-				'label'       => __( 'Category-based product rules', 'cetech-woocommerce-delivery-engine' ),
-				'description' => __( 'Allows product delivery rules to target product categories.', 'cetech-woocommerce-delivery-engine' ),
-			],
-			[
-				'flag'        => 'enable_site_fallback_rule',
-				'label'       => __( 'Site-wide fallback product rule', 'cetech-woocommerce-delivery-engine' ),
-				'description' => __( 'Uses a fallback rule when no product-specific rule matches.', 'cetech-woocommerce-delivery-engine' ),
-			],
-			[
-				'flag'        => 'demo_data_on_activation',
-				'label'       => __( 'Load demo data on plugin activation', 'cetech-woocommerce-delivery-engine' ),
-				'description' => __( 'For testing environments only. Do not enable on production stores.', 'cetech-woocommerce-delivery-engine' ),
-				'caution'     => __( 'Can create sample delivery areas, delivery options, and delivery charges automatically.', 'cetech-woocommerce-delivery-engine' ),
 			],
 		];
 	}

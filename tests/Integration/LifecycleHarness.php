@@ -92,6 +92,16 @@ final class LifecycleHarness {
 		}
 
 		$registered->setValue( null, false );
+
+		if ( $reflection->hasProperty( 'blocks_declared' ) ) {
+			$blocks = $reflection->getProperty( 'blocks_declared' );
+
+			if ( \PHP_VERSION_ID < 80500 ) {
+				$blocks->setAccessible( true );
+			}
+
+			$blocks->setValue( null, false );
+		}
 	}
 
 	private static function define_paths(): void {

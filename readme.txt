@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-rc.8
+Stable tag: 1.0.0-dev.blocks.1
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,9 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-dev.blocks.1 =
+* Settings honesty: Site-wide Defaults and variation inheritance are no longer experimental checkboxes. Dead Bulk/category/fallback/demo checkboxes removed. Integrations report detection status instead of blind toggles. Real WooCommerce Cart and Checkout Blocks adapter (Store API, validation, snapshots) with Classic checkout unchanged. Schema remains 5. Tagged 1.0.0-rc.8 is unchanged.
 
 = 1.0.0-rc.8 =
 * Promotes the owner-accepted 1.0.0-dev.fulfilment.4 Fulfilment Correctness runtime to the tagged release candidate. Schema remains 5. No new features. Not Stage 15. Historical 1.0.0-dev.fulfilment.1–fulfilment.4 packages and tagged 1.0.0-rc.7 remain unchanged.

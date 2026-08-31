@@ -365,14 +365,20 @@ final class CartDeliverySelectionCapture {
 
 	private function read_submitted_display_key(): string {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce add-to-cart form; validated server-side.
-		if ( ! isset( $_POST[ self::POST_FIELD ] ) ) {
-			return '';
+		if ( isset( $_POST[ self::POST_FIELD ] ) ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Missing
+			$raw = wp_unslash( (string) $_POST[ self::POST_FIELD ] );
+
+			return ProductDeliveryOptionsBuilder::normalizeDisplayKey( $raw );
 		}
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$raw = wp_unslash( (string) $_POST[ self::POST_FIELD ] );
+		$from_store_api = apply_filters( 'cetech_de_submitted_delivery_option_key', '' );
 
-		return ProductDeliveryOptionsBuilder::normalizeDisplayKey( $raw );
+		if ( is_string( $from_store_api ) && '' !== $from_store_api ) {
+			return ProductDeliveryOptionsBuilder::normalizeDisplayKey( $from_store_api );
+		}
+
+		return '';
 	}
 
 	/**
@@ -419,14 +425,16 @@ final class CartDeliverySelectionCapture {
 
 	private function submitted_variation_matches( int $variation_id ): bool {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce add-to-cart form; validated server-side.
-		if ( ! isset( $_POST[ self::POST_VARIATION_FIELD ] ) ) {
-			return false;
+		if ( isset( $_POST[ self::POST_VARIATION_FIELD ] ) ) {
+			// phpcs:ignore WordPress.Security.NonceVerification.Missing
+			$submitted = (int) wp_unslash( (string) $_POST[ self::POST_VARIATION_FIELD ] );
+
+			return $submitted > 0 && $submitted === $variation_id;
 		}
 
-		// phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$submitted = (int) wp_unslash( (string) $_POST[ self::POST_VARIATION_FIELD ] );
+		$from_store_api = (int) apply_filters( 'cetech_de_submitted_delivery_variation_id', 0 );
 
-		return $submitted > 0 && $submitted === $variation_id;
+		return $from_store_api > 0 && $from_store_api === $variation_id;
 	}
 
 	/**

@@ -56,35 +56,35 @@ final class FeatureFlagLabels {
 			],
 			'enable_wpml_adapter' => [
 				'label'       => 'WPML language adapter',
-				'description' => 'Optional WPML compatibility. Leave off unless CETECH support asks you to enable it.',
+				'description' => 'Optional WPML compatibility. No adapter is implemented in this release.',
 			],
 			'enable_wcml_adapter' => [
 				'label'       => 'WooCommerce Multilingual adapter',
-				'description' => 'Optional WCML compatibility. Leave off unless CETECH support asks you to enable it.',
+				'description' => 'Optional WCML compatibility. No adapter is implemented in this release.',
 			],
 			'enable_woodmart_adapter' => [
 				'label'       => 'WoodMart theme adapter',
-				'description' => 'Optional WoodMart compatibility. Core delivery does not require this theme.',
+				'description' => 'No dedicated WoodMart adapter. Core delivery uses generic WooCommerce hooks.',
 			],
 			'enable_wcfm_adapter' => [
 				'label'       => 'WCFM marketplace adapter',
-				'description' => 'Optional WCFM compatibility. Leave off unless CETECH support asks you to enable it.',
+				'description' => 'Optional WCFM compatibility. No adapter is implemented in this release.',
 			],
 			'enable_vitepos_adapter' => [
 				'label'       => 'Vitepos adapter',
-				'description' => 'Optional Vitepos compatibility. Leave off unless CETECH support asks you to enable it.',
+				'description' => 'Optional Vitepos compatibility. No adapter is implemented in this release.',
 			],
 			'enable_bulk_import' => [
 				'label'       => 'Bulk import tools',
-				'description' => 'Enables bulk import utilities when available.',
+				'description' => 'Bulk Tools are available from the Delivery Engine menu when the user has the required capability. This stored key is unused.',
 			],
 			'enable_classic_checkout_adapter' => [
 				'label'       => 'Classic checkout support',
-				'description' => 'Keeps Delivery Engine compatible with the classic WooCommerce checkout.',
+				'description' => 'Classic WooCommerce checkout remains automatically available.',
 			],
 			'enable_blocks_adapter' => [
-				'label'       => 'Block checkout adapter',
-				'description' => 'Optional WooCommerce block-checkout compatibility. Leave off unless CETECH support asks you to enable it.',
+				'label'       => 'WooCommerce Cart and Checkout Blocks',
+				'description' => 'Blocks support is automatic when WooCommerce Cart or Checkout Blocks are present. This stored key is not an operator switch.',
 			],
 			'enable_category_rules' => [
 				'label'       => 'Category-based product rules',
@@ -96,18 +96,15 @@ final class FeatureFlagLabels {
 			],
 			'enable_effective_configuration_runtime' => [
 				'label'       => 'Use Site-wide Defaults at checkout',
-				'description' => 'When enabled, eligible products use Site-wide Defaults and Product Exceptions for live checkout.',
-				'caution'     => 'Deployment switch. Leave off unless CETECH support has asked you to turn it on for a controlled test.',
+				'description' => 'When active, eligible products use Site-wide Defaults and Product Exceptions for live checkout. Activated with the Delivery Engine; not an ordinary Settings switch.',
 			],
 			'enable_variable_product_ecr_runtime' => [
 				'label'       => 'Use Site-wide Defaults for product variations',
-				'description' => 'Allows individual WooCommerce variations to inherit or override delivery settings. Requires Site-wide Defaults at checkout.',
-				'caution'     => 'Deployment switch. Leave off unless CETECH support has asked you to turn it on for a controlled test.',
+				'description' => 'Variation inheritance and overrides follow Site-wide Defaults when that runtime is active.',
 			],
 			'demo_data_on_activation' => [
-				'label'       => 'Load demo data on plugin activation',
-				'description' => 'For testing environments only. Do not enable on production stores.',
-				'caution'     => 'Can create sample zones, offers, and rate cards automatically.',
+				'label'       => 'Demo data on activation',
+				'description' => 'Not used. This release does not seed demo Delivery Areas, Delivery Options, or Delivery Charges.',
 			],
 			default => [
 				'label'       => $flag,

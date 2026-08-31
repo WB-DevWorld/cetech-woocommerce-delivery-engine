@@ -114,7 +114,7 @@ final class SystemStatusPage {
 		$this->render_admin_notices();
 
 		$integrations = $this->integration_registry->get_detection_statuses();
-		$display_keys = [ 'woodmart', 'wpml', 'wcml', 'wcfm', 'vitepos' ];
+		$display_keys = [ 'woodmart', 'wpml', 'wcml', 'wcfm', 'vitepos', 'wc_blocks' ];
 
 		echo '<div class="wrap cetech-de-admin-page">';
 		$this->render_admin_ui_styles();
@@ -146,6 +146,7 @@ final class SystemStatusPage {
 				__( 'WooCommerce active', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( $this->requirements->is_woocommerce_active() ),
 				__( 'WooCommerce version', 'cetech-woocommerce-delivery-engine' ) => $this->woocommerce_version(),
 				__( 'HPOS compatibility declaration attempted', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( FeaturesCompatibility::hpos_declaration_attempted() ),
+				__( 'Cart and Checkout Blocks compatibility declaration attempted', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( FeaturesCompatibility::blocks_declaration_attempted() ),
 				__( 'Schema up to date', 'cetech-woocommerce-delivery-engine' ) => $this->yes_no( SchemaVersion::is_up_to_date() ),
 				__( 'Target schema version', 'cetech-woocommerce-delivery-engine' ) => SchemaVersion::target(),
 				__( 'Installed schema version', 'cetech-woocommerce-delivery-engine' ) => SchemaVersion::get(),

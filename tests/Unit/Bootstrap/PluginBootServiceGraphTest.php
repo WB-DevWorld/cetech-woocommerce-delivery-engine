@@ -118,6 +118,8 @@ final class PluginBootServiceGraphTest extends TestCase {
 			EffectiveConfigurationPreviewPage::class,
 			ScopedConfigurationPage::class,
 			SystemStatusPage::class,
+			\CetechDeliveryEngine\Integrations\Blocks\BlocksCheckoutAdapter::class,
+			\CetechDeliveryEngine\Integrations\Status\IntegrationStatusCatalog::class,
 			\CetechDeliveryEngine\Presentation\Admin\DeliverySettingsHomePage::class,
 			\CetechDeliveryEngine\Presentation\Admin\ProductExceptionsPage::class,
 			\CetechDeliveryEngine\Presentation\Admin\NeedsAttentionPage::class,

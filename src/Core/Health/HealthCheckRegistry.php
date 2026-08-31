@@ -72,7 +72,7 @@ final class HealthCheckRegistry {
 		$this->add(
 			'integrations',
 			'info',
-			'Optional integration detection placeholder.',
+			'Optional integration detection.',
 			$this->integration_registry->get_detection_statuses()
 		);
 	}
