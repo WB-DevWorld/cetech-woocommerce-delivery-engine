@@ -50,10 +50,10 @@ Filled after packaging.
 | Version | `1.0.0-dev.fulfilment.4` |
 | Schema | `5` |
 | Branch | `feat/post-rc7-fulfilment-correctness` |
-| Implementation/source SHA | *(filled after packaging)* |
-| Package-source commit | *(filled after packaging)* |
-| Bytes | *(filled after packaging)* |
-| SHA-256 | *(filled after packaging)* |
+| Implementation/source SHA | `844544ad4020e2c17616145de31a6d6b67bb5128` |
+| Package-source commit | `844544ad4020e2c17616145de31a6d6b67bb5128` |
+| Bytes | `1303884` |
+| SHA-256 | `f31401636a7c3cadf68636bbdc9a94224782eb3fbf408696880da9d11ac67127` |
 | Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.4.zip` |
 | Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.4.zip` |
 | Build | `scripts/build-v1-rc-package.ps1 -Version 1.0.0-dev.fulfilment.4 -ZipFileName cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.4.zip` (clean tree; **not** `-AllowDirty`) |
