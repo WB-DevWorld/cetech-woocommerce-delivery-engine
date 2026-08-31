@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-dev.fulfilment.3
+Stable tag: 1.0.0-dev.fulfilment.4
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,9 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-dev.fulfilment.4 =
+* Post-RC.7 Scenario 1 mixed-cart repair: Store Pickup packages no longer render WooCommerce “Shipping to” customer destination or Change address. Delivery packages keep normal shipping destination copy. Schema remains 5. Tagged 1.0.0-rc.7 is unchanged.
 
 = 1.0.0-dev.fulfilment.3 =
 * Post-RC.7 Scenario 1 cart presentation repair: human-readable Pickup Location address (never serialized JSON) and Store Pickup groups labelled as pickup at the store, not shipping to the customer address. Schema remains 5. Tagged 1.0.0-rc.7 is unchanged.

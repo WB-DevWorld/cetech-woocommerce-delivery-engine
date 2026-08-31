@@ -4,12 +4,12 @@
 **Date:** 2026-08-31  
 **Branch:** `feat/post-rc7-fulfilment-correctness`  
 **Starting source:** tagged `1.0.0-rc.7` / `ad3feebfd1aa92d078caaa557c0c0d11c090a0c6`  
-**Previous packaged identity:** `1.0.0-dev.fulfilment.2` (runtime + admin accepted for Scenario 1 architecture; cart copy blocked acceptance)  
-**Development identity:** `1.0.0-dev.fulfilment.3`  
+**Previous packaged identity:** `1.0.0-dev.fulfilment.3` (Pickup-only cart accepted; mixed cart still printed WooCommerce destination copy)  
+**Development identity:** `1.0.0-dev.fulfilment.4`  
 **Schema target:** `5` (unchanged; no schema 6)  
 **Protected tag:** `v1.0.0-rc.7` still peels to `ad3feebfd1aa92d078caaa557c0c0d11c090a0c6`  
 **FLAIROC:** not modified  
-**Package:** `cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.3.zip` — see `docs/POST-RC7-FULFILMENT-CORRECTNESS-QA.md`. Not deployed. Not RC.8.
+**Package:** `cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.4.zip` — see `docs/POST-RC7-FULFILMENT-CORRECTNESS-QA.md`. Not deployed. Not RC.8.
 
 ```text
 READ → AUDIT → PLAN → IMPLEMENT → TEST → DOCUMENT → REVIEW → STOP
@@ -49,7 +49,14 @@ Repair (presentation filters only):
 - Mixed carts render each group independently.
 - Pickup charge remains explicit `0.0000`. Package destination used for quoting is not rewritten. Shipment persistence is unchanged.
 
-WooCommerce’s `woocommerce_shipping_formatted_destination` second argument is the raw destination address, not the package. The pickup package is stashed from `woocommerce_shipping_package_name` during cart-shipping render.
+WooCommerce’s `woocommerce_shipping_formatted_destination` second argument is the raw destination address, not the package. `cart/cart-shipping.php` also formats `$formatted_destination` **before** the package-name filter, so mixed carts still printed `Shipping to [customer address]` plus `Change address`.
+
+Follow-up (`1.0.0-dev.fulfilment.4`):
+
+- Stash the pickup package on `woocommerce_before_template_part` for `cart/cart-shipping.php` before destination copy is built.
+- Hide the shipping calculator for pickup packages (`woocommerce_shipping_show_shipping_calculator`).
+- Rewrite pickup package HTML so it cannot keep `Shipping to …` or `Change address`.
+- Delivery packages are not rewritten and keep `Shipping to …` / `Change address`.
 
 ---
 
@@ -96,9 +103,10 @@ Focused coverage:
 
 ## Owner recheck
 
-Do **not** redo Pickup Location admin or the full PDP configuration.
+Do **not** redo Pickup Location admin, PDP configuration, or the Pickup-only cart.
 
-Confirm only:
+Confirm only **one mixed Delivery + Pickup cart screenshot**:
 
-1. one Pickup-only cart
-2. one mixed Delivery + Pickup cart
+- Pickup group: `Pickup at CETECH Accra Store` and human-readable pickup address
+- Pickup group does **not** say `Shipping to …` and has no `Change address`
+- Delivery group still shows Standard Delivery, the delivery charge, `Shipping to …`, and `Change address`

@@ -233,7 +233,10 @@ final class PostRc7CartPickupPresentationTest extends TestCase {
 		self::assertStringNotContainsString( '{', $pickup_destination );
 
 		$pickup_copy = $presentation->filter_shipping_to_copy( 'Shipping to %s.', 'Shipping to %s.', 'woocommerce' );
-		self::assertSame( 'Pickup address: %s.', $pickup_copy );
+		self::assertSame( 'Pickup address: %s', $pickup_copy );
+
+		$pickup_change = $presentation->filter_shipping_to_copy( 'Change address', 'Change address', 'woocommerce' );
+		self::assertSame( '', $pickup_change );
 
 		$delivery_heading = $presentation->filter_package_name( 'Shipment 2', 1, $packages['delivery'], 2 );
 		self::assertSame( 'Shipment 2', $delivery_heading );
@@ -243,6 +246,9 @@ final class PostRc7CartPickupPresentationTest extends TestCase {
 
 		$delivery_copy = $presentation->filter_shipping_to_copy( 'Shipping to %s.', 'Shipping to %s.', 'woocommerce' );
 		self::assertSame( 'Shipping to %s.', $delivery_copy );
+
+		$delivery_change = $presentation->filter_shipping_to_copy( 'Change address', 'Change address', 'woocommerce' );
+		self::assertSame( 'Change address', $delivery_change );
 	}
 
 	public function test_pickup_only_package_has_zero_delivery_charge(): void {
@@ -270,6 +276,79 @@ final class PostRc7CartPickupPresentationTest extends TestCase {
 			'Pickup at CETECH Accra Store',
 			CartFulfilmentPackagePresentation::heading( 'Shipping', $packages[0] )
 		);
+	}
+
+	public function test_pickup_only_package_html_has_no_shipping_destination_or_change_address(): void {
+		$builder  = $this->package_builder();
+		$packages = $builder->split_package(
+			[
+				'contents'    => [ 'line-p' => $this->pickup_cart_item() ],
+				'destination' => [
+					'country' => 'GH',
+					'city'    => 'Customer Home Accra',
+					'state'   => 'Greater Accra',
+				],
+			]
+		);
+
+		self::assertCount( 1, $packages );
+		$pickup = $packages[0];
+		self::assertTrue( CartFulfilmentPackagePresentation::is_pickup( $pickup ) );
+		self::assertFalse( CartFulfilmentPackagePresentation::shows_shipping_to_copy( $pickup ) );
+		self::assertFalse( CartFulfilmentPackagePresentation::shows_change_address( $pickup ) );
+		self::assertFalse( ( new CartFulfilmentPackagePresentation() )->filter_show_shipping_calculator( true, 0, $pickup ) );
+
+		$out = CartFulfilmentPackagePresentation::rewrite_pickup_package_html(
+			$this->wc_cart_shipping_html(
+				CartFulfilmentPackagePresentation::heading( 'Shipping', $pickup ),
+				'Store Pickup',
+				'Customer Home Accra, Greater Accra, Ghana',
+				true
+			),
+			$pickup
+		);
+
+		$this->assert_pickup_package_copy( $out );
+	}
+
+	public function test_mixed_cart_pickup_package_html_has_no_shipping_destination_or_change_address(): void {
+		$packages = $this->split_mixed_cart();
+		$pickup   = $packages['pickup'];
+
+		self::assertFalse( CartFulfilmentPackagePresentation::shows_shipping_to_copy( $pickup ) );
+		self::assertFalse( CartFulfilmentPackagePresentation::shows_change_address( $pickup ) );
+		self::assertFalse( ( new CartFulfilmentPackagePresentation() )->filter_show_shipping_calculator( true, 1, $pickup ) );
+
+		$out = CartFulfilmentPackagePresentation::rewrite_pickup_package_html(
+			$this->wc_cart_shipping_html(
+				CartFulfilmentPackagePresentation::heading( 'Shipment 2', $pickup ),
+				'Store Pickup',
+				'Customer Home Accra, Greater Accra, Ghana',
+				true
+			),
+			$pickup
+		);
+
+		$this->assert_pickup_package_copy( $out );
+	}
+
+	public function test_mixed_cart_delivery_package_keeps_shipping_destination_and_change_address(): void {
+		$packages = $this->split_mixed_cart();
+		$delivery = $packages['delivery'];
+		$html     = $this->wc_cart_shipping_html(
+			'Shipping',
+			'Standard Delivery: GHS 50',
+			'Customer Home Accra, Greater Accra, Ghana',
+			true
+		);
+
+		self::assertTrue( CartFulfilmentPackagePresentation::shows_shipping_to_copy( $delivery ) );
+		self::assertTrue( CartFulfilmentPackagePresentation::shows_change_address( $delivery ) );
+		self::assertTrue( ( new CartFulfilmentPackagePresentation() )->filter_show_shipping_calculator( true, 0, $delivery ) );
+		self::assertSame( $html, CartFulfilmentPackagePresentation::rewrite_pickup_package_html( $html, $delivery ) );
+		self::assertStringContainsString( 'Shipping to', $html );
+		self::assertStringContainsString( 'Change address', $html );
+		self::assertStringContainsString( 'Standard Delivery: GHS 50', $html );
 	}
 
 	/**
@@ -380,6 +459,40 @@ final class PostRc7CartPickupPresentationTest extends TestCase {
 				'estimate_text'               => '2–4 business days',
 			],
 		];
+	}
+
+	private function assert_pickup_package_copy( string $html ): void {
+		self::assertStringContainsString( 'Pickup at CETECH Accra Store', $html );
+		self::assertStringContainsString( 'Pickup address:', $html );
+		self::assertStringContainsString( 'Papafio Hills Road', $html );
+		self::assertStringContainsString( 'Store Pickup', $html );
+		self::assertStringNotContainsString( 'Shipping to', $html );
+		self::assertStringNotContainsString( 'Change address', $html );
+		self::assertStringNotContainsString( 'Customer Home Accra', $html );
+		self::assertStringNotContainsString( '{', $html );
+	}
+
+	private function wc_cart_shipping_html(
+		string $heading,
+		string $rate_label,
+		string $formatted_destination,
+		bool $change_address
+	): string {
+		$destination = '<p class="woocommerce-shipping-destination">Shipping to <strong>'
+			. esc_html( $formatted_destination )
+			. '</strong>. </p>';
+		$calculator  = $change_address
+			? '<form class="woocommerce-shipping-calculator" action="" method="post"><a href="#" class="shipping-calculator-button">Change address</a></form>'
+			: '';
+
+		return '<tr class="woocommerce-shipping-totals shipping"><th>'
+			. esc_html( $heading )
+			. '</th><td><ul id="shipping_method" class="woocommerce-shipping-methods"><li><label>'
+			. esc_html( $rate_label )
+			. '</label></li></ul>'
+			. $destination
+			. $calculator
+			. '</td></tr>';
 	}
 
 	private function package_builder(): ShippingPackageBuilder {

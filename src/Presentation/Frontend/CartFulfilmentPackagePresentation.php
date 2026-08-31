@@ -17,11 +17,16 @@ final class CartFulfilmentPackagePresentation {
 
 	private static ?array $current_package = null;
 
+	private static bool $buffering_pickup_shipping = false;
+
 	public function register(): void {
 		add_filter( 'woocommerce_shipping_package_name', [ $this, 'filter_package_name' ], 20, 4 );
 		add_filter( 'woocommerce_shipping_formatted_destination', [ $this, 'filter_formatted_destination' ], 20, 2 );
+		add_filter( 'woocommerce_formatted_address', [ $this, 'filter_formatted_address' ], 20, 2 );
+		add_filter( 'woocommerce_shipping_show_shipping_calculator', [ $this, 'filter_show_shipping_calculator' ], 20, 3 );
 		add_filter( 'gettext', [ $this, 'filter_shipping_to_copy' ], 20, 3 );
-		add_action( 'woocommerce_after_template_part', [ $this, 'clear_current_package' ], 20, 1 );
+		add_action( 'woocommerce_before_template_part', [ $this, 'before_shipping_template' ], 1, 4 );
+		add_action( 'woocommerce_after_template_part', [ $this, 'after_shipping_template' ], 1, 4 );
 	}
 
 	/**
@@ -41,7 +46,7 @@ final class CartFulfilmentPackagePresentation {
 
 	/**
 	 * WooCommerce's second argument is the raw destination address, not the package.
-	 * Pickup copy uses the package stashed by filter_package_name.
+	 * Pickup copy uses the package stashed before cart-shipping renders.
 	 *
 	 * @param mixed $destination
 	 * @param mixed $raw_address
@@ -55,6 +60,37 @@ final class CartFulfilmentPackagePresentation {
 	}
 
 	/**
+	 * cart-shipping.php formats the destination before the package-name filter.
+	 *
+	 * @param mixed $formatted
+	 * @param mixed $raw_address
+	 */
+	public function filter_formatted_address( $formatted, $raw_address = null ): string {
+		unset( $raw_address );
+
+		$package = is_array( self::$current_package ) ? self::$current_package : [];
+
+		return self::destination( (string) $formatted, $package );
+	}
+
+	/**
+	 * @param mixed $show
+	 * @param mixed $index
+	 * @param mixed $package
+	 */
+	public function filter_show_shipping_calculator( $show, $index = 0, $package = array() ): bool {
+		unset( $index );
+
+		$package = is_array( $package ) ? $package : [];
+
+		if ( self::is_pickup( $package ) ) {
+			return false;
+		}
+
+		return (bool) $show;
+	}
+
+	/**
 	 * @param mixed $translated
 	 * @param mixed $text
 	 * @param mixed $domain
@@ -62,14 +98,18 @@ final class CartFulfilmentPackagePresentation {
 	public function filter_shipping_to_copy( $translated, $text, $domain ): string {
 		$translated = (string) $translated;
 		$text       = (string) $text;
-		$domain     = (string) $domain;
+		unset( $domain );
 
-		if ( 'woocommerce' !== $domain || ! self::is_pickup( self::$current_package ?? [] ) ) {
+		if ( ! self::is_pickup( self::$current_package ?? [] ) ) {
 			return $translated;
 		}
 
-		if ( 'Shipping to %s.' === $text ) {
-			return __( 'Pickup address: %s.', 'cetech-woocommerce-delivery-engine' );
+		if ( self::is_shipping_to_string( $text ) || self::is_shipping_to_string( $translated ) ) {
+			return __( 'Pickup address: %s', 'cetech-woocommerce-delivery-engine' );
+		}
+
+		if ( self::is_change_address_string( $text ) || self::is_change_address_string( $translated ) ) {
+			return '';
 		}
 
 		if ( 'Shipping options will be updated during checkout.' === $text ) {
@@ -83,11 +123,55 @@ final class CartFulfilmentPackagePresentation {
 
 	/**
 	 * @param mixed $template_name
+	 * @param mixed $template_path
+	 * @param mixed $located
+	 * @param mixed $args
+	 */
+	public function before_shipping_template( $template_name, $template_path = '', $located = '', $args = array() ): void {
+		unset( $template_path, $located );
+
+		if ( ! self::is_cart_shipping_template( $template_name ) ) {
+			return;
+		}
+
+		$args    = is_array( $args ) ? $args : [];
+		$package = is_array( $args['package'] ?? null ) ? $args['package'] : [];
+		self::$current_package = $package;
+
+		if ( self::is_pickup( $package ) && ! self::$buffering_pickup_shipping ) {
+			ob_start();
+			self::$buffering_pickup_shipping = true;
+		}
+	}
+
+	/**
+	 * @param mixed $template_name
+	 * @param mixed $template_path
+	 * @param mixed $located
+	 * @param mixed $args
+	 */
+	public function after_shipping_template( $template_name, $template_path = '', $located = '', $args = array() ): void {
+		unset( $template_path, $located, $args );
+
+		if ( ! self::is_cart_shipping_template( $template_name ) ) {
+			return;
+		}
+
+		if ( self::$buffering_pickup_shipping ) {
+			$html = (string) ob_get_clean();
+			self::$buffering_pickup_shipping = false;
+			$package = is_array( self::$current_package ) ? self::$current_package : [];
+			echo self::rewrite_pickup_package_html( $html, $package ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rewriting WooCommerce template HTML.
+		}
+
+		self::$current_package = null;
+	}
+
+	/**
+	 * @param mixed $template_name
 	 */
 	public function clear_current_package( $template_name ): void {
-		if ( is_string( $template_name ) && str_contains( $template_name, 'cart-shipping' ) ) {
-			self::$current_package = null;
-		}
+		$this->after_shipping_template( $template_name );
 	}
 
 	/**
@@ -138,6 +222,63 @@ final class CartFulfilmentPackagePresentation {
 	/**
 	 * @param array<string, mixed> $package
 	 */
+	public static function shows_shipping_to_copy( array $package ): bool {
+		return ! self::is_pickup( $package );
+	}
+
+	/**
+	 * @param array<string, mixed> $package
+	 */
+	public static function shows_change_address( array $package ): bool {
+		return ! self::is_pickup( $package );
+	}
+
+	/**
+	 * Replace WooCommerce "Shipping to" / "Change address" markup on pickup packages.
+	 *
+	 * @param array<string, mixed> $package
+	 */
+	public static function rewrite_pickup_package_html( string $html, array $package ): string {
+		if ( ! self::is_pickup( $package ) ) {
+			return $html;
+		}
+
+		$address     = self::pickup_address( $package );
+		$pickup_copy = '' !== $address
+			? sprintf(
+				/* translators: %s: pickup location address */
+				__( 'Pickup address: %s', 'cetech-woocommerce-delivery-engine' ),
+				$address
+			)
+			: '';
+		$destination_html = '' !== $pickup_copy
+			? '<p class="woocommerce-shipping-destination">' . esc_html( $pickup_copy ) . '</p>'
+			: '';
+
+		$destination_pattern = '/<p[^>]*class="[^"]*woocommerce-shipping-destination[^"]*"[^>]*>.*?<\/p>/s';
+
+		if ( 1 === preg_match( $destination_pattern, $html ) ) {
+			$html = (string) preg_replace( $destination_pattern, $destination_html, $html, 1 );
+		} elseif ( '' !== $destination_html ) {
+			if ( str_contains( $html, '</ul>' ) ) {
+				$html = (string) preg_replace( '/<\/ul>/', '</ul>' . $destination_html, $html, 1 );
+			} else {
+				$html .= $destination_html;
+			}
+		}
+
+		$html = (string) preg_replace( '/<form\b[^>]*woocommerce-shipping-calculator[^>]*>.*?<\/form>/s', '', $html );
+		$html = (string) preg_replace( '/<p\b[^>]*woocommerce-shipping-calculator[^>]*>.*?<\/p>/s', '', $html );
+		$html = (string) preg_replace( '/Shipping to\s+(?:<[^>]+>)?[^<]*(?:<\/[^>]+>)?\.?\s*/i', '', $html );
+		$html = (string) preg_replace( '/<a\b[^>]*>\s*Change address\s*<\/a>/i', '', $html );
+		$html = (string) preg_replace( '/<button\b[^>]*>\s*Change address\s*<\/button>/i', '', $html );
+
+		return $html;
+	}
+
+	/**
+	 * @param array<string, mixed> $package
+	 */
 	public static function is_pickup( array $package ): bool {
 		$meta = DeliveryGroupIdentity::package_meta( $package );
 
@@ -148,6 +289,29 @@ final class CartFulfilmentPackagePresentation {
 		$group_id = is_array( $meta ) ? (string) ( $meta['group_id'] ?? '' ) : '';
 
 		return '' !== $group_id && DeliveryGroupIdentity::is_pickup_group( $group_id );
+	}
+
+	/**
+	 * @param mixed $template_name
+	 */
+	private static function is_cart_shipping_template( $template_name ): bool {
+		if ( ! is_string( $template_name ) ) {
+			return false;
+		}
+
+		$normalized = str_replace( '\\', '/', $template_name );
+
+		return str_ends_with( $normalized, 'cart/cart-shipping.php' )
+			|| 'cart-shipping.php' === $normalized;
+	}
+
+	private static function is_shipping_to_string( string $value ): bool {
+		return 'Shipping to %s.' === $value
+			|| 'Shipping to %s' === $value;
+	}
+
+	private static function is_change_address_string( string $value ): bool {
+		return 'Change address' === $value;
 	}
 
 	/**

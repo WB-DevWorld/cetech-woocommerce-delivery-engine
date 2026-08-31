@@ -1,9 +1,9 @@
-# POST-RC.7 Fulfilment Correctness — `1.0.0-dev.fulfilment.3` Owner QA Package
+# POST-RC.7 Fulfilment Correctness — `1.0.0-dev.fulfilment.4` Owner QA Package
 
 **Document status:** Packaged for owner physical QA. **Not deployed. Not RC.8.**  
 **Date:** 2026-08-31  
 **Branch:** `feat/post-rc7-fulfilment-correctness`  
-**QA identity:** `1.0.0-dev.fulfilment.3`  
+**QA identity:** `1.0.0-dev.fulfilment.4`  
 **Schema:** `5`  
 **Protected published baseline:** tagged `v1.0.0-rc.7` / `ad3feebfd1aa92d078caaa557c0c0d11c090a0c6` **untouched**  
 **FLAIROC:** not modified  
@@ -13,29 +13,30 @@
 
 ## 1. What this package is
 
-`1.0.0-dev.fulfilment.3` is the replacement owner-physical-QA package after Scenario 1 **cart presentation** blockers in `1.0.0-dev.fulfilment.2`.
+`1.0.0-dev.fulfilment.4` is the replacement owner-physical-QA package after the mixed-cart destination-copy defect in `1.0.0-dev.fulfilment.3`.
 
-Fulfilment.2 architecture remains accepted and is not redesigned:
+Already accepted and not redesigned:
 
-- Delivery + Store Pickup can both be enabled
-- Delivery is default
-- Pickup Location resolves through ECR
-- Standard Delivery and Store Pickup both appear on PDP
-- selections persist separately in cart
-- Pickup readiness/location/instructions persist
-- Store Pickup adds zero delivery charge
+- Pickup-only cart (human-readable address, `Pickup at CETECH Accra Store`, zero charge, no false customer destination)
+- Delivery + Store Pickup availability, Delivery default, ECR Pickup Location, PDP switching, cart-line separation, zero Pickup charge
 
-This package repairs only:
+This package repairs only the mixed-cart Pickup package still rendering WooCommerce `Shipping to [customer delivery address]` and `Change address`.
 
-- Pickup address rendered as human-readable copy, never serialized JSON
-- Store Pickup groups labelled as pickup at the store, not “Shipping to [customer shipping address]”
+Pickup package copy becomes:
+
+- `Pickup at CETECH Accra Store`
+- `Pickup address: …` (human-readable store address)
+
+Delivery package stays:
+
+- Standard Delivery
+- delivery charge
+- `Shipping to …`
+- `Change address`
 
 It is **not** RC.7, **not** RC.8, **not** Stage 15, and **not** a Bulk / per-item-location / Return-Refund / Checkout Blocks stream.
 
-Repair note: `docs/POST-RC7-FULFILMENT-CORRECTNESS-CART-PRESENTATION.md`.  
-Admin repair (historical): `docs/POST-RC7-FULFILMENT-CORRECTNESS-ADMIN-REPAIR.md`.  
-Runtime record: `docs/POST-RC7-FULFILMENT-CORRECTNESS-IMPLEMENTATION.md`.  
-Accepted audit: `docs/POST-RC7-FULFILMENT-CORRECTNESS-AUDIT.md`.
+Repair note: `docs/POST-RC7-FULFILMENT-CORRECTNESS-CART-PRESENTATION.md`.
 
 ---
 
@@ -45,20 +46,20 @@ Filled after packaging.
 
 | Item | Value |
 |------|--------|
-| Filename | `cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.3.zip` |
-| Version | `1.0.0-dev.fulfilment.3` |
+| Filename | `cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.4.zip` |
+| Version | `1.0.0-dev.fulfilment.4` |
 | Schema | `5` |
 | Branch | `feat/post-rc7-fulfilment-correctness` |
-| Implementation/source SHA | `6a2091c28b7d32bae5e857dfb4ef4032dae5922b` |
-| Package-source commit | `6a2091c28b7d32bae5e857dfb4ef4032dae5922b` |
-| Bytes | `1303042` |
-| SHA-256 | `6b9337bd9a8f5ffb57dde8fa4ea8bb5e7406280df52609fdb49c4845d0f30285` |
-| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.3.zip` |
-| Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.3.zip` |
-| Build | `scripts/build-v1-rc-package.ps1 -Version 1.0.0-dev.fulfilment.3 -ZipFileName cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.3.zip` (clean tree; **not** `-AllowDirty`) |
+| Implementation/source SHA | *(filled after packaging)* |
+| Package-source commit | *(filled after packaging)* |
+| Bytes | *(filled after packaging)* |
+| SHA-256 | *(filled after packaging)* |
+| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.4.zip` |
+| Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.4.zip` |
+| Build | `scripts/build-v1-rc-package.ps1 -Version 1.0.0-dev.fulfilment.4 -ZipFileName cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.4.zip` (clean tree; **not** `-AllowDirty`) |
 | RC.7 tag | `v1.0.0-rc.7` still peels to `ad3feebfd1aa92d078caaa557c0c0d11c090a0c6` |
 
-Previous packages `1.0.0-dev.fulfilment.1.zip` and `1.0.0-dev.fulfilment.2.zip` remain on disk as historical artifacts. Do not install them for this QA pass.
+Previous packages `1.0.0-dev.fulfilment.1.zip`–`fulfilment.3.zip` remain historical artifacts. Do not install them for this QA pass.
 
 ---
 
@@ -66,45 +67,26 @@ Previous packages `1.0.0-dev.fulfilment.1.zip` and `1.0.0-dev.fulfilment.2.zip` 
 
 | Suite | Result |
 |-------|--------|
-| Focused cart-presentation + fulfilment PHPUnit | **112 tests, 645 assertions, OK** (3 deprecations in that subset) |
-| Full PHPUnit | **780 tests, 4507 assertions, OK** (5 pre-existing deprecations) |
+| Focused cart-presentation + fulfilment PHPUnit | **47 tests, 274 assertions, OK** |
+| Full PHPUnit | **783 tests, 4544 assertions, OK** (5 pre-existing deprecations) |
 | Full JS (`npm run test:js`) | **28 / 28 OK** |
 | Changed PHP lint | **0 errors** |
 
-Assertions were not weakened. The 6 new cart-presentation tests are included in the full suite (774 → 780).
+Assertions were not weakened. Three new mixed-cart HTML regressions are included (Pickup-only, mixed Pickup, mixed Delivery).
 
 ---
 
-## 4. Owner physical QA — Scenario 1 cart recheck only
+## 4. Owner physical QA — one mixed-cart screenshot only
 
-Do **not** redo Pickup Location admin or the full PDP configuration. Do **not** expand to International or In Warehouse until Scenario 1 cart presentation passes.
+Do **not** redo Pickup-only, PDP, Pickup Location admin, International, or In Warehouse.
 
-Confirm only:
+Confirm only **one mixed Delivery + Pickup cart**:
 
-### Pickup-only cart
-
-- Pickup address is human-readable (street, locality, Accra, Ghana — not JSON)
-- Group heading is pickup at the store (e.g. `Pickup at CETECH Accra Store`), not a delivery shipment
-- Copy does **not** say the pickup group is shipping to the customer shipping address
-- Pickup location / readiness / instructions remain visible
-- Cart total has **no** delivery charge for pickup
-
-### Mixed Delivery + Pickup cart
-
-- Two groups: Delivery vs Store Pickup
-- Delivery group still shows normal `Shipping to …`
-- Pickup group shows pickup at the store + pickup address, not the customer shipping destination
-- Pickup remains zero charge; Delivery still quotes as before
-
-If Scenario 1 cart presentation fails, preserve evidence and investigate that presentation only.
-
-### Scenario 2 — International (later)
-
-Wait until Scenario 1 passes.
-
-### Scenario 3 — In Warehouse (later)
-
-Wait until Scenario 1 passes.
+- Pickup group heading is `Pickup at CETECH Accra Store`
+- Pickup group shows the human-readable pickup address
+- Pickup group does **not** show `Shipping to [customer delivery address]`
+- Pickup group does **not** show `Change address`
+- Delivery group still shows Standard Delivery, the delivery charge, `Shipping to …`, and `Change address`
 
 ---
 
@@ -119,3 +101,4 @@ Wait until Scenario 1 passes.
 - No Return/Refund work
 - No Checkout Blocks
 - No carriers
+- No International / In Warehouse work in this pass
