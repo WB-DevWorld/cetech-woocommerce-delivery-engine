@@ -4,21 +4,24 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Admin;
 
-use CetechDeliveryEngine\Application\Configuration\Admin\ConfigurationFieldCatalog;
-use CetechDeliveryEngine\Core\Capabilities\Capabilities;
 use CetechDeliveryEngine\Application\Configuration\Admin\EntityLabelResolver;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
 use CetechDeliveryEngine\Application\Configuration\DeliveryOptionCompatibility;
+use CetechDeliveryEngine\Application\Configuration\InStoreMethodSelection;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultSummary;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsService;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsSettings;
+use CetechDeliveryEngine\Core\Capabilities\Capabilities;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
 use CetechDeliveryEngine\Domain\Configuration\ScopedConfigurationRepositoryInterface;
 use CetechDeliveryEngine\Domain\DeliveryOffer\DeliveryOfferRepositoryInterface;
 use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
+use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
+use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Domain\FulfilmentProfile\FulfilmentProfile;
 use CetechDeliveryEngine\Domain\FulfilmentProfile\FulfilmentProfileRegistry;
+use CetechDeliveryEngine\Domain\Pickup\PickupLocationRepositoryInterface;
 
 /**
  * Task-based Delivery Settings landing, guided setup, and site-wide default editor.
@@ -39,7 +42,8 @@ final class DeliverySettingsHomePage {
 		private readonly ScopedConfigurationRepositoryInterface $scopes,
 		private readonly EntityLabelResolver $labels,
 		private readonly AdminActionHandler $action_handler,
-		private readonly ?DeliveryOfferRepositoryInterface $offers = null
+		private readonly ?DeliveryOfferRepositoryInterface $offers = null,
+		private readonly ?PickupLocationRepositoryInterface $pickups = null
 	) {
 	}
 
@@ -420,30 +424,52 @@ final class DeliverySettingsHomePage {
 		echo '<input type="hidden" name="profile_key" value="' . esc_attr( $profile_key ) . '" />';
 		AdminFormHelper::nonce_field( self::ACTION_SAVE_PROFILE );
 
-		$choice = $scope?->scalars[ ConfigurationFieldKey::FULFILMENT_CHOICE ]->value ?? '';
-		$eta    = $scope?->scalars[ ConfigurationFieldKey::ESTIMATED_DELIVERY ]->value ?? '';
-		$offers = $scope?->collections[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ]->members ?? [];
+		$choice       = $scope?->scalars[ ConfigurationFieldKey::FULFILMENT_CHOICE ]->value ?? '';
+		$eta          = $scope?->scalars[ ConfigurationFieldKey::ESTIMATED_DELIVERY ]->value ?? '';
+		$offers       = $scope?->collections[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ]->members ?? [];
+		$pickup_id    = (int) ( $scope?->scalars[ ConfigurationFieldKey::PICKUP_LOCATION_ID ]->value ?? 0 );
+		$local_ids    = InStoreMethodSelection::local_delivery_offer_ids( is_array( $offers ) ? $offers : [], $this->offers );
+		$has_pickup   = $pickup_id > 0;
+		$has_delivery = [] !== $local_ids;
 
 		echo '<table class="form-table" role="presentation"><tbody>';
 		echo '<tr><th>' . esc_html__( 'Fulfilment', 'cetech-woocommerce-delivery-engine' ) . '</th><td>' . esc_html( $profile->label ) . '</td></tr>';
 
 		if ( $profile->pickup_allowed ) {
-			echo '<tr><th><label for="fulfilment_choice">' . esc_html__( 'Customer fulfilment', 'cetech-woocommerce-delivery-engine' ) . '</label></th><td>';
-			echo '<select id="fulfilment_choice" name="fields[' . esc_attr( ConfigurationFieldKey::FULFILMENT_CHOICE ) . '][value]">';
-			foreach ( ConfigurationFieldCatalog::enum_options( ConfigurationFieldKey::FULFILMENT_CHOICE ) ?? [] as $value => $label ) {
-				echo '<option value="' . esc_attr( $value ) . '"' . selected( (string) $choice, $value, false ) . '>' . esc_html( $label ) . '</option>';
+			if ( ! $has_delivery && ! $has_pickup ) {
+				$has_delivery = true;
 			}
-			echo '</select>';
-			echo '<input type="hidden" name="fields[' . esc_attr( ConfigurationFieldKey::FULFILMENT_CHOICE ) . '][mode]" value="override" />';
-			echo '</td></tr>';
+			echo '<tr><th>' . esc_html__( 'Available fulfilment methods', 'cetech-woocommerce-delivery-engine' ) . '</th><td>';
+			echo '<fieldset><legend class="screen-reader-text">' . esc_html__( 'Available fulfilment methods', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
+			echo '<label style="display:block;margin:0 0 0.35rem;"><input type="checkbox" name="available_methods[]" value="delivery"' . checked( $has_delivery, true, false ) . ' /> ';
+			echo esc_html__( 'Delivery', 'cetech-woocommerce-delivery-engine' ) . '</label>';
+			echo '<label style="display:block;margin:0 0 0.35rem;"><input type="checkbox" name="available_methods[]" value="store_pickup"' . checked( $has_pickup, true, false ) . ' /> ';
+			echo esc_html__( 'Store Pickup', 'cetech-woocommerce-delivery-engine' ) . '</label>';
+			echo '<p class="description">' . esc_html__( 'One or both methods may be enabled. These are availability settings, not an exclusive choice.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			echo '</fieldset></td></tr>';
+
+			echo '<tr><th>' . esc_html__( 'Default customer choice', 'cetech-woocommerce-delivery-engine' ) . '</th><td>';
+			echo '<fieldset><legend class="screen-reader-text">' . esc_html__( 'Default customer choice', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
+			$default = FulfilmentChoice::StorePickup->value === (string) $choice && $has_pickup
+				? FulfilmentChoice::StorePickup->value
+				: FulfilmentChoice::Delivery->value;
+			echo '<label style="display:block;margin:0 0 0.35rem;"><input type="radio" name="default_customer_choice" value="' . esc_attr( FulfilmentChoice::Delivery->value ) . '"' . checked( $default, FulfilmentChoice::Delivery->value, false ) . ' /> ';
+			echo esc_html__( 'Delivery', 'cetech-woocommerce-delivery-engine' ) . '</label>';
+			echo '<label style="display:block;margin:0 0 0.35rem;"><input type="radio" name="default_customer_choice" value="' . esc_attr( FulfilmentChoice::StorePickup->value ) . '"' . checked( $default, FulfilmentChoice::StorePickup->value, false ) . ' /> ';
+			echo esc_html__( 'Store Pickup', 'cetech-woocommerce-delivery-engine' ) . '</label>';
+			echo '<p class="description">' . esc_html__( 'Must be one of the enabled methods. Delivery may be the default when both are enabled.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			echo '</fieldset></td></tr>';
 		} else {
-			echo '<tr><th>' . esc_html__( 'Customer fulfilment', 'cetech-woocommerce-delivery-engine' ) . '</th><td>' . esc_html__( 'Delivery only', 'cetech-woocommerce-delivery-engine' ) . '</td></tr>';
+			echo '<tr><th>' . esc_html__( 'Available fulfilment methods', 'cetech-woocommerce-delivery-engine' ) . '</th><td>' . esc_html__( 'Delivery only', 'cetech-woocommerce-delivery-engine' ) . '</td></tr>';
 		}
 
 		$options_label = $profile->air_sea_allowed
 			? __( 'International shipping options', 'cetech-woocommerce-delivery-engine' )
-			: __( 'Delivery options', 'cetech-woocommerce-delivery-engine' );
+			: __( 'Delivery Options', 'cetech-woocommerce-delivery-engine' );
 		echo '<tr><th>' . esc_html( $options_label ) . '</th><td>';
+		if ( $profile->pickup_allowed && ! $profile->air_sea_allowed ) {
+			echo '<p class="description">' . esc_html__( 'Local doorstep delivery services, such as Standard Delivery. Store Pickup is configured separately.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		}
 		$compatible = $this->compatible_option_labels( $profile );
 		if ( [] === $compatible ) {
 			if ( $profile->air_sea_allowed ) {
@@ -454,17 +480,38 @@ final class DeliverySettingsHomePage {
 			}
 		} else {
 			foreach ( $compatible as $id => $label ) {
-				$checked = in_array( $id, $offers, true ) ? ' checked' : '';
+				$checked = in_array( $id, $local_ids, true ) ? ' checked' : '';
 				echo '<label style="display:block;margin:0 0 0.35rem;"><input type="checkbox" name="fields[' . esc_attr( ConfigurationFieldKey::DELIVERY_OFFER_IDS ) . '][members][]" value="' . esc_attr( (string) $id ) . '"' . $checked . ' /> ' . esc_html( $label ) . '</label>';
 			}
 		}
 		echo '<input type="hidden" name="fields[' . esc_attr( ConfigurationFieldKey::DELIVERY_OFFER_IDS ) . '][mode]" value="replace" />';
 		echo '</td></tr>';
 
+		if ( $profile->pickup_allowed ) {
+			echo '<tr><th><label for="pickup_location_id">' . esc_html__( 'Pickup Location', 'cetech-woocommerce-delivery-engine' ) . '</label></th><td>';
+			$locations = $this->active_pickup_locations();
+			if ( [] === $locations ) {
+				echo '<p>' . esc_html__( 'No active Pickup Locations yet. Create one before enabling Store Pickup.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+				echo '<p><a class="button" href="' . esc_url( AdminPageRenderer::list_url( PickupLocationsPage::SLUG ) ) . '">' . esc_html__( 'Add Pickup Location', 'cetech-woocommerce-delivery-engine' ) . '</a></p>';
+			} else {
+				echo '<select id="pickup_location_id" name="fields[' . esc_attr( ConfigurationFieldKey::PICKUP_LOCATION_ID ) . '][value]">';
+				echo '<option value="">' . esc_html__( 'Select a Pickup Location', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+				foreach ( $locations as $location ) {
+					$id    = (int) ( $location['id'] ?? 0 );
+					$label = (string) ( $location['location_name'] ?? '' );
+					echo '<option value="' . esc_attr( (string) $id ) . '"' . selected( $pickup_id, $id, false ) . '>' . esc_html( $label ) . '</option>';
+				}
+				echo '</select>';
+				echo '<input type="hidden" name="fields[' . esc_attr( ConfigurationFieldKey::PICKUP_LOCATION_ID ) . '][mode]" value="override" />';
+			}
+			echo '<p class="description">' . esc_html__( 'Required when Store Pickup is enabled. Customers see this location and its pickup readiness.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			echo '</td></tr>';
+		}
+
 		echo '<tr><th><label for="estimated_delivery">' . esc_html__( 'Estimated delivery', 'cetech-woocommerce-delivery-engine' ) . '</label></th><td>';
 		echo '<input type="text" class="regular-text" id="estimated_delivery" name="fields[' . esc_attr( ConfigurationFieldKey::ESTIMATED_DELIVERY ) . '][value]" value="' . esc_attr( is_string( $eta ) ? $eta : '' ) . '" placeholder="3–5 days" />';
 		echo '<input type="hidden" name="fields[' . esc_attr( ConfigurationFieldKey::ESTIMATED_DELIVERY ) . '][mode]" value="override" />';
-		echo '<p class="description">' . esc_html__( 'Shown to customers when this fulfilment type is used. Leave blank to use the delivery option’s own estimate.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '<p class="description">' . esc_html__( 'Shown to customers for Delivery. Store Pickup uses the Pickup Location’s readiness instead.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 		echo '</td></tr>';
 		echo '</tbody></table>';
 
@@ -592,6 +639,35 @@ final class DeliverySettingsHomePage {
 			);
 		}
 
+		if ( $profile instanceof FulfilmentProfile && $profile->pickup_allowed ) {
+			$methods = [];
+			if ( isset( $_POST['available_methods'] ) && is_array( $_POST['available_methods'] ) ) {
+				foreach ( wp_unslash( $_POST['available_methods'] ) as $method ) {
+					$methods[] = sanitize_key( (string) $method );
+				}
+			}
+			$default = isset( $_POST['default_customer_choice'] )
+				? sanitize_key( wp_unslash( (string) $_POST['default_customer_choice'] ) )
+				: (string) ( $fields[ ConfigurationFieldKey::FULFILMENT_CHOICE ]['value'] ?? FulfilmentChoice::Delivery->value );
+			$pickup_id = isset( $fields[ ConfigurationFieldKey::PICKUP_LOCATION_ID ]['value'] )
+				? absint( $fields[ ConfigurationFieldKey::PICKUP_LOCATION_ID ]['value'] )
+				: 0;
+			$selection = InStoreMethodSelection::from_posted(
+				$methods,
+				$default,
+				$fields[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ]['members'] ?? [],
+				$pickup_id,
+				$this->offers
+			);
+			$errors = $selection->validate( $this->pickups );
+			if ( [] !== $errors ) {
+				$this->action_handler->notices()->flash_error( implode( ' ', $errors ) );
+				$this->action_handler->redirect( self::SLUG, [ 'profile' => $profile_key ] );
+				return;
+			}
+			$fields = array_merge( $fields, $selection->field_payloads() );
+		}
+
 		try {
 			$this->defaults->save_profile_defaults( $profile_key, $fields );
 		} catch ( \Throwable $exception ) {
@@ -615,6 +691,22 @@ final class DeliverySettingsHomePage {
 			$offers,
 			$profile
 		);
+	}
+
+	/**
+	 * @return list<array<string, mixed>>
+	 */
+	private function active_pickup_locations(): array {
+		$rows = $this->pickups?->list( [ 'limit' => 200 ] ) ?? [];
+		$out  = [];
+		foreach ( $rows as $row ) {
+			if ( RecordStatus::Active->value !== (string) ( $row['status'] ?? '' ) ) {
+				continue;
+			}
+			$out[] = $row;
+		}
+
+		return $out;
 	}
 
 	/**

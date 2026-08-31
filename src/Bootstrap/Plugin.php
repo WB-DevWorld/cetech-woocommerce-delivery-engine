@@ -1037,7 +1037,8 @@ final class Plugin {
 				$container->get( DeliveryOfferRepositoryInterface::class ),
 				$container->get( LogisticsProfileRepositoryInterface::class ),
 				$container->get( SupplierRepositoryInterface::class ),
-				$container->get( OriginRepositoryInterface::class )
+				$container->get( OriginRepositoryInterface::class ),
+				$container->get( PickupLocationRepositoryInterface::class )
 			)
 		);
 
@@ -1116,7 +1117,8 @@ final class Plugin {
 				$container->get( ScopedConfigurationRepositoryInterface::class ),
 				$container->get( EntityLabelResolver::class ),
 				$container->get( AdminActionHandler::class ),
-				$container->get( DeliveryOfferRepositoryInterface::class )
+				$container->get( DeliveryOfferRepositoryInterface::class ),
+				$container->get( PickupLocationRepositoryInterface::class )
 			)
 		);
 
@@ -1551,7 +1553,8 @@ final class Plugin {
 		$this->container->singleton(
 			FulfilmentConstraintServiceInterface::class,
 			static fn ( ServiceContainer $container ): FulfilmentConstraintServiceInterface => new HardFulfilmentConstraintService(
-				$container->get( DeliveryOfferRepositoryInterface::class )
+				$container->get( DeliveryOfferRepositoryInterface::class ),
+				$container->get( PickupLocationRepositoryInterface::class )
 			)
 		);
 

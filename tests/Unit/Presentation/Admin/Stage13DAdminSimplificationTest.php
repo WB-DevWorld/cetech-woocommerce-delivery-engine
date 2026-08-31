@@ -230,7 +230,7 @@ final class Stage13DAdminSimplificationTest extends TestCase {
 		self::assertStringContainsString( 'data-cetech-de-preview-variation', $preview );
 		self::assertStringContainsString( 'Select at least one Delivery Option before continuing.', $wizard );
 		self::assertStringContainsString( 'International shipping options', $home );
-		self::assertStringContainsString( 'Customer fulfilment', $home );
+		self::assertStringContainsString( 'Available fulfilment methods', $home );
 		self::assertStringContainsString( 'DeliveryOptionCompatibility::', $home );
 		self::assertStringContainsString( 'Existing delivery configuration is still serving customers while you finish Delivery Engine setup.', $wizard );
 		self::assertStringNotContainsString( 'activate the new runtime', $wizard );

@@ -105,6 +105,11 @@ final class SiteWideDefaultsService {
 				ConfigurationFieldKey::FULFILMENT_CHOICE,
 				FulfilmentChoice::Delivery->value
 			);
+			if ( isset( $scalars[ ConfigurationFieldKey::PICKUP_LOCATION_ID ] ) ) {
+				$scalars[ ConfigurationFieldKey::PICKUP_LOCATION_ID ] = ScalarFieldInstruction::disable(
+					ConfigurationFieldKey::PICKUP_LOCATION_ID
+				);
+			}
 		}
 
 		$saved = $this->scopes->saveScopedConfiguration(

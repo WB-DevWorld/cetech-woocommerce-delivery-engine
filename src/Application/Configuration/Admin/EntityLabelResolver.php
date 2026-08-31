@@ -8,6 +8,7 @@ use CetechDeliveryEngine\Domain\DeliveryOffer\DeliveryOfferRepositoryInterface;
 use CetechDeliveryEngine\Domain\LogisticsProfile\LogisticsProfileRepositoryInterface;
 use CetechDeliveryEngine\Domain\Supplier\OriginRepositoryInterface;
 use CetechDeliveryEngine\Domain\Supplier\SupplierRepositoryInterface;
+use CetechDeliveryEngine\Domain\Pickup\PickupLocationRepositoryInterface;
 
 /**
  * Bounded entity label lookups for admin selectors (IDs remain authoritative).
@@ -23,7 +24,8 @@ final class EntityLabelResolver {
 		private readonly ?DeliveryOfferRepositoryInterface $delivery_offers = null,
 		private readonly ?LogisticsProfileRepositoryInterface $logistics_profiles = null,
 		private readonly ?SupplierRepositoryInterface $suppliers = null,
-		private readonly ?OriginRepositoryInterface $origins = null
+		private readonly ?OriginRepositoryInterface $origins = null,
+		private readonly ?PickupLocationRepositoryInterface $pickup_locations = null
 	) {
 	}
 
@@ -40,6 +42,7 @@ final class EntityLabelResolver {
 			'logistics_profile' => $this->map_named_records( $this->logistics_profiles?->list( [ 'limit' => self::LIST_LIMIT ] ) ?? [] ),
 			'supplier' => $this->map_named_records( $this->suppliers?->list( [ 'limit' => self::LIST_LIMIT ] ) ?? [] ),
 			'origin' => $this->map_named_records( $this->origins?->list( [ 'limit' => self::LIST_LIMIT ] ) ?? [] ),
+			'pickup_location' => $this->map_named_records( $this->pickup_locations?->list( [ 'limit' => self::LIST_LIMIT ] ) ?? [] ),
 			default => [],
 		};
 

@@ -54,6 +54,7 @@ final class ReasonCodeLabelMapper {
 			ConfigurationReasonCode::UNSUPPORTED_DISABLE => 'This setting cannot be turned off.',
 			ConfigurationReasonCode::INVALID_REFERENCE => 'A selected supplier, origin, profile, or offer is not valid.',
 			ConfigurationReasonCode::INVALID_REQUEST => 'This delivery settings request is not valid.',
+			ConfigurationReasonCode::CONSTRAINT_PICKUP_LOCATION_INVALID => 'Store Pickup is enabled but no valid active Pickup Location is configured.',
 			default => $code,
 		};
 	}

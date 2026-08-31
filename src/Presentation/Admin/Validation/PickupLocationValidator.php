@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Presentation\Admin\Validation;
 
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Presentation\Admin\AdminFormHelper;
+use CetechDeliveryEngine\Application\Destination\WooCommerceCountryCatalog;
 
 final class PickupLocationValidator {
 
@@ -33,10 +34,11 @@ final class PickupLocationValidator {
 			$errors['location_name'] = __( 'Location name is required.', 'cetech-woocommerce-delivery-engine' );
 		}
 
-		$country_code = strtoupper( trim( (string) ( $input['country_code'] ?? '' ) ) );
+		$country_code = WooCommerceCountryCatalog::canonical_iso2( (string) ( $input['country_code'] ?? '' ) );
+		$input['country_code'] = $country_code;
 
 		if ( '' !== $country_code && ! preg_match( '/^[A-Z]{2}$/', $country_code ) ) {
-			$errors['country_code'] = __( 'Country code must be a 2-letter ISO code.', 'cetech-woocommerce-delivery-engine' );
+			$errors['country_code'] = __( 'Country must be selected from the country list.', 'cetech-woocommerce-delivery-engine' );
 		}
 
 		$email = trim( (string) ( $input['contact_email'] ?? '' ) );
@@ -63,7 +65,7 @@ final class PickupLocationValidator {
 			'line2'        => trim( (string) ( $input['address_line_2'] ?? '' ) ),
 			'city'         => trim( (string) ( $input['city'] ?? '' ) ),
 			'region'       => trim( (string) ( $input['region'] ?? '' ) ),
-			'country_code' => strtoupper( trim( (string) ( $input['country_code'] ?? '' ) ) ),
+			'country_code' => WooCommerceCountryCatalog::canonical_iso2( (string) ( $input['country_code'] ?? '' ) ),
 			'postcode'     => trim( (string) ( $input['postcode'] ?? '' ) ),
 		];
 

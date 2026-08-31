@@ -41,8 +41,9 @@ final class Stage13BR2AdminUxTest extends TestCase {
 		$intl_ids      = array_column( DeliveryOptionCompatibility::filter_offers( $offers, $intl ), 'id' );
 
 		self::assertSame( [ 11 ], $warehouse_ids );
-		self::assertSame( [ 11, 12 ], $store_ids );
+		self::assertSame( [ 11 ], $store_ids );
 		self::assertSame( [ 13, 14 ], $intl_ids );
+		self::assertNotContains( 12, $store_ids );
 
 		$home = (string) file_get_contents( dirname( __DIR__, 4 ) . '/src/Presentation/Admin/DeliverySettingsHomePage.php' );
 		$wizard = (string) file_get_contents( dirname( __DIR__, 4 ) . '/src/Presentation/Admin/SetupWizardPage.php' );
@@ -128,7 +129,7 @@ final class Stage13BR2AdminUxTest extends TestCase {
 
 	public function test_normal_field_labels_use_business_language(): void {
 		self::assertSame( 'Fulfilment', ConfigurationFieldCatalog::label( ConfigurationFieldKey::FULFILMENT_AVAILABILITY ) );
-		self::assertSame( 'Delivery method', ConfigurationFieldCatalog::label( ConfigurationFieldKey::FULFILMENT_CHOICE ) );
+		self::assertSame( 'Default customer choice', ConfigurationFieldCatalog::label( ConfigurationFieldKey::FULFILMENT_CHOICE ) );
 		$panel = (string) file_get_contents( dirname( __DIR__, 4 ) . '/src/Presentation/Admin/ProductDeliveryPanel.php' );
 		self::assertStringContainsString( 'cetech-de-product-panel', $panel );
 		$css = (string) file_get_contents( dirname( __DIR__, 4 ) . '/assets/admin/delivery-engine-admin.css' );

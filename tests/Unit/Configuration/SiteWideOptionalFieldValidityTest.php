@@ -107,6 +107,7 @@ final class SiteWideOptionalFieldValidityTest extends TestCase {
 		self::assertTrue( ConfigurationFieldRegistry::is_optional( ConfigurationFieldKey::LOGISTICS_PROFILE_ID ) );
 		self::assertTrue( ConfigurationFieldRegistry::is_optional( ConfigurationFieldKey::SUPPLIER_ID ) );
 		self::assertTrue( ConfigurationFieldRegistry::is_optional( ConfigurationFieldKey::ORIGIN_ID ) );
+		self::assertTrue( ConfigurationFieldRegistry::is_optional( ConfigurationFieldKey::PICKUP_LOCATION_ID ) );
 		self::assertTrue( ConfigurationFieldRegistry::is_optional( ConfigurationFieldKey::PRIORITY ) );
 		self::assertFalse( ConfigurationFieldRegistry::is_optional( ConfigurationFieldKey::FULFILMENT_AVAILABILITY ) );
 		self::assertFalse( ConfigurationFieldRegistry::is_optional( ConfigurationFieldKey::FULFILMENT_CHOICE ) );

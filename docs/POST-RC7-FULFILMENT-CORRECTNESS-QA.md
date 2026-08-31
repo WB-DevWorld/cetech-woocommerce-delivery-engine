@@ -1,9 +1,9 @@
-# POST-RC.7 Fulfilment Correctness — `1.0.0-dev.fulfilment.1` Owner QA Package
+# POST-RC.7 Fulfilment Correctness — `1.0.0-dev.fulfilment.2` Owner QA Package
 
 **Document status:** Packaged for owner physical QA. **Not deployed. Not RC.8.**  
 **Date:** 2026-08-31  
 **Branch:** `feat/post-rc7-fulfilment-correctness`  
-**QA identity:** `1.0.0-dev.fulfilment.1`  
+**QA identity:** `1.0.0-dev.fulfilment.2`  
 **Schema:** `5`  
 **Protected published baseline:** tagged `v1.0.0-rc.7` / `ad3feebfd1aa92d078caaa557c0c0d11c090a0c6` **untouched**  
 **FLAIROC:** not modified  
@@ -13,46 +13,52 @@
 
 ## 1. What this package is
 
-`1.0.0-dev.fulfilment.1` is the authorised owner-physical-QA package of the post-RC.7 fulfilment correctness repair:
+`1.0.0-dev.fulfilment.2` is the replacement owner-physical-QA package after Scenario 1 admin blockers in `1.0.0-dev.fulfilment.1`.
 
-- In Store Delivery + Store Pickup as concurrent customer choices (Delivery default/preselected)
-- International single eligible Air/Sea offer auto-select; multiple remain a choice; constraints not weakened
-- DE-managed packages fail closed instead of exposing native WooCommerce methods
+It keeps the fulfilment.1 runtime (In Store Delivery + Store Pickup as concurrent customer choices; International single-offer auto-select; DE-managed packages fail closed) and repairs:
+
+- In Store **Available fulfilment methods** vs **Default customer choice**
+- ECR Pickup Location (inherit/override/disable) so Store Pickup is not a Delivery Option
+- Pickup Locations R1 (Reference Code, WooCommerce country selector storing ISO-2, form ownership)
+- Pickup readiness wired to the existing `readiness_estimate` column
 
 It is **not** RC.7, **not** RC.8, **not** Stage 15, and **not** a Bulk / per-item-location / Return-Refund / Checkout Blocks stream.
 
-Implementation record: `docs/POST-RC7-FULFILMENT-CORRECTNESS-IMPLEMENTATION.md`.  
+Repair note: `docs/POST-RC7-FULFILMENT-CORRECTNESS-ADMIN-REPAIR.md`.  
+Runtime record: `docs/POST-RC7-FULFILMENT-CORRECTNESS-IMPLEMENTATION.md`.  
 Accepted audit: `docs/POST-RC7-FULFILMENT-CORRECTNESS-AUDIT.md`.
 
 ---
 
 ## 2. Source and ZIP
 
+Filled after packaging. See the checksum commit on this branch if this file still says pending at read time.
+
 | Item | Value |
 |------|--------|
-| Filename | `cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.1.zip` |
-| Version | `1.0.0-dev.fulfilment.1` |
+| Filename | `cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.2.zip` |
+| Version | `1.0.0-dev.fulfilment.2` |
 | Schema | `5` |
 | Branch | `feat/post-rc7-fulfilment-correctness` |
-| Implementation/source SHA | `f7dd170c8ecb1009ca95c4c9e456b6c68cd11183` |
-| Package-source commit | `f7dd170c8ecb1009ca95c4c9e456b6c68cd11183` |
-| Bytes | `1284412` |
-| SHA-256 | `1fa195b59a3503c0e1362cc2c24f70f557ec98e8d27bb992a3c432d7ec128886` |
-| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.1.zip` |
-| Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.1.zip` |
-| Build | `scripts/build-v1-rc-package.ps1 -Version 1.0.0-dev.fulfilment.1 -ZipFileName cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.1.zip` (clean tree; **not** `-AllowDirty`) |
+| Implementation/source SHA | pending package |
+| Package-source commit | pending package |
+| Bytes | pending package |
+| SHA-256 | pending package |
+| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.2.zip` |
+| Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.2.zip` |
+| Build | `scripts/build-v1-rc-package.ps1 -Version 1.0.0-dev.fulfilment.2 -ZipFileName cetech-woocommerce-delivery-engine-1.0.0-dev.fulfilment.2.zip` (clean tree; **not** `-AllowDirty`) |
 | RC.7 tag | `v1.0.0-rc.7` still peels to `ad3feebfd1aa92d078caaa557c0c0d11c090a0c6` |
+
+Previous package `1.0.0-dev.fulfilment.1.zip` remains on disk as a historical artifact. Do not install it for this QA pass.
 
 ---
 
 ## 3. Automated tests at packaging source
 
-Run against the implementation that became `f7dd170` (runtime identical; docs Git-line only changed before commit):
-
 | Suite | Result |
 |-------|--------|
-| Focused fulfilment PHPUnit | **39 tests, 189 assertions, OK** |
-| Full PHPUnit | **758 tests, 4282 assertions, OK** (5 pre-existing deprecations) |
+| Focused fulfilment + pickup-admin PHPUnit | **83 tests, 890 assertions, OK** |
+| Full PHPUnit | **774 tests, 4463 assertions, OK** (5 pre-existing deprecations) |
 | Full JS (`npm run test:js`) | **28 / 28 OK** |
 | Changed PHP lint | **0 errors** |
 
@@ -60,74 +66,49 @@ Assertions were not weakened.
 
 ---
 
-## 4. Extracted-package verification
+## 4. Owner physical QA — Scenario 1 only
 
-Extracted to a disposable directory outside the git repo (`%TEMP%\cetech-de-fulfilment1-extract`).
-
-| Check | Result |
-|-------|--------|
-| One plugin root `cetech-woocommerce-delivery-engine/` | PASS (512 ZIP entries, forward slashes) |
-| Identity `CETECH_DE_VERSION` / header `1.0.0-dev.fulfilment.1` | PASS |
-| Schema `SchemaVersion::TARGET` = `5` | PASS |
-| Production autoload + `scripts/verify-production-package-autoload.php` | PASS (exit 0; Linux-case classmap; no PHPUnit in vendor) |
-| In Store `store_pickup` route + dual builder emission + PDP switcher JS | PASS |
-| International `defaultDisplayKey` single-offer auto-select present | PASS |
-| DE-managed native-rate filter returns only DE rates (fail closed) | PASS |
-| No `tests/`, `phpunit.xml`, `node_modules/`, `.git/`, `.env`, nested ZIPs | PASS |
-| Packaged PHP lint | **0 errors** |
-
-The verifier success banner still prints the historical line “Schema target 4”; the actual schema gate for this identity requires `TARGET === 5` and passed.
-
----
-
-## 5. Owner physical QA — three scenarios only
-
-Do **not** expand. If one fails, preserve evidence and investigate that scenario only.
+Do **not** expand to International or In Warehouse until Scenario 1 passes. If Scenario 1 fails, preserve evidence and investigate that scenario only.
 
 ### Scenario 1 — In Store
 
-One clean In Store test product with local Delivery, Store Pickup, and a valid pickup location.
+Configure one clean In Store product:
+
+- Available methods: Delivery **and** Store Pickup
+- Default customer choice: Delivery
+- Delivery Option: Standard Delivery (local)
+- Pickup Location: one valid active location (Ghana stored as `GH`)
+- Pickup readiness: `1–2 business days`
+- Pickup instructions: e.g. Collect from the CETECH Store
 
 Confirm:
 
 - Delivery is preselected
-- local Delivery Offer / price / ETA appears
+- Standard Delivery price / ETA is visible
 - Store Pickup is also selectable
-- switching to Pickup removes delivery charge / offers / route / doorstep ETA
-- pickup location / readiness appears
-- switching back restores Delivery correctly
-
-### Scenario 2 — International
-
-One correctly classified International test product with clean Air/Sea configuration.
-
-Confirm:
-
-- Delivery Only
-- only eligible Air and/or Sea appear
-- no Standard Delivery
-- no Store Pickup
-- if exactly one eligible Air/Sea offer remains, it auto-selects
+- switching to Pickup removes delivery details and shows location / readiness
+- switching back restores Delivery
 
 Do **not** use the known misconfigured `airshipping` row (`route = local_delivery`) as evidence of resolver behaviour.
 
-### Scenario 3 — In Warehouse
+### Scenario 2 — International (later)
 
-One In Warehouse product still shows:
+Wait until Scenario 1 passes.
 
-- Delivery Only
-- Standard/local Delivery
-- no Store Pickup
-- no Air/Sea
+### Scenario 3 — In Warehouse (later)
+
+Wait until Scenario 1 passes.
 
 ---
 
-## 6. Explicitly not done
+## 5. Hard limits
 
-- FLAIROC not modified; ZIP not installed
-- RC.7 not retagged or rebuilt
-- RC.8 not created
-- Bulk QA not reopened
-- Per-item pickup location work not started
-- Return/Refund not started
-- Checkout Blocks / carrier integrations not started
+- No RC.7 mutation
+- No RC.8
+- No schema 6
+- No FLAIROC
+- No Bulk work
+- No per-item location architecture
+- No Return/Refund work
+- No Checkout Blocks
+- No carriers

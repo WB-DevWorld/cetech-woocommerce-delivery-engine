@@ -123,6 +123,24 @@ final class ConfigurationFieldRegistry {
 				},
 				true
 			),
+			ConfigurationFieldKey::PICKUP_LOCATION_ID => new ConfigurationFieldDefinition(
+				ConfigurationFieldKey::PICKUP_LOCATION_ID,
+				false,
+				ConfigurationFieldValueType::Int,
+				[
+					ScalarConfigurationMode::Inherit,
+					ScalarConfigurationMode::Override,
+					ScalarConfigurationMode::Disable,
+				],
+				true,
+				false,
+				false,
+				static fn ( mixed $value ): int => self::normalize_positive_int( $value ),
+				static function ( mixed $value ): void {
+					self::assert_positive_int( $value, ConfigurationFieldKey::PICKUP_LOCATION_ID );
+				},
+				true
+			),
 			ConfigurationFieldKey::PRIORITY => new ConfigurationFieldDefinition(
 				ConfigurationFieldKey::PRIORITY,
 				false,

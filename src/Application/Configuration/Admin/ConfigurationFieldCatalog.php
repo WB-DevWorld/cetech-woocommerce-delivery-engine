@@ -72,10 +72,11 @@ final class ConfigurationFieldCatalog {
 	public static function label( string $field_key ): string {
 		return match ( $field_key ) {
 			ConfigurationFieldKey::FULFILMENT_AVAILABILITY => 'Fulfilment',
-			ConfigurationFieldKey::FULFILMENT_CHOICE => 'Delivery method',
+			ConfigurationFieldKey::FULFILMENT_CHOICE => 'Default customer choice',
 			ConfigurationFieldKey::LOGISTICS_PROFILE_ID => 'Logistics profile',
 			ConfigurationFieldKey::SUPPLIER_ID => 'Supplier',
 			ConfigurationFieldKey::ORIGIN_ID => 'Origin',
+			ConfigurationFieldKey::PICKUP_LOCATION_ID => 'Pickup Location',
 			ConfigurationFieldKey::PRIORITY => 'Priority',
 			ConfigurationFieldKey::ESTIMATED_DELIVERY => 'Estimated delivery',
 			ConfigurationFieldKey::DELIVERY_OFFER_IDS => 'Delivery options',
@@ -93,6 +94,7 @@ final class ConfigurationFieldCatalog {
 			ConfigurationFieldKey::FULFILMENT_AVAILABILITY,
 			ConfigurationFieldKey::FULFILMENT_CHOICE,
 			ConfigurationFieldKey::DELIVERY_OFFER_IDS,
+			ConfigurationFieldKey::PICKUP_LOCATION_ID,
 			ConfigurationFieldKey::ESTIMATED_DELIVERY,
 		];
 	}
@@ -126,10 +128,11 @@ final class ConfigurationFieldCatalog {
 	public static function description( string $field_key ): string {
 		return match ( $field_key ) {
 			ConfigurationFieldKey::FULFILMENT_AVAILABILITY => 'Choose where this item is fulfilled from, such as In Store, In Warehouse, or International. This affects which delivery methods can be offered.',
-			ConfigurationFieldKey::FULFILMENT_CHOICE => 'Whether the customer chooses delivery or store pickup for this path.',
+			ConfigurationFieldKey::FULFILMENT_CHOICE => 'Which enabled fulfilment method is initially selected for the customer. This is a default, not an exclusive lock.',
 			ConfigurationFieldKey::LOGISTICS_PROFILE_ID => 'A logistics profile groups the delivery handling rules used to fulfil an item, such as how it is dispatched or which delivery services can be used. Choose “Turn off” if this item should not use a profile.',
 			ConfigurationFieldKey::SUPPLIER_ID => 'Private supplier reference. Choose “Turn off” if this item should not use a supplier.',
 			ConfigurationFieldKey::ORIGIN_ID => 'Private origin reference. Choose “Turn off” if this item should not use an origin.',
+			ConfigurationFieldKey::PICKUP_LOCATION_ID => 'The store or warehouse location customers collect from when Store Pickup is enabled. Inherit the site-wide default, choose a different location, or turn Store Pickup off for this product.',
 			ConfigurationFieldKey::PRIORITY => 'Priority decides which delivery setup takes precedence if more than one setup could apply. A lower number is considered first. Most products can leave this unchanged. Zero is a valid value.',
 			ConfigurationFieldKey::ESTIMATED_DELIVERY => 'Customer-facing estimated delivery, such as 3–5 days. Leave this inherited to follow the site-wide default. Setting a different value here does not freeze the delivery option or charge.',
 			ConfigurationFieldKey::DELIVERY_OFFER_IDS => 'Choose whether this product should use the delivery options it inherits, add more options, remove some, or use only these options. Choosing an empty list means no delivery options for this setup.',
@@ -142,6 +145,7 @@ final class ConfigurationFieldCatalog {
 			ConfigurationFieldKey::LOGISTICS_PROFILE_ID => 'logistics_profile',
 			ConfigurationFieldKey::SUPPLIER_ID => 'supplier',
 			ConfigurationFieldKey::ORIGIN_ID => 'origin',
+			ConfigurationFieldKey::PICKUP_LOCATION_ID => 'pickup_location',
 			ConfigurationFieldKey::DELIVERY_OFFER_IDS => 'delivery_offer',
 			default => null,
 		};
@@ -159,7 +163,7 @@ final class ConfigurationFieldCatalog {
 			],
 			ConfigurationFieldKey::FULFILMENT_CHOICE => [
 				FulfilmentChoice::Delivery->value => 'Delivery',
-				FulfilmentChoice::StorePickup->value => 'Store pickup',
+				FulfilmentChoice::StorePickup->value => 'Store Pickup',
 			],
 			default => null,
 		};

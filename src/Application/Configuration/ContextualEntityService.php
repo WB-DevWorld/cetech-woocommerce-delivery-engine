@@ -315,7 +315,7 @@ final class ContextualEntityService {
 			'address_line_1'             => $address,
 			'city'                       => $city,
 			'country_code'               => $this->store_country(),
-			'public_pickup_instructions' => $ready,
+			'readiness_estimate'         => $ready,
 			'status'                     => RecordStatus::Active->value,
 		];
 
@@ -331,7 +331,8 @@ final class ContextualEntityService {
 				'location_name'              => $name,
 				'public_address'             => $this->pickup_validator->encode_public_address( $form ),
 				'public_opening_hours'       => '',
-				'public_pickup_instructions' => $ready,
+				'public_pickup_instructions' => '',
+				'readiness_estimate'         => $ready,
 				'contact_phone'              => '',
 				'contact_email'              => '',
 				'status'                     => RecordStatus::Active->value,

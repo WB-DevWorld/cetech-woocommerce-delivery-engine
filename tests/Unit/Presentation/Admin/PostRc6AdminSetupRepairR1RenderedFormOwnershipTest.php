@@ -21,13 +21,16 @@ use CetechDeliveryEngine\Presentation\Admin\ConfigurationAuditLogger;
 use CetechDeliveryEngine\Presentation\Admin\DeliveryOffersPage;
 use CetechDeliveryEngine\Presentation\Admin\DestinationZoneTestMatcher;
 use CetechDeliveryEngine\Presentation\Admin\DestinationZonesPage;
+use CetechDeliveryEngine\Presentation\Admin\PickupLocationsPage;
 use CetechDeliveryEngine\Presentation\Admin\Validation\DeliveryOfferValidator;
 use CetechDeliveryEngine\Presentation\Admin\Validation\DestinationRuleValidator;
 use CetechDeliveryEngine\Presentation\Admin\Validation\DestinationZoneValidator;
+use CetechDeliveryEngine\Presentation\Admin\Validation\PickupLocationValidator;
 use CetechDeliveryEngine\Support\Logger;
 use CetechDeliveryEngine\Tests\Unit\Runtime\InMemoryDeliveryOfferRepository;
 use CetechDeliveryEngine\Tests\Unit\Runtime\InMemoryDestinationRuleRepository;
 use CetechDeliveryEngine\Tests\Unit\Runtime\InMemoryDestinationZoneRepository;
+use CetechDeliveryEngine\Tests\Unit\Runtime\InMemoryPickupLocationRepository;
 use DOMDocument;
 use DOMElement;
 use DOMXPath;
@@ -309,6 +312,77 @@ final class PostRc6AdminSetupRepairR1RenderedFormOwnershipTest extends TestCase 
 		self::assertStringContainsString( 'Germany', (string) $selected->textContent );
 	}
 
+	public function test_pickup_location_add_form_ownership_and_country_iso_options(): void {
+		$html = $this->render_pickup_add();
+		$dom  = $this->assert_entity_form_ownership(
+			$html,
+			[
+				'location_name',
+				'code',
+				'country_code',
+				'readiness_estimate',
+				'cetech_de_action',
+				'cetech_de_nonce',
+				'cetech_de_save',
+			],
+			'Create Location',
+			'Back to pickup locations'
+		);
+
+		$country = $this->successful_control( $dom, self::FORM_ID, 'country_code' );
+		self::assertNotNull( $country );
+		self::assertSame( 'select', strtolower( $country->tagName ) );
+		foreach ( self::COUNTRY_LABELS as $iso => $label ) {
+			$option = $this->option_for_value( $country, $iso );
+			self::assertNotNull( $option, 'Missing ISO option ' . $iso );
+			self::assertSame( $iso, $option->getAttribute( 'value' ) );
+			self::assertStringContainsString( $label, (string) $option->textContent );
+			self::assertNotSame( $label, $option->getAttribute( 'value' ) );
+		}
+	}
+
+	public function test_pickup_location_error_state_retains_values_and_form_ownership(): void {
+		$page = $this->pickup_page( new InMemoryPickupLocationRepository() );
+		$_POST = $this->pickup_post(
+			[
+				'location_name'      => 'CETECH Accra Store',
+				'code'               => '!!!',
+				'country_code'       => 'GH',
+				'readiness_estimate' => '1–2 business days',
+			]
+		);
+		$this->capture_redirect( static fn () => $page->handle_actions() );
+
+		$_GET = [
+			'page'   => PickupLocationsPage::SLUG,
+			'action' => 'add',
+		];
+		$html = $this->capture_render( $page );
+		$dom  = $this->assert_entity_form_ownership(
+			$html,
+			[
+				'location_name',
+				'code',
+				'country_code',
+				'readiness_estimate',
+				'cetech_de_save',
+			],
+			'Create Location',
+			'Back to pickup locations'
+		);
+
+		$payload = $this->successful_controls( $dom, self::FORM_ID );
+		self::assertSame( 'CETECH Accra Store', $payload['location_name'] ?? null );
+		self::assertSame( '!!!', $payload['code'] ?? null );
+		self::assertSame( '1–2 business days', $payload['readiness_estimate'] ?? null );
+		$country = $this->successful_control( $dom, self::FORM_ID, 'country_code' );
+		self::assertNotNull( $country );
+		$selected = $this->selected_option( $country );
+		self::assertNotNull( $selected );
+		self::assertSame( 'GH', $selected->getAttribute( 'value' ) );
+		self::assertStringContainsString( 'Ghana', (string) $selected->textContent );
+	}
+
 	/**
 	 * @param list<string> $required_names
 	 */
@@ -381,7 +455,7 @@ final class PostRc6AdminSetupRepairR1RenderedFormOwnershipTest extends TestCase 
 		self::assertArrayHasKey( 'cetech_de_action', $payload );
 		self::assertArrayHasKey( 'cetech_de_nonce', $payload );
 		self::assertTrue(
-			array_key_exists( 'public_label', $payload ) || array_key_exists( 'name', $payload ),
+			array_key_exists( 'public_label', $payload ) || array_key_exists( 'name', $payload ) || array_key_exists( 'location_name', $payload ),
 			'Entity name/label must belong to the entity form.'
 		);
 		self::assertGreaterThan( 4, count( $payload ), 'Header submit must not post only nonce/action.' );
@@ -546,7 +620,7 @@ final class PostRc6AdminSetupRepairR1RenderedFormOwnershipTest extends TestCase 
 		);
 	}
 
-	private function capture_render( DeliveryOffersPage|DestinationZonesPage $page ): string {
+	private function capture_render( DeliveryOffersPage|DestinationZonesPage|PickupLocationsPage $page ): string {
 		ob_start();
 		try {
 			$page->render();
@@ -608,6 +682,54 @@ final class PostRc6AdminSetupRepairR1RenderedFormOwnershipTest extends TestCase 
 				],
 			],
 			$overrides
+		);
+	}
+
+	private function render_pickup_add(): string {
+		$_GET = [
+			'page'   => PickupLocationsPage::SLUG,
+			'action' => 'add',
+		];
+
+		return $this->capture_render( $this->pickup_page( new InMemoryPickupLocationRepository() ) );
+	}
+
+	/**
+	 * @param array<string, mixed> $overrides
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function pickup_post( array $overrides ): array {
+		return array_merge(
+			[
+				'cetech_de_action'           => 'cetech_de_save_pickup_location',
+				'cetech_de_nonce'            => 'test-nonce-cetech_de_save_pickup_location',
+				'location_name'              => 'CETECH Accra Store',
+				'code'                       => '',
+				'status'                     => RecordStatus::Active->value,
+				'address_line_1'             => '',
+				'address_line_2'             => '',
+				'city'                       => '',
+				'region'                     => '',
+				'country_code'               => 'GH',
+				'postcode'                   => '',
+				'contact_phone'              => '',
+				'contact_email'              => '',
+				'public_opening_hours'       => '',
+				'public_pickup_instructions' => '',
+				'readiness_estimate'         => '',
+			],
+			$overrides
+		);
+	}
+
+	private function pickup_page( InMemoryPickupLocationRepository $pickups ): PickupLocationsPage {
+		return new PickupLocationsPage(
+			$pickups,
+			new PickupLocationValidator(),
+			new AdminActionHandler( new AdminNoticeService() ),
+			$this->audit_logger(),
+			$this->dependency_checker()
 		);
 	}
 

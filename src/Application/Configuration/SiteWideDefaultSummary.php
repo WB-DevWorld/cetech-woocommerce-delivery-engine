@@ -79,22 +79,44 @@ final class SiteWideDefaultSummary {
 
 	private function has_useful_defaults( ScopedConfiguration $scope ): bool {
 		$offers = $scope->collections[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ] ?? null;
-
-		return null !== $offers
+		$has_offers = null !== $offers
 			&& CollectionConfigurationMode::Inherit !== $offers->mode
 			&& [] !== $offers->members;
+		$pickup = $scope->scalars[ ConfigurationFieldKey::PICKUP_LOCATION_ID ] ?? null;
+		$has_pickup = null !== $pickup
+			&& ScalarConfigurationMode::Override === $pickup->mode
+			&& (int) $pickup->value > 0;
+
+		return $has_offers || $has_pickup;
 	}
 
 	private function delivery_method_label( FulfilmentProfile $profile, ?ScopedConfiguration $scope ): string {
-		if ( $profile->pickup_allowed && $profile->delivery_allowed ) {
+		$pickup = $scope?->scalars[ ConfigurationFieldKey::PICKUP_LOCATION_ID ] ?? null;
+		$has_pickup = $profile->pickup_allowed
+			&& null !== $pickup
+			&& ScalarConfigurationMode::Override === $pickup->mode
+			&& (int) $pickup->value > 0;
+		$offers = $scope?->collections[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ] ?? null;
+		$has_delivery = null !== $offers && [] !== $offers->members;
+
+		if ( $has_delivery && $has_pickup ) {
 			$choice = $scope?->scalars[ ConfigurationFieldKey::FULFILMENT_CHOICE ] ?? null;
 			if ( null !== $choice && ScalarConfigurationMode::Override === $choice->mode ) {
 				$options = ConfigurationFieldCatalog::enum_options( ConfigurationFieldKey::FULFILMENT_CHOICE );
+				$default = $options[ (string) $choice->value ] ?? 'Delivery';
 
-				return $options[ (string) $choice->value ] ?? 'Delivery + Store Pickup';
+				return 'Delivery + Store Pickup (default: ' . $default . ')';
 			}
 
 			return 'Delivery + Store Pickup';
+		}
+
+		if ( $has_pickup && ! $has_delivery ) {
+			return 'Store Pickup only';
+		}
+
+		if ( $profile->pickup_allowed && $profile->delivery_allowed && ! $has_pickup ) {
+			return 'Delivery only';
 		}
 
 		return 'Delivery only';

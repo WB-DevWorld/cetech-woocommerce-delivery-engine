@@ -16,6 +16,8 @@ use CetechDeliveryEngine\Domain\Enum\DeliveryRoute;
 use CetechDeliveryEngine\Domain\Enum\EffectiveFieldState;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentAvailability;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
+use CetechDeliveryEngine\Domain\Enum\RecordStatus;
+use CetechDeliveryEngine\Domain\Pickup\PickupLocationRepositoryInterface;
 
 /**
  * Configuration-level hard fulfilment invariants.
@@ -26,7 +28,8 @@ use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 final class HardFulfilmentConstraintService implements FulfilmentConstraintServiceInterface {
 
 	public function __construct(
-		private readonly ?DeliveryOfferRepositoryInterface $delivery_offers = null
+		private readonly ?DeliveryOfferRepositoryInterface $delivery_offers = null,
+		private readonly ?PickupLocationRepositoryInterface $pickup_locations = null
 	) {
 	}
 
@@ -66,6 +69,16 @@ final class HardFulfilmentConstraintService implements FulfilmentConstraintServi
 			}
 		}
 
+		$pickup_field = $scalars[ ConfigurationFieldKey::PICKUP_LOCATION_ID ] ?? null;
+		if ( $pickup_field instanceof EffectiveScalarField && EffectiveFieldState::Valid === $pickup_field->state ) {
+			$constrained = $this->constrain_pickup_location( $pickup_field, $policy['pickup_allowed'] );
+			if ( $constrained !== $pickup_field ) {
+				$scalars[ ConfigurationFieldKey::PICKUP_LOCATION_ID ] = $constrained;
+				$reasons                                             = array_merge( $reasons, $constrained->reason_codes );
+				$changed                                             = true;
+			}
+		}
+
 		$offers_field = $collections[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ] ?? null;
 
 		if ( $offers_field instanceof EffectiveCollectionField && EffectiveFieldState::Valid === $offers_field->state ) {
@@ -99,10 +112,22 @@ final class HardFulfilmentConstraintService implements FulfilmentConstraintServi
 		$state = $configuration->state;
 
 		foreach ( $scalars as $field ) {
-			if ( $field instanceof EffectiveScalarField && EffectiveFieldState::Invalid === $field->state ) {
-				$state = EffectiveFieldState::Invalid;
-				break;
+			if ( ! $field instanceof EffectiveScalarField || EffectiveFieldState::Invalid !== $field->state ) {
+				continue;
 			}
+
+			// Invalid Store Pickup location must not silently offer Pickup, but it
+			// must not fail-close an otherwise valid Delivery configuration.
+			if (
+				ConfigurationFieldKey::PICKUP_LOCATION_ID === $field->field_key
+				&& $policy['pickup_allowed']
+				&& $this->has_usable_delivery_offers( $collections[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ] ?? null )
+			) {
+				continue;
+			}
+
+			$state = EffectiveFieldState::Invalid;
+			break;
 		}
 
 		return new EffectiveConfiguration(
@@ -164,9 +189,74 @@ final class HardFulfilmentConstraintService implements FulfilmentConstraintServi
 		return $this->is_availability( $value ) ? $value : null;
 	}
 
+	private function constrain_pickup_location( EffectiveScalarField $field, bool $pickup_allowed ): EffectiveScalarField {
+		$value = (int) $field->value;
+
+		if ( ! $pickup_allowed ) {
+			return new EffectiveScalarField(
+				ConfigurationFieldKey::PICKUP_LOCATION_ID,
+				EffectiveFieldState::Invalid,
+				$value > 0 ? $value : $field->value,
+				new FieldProvenance( null, 'hard_constraint' ),
+				[ ConfigurationReasonCode::CONSTRAINT_CHOICE_PROHIBITED ]
+			);
+		}
+
+		if ( $value <= 0 ) {
+			return new EffectiveScalarField(
+				ConfigurationFieldKey::PICKUP_LOCATION_ID,
+				EffectiveFieldState::Invalid,
+				$field->value,
+				new FieldProvenance( null, 'hard_constraint' ),
+				[ ConfigurationReasonCode::CONSTRAINT_PICKUP_LOCATION_INVALID ]
+			);
+		}
+
+		if ( null === $this->pickup_locations ) {
+			return $field;
+		}
+
+		$row = $this->pickup_locations->findById( $value );
+		if ( ! is_array( $row ) || RecordStatus::Active->value !== (string) ( $row['status'] ?? '' ) ) {
+			return new EffectiveScalarField(
+				ConfigurationFieldKey::PICKUP_LOCATION_ID,
+				EffectiveFieldState::Invalid,
+				$value,
+				new FieldProvenance( null, 'hard_constraint' ),
+				[ ConfigurationReasonCode::CONSTRAINT_PICKUP_LOCATION_INVALID ]
+			);
+		}
+
+		return $field;
+	}
+
 	private function is_availability( string $value ): bool {
 		foreach ( FulfilmentAvailability::cases() as $case ) {
 			if ( $case->value === $value ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private function has_usable_delivery_offers( mixed $offers_field ): bool {
+		if ( ! $offers_field instanceof EffectiveCollectionField || EffectiveFieldState::Valid !== $offers_field->state ) {
+			return false;
+		}
+
+		foreach ( $offers_field->members as $offer_id ) {
+			if ( $offer_id <= 0 ) {
+				continue;
+			}
+			if ( null === $this->delivery_offers ) {
+				return true;
+			}
+			$row = $this->delivery_offers->findById( $offer_id );
+			if ( ! is_array( $row ) ) {
+				continue;
+			}
+			if ( DeliveryRoute::LocalDelivery->value === (string) ( $row['route'] ?? '' ) ) {
 				return true;
 			}
 		}

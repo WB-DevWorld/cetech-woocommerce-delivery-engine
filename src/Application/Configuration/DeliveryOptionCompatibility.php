@@ -21,9 +21,12 @@ final class DeliveryOptionCompatibility {
 	 * @return list<string>
 	 */
 	public static function allowed_routes( FulfilmentProfile $profile ): array {
-		$allowed = $profile->allowed_routes;
-		if ( $profile->pickup_allowed ) {
-			$allowed[] = DeliveryRoute::StorePickup->value;
+		$allowed = [];
+		foreach ( $profile->allowed_routes as $route ) {
+			if ( DeliveryRoute::StorePickup->value === $route ) {
+				continue;
+			}
+			$allowed[] = $route;
 		}
 
 		return array_values( array_unique( $allowed ) );

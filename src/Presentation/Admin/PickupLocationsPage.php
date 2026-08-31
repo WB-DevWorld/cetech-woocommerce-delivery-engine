@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Core\Capabilities\Capabilities;
+use CetechDeliveryEngine\Application\Destination\WooCommerceCountryCatalog;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Domain\Pickup\PickupLocationRepositoryInterface;
 use CetechDeliveryEngine\Presentation\Admin\Validation\PickupLocationValidator;
@@ -116,10 +117,8 @@ final class PickupLocationsPage {
 			$rows = [];
 
 			foreach ( $records as $record ) {
-				$id      = (int) ( $record['id'] ?? 0 );
-				$address = $this->validator->decode_public_address( isset( $record['public_address'] ) ? (string) $record['public_address'] : null );
-
-				$ready = trim( (string) ( $record['public_pickup_instructions'] ?? $record['public_opening_hours'] ?? '' ) );
+				$id    = (int) ( $record['id'] ?? 0 );
+				$ready = trim( (string) ( $record['readiness_estimate'] ?? '' ) );
 				$rows[] = [
 					'<strong>' . esc_html( (string) ( $record['location_name'] ?? '' ) ) . '</strong>',
 					esc_html( $this->validator->address_summary( isset( $record['public_address'] ) ? (string) $record['public_address'] : null ) ),
@@ -170,29 +169,36 @@ final class PickupLocationsPage {
 			$record = $this->load_record_for_form( $is_edit );
 		}
 
-		$title = $is_edit
+		$title  = $is_edit
 			? __( 'Edit Pickup Location', 'cetech-woocommerce-delivery-engine' )
 			: __( 'Add Pickup Location', 'cetech-woocommerce-delivery-engine' );
+		$submit = $is_edit
+			? __( 'Save Location', 'cetech-woocommerce-delivery-engine' )
+			: __( 'Create Location', 'cetech-woocommerce-delivery-engine' );
 
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
 			__( 'Customer pickup', 'cetech-woocommerce-delivery-engine' ),
 			$title,
-			__( 'Add the address and contact details customers need to collect their order.', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Add the address, country, and pickup readiness customers need to collect their order.', 'cetech-woocommerce-delivery-engine' ),
+			[
+				'label' => $submit,
+				'type'  => 'submit',
+				'class' => 'primary',
+				'form'  => AdminPageLayout::ENTITY_FORM_ID,
+			],
 			[
 				'label' => __( 'Back to pickup locations', 'cetech-woocommerce-delivery-engine' ),
 				'url'   => AdminPageRenderer::list_url( self::SLUG ),
 				'class' => 'secondary',
 			]
 		);
-
-		echo '<form method="post" action="">';
-		AdminFormHelper::nonce_field( self::ACTION_SAVE );
-		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_SAVE ) . '" />';
-
-		if ( $is_edit && ! empty( $record['id'] ) ) {
-			echo '<input type="hidden" name="id" value="' . esc_attr( (string) $record['id'] ) . '" />';
-		}
+		AdminPageLayout::open_entity_form(
+			self::ACTION_SAVE,
+			self::ACTION_SAVE,
+			$submit,
+			$is_edit && ! empty( $record['id'] ) ? (int) $record['id'] : null
+		);
 
 		AdminPageLayout::open_form_panel(
 			__( 'Location name', 'cetech-woocommerce-delivery-engine' ),
@@ -203,14 +209,14 @@ final class PickupLocationsPage {
 			__( 'Location name', 'cetech-woocommerce-delivery-engine' ),
 			(string) ( $record['location_name'] ?? '' ),
 			true,
-			__( 'Example: CETECH Main Store', 'cetech-woocommerce-delivery-engine' )
+			__( 'Example: CETECH Accra Store', 'cetech-woocommerce-delivery-engine' )
 		);
 		AdminFormHelper::text_field(
 			'code',
 			__( 'Reference code', 'cetech-woocommerce-delivery-engine' ),
 			(string) ( $record['code'] ?? '' ),
-			true,
-			__( 'Example: main-store-pickup', 'cetech-woocommerce-delivery-engine' )
+			false,
+			__( 'Generated from the name if left blank. Staff do not need to invent a code. Renaming does not change an established code.', 'cetech-woocommerce-delivery-engine' )
 		);
 		AdminFormHelper::select_field(
 			'status',
@@ -229,19 +235,25 @@ final class PickupLocationsPage {
 		AdminFormHelper::text_field( 'address_line_2', __( 'Address line 2', 'cetech-woocommerce-delivery-engine' ), (string) ( $record['address_line_2'] ?? '' ) );
 		AdminFormHelper::text_field( 'city', __( 'City', 'cetech-woocommerce-delivery-engine' ), (string) ( $record['city'] ?? '' ) );
 		AdminFormHelper::text_field( 'region', __( 'Region', 'cetech-woocommerce-delivery-engine' ), (string) ( $record['region'] ?? '' ) );
-		AdminFormHelper::text_field(
+		AdminFormHelper::country_select_field(
 			'country_code',
-			__( 'Country code', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Country', 'cetech-woocommerce-delivery-engine' ),
 			(string) ( $record['country_code'] ?? '' ),
-			false,
-			__( '2-letter code. Example: GH', 'cetech-woocommerce-delivery-engine' )
+			__( 'Staff select Ghana; the stored value is GH.', 'cetech-woocommerce-delivery-engine' )
 		);
 		AdminFormHelper::text_field( 'postcode', __( 'Postcode', 'cetech-woocommerce-delivery-engine' ), (string) ( $record['postcode'] ?? '' ) );
 		AdminPageLayout::close_form_panel();
 
 		AdminPageLayout::open_form_panel(
-			__( 'Contact and pickup instructions', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Contact, readiness, and pickup instructions', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Help customers know when and how to collect their order.', 'cetech-woocommerce-delivery-engine' )
+		);
+		AdminFormHelper::text_field(
+			'readiness_estimate',
+			__( 'Pickup readiness', 'cetech-woocommerce-delivery-engine' ),
+			(string) ( $record['readiness_estimate'] ?? '' ),
+			false,
+			__( 'Shown to customers as “Ready for pickup”. Example: 1–2 business days.', 'cetech-woocommerce-delivery-engine' )
 		);
 		AdminFormHelper::text_field(
 			'contact_phone',
@@ -269,13 +281,12 @@ final class PickupLocationsPage {
 			__( 'Pickup instructions', 'cetech-woocommerce-delivery-engine' ),
 			(string) ( $record['public_pickup_instructions'] ?? '' ),
 			4,
-			__( 'Tell customers where to go and what to bring when collecting.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Tell customers where to go and what to bring when collecting. Example: Collect from the CETECH Store.', 'cetech-woocommerce-delivery-engine' )
 		);
 		AdminPageLayout::close_form_panel();
 
 		echo '<div class="cetech-de-form-actions">';
-		submit_button( $is_edit ? __( 'Save Location', 'cetech-woocommerce-delivery-engine' ) : __( 'Create Location', 'cetech-woocommerce-delivery-engine' ) );
-		echo ' <a class="button" href="' . esc_url( AdminPageRenderer::list_url( self::SLUG ) ) . '">' . esc_html__( 'Cancel', 'cetech-woocommerce-delivery-engine' ) . '</a>';
+		echo '<a class="button" href="' . esc_url( AdminPageRenderer::list_url( self::SLUG ) ) . '">' . esc_html__( 'Cancel', 'cetech-woocommerce-delivery-engine' ) . '</a>';
 		echo '</div></form>';
 
 		if ( $is_edit && isset( $record['id'] ) && (int) $record['id'] > 0 ) {
@@ -291,7 +302,23 @@ final class PickupLocationsPage {
 	}
 
 	private function handle_save(): void {
-		$input  = $this->read_form_input();
+		$input = $this->read_form_input();
+		$input = AdminFormHelper::prepare_reference_code(
+			$input,
+			(string) ( $input['location_name'] ?? '' ),
+			function ( string $candidate ) use ( $input ): bool {
+				$id       = isset( $input['id'] ) ? (int) $input['id'] : 0;
+				$existing = $this->repository->findByCode( $candidate );
+
+				return null !== $existing && (int) ( $existing['id'] ?? 0 ) !== $id;
+			},
+			function ( int $id ): string {
+				$row = $this->repository->findById( $id );
+
+				return is_array( $row ) ? (string) ( $row['internal_code'] ?? '' ) : '';
+			},
+			'pickup-location'
+		);
 		$errors = $this->validator->validate( $input, isset( $input['id'] ) ? (int) $input['id'] : null );
 
 		if ( [] !== $errors ) {
@@ -321,6 +348,7 @@ final class PickupLocationsPage {
 			'public_pickup_instructions' => trim( (string) ( $input['public_pickup_instructions'] ?? '' ) ),
 			'contact_phone'              => trim( (string) ( $input['contact_phone'] ?? '' ) ),
 			'contact_email'              => trim( (string) ( $input['contact_email'] ?? '' ) ),
+			'readiness_estimate'         => trim( (string) ( $input['readiness_estimate'] ?? '' ) ),
 			'status'                     => (string) $input['status'],
 		];
 
@@ -513,6 +541,7 @@ final class PickupLocationsPage {
 				'contact_email'              => (string) ( $row['contact_email'] ?? '' ),
 				'public_opening_hours'       => (string) ( $row['public_opening_hours'] ?? '' ),
 				'public_pickup_instructions' => (string) ( $row['public_pickup_instructions'] ?? '' ),
+				'readiness_estimate'         => (string) ( $row['readiness_estimate'] ?? '' ),
 				'status'                     => (string) ( $row['status'] ?? RecordStatus::Active->value ),
 			],
 			$address
@@ -539,6 +568,7 @@ final class PickupLocationsPage {
 			'contact_email'              => (string) ( $draft['contact_email'] ?? '' ),
 			'public_opening_hours'       => (string) ( $draft['public_opening_hours'] ?? '' ),
 			'public_pickup_instructions' => (string) ( $draft['public_pickup_instructions'] ?? '' ),
+			'readiness_estimate'         => (string) ( $draft['readiness_estimate'] ?? '' ),
 			'status'                     => (string) ( $draft['status'] ?? RecordStatus::Active->value ),
 		];
 	}
@@ -556,12 +586,15 @@ final class PickupLocationsPage {
 			'address_line_2'             => isset( $_POST['address_line_2'] ) ? wp_unslash( (string) $_POST['address_line_2'] ) : '',
 			'city'                       => isset( $_POST['city'] ) ? wp_unslash( (string) $_POST['city'] ) : '',
 			'region'                     => isset( $_POST['region'] ) ? wp_unslash( (string) $_POST['region'] ) : '',
-			'country_code'               => isset( $_POST['country_code'] ) ? wp_unslash( (string) $_POST['country_code'] ) : '',
+			'country_code'               => WooCommerceCountryCatalog::canonical_iso2(
+				isset( $_POST['country_code'] ) ? wp_unslash( (string) $_POST['country_code'] ) : ''
+			),
 			'postcode'                   => isset( $_POST['postcode'] ) ? wp_unslash( (string) $_POST['postcode'] ) : '',
 			'contact_phone'              => isset( $_POST['contact_phone'] ) ? wp_unslash( (string) $_POST['contact_phone'] ) : '',
 			'contact_email'              => isset( $_POST['contact_email'] ) ? wp_unslash( (string) $_POST['contact_email'] ) : '',
 			'public_opening_hours'       => isset( $_POST['public_opening_hours'] ) ? wp_unslash( (string) $_POST['public_opening_hours'] ) : '',
 			'public_pickup_instructions' => isset( $_POST['public_pickup_instructions'] ) ? wp_unslash( (string) $_POST['public_pickup_instructions'] ) : '',
+			'readiness_estimate'         => isset( $_POST['readiness_estimate'] ) ? wp_unslash( (string) $_POST['readiness_estimate'] ) : '',
 			'status'                     => isset( $_POST['status'] ) ? wp_unslash( (string) $_POST['status'] ) : '',
 		];
 	}

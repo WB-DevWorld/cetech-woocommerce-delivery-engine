@@ -24,7 +24,8 @@ final class ResolvedProductDeliveryRule {
 		public readonly ?int $logistics_profile_id,
 		public readonly ?int $supplier_id,
 		public readonly ?int $origin_id,
-		public readonly int $priority
+		public readonly int $priority,
+		public readonly ?int $pickup_location_id = null
 	) {
 	}
 
@@ -45,7 +46,8 @@ final class ResolvedProductDeliveryRule {
 			self::nullable_int( $row['logistics_profile_id'] ?? null ),
 			self::nullable_int( $row['supplier_id'] ?? null ),
 			self::nullable_int( $row['origin_id'] ?? null ),
-			(int) ( $row['priority'] ?? 100 )
+			(int) ( $row['priority'] ?? 100 ),
+			self::nullable_int( $row['pickup_location_id'] ?? null )
 		);
 	}
 
@@ -66,6 +68,7 @@ final class ResolvedProductDeliveryRule {
 			'supplier_id'             => $this->supplier_id,
 			'origin_id'               => $this->origin_id,
 			'priority'                => $this->priority,
+			'pickup_location_id'      => $this->pickup_location_id,
 		];
 	}
 
@@ -97,7 +100,8 @@ final class ResolvedProductDeliveryRule {
 			self::nullable_int( $data['logistics_profile_id'] ?? null ),
 			self::nullable_int( $data['supplier_id'] ?? null ),
 			self::nullable_int( $data['origin_id'] ?? null ),
-			(int) ( $data['priority'] ?? 100 )
+			(int) ( $data['priority'] ?? 100 ),
+			self::nullable_int( $data['pickup_location_id'] ?? null )
 		);
 	}
 

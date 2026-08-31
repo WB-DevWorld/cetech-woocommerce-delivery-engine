@@ -222,6 +222,11 @@ final class EcrToRuntimeConfigurationAdapter {
 		$logistics = $this->nullable_reference( $configuration, ConfigurationFieldKey::LOGISTICS_PROFILE_ID );
 		$supplier  = $this->nullable_reference( $configuration, ConfigurationFieldKey::SUPPLIER_ID );
 		$origin    = $this->nullable_reference( $configuration, ConfigurationFieldKey::ORIGIN_ID );
+		$pickup    = $this->nullable_reference( $configuration, ConfigurationFieldKey::PICKUP_LOCATION_ID );
+
+		if ( FulfilmentChoice::Delivery->value === $choice && [] === $offer_ids && null === $pickup ) {
+			return null;
+		}
 
 		$rule_target_type = ProductTargetType::Variation->value === $input_target_type
 			&& null !== $variation_id
@@ -245,7 +250,8 @@ final class EcrToRuntimeConfigurationAdapter {
 			$logistics,
 			$supplier,
 			$origin,
-			$priority
+			$priority,
+			$pickup
 		);
 
 		return [

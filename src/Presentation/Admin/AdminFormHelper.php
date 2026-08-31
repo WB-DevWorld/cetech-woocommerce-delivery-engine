@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Admin;
 
+use CetechDeliveryEngine\Application\Destination\WooCommerceCountryCatalog;
+
 /**
  * Shared admin form helpers.
  */
@@ -186,6 +188,48 @@ final class AdminFormHelper {
 			);
 		}
 		echo '</select>';
+		if ( '' !== $description ) {
+			echo '<p class="description">' . esc_html( $description ) . '</p>';
+		}
+		echo '</td></tr>';
+	}
+
+	public static function country_select_field(
+		string $name,
+		string $label,
+		string $selected = '',
+		string $description = ''
+	): void {
+		$countries = WooCommerceCountryCatalog::options();
+		$stored    = WooCommerceCountryCatalog::canonical_iso2( $selected );
+
+		echo '<tr><th scope="row"><label for="' . esc_attr( $name ) . '">' . esc_html( $label ) . '</label></th><td>';
+		if ( [] === $countries ) {
+			printf(
+				'<input type="text" class="regular-text" id="%1$s" name="%1$s" value="%2$s" maxlength="2" placeholder="%3$s" />',
+				esc_attr( $name ),
+				esc_attr( $stored ),
+				esc_attr__( '2-letter country code, for example GH', 'cetech-woocommerce-delivery-engine' )
+			);
+		} else {
+			echo '<select class="cetech-de-country-select cetech-de-select" data-cetech-de-country-select id="' . esc_attr( $name ) . '" name="' . esc_attr( $name ) . '" aria-label="' . esc_attr( $label ) . '">';
+			echo '<option value="">' . esc_html__( 'Select a country', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+			foreach ( $countries as $code => $country_label ) {
+				printf(
+					'<option value="%1$s"%2$s>%3$s</option>',
+					esc_attr( $code ),
+					selected( $stored, $code, false ),
+					esc_html( $country_label )
+				);
+			}
+			if ( '' !== $stored && ! isset( $countries[ $stored ] ) ) {
+				printf(
+					'<option value="%1$s" selected="selected">%1$s</option>',
+					esc_attr( $stored )
+				);
+			}
+			echo '</select>';
+		}
 		if ( '' !== $description ) {
 			echo '<p class="description">' . esc_html( $description ) . '</p>';
 		}

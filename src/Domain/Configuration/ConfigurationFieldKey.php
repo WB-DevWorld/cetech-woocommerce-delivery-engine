@@ -14,6 +14,7 @@ final class ConfigurationFieldKey {
 	public const LOGISTICS_PROFILE_ID    = 'logistics_profile_id';
 	public const SUPPLIER_ID             = 'supplier_id';
 	public const ORIGIN_ID               = 'origin_id';
+	public const PICKUP_LOCATION_ID      = 'pickup_location_id';
 	public const PRIORITY                = 'priority';
 	public const ESTIMATED_DELIVERY      = 'estimated_delivery';
 	public const DELIVERY_OFFER_IDS      = 'delivery_offer_ids';
@@ -31,6 +32,7 @@ final class ConfigurationFieldKey {
 			self::LOGISTICS_PROFILE_ID,
 			self::SUPPLIER_ID,
 			self::ORIGIN_ID,
+			self::PICKUP_LOCATION_ID,
 			self::PRIORITY,
 			self::ESTIMATED_DELIVERY,
 			self::DELIVERY_OFFER_IDS,

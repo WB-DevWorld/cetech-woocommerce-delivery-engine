@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Application\Configuration;
 
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey;
+use CetechDeliveryEngine\Domain\Configuration\ConfigurationReasonCode;
 use CetechDeliveryEngine\Domain\Configuration\EffectiveConfigurationRequest;
 use CetechDeliveryEngine\Domain\Enum\EffectiveFieldState;
 
@@ -144,6 +145,18 @@ final class OperationalReadinessAssessor {
 	 * Does not construct a second resolver; callers pass an already-resolved configuration.
 	 */
 	public static function reason_for_effective( \CetechDeliveryEngine\Domain\Configuration\EffectiveConfiguration $configuration ): ?string {
+		$pickup_field = $configuration->scalar( ConfigurationFieldKey::PICKUP_LOCATION_ID );
+		if (
+			null !== $pickup_field
+			&& EffectiveFieldState::Invalid === $pickup_field->state
+			&& (
+				in_array( ConfigurationReasonCode::CONSTRAINT_PICKUP_LOCATION_INVALID, $pickup_field->reason_codes, true )
+				|| in_array( ConfigurationReasonCode::CONSTRAINT_PICKUP_LOCATION_INVALID, $configuration->reason_codes, true )
+			)
+		) {
+			return 'Store Pickup is enabled but no valid Pickup Location is configured.';
+		}
+
 		if ( EffectiveFieldState::Invalid === $configuration->state ) {
 			return 'This product has a fulfilment combination that is not allowed.';
 		}
@@ -154,7 +167,9 @@ final class OperationalReadinessAssessor {
 		}
 
 		$offer_reason = self::offer_field_readiness_for( $configuration )->reason;
-		if ( null !== $offer_reason ) {
+		$pickup_valid = null !== $pickup_field && EffectiveFieldState::Valid === $pickup_field->state && (int) $pickup_field->value > 0;
+
+		if ( null !== $offer_reason && ! $pickup_valid ) {
 			return $offer_reason;
 		}
 

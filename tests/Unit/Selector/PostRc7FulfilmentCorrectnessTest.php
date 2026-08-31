@@ -100,6 +100,133 @@ final class PostRc7FulfilmentCorrectnessTest extends TestCase {
 		self::assertSame( 'in_store:delivery:11', ProductDeliveryOptionsBuilder::defaultDisplayKey( $options ) );
 	}
 
+	public function test_in_store_pickup_only_uses_ecr_location_not_delivery_option(): void {
+		$options = $this->builder->buildFromResolution(
+			$this->resolution(
+				FulfilmentAvailability::InStore->value,
+				FulfilmentChoice::StorePickup->value,
+				[],
+				1
+			)
+		);
+
+		self::assertSame( [ FulfilmentChoice::StorePickup->value ], $this->choices( $options ) );
+		self::assertSame( 'in_store:store_pickup:pickup', ProductDeliveryOptionsBuilder::defaultDisplayKey( $options ) );
+		self::assertSame( 'Main showroom', $options[0]->pickup_location_label );
+		self::assertSame( 'Ready in 2 hours', $options[0]->estimate_text );
+		self::assertNull( $options[0]->delivery_offer_id );
+	}
+
+	public function test_in_store_both_via_ecr_location_defaults_to_delivery(): void {
+		$options = $this->builder->buildFromResolution(
+			$this->resolution(
+				FulfilmentAvailability::InStore->value,
+				FulfilmentChoice::Delivery->value,
+				[ 11 ],
+				1
+			)
+		);
+
+		self::assertSame( [ FulfilmentChoice::Delivery->value, FulfilmentChoice::StorePickup->value ], $this->choices( $options ) );
+		self::assertSame( 'in_store:delivery:11', ProductDeliveryOptionsBuilder::defaultDisplayKey( $options, FulfilmentChoice::Delivery->value ) );
+		self::assertTrue( $options[0]->is_default );
+		self::assertFalse( $options[1]->is_default );
+	}
+
+	public function test_in_store_default_pickup_when_location_configured_and_valid(): void {
+		$options = $this->builder->buildFromResolution(
+			$this->resolution(
+				FulfilmentAvailability::InStore->value,
+				FulfilmentChoice::StorePickup->value,
+				[ 11 ],
+				1
+			)
+		);
+
+		self::assertSame( 'in_store:store_pickup:pickup', ProductDeliveryOptionsBuilder::defaultDisplayKey( $options, FulfilmentChoice::StorePickup->value ) );
+		self::assertTrue( $options[1]->is_default );
+	}
+
+	public function test_pickup_enabled_without_valid_location_fails_closed(): void {
+		$missing = $this->builder->buildFromResolution(
+			$this->resolution(
+				FulfilmentAvailability::InStore->value,
+				FulfilmentChoice::StorePickup->value,
+				[ 11 ],
+				99
+			)
+		);
+		self::assertSame( [ FulfilmentChoice::Delivery->value ], $this->choices( $missing ) );
+		self::assertNotContains( FulfilmentChoice::StorePickup->value, $this->choices( $missing ) );
+
+		$this->pickups->seed(
+			2,
+			[
+				'status'        => RecordStatus::Inactive->value,
+				'location_name' => 'Closed store',
+			]
+		);
+		$inactive = $this->builder->buildFromResolution(
+			$this->resolution(
+				FulfilmentAvailability::InStore->value,
+				FulfilmentChoice::Delivery->value,
+				[ 11 ],
+				2
+			)
+		);
+		self::assertSame( [ FulfilmentChoice::Delivery->value ], $this->choices( $inactive ) );
+	}
+
+	public function test_store_pickup_is_not_treated_as_a_delivery_option(): void {
+		$profile = \CetechDeliveryEngine\Domain\FulfilmentProfile\FulfilmentProfileRegistry::get( FulfilmentAvailability::InStore->value );
+		self::assertNotNull( $profile );
+		$filtered = \CetechDeliveryEngine\Application\Configuration\DeliveryOptionCompatibility::filter_offers(
+			[
+				[ 'id' => 11, 'route' => DeliveryRoute::LocalDelivery->value ],
+				[ 'id' => 12, 'route' => DeliveryRoute::StorePickup->value ],
+			],
+			$profile
+		);
+		self::assertSame( [ 11 ], array_column( $filtered, 'id' ) );
+		self::assertNotContains(
+			DeliveryRoute::StorePickup->value,
+			\CetechDeliveryEngine\Application\Configuration\DeliveryOptionCompatibility::allowed_routes( $profile )
+		);
+	}
+
+	public function test_default_cannot_reference_a_disabled_method(): void {
+		$selection = \CetechDeliveryEngine\Application\Configuration\InStoreMethodSelection::from_posted(
+			[ 'delivery' ],
+			FulfilmentChoice::StorePickup->value,
+			[ 11 ],
+			0,
+			$this->offers
+		);
+		self::assertSame( FulfilmentChoice::Delivery->value, $selection->default_choice );
+		self::assertFalse( $selection->pickup_enabled );
+
+		$pickup_only = \CetechDeliveryEngine\Application\Configuration\InStoreMethodSelection::from_posted(
+			[ 'store_pickup' ],
+			FulfilmentChoice::Delivery->value,
+			[],
+			1,
+			$this->offers
+		);
+		self::assertSame( FulfilmentChoice::StorePickup->value, $pickup_only->default_choice );
+		self::assertSame( [], $pickup_only->validate( $this->pickups ) );
+
+		$pickup_without_location = \CetechDeliveryEngine\Application\Configuration\InStoreMethodSelection::from_posted(
+			[ 'store_pickup' ],
+			FulfilmentChoice::StorePickup->value,
+			[],
+			0,
+			$this->offers
+		);
+		$errors = $pickup_without_location->validate( $this->pickups );
+		self::assertNotSame( [], $errors );
+		self::assertStringContainsString( 'valid active Pickup Location', implode( ' ', $errors ) );
+	}
+
 	public function test_in_store_delivery_plus_pickup_exposes_both_and_defaults_to_delivery(): void {
 		$options = $this->builder->buildFromResolution(
 			$this->resolution( FulfilmentAvailability::InStore->value, FulfilmentChoice::Delivery->value, [ 11, 12 ] )
@@ -228,6 +355,34 @@ final class PostRc7FulfilmentCorrectnessTest extends TestCase {
 			[ 11 ]
 		);
 		self::assertSame( EffectiveFieldState::Invalid, $warehouse_pickup->scalar( ConfigurationFieldKey::FULFILMENT_CHOICE )?->state );
+
+		$missing_location = $this->constrained_config(
+			FulfilmentAvailability::InStore->value,
+			FulfilmentChoice::Delivery->value,
+			[ 11 ],
+			99
+		);
+		self::assertSame( EffectiveFieldState::Invalid, $missing_location->scalar( ConfigurationFieldKey::PICKUP_LOCATION_ID )?->state );
+		self::assertSame( EffectiveFieldState::Valid, $missing_location->state );
+		self::assertSame( [ 11 ], $missing_location->collection( ConfigurationFieldKey::DELIVERY_OFFER_IDS )?->members );
+
+		$international_location = $this->constrained_config(
+			FulfilmentAvailability::InternationalFulfilment->value,
+			FulfilmentChoice::Delivery->value,
+			[ 13 ],
+			1
+		);
+		self::assertSame( EffectiveFieldState::Invalid, $international_location->scalar( ConfigurationFieldKey::PICKUP_LOCATION_ID )?->state );
+		self::assertSame( EffectiveFieldState::Invalid, $international_location->state );
+
+		$pickup_only_missing = $this->constrained_config(
+			FulfilmentAvailability::InStore->value,
+			FulfilmentChoice::StorePickup->value,
+			[],
+			99
+		);
+		self::assertSame( EffectiveFieldState::Invalid, $pickup_only_missing->scalar( ConfigurationFieldKey::PICKUP_LOCATION_ID )?->state );
+		self::assertSame( EffectiveFieldState::Invalid, $pickup_only_missing->state );
 	}
 
 	public function test_selected_choice_survives_cart_summary_and_pickup_details(): void {
@@ -315,7 +470,7 @@ final class PostRc7FulfilmentCorrectnessTest extends TestCase {
 	/**
 	 * @param list<int> $offer_ids
 	 */
-	private function resolution( string $availability, string $choice, array $offer_ids ): ProductRuleResolutionResult {
+	private function resolution( string $availability, string $choice, array $offer_ids, ?int $pickup_location_id = null ): ProductRuleResolutionResult {
 		$rule = new ResolvedProductDeliveryRule(
 			1,
 			ProductTargetType::Product->value,
@@ -328,7 +483,8 @@ final class PostRc7FulfilmentCorrectnessTest extends TestCase {
 			null,
 			null,
 			null,
-			100
+			100,
+			$pickup_location_id
 		);
 
 		return new ProductRuleResolutionResult(
@@ -351,8 +507,29 @@ final class PostRc7FulfilmentCorrectnessTest extends TestCase {
 	/**
 	 * @param list<int> $offer_ids
 	 */
-	private function constrained_config( string $availability, string $choice, array $offer_ids ): \CetechDeliveryEngine\Domain\Configuration\EffectiveConfiguration {
+	private function constrained_config( string $availability, string $choice, array $offer_ids, ?int $pickup_location_id = null ): \CetechDeliveryEngine\Domain\Configuration\EffectiveConfiguration {
 		$repository = new InMemoryScopedConfigurationRepository();
+		$scalars    = [
+			ConfigurationFieldKey::FULFILMENT_AVAILABILITY => ScalarFieldInstruction::override(
+				ConfigurationFieldKey::FULFILMENT_AVAILABILITY,
+				$availability
+			),
+			ConfigurationFieldKey::FULFILMENT_CHOICE => ScalarFieldInstruction::override(
+				ConfigurationFieldKey::FULFILMENT_CHOICE,
+				$choice
+			),
+			ConfigurationFieldKey::PRIORITY => ScalarFieldInstruction::override( ConfigurationFieldKey::PRIORITY, 100 ),
+			ConfigurationFieldKey::LOGISTICS_PROFILE_ID => ScalarFieldInstruction::override( ConfigurationFieldKey::LOGISTICS_PROFILE_ID, 10 ),
+			ConfigurationFieldKey::SUPPLIER_ID => ScalarFieldInstruction::override( ConfigurationFieldKey::SUPPLIER_ID, 20 ),
+			ConfigurationFieldKey::ORIGIN_ID => ScalarFieldInstruction::override( ConfigurationFieldKey::ORIGIN_ID, 30 ),
+		];
+		if ( null !== $pickup_location_id && $pickup_location_id > 0 ) {
+			$scalars[ ConfigurationFieldKey::PICKUP_LOCATION_ID ] = ScalarFieldInstruction::override(
+				ConfigurationFieldKey::PICKUP_LOCATION_ID,
+				$pickup_location_id
+			);
+		}
+
 		$repository->saveScopedConfiguration(
 			new ScopedConfiguration(
 				new ConfigurationScope(
@@ -366,20 +543,7 @@ final class PostRc7FulfilmentCorrectnessTest extends TestCase {
 					ConfigurationSource::Native,
 					null
 				),
-				[
-					ConfigurationFieldKey::FULFILMENT_AVAILABILITY => ScalarFieldInstruction::override(
-						ConfigurationFieldKey::FULFILMENT_AVAILABILITY,
-						$availability
-					),
-					ConfigurationFieldKey::FULFILMENT_CHOICE => ScalarFieldInstruction::override(
-						ConfigurationFieldKey::FULFILMENT_CHOICE,
-						$choice
-					),
-					ConfigurationFieldKey::PRIORITY => ScalarFieldInstruction::override( ConfigurationFieldKey::PRIORITY, 100 ),
-					ConfigurationFieldKey::LOGISTICS_PROFILE_ID => ScalarFieldInstruction::override( ConfigurationFieldKey::LOGISTICS_PROFILE_ID, 10 ),
-					ConfigurationFieldKey::SUPPLIER_ID => ScalarFieldInstruction::override( ConfigurationFieldKey::SUPPLIER_ID, 20 ),
-					ConfigurationFieldKey::ORIGIN_ID => ScalarFieldInstruction::override( ConfigurationFieldKey::ORIGIN_ID, 30 ),
-				],
+				$scalars,
 				[
 					ConfigurationFieldKey::DELIVERY_OFFER_IDS => CollectionFieldInstruction::replace(
 						ConfigurationFieldKey::DELIVERY_OFFER_IDS,
@@ -392,7 +556,7 @@ final class PostRc7FulfilmentCorrectnessTest extends TestCase {
 		$resolver = new EffectiveConfigurationResolver(
 			$repository,
 			new EffectiveConfigurationValidator(),
-			new HardFulfilmentConstraintService( $this->offers )
+			new HardFulfilmentConstraintService( $this->offers, $this->pickups )
 		);
 
 		return $resolver->resolve( new EffectiveConfigurationRequest( 101, null, $availability ) );

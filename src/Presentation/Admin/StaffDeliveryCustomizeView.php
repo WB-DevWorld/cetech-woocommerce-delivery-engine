@@ -76,11 +76,14 @@ final class StaffDeliveryCustomizeView {
 		$this->render_scalar_control(
 			$model,
 			ConfigurationFieldKey::FULFILMENT_CHOICE,
-			__( 'Delivery method', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Default customer choice', 'cetech-woocommerce-delivery-engine' ),
 			$is_variation,
 			$profile_label,
-			__( 'Set a different delivery method', 'cetech-woocommerce-delivery-engine' )
+			__( 'Set a different default customer choice', 'cetech-woocommerce-delivery-engine' )
 		);
+		if ( $profile?->pickup_allowed ) {
+			$this->render_pickup_location_control( $model, $is_variation, $profile_label );
+		}
 		$this->render_scalar_control(
 			$model,
 			ConfigurationFieldKey::ESTIMATED_DELIVERY,
@@ -173,6 +176,55 @@ final class StaffDeliveryCustomizeView {
 		echo '</div></fieldset>';
 	}
 
+	private function render_pickup_location_control(
+		ScopedConfigurationEditViewModel $model,
+		bool $is_variation,
+		string $profile_label
+	): void {
+		$field = $this->field( $model, ConfigurationFieldKey::PICKUP_LOCATION_ID );
+		if ( null === $field ) {
+			return;
+		}
+
+		$inherited = $this->display_scalar( $field, $field->inherited_value ?? $field->effective_value );
+		$current   = $field->current_mode;
+		if ( ! in_array( $current, [ 'inherit', 'override', 'disable' ], true ) ) {
+			$current = 'inherit';
+		}
+		$inherit_label = $is_variation
+			? sprintf(
+				/* translators: %s inherited location */
+				__( 'Use Product Setting: %s', 'cetech-woocommerce-delivery-engine' ),
+				'' !== $inherited ? $inherited : '—'
+			)
+			: sprintf(
+				/* translators: %s inherited location */
+				__( 'Use Site-wide Default: %s', 'cetech-woocommerce-delivery-engine' ),
+				'' !== $inherited ? $inherited : $profile_label
+			);
+
+		echo '<fieldset class="cetech-de-customize-field" data-field="' . esc_attr( ConfigurationFieldKey::PICKUP_LOCATION_ID ) . '">';
+		echo '<legend>' . esc_html__( 'Pickup Location', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
+		echo '<p><label><input type="radio" name="fields[' . esc_attr( ConfigurationFieldKey::PICKUP_LOCATION_ID ) . '][mode]" value="inherit"' . checked( $current, 'inherit', false ) . ' /> ';
+		echo esc_html( $inherit_label ) . '</label></p>';
+		echo '<p><label><input type="radio" name="fields[' . esc_attr( ConfigurationFieldKey::PICKUP_LOCATION_ID ) . '][mode]" value="override"' . checked( $current, 'override', false ) . ' /> ';
+		echo esc_html__( 'Use a different Pickup Location', 'cetech-woocommerce-delivery-engine' ) . '</label></p>';
+		echo '<p><label><input type="radio" name="fields[' . esc_attr( ConfigurationFieldKey::PICKUP_LOCATION_ID ) . '][mode]" value="disable"' . checked( $current, 'disable', false ) . ' /> ';
+		echo esc_html__( 'Turn off Store Pickup for this product', 'cetech-woocommerce-delivery-engine' ) . '</label></p>';
+		echo '<div class="cetech-de-customize-override">';
+		$selected = is_scalar( $field->configured_value ) && 'override' === $field->current_mode
+			? (string) $field->configured_value
+			: ( is_scalar( $field->effective_value ) ? (string) $field->effective_value : '' );
+		echo '<p><select name="fields[' . esc_attr( ConfigurationFieldKey::PICKUP_LOCATION_ID ) . '][value]">';
+		echo '<option value="">' . esc_html__( 'Select a Pickup Location', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		foreach ( $field->selector_options ?? [] as $value => $label ) {
+			echo '<option value="' . esc_attr( (string) $value ) . '"' . selected( $selected, (string) $value, false ) . '>' . esc_html( (string) $label ) . '</option>';
+		}
+		echo '</select></p>';
+		echo '<p class="description">' . esc_html__( 'Store Pickup stays a fulfilment alternative. It is not a Delivery Option.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '</div></fieldset>';
+	}
+
 	private function render_options_control(
 		ScopedConfigurationEditViewModel $model,
 		bool $is_variation,
@@ -199,7 +251,7 @@ final class StaffDeliveryCustomizeView {
 			);
 
 		echo '<fieldset class="cetech-de-customize-field" data-field="' . esc_attr( ConfigurationFieldKey::DELIVERY_OFFER_IDS ) . '">';
-		echo '<legend>' . esc_html__( 'Delivery options', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
+		echo '<legend>' . esc_html__( 'Delivery Options', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
 		echo '<p><label><input type="radio" name="fields[' . esc_attr( ConfigurationFieldKey::DELIVERY_OFFER_IDS ) . '][mode]" value="inherit"' . checked( $current, 'inherit', false ) . ' /> ';
 		echo esc_html( $inherit_label ) . '</label></p>';
 		echo '<p><label><input type="radio" name="fields[' . esc_attr( ConfigurationFieldKey::DELIVERY_OFFER_IDS ) . '][mode]" value="replace"' . checked( $current, 'replace', false ) . ' /> ';
@@ -260,6 +312,15 @@ final class StaffDeliveryCustomizeView {
 		$key = (string) $value;
 		if ( is_array( $field->enum_options ) && isset( $field->enum_options[ $key ] ) ) {
 			return (string) $field->enum_options[ $key ];
+		}
+		if ( is_array( $field->selector_options ) ) {
+			$id = (int) $key;
+			if ( isset( $field->selector_options[ $id ] ) ) {
+				return (string) $field->selector_options[ $id ];
+			}
+			if ( isset( $field->selector_options[ $key ] ) ) {
+				return (string) $field->selector_options[ $key ];
+			}
 		}
 
 		return $key;
