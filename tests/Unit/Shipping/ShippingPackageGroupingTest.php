@@ -404,6 +404,12 @@ final class ShippingPackageGroupingTest extends TestCase {
 			public function resolve_zone_id( array $destination ): ?int {
 				return 20;
 			}
+
+			public function resolve_zone_ids( array $destination ): array {
+				$id = $this->resolve_zone_id( $destination );
+
+				return null === $id ? [] : [ $id ];
+			}
 		};
 
 		$rules = $this->createMock( ProductDeliveryRuleRepositoryInterface::class );

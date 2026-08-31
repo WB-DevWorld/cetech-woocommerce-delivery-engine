@@ -99,6 +99,8 @@ final class Stage13BR1AdminUxTest extends TestCase {
 		self::assertStringContainsString( "__( 'Back to Delivery Areas'", $areas );
 		self::assertStringContainsString( "__( 'Locations & delivery options'", $areas );
 		self::assertStringContainsString( "__( 'Test an address'", $areas );
+		self::assertStringContainsString( "__( 'Primary match:'", $areas );
+		self::assertStringContainsString( "__( 'Also matches:'", $areas );
 		self::assertStringContainsString( "__( 'Save Delivery Charge'", $charges );
 		self::assertStringNotContainsString( "__( 'Save Rate Card'", $charges );
 		self::assertStringContainsString( 'human_charge_name', $charges );

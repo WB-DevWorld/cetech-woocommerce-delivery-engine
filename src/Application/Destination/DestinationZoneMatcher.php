@@ -12,8 +12,21 @@ use CetechDeliveryEngine\Domain\Zone\DestinationZoneRepositoryInterface;
 
 /**
  * Runtime destination zone matcher using configured zones and rules.
+ *
+ * Returns one primary match for callers that still need a single area, and an
+ * ordered list of every matching active area for selected-offer pricing fallback.
  */
 final class DestinationZoneMatcher {
+
+	public const SPECIFICITY_FALLBACK = 0;
+
+	public const SPECIFICITY_COUNTRY = 1;
+
+	public const SPECIFICITY_REGION = 2;
+
+	public const SPECIFICITY_CITY = 3;
+
+	public const SPECIFICITY_POSTCODE = 4;
 
 	public function __construct(
 		private DestinationZoneRepositoryInterface $zone_repository,
@@ -24,7 +37,7 @@ final class DestinationZoneMatcher {
 	}
 
 	/**
-	 * @return array<string, mixed>|null Matched zone row or explicit active fallback zone.
+	 * @return array<string, mixed>|null Primary matched zone row or explicit active fallback zone.
 	 */
 	public function match(
 		string $country_code,
@@ -32,6 +45,25 @@ final class DestinationZoneMatcher {
 		string $city,
 		string $postcode
 	): ?array {
+		$matches = $this->match_all( $country_code, $region, $city, $postcode );
+
+		return $matches[0] ?? null;
+	}
+
+	/**
+	 * Every matching active Delivery Area, ordered by configured priority, then
+	 * geographic specificity (postcode > city > region > country > fallback),
+	 * then a deterministic name/code tie-break. Database creation order is not
+	 * a business ranking.
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	public function match_all(
+		string $country_code,
+		string $region,
+		string $city,
+		string $postcode
+	): array {
 		$country_code = strtoupper( trim( $country_code ) );
 		$region       = strtolower( trim( $region ) );
 		$city         = strtolower( trim( $city ) );
@@ -54,40 +86,108 @@ final class DestinationZoneMatcher {
 				continue;
 			}
 
+			$rules = $this->rule_repository->listByZoneId( $zone_id );
+
 			if ( ! empty( $zone['is_fallback'] ) ) {
 				$fallback = $zone;
 			}
-
-			$rules = $this->rule_repository->listByZoneId( $zone_id );
 
 			if ( [] === $rules ) {
 				continue;
 			}
 
 			if ( $this->zone_matches_address( $rules, $country_code, $region, $city, $postcode ) ) {
-				$candidates[] = $zone;
+				$candidates[] = [
+					'zone'         => $zone,
+					'specificity'  => self::geographic_specificity_rank( $rules, ! empty( $zone['is_fallback'] ) ),
+				];
 			}
 		}
 
 		if ( [] !== $candidates ) {
-			usort(
-				$candidates,
-				static function ( array $left, array $right ): int {
-					$left_priority  = (int) ( $left['priority'] ?? 100 );
-					$right_priority = (int) ( $right['priority'] ?? 100 );
+			usort( $candidates, [ $this, 'compare_candidates' ] );
 
-					if ( $left_priority === $right_priority ) {
-						return (int) ( $left['id'] ?? 0 ) <=> (int) ( $right['id'] ?? 0 );
-					}
+			$ordered = [];
 
-					return $left_priority <=> $right_priority;
-				}
-			);
+			foreach ( $candidates as $candidate ) {
+				$ordered[] = $candidate['zone'];
+			}
 
-			return $candidates[0];
+			return $ordered;
 		}
 
-		return $fallback;
+		return null !== $fallback ? [ $fallback ] : [];
+	}
+
+	/**
+	 * Highest geographic rank represented by the zone's rules.
+	 *
+	 * @param list<array<string, mixed>> $rules
+	 */
+	public static function geographic_specificity_rank( array $rules, bool $is_fallback = false ): int {
+		if ( $is_fallback ) {
+			return self::SPECIFICITY_FALLBACK;
+		}
+
+		$rank = self::SPECIFICITY_FALLBACK;
+
+		foreach ( $rules as $rule ) {
+			$rank = max(
+				$rank,
+				match ( (string) ( $rule['rule_type'] ?? '' ) ) {
+					DestinationRuleType::Postcode->value => self::SPECIFICITY_POSTCODE,
+					DestinationRuleType::City->value => self::SPECIFICITY_CITY,
+					DestinationRuleType::Region->value => self::SPECIFICITY_REGION,
+					DestinationRuleType::Country->value => self::SPECIFICITY_COUNTRY,
+					default => self::SPECIFICITY_FALLBACK,
+				}
+			);
+		}
+
+		return $rank;
+	}
+
+	/**
+	 * @param array{zone: array<string, mixed>, specificity: int} $left
+	 * @param array{zone: array<string, mixed>, specificity: int} $right
+	 */
+	private function compare_candidates( array $left, array $right ): int {
+		$left_zone  = $left['zone'];
+		$right_zone = $right['zone'];
+
+		$left_priority  = (int) ( $left_zone['priority'] ?? 100 );
+		$right_priority = (int) ( $right_zone['priority'] ?? 100 );
+
+		if ( $left_priority !== $right_priority ) {
+			return $left_priority <=> $right_priority;
+		}
+
+		$left_specificity  = (int) ( $left['specificity'] ?? self::SPECIFICITY_FALLBACK );
+		$right_specificity = (int) ( $right['specificity'] ?? self::SPECIFICITY_FALLBACK );
+
+		if ( $left_specificity !== $right_specificity ) {
+			return $right_specificity <=> $left_specificity;
+		}
+
+		$name = strnatcasecmp(
+			(string) ( $left_zone['internal_name'] ?? $left_zone['public_label'] ?? '' ),
+			(string) ( $right_zone['internal_name'] ?? $right_zone['public_label'] ?? '' )
+		);
+
+		if ( 0 !== $name ) {
+			return $name;
+		}
+
+		$code = strnatcasecmp(
+			(string) ( $left_zone['internal_code'] ?? '' ),
+			(string) ( $right_zone['internal_code'] ?? '' )
+		);
+
+		if ( 0 !== $code ) {
+			return $code;
+		}
+
+		return (int) ( $left_zone['id'] ?? 0 ) <=> (int) ( $right_zone['id'] ?? 0 );
 	}
 
 	/**

@@ -90,9 +90,9 @@ final class SelectedOfferShippingRateCalculator {
 		}
 
 		$destination = is_array( $package['destination'] ?? null ) ? $package['destination'] : [];
-		$zone_id     = $this->destination_resolver->resolve_zone_id( $destination );
+		$zone_ids    = $this->destination_resolver->resolve_zone_ids( $destination );
 
-		if ( null === $zone_id ) {
+		if ( [] === $zone_ids ) {
 			return SelectedOfferShippingRateResult::blocked( self::BLOCK_DESTINATION_UNRESOLVED );
 		}
 
@@ -109,20 +109,21 @@ final class SelectedOfferShippingRateCalculator {
 		}
 
 		if ( is_array( $meta ) && ! empty( $meta['managed'] ) ) {
-			return $this->calculate_managed_group( $contents, $meta, $zone_id, $currency_code );
+			return $this->calculate_managed_group( $contents, $meta, $zone_ids, $currency_code );
 		}
 
-		return $this->calculate_legacy_sum( $contents, $zone_id, $currency_code );
+		return $this->calculate_legacy_sum( $contents, $zone_ids, $currency_code );
 	}
 
 	/**
 	 * @param array<string, mixed> $contents
 	 * @param array<string, mixed> $meta
+	 * @param list<int>            $zone_ids
 	 */
 	private function calculate_managed_group(
 		array $contents,
 		array $meta,
-		int $zone_id,
+		array $zone_ids,
 		string $currency_code
 	): SelectedOfferShippingRateResult {
 		$expected_group = isset( $meta['group_id'] ) ? (string) $meta['group_id'] : '';
@@ -181,40 +182,22 @@ final class SelectedOfferShippingRateCalculator {
 		$request_item   = $representative['cart_item'];
 		$request_item['quantity'] = $total_quantity;
 
-		$request = $this->build_quote_request(
+		return $this->quote_selected_offer_against_matched_zones(
 			$request_item,
 			$representative['intent'],
-			$zone_id,
-			$currency_code
+			$zone_ids,
+			$currency_code,
+			'Selected-offer shipping quote blocked for delivery group.'
 		);
-
-		if ( null === $request ) {
-			return SelectedOfferShippingRateResult::blocked( self::BLOCK_NO_QUOTABLE_LINES );
-		}
-
-		$quote_result = $this->quote_engine->quote( $request );
-
-		if ( ! $quote_result->success || null === $quote_result->amount ) {
-			$this->logger->info(
-				'Selected-offer shipping quote blocked for delivery group.',
-				[
-					'block_reason' => self::BLOCK_QUOTE_FAILED,
-					'error_code'   => $quote_result->error_code,
-				]
-			);
-
-			return SelectedOfferShippingRateResult::blocked( self::BLOCK_QUOTE_FAILED );
-		}
-
-		return SelectedOfferShippingRateResult::quoted( $quote_result->amount->amount(), $currency_code );
 	}
 
 	/**
 	 * @param array<string, mixed> $contents
+	 * @param list<int>            $zone_ids
 	 */
 	private function calculate_legacy_sum(
 		array $contents,
-		int $zone_id,
+		array $zone_ids,
 		string $currency_code
 	): SelectedOfferShippingRateResult {
 		$total_amount = '0.0000';
@@ -241,27 +224,23 @@ final class SelectedOfferShippingRateCalculator {
 				return SelectedOfferShippingRateResult::blocked( self::BLOCK_LINE_INVALID );
 			}
 
-			$request = $this->build_quote_request( $cart_item, $intent, $zone_id, $currency_code );
+			$line_quote = $this->quote_selected_offer_against_matched_zones(
+				$cart_item,
+				$intent,
+				$zone_ids,
+				$currency_code,
+				'Selected-offer shipping quote blocked for package line.'
+			);
 
-			if ( null === $request ) {
-				continue;
+			if ( ! $line_quote->success || null === $line_quote->total_amount ) {
+				if ( self::BLOCK_NO_QUOTABLE_LINES === $line_quote->block_reason ) {
+					continue;
+				}
+
+				return $line_quote;
 			}
 
-			$quote_result = $this->quote_engine->quote( $request );
-
-			if ( ! $quote_result->success || null === $quote_result->amount ) {
-				$this->logger->info(
-					'Selected-offer shipping quote blocked for package line.',
-					[
-						'block_reason' => self::BLOCK_QUOTE_FAILED,
-						'error_code'   => $quote_result->error_code,
-					]
-				);
-
-				return SelectedOfferShippingRateResult::blocked( self::BLOCK_QUOTE_FAILED );
-			}
-
-			$total_amount = $this->add_amounts( $total_amount, $quote_result->amount->amount() );
+			$total_amount = $this->add_amounts( $total_amount, $line_quote->total_amount );
 			++$quoted_lines;
 		}
 
@@ -270,6 +249,71 @@ final class SelectedOfferShippingRateCalculator {
 		}
 
 		return SelectedOfferShippingRateResult::quoted( $total_amount, $currency_code );
+	}
+
+	/**
+	 * Quote the same selected offer against ordered matched areas.
+	 * Continues to a broader area only when the current area has no matching
+	 * rate card. Any other quote error remains fail-closed.
+	 *
+	 * @param array<string, mixed> $cart_item
+	 * @param array<string, mixed> $intent
+	 * @param list<int>            $zone_ids
+	 */
+	private function quote_selected_offer_against_matched_zones(
+		array $cart_item,
+		array $intent,
+		array $zone_ids,
+		string $currency_code,
+		string $log_message
+	): SelectedOfferShippingRateResult {
+		$last_error = RateQuoteEngine::ERROR_NO_MATCHING_RATE_CARD;
+		$attempted  = false;
+
+		foreach ( $zone_ids as $zone_id ) {
+			$request = $this->build_quote_request( $cart_item, $intent, $zone_id, $currency_code );
+
+			if ( null === $request ) {
+				continue;
+			}
+
+			$attempted    = true;
+			$quote_result = $this->quote_engine->quote( $request );
+
+			if ( $quote_result->success && null !== $quote_result->amount ) {
+				return SelectedOfferShippingRateResult::quoted( $quote_result->amount->amount(), $currency_code );
+			}
+
+			$last_error = (string) ( $quote_result->error_code ?? self::BLOCK_QUOTE_FAILED );
+
+			if ( RateQuoteEngine::ERROR_NO_MATCHING_RATE_CARD !== $last_error ) {
+				$this->logger->info(
+					$log_message,
+					[
+						'block_reason'        => self::BLOCK_QUOTE_FAILED,
+						'error_code'          => $last_error,
+						'destination_zone_id' => $zone_id,
+						'delivery_offer_id'   => $request->delivery_offer_id,
+					]
+				);
+
+				return SelectedOfferShippingRateResult::blocked( self::BLOCK_QUOTE_FAILED );
+			}
+		}
+
+		if ( ! $attempted ) {
+			return SelectedOfferShippingRateResult::blocked( self::BLOCK_NO_QUOTABLE_LINES );
+		}
+
+		$this->logger->info(
+			$log_message,
+			[
+				'block_reason' => self::BLOCK_QUOTE_FAILED,
+				'error_code'   => $last_error,
+			]
+		);
+
+		return SelectedOfferShippingRateResult::blocked( self::BLOCK_QUOTE_FAILED );
 	}
 
 	/**

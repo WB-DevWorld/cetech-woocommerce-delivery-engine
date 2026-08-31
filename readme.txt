@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-dev.blocks.2
+Stable tag: 1.0.0-dev.blocks.3
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,9 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-dev.blocks.3 =
+* Matched Delivery Area pricing fallback: a selected Delivery Option can use a broader matching area when the more-specific area has no rate card. Invalid specific-area rates stay fail-closed. Schema remains 5.
 
 = 1.0.0-dev.blocks.2 =
 * Blocks mixed Delivery + Pickup: a valid GHS 0 Store Pickup quote is no longer treated as a missing Delivery Engine rate. Fail-closed remains for unquoted managed Delivery packages. Schema remains 5.

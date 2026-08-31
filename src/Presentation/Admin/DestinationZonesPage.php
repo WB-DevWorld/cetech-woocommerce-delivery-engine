@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Configuration\Admin\StoreAwareExamples;
+use CetechDeliveryEngine\Application\Destination\OverlappingDeliveryAreaCoverage;
 use CetechDeliveryEngine\Application\Destination\WooCommerceCountryCatalog;
 use CetechDeliveryEngine\Domain\Enum\DestinationRuleMatchMode;
 use CetechDeliveryEngine\Domain\Enum\DestinationRuleType;
@@ -109,6 +110,14 @@ final class DestinationZonesPage {
 			}
 		}
 
+		$coverage   = new OverlappingDeliveryAreaCoverage(
+			$this->zone_repository,
+			$this->rule_repository,
+			$this->rate_card_repository
+		);
+		$uncovered  = $coverage->uncovered_zone_ids();
+		$overlap_warnings = $coverage->warnings();
+
 		AdminPageLayout::render_summary_stats(
 			[
 				[
@@ -124,10 +133,25 @@ final class DestinationZonesPage {
 			]
 		);
 
-		if ( $zones_without_rates > 0 ) {
+		if ( $coverage->has_nested_overlaps() ) {
+			AdminPageLayout::render_info_notice(
+				__( 'Some delivery areas overlap. A more-specific area such as a city is used first. If that area has no charge for the selected Delivery Option, pricing can use the broader matching area. A different Delivery Option is never substituted.', 'cetech-woocommerce-delivery-engine' )
+			);
+		}
+
+		foreach ( $overlap_warnings as $warning ) {
+			AdminPageLayout::render_warning(
+				(string) $warning['title'],
+				(string) $warning['message'],
+				__( 'Manage delivery charges', 'cetech-woocommerce-delivery-engine' ),
+				AdminPageRenderer::list_url( RateCardsPage::SLUG )
+			);
+		}
+
+		if ( [] !== $uncovered ) {
 			AdminPageLayout::render_warning(
 				__( 'Some delivery areas have no delivery charges', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Customers may not see delivery prices for these areas until you add delivery charges that match each area.', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Customers may not see delivery prices for these areas until you add delivery charges that match each area. Broader overlapping areas are already considered before this warning is shown.', 'cetech-woocommerce-delivery-engine' ),
 				__( 'Manage delivery charges', 'cetech-woocommerce-delivery-engine' ),
 				AdminPageRenderer::list_url( RateCardsPage::SLUG )
 			);
@@ -197,7 +221,7 @@ final class DestinationZonesPage {
 
 		echo '<h3>' . esc_html__( 'Test an address', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
 		echo '<p class="description">' . esc_html__(
-			'Enter a sample address to see which delivery area would match. Read-only — does not change data or prices.',
+			'Enter a sample address to see which delivery areas would match. Read-only — does not change data or prices.',
 			'cetech-woocommerce-delivery-engine'
 		) . '</p>';
 
@@ -230,9 +254,19 @@ final class DestinationZonesPage {
 		echo '</form>';
 
 		if ( is_array( $draft ) && isset( $draft['test_result'] ) ) {
-			echo '<p><strong>' . esc_html__( 'Result:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
+			echo '<p><strong>' . esc_html__( 'Primary match:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
 			echo esc_html( (string) $draft['test_result'] );
 			echo '</p>';
+
+			if ( ! empty( $draft['test_also'] ) ) {
+				echo '<p><strong>' . esc_html__( 'Also matches:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
+				echo esc_html( (string) $draft['test_also'] );
+				echo '</p>';
+				echo '<p class="description">' . esc_html__(
+					'Pricing can use a charge from a broader matching Delivery Area when the selected Delivery Option has no charge in the more-specific area. A different Delivery Option is never substituted.',
+					'cetech-woocommerce-delivery-engine'
+				) . '</p>';
+			}
 		}
 	}
 
@@ -700,21 +734,32 @@ final class DestinationZonesPage {
 			'test_postcode'     => isset( $_POST['test_postcode'] ) ? wp_unslash( (string) $_POST['test_postcode'] ) : '',
 		];
 
-		$matched = $this->test_matcher->match(
+		$matched = $this->test_matcher->match_all(
 			$input['test_country_code'],
 			$input['test_region'],
 			$input['test_city'],
 			$input['test_postcode']
 		);
 
-		if ( null === $matched ) {
+		if ( [] === $matched ) {
 			$input['test_result'] = __( 'No matching delivery area.', 'cetech-woocommerce-delivery-engine' );
 		} else {
-			$input['test_result'] = sprintf(
-				/* translators: 1: area name */
-				__( 'Matched delivery area: %s', 'cetech-woocommerce-delivery-engine' ),
-				(string) ( $matched['public_label'] ?? $matched['internal_name'] ?? '' )
-			);
+			$primary = $matched[0];
+			$input['test_result'] = (string) ( $primary['public_label'] ?? $primary['internal_name'] ?? '' );
+
+			$also = [];
+
+			foreach ( array_slice( $matched, 1 ) as $extra ) {
+				$label = trim( (string) ( $extra['public_label'] ?? $extra['internal_name'] ?? '' ) );
+
+				if ( '' !== $label ) {
+					$also[] = $label;
+				}
+			}
+
+			if ( [] !== $also ) {
+				$input['test_also'] = implode( ', ', $also );
+			}
 		}
 
 		$this->action_handler->notices()->stash_form_draft( self::SLUG . '_test', $input );

@@ -17,7 +17,7 @@ final class DestinationZoneTestMatcher {
 	}
 
 	/**
-	 * @return array<string, mixed>|null Matched zone row or null.
+	 * @return array<string, mixed>|null Primary matched zone row or null.
 	 */
 	public function match(
 		string $country_code,
@@ -26,5 +26,17 @@ final class DestinationZoneTestMatcher {
 		string $postcode
 	): ?array {
 		return $this->zone_matcher->match( $country_code, $region, $city, $postcode );
+	}
+
+	/**
+	 * @return list<array<string, mixed>>
+	 */
+	public function match_all(
+		string $country_code,
+		string $region,
+		string $city,
+		string $postcode
+	): array {
+		return $this->zone_matcher->match_all( $country_code, $region, $city, $postcode );
 	}
 }

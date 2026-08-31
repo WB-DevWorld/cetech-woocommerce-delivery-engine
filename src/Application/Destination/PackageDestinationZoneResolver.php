@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Application\Destination;
 
 /**
- * Resolves a destination zone ID from a WooCommerce shipping package destination.
+ * Resolves destination zone IDs from a WooCommerce shipping package destination.
  */
 final class PackageDestinationZoneResolver implements PackageDestinationZoneResolverInterface {
 
@@ -18,19 +18,34 @@ final class PackageDestinationZoneResolver implements PackageDestinationZoneReso
 	 * @param array<string, mixed> $destination WooCommerce package destination.
 	 */
 	public function resolve_zone_id( array $destination ): ?int {
-		$zone = $this->zone_matcher->match(
+		$ids = $this->resolve_zone_ids( $destination );
+
+		return $ids[0] ?? null;
+	}
+
+	/**
+	 * @param array<string, mixed> $destination WooCommerce package destination.
+	 *
+	 * @return list<int>
+	 */
+	public function resolve_zone_ids( array $destination ): array {
+		$zones = $this->zone_matcher->match_all(
 			(string) ( $destination['country'] ?? '' ),
 			(string) ( $destination['state'] ?? '' ),
 			(string) ( $destination['city'] ?? '' ),
 			(string) ( $destination['postcode'] ?? '' )
 		);
 
-		if ( null === $zone ) {
-			return null;
+		$ids = [];
+
+		foreach ( $zones as $zone ) {
+			$zone_id = (int) ( $zone['id'] ?? 0 );
+
+			if ( $zone_id > 0 ) {
+				$ids[] = $zone_id;
+			}
 		}
 
-		$zone_id = (int) ( $zone['id'] ?? 0 );
-
-		return $zone_id > 0 ? $zone_id : null;
+		return $ids;
 	}
 }

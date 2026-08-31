@@ -18,6 +18,7 @@ use CetechDeliveryEngine\Presentation\Frontend\CustomerOrderDeliverySummaryRende
 use CetechDeliveryEngine\Application\RateQuote\RateQuoteEngine;
 use CetechDeliveryEngine\Application\Shipping\ShippingRateCalculationGate;
 use CetechDeliveryEngine\Application\Destination\DestinationZoneMatcher;
+use CetechDeliveryEngine\Application\Destination\OverlappingDeliveryAreaCoverage;
 use CetechDeliveryEngine\Application\Destination\PackageDestinationZoneResolver;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
@@ -346,6 +347,25 @@ final class ConfigurationHealthChecker {
 					sprintf( 'match_mode=%s', $match_mode )
 				);
 			}
+		}
+
+		$overlap = new OverlappingDeliveryAreaCoverage(
+			$this->destination_zone_repository,
+			$this->destination_rule_repository,
+			$this->rate_card_repository
+		);
+
+		foreach ( $overlap->warnings() as $warning ) {
+			$this->add(
+				$diagnostics,
+				DiagnosticSeverity::Warning,
+				(string) $warning['code'],
+				(string) $warning['title'],
+				(string) $warning['message'],
+				'destination_zone',
+				(int) $warning['zone_id'],
+				(string) $warning['details']
+			);
 		}
 
 		foreach ( $this->pickup_location_repository->list( [ 'limit' => self::LIST_LIMIT ] ) as $location ) {
