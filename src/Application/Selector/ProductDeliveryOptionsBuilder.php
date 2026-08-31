@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Selector;
 
+use CetechDeliveryEngine\Application\Pickup\PickupLocationAddressFormatter;
 use CetechDeliveryEngine\Application\ProductRule\ProductRuleResolutionResult;
 use CetechDeliveryEngine\Application\ProductRule\ResolvedProductDeliveryRule;
 use CetechDeliveryEngine\Domain\DeliveryOffer\DeliveryOfferRepositoryInterface;
@@ -301,7 +302,9 @@ final class ProductDeliveryOptionsBuilder {
 				$location_label = $name;
 			}
 
-			$address_text = trim( (string) ( $location['public_address'] ?? '' ) );
+			$address_text = PickupLocationAddressFormatter::format(
+				(string) ( $location['public_address'] ?? '' )
+			);
 
 			if ( '' !== $address_text ) {
 				$address = $address_text;

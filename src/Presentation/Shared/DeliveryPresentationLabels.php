@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Shared;
 
+use CetechDeliveryEngine\Application\Pickup\PickupLocationAddressFormatter;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 
 /**
@@ -142,6 +143,10 @@ final class DeliveryPresentationLabels {
 				] as $field => $label
 			) {
 				$value = trim( (string) ( $summary[ $field ] ?? '' ) );
+
+				if ( 'pickup_address' === $field ) {
+					$value = PickupLocationAddressFormatter::format( $value );
+				}
 
 				if ( '' === $value ) {
 					continue;

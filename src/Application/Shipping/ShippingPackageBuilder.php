@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Application\Shipping;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionSessionData;
+use CetechDeliveryEngine\Application\Pickup\PickupLocationAddressFormatter;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 
 /**
@@ -163,6 +164,18 @@ final class ShippingPackageBuilder {
 		$offer_label = is_array( $summary )
 			? trim( (string) ( $summary['delivery_offer_public_label'] ?? '' ) )
 			: '';
+		$pickup_location = is_array( $summary )
+			? trim( (string) ( $summary['pickup_location_label'] ?? '' ) )
+			: '';
+		$pickup_address = is_array( $summary )
+			? PickupLocationAddressFormatter::format( (string) ( $summary['pickup_address'] ?? '' ) )
+			: '';
+		$estimate = is_array( $summary )
+			? trim( (string) ( $summary['estimate_text'] ?? '' ) )
+			: '';
+		$instructions = is_array( $summary )
+			? trim( (string) ( $summary['pickup_instructions'] ?? $summary['pickup_public_instructions'] ?? '' ) )
+			: '';
 
 		$package[ DeliveryGroupIdentity::PACKAGE_META_KEY ] = [
 			'managed'                 => true,
@@ -172,6 +185,10 @@ final class ShippingPackageBuilder {
 			'delivery_offer_id'       => $offer_id > 0 ? $offer_id : null,
 			'is_pickup'               => $is_pickup,
 			'offer_public_label'      => '' !== $offer_label ? $offer_label : null,
+			'pickup_location_label'   => '' !== $pickup_location ? $pickup_location : null,
+			'pickup_address'          => '' !== $pickup_address ? $pickup_address : null,
+			'estimate_text'           => '' !== $estimate ? $estimate : null,
+			'pickup_instructions'     => '' !== $instructions ? $instructions : null,
 			'display_index'           => null,
 			// Stage 13F: genuine WC shipping rate label uses the selected public option label.
 			'rate_label'              => $this->customer_rate_label( $is_pickup, $offer_label, null ),

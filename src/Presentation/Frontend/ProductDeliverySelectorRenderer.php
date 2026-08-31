@@ -7,6 +7,7 @@ namespace CetechDeliveryEngine\Presentation\Frontend;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryRuntimeConfigurationRouter;
+use CetechDeliveryEngine\Application\Pickup\PickupLocationAddressFormatter;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
@@ -398,8 +399,11 @@ final class ProductDeliverySelectorRenderer {
 		}
 
 		if ( null !== $option->pickup_address && '' !== $option->pickup_address ) {
-			echo '<p class="cetech-de-pickup-details__row"><span class="cetech-de-pickup-details__label">' . esc_html( DeliveryPresentationLabels::pickup_address() ) . '</span> ';
-			echo '<span class="cetech-de-pickup-details__value">' . esc_html( $option->pickup_address ) . '</span></p>';
+			$address = PickupLocationAddressFormatter::format( $option->pickup_address );
+			if ( '' !== $address ) {
+				echo '<p class="cetech-de-pickup-details__row"><span class="cetech-de-pickup-details__label">' . esc_html( DeliveryPresentationLabels::pickup_address() ) . '</span> ';
+				echo '<span class="cetech-de-pickup-details__value">' . esc_html( $address ) . '</span></p>';
+			}
 		}
 
 		if ( null !== $option->estimate_text && '' !== trim( $option->estimate_text ) ) {

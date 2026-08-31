@@ -154,6 +154,7 @@ use CetechDeliveryEngine\Presentation\Admin\SuppliersOriginsPage;
 use CetechDeliveryEngine\Presentation\Admin\DeliverySettingsPage;
 use CetechDeliveryEngine\Presentation\Admin\SystemStatusPage;
 use CetechDeliveryEngine\Presentation\Email\CustomerOrderDeliveryEmailSummaryRenderer;
+use CetechDeliveryEngine\Presentation\Frontend\CartFulfilmentPackagePresentation;
 use CetechDeliveryEngine\Presentation\Frontend\CustomerOrderDeliverySummaryRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\CustomerShipmentRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\ProductDeliverySelectorRenderer;
@@ -298,6 +299,7 @@ final class Plugin {
 		$this->container->get( CartDeliverySelectionRevalidator::class )->register();
 		$this->container->get( CheckoutDeliverySelectionValidator::class )->register();
 		$this->container->get( ShippingPackageBuilder::class )->register();
+		$this->container->get( CartFulfilmentPackagePresentation::class )->register();
 		$this->container->get( SelectedOfferShippingIntegration::class )->register();
 		$this->container->get( OrderDeliverySnapshotPersister::class )->register();
 		$this->container->get( PaidOrderShipmentSubscriber::class )->register();
@@ -638,6 +640,11 @@ final class Plugin {
 				$container->get( ShippingRateCalculationGate::class ),
 				$container->get( CartDeliverySelectionCapture::class )
 			)
+		);
+
+		$this->container->singleton(
+			CartFulfilmentPackagePresentation::class,
+			static fn (): CartFulfilmentPackagePresentation => new CartFulfilmentPackagePresentation()
 		);
 
 		$this->container->singleton(
