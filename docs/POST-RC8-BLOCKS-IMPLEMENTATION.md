@@ -1,13 +1,13 @@
 # POST-RC.8 Settings Honesty + Cart/Checkout Blocks Implementation
 
-**Document status:** Implementation + test record. **Not packaged.**  
+**Document status:** Implementation + packaged owner-QA ZIP. Physical QA pending.  
 **Date:** 2026-08-31  
 **Branch:** `feat/post-rc8-integrations`  
 **Protected baseline:** tagged `1.0.0-rc.8` / schema `5` / `v1.0.0-rc.8` — **immutable; do not retag**  
 **Development identity:** `1.0.0-dev.blocks.1`  
 **Schema target:** `5` (unchanged; schema 6 was not required)  
 **FLAIROC:** not modified  
-**Package:** not built. Do not package until authorised.  
+**Package:** `cetech-woocommerce-delivery-engine-1.0.0-dev.blocks.1.zip` — see `docs/POST-RC8-BLOCKS-QA.md`. Not RC.9. Not deployed to FLAIROC.  
 **Audit accepted:** `docs/POST-RC8-INTEGRATIONS-COMPATIBILITY-AUDIT.md` §15  
 
 ```text
@@ -326,7 +326,7 @@ Cursor must not install the plugin on FLAIROC or training. Packaging is not auth
 - Blocks client pickup notes depend on Store API extensions; if WooCommerce removes `ExperimentalOrderShippingPackages`, notes may degrade while server rates/validation remain.
 - Mini-cart / catalog AJAX add-to-cart without Store API extension data is not a new capture path.
 - Schema remains 5. No schema 6. No RC.9. No Stage 15. No Return/Refund. No carrier APIs. No unrelated Bulk work.
-- This identity is **not packaged**. Source-tree package verification is expected to fail while `/tests` and PHPUnit remain.
+- This identity is packaged as `1.0.0-dev.blocks.1` for owner QA. Physical QA on training is pending.
 
 ---
 
@@ -408,4 +408,4 @@ Audit document `docs/POST-RC8-INTEGRATIONS-COMPATIBILITY-AUDIT.md` is unchanged 
 
 ## STOP
 
-Implementation and automated tests are complete. **Do not package until authorised.** Do not begin Stage 15. Do not modify FLAIROC. Do not retag `v1.0.0-rc.8`.
+Implementation, automated tests, and the owner-QA ZIP are complete. **Do not create RC.9 until physical QA is accepted.** Do not begin Stage 15. Do not modify FLAIROC. Do not retag `v1.0.0-rc.8`.
