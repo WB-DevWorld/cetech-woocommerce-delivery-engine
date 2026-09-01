@@ -127,6 +127,7 @@ final class PluginBootServiceGraphTest extends TestCase {
 			\CetechDeliveryEngine\Presentation\Admin\OverviewPage::class,
 			\CetechDeliveryEngine\Presentation\Admin\SetupWizardPage::class,
 			\CetechDeliveryEngine\Presentation\Admin\ProductDeliveryPanel::class,
+			\CetechDeliveryEngine\Integrations\WCFM\WcfmVendorIsolation::class,
 		];
 
 		foreach ( $eager_ids as $id ) {

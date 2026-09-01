@@ -68,7 +68,7 @@ final class FeatureFlagLabels {
 			],
 			'enable_wcfm_adapter' => [
 				'label'       => 'WCFM marketplace adapter',
-				'description' => 'Optional WCFM compatibility. No adapter is implemented in this release.',
+				'description' => 'Reserved stored key. WCFM administrative isolation is automatic when WCFM is present and cannot be turned off. Vendor fulfilment screens are not provided.',
 			],
 			'enable_vitepos_adapter' => [
 				'label'       => 'Vitepos adapter',
