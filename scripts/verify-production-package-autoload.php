@@ -638,8 +638,8 @@ if ( '' !== $caps_source ) {
 	if ( ! str_contains( $caps_source, "const VIEW = 'view_delivery_engine'" ) ) {
 		$failures[] = 'Capabilities missing view_delivery_engine.';
 	}
-	if ( ! str_contains( $caps_source, 'const VERSION = 3' ) ) {
-		$failures[] = 'Capabilities VERSION is not 3 in the packaged plugin.';
+	if ( ! str_contains( $caps_source, 'const VERSION = 4' ) ) {
+		$failures[] = 'Capabilities VERSION is not 4 in the packaged plugin.';
 	}
 	if ( ! str_contains( $caps_source, 'administrator_missing_required_capabilities' ) ) {
 		$failures[] = 'Capabilities missing administrator_missing_required_capabilities() self-heal probe.';
