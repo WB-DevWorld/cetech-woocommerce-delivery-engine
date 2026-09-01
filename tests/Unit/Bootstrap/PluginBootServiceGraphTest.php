@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Tests\Unit\Bootstrap;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
+use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionReconciler;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
+use CetechDeliveryEngine\Application\Cart\CartDeliveryReselectionService;
 use CetechDeliveryEngine\Application\Checkout\CheckoutDeliverySelectionValidator;
 use CetechDeliveryEngine\Application\Diagnostics\ConfigurationHealthChecker;
 use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotPersister;
@@ -103,7 +105,10 @@ final class PluginBootServiceGraphTest extends TestCase {
 			VariableDeliverySelectorAssets::class,
 			VariationDeliveryOptionsEndpoint::class,
 			CartDeliverySelectionCapture::class,
+			CartDeliverySelectionReconciler::class,
 			CartDeliverySelectionRevalidator::class,
+			CartDeliveryReselectionService::class,
+			\CetechDeliveryEngine\Presentation\Frontend\CartDeliveryReselectionRenderer::class,
 			CheckoutDeliverySelectionValidator::class,
 			ShippingPackageBuilder::class,
 			SelectedOfferShippingIntegration::class,

@@ -195,7 +195,7 @@ final class BlocksCheckoutValidation {
 
 	private function stale_choice_message(): string {
 		return __(
-			'A delivery option in your cart is no longer available. Please return to your cart and update the affected product.',
+			'Delivery options for an item in your cart have changed. Please return to your cart and choose a delivery option. You do not need to remove the product.',
 			'cetech-woocommerce-delivery-engine'
 		);
 	}

@@ -149,21 +149,137 @@
 		});
 	}
 
+	function itemExtension(item) {
+		if (!item || !item.extensions) {
+			return {};
+		}
+		return item.extensions[NAMESPACE] || {};
+	}
+
+	function itemsNeedingReselection(cart) {
+		var items = (cart && cart.items) || [];
+		return items
+			.filter(function (item) {
+				return itemExtension(item).needs_reselection;
+			})
+			.map(function (item) {
+				var ext = itemExtension(item);
+				return {
+					key: ext.cart_item_key || item.key,
+					name: ext.product_name || item.name || '',
+					message: ext.reselection_message || '',
+					options: ext.reselection_options || []
+				};
+			});
+	}
+
+	function submitReselection(cartItemKey, displayKey) {
+		var blocksCheckout = (window.wc && window.wc.blocksCheckout) || {};
+		if (typeof blocksCheckout.extensionCartUpdate !== 'function' || !cartItemKey || !displayKey) {
+			return;
+		}
+		blocksCheckout.extensionCartUpdate({
+			namespace: NAMESPACE,
+			data: {
+				cart_item_key: cartItemKey,
+				display_key: displayKey
+			}
+		});
+	}
+
+	function registerReselectionPanel() {
+		var wp = window.wp || {};
+		var plugins = wp.plugins || {};
+		var element = wp.element || {};
+		var createElement = element.createElement;
+		var registerPlugin = plugins.registerPlugin;
+		var i18n = (window.cetechDeBlocks && window.cetechDeBlocks.i18n) || {};
+
+		if (!registerPlugin || !createElement) {
+			return;
+		}
+
+		function ReselectionPanel() {
+			var needing = itemsNeedingReselection(getCartData());
+			if (!needing.length) {
+				return null;
+			}
+
+			return createElement(
+				'div',
+				{ className: 'cetech-de-blocks-reselection' },
+				needing.map(function (item) {
+					return createElement(
+						'div',
+						{ key: item.key, className: 'cetech-de-blocks-reselection__item' },
+						createElement('p', { className: 'cetech-de-blocks-reselection__message' }, item.message),
+						createElement(
+							'label',
+							null,
+							i18n.choose || 'Choose a delivery option',
+							createElement(
+								'select',
+								{
+									defaultValue: '',
+									onChange: function (event) {
+										item._selected = event.target.value;
+									}
+								},
+								createElement('option', { value: '' }, i18n.choose || 'Choose a delivery option'),
+								item.options.map(function (option) {
+									return createElement(
+										'option',
+										{ key: option.display_key, value: option.display_key },
+										option.estimate_text
+											? option.label + ' — ' + option.estimate_text
+											: option.label
+									);
+								})
+							)
+						),
+						createElement(
+							'button',
+							{
+								type: 'button',
+								className: 'wc-block-components-button',
+								onClick: function () {
+									submitReselection(item.key, item._selected || '');
+								}
+							},
+							i18n.update || 'Update delivery option'
+						)
+					);
+				})
+			);
+		}
+
+		['woocommerce-checkout', 'woocommerce-cart'].forEach(function (scope) {
+			registerPlugin('cetech-de-blocks-reselection-' + scope, {
+				render: ReselectionPanel,
+				scope: scope
+			});
+		});
+	}
+
 	window.CetechDeBlocksCheckout = {
 		apply: apply,
 		getExtensions: getExtensions,
 		pickupPackages: pickupPackages,
+		itemsNeedingReselection: itemsNeedingReselection,
+		submitReselection: submitReselection,
 		namespace: NAMESPACE
 	};
 
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', function () {
 			registerSlotFill();
+			registerReselectionPanel();
 			subscribe();
 			apply();
 		});
 	} else {
 		registerSlotFill();
+		registerReselectionPanel();
 		subscribe();
 		apply();
 	}

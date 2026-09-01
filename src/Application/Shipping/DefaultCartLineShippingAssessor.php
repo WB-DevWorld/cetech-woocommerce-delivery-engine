@@ -44,6 +44,13 @@ final class DefaultCartLineShippingAssessor implements CartLineShippingAssessorI
 				];
 			}
 
+			if ( ! empty( $cart_item[ CartDeliverySelectionCapture::CART_NEEDS_RESELECTION_KEY ] ) ) {
+				return [
+					'action' => 'block',
+					'reason' => SelectedOfferShippingRateCalculator::BLOCK_LINE_INVALID,
+				];
+			}
+
 			$revalidation = $this->cart_revalidator->revalidate_cart_item( $cart_item_key, $cart_item );
 
 			if ( CartDeliverySelectionRevalidationResult::STATUS_VALID !== $revalidation->status ) {

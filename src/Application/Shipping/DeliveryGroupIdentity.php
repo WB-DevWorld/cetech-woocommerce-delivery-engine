@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Application\Shipping;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionSessionData;
+use CetechDeliveryEngine\Application\Cart\CartLineCustomerIdentity;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 
 /**
@@ -72,7 +73,23 @@ final class DeliveryGroupIdentity {
 			return null;
 		}
 
-		return self::fromIntent( $intent );
+		$base = self::fromIntent( $intent );
+
+		if ( null === $base ) {
+			return null;
+		}
+
+		if ( ! empty( $cart_item[ CartDeliverySelectionCapture::CART_NEEDS_RESELECTION_KEY ] ) ) {
+			return $base . '|reselect';
+		}
+
+		$location = CartLineCustomerIdentity::locationToken( $intent, $cart_item );
+
+		if ( '' !== $location ) {
+			return $base . '|' . sanitize_key( substr( hash( 'sha256', $location ), 0, 12 ) );
+		}
+
+		return $base;
 	}
 
 	public static function compose( string $availability, string $choice, string $offer_segment ): string {
@@ -82,7 +99,7 @@ final class DeliveryGroupIdentity {
 	public static function is_pickup_group( string $group_id ): bool {
 		$parts = explode( '|', $group_id );
 
-		return 3 === count( $parts )
+		return count( $parts ) >= 3
 			&& FulfilmentChoice::StorePickup->value === $parts[1]
 			&& 'pickup' === $parts[2];
 	}
