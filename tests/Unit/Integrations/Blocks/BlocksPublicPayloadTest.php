@@ -233,4 +233,43 @@ final class BlocksPublicPayloadTest extends TestCase {
 		self::assertSame( [ 'ok' => 'yes' ], $clean['nested'] );
 		self::assertFalse( BlocksPublicPayload::contains_forbidden( $clean ) );
 	}
+
+	public function test_needs_reselection_hides_stale_labels_and_exposes_recoverable_options(): void {
+		$cart_item = [
+			'key'          => 'abc123',
+			'product_id'   => 11,
+			'variation_id' => 0,
+			'data'         => new \WC_Product( [ 'id' => 11, 'type' => 'simple', 'name' => 'Cable' ] ),
+			CartDeliverySelectionCapture::CART_SELECTION_KEY => [
+				'contract_version'         => '1',
+				'product_id'               => 11,
+				'variation_id'             => null,
+				'target_type'              => 'product',
+				'target_id'                => 11,
+				'display_key'              => 'in_store:delivery:44',
+				'fulfilment_availability'  => 'in_store',
+				'fulfilment_choice'        => 'delivery',
+				'delivery_offer_id'        => 44,
+				'rule_id'                  => null,
+				'issued_at'                => '2026-08-31T00:00:00+00:00',
+			],
+			CartDeliverySelectionCapture::CART_SUMMARY_KEY => [
+				'delivery_offer_public_label' => 'Stale Option A',
+				'estimate_text'               => 'yesterday',
+			],
+			CartDeliverySelectionCapture::CART_NEEDS_RESELECTION_KEY => true,
+		];
+
+		$payload = BlocksPublicPayload::cart_item( $cart_item, null, null, 'abc123' );
+
+		self::assertTrue( $payload['needs_reselection'] );
+		self::assertFalse( $payload['selection_valid'] );
+		self::assertNull( $payload['delivery_option_label'] );
+		self::assertNull( $payload['estimate_text'] );
+		self::assertSame( 'Cable', $payload['product_name'] );
+		self::assertSame( 'abc123', $payload['cart_item_key'] );
+		self::assertStringContainsString( 'Cable', (string) $payload['reselection_message'] );
+		self::assertStringContainsString( 'do not need to remove', strtolower( (string) $payload['reselection_message'] ) );
+		self::assertFalse( BlocksPublicPayload::contains_forbidden( $payload ) );
+	}
 }

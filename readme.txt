@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-rc.9
+Stable tag: 1.0.0-dev.cartstate.1
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,9 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-dev.cartstate.1 =
+* Post-RC.9 cart-state reconciliation: existing cart lines refresh to live Delivery Engine configuration, stale admin fingerprints no longer force duplicate shipping groups, and unavailable choices require in-cart reselection instead of remove-and-re-add. Schema remains 5. Tagged 1.0.0-rc.9 is unchanged.
 
 = 1.0.0-rc.9 =
 * Promotes the frozen 1.0.0-dev.blocks.4 Cart/Checkout Blocks runtime to the tagged release candidate. Schema remains 5. No behaviour change versus Blocks.4. Not Stage 15. Historical 1.0.0-dev.blocks.1–blocks.4 packages and tagged 1.0.0-rc.8 remain unchanged.

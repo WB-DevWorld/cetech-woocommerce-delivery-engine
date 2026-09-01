@@ -81,6 +81,11 @@ final class BlocksStoreApiExtension {
 			'is_pickup'               => [ 'description' => 'Whether this line is store pickup.', 'type' => 'boolean', 'readonly' => true ],
 			'requires_selection'      => [ 'description' => 'Whether a Delivery Engine selection is required.', 'type' => 'boolean', 'readonly' => true ],
 			'selection_valid'         => [ 'description' => 'Whether the captured selection is still valid.', 'type' => [ 'boolean', 'null' ], 'readonly' => true ],
+			'needs_reselection'       => [ 'description' => 'Whether the customer must choose a new delivery option.', 'type' => 'boolean', 'readonly' => true ],
+			'reselection_message'     => [ 'description' => 'Customer-safe reselection message.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'reselection_options'     => [ 'description' => 'Public delivery options available for reselection.', 'type' => 'array', 'readonly' => true ],
+			'product_name'            => [ 'description' => 'Public product name for the affected cart line.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'cart_item_key'           => [ 'description' => 'WooCommerce cart item key.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
 		];
 	}
 

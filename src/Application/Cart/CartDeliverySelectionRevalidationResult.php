@@ -19,6 +19,8 @@ final class CartDeliverySelectionRevalidationResult {
 
 	public const STATUS_MISSING = 'missing';
 
+	public const STATUS_NEEDS_RESELECTION = 'needs_reselection';
+
 	/**
 	 * @param array<string, mixed>|null $stored_intent
 	 * @param array<string, mixed>|null $current_intent Safe intent array when revalidation succeeded

@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Bootstrap;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
+use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionReconciler;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
+use CetechDeliveryEngine\Application\Cart\CartDeliveryReselectionService;
 use CetechDeliveryEngine\Application\Checkout\CheckoutDeliverySelectionValidator;
 use CetechDeliveryEngine\Application\ProductRule\ProductDeliveryRuleResolver;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
@@ -163,6 +165,7 @@ use CetechDeliveryEngine\Presentation\Email\CustomerOrderDeliveryEmailSummaryRen
 use CetechDeliveryEngine\Presentation\Frontend\CartFulfilmentPackagePresentation;
 use CetechDeliveryEngine\Presentation\Frontend\CustomerOrderDeliverySummaryRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\CustomerShipmentRenderer;
+use CetechDeliveryEngine\Presentation\Frontend\CartDeliveryReselectionRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\ProductDeliverySelectorRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\VariableDeliverySelectorAssets;
 use CetechDeliveryEngine\Application\Selector\VariationDeliveryOptionsEndpoint;
@@ -302,7 +305,10 @@ final class Plugin {
 		$this->container->get( VariableDeliverySelectorAssets::class )->register();
 		$this->container->get( VariationDeliveryOptionsEndpoint::class )->register();
 		$this->container->get( CartDeliverySelectionCapture::class )->register();
+		$this->container->get( CartDeliverySelectionReconciler::class )->register();
 		$this->container->get( CartDeliverySelectionRevalidator::class )->register();
+		$this->container->get( CartDeliveryReselectionService::class )->register();
+		$this->container->get( CartDeliveryReselectionRenderer::class )->register();
 		$this->container->get( CheckoutDeliverySelectionValidator::class )->register();
 		$this->container->get( ShippingPackageBuilder::class )->register();
 		$this->container->get( CartFulfilmentPackagePresentation::class )->register();
@@ -658,6 +664,36 @@ final class Plugin {
 				$container->get( FeatureFlags::class ),
 				$container->get( Requirements::class ),
 				$container->get( ProductDeliverySelectionValidator::class )
+			)
+		);
+
+		$this->container->singleton(
+			CartDeliverySelectionReconciler::class,
+			static fn ( ServiceContainer $container ): CartDeliverySelectionReconciler => new CartDeliverySelectionReconciler(
+				$container->get( FeatureFlags::class ),
+				$container->get( Requirements::class ),
+				$container->get( CartDeliverySelectionCapture::class ),
+				$container->get( ProductDeliverySelectionValidator::class )
+			)
+		);
+
+		$this->container->singleton(
+			CartDeliveryReselectionService::class,
+			static fn ( ServiceContainer $container ): CartDeliveryReselectionService => new CartDeliveryReselectionService(
+				$container->get( FeatureFlags::class ),
+				$container->get( Requirements::class ),
+				$container->get( CartDeliverySelectionCapture::class ),
+				$container->get( ProductDeliverySelectionValidator::class ),
+				$container->get( CartDeliverySelectionReconciler::class )
+			)
+		);
+
+		$this->container->singleton(
+			CartDeliveryReselectionRenderer::class,
+			static fn ( ServiceContainer $container ): CartDeliveryReselectionRenderer => new CartDeliveryReselectionRenderer(
+				$container->get( FeatureFlags::class ),
+				$container->get( Requirements::class ),
+				$container->get( CartDeliverySelectionCapture::class )
 			)
 		);
 

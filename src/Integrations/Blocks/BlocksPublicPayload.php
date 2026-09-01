@@ -8,6 +8,7 @@ use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidationResult;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionSessionData;
+use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Presentation\Frontend\CartFulfilmentPackagePresentation;
@@ -56,6 +57,7 @@ final class BlocksPublicPayload {
 
 		$selection_valid = null;
 		$requires_selection = false;
+		$needs_reselection = ! empty( $cart_item[ CartDeliverySelectionCapture::CART_NEEDS_RESELECTION_KEY ] );
 
 		if ( null !== $capture ) {
 			$product_id   = (int) ( $cart_item['product_id'] ?? 0 );
@@ -64,24 +66,77 @@ final class BlocksPublicPayload {
 				&& 'required' === ( $capture->assess_product_selection( $product_id, $variation_id )['requirement'] ?? 'none' );
 		}
 
-		if ( null !== $revalidator && '' !== $cart_item_key && is_array( $intent ) ) {
+		if ( $needs_reselection ) {
+			$selection_valid = false;
+		} elseif ( null !== $revalidator && '' !== $cart_item_key && is_array( $intent ) ) {
 			$result = $revalidator->revalidate_cart_item( $cart_item_key, $cart_item );
 			$selection_valid = CartDeliverySelectionRevalidationResult::STATUS_VALID === $result->status;
 		} elseif ( is_array( $intent ) ) {
 			$selection_valid = true;
 		}
 
+		$reselection_options = [];
+		$product_name        = '';
+		$data                = $cart_item['data'] ?? null;
+
+		if ( is_object( $data ) && method_exists( $data, 'get_name' ) ) {
+			$product_name = trim( (string) $data->get_name() );
+		}
+
+		if ( $needs_reselection && null !== $capture ) {
+			$product_id   = (int) ( $cart_item['product_id'] ?? 0 );
+			$variation_id = (int) ( $cart_item['variation_id'] ?? 0 );
+			$assessment   = $capture->assess_product_selection( $product_id, $variation_id );
+
+			foreach ( $assessment['options'] as $option ) {
+				if ( ! $option instanceof ProductDeliveryOption || ! $option->is_available ) {
+					continue;
+				}
+
+				$label = trim( (string) $option->delivery_offer_public_label );
+
+				if ( '' === $label && FulfilmentChoice::StorePickup->value === $option->fulfilment_choice ) {
+					$label = trim( (string) $option->pickup_location_label );
+					$label = '' !== $label ? $label : __( 'Store pickup', 'cetech-woocommerce-delivery-engine' );
+				}
+
+				$estimate = trim( (string) $option->estimate_text );
+
+				$reselection_options[] = [
+					'display_key'       => $option->display_key,
+					'label'             => '' !== $label ? $label : __( 'Delivery option', 'cetech-woocommerce-delivery-engine' ),
+					'fulfilment_choice' => $option->fulfilment_choice,
+					'estimate_text'     => '' !== $estimate ? $estimate : null,
+				];
+			}
+		}
+
 		$payload = [
-			'fulfilment_choice'       => '' !== $choice ? $choice : null,
-			'fulfilment_availability' => '' !== $availability ? $availability : null,
-			'delivery_option_label'   => self::nullable_string( $summary['delivery_offer_public_label'] ?? null ),
-			'estimate_text'           => self::nullable_string( $summary['estimate_text'] ?? null ),
-			'pickup_location_label'   => self::nullable_string( $summary['pickup_location_label'] ?? null ),
-			'pickup_address'          => self::nullable_string( $summary['pickup_address'] ?? null ),
-			'pickup_instructions'     => self::nullable_string( $summary['pickup_instructions'] ?? null ),
-			'is_pickup'               => $is_pickup,
+			'fulfilment_choice'       => $needs_reselection ? null : ( '' !== $choice ? $choice : null ),
+			'fulfilment_availability' => $needs_reselection ? null : ( '' !== $availability ? $availability : null ),
+			'delivery_option_label'   => $needs_reselection ? null : self::nullable_string( $summary['delivery_offer_public_label'] ?? null ),
+			'estimate_text'           => $needs_reselection ? null : self::nullable_string( $summary['estimate_text'] ?? null ),
+			'pickup_location_label'   => $needs_reselection ? null : self::nullable_string( $summary['pickup_location_label'] ?? null ),
+			'pickup_address'          => $needs_reselection ? null : self::nullable_string( $summary['pickup_address'] ?? null ),
+			'pickup_instructions'     => $needs_reselection ? null : self::nullable_string( $summary['pickup_instructions'] ?? null ),
+			'is_pickup'               => $needs_reselection ? false : $is_pickup,
 			'requires_selection'      => $requires_selection,
 			'selection_valid'         => $selection_valid,
+			'needs_reselection'       => $needs_reselection,
+			'reselection_message'     => $needs_reselection
+				? (
+					'' !== $product_name
+						? sprintf(
+							/* translators: %s: product name */
+							__( 'Delivery options for “%s” have changed. Please choose a delivery option. You do not need to remove the product.', 'cetech-woocommerce-delivery-engine' ),
+							$product_name
+						)
+						: __( 'Delivery options for this item have changed. Please choose a delivery option. You do not need to remove the product.', 'cetech-woocommerce-delivery-engine' )
+				)
+				: null,
+			'reselection_options'     => $reselection_options,
+			'product_name'            => '' !== $product_name ? $product_name : null,
+			'cart_item_key'           => '' !== $cart_item_key ? $cart_item_key : ( is_string( $cart_item['key'] ?? null ) ? (string) $cart_item['key'] : null ),
 		];
 
 		return self::strip_forbidden( $payload );

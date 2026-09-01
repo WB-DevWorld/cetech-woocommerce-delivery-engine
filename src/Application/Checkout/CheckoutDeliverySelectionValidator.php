@@ -100,7 +100,7 @@ final class CheckoutDeliverySelectionValidator {
 			$affected_keys[] = $key;
 
 			if ( ! $customer_message_shown ) {
-				$messages[]             = $this->checkout_error_message( $status );
+				$messages[]             = $this->checkout_error_message( $status, $cart_item );
 				$customer_message_shown = true;
 			}
 		}
@@ -175,7 +175,10 @@ final class CheckoutDeliverySelectionValidator {
 		return ! hash_equals( CartDeliverySelectionFingerprint::fromIntent( $intent ), $hash );
 	}
 
-	private function checkout_error_message( string $status ): string {
+	/**
+	 * @param array<string, mixed> $cart_item
+	 */
+	private function checkout_error_message( string $status, array $cart_item = [] ): string {
 		if ( CartDeliverySelectionRevalidationResult::STATUS_MISSING === $status ) {
 			return __(
 				'Please select a delivery option for all products in your cart before checking out.',
@@ -183,8 +186,32 @@ final class CheckoutDeliverySelectionValidator {
 			);
 		}
 
+		$name = '';
+		$data = $cart_item['data'] ?? null;
+
+		if ( is_object( $data ) && method_exists( $data, 'get_name' ) ) {
+			$name = trim( (string) $data->get_name() );
+		}
+
+		if ( '' === $name && function_exists( 'wc_get_product' ) ) {
+			$product_id = (int) ( $cart_item['product_id'] ?? 0 );
+			$product    = $product_id > 0 ? wc_get_product( $product_id ) : false;
+
+			if ( is_object( $product ) && method_exists( $product, 'get_name' ) ) {
+				$name = trim( (string) $product->get_name() );
+			}
+		}
+
+		if ( '' !== $name ) {
+			return sprintf(
+				/* translators: %s: product name */
+				__( 'Delivery options for “%s” have changed. Please return to your cart and choose a delivery option. You do not need to remove the product.', 'cetech-woocommerce-delivery-engine' ),
+				$name
+			);
+		}
+
 		return __(
-			'A delivery option in your cart is no longer available. Please return to your cart and update the affected product.',
+			'Delivery options for an item in your cart have changed. Please return to your cart and choose a delivery option. You do not need to remove the product.',
 			'cetech-woocommerce-delivery-engine'
 		);
 	}

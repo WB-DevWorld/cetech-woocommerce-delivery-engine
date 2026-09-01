@@ -31,6 +31,8 @@ final class CartDeliverySelectionCapture {
 
 	public const CART_HASH_KEY = 'cetech_de_delivery_selection_hash';
 
+	public const CART_NEEDS_RESELECTION_KEY = 'cetech_de_needs_reselection';
+
 	public function __construct(
 		private FeatureFlags $feature_flags,
 		private Requirements $requirements,
@@ -193,6 +195,12 @@ final class CartDeliverySelectionCapture {
 		$cart_item[ self::CART_SUMMARY_KEY ]   = $restored['summary'];
 		$cart_item[ self::CART_HASH_KEY ]      = $restored['hash'];
 
+		if ( ! empty( $restored['needs_reselection'] ) ) {
+			$cart_item[ self::CART_NEEDS_RESELECTION_KEY ] = true;
+		} else {
+			unset( $cart_item[ self::CART_NEEDS_RESELECTION_KEY ] );
+		}
+
 		return $cart_item;
 	}
 
@@ -204,6 +212,15 @@ final class CartDeliverySelectionCapture {
 	 */
 	public function display_cart_item_data( array $item_data, array $cart_item ): array {
 		if ( ! $this->is_capture_enabled() ) {
+			return $item_data;
+		}
+
+		if ( ! empty( $cart_item[ self::CART_NEEDS_RESELECTION_KEY ] ) ) {
+			$item_data[] = [
+				'key'   => esc_html__( 'Delivery option', 'cetech-woocommerce-delivery-engine' ),
+				'value' => esc_html__( 'Delivery options have changed. Please choose a new option below.', 'cetech-woocommerce-delivery-engine' ),
+			];
+
 			return $item_data;
 		}
 

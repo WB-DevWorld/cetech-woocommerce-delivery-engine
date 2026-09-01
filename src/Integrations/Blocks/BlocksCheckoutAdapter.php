@@ -83,6 +83,16 @@ final class BlocksCheckoutAdapter implements IntegrationInterface {
 		BlocksScriptIntegration::register_assets();
 		wp_enqueue_script( self::SCRIPT_HANDLE );
 		wp_enqueue_style( self::STYLE_HANDLE );
+
+		$version = defined( 'CETECH_DE_VERSION' ) ? CETECH_DE_VERSION : '0';
+		$base    = defined( 'CETECH_DE_URL' ) ? CETECH_DE_URL : '';
+
+		wp_enqueue_style(
+			'cetech-de-cart-delivery-reselection',
+			$base . 'assets/frontend/cart-delivery-reselection.css',
+			[ self::STYLE_HANDLE ],
+			$version
+		);
 	}
 
 	public function usage(): BlocksUsageDetector {
