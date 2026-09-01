@@ -184,14 +184,19 @@ Do not store only a WPML lookup key.
 
 ---
 
-## 10. Package identity (filled after ZIP build)
+## 10. Package identity
 
 | Item | Value |
 |------|-------|
 | Version | `1.0.0-dev.wpml.1` |
 | Schema | `5` |
+| Branch | `feat/post-rc9-wpml` |
+| Source SHA | `e85b44d256852666a9c46b673c7903c0f56388ce` |
 | ZIP | `cetech-woocommerce-delivery-engine-1.0.0-dev.wpml.1.zip` |
-| Source SHA | *(recorded after implementation commit)* |
-| ZIP SHA-256 | *(recorded after package)* |
-| RC.9 tag | unchanged (`v1.0.0-rc.9`) |
+| Bytes | `1396670` |
+| ZIP SHA-256 | `98d29a132b008e3ef7f382c0f80368b196ac4bcf0f9d9f1c1ee5e283de344444` |
+| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.wpml.1.zip` |
+| Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.wpml.1.zip` |
+| RC.9 tag | `v1.0.0-rc.9` still peels to `e6bc7fba16d9d7b96682f2945c518a33a9a16cd5` |
 | FLAIROC | not modified |
+

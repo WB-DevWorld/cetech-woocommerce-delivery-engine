@@ -3,10 +3,28 @@
 **Document status:** Narrow owner physical QA plan  
 **Package:** `cetech-woocommerce-delivery-engine-1.0.0-dev.wpml.1.zip`  
 **Schema:** `5`  
-**Baseline:** immutable `1.0.0-rc.9`  
+**Baseline:** immutable `1.0.0-rc.9` (`e6bc7fba16d9d7b96682f2945c518a33a9a16cd5`)  
 **FLAIROC:** this stream does **not** install or mutate FLAIROC from Cursor. Owner may later install the ZIP on a WPML-capable site (for example FLAIROC `/intl`) after explicit authorisation.
 
 Do not treat this document as permission to deploy.
+
+---
+
+## Source and ZIP
+
+| Item | Value |
+|------|-------|
+| Filename | `cetech-woocommerce-delivery-engine-1.0.0-dev.wpml.1.zip` |
+| Version | `1.0.0-dev.wpml.1` |
+| Schema | `5` |
+| Branch | `feat/post-rc9-wpml` |
+| Package-source commit | `e85b44d256852666a9c46b673c7903c0f56388ce` |
+| Bytes | `1396670` |
+| SHA-256 | `98d29a132b008e3ef7f382c0f80368b196ac4bcf0f9d9f1c1ee5e283de344444` |
+| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.wpml.1.zip` |
+| Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.wpml.1.zip` |
+| RC.9 tag | `v1.0.0-rc.9` still peels to `e6bc7fba16d9d7b96682f2945c518a33a9a16cd5` |
+| FLAIROC | not modified |
 
 ---
 
