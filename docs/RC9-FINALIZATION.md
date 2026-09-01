@@ -84,14 +84,16 @@ Run on the RC.9 identity source immediately before packaging:
 
 | Gate | Result |
 |------|--------|
-| `composer validate --no-check-publish` | TBD |
-| Production PHP lint (`src/`, `database/`, root plugin, uninstall) | TBD |
-| PHPUnit | TBD |
-| Focused release identity tests | TBD |
-| `npm run test:js` | TBD |
+| `composer validate --no-check-publish` | **valid** |
+| Production PHP lint (`src/`, `database/`, root plugin, uninstall) | **399 files, 0 failures** |
+| PHPUnit | **840 tests, 4798 assertions, OK** (5 pre-existing deprecations) |
+| Focused release identity tests | **6 tests, 84 assertions, OK** (`SchemaV4InspectionTest`; version is `1.0.0-rc.9`; schema remains `5`) |
+| `npm run test:js` | **32 passed / 32** |
 | Identity / schema | `CETECH_DE_VERSION` = `1.0.0-rc.9`; `SchemaVersion::TARGET` = `5`; not `1.0.0-dev.blocks.4`; not `1.0.0-rc.8` |
-| `scripts/verify-production-package-autoload.php` | run on staged package during ZIP build |
+| `scripts/verify-production-package-autoload.php` | **exit 0** on staged package and extracted ZIP (stale “Schema target 4…” success string; actual TARGET is `5`) |
 | Playwright / FLAIROC | **not run** |
+
+Accepted Blocks.4 baseline: PHPUnit **840 tests / 4798 assertions**; JS **32 / 32**; production PHP lint **399 / 0**. RC.9 remains green with no runtime regression. The identity test now asserts `1.0.0-rc.9` instead of `1.0.0-dev.blocks.4`. No assertions were weakened.
 
 ---
 
@@ -111,11 +113,11 @@ Run on the RC.9 identity source immediately before packaging:
 
 | Item | Value |
 |------|--------|
-| Product finalize commit (package source) | TBD |
-| Tag `v1.0.0-rc.9` | TBD |
-| ZIP bytes | TBD |
-| SHA-256 | TBD |
-| Built from | committed clean `feat/post-rc8-integrations` (not `-AllowDirty`) |
+| Product finalize commit (package source) | `e6bc7fba16d9d7b96682f2945c518a33a9a16cd5` |
+| Tag `v1.0.0-rc.9` | local annotated tag `e6f98d91fc14585bf85a62f9bbee555b0be7b71e` peeling to package-source `e6bc7fba16d9d7b96682f2945c518a33a9a16cd5` (**not pushed**) |
+| ZIP bytes | `1380751` |
+| SHA-256 | `08862b8c048b92dd0ff42ded7eff29c3a5e42a42c984ac43e0a603cef50d96fd` |
+| Built from | committed clean `feat/post-rc8-integrations` at `e6bc7fb` (not `-AllowDirty`) |
 
 Do **not** rebuild the ZIP after the SHA-256 recording commit. The source commit is the tagged RC.9 identity commit, not the later docs-only hash record.
 
@@ -127,15 +129,15 @@ The diff from packaged Blocks.4 source `796b9a52` to RC.9 source is release iden
 
 | Check | Result |
 |-------|--------|
-| One plugin root | TBD |
-| Version `1.0.0-rc.9` | TBD |
-| Schema target `5` | TBD |
-| Production autoload / Linux-case classmap | TBD |
-| Blocks.4 runtime present | TBD |
-| Packaged PHP lint | TBD |
-| No PHPUnit / tests / node_modules / `.git` / `.env` / nested ZIPs | TBD |
-| Historical Blocks / fulfilment / Bulk / RC.8 ZIPs unchanged | TBD |
-| Tag `v1.0.0-rc.8` still peels to `6d166227998d4b0f5047fea91944ff024b389810` | TBD |
+| One plugin root | **PASS** — `cetech-woocommerce-delivery-engine/` |
+| Version `1.0.0-rc.9` | **PASS** |
+| Schema target `5` | **PASS** (`SchemaVersion::TARGET = '5'`) |
+| Production autoload / Linux-case classmap | **PASS** (`scripts/verify-production-package-autoload.php` exit 0) |
+| Blocks.4 runtime present | **PASS** — `src/Integrations/Blocks/BlocksCheckoutAdapter.php`, `assets/frontend/blocks-checkout.js`, `is_unrestricted_fallback`, `cart_checkout_blocks` |
+| Packaged PHP lint | **399 files, 0 failures** (excluding vendor) |
+| No PHPUnit / tests / node_modules / `.git` / `.env` / nested ZIPs | **PASS** |
+| Historical Blocks / fulfilment / Bulk / RC.8 ZIPs unchanged | **PASS** — RC.8 ZIP still `1307532` bytes / SHA-256 `70ae635e71741663d5084e3cccd0d2246871d7c485efb919310267d7c9d46b03` |
+| Tag `v1.0.0-rc.8` still peels to `6d166227998d4b0f5047fea91944ff024b389810` | **PASS** (tag object `2c211eb5b8a3a6af23e67b4d254a6c19c4e4b8ae`) |
 
 ---
 
