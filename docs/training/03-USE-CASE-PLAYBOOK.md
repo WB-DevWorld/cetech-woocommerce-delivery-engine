@@ -1,7 +1,7 @@
 # Use-Case Playbook
 
 **Audience:** Experienced staff and administrators  
-**Version:** 1.0.0-rc.8 (schema 5; training-site package `1.0.0-dev.blocks.3`)  
+**Version:** 1.0.0-rc.8 (schema 5; training-site package `1.0.0-dev.blocks.4`)  
 **QA fixtures:** #39705 (simple), #39717 (parent), #39718 (A), #39719 (B)  
 **Everyday system:** Site-wide Defaults + Product Exceptions. When shipment records are on, also **Delivery Engine → Shipments**.
 

@@ -1,7 +1,7 @@
 # Glossary (plain language)
 
 **Audience:** All staff  
-**Version:** 1.0.0-rc.8 (schema 5; training-site package `1.0.0-dev.blocks.3`)
+**Version:** 1.0.0-rc.8 (schema 5; training-site package `1.0.0-dev.blocks.4`)
 
 Terms match what you see in the Delivery Engine screens. Technical implementation words are avoided unless they appear in the UI.
 

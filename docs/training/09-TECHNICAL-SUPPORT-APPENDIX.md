@@ -3,7 +3,7 @@
 **Audience:** Technical support and developers **only**  
 **Normal staff should not require this document.**
 
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.8** (schema **5**). Training-site package **`1.0.0-dev.blocks.3`** (Cart/Checkout Blocks + overlapping Delivery Area pricing).  
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.8** (schema **5**). Training-site package **`1.0.0-dev.blocks.4`** (Cart/Checkout Blocks + overlapping Delivery Area pricing).  
 **Schema target:** `5`  
 **Release identity:** Git tag `v1.0.0-rc.8` (do not rewrite). Tags `v1.0.0-rc.7` through `v1.0.0-rc.2` remain untouched. This is not RC.9.
 
@@ -37,7 +37,7 @@ Required production switches (Classic Checkout **and** Cart/Checkout Blocks):
 - Show delivery fees at checkout — ON  
 - Save delivery details on orders — ON  
 
-Shipment records and customer tracking links stay **OFF** until an Administrator turns them on in Settings. Not in this release: customer timeline, carrier APIs, automatic tracking updates, Delivery Engine shipment emails. Cart/Checkout Blocks **are** implemented (`1.0.0-dev.blocks.3` on the training site). Settings shows Blocks and optional integrations as **status**, not experimental checkboxes.
+Shipment records and customer tracking links stay **OFF** until an Administrator turns them on in Settings. Not in this release: customer timeline, carrier APIs, automatic tracking updates, Delivery Engine shipment emails. Cart/Checkout Blocks **are** implemented (`1.0.0-dev.blocks.4` on the training site). Settings shows Blocks and optional integrations as **status**, not experimental checkboxes.
 
 Do not flip Advanced cutover switches without a change window and owner approval.
 
@@ -96,7 +96,7 @@ Administrator lockout repair is **Restore Administrator Access**, authorised by 
 ## Rollback / release identity
 
 - Protected published baseline: tagged `v1.0.0-rc.8`, schema `5`. Do not retag RC.8 or earlier.  
-- Training-site Blocks package: `1.0.0-dev.blocks.3` (not RC.9). Record: `docs/POST-RC8-BLOCKS-3-MATCHED-AREA-PRICING.md`.  
+- Training-site Blocks package: `1.0.0-dev.blocks.4` (not RC.9). Record: `docs/POST-RC8-BLOCKS-4-CONSTRAINED-FALLBACK.md`.  
 - Historical tagged `v1.0.0-rc.7` (schema `5`) and `v1.0.0-rc.6` (schema `4`) remain untouched.  
 - Historical RC.6 package `cetech-woocommerce-delivery-engine-1.0.0-rc.6.zip` remains immutable (`1059918` bytes, SHA-256 `0d4adbef50462d798a4ff9bf802643bed92a35cdd332ceee13a985dbda2a689d`, source `7e52525`). Full RC.6 record: `docs/STAGE-14H-RC6-FINAL.md`.  
 - Do not alter tags `v1.0.0-rc.8` through `v1.0.0-rc.2`. Do not overwrite historical QA ZIPs.

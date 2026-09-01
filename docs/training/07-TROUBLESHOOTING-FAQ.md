@@ -1,7 +1,7 @@
 # Troubleshooting FAQ (staff)
 
 **Audience:** Everyday staff and administrators  
-**Version:** 1.0.0-rc.8 (schema 5; training-site package `1.0.0-dev.blocks.3`)  
+**Version:** 1.0.0-rc.8 (schema 5; training-site package `1.0.0-dev.blocks.4`)  
 
 Use this guide first. Do **not** edit PHP, run SQL, clear Redis globally, change the database by hand, install Code Snippets, change Nginx, or use SSH. Those steps belong only in the [Technical Support Appendix](09-TECHNICAL-SUPPORT-APPENDIX.md).
 
@@ -237,4 +237,4 @@ If the name is not in this table, stay on the everyday menu in [00-START-HERE](0
 - What the customer sees (option name + estimate, or the problem)  
 - What you already tried  
 - Exact wording of Ready / Needs Attention  
-- Plugin version shown in WordPress (**1.0.0-rc.8** expected on the tagged baseline; training site may show **1.0.0-dev.blocks.3**)
+- Plugin version shown in WordPress (**1.0.0-rc.8** expected on the tagged baseline; training site may show **1.0.0-dev.blocks.4**)

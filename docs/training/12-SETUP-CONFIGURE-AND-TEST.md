@@ -1,7 +1,7 @@
 # How to use each Delivery Engine menu
 
 **Audience:** New staff — start here if you are new to this plugin  
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.8** (schema **5**; training-site package `1.0.0-dev.blocks.3`)  
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.8** (schema **5**; training-site package `1.0.0-dev.blocks.4`)  
 **Open:** WordPress admin left menu → **Delivery Engine** (location-pin icon)
 
 This guide is only about the plugin. Each section is one menu. For every menu you get **how to open it, how to do the work, what to type, which button to press, and how to check it**.
@@ -213,7 +213,10 @@ Where you deliver. Together with a charge, this decides the fee for the customer
 7. To narrow it later, click **+ Add another location condition** and add **State / Region**, **City**, or **Postcode**.  
    For **State / Region**, you may type the name customers see in WooCommerce checkout (for example `Greater Accra`) **or** WooCommerce’s short code for that state (for example `AA` in Ghana). Checkout uses the short code. The plugin matches both for that country, so you do **not** need to rewrite existing areas. Do not use another country’s region name.  
 8. Leave **Advanced matching** closed.  
-9. Leave **Advanced details** / reference code blank.  
+9. Under **Advanced details**, **Use as fallback for unmatched addresses** is optional:
+   - Tick it **and leave location rules empty** only if this area should catch leftover addresses (a true Everywhere else area).
+   - Tick it **and keep location rules** if this is a fallback inside those places only. A Greater Accra fallback with Ghana + Greater Accra never matches the United States.
+   - Leave it unticked for a normal area.
 10. Click **Create Delivery Area**.
 
 ## How to test an address
@@ -221,12 +224,13 @@ Where you deliver. Together with a charge, this decides the fee for the customer
 1. Stay on **Delivery Areas** (list) or open the area.  
 2. Open **Test an address**.  
 3. Fill:  
-   - **Country code** (same 2-letter code)  
+   - **Country** (choose the country name from the list, for example Ghana or United States — the plugin uses the standard country code internally)  
    - **Region**, **City**, **Postcode** if you used those conditions  
    If the area uses **State / Region**, test once with the name (for example `Greater Accra`) and once with the checkout short code (for example `AA`). Both should name the **same** area.  
 4. Click **Run test**.  
 5. Read **Primary match.** It should name the most specific area (for example Accra city before Greater Accra region).  
 6. If more than one area covers the address, read **Also matches.** Nested city-inside-region is normal. Pricing can use a charge from a broader matching area when the selected Delivery Option has no charge in the city. A different Delivery Option is never substituted.
+7. A Fallback area with location rules is a **constrained fallback**. Test Ghana / Greater Accra / Accra and it may match. Test United States / New York and it must **not** match merely because Fallback is ticked. Only a Fallback area with **no** location rules is a true **Everywhere else** (global fallback). If no area and no global fallback match, the test stays unmatched — that is fail closed, not native WooCommerce shipping.
 
 ## How to edit an area
 

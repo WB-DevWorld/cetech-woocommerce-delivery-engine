@@ -1,7 +1,7 @@
 # Feature coverage and confirmation
 
 **Audience:** Trainers and administrators  
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.8** (schema **5**). Training-site package **`1.0.0-dev.blocks.3`** also includes Cart/Checkout Blocks and overlapping Delivery Area pricing. This is **not** RC.9 and does **not** retag RC.8.  
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.8** (schema **5**). Training-site package **`1.0.0-dev.blocks.4`** also includes Cart/Checkout Blocks and overlapping Delivery Area pricing. This is **not** RC.9 and does **not** retag RC.8.  
 **Everyday home:** WordPress admin → **Delivery Engine → Overview**
 
 Every implemented staff-facing feature is either **trained** (staff can do the work from a written guide) or **confirmed** (a trainer or administrator ticks a live pass/fail check). Reading this page is not training. Use the linked guides, then tick the checks on the live site.
@@ -39,7 +39,8 @@ Tick on the live training site. Keep one copy per trainee (or per site smoke).
 | A4 | Field-by-field inheritance | [01](01-QUICK-START.md), [05](05-STAFF-TRAINING-MANUAL.md) M3 | On **#39705**, show **Currently using** Site-wide Default. Explain that changing Estimated delivery does not freeze Delivery Options. | ☐ |
 | A5 | Delivery Options (public names) | [12](12-SETUP-CONFIGURE-AND-TEST.md) §2 | Open Delivery Options. Name one public option customers would see. | ☐ |
 | A6 | Delivery Areas + region name and short code | [12](12-SETUP-CONFIGURE-AND-TEST.md) §4 | **Test an address** with `Greater Accra` **and** `AA` (or the store’s equivalent). Both name the same area. | ☐ |
-| A7 | Test an address Primary match / Also matches | [12](12-SETUP-CONFIGURE-AND-TEST.md) §4, playbook 31 | For Accra city (or the store’s city-in-region pair): **Primary match** is the more-specific area; **Also matches** lists the broader area. | ☐ |
+| A7 | Test an address Primary match / Also matches | [12](12-SETUP-CONFIGURE-AND-TEST.md) §4, playbook 31 | For Accra city (or the store’s city-in-region pair): **Primary match** is the more-specific area; **Also matches** lists the broader area. Country is chosen by name (Ghana), not typed as `GH`. | ☐ |
+| A7b | Constrained vs global fallback | [12](12-SETUP-CONFIGURE-AND-TEST.md) §4 | Greater Accra Fallback with Ghana + Greater Accra rules does **not** match United States / New York. A ruleless Fallback can catch leftover addresses. No match stays unmatched. | ☐ |
 | A8 | Delivery Charges + Check a delivery price | [12](12-SETUP-CONFIGURE-AND-TEST.md) §5 | **Check a delivery price** for a known option + area shows the configured fee, not a silent 0. | ☐ |
 | A9 | Pickup Locations (if pickup is offered) | [12](12-SETUP-CONFIGURE-AND-TEST.md) §6 | At least one active Pickup Location exists when Store pickup is offered. | ☐ |
 | A10 | Product exception (single field) | playbook 2, [05](05-STAFF-TRAINING-MANUAL.md) M4 | On QA only: customize one field, Preview, then **Reset to Site-wide Defaults**. | ☐ |

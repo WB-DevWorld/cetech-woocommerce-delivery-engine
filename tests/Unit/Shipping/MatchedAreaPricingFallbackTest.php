@@ -45,6 +45,25 @@ final class MatchedAreaPricingFallbackTest extends TestCase {
 	protected function setUp(): void {
 		$GLOBALS['cetech_de_test_options'] = [];
 
+		if ( ! class_exists( 'WC_Shipping_Method', false ) ) {
+			eval(
+				'class WC_Shipping_Method {
+					public string $id = "";
+					public int $instance_id = 0;
+					public string $title = "";
+					public string $method_title = "";
+					public string $method_description = "";
+					public string $tax_status = "";
+					public array $supports = [];
+					public array $instance_form_fields = [];
+					public function init_form_fields(): void {}
+					public function init_settings(): void {}
+					public function get_option( string $key, $default_value = "" ) { return $default_value; }
+					public function process_admin_options(): void {}
+				}'
+			);
+		}
+
 		if ( ! function_exists( 'get_woocommerce_currency' ) ) {
 			eval( 'function get_woocommerce_currency(): string { return "USD"; }' );
 		}
