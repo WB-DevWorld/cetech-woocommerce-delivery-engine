@@ -56,7 +56,7 @@ final class FeatureFlagLabels {
 			],
 			'enable_wpml_adapter' => [
 				'label'       => 'WPML language adapter',
-				'description' => 'Optional WPML compatibility. No adapter is implemented in this release.',
+				'description' => 'Kept for compatibility. Customer-facing Delivery Engine text uses WPML String Translation automatically when those APIs are present. This switch does not control translation correctness.',
 			],
 			'enable_wcml_adapter' => [
 				'label'       => 'WooCommerce Multilingual adapter',

@@ -16,6 +16,7 @@ use CetechDeliveryEngine\Domain\Zone\DestinationRuleRepositoryInterface;
 use CetechDeliveryEngine\Domain\Zone\DestinationZoneRepositoryInterface;
 use CetechDeliveryEngine\Presentation\Admin\Validation\DestinationRuleValidator;
 use CetechDeliveryEngine\Presentation\Admin\Validation\DestinationZoneValidator;
+use CetechDeliveryEngine\Integrations\WPML\WpmlPublicCopyCatalog;
 
 final class DestinationZonesPage {
 
@@ -40,7 +41,8 @@ final class DestinationZonesPage {
 		private DestinationZoneTestMatcher $test_matcher,
 		private AdminActionHandler $action_handler,
 		private ConfigurationAuditLogger $audit_logger,
-		private AdminRecordDependencyChecker $dependency_checker
+		private AdminRecordDependencyChecker $dependency_checker,
+		private ?WpmlPublicCopyCatalog $wpml_copy = null
 	) {
 	}
 
@@ -584,6 +586,11 @@ final class DestinationZonesPage {
 		if ( $saved_id <= 0 ) {
 			$this->action_handler->notices()->flash_error( __( 'Unable to save destination zone.', 'cetech-woocommerce-delivery-engine' ) );
 			$this->action_handler->redirect( self::SLUG );
+		}
+
+		$saved_zone = $this->zone_repository->findById( $saved_id );
+		if ( is_array( $saved_zone ) ) {
+			$this->wpml_copy?->register_destination_zone( $saved_zone );
 		}
 
 		if ( ! $this->rule_repository->replaceForZone( $saved_id, $rule_result['rules'] ) ) {

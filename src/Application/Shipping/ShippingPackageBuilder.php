@@ -8,6 +8,7 @@ use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionSessionData;
 use CetechDeliveryEngine\Application\Pickup\PickupLocationAddressFormatter;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
+use CetechDeliveryEngine\Integrations\WPML\WpmlLivePublicCopyPresenter;
 
 /**
  * Splits WooCommerce cart shipping packages into delivery groups.
@@ -19,7 +20,8 @@ final class ShippingPackageBuilder {
 
 	public function __construct(
 		private ShippingRateCalculationGate $gate,
-		private CartDeliverySelectionCapture $cart_capture
+		private CartDeliverySelectionCapture $cart_capture,
+		private ?WpmlLivePublicCopyPresenter $wpml_presenter = null
 	) {
 	}
 
@@ -161,6 +163,11 @@ final class ShippingPackageBuilder {
 			|| FulfilmentChoice::StorePickup->value === $choice;
 
 		$summary = $this->first_summary( $contents );
+
+		if ( is_array( $summary ) && null !== $this->wpml_presenter ) {
+			$summary = $this->wpml_presenter->localize_summary( $summary, $intent );
+		}
+
 		$offer_label = is_array( $summary )
 			? trim( (string) ( $summary['delivery_offer_public_label'] ?? '' ) )
 			: '';

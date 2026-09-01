@@ -21,6 +21,8 @@ use CetechDeliveryEngine\Core\Versioning\MigrationRunner;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentRepositoryInterface;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbShipmentRepository;
 use CetechDeliveryEngine\Integrations\Registry\IntegrationRegistry;
+use CetechDeliveryEngine\Integrations\Status\IntegrationStatusCatalog;
+use CetechDeliveryEngine\Integrations\WPML\WpmlPublicCopySync;
 use CetechDeliveryEngine\Presentation\Admin\AdminMenu;
 use CetechDeliveryEngine\Presentation\Admin\EffectiveConfigurationPreviewPage;
 use CetechDeliveryEngine\Presentation\Admin\OrderDeliverySnapshotAdminDisplay;
@@ -119,7 +121,8 @@ final class PluginBootServiceGraphTest extends TestCase {
 			ScopedConfigurationPage::class,
 			SystemStatusPage::class,
 			\CetechDeliveryEngine\Integrations\Blocks\BlocksCheckoutAdapter::class,
-			\CetechDeliveryEngine\Integrations\Status\IntegrationStatusCatalog::class,
+			WpmlPublicCopySync::class,
+			IntegrationStatusCatalog::class,
 			\CetechDeliveryEngine\Presentation\Admin\DeliverySettingsHomePage::class,
 			\CetechDeliveryEngine\Presentation\Admin\ProductExceptionsPage::class,
 			\CetechDeliveryEngine\Presentation\Admin\NeedsAttentionPage::class,

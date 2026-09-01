@@ -16,6 +16,7 @@ use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingRateCalculato
 use CetechDeliveryEngine\Domain\DeliveryOffer\DeliveryOfferRepositoryInterface;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Infrastructure\WooCommerce\Shipping\SelectedOfferShippingMethod;
+use CetechDeliveryEngine\Integrations\WPML\WpmlLivePublicCopyPresenter;
 use WC_Order;
 
 /**
@@ -30,7 +31,8 @@ final class OrderDeliverySnapshotBuilder {
 		private PackageDestinationZoneResolver $destination_resolver,
 		private SelectedOfferShippingRateCalculator $shipping_rate_calculator,
 		private RateQuoteEngine $quote_engine,
-		private DeliveryOfferRepositoryInterface $delivery_offer_repository
+		private DeliveryOfferRepositoryInterface $delivery_offer_repository,
+		private ?WpmlLivePublicCopyPresenter $wpml_presenter = null
 	) {
 	}
 
@@ -106,6 +108,11 @@ final class OrderDeliverySnapshotBuilder {
 		}
 
 		$summary = is_array( $summary ) ? $summary : [];
+
+		if ( null !== $this->wpml_presenter ) {
+			$summary = $this->wpml_presenter->localize_summary( $summary, $intent );
+		}
+
 		$offer_label = $summary['delivery_offer_public_label'] ?? null;
 		$estimate    = $summary['estimate_text'] ?? null;
 		$group_id    = DeliveryGroupIdentity::fromIntent( $intent );
@@ -278,6 +285,14 @@ final class OrderDeliverySnapshotBuilder {
 		}
 
 		$description = trim( (string) ( $offer['public_description'] ?? '' ) );
+
+		if ( '' === $description ) {
+			return null;
+		}
+
+		if ( null !== $this->wpml_presenter ) {
+			$description = $this->wpml_presenter->translate_offer_description( $delivery_offer_id, $description );
+		}
 
 		return '' !== $description ? sanitize_text_field( $description ) : null;
 	}

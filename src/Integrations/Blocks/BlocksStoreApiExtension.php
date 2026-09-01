@@ -9,6 +9,7 @@ use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
 use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
 use CetechDeliveryEngine\Application\Shipping\ShippingRateCalculationGate;
 use CetechDeliveryEngine\Infrastructure\WooCommerce\Shipping\SelectedOfferShippingMethod;
+use CetechDeliveryEngine\Integrations\WPML\WpmlLivePublicCopyPresenter;
 
 /**
  * Registers customer-safe Delivery Engine data on Store API cart / cart-item / checkout.
@@ -24,7 +25,8 @@ final class BlocksStoreApiExtension {
 	public function __construct(
 		private CartDeliverySelectionCapture $cart_capture,
 		private CartDeliverySelectionRevalidator $cart_revalidator,
-		private ShippingRateCalculationGate $shipping_gate
+		private ShippingRateCalculationGate $shipping_gate,
+		private ?WpmlLivePublicCopyPresenter $wpml_presenter = null
 	) {
 	}
 
@@ -62,7 +64,8 @@ final class BlocksStoreApiExtension {
 			$cart_item,
 			$this->cart_capture,
 			$this->cart_revalidator,
-			$key
+			$key,
+			$this->wpml_presenter
 		);
 	}
 

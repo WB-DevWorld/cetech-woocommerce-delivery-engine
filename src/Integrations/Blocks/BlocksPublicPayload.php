@@ -10,6 +10,7 @@ use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionSessionData;
 use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
+use CetechDeliveryEngine\Integrations\WPML\WpmlLivePublicCopyPresenter;
 use CetechDeliveryEngine\Presentation\Frontend\CartFulfilmentPackagePresentation;
 
 /**
@@ -41,7 +42,8 @@ final class BlocksPublicPayload {
 		array $cart_item,
 		?CartDeliverySelectionCapture $capture = null,
 		?CartDeliverySelectionRevalidator $revalidator = null,
-		string $cart_item_key = ''
+		string $cart_item_key = '',
+		?WpmlLivePublicCopyPresenter $wpml_presenter = null
 	): array {
 		$intent  = CartDeliverySelectionSessionData::normalizeIntent(
 			$cart_item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] ?? null
@@ -49,6 +51,10 @@ final class BlocksPublicPayload {
 		$summary = CartDeliverySelectionSessionData::normalizeSummary(
 			$cart_item[ CartDeliverySelectionCapture::CART_SUMMARY_KEY ] ?? null
 		) ?? [];
+
+		if ( null !== $wpml_presenter ) {
+			$summary = $wpml_presenter->localize_summary( $summary, $intent );
+		}
 
 		$choice = is_array( $intent ) ? sanitize_key( (string) ( $intent['fulfilment_choice'] ?? '' ) ) : '';
 		$availability = is_array( $intent ) ? sanitize_key( (string) ( $intent['fulfilment_availability'] ?? '' ) ) : '';

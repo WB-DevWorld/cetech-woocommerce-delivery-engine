@@ -166,6 +166,26 @@ if ( ! class_exists( 'WC_Order', false ) ) {
 		public function get_billing_company(): string {
 			return (string) ( $this->data['billing_company'] ?? '' );
 		}
+
+		public function get_currency(): string {
+			return (string) ( $this->data['currency'] ?? 'USD' );
+		}
+
+		public function get_shipping_country(): string {
+			return (string) ( $this->data['shipping_country'] ?? '' );
+		}
+
+		public function get_shipping_state(): string {
+			return (string) ( $this->data['shipping_state'] ?? '' );
+		}
+
+		public function get_shipping_city(): string {
+			return (string) ( $this->data['shipping_city'] ?? '' );
+		}
+
+		public function get_shipping_postcode(): string {
+			return (string) ( $this->data['shipping_postcode'] ?? '' );
+		}
 	}
 }
 

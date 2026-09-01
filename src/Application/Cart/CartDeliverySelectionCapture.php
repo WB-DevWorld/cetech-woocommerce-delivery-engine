@@ -12,6 +12,7 @@ use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\Enum\ProductTargetType;
 use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
+use CetechDeliveryEngine\Integrations\WPML\WpmlLivePublicCopyPresenter;
 use WC_Product;
 
 /**
@@ -36,7 +37,8 @@ final class CartDeliverySelectionCapture {
 		private Requirements $requirements,
 		private ProductDeliveryConfigurationSourceInterface $configuration_source,
 		private ProductDeliveryOptionsBuilder $options_builder,
-		private ProductDeliverySelectionValidator $selection_validator
+		private ProductDeliverySelectionValidator $selection_validator,
+		private ?WpmlLivePublicCopyPresenter $wpml_presenter = null
 	) {
 	}
 
@@ -218,6 +220,11 @@ final class CartDeliverySelectionCapture {
 		$intent = CartDeliverySelectionSessionData::normalizeIntent(
 			$cart_item[ self::CART_SELECTION_KEY ] ?? null
 		);
+
+		if ( null !== $this->wpml_presenter ) {
+			$summary = $this->wpml_presenter->localize_summary( $summary, $intent );
+		}
+
 		$choice = is_array( $intent ) ? (string) ( $intent['fulfilment_choice'] ?? '' ) : '';
 
 		$rows = self::formatPublicSummaryRows( $summary, '' !== $choice ? $choice : null );
@@ -323,6 +330,10 @@ final class CartDeliverySelectionCapture {
 				: null,
 			'pickup_instructions'           => isset( $matched_option['pickup_instructions'] )
 				? (string) $matched_option['pickup_instructions']
+				: null,
+			'pickup_location_id'            => isset( $matched_option['pickup_location_id'] )
+				&& (int) $matched_option['pickup_location_id'] > 0
+				? (string) (int) $matched_option['pickup_location_id']
 				: null,
 		];
 

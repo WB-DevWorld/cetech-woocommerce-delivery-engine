@@ -13,6 +13,7 @@ use CetechDeliveryEngine\Domain\Enum\FulfilmentAvailability;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Domain\Pickup\PickupLocationRepositoryInterface;
+use CetechDeliveryEngine\Integrations\WPML\WpmlPublicCopyCatalog;
 
 /**
  * Builds customer-safe delivery options from resolver output and active delivery offers.
@@ -24,7 +25,8 @@ final class ProductDeliveryOptionsBuilder {
 
 	public function __construct(
 		private DeliveryOfferRepositoryInterface $delivery_offer_repository,
-		private ?PickupLocationRepositoryInterface $pickup_locations = null
+		private ?PickupLocationRepositoryInterface $pickup_locations = null,
+		private ?WpmlPublicCopyCatalog $wpml_copy = null
 	) {
 	}
 
@@ -294,12 +296,13 @@ final class ProductDeliveryOptionsBuilder {
 		$instructions = null;
 		$address      = null;
 		$location_label = null;
+		$pickup_id      = isset( $location['id'] ) ? (int) $location['id'] : 0;
 
 		if ( is_array( $location ) ) {
 			$name = trim( (string) ( $location['location_name'] ?? '' ) );
 
 			if ( '' !== $name ) {
-				$location_label = $name;
+				$location_label = $this->translate_pickup_name( $pickup_id, $name );
 			}
 
 			$address_text = PickupLocationAddressFormatter::format(
@@ -313,13 +316,13 @@ final class ProductDeliveryOptionsBuilder {
 			$instruction_text = trim( (string) ( $location['public_pickup_instructions'] ?? '' ) );
 
 			if ( '' !== $instruction_text ) {
-				$instructions = $instruction_text;
+				$instructions = $this->translate_pickup_instructions( $pickup_id, $instruction_text );
 			}
 
 			$readiness = trim( (string) ( $location['readiness_estimate'] ?? '' ) );
 
 			if ( '' !== $readiness ) {
-				$estimate = $readiness;
+				$estimate = $this->translate_pickup_readiness( $pickup_id, $readiness );
 			}
 		}
 
@@ -339,7 +342,8 @@ final class ProductDeliveryOptionsBuilder {
 			false,
 			$location_label,
 			$address,
-			$instructions
+			$instructions,
+			$pickup_id > 0 ? $pickup_id : null
 		);
 	}
 
@@ -397,9 +401,14 @@ final class ProductDeliveryOptionsBuilder {
 
 			if ( '' === $public_label ) {
 				$public_label = __( 'Delivery option', 'cetech-woocommerce-delivery-engine' );
+			} else {
+				$public_label = $this->translate_offer_label( (int) $offer_id, $public_label );
 			}
 
 			$public_description = trim( (string) ( $row['public_description'] ?? '' ) );
+			$public_description = '' !== $public_description
+				? $this->translate_offer_description( (int) $offer_id, $public_description )
+				: '';
 
 			$options[] = new ProductDeliveryOption(
 				$this->display_key( $availability_slug, $choice_slug, (string) $offer_id ),
@@ -560,6 +569,36 @@ final class ProductDeliveryOptionsBuilder {
 			$value,
 			$unit
 		);
+	}
+
+	private function translate_offer_label( int $offer_id, string $source ): string {
+		return null !== $this->wpml_copy
+			? $this->wpml_copy->translate_delivery_offer_label( $offer_id, $source )
+			: $source;
+	}
+
+	private function translate_offer_description( int $offer_id, string $source ): string {
+		return null !== $this->wpml_copy
+			? $this->wpml_copy->translate_delivery_offer_description( $offer_id, $source )
+			: $source;
+	}
+
+	private function translate_pickup_name( int $pickup_id, string $source ): string {
+		return $pickup_id > 0 && null !== $this->wpml_copy
+			? $this->wpml_copy->translate_pickup_location_name( $pickup_id, $source )
+			: $source;
+	}
+
+	private function translate_pickup_instructions( int $pickup_id, string $source ): string {
+		return $pickup_id > 0 && null !== $this->wpml_copy
+			? $this->wpml_copy->translate_pickup_instructions( $pickup_id, $source )
+			: $source;
+	}
+
+	private function translate_pickup_readiness( int $pickup_id, string $source ): string {
+		return $pickup_id > 0 && null !== $this->wpml_copy
+			? $this->wpml_copy->translate_pickup_readiness( $pickup_id, $source )
+			: $source;
 	}
 
 	private function duration_unit_label( string $unit ): string {

@@ -21,6 +21,7 @@ use CetechDeliveryEngine\Presentation\Admin\Validation\DestinationRuleValidator;
 use CetechDeliveryEngine\Presentation\Admin\Validation\DestinationZoneValidator;
 use CetechDeliveryEngine\Presentation\Admin\Validation\PickupLocationValidator;
 use CetechDeliveryEngine\Presentation\Admin\Validation\RateCardValidator;
+use CetechDeliveryEngine\Integrations\WPML\WpmlPublicCopyCatalog;
 
 /**
  * Lightweight first-setup creation of canonical Delivery Engine records.
@@ -40,7 +41,8 @@ final class ContextualEntityService {
 		private readonly DestinationZoneValidator $zone_validator,
 		private readonly DestinationRuleValidator $rule_validator,
 		private readonly RateCardValidator $rate_validator,
-		private readonly PickupLocationValidator $pickup_validator
+		private readonly PickupLocationValidator $pickup_validator,
+		private readonly ?WpmlPublicCopyCatalog $wpml_copy = null
 	) {
 	}
 
@@ -114,6 +116,11 @@ final class ContextualEntityService {
 
 		if ( $id <= 0 ) {
 			return [ 'id' => 0, 'errors' => [ 'Unable to create the delivery option.' ] ];
+		}
+
+		$saved = $this->offers->findById( $id );
+		if ( is_array( $saved ) ) {
+			$this->wpml_copy?->register_delivery_offer( $saved );
 		}
 
 		return [ 'id' => $id, 'errors' => [] ];
@@ -190,6 +197,11 @@ final class ContextualEntityService {
 
 		if ( ! $this->rules->replaceForZone( $id, $rule_result['rules'] ) ) {
 			return [ 'id' => $id, 'errors' => [ 'Delivery area saved, but location matching could not be stored.' ] ];
+		}
+
+		$saved = $this->zones->findById( $id );
+		if ( is_array( $saved ) ) {
+			$this->wpml_copy?->register_destination_zone( $saved );
 		}
 
 		return [ 'id' => $id, 'errors' => [] ];
@@ -341,6 +353,11 @@ final class ContextualEntityService {
 
 		if ( $id <= 0 ) {
 			return [ 'id' => 0, 'errors' => [ 'Unable to create the pickup location.' ] ];
+		}
+
+		$saved = $this->pickups->findById( $id );
+		if ( is_array( $saved ) ) {
+			$this->wpml_copy?->register_pickup_location( $saved );
 		}
 
 		return [ 'id' => $id, 'errors' => [] ];

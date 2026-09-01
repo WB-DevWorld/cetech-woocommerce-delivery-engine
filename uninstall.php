@@ -107,6 +107,7 @@ delete_option( 'cetech_de_global_configuration_version' );
 delete_option( 'cetech_de_v3_config_migration_report' );
 delete_option( 'cetech_de_capabilities_version' );
 delete_option( 'cetech_de_shipment_creation_failure_order_ids' );
+delete_option( 'cetech_de_wpml_string_sync_version' );
 
 global $wpdb;
 

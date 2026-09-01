@@ -38,6 +38,7 @@ final class CartDeliverySelectionSessionData {
 		'pickup_location_label',
 		'pickup_address',
 		'pickup_instructions',
+		'pickup_location_id',
 	];
 
 	/**

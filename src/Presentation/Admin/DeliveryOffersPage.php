@@ -9,6 +9,7 @@ use CetechDeliveryEngine\Domain\Enum\DeliveryRoute;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Domain\DeliveryOffer\DeliveryOfferRepositoryInterface;
 use CetechDeliveryEngine\Presentation\Admin\Validation\DeliveryOfferValidator;
+use CetechDeliveryEngine\Integrations\WPML\WpmlPublicCopyCatalog;
 
 final class DeliveryOffersPage {
 
@@ -25,7 +26,8 @@ final class DeliveryOffersPage {
 		private DeliveryOfferValidator $validator,
 		private AdminActionHandler $action_handler,
 		private ConfigurationAuditLogger $audit_logger,
-		private AdminRecordDependencyChecker $dependency_checker
+		private AdminRecordDependencyChecker $dependency_checker,
+		private ?WpmlPublicCopyCatalog $wpml_copy = null
 	) {
 	}
 
@@ -363,6 +365,11 @@ final class DeliveryOffersPage {
 		if ( $saved_id <= 0 ) {
 			$this->action_handler->notices()->flash_error( __( 'Unable to save delivery offer.', 'cetech-woocommerce-delivery-engine' ) );
 			$this->action_handler->redirect( self::SLUG );
+		}
+
+		$saved = $this->repository->findById( $saved_id );
+		if ( is_array( $saved ) ) {
+			$this->wpml_copy?->register_delivery_offer( $saved );
 		}
 
 		$audit_logged = $this->audit_logger->log(

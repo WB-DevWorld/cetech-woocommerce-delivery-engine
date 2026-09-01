@@ -108,6 +108,10 @@ use CetechDeliveryEngine\Integrations\Blocks\BlocksStoreApiExtension;
 use CetechDeliveryEngine\Integrations\Blocks\BlocksUsageDetector;
 use CetechDeliveryEngine\Integrations\Registry\IntegrationRegistry;
 use CetechDeliveryEngine\Integrations\Status\IntegrationStatusCatalog;
+use CetechDeliveryEngine\Integrations\WPML\WpmlDynamicStringTranslator;
+use CetechDeliveryEngine\Integrations\WPML\WpmlLivePublicCopyPresenter;
+use CetechDeliveryEngine\Integrations\WPML\WpmlPublicCopyCatalog;
+use CetechDeliveryEngine\Integrations\WPML\WpmlPublicCopySync;
 use CetechDeliveryEngine\Application\Bulk\BulkJobEngine;
 use CetechDeliveryEngine\Application\Bulk\BulkJobWorker;
 use CetechDeliveryEngine\Application\Bulk\BulkQueueHealth;
@@ -267,6 +271,13 @@ final class Plugin {
 			$this->container->get( ProductDeliveryPanel::class )->register();
 			$this->container->get( PreviewVariationsEndpoint::class )->register();
 			$this->container->get( BulkJobProgressEndpoint::class )->register();
+			add_action(
+				'admin_init',
+				function (): void {
+					$this->container->get( WpmlPublicCopySync::class )->maybe_sync();
+				},
+				20
+			);
 		}
 
 		$this->container->get( BulkJobCliCommand::class )->register();
@@ -339,6 +350,18 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			WpmlDynamicStringTranslator::class,
+			static fn (): WpmlDynamicStringTranslator => new WpmlDynamicStringTranslator()
+		);
+
+		$this->container->singleton(
+			WpmlPublicCopyCatalog::class,
+			static fn ( ServiceContainer $container ): WpmlPublicCopyCatalog => new WpmlPublicCopyCatalog(
+				$container->get( WpmlDynamicStringTranslator::class )
+			)
+		);
+
+		$this->container->singleton(
 			AdminNoticeManager::class,
 			static fn (): AdminNoticeManager => new AdminNoticeManager()
 		);
@@ -375,7 +398,8 @@ final class Plugin {
 			static fn ( ServiceContainer $container ): BlocksStoreApiExtension => new BlocksStoreApiExtension(
 				$container->get( CartDeliverySelectionCapture::class ),
 				$container->get( CartDeliverySelectionRevalidator::class ),
-				$container->get( ShippingRateCalculationGate::class )
+				$container->get( ShippingRateCalculationGate::class ),
+				$container->get( WpmlLivePublicCopyPresenter::class )
 			)
 		);
 
@@ -423,7 +447,8 @@ final class Plugin {
 			static fn ( ServiceContainer $container ): IntegrationStatusCatalog => new IntegrationStatusCatalog(
 				$container->get( IntegrationRegistry::class ),
 				$container->get( BlocksUsageDetector::class ),
-				$container->get( BlocksCheckoutAdapter::class )
+				$container->get( BlocksCheckoutAdapter::class ),
+				$container->get( WpmlDynamicStringTranslator::class )
 			)
 		);
 
@@ -443,6 +468,25 @@ final class Plugin {
 		);
 
 		$this->register_repository_bindings();
+
+		$this->container->singleton(
+			WpmlLivePublicCopyPresenter::class,
+			static fn ( ServiceContainer $container ): WpmlLivePublicCopyPresenter => new WpmlLivePublicCopyPresenter(
+				$container->get( WpmlPublicCopyCatalog::class ),
+				$container->get( DeliveryOfferRepositoryInterface::class ),
+				$container->get( PickupLocationRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			WpmlPublicCopySync::class,
+			static fn ( ServiceContainer $container ): WpmlPublicCopySync => new WpmlPublicCopySync(
+				$container->get( WpmlPublicCopyCatalog::class ),
+				$container->get( DeliveryOfferRepositoryInterface::class ),
+				$container->get( PickupLocationRepositoryInterface::class ),
+				$container->get( DestinationZoneRepositoryInterface::class )
+			)
+		);
 
 		$this->container->singleton(
 			HealthCheckRegistry::class,
@@ -627,7 +671,8 @@ final class Plugin {
 			ProductDeliveryOptionsBuilder::class,
 			static fn ( ServiceContainer $container ): ProductDeliveryOptionsBuilder => new ProductDeliveryOptionsBuilder(
 				$container->get( DeliveryOfferRepositoryInterface::class ),
-				$container->get( PickupLocationRepositoryInterface::class )
+				$container->get( PickupLocationRepositoryInterface::class ),
+				$container->get( WpmlPublicCopyCatalog::class )
 			)
 		);
 
@@ -648,7 +693,8 @@ final class Plugin {
 				$container->get( Requirements::class ),
 				$container->get( ProductDeliveryConfigurationSourceInterface::class ),
 				$container->get( ProductDeliveryOptionsBuilder::class ),
-				$container->get( ProductDeliverySelectionValidator::class )
+				$container->get( ProductDeliverySelectionValidator::class ),
+				$container->get( WpmlLivePublicCopyPresenter::class )
 			)
 		);
 
@@ -699,7 +745,8 @@ final class Plugin {
 			ShippingPackageBuilder::class,
 			static fn ( ServiceContainer $container ): ShippingPackageBuilder => new ShippingPackageBuilder(
 				$container->get( ShippingRateCalculationGate::class ),
-				$container->get( CartDeliverySelectionCapture::class )
+				$container->get( CartDeliverySelectionCapture::class ),
+				$container->get( WpmlLivePublicCopyPresenter::class )
 			)
 		);
 
@@ -731,7 +778,8 @@ final class Plugin {
 				$container->get( PackageDestinationZoneResolver::class ),
 				$container->get( SelectedOfferShippingRateCalculator::class ),
 				$container->get( RateQuoteEngine::class ),
-				$container->get( DeliveryOfferRepositoryInterface::class )
+				$container->get( DeliveryOfferRepositoryInterface::class ),
+				$container->get( WpmlLivePublicCopyPresenter::class )
 			)
 		);
 
@@ -1007,7 +1055,8 @@ final class Plugin {
 				$container->get( DeliveryOfferValidator::class ),
 				$container->get( AdminActionHandler::class ),
 				$container->get( ConfigurationAuditLogger::class ),
-				$container->get( AdminRecordDependencyChecker::class )
+				$container->get( AdminRecordDependencyChecker::class ),
+				$container->get( WpmlPublicCopyCatalog::class )
 			)
 		);
 
@@ -1022,7 +1071,8 @@ final class Plugin {
 				$container->get( DestinationZoneTestMatcher::class ),
 				$container->get( AdminActionHandler::class ),
 				$container->get( ConfigurationAuditLogger::class ),
-				$container->get( AdminRecordDependencyChecker::class )
+				$container->get( AdminRecordDependencyChecker::class ),
+				$container->get( WpmlPublicCopyCatalog::class )
 			)
 		);
 
@@ -1033,7 +1083,8 @@ final class Plugin {
 				$container->get( PickupLocationValidator::class ),
 				$container->get( AdminActionHandler::class ),
 				$container->get( ConfigurationAuditLogger::class ),
-				$container->get( AdminRecordDependencyChecker::class )
+				$container->get( AdminRecordDependencyChecker::class ),
+				$container->get( WpmlPublicCopyCatalog::class )
 			)
 		);
 
@@ -1295,7 +1346,8 @@ final class Plugin {
 				$container->get( DestinationZoneValidator::class ),
 				$container->get( DestinationRuleValidator::class ),
 				$container->get( RateCardValidator::class ),
-				$container->get( PickupLocationValidator::class )
+				$container->get( PickupLocationValidator::class ),
+				$container->get( WpmlPublicCopyCatalog::class )
 			)
 		);
 

@@ -7,6 +7,7 @@ namespace CetechDeliveryEngine\Integrations\Status;
 use CetechDeliveryEngine\Integrations\Blocks\BlocksCheckoutAdapter;
 use CetechDeliveryEngine\Integrations\Blocks\BlocksUsageDetector;
 use CetechDeliveryEngine\Integrations\Registry\IntegrationRegistry;
+use CetechDeliveryEngine\Integrations\WPML\WpmlDynamicStringTranslator;
 
 /**
  * Builds honest operator-facing integration statuses from runtime detection.
@@ -24,7 +25,8 @@ final class IntegrationStatusCatalog {
 	public function __construct(
 		private IntegrationRegistry $registry,
 		private BlocksUsageDetector $blocks_usage,
-		private ?BlocksCheckoutAdapter $blocks_adapter = null
+		private ?BlocksCheckoutAdapter $blocks_adapter = null,
+		private ?WpmlDynamicStringTranslator $wpml_strings = null
 	) {
 	}
 
@@ -53,12 +55,70 @@ final class IntegrationStatusCatalog {
 	}
 
 	public function wpml(): IntegrationStatus {
-		return $this->stub_plugin_status(
+		$label   = __( 'WPML', 'cetech-woocommerce-delivery-engine' );
+		$version = $this->defined_version( 'ICL_SITEPRESS_VERSION' );
+		$active  = $this->wpml_strings instanceof WpmlDynamicStringTranslator
+			? $this->wpml_strings->is_wpml_present()
+			: (bool) ( $this->registry->get_detection_statuses()['wpml'] ?? false );
+		$installed = $active || $this->plugin_file_installed( 'wpml' );
+		$st_available = $this->wpml_strings?->is_string_translation_available() ?? false;
+
+		if ( ! $installed ) {
+			return new IntegrationStatus(
+				'wpml',
+				$label,
+				IntegrationStatus::STATE_NOT_INSTALLED,
+				null,
+				false,
+				false,
+				false,
+				false,
+				__( 'Not installed', 'cetech-woocommerce-delivery-engine' ),
+				__( 'WPML is not installed. Customer-facing Delivery Engine text uses the administrator source language.', 'cetech-woocommerce-delivery-engine' )
+			);
+		}
+
+		if ( ! $active ) {
+			return new IntegrationStatus(
+				'wpml',
+				$label,
+				IntegrationStatus::STATE_INSTALLED_INACTIVE,
+				$version,
+				true,
+				false,
+				false,
+				false,
+				__( 'Installed but inactive', 'cetech-woocommerce-delivery-engine' ),
+				__( 'WPML is installed but inactive. Customer-facing Delivery Engine text uses the administrator source language.', 'cetech-woocommerce-delivery-engine' )
+			);
+		}
+
+		if ( ! $st_available ) {
+			return new IntegrationStatus(
+				'wpml',
+				$label,
+				IntegrationStatus::STATE_DETECTED,
+				$version,
+				true,
+				true,
+				false,
+				false,
+				__( 'Detected — String Translation unavailable', 'cetech-woocommerce-delivery-engine' ),
+				__( 'WPML is detected, but String Translation is unavailable. Canonical Delivery Engine source strings render. Delivery rules, routing and pricing remain shared across languages.', 'cetech-woocommerce-delivery-engine' )
+			);
+		}
+
+		return new IntegrationStatus(
 			'wpml',
-			__( 'WPML', 'cetech-woocommerce-delivery-engine' ),
-			$this->defined_version( 'ICL_SITEPRESS_VERSION' ),
-			(bool) ( $this->registry->get_detection_statuses()['wpml'] ?? false ),
-			__( 'No Delivery Engine translation adapter is implemented in this release. Translated WooCommerce products remain separate product IDs.', 'cetech-woocommerce-delivery-engine' )
+			$label,
+			IntegrationStatus::STATE_SUPPORTED,
+			$version,
+			true,
+			true,
+			true,
+			true,
+			__( 'Supported', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Supported for customer-facing Delivery Engine text through WPML String Translation. Delivery rules, routing and pricing remain shared across languages. This status does not mean translations have been entered.', 'cetech-woocommerce-delivery-engine' )
 		);
 	}
 

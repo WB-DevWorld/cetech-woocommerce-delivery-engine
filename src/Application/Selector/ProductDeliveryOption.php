@@ -30,7 +30,8 @@ final class ProductDeliveryOption {
 		public readonly bool $is_default = false,
 		public readonly ?string $pickup_location_label = null,
 		public readonly ?string $pickup_address = null,
-		public readonly ?string $pickup_instructions = null
+		public readonly ?string $pickup_instructions = null,
+		public readonly ?int $pickup_location_id = null
 	) {
 	}
 
@@ -55,6 +56,7 @@ final class ProductDeliveryOption {
 			'pickup_location_label'             => $this->pickup_location_label,
 			'pickup_address'                    => $this->pickup_address,
 			'pickup_instructions'               => $this->pickup_instructions,
+			'pickup_location_id'                => $this->pickup_location_id,
 		];
 	}
 
@@ -78,7 +80,8 @@ final class ProductDeliveryOption {
 			! empty( $data['is_default'] ),
 			isset( $data['pickup_location_label'] ) ? (string) $data['pickup_location_label'] : null,
 			isset( $data['pickup_address'] ) ? (string) $data['pickup_address'] : null,
-			isset( $data['pickup_instructions'] ) ? (string) $data['pickup_instructions'] : null
+			isset( $data['pickup_instructions'] ) ? (string) $data['pickup_instructions'] : null,
+			isset( $data['pickup_location_id'] ) ? (int) $data['pickup_location_id'] : null
 		);
 	}
 
@@ -99,7 +102,8 @@ final class ProductDeliveryOption {
 			$is_default,
 			$this->pickup_location_label,
 			$this->pickup_address,
-			$this->pickup_instructions
+			$this->pickup_instructions,
+			$this->pickup_location_id
 		);
 	}
 }
