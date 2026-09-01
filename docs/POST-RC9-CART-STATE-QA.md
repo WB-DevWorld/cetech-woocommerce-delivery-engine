@@ -21,14 +21,16 @@ It is **not** RC.9, **not** RC.10, **not** Stage 15, and not a FLAIROC install.
 
 ## 2. Source and ZIP
 
-Filled after packaging from a clean committed tree. See the packaging section in the agent return / later checksum commit if added.
-
 | Item | Value |
 |------|--------|
 | Filename | `cetech-woocommerce-delivery-engine-1.0.0-dev.cartstate.1.zip` |
 | Version | `1.0.0-dev.cartstate.1` |
 | Schema | `5` |
 | Branch | `feat/post-rc9-cart-state` |
+| Implementation/source SHA | `39f61c1bc79e6248f1e64cdb945f62edf61b357b` |
+| Package-source commit | `39f61c1bc79e6248f1e64cdb945f62edf61b357b` |
+| Bytes | `1401258` |
+| SHA-256 | `5c72a87bdba7f77d2d2b66f7812f12fc448a2f84dc51748ab6c266d6a3175ecc` |
 | Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.cartstate.1.zip` |
 | Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.cartstate.1.zip` |
 | Build | `scripts/build-v1-rc-package.ps1 -Version 1.0.0-dev.cartstate.1 -ZipFileName cetech-woocommerce-delivery-engine-1.0.0-dev.cartstate.1.zip` (clean tree; **not** `-AllowDirty`) |
