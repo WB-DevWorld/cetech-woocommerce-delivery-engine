@@ -1,6 +1,6 @@
 # POST-RC.8 Blocks — `1.0.0-dev.blocks.4` Owner QA Package
 
-**Document status:** Packaged for owner physical QA of constrained Delivery Area fallback. Not RC.9. Not deployed.  
+**Document status:** Frozen packaged source for identity-only promotion to tagged `1.0.0-rc.9`. Schema `5`. Not a live FLAIROC change.  
 **Date:** 2026-09-01  
 **Branch:** `feat/post-rc8-integrations`  
 **QA identity:** `1.0.0-dev.blocks.4`  
@@ -87,4 +87,4 @@ Confirm:
 5. Accra + Greater Accra overlap still works; Air can still inherit Greater Accra pricing.
 6. Pickup remains free. International remains Air/Sea only. In Warehouse remains local delivery only.
 
-Do **not** begin RC.9.
+Promoted to tagged `1.0.0-rc.9` by owner authorization. See `docs/RC9-FINALIZATION.md`.

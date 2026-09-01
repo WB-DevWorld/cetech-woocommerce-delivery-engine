@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-dev.blocks.3
+Stable tag: 1.0.0-rc.9
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,12 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-rc.9 =
+* Promotes the frozen 1.0.0-dev.blocks.4 Cart/Checkout Blocks runtime to the tagged release candidate. Schema remains 5. No behaviour change versus Blocks.4. Not Stage 15. Historical 1.0.0-dev.blocks.1–blocks.4 packages and tagged 1.0.0-rc.8 remain unchanged.
+
+= 1.0.0-dev.blocks.4 =
+* Constrained Delivery Area fallback: a Fallback area with location rules stays inside those rules. Only a ruleless fallback is Everywhere else. Test an address uses the WooCommerce country selector. Schema remains 5. Tagged 1.0.0-rc.8 is unchanged.
 
 = 1.0.0-dev.blocks.3 =
 * Matched Delivery Area pricing fallback: a selected Delivery Option can use a broader matching area when the more-specific area has no rate card. Invalid specific-area rates stay fail-closed. Schema remains 5.
