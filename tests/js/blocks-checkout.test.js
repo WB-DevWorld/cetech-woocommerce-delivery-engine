@@ -70,3 +70,40 @@ describe('Blocks checkout pickup presentation', () => {
 		expect(extensions.has_managed_packages).toBe(true);
 	});
 });
+
+describe('Blocks cart reselection', () => {
+	it('selects cart items that need a new delivery option', () => {
+		const api = loadScript();
+		const needing = api.itemsNeedingReselection({
+			items: [
+				{
+					key: 'keep',
+					name: 'Valid item',
+					extensions: {
+						'cetech-delivery-engine': { needs_reselection: false }
+					}
+				},
+				{
+					key: 'stale',
+					name: 'Changed item',
+					extensions: {
+						'cetech-delivery-engine': {
+							needs_reselection: true,
+							cart_item_key: 'stale',
+							product_name: 'Cable',
+							reselection_message: 'Delivery options for “Cable” have changed.',
+							reselection_options: [
+								{ display_key: 'in_warehouse:delivery:20', label: 'Option B', estimate_text: '2 days' }
+							]
+						}
+					}
+				}
+			]
+		});
+
+		expect(needing).toHaveLength(1);
+		expect(needing[0].key).toBe('stale');
+		expect(needing[0].name).toBe('Cable');
+		expect(needing[0].options[0].display_key).toBe('in_warehouse:delivery:20');
+	});
+});

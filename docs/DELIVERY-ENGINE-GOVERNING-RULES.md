@@ -5,6 +5,7 @@
 **Plugin:** CETECH WooCommerce Delivery Engine  
 **Current protected runtime baseline:** tagged `1.0.0-rc.9` (schema `5`)  
 **Previous protected published tag:** `1.0.0-rc.8` (schema `5`; **do not retag**)  
+**Current development tree:** `1.0.0-dev.cartstate.1` on `feat/post-rc9-cart-state` (schema `5`). Tagged RC.9 remains schema `5` and must not be retagged or rebuilt.  
 **Schema target:** `5` on tagged `1.0.0-rc.9`, `1.0.0-rc.8`, and `1.0.0-rc.7`. Tagged RC.6 remains schema `4`.  
 **Text domain:** `cetech-woocommerce-delivery-engine`
 

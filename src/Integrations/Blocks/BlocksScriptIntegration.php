@@ -72,6 +72,10 @@ final class BlocksScriptIntegration {
 				'cetechDeBlocks',
 				[
 					'namespace' => BlocksCheckoutAdapter::NAMESPACE,
+					'i18n'      => [
+						'update' => __( 'Update delivery option', 'cetech-woocommerce-delivery-engine' ),
+						'choose' => __( 'Choose a delivery option', 'cetech-woocommerce-delivery-engine' ),
+					],
 				]
 			);
 		}
