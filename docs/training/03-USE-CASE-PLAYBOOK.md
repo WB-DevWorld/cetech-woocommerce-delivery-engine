@@ -1,7 +1,7 @@
 # Use-Case Playbook
 
 **Audience:** Experienced staff and administrators  
-**Version:** 1.0.0-rc.6  
+**Version:** 1.0.0-rc.8 (schema 5; training-site package `1.0.0-dev.blocks.3`)  
 **QA fixtures:** #39705 (simple), #39717 (parent), #39718 (A), #39719 (B)  
 **Everyday system:** Site-wide Defaults + Product Exceptions. When shipment records are on, also **Delivery Engine → Shipments**.
 
@@ -9,7 +9,11 @@ Each use case includes: Goal, When, Starting point, Steps, What you should see, 
 
 Screenshots are deferred. Follow the live screens.
 
-**Shipments:** Use cases 20–30. Full how-to: [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md). Old menu names from older guides: [Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md).
+**Shipments:** Use cases 20–30. Full how-to: [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md).  
+**Checkout, overlapping areas, mixed carts:** Use cases 31–40.  
+**Bulk Tools (administrators):** Use cases 41–42.  
+**Tick every feature:** [13 — Feature coverage and confirmation](13-FEATURE-COVERAGE-AND-CONFIRMATION.md).  
+Old menu names from older guides: [Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md).
 
 ---
 
@@ -387,3 +391,143 @@ Screenshots are deferred. Follow the live screens.
 **Order impact:** Creating the same delivery group twice does not duplicate it.  
 **Common mistake:** Inventing a pickup shipment.  
 **Verify:** Shipment list matches delivery groups only.
+
+---
+
+## USE CASE 31 — Test an address: Primary match and Also matches
+
+**Goal:** See every Delivery Area that covers a sample address.  
+**When:** A city sits inside a region (for example Accra inside Greater Accra), or staff need to confirm coverage.  
+**Starting point:** **Delivery Engine → Delivery Areas** → **Test an address**.  
+**Steps:** Enter country `GH` (or the store country), region `AA` or `Greater Accra`, city `Accra` if that area exists. Click **Run test**. Repeat once with the region name and once with the short code.  
+**What you should see:** **Primary match** is the more-specific area (usually the city). **Also matches** lists the broader area (usually the region). Nested overlap is normal, not an error.  
+**Customer impact:** Checkout can still quote the selected Delivery Option using a broader area’s charge when the city has none for that option.  
+**Common mistake:** Treating Also matches as a warning, or rewriting areas so only one can match.  
+**Verify:** Both the region name and the short code name the same areas.
+
+---
+
+## USE CASE 32 — City has no charge; broader area supplies the selected option
+
+**Goal:** Confirm overlapping-area pricing without duplicating charges onto every city.  
+**When:** Air (or another option) is priced on Greater Accra (region) but not on Accra (city).  
+**Starting point:** Delivery Charges for the region option, then Classic or Blocks checkout with an Accra address.  
+**Steps:** Select that Delivery Option on a QA product. Checkout to Accra / Greater Accra / Ghana. Do **not** copy the region charge onto the city area “to make it work.”  
+**What you should see:** The selected option still shows the region’s configured fee. The option name does not change.  
+**Customer impact:** Correct fee for the option they chose.  
+**Common mistake:** Duplicating Air onto every city Delivery Area.  
+**Verify:** Fee matches the broader area’s Delivery Charge for that same option.
+
+---
+
+## USE CASE 33 — Invalid city charge does not silently inherit
+
+**Goal:** Fail closed when the more-specific area has a broken charge for the selected option.  
+**When:** A city Delivery Charge for that option is missing amount, negative, or unusable, while the region still has a valid charge.  
+**Steps:** Do **not** create this on production. On QA only, an administrator may demonstrate that checkout does **not** take the region fee when the city charge for the same option is invalid. Then restore.  
+**What you should see:** Checkout does not invent a fee. Missing or invalid configuration never becomes silent free shipping.  
+**Common mistake:** Assuming any overlapping area can always fill in.  
+**Verify:** The selected Delivery Option is not replaced with a different option.
+
+---
+
+## USE CASE 34 — Mixed In Store Delivery and Store pickup in one cart
+
+**Goal:** Delivery and pickup can sit in the same cart without a false pricing error.  
+**When:** One In Store item uses Delivery; another uses Store pickup.  
+**Starting point:** QA products configured for each path. Empty the training cart first.  
+**Steps:** Add the Delivery item (select its Delivery option). Add the Pickup item (select Store pickup). Open cart, then Classic and/or Blocks checkout.  
+**What you should see:** Delivery line shows the real fee (example GHS 50). Pickup shows FREE / 0.00. No message that “Delivery pricing is not available.” Pickup is not presented as shipping to the customer address.  
+**Customer impact:** Both choices stay as selected.  
+**Common mistake:** Forcing both lines onto one shipping method, or treating pickup 0 as a missing rate.  
+**Verify:** Both Classic and Blocks if the store uses both.
+
+---
+
+## USE CASE 35 — Store pickup at 0.00 is valid
+
+**Goal:** Explicit free pickup is allowed.  
+**When:** Pickup is configured with amount 0.  
+**Steps:** Checkout a pickup-only QA cart.  
+**What you should see:** Shipping amount 0.00 / FREE for pickup. Place Order is not blocked for “missing price.”  
+**Common mistake:** Treating 0 as the same as a missing Delivery Charge.  
+**Verify:** A genuine missing Delivery option charge still fail-closes; pickup 0 does not.
+
+---
+
+## USE CASE 36 — International Air or Sea only, including a single option
+
+**Goal:** International checkout never offers local delivery or pickup.  
+**When:** International Site-wide Defaults list Air and/or Sea only.  
+**Steps:** Open an International QA product. Confirm only Air and/or Sea. If only one of those is assigned, checkout uses that option (no extra customer choice required for a second mode that does not exist).  
+**What you should see:** No Standard Delivery, no Store pickup, no warehouse-only option.  
+**Common mistake:** Adding a local Delivery Option to International “so checkout has something.”  
+**Verify:** Preview Ready; checkout fee matches the Air or Sea Delivery Charge for the destination.
+
+---
+
+## USE CASE 37 — In Warehouse stays on local delivery
+
+**Goal:** Warehouse products do not leak Air, Sea, or pickup.  
+**When:** In Warehouse Site-wide Defaults.  
+**Steps:** Open a warehouse-path QA product. Confirm local Delivery Options only.  
+**What you should see:** Ready; local delivery; customers still do not see an “In Warehouse” heading.  
+**Common mistake:** Assigning International Air/Sea or Store pickup to warehouse defaults.  
+**Verify:** Product page + Preview.
+
+---
+
+## USE CASE 38 — Classic Checkout shows the Delivery Engine fee
+
+**Goal:** Prove Classic Checkout on the live theme/pages.  
+**When:** The store still has Classic cart/checkout, or you are regression-checking Classic.  
+**Steps:** QA product → select option → Classic cart → Classic checkout with a matching address. Stop before paying unless authorised.  
+**What you should see:** Shipping line uses the public Delivery Option name and the configured charge.  
+**Common mistake:** Switching the whole store to Blocks to “fix” Classic, or the reverse.  
+**Verify:** Amount matches Delivery Charges.
+
+---
+
+## USE CASE 39 — Cart/Checkout Blocks shows the same fee
+
+**Goal:** Prove WooCommerce Cart and Checkout **Blocks**.  
+**When:** The cart or checkout page uses Blocks (Settings may show Blocks currently in use).  
+**Steps:** Repeat use case 38 on the Blocks cart and Blocks checkout. Confirm mixed pickup (use case 34) on Blocks as well if pickup is offered.  
+**What you should see:** Same selected option, same fee, same public label as Classic. No experimental Settings checkbox is required to “turn Blocks on.”  
+**Common mistake:** Looking for a Delivery Engine “enable Checkout Blocks” switch, or treating a WooCommerce Blocks warning as proof the adapter is missing.  
+**Verify:** Settings **WooCommerce Cart & Checkout Blocks** status row; live Blocks checkout fee.
+
+---
+
+## USE CASE 40 — Leftover WooCommerce Flat rate / Local pickup must not replace Delivery Engine
+
+**Goal:** Managed Delivery Engine packages fail closed instead of quoting native leftovers.  
+**When:** A WooCommerce zone still has Flat rate or Local pickup beside **Delivery**.  
+**Steps:** Put a Delivery Engine item in the cart. Checkout.  
+**What you should see:** The customer is not quietly charged the native Flat rate / Local pickup instead of the Delivery Engine fee. Missing Delivery Engine pricing does not become $0.  
+**Common mistake:** Adding Flat rate “as a backup.”  
+**Verify:** Ask an administrator before disabling leftover methods on a live zone.
+
+---
+
+## USE CASE 41 — Bulk Tools catalog Preview before Apply (Administrators)
+
+**Goal:** Change many products only after a Preview.  
+**When:** Authorised catalog work during a change window. Prefer QA targets.  
+**Starting point:** **Delivery Engine → Bulk Tools → Catalog**.  
+**Steps:** Choose targets → choose the action → **Preview**. Read Would fail vs ready. Apply **only** when the preview is safe. Watch **Jobs / History**.  
+**What you should see:** Preview counts. Background job, not an instant freeze of the whole catalogue.  
+**Common mistake:** Clicking Apply on a failed preview, or Apply repeatedly.  
+**Verify:** Jobs / History shows the job. Restore QA with rollback if you applied.
+
+---
+
+## USE CASE 42 — Bulk Tools Validation Scan and charge rollback (Administrators)
+
+**Goal:** Scan for unsafe catalog states; preview a charge change.  
+**Starting point:** **Bulk Tools → Validation & Cleanup** and **Charges**.  
+**Steps:** Run Validation Scan. It reports problems; it does not invent free shipping. On **Charges**, preview an amount change on QA only. Apply and rollback only with authorisation.  
+**What you should see:** A report, then (if authorised) a reversible charge job.  
+**Common mistake:** Importing a configuration package onto production without a window.  
+**Verify:** After rollback, the QA charge is the previous amount.
+

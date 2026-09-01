@@ -3,9 +3,9 @@
 **Audience:** Technical support and developers **only**  
 **Normal staff should not require this document.**
 
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.6**  
-**Schema target:** `4`  
-**Release identity:** Git tag `v1.0.0-rc.6` (do not rewrite). Tags `v1.0.0-rc.5`, `v1.0.0-rc.4`, `v1.0.0-rc.3`, and `v1.0.0-rc.2` remain untouched.
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.8** (schema **5**). Training-site package **`1.0.0-dev.blocks.3`** (Cart/Checkout Blocks + overlapping Delivery Area pricing).  
+**Schema target:** `5`  
+**Release identity:** Git tag `v1.0.0-rc.8` (do not rewrite). Tags `v1.0.0-rc.7` through `v1.0.0-rc.2` remain untouched. This is not RC.9.
 
 If WordPress shows a different plugin version, stop and confirm which package is installed before following this appendix.
 
@@ -21,12 +21,13 @@ If you are store staff configuring products day to day, use:
 - [03-USE-CASE-PLAYBOOK](03-USE-CASE-PLAYBOOK.md)
 - [07-TROUBLESHOOTING-FAQ](07-TROUBLESHOOTING-FAQ.md)
 - [11-STAGE-14-SHIPMENTS](11-STAGE-14-SHIPMENTS.md) (when **Shipments** is in the menu)
+- [13-FEATURE-COVERAGE-AND-CONFIRMATION](13-FEATURE-COVERAGE-AND-CONFIRMATION.md)
 
 ---
 
 ## Feature flags (operational names)
 
-Required production switches (Classic Checkout environment):
+Required production switches (Classic Checkout **and** Cart/Checkout Blocks):
 
 - Use Site-wide Defaults at checkout — ON  
 - Use Site-wide Defaults for product variations — ON  
@@ -36,7 +37,7 @@ Required production switches (Classic Checkout environment):
 - Show delivery fees at checkout — ON  
 - Save delivery details on orders — ON  
 
-Shipment records and customer tracking links stay **OFF** until an Administrator turns them on in Settings. Not in this release: customer timeline, Checkout Blocks, carrier APIs, automatic tracking updates, shipment emails.
+Shipment records and customer tracking links stay **OFF** until an Administrator turns them on in Settings. Not in this release: customer timeline, carrier APIs, automatic tracking updates, Delivery Engine shipment emails. Cart/Checkout Blocks **are** implemented (`1.0.0-dev.blocks.3` on the training site). Settings shows Blocks and optional integrations as **status**, not experimental checkboxes.
 
 Do not flip Advanced cutover switches without a change window and owner approval.
 
@@ -77,28 +78,28 @@ Administrator lockout repair is **Restore Administrator Access**, authorised by 
 ## Runtime compatibility notes
 
 - WooCommerce is authoritative for commerce workflows; HPOS-compatible order CRUD.  
-- Classic Checkout is the verified path.  
+- Classic Checkout remains available. Cart/Checkout Blocks use the same Delivery Engine pricing, validation, and order snapshots.  
 - Core must not depend on WoodMart.  
 - Never trust browser-submitted authoritative delivery prices.  
-- Missing / malformed / nonnumeric rates fail closed — never silent free shipping. Explicit configured numeric zero is allowed.  
+- Missing / malformed / nonnumeric rates fail closed — never silent free shipping. Explicit configured numeric zero is allowed (including Store pickup).  
 - Never silently replace a customer’s selected Delivery Option.  
 - International Delivery = Air and/or Sea only. Air and Sea are separate delivery groups / shipments.  
+- In Warehouse = local delivery only (no Air/Sea/pickup leak).  
+- Matched overlapping Delivery Areas: quote the same selected option against broader matches only when the more-specific area has **no matching charge** for that option. Invalid more-specific charges fail closed.  
 - Store pickup is not a delivery shipment.  
 - Suppliers, origins, and private logistics stay off customer surfaces.  
 - Historical order delivery snapshots remain immutable. Shipments are built from that saved order data, not from today’s product settings.  
-- Do not start Stage 15, Checkout Blocks, carrier APIs, or other future work from this appendix.
+- Do not start Stage 15, carrier APIs, WPML/WCML/WCFM/VitePOS adapters, or RC.9 from this appendix.
 
 ---
 
 ## Rollback / release identity
 
-- Current package: `cetech-woocommerce-delivery-engine-1.0.0-rc.6.zip` (`1059918` bytes, SHA-256 `0d4adbef50462d798a4ff9bf802643bed92a35cdd332ceee13a985dbda2a689d`, source `7e52525`)  
-- Full RC.6 record: `docs/STAGE-14H-RC6-FINAL.md`  
-- Prior RC.6 QA packages `cetech-woocommerce-delivery-engine-1.0.0-rc.6-qa.1.zip` and `cetech-woocommerce-delivery-engine-1.0.0-rc.6-qa.2.zip` remain immutable  
-- Protected historical package `cetech-woocommerce-delivery-engine-1.0.0-rc.5.zip` (`1043995` bytes, SHA-256 `7f9ad300a2d7198b7f0e70f1cd0819351e35430fd5ca843dac7c24ce9f96d66c`, source `e0b4613`)  
-- Immediate prior published rollback: tagged `v1.0.0-rc.5` (RC.5 ZIP remains available)  
-- Do not alter tags `v1.0.0-rc.6`, `v1.0.0-rc.5`, `v1.0.0-rc.4`, `v1.0.0-rc.3`, or `v1.0.0-rc.2`.  
-- Do not retag RC.5 or earlier. Do not overwrite historical QA ZIPs.
+- Protected published baseline: tagged `v1.0.0-rc.8`, schema `5`. Do not retag RC.8 or earlier.  
+- Training-site Blocks package: `1.0.0-dev.blocks.3` (not RC.9). Record: `docs/POST-RC8-BLOCKS-3-MATCHED-AREA-PRICING.md`.  
+- Historical tagged `v1.0.0-rc.7` (schema `5`) and `v1.0.0-rc.6` (schema `4`) remain untouched.  
+- Historical RC.6 package `cetech-woocommerce-delivery-engine-1.0.0-rc.6.zip` remains immutable (`1059918` bytes, SHA-256 `0d4adbef50462d798a4ff9bf802643bed92a35cdd332ceee13a985dbda2a689d`, source `7e52525`). Full RC.6 record: `docs/STAGE-14H-RC6-FINAL.md`.  
+- Do not alter tags `v1.0.0-rc.8` through `v1.0.0-rc.2`. Do not overwrite historical QA ZIPs.
 
 Staff training markdown lives in `docs/training/` in the plugin repository. It is **not** gitignored. Screenshot/video binaries and `training/playwright/` auth stay gitignored. Training docs are **not** part of the production plugin ZIP.
 
@@ -114,9 +115,10 @@ Staff training markdown lives in `docs/training/` in the plugin repository. It i
 
 - `docs/PROJECT-GOVERNANCE.md`
 - `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`
-- `docs/ADMIN-UI-LANGUAGE-GUIDE.md` (some page names still describe earlier stages; **live 1.0.0-rc.6 menus win**)
-- `docs/AI-HANDOFF.md` (current implementation status)
-- `docs/STAGE-14H-RC6-FINAL.md`
+- `docs/ADMIN-UI-LANGUAGE-GUIDE.md` (some page names still describe earlier stages; **live menus win**)  
+- `docs/AI-HANDOFF.md` (current implementation status)  
+- `docs/RC8-FINALIZATION.md`  
+- `docs/POST-RC8-BLOCKS-3-MATCHED-AREA-PRICING.md`
 - `docs/STAGE-14H-FINAL.md`
 - `docs/STAGE-14F-SHIPMENT-OPERATIONS-WORKFLOW.md`
 - Stage/phase implementation records under `docs/`

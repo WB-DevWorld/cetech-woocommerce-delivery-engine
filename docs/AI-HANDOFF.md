@@ -2,7 +2,8 @@
 
 ## CURRENT IMPLEMENTATION STATUS — V1 RC (read first)
 
-**Last updated:** 2026-08-31  
+**Last updated:** 2026-09-01  
+**Staff training:** `docs/training/` updated for RC.8 operational features plus Cart/Checkout Blocks and overlapping Delivery Area pricing (`1.0.0-dev.blocks.3`). Coverage matrix: `docs/training/13-FEATURE-COVERAGE-AND-CONFIRMATION.md`. Videos remain deferred; trainers tick live Pass/Fail/N/A. Not RC.9. FLAIROC not modified.  
 **Plugin version:** development identity **`1.0.0-dev.blocks.3`** on `feat/post-rc8-integrations` (starts from tagged `v1.0.0-rc.8`). Tagged/protected published baseline remains **`1.0.0-rc.8`** (schema `5`, tag `v1.0.0-rc.8`). Matched Delivery Area pricing fallback after blocks.2 physical QA. Do not retag RC.2–RC.8. Do not rebuild the RC.6, RC.7, or RC.8 ZIP. Do not begin Stage 15. FLAIROC must not be modified. Historical tagged **`1.0.0-rc.7`** (schema `5`) and **`1.0.0-rc.6`** (schema `4`) remain untouched.  
 **Post-RC.8 Settings honesty + Cart/Checkout Blocks:** **BLOCKS.3 REPAIR** — identity `1.0.0-dev.blocks.3`, schema **`5`**. Ordered matched-area pricing fallback: `docs/POST-RC8-BLOCKS-3-MATCHED-AREA-PRICING.md`. Blocks.2 mixed Pickup repair remains historical. Classic unchanged. FLAIROC not modified. RC.8 tag untouched.  
 **Post-RC.7 fulfilment correctness:** **PROMOTED TO `1.0.0-rc.8`** — owner physical QA of `1.0.0-dev.fulfilment.4` on training.cetechbpa.com: **ALL THREE SCENARIOS PASSED**. Canonical record: `docs/RC8-FINALIZATION.md`. Schema **`5`**. Not Stage 15. FLAIROC not modified. Owner RC.8 confirmation is install/Active/version/schema plus one PDP and one admin page only.  

@@ -1,7 +1,7 @@
 # How to use each Delivery Engine menu
 
 **Audience:** New staff — start here if you are new to this plugin  
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.6**  
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.8** (schema **5**; training-site package `1.0.0-dev.blocks.3`)  
 **Open:** WordPress admin left menu → **Delivery Engine** (location-pin icon)
 
 This guide is only about the plugin. Each section is one menu. For every menu you get **how to open it, how to do the work, what to type, which button to press, and how to check it**.
@@ -33,7 +33,8 @@ If a menu name is not in the list below, stop and ask an administrator.
 8. Settings  
 9. Product Exceptions  
 10. Needs Attention  
-11. Shipments (only after you turn that setting on)
+11. **Bulk Tools** (administrators / authorised catalog staff)  
+12. Shipments (only after you turn that setting on)
 
 The product **Delivery** tab and **Preview Delivery** are plugin screens too. They live on the WooCommerce product editor, not in the left menu.
 
@@ -43,7 +44,7 @@ WooCommerce also needs this plugin’s shipping method, named **Delivery**, on a
 
 Do the work in this order so each screen has what it needs:
 
-**Setup Guide** (if showing) → **Delivery Options** → **Delivery Areas** → **Delivery Charges** → **Pickup Locations** (only if you offer pickup) → **Site-wide Defaults** → **Settings** → **add Delivery in WooCommerce shipping** → **Overview** → product **Delivery** tab and **Preview** → shop check → **Product Exceptions** / **Needs Attention** as needed → **Shipments** last.
+**Setup Guide** (if showing) → **Delivery Options** → **Delivery Areas** → **Delivery Charges** → **Pickup Locations** (only if you offer pickup) → **Site-wide Defaults** → **Settings** → **add Delivery in WooCommerce shipping** → **Overview** → product **Delivery** tab and **Preview** → shop check → **Product Exceptions** / **Needs Attention** as needed → **Shipments** last. **Bulk Tools** is not part of first-time setup.
 
 ---
 
@@ -224,7 +225,8 @@ Where you deliver. Together with a charge, this decides the fee for the customer
    - **Region**, **City**, **Postcode** if you used those conditions  
    If the area uses **State / Region**, test once with the name (for example `Greater Accra`) and once with the checkout short code (for example `AA`). Both should name the **same** area.  
 4. Click **Run test**.  
-5. Read **Result.** It should name this area.
+5. Read **Primary match.** It should name the most specific area (for example Accra city before Greater Accra region).  
+6. If more than one area covers the address, read **Also matches.** Nested city-inside-region is normal. Pricing can use a charge from a broader matching area when the selected Delivery Option has no charge in the city. A different Delivery Option is never substituted.
 
 ## How to edit an area
 
@@ -233,7 +235,7 @@ Where you deliver. Together with a charge, this decides the fee for the customer
 3. Click **Save Delivery Area**.  
 4. Run **Test an address** again.
 
-**Check:** The test matches, including both the region name and the checkout short code when you used a State / Region condition. You can pick this area on a Delivery Charge.
+**Check:** The test matches, including both the region name and the checkout short code when you used a State / Region condition. Primary match / Also matches make sense for overlapping city and region. You can pick this area on a Delivery Charge. Do **not** copy the same charge onto every city so Air “works.”
 
 ---
 
@@ -384,7 +386,9 @@ Under Setup Guide, click **Run Setup Guide Again**. Review mode does not wipe ex
 
 ## Advanced
 
-Leave it collapsed. Do not turn on Checkout Blocks.
+Leave it collapsed. Cart and Checkout Blocks work when WooCommerce uses those pages. Settings shows **WooCommerce Cart & Checkout Blocks** as status, not an experimental checkbox. Do not flip leftover experimental switches to “fix” shipping.
+
+**Optional integrations** lists detected plugins. These are not on/off compatibility switches.
 
 **Check:** General shows Active, Complete, Ready. A product on the shop shows delivery choices.
 
@@ -475,11 +479,12 @@ Then close and return to the plugin.
 - Do not use WooCommerce **Flat rate** to copy this plugin’s prices.  
 - Do not expect a missing Delivery Charge to become free shipping.  
 - Do not confuse this WooCommerce zone with **Delivery Engine → Delivery Areas**. Areas still need a matching charge.  
-- Do not turn on Checkout Blocks in Delivery Engine Settings to “fix” shipping. Classic Checkout is the supported path.
+- Do not look for a Delivery Engine checkbox that “turns on Checkout Blocks.” Classic and Blocks both use the same Delivery Engine fees.  
+- Do not add Flat rate or Local pickup as a backup for Delivery Engine packages. Leftover native methods must not quietly replace this plugin’s fee.
 
-If other methods (Flat rate, Free shipping) are already on the same zone, customers may see more than one WooCommerce shipping row. Ask an administrator before disabling those leftovers.
+If other methods (Flat rate, Free shipping) are already on the same zone, ask an administrator before disabling those leftovers. For a Delivery Engine cart, native leftovers must not become the charged method.
 
-**Check:** The WooCommerce zones you intend to use list **Delivery** and it is enabled. Rest of the World only if you chose to support it. Plugin **WooCommerce shipping** = **Ready**. On checkout, with a matching address and a selected Delivery option, the shipping amount matches the Delivery Charge.
+**Check:** The WooCommerce zones you intend to use list **Delivery** and it is enabled. Rest of the World only if you chose to support it. Plugin **WooCommerce shipping** = **Ready**. On checkout (Classic **and** Blocks if the store uses both), with a matching address and a selected Delivery option, the shipping amount matches the Delivery Charge.
 
 ---
 
@@ -655,6 +660,49 @@ More jobs: [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md) and playbook us
 
 ---
 
+# How to use Bulk Tools
+
+**Menu:** **Delivery Engine → Bulk Tools**
+
+**What it is for**  
+Preview large catalog or Delivery Charge changes, then apply them in the background. Not everyday product editing.
+
+**Who**  
+Administrators and authorised catalog staff.
+
+## How to open it
+
+1. Click **Delivery Engine → Bulk Tools**.  
+2. Use the tabs: **Catalog**, **Import / Export**, **Validation & Cleanup**, **Jobs / History**, **Charges**.
+
+## How to preview a catalog change
+
+1. Open **Catalog**.  
+2. Choose the products (prefer QA in training).  
+3. Choose the action.  
+4. Click the **Preview** control on that screen.  
+5. Read whether targets would fail or are ready.  
+6. Apply **only** when the preview is safe, during a change window.  
+7. Open **Jobs / History** and wait. Do not click Apply again.
+
+## How to scan for problems
+
+1. Open **Validation & Cleanup**.  
+2. Run the Validation Scan.  
+3. Use the report. The scan does not invent free shipping.
+
+## How to change a charge in bulk
+
+1. Open **Charges**.  
+2. Preview an amount change on QA only.  
+3. Apply and, if needed, **rollback** from Jobs / History only with authorisation.
+
+**Do not** import a configuration package onto production without a change window. **Do not** Apply a failed preview.
+
+**Check:** You can name the five tabs and explain Preview → Apply → Jobs. Practice jobs: playbook 41–42.
+
+---
+
 # 14. How to check what customers see
 
 This is still the plugin. It is not a left-menu item.
@@ -662,10 +710,11 @@ This is still the plugin. It is not a left-menu item.
 1. Open a product that inherits Site-wide Defaults (**View** on the product).  
 2. Confirm: radio, **bold** public option name, **Estimated delivery:** line.  
 3. Select the option. Add to cart. Confirm the cart still shows it.  
-4. Go to checkout. Use an address in the same country (and city if your area used a city).  
+4. Go to checkout (**Classic** and, if the store uses them, **Cart/Checkout Blocks**). Use an address in the same country (and city if your area used a city).  
 5. Confirm the shipping line amount matches the Delivery Charge and the label prefers the option name.  
-6. Stop before paying unless an administrator authorised a test order.  
-7. For a variable product, select the variation **first**, then the delivery choice, then switch variations and confirm the options refresh.
+6. If you offer pickup, add a pickup item with a delivery item. Delivery keeps its fee; pickup may be FREE / 0.00; there is no false “Delivery pricing is not available.”  
+7. Stop before paying unless an administrator authorised a test order.  
+8. For a variable product, select the variation **first**, then the delivery choice, then switch variations and confirm the options refresh.
 
 Customers must not see “In Warehouse”, supplier names, or internal codes.
 
@@ -675,14 +724,20 @@ Customers must not see “In Warehouse”, supplier names, or internal codes.
 
 - [ ] You can open each everyday Delivery Engine menu and say what it does  
 - [ ] You can add a Delivery Option, Area, and Charge and save them  
-- [ ] Test an address matches your area (if you used State / Region, both the checkout name and the short code match the same area)  
+- [ ] Test an address matches your area (region name **and** short code). Primary match / Also matches make sense for city-in-region  
+- [ ] A city without a charge for an option can use the broader area’s charge for **that same option**. You did not copy Air onto every city  
 - [ ] Site-wide Defaults are saved; Preview is **Ready**  
 - [ ] **Delivery** is enabled on the WooCommerce zones where you want this plugin to operate (Rest of the World only if you intend to support leftover addresses)  
-- [ ] Settings show Active / shipping Ready; Advanced left alone  
-- [ ] Shop shows option + estimate; checkout shows the real fee  
+- [ ] Settings show Active / shipping Ready; Advanced left alone; Blocks is a status row, not a toggle  
+- [ ] Shop shows option + estimate; Classic **and** Blocks checkout (whichever the store uses) show the real fee  
+- [ ] Mixed Delivery + Pickup (if offered): real delivery fee + pickup FREE / 0.00; no false missing-price warning  
+- [ ] International is Air/Sea only; In Warehouse is local delivery only  
 - [ ] You can customize one product field and reset it  
 - [ ] Needs Attention is empty or you know how to Fix Now  
 - [ ] You only open Shipments after that setting is on  
+- [ ] Bulk Tools: you know Preview before Apply, or you will not open it  
+
+Every box is also on [13 — Feature coverage and confirmation](13-FEATURE-COVERAGE-AND-CONFIRMATION.md).  
 
 If something fails: [07 — Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md). Stay in these menus. Do not edit PHP. Do not change delivery details on an old paid order.
 
@@ -695,3 +750,7 @@ If something fails: [07 — Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md). Sta
 - [02 — Complete Administrator Guide](02-COMPLETE-ADMIN-GUIDE.md)  
 - [03 — Use-Case Playbook](03-USE-CASE-PLAYBOOK.md)  
 - [04 — Visual Walkthrough](04-VISUAL-WALKTHROUGH.md)  
+- [05 — Staff Training Manual](05-STAFF-TRAINING-MANUAL.md)  
+- [07 — Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md)  
+- [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md)  
+- [13 — Feature coverage and confirmation](13-FEATURE-COVERAGE-AND-CONFIRMATION.md)  

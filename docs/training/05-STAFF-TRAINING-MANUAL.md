@@ -1,7 +1,7 @@
 # Staff Training Manual (self-paced)
 
 **Audience:** New and returning staff  
-**Version:** CETECH Delivery Engine 1.0.0-rc.6  
+**Version:** CETECH Delivery Engine **1.0.0-rc.8** (schema **5**; training-site package `1.0.0-dev.blocks.3`)  
 **Everyday home:** Delivery Engine → Overview  
 **Practice products:** Simple QA **#39705**; Variable QA **#39717** / A **#39718** / B **#39719**
 
@@ -71,7 +71,7 @@ Wrong menu = wrong changes. Options, Areas, and Charges work together; Site-wide
 [04-VISUAL-WALKTHROUGH](04-VISUAL-WALKTHROUGH.md) sections 2–10. Skim [02-COMPLETE-ADMIN-GUIDE](02-COMPLETE-ADMIN-GUIDE.md).
 
 ## 4. Do it yourself
-Open each everyday page once (read-only): Overview, Site-wide Defaults, Delivery Options, Delivery Areas, Delivery Charges, Pickup Locations, Product Exceptions, Needs Attention. If **Shipments** is in the menu, open the list read-only. Do not change Settings switches.
+Open each everyday page once (read-only): Overview, Site-wide Defaults, Delivery Options, Delivery Areas, Delivery Charges, Pickup Locations, Product Exceptions, Needs Attention. If **Shipments** is in the menu, open the list read-only. If **Bulk Tools** is in the menu, note it as administrator-only — do not run Apply. Do not change Settings switches.
 
 ## 5. Check your result
 You can say which page sets store defaults, which lists customer-facing option names, and which sets fees.
@@ -241,10 +241,10 @@ Customers pay the fee shown at checkout. Missing charges must not become silent 
 Visual Walkthrough sections 5–6 and 16. Playbook use cases 14 and 16.
 
 ## 4. Do it yourself
-Open Delivery Areas and Delivery Charges read-only. Find how an area and an option pair to a fee. If an area uses **State / Region**, notice that the checkout name and the short code (for example `Greater Accra` and `AA`) are the same place. Do not edit production rates without authorisation.
+Open Delivery Areas and Delivery Charges read-only. Find how an area and an option pair to a fee. If an area uses **State / Region**, notice that the checkout name and the short code (for example `Greater Accra` and `AA`) are the same place. Run **Test an address** if a trainer asks, and read **Primary match** / **Also matches**. Do not edit production rates without authorisation. Do not copy the same charge onto every city.
 
 ## 5. Check your result
-You can describe: customer address → area match → charge for selected option → shipping line (public option label + amount).
+You can describe: customer address → area match (Primary / Also matches) → charge for the selected option (city first, broader area only if that option has no city charge) → shipping line (public option label + amount).
 
 ## 6. Common mistakes
 Changing fees on the order instead of Delivery Charges; assuming quantity always multiplies a shared delivery fee.
@@ -266,7 +266,7 @@ Explain why two compatible items might share one 25.00 charge without using deve
 # MODULE 8 — What customers experience
 
 ## 1. What you are learning
-The compact product selector, thank-you / My Account / email **Delivery details**, and what “good” looks like.
+The compact product selector, thank-you / My Account / email **Delivery details**, and what “good” looks like on **Classic Checkout** and **Cart/Checkout Blocks**.
 
 ## 2. Why it matters
 Staff configuration is successful only if the customer journey is clear and non-technical.
@@ -414,7 +414,7 @@ Visual Walkthrough section 10. Start Here golden rules. Administrator guide Sett
 Confirm the left Delivery Engine menu matches the everyday list in [00-START-HERE](00-START-HERE.md). Do not open hidden support destinations. Confirm you know who to ask before any Settings / Access change.
 
 ## 5. Check your result
-You can explain: everyday = Site-wide Defaults + Product Exceptions; Settings / Access need an administrator; Administrator access is protected.
+You can explain: everyday = Site-wide Defaults + Product Exceptions; Settings / Access / Bulk Tools need an administrator; Administrator access is protected.
 
 ## 6. Common mistakes
 Changing Advanced Settings flags; publishing supplier/origin details to customers; rewriting old paid orders.
@@ -433,8 +433,106 @@ Pass/fail oral exam: explain Site-wide Defaults vs a Product Exception, without 
 
 ---
 
+# MODULE 13 — Classic Checkout and Cart/Checkout Blocks
+
+## 1. What you are learning
+How to confirm the Delivery Engine fee on Classic Checkout and on WooCommerce Cart/Checkout Blocks, including mixed Delivery + Pickup.
+
+## 2. Why it matters
+Both checkout types are supported. Pickup at 0.00 is valid. A missing charge must not become silent free shipping.
+
+## 3. Watch the walkthrough
+Visual Walkthrough sections 15–16. Playbook 34–35 and 38–39.
+
+## 4. Do it yourself
+On QA **#39705**, select a Delivery option, add to cart, open the checkout type this store uses. Stop before paying. If pickup is offered, also run a mixed Delivery + Pickup cart.
+
+## 5. Check your result
+Shipping label uses the public option name. Amount matches the Delivery Charge. Pickup FREE / 0.00 does not show a false missing-price warning.
+
+## 6. Common mistakes
+Looking for a Settings checkbox that “turns on Blocks.” Treating pickup 0 as missing configuration.
+
+## 7. Short quiz
+1. Are Cart/Checkout Blocks supported?  
+2. Must pickup 0.00 fail closed?  
+3. Should native Flat rate replace a Delivery Engine fee?
+
+**Answers:** (1) Yes (2) No — explicit 0 is allowed (3) No.
+
+## 8. Practical test
+Show a trainer the live checkout shipping line for this store’s checkout type.
+
+---
+
+# MODULE 14 — Overlapping Delivery Areas
+
+## 1. What you are learning
+City areas can sit inside region areas. **Test an address** shows Primary match and Also matches. The selected option can use a broader area’s charge when the city has none for that option.
+
+## 2. Why it matters
+Staff must not duplicate Air (or any option) onto every city “so checkout works.”
+
+## 3. Watch the walkthrough
+Visual Walkthrough section 5. Playbook 31–33.
+
+## 4. Do it yourself
+Run **Test an address** for Accra / Greater Accra (or the store’s equivalent) with the region name and the short code.
+
+## 5. Check your result
+You can explain Primary vs Also matches, and that a different Delivery Option is never substituted.
+
+## 6. Common mistakes
+Treating nested overlap as an error; copying charges onto every city; assuming an invalid city charge still inherits.
+
+## 7. Short quiz
+1. What does Also matches mean?  
+2. Should you copy Air onto every city?  
+3. Does an invalid city charge silently use the region fee?
+
+**Answers:** (1) Broader areas that also cover the address (2) No (3) No — fail closed.
+
+## 8. Practical test
+Explain overlapping-area pricing to a trainer using the live Test an address result.
+
+---
+
+# MODULE 15 — Bulk Tools (administrators)
+
+## 1. What you are learning
+Preview large catalog or charge changes, then apply in the background. Validation Scan. Jobs / History and rollback.
+
+## 2. Why it matters
+Apply without Preview can change many products. Training uses QA targets only.
+
+## 3. Watch the walkthrough
+Visual Walkthrough section 20. Playbook 41–42. [12 — Bulk Tools](12-SETUP-CONFIGURE-AND-TEST.md#how-to-use-bulk-tools).
+
+## 4. Do it yourself
+Open Bulk Tools read-only. Name the five tabs. Run a Catalog **Preview** on QA only if a trainer authorises it. Do not Apply unless authorised.
+
+## 5. Check your result
+You can say Preview → Apply → Jobs, and that a failed preview must not be Applied.
+
+## 6. Common mistakes
+Apply repeatedly; import onto production; using Bulk Tools for a one-product edit.
+
+## 7. Short quiz
+1. What must you do before Apply?  
+2. Where do you watch a running job?  
+3. Does Validation Scan invent free shipping?
+
+**Answers:** (1) Preview (2) Jobs / History (3) No.
+
+## 8. Practical test
+Point to each Bulk Tools tab and say whether you would Preview, Apply, or leave it.
+
+---
+
 ## Course completion
 
-You are trained when you can demonstrate Modules 4, 5, 10, and 12 practical tests plus inheritance explanation (Module 3). Reading alone is not enough — see [06-TRAINER-GUIDE](06-TRAINER-GUIDE.md).
+You are trained when you can demonstrate Modules 4, 5, 10, and 12 practical tests plus inheritance explanation (Module 3), plus Module 13 checkout checks for the checkout type this store uses. Reading alone is not enough — see [06-TRAINER-GUIDE](06-TRAINER-GUIDE.md) and tick [13 — Feature coverage](13-FEATURE-COVERAGE-AND-CONFIRMATION.md).
 
 If your role includes fulfilling orders, continue with [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md) and playbook use cases 20–30 after an Administrator has enabled shipment records.
+
+Administrators also complete Module 15 (Bulk Tools) and the administrator rows in the coverage register.
