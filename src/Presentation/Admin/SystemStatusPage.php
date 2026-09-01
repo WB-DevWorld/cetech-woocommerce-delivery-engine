@@ -517,7 +517,7 @@ final class SystemStatusPage {
 			return __( 'Unavailable', 'cetech-woocommerce-delivery-engine' );
 		}
 
-		return __( 'Package destination → active zone rules (+ explicit fallback zone when configured)', 'cetech-woocommerce-delivery-engine' );
+		return __( 'Package destination → matching Delivery Area rules. A fallback with location rules stays inside those places. Only a ruleless fallback is Everywhere else.', 'cetech-woocommerce-delivery-engine' );
 	}
 
 	private function describe_shipping_method_registration( bool $shipping_runtime_active ): string {

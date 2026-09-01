@@ -256,7 +256,7 @@ final class ConfigurationHealthChecker {
 			$rules_by_zone[ $zone_id ][] = $rule;
 		}
 
-		$fallback_count = 0;
+		$unrestricted_fallback_count = 0;
 
 		foreach ( $zones as $zone ) {
 			$zone_id = (int) ( $zone['id'] ?? 0 );
@@ -266,11 +266,11 @@ final class ConfigurationHealthChecker {
 				continue;
 			}
 
-			if ( ! empty( $zone['is_fallback'] ) ) {
-				++$fallback_count;
-			}
-
 			$zone_rules = $rules_by_zone[ $zone_id ] ?? [];
+
+			if ( DestinationZoneMatcher::is_unrestricted_fallback( $zone, $zone_rules ) ) {
+				++$unrestricted_fallback_count;
+			}
 
 			if ( [] === $zone_rules && empty( $zone['is_fallback'] ) ) {
 				$this->add(
@@ -286,16 +286,16 @@ final class ConfigurationHealthChecker {
 			}
 		}
 
-		if ( $fallback_count > 1 ) {
+		if ( $unrestricted_fallback_count > 1 ) {
 			$this->add(
 				$diagnostics,
 				DiagnosticSeverity::Warning,
 				'multiple_active_fallback_zones',
-				__( 'Multiple fallback zones', 'cetech-woocommerce-delivery-engine' ),
+				__( 'More than one Everywhere else fallback', 'cetech-woocommerce-delivery-engine' ),
 				sprintf(
-					/* translators: %d: number of active fallback zones */
-					__( '%d active destination zones are marked as fallback.', 'cetech-woocommerce-delivery-engine' ),
-					$fallback_count
+					/* translators: %d: number of unrestricted fallback delivery areas */
+					__( '%d active Delivery Areas have no location rules and are marked as fallback. Keep only one true Everywhere else area.', 'cetech-woocommerce-delivery-engine' ),
+					$unrestricted_fallback_count
 				),
 				'destination_zone'
 			);

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Configuration\Admin\StoreAwareExamples;
+use CetechDeliveryEngine\Application\Destination\DestinationZoneMatcher;
 use CetechDeliveryEngine\Application\Destination\OverlappingDeliveryAreaCoverage;
 use CetechDeliveryEngine\Application\Destination\WooCommerceCountryCatalog;
 use CetechDeliveryEngine\Domain\Enum\DestinationRuleMatchMode;
@@ -229,10 +230,11 @@ final class DestinationZonesPage {
 		AdminFormHelper::nonce_field( self::ACTION_TEST );
 		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_TEST ) . '" />';
 		echo '<table class="form-table" role="presentation"><tbody>';
-		AdminFormHelper::text_field(
+		AdminFormHelper::country_select_field(
 			'test_country_code',
-			__( 'Country code', 'cetech-woocommerce-delivery-engine' ),
-			(string) ( $draft['test_country_code'] ?? '' )
+			__( 'Country', 'cetech-woocommerce-delivery-engine' ),
+			(string) ( $draft['test_country_code'] ?? '' ),
+			__( 'Choose the country the customer would select at checkout. The plugin uses the standard country code internally.', 'cetech-woocommerce-delivery-engine' )
 		);
 		AdminFormHelper::text_field(
 			'test_region',
@@ -264,6 +266,18 @@ final class DestinationZonesPage {
 				echo '</p>';
 				echo '<p class="description">' . esc_html__(
 					'Pricing can use a charge from a broader matching Delivery Area when the selected Delivery Option has no charge in the more-specific area. A different Delivery Option is never substituted.',
+					'cetech-woocommerce-delivery-engine'
+				) . '</p>';
+			}
+
+			if ( ! empty( $draft['test_global_fallback'] ) ) {
+				echo '<p class="description">' . esc_html__(
+					'This is the global fallback (Everywhere else). It was used because no other Delivery Area matched this address.',
+					'cetech-woocommerce-delivery-engine'
+				) . '</p>';
+			} elseif ( ! empty( $draft['test_constrained_fallback'] ) ) {
+				echo '<p class="description">' . esc_html__(
+					'This match is a constrained fallback. Location rules still apply, so this area cannot be used for a country or region it does not cover.',
 					'cetech-woocommerce-delivery-engine'
 				) . '</p>';
 			}
@@ -368,9 +382,9 @@ final class DestinationZonesPage {
 		);
 		AdminFormHelper::checkbox_field(
 			'is_fallback',
-			__( 'Fallback delivery area', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Use as fallback for unmatched addresses', 'cetech-woocommerce-delivery-engine' ),
 			! empty( $record['is_fallback'] ),
-			__( 'Use this Delivery Area when no country or location rule matches. This is not a country named Everywhere.', 'cetech-woocommerce-delivery-engine' )
+			__( 'If this area has no location rules, it is a global fallback: a true Everywhere else area used only when no other Delivery Area matches. If this area also has location rules, those rules still apply — for example a Greater Accra fallback with Ghana + Greater Accra never matches the United States. Native WooCommerce shipping is never used as a fallback.', 'cetech-woocommerce-delivery-engine' )
 		);
 		AdminFormHelper::checkbox_field(
 			'is_remote_area',
@@ -727,8 +741,9 @@ final class DestinationZonesPage {
 
 	private function handle_test_match(): void {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$input = [
-			'test_country_code' => isset( $_POST['test_country_code'] ) ? wp_unslash( (string) $_POST['test_country_code'] ) : '',
+		$raw_country = isset( $_POST['test_country_code'] ) ? wp_unslash( (string) $_POST['test_country_code'] ) : '';
+		$input       = [
+			'test_country_code' => WooCommerceCountryCatalog::canonical_iso2( $raw_country ),
 			'test_region'       => isset( $_POST['test_region'] ) ? wp_unslash( (string) $_POST['test_region'] ) : '',
 			'test_city'         => isset( $_POST['test_city'] ) ? wp_unslash( (string) $_POST['test_city'] ) : '',
 			'test_postcode'     => isset( $_POST['test_postcode'] ) ? wp_unslash( (string) $_POST['test_postcode'] ) : '',
@@ -744,8 +759,16 @@ final class DestinationZonesPage {
 		if ( [] === $matched ) {
 			$input['test_result'] = __( 'No matching delivery area.', 'cetech-woocommerce-delivery-engine' );
 		} else {
-			$primary = $matched[0];
+			$primary      = $matched[0];
+			$primary_id   = (int) ( $primary['id'] ?? 0 );
+			$primary_rules = $primary_id > 0 ? $this->rule_repository->listByZoneId( $primary_id ) : [];
 			$input['test_result'] = (string) ( $primary['public_label'] ?? $primary['internal_name'] ?? '' );
+
+			if ( DestinationZoneMatcher::is_unrestricted_fallback( $primary, $primary_rules ) ) {
+				$input['test_global_fallback'] = 1;
+			} elseif ( ! empty( $primary['is_fallback'] ) ) {
+				$input['test_constrained_fallback'] = 1;
+			}
 
 			$also = [];
 
@@ -931,7 +954,10 @@ final class DestinationZonesPage {
 			$parts[] = $summary['city'];
 		}
 		if ( [] === $parts ) {
-			if ( str_contains( strtolower( $label ), 'international' ) || ! empty( $zone['is_fallback'] ) ) {
+			if ( ! empty( $zone['is_fallback'] ) ) {
+				return __( 'Everywhere else (global fallback)', 'cetech-woocommerce-delivery-engine' );
+			}
+			if ( str_contains( strtolower( $label ), 'international' ) ) {
 				return __( 'International', 'cetech-woocommerce-delivery-engine' );
 			}
 
@@ -941,7 +967,17 @@ final class DestinationZonesPage {
 			return __( 'International', 'cetech-woocommerce-delivery-engine' );
 		}
 
-		return implode( ', ', $parts );
+		$location = implode( ', ', $parts );
+
+		if ( ! empty( $zone['is_fallback'] ) ) {
+			return sprintf(
+				/* translators: %s: country, region, or city summary */
+				__( '%s (fallback only inside this area)', 'cetech-woocommerce-delivery-engine' ),
+				$location
+			);
+		}
+
+		return $location;
 	}
 
 	private function country_label( string $code ): string {

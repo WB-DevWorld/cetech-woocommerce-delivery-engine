@@ -163,13 +163,13 @@ final class OverlappingDeliveryAreaCoverage {
 		foreach ( $this->zone_repository->list( [ 'status' => RecordStatus::Active->value, 'limit' => 500 ] ) as $zone ) {
 			$zone_id = (int) ( $zone['id'] ?? 0 );
 
-			if ( $zone_id <= 0 || ! empty( $zone['is_fallback'] ) ) {
+			if ( $zone_id <= 0 ) {
 				continue;
 			}
 
 			$rules = $this->rule_repository->listByZoneId( $zone_id );
 
-			if ( [] === $rules ) {
+			if ( [] === $rules || DestinationZoneMatcher::is_unrestricted_fallback( $zone, $rules ) ) {
 				continue;
 			}
 

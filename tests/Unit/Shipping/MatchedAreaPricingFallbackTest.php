@@ -176,13 +176,96 @@ final class MatchedAreaPricingFallbackTest extends TestCase {
 		self::assertNotSame( '50.0000', $result->total_amount );
 	}
 
+	public function test_constrained_greater_accra_fallback_does_not_quote_usa(): void {
+		$result = $this->calculator(
+			[
+				$this->card( 1, self::AIR_OFFER_ID, self::GREATER_ACCRA_ID, '150.00' ),
+			],
+			true
+		)->calculate_for_package(
+			$this->managed_package(
+				self::AIR_OFFER_ID,
+				FulfilmentAvailability::InternationalFulfilment->value,
+				[
+					'country'  => 'US',
+					'state'    => 'NY',
+					'city'     => 'New York',
+					'postcode' => '10001',
+				]
+			)
+		);
+
+		self::assertFalse( $result->success );
+		self::assertNull( $result->total_amount );
+		self::assertSame( SelectedOfferShippingRateCalculator::BLOCK_DESTINATION_UNRESOLVED, $result->block_reason );
+	}
+
+	public function test_ruleless_fallback_quotes_unmatched_address_for_selected_offer(): void {
+		$result = $this->calculator(
+			[
+				$this->card( 1, self::AIR_OFFER_ID, 99, '200.00' ),
+			],
+			false,
+			true
+		)->calculate_for_package(
+			$this->managed_package(
+				self::AIR_OFFER_ID,
+				FulfilmentAvailability::InternationalFulfilment->value,
+				[
+					'country'  => 'US',
+					'state'    => 'NY',
+					'city'     => 'New York',
+					'postcode' => '10001',
+				]
+			)
+		);
+
+		self::assertTrue( $result->success );
+		self::assertSame( '200.0000', $result->total_amount );
+	}
+
+	public function test_no_fallback_unmatched_address_fails_closed(): void {
+		$result = $this->calculator(
+			[
+				$this->card( 1, self::AIR_OFFER_ID, self::GREATER_ACCRA_ID, '150.00' ),
+			]
+		)->calculate_for_package(
+			$this->managed_package(
+				self::AIR_OFFER_ID,
+				FulfilmentAvailability::InternationalFulfilment->value,
+				[
+					'country'  => 'US',
+					'state'    => 'NY',
+					'city'     => 'New York',
+					'postcode' => '10001',
+				]
+			)
+		);
+
+		self::assertFalse( $result->success );
+		self::assertSame( SelectedOfferShippingRateCalculator::BLOCK_DESTINATION_UNRESOLVED, $result->block_reason );
+	}
+
+	public function test_air_still_inherits_greater_accra_when_that_area_is_constrained_fallback(): void {
+		$result = $this->calculator(
+			[
+				$this->card( 1, self::STANDARD_OFFER_ID, self::ACCRA_ID, '50.00' ),
+				$this->card( 2, self::AIR_OFFER_ID, self::GREATER_ACCRA_ID, '150.00' ),
+			],
+			true
+		)->calculate_for_package( $this->managed_package( self::AIR_OFFER_ID, FulfilmentAvailability::InternationalFulfilment->value ) );
+
+		self::assertTrue( $result->success );
+		self::assertSame( '150.0000', $result->total_amount );
+	}
+
 	/**
 	 * @param list<array<string, mixed>> $cards
 	 */
-	private function calculator( array $cards ): SelectedOfferShippingRateCalculator {
+	private function calculator( array $cards, bool $greater_is_fallback = false, bool $with_global_fallback = false ): SelectedOfferShippingRateCalculator {
 		$zones = new InMemoryDestinationZoneRepository();
 		$zones->save( $this->zone( self::ACCRA_ID, 'Accra' ) );
-		$zones->save( $this->zone( self::GREATER_ACCRA_ID, 'Greater Accra' ) );
+		$zones->save( $this->zone( self::GREATER_ACCRA_ID, 'Greater Accra', $greater_is_fallback ) );
 
 		$rules = new InMemoryDestinationRuleRepository();
 		$rules->replaceForZone(
@@ -199,6 +282,12 @@ final class MatchedAreaPricingFallbackTest extends TestCase {
 				$this->rule( DestinationRuleType::Region, 'Greater Accra' ),
 			]
 		);
+
+		if ( $with_global_fallback ) {
+			$zones->save( $this->zone( 99, 'Everywhere else', true ) );
+			$rules->replaceForZone( 99, [] );
+		}
+
 		$catalog = new class() implements WooCommerceStateCatalogInterface {
 			public function states_for_country( string $country_code ): array {
 				return 'GH' === strtoupper( trim( $country_code ) )
@@ -246,7 +335,10 @@ final class MatchedAreaPricingFallbackTest extends TestCase {
 	/**
 	 * @return array<string, mixed>
 	 */
-	private function managed_package( int $offer_id, string $availability ): array {
+	/**
+	 * @param array<string, string> $destination
+	 */
+	private function managed_package( int $offer_id, string $availability, array $destination = [] ): array {
 		$intent = [
 			'contract_version'        => '1',
 			'product_id'              => 101,
@@ -271,12 +363,14 @@ final class MatchedAreaPricingFallbackTest extends TestCase {
 					CartDeliverySelectionCapture::CART_SELECTION_KEY => $intent,
 				],
 			],
-			'destination'   => [
-				'country'  => 'GH',
-				'state'    => 'AA',
-				'city'     => 'Accra',
-				'postcode' => '',
-			],
+			'destination'   => [] === $destination
+				? [
+					'country'  => 'GH',
+					'state'    => 'AA',
+					'city'     => 'Accra',
+					'postcode' => '',
+				]
+				: $destination,
 			DeliveryGroupIdentity::PACKAGE_META_KEY => [
 				'managed'   => true,
 				'group_id'  => DeliveryGroupIdentity::compose( $availability, FulfilmentChoice::Delivery->value, (string) $offer_id ),
@@ -333,14 +427,14 @@ final class MatchedAreaPricingFallbackTest extends TestCase {
 	/**
 	 * @return array<string, mixed>
 	 */
-	private function zone( int $id, string $name ): array {
+	private function zone( int $id, string $name, bool $fallback = false ): array {
 		return [
 			'id'            => $id,
 			'internal_name' => $name,
 			'public_label'  => $name,
 			'status'        => RecordStatus::Active->value,
 			'priority'      => 100,
-			'is_fallback'   => false,
+			'is_fallback'   => $fallback,
 		];
 	}
 

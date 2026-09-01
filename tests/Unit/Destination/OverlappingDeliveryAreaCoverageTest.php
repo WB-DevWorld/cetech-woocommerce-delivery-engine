@@ -74,6 +74,41 @@ final class OverlappingDeliveryAreaCoverageTest extends TestCase {
 		self::assertSame( 'overlapping_invalid_specific_rate', $warnings[0]['code'] );
 	}
 
+	public function test_constrained_fallback_greater_accra_still_counts_as_nested_overlap(): void {
+		$zones = new InMemoryDestinationZoneRepository();
+		$zones->save( $this->zone( 30, 'Accra', 100 ) );
+		$zones->save( $this->zone( 3, 'Greater Accra', 100, true ) );
+		$rules = new InMemoryDestinationRuleRepository();
+		$rules->replaceForZone(
+			30,
+			[
+				$this->rule( DestinationRuleType::Country, 'GH' ),
+				$this->rule( DestinationRuleType::City, 'Accra' ),
+			]
+		);
+		$rules->replaceForZone(
+			3,
+			[
+				$this->rule( DestinationRuleType::Country, 'GH' ),
+				$this->rule( DestinationRuleType::Region, 'Greater Accra' ),
+			]
+		);
+		$coverage = new OverlappingDeliveryAreaCoverage(
+			$zones,
+			$rules,
+			new InMemoryQuoteRateCardRepository(
+				[
+					$this->card( 1, 11, 30, '50.00' ),
+					$this->card( 2, 101, 3, '150.00' ),
+				]
+			),
+			$this->ghana_catalog()
+		);
+
+		self::assertTrue( $coverage->has_nested_overlaps() );
+		self::assertSame( [], $coverage->warnings() );
+	}
+
 	/**
 	 * @param list<array<string, mixed>> $cards
 	 */
@@ -120,14 +155,14 @@ final class OverlappingDeliveryAreaCoverageTest extends TestCase {
 	/**
 	 * @return array<string, mixed>
 	 */
-	private function zone( int $id, string $name, int $priority ): array {
+	private function zone( int $id, string $name, int $priority, bool $fallback = false ): array {
 		return [
 			'id'            => $id,
 			'internal_name' => $name,
 			'public_label'  => $name,
 			'status'        => RecordStatus::Active->value,
 			'priority'      => $priority,
-			'is_fallback'   => false,
+			'is_fallback'   => $fallback,
 		];
 	}
 

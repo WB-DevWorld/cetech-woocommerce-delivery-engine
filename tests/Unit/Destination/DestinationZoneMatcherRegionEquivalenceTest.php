@@ -69,9 +69,7 @@ final class DestinationZoneMatcherRegionEquivalenceTest extends TestCase {
 					$this->rule( DestinationRuleType::Country, 'GH' ),
 					$this->rule( DestinationRuleType::Postcode, '00', DestinationRuleMatchMode::Prefix ),
 				],
-				self::FALLBACK_ZONE_ID => [
-					$this->rule( DestinationRuleType::Country, 'XX' ),
-				],
+				self::FALLBACK_ZONE_ID => [],
 			]
 		);
 
@@ -101,9 +99,7 @@ final class DestinationZoneMatcherRegionEquivalenceTest extends TestCase {
 					$this->rule( DestinationRuleType::Region, 'AA' ),
 					$this->rule( DestinationRuleType::City, 'Accra' ),
 				],
-				self::FALLBACK_ZONE_ID => [
-					$this->rule( DestinationRuleType::Country, 'XX' ),
-				],
+				self::FALLBACK_ZONE_ID => [],
 			]
 		);
 		$matcher = new DestinationZoneMatcher( $zones, $rules, $this->ghana_catalog_matcher() );
@@ -134,9 +130,7 @@ final class DestinationZoneMatcherRegionEquivalenceTest extends TestCase {
 					$this->rule( DestinationRuleType::Region, 'Armed Forces Americas' ),
 					$this->rule( DestinationRuleType::City, 'Accra' ),
 				],
-				self::FALLBACK_ZONE_ID => [
-					$this->rule( DestinationRuleType::Country, 'XX' ),
-				],
+				self::FALLBACK_ZONE_ID => [],
 			]
 		);
 		$matcher = new DestinationZoneMatcher( $zones, $rules, $this->ghana_catalog_matcher() );
