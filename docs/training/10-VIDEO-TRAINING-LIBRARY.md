@@ -1,11 +1,11 @@
 # Video Training Library — CETECH Delivery Engine
 
-**Plugin version:** 1.0.0-rc.6  
+**Plugin version:** 1.0.0-rc.8 (schema 5; training-site package `1.0.0-dev.blocks.4`)  
 **Status:** Recapture **deferred**. Written guides are the teaching authority until new recordings exist.
 
 Older recordings use different menu names and an older customer layout. **Do not use them as current truth.** If an old name appears in a leftover file, the mapping is only in the [Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md).
 
-When recordings are made later, replace binaries under [`assets/videos/`](assets/videos/) and update this index. Narration scripts in `video-scripts/` will need a rewrite to match the live 1.0.0-rc.6 screens.
+When recordings are made later, replace binaries under [`assets/videos/`](assets/videos/) and update this index. Narration scripts in `video-scripts/` will need a rewrite to match the live screens. Until then, trainers tick [13 — Feature coverage](13-FEATURE-COVERAGE-AND-CONFIRMATION.md) on the live site.
 
 ---
 
@@ -19,7 +19,7 @@ When recordings are made later, replace binaries under [`assets/videos/`](assets
 | Shipments (when enabled) | [11-STAGE-14-SHIPMENTS](11-STAGE-14-SHIPMENTS.md) |
 | Customer journey | Manual Module 8–9 + Visual Walkthrough sections 14–17 |
 | Problem solving | [07-TROUBLESHOOTING-FAQ](07-TROUBLESHOOTING-FAQ.md) |
-| Trainers | [06-TRAINER-GUIDE](06-TRAINER-GUIDE.md) with live demos |
+| Trainers | [06-TRAINER-GUIDE](06-TRAINER-GUIDE.md) with live demos and [13 — Feature coverage](13-FEATURE-COVERAGE-AND-CONFIRMATION.md) |
 
 Companion written tour: [04-VISUAL-WALKTHROUGH](04-VISUAL-WALKTHROUGH.md).
 
@@ -27,7 +27,7 @@ Companion written tour: [04-VISUAL-WALKTHROUGH](04-VISUAL-WALKTHROUGH.md).
 
 ## Intended video index (for later recapture)
 
-Keep this list so future recordings match the staff course. Filenames may stay the same; **content must match 1.0.0-rc.6**.
+Keep this list so future recordings match the staff course. Filenames may stay the same; **content must match the live 1.0.0-rc.8 / blocks.4 screens**.
 
 ### 01 — Getting started overview
 
@@ -79,7 +79,7 @@ Keep this list so future recordings match the staff course. Filenames may stay t
 
 | Field | Detail |
 |-------|--------|
-| **What they will learn** | Compact option + Estimated delivery; shipping line uses public option label |
+| **What they will learn** | Compact option + Estimated delivery; Classic **and** Blocks shipping line uses public option label |
 | **Status** | Deferred |
 
 ### 08 — Multi-product shipping
@@ -114,7 +114,7 @@ Keep this list so future recordings match the staff course. Filenames may stay t
 
 | Field | Detail |
 |-------|--------|
-| **What they will learn** | End-to-end 1.0.0-rc.6 path from Overview to order |
+| **What they will learn** | End-to-end path from Overview to order (Classic and Blocks) |
 | **Status** | Deferred |
 
 ### 13 — Shipments (when enabled)
@@ -125,6 +125,30 @@ Keep this list so future recordings match the staff course. Filenames may stay t
 | **Related written guide** | [11-STAGE-14-SHIPMENTS](11-STAGE-14-SHIPMENTS.md), playbook use cases 20–30 |
 | **Status** | Deferred |
 
+### 14 — Overlapping Delivery Areas
+
+| Field | Detail |
+|-------|--------|
+| **What they will learn** | Test an address Primary / Also matches; city can inherit a broader area’s charge for the same option; do not duplicate city charges |
+| **Related written guide** | Playbook 31–33, [12](12-SETUP-CONFIGURE-AND-TEST.md) Delivery Areas |
+| **Status** | Deferred |
+
+### 15 — Mixed Delivery and Pickup
+
+| Field | Detail |
+|-------|--------|
+| **What they will learn** | One cart: real delivery fee + pickup FREE / 0.00; no false missing-price warning |
+| **Related written guide** | Playbook 34–35 |
+| **Status** | Deferred |
+
+### 16 — Bulk Tools (administrators)
+
+| Field | Detail |
+|-------|--------|
+| **What they will learn** | Catalog Preview before Apply; Jobs / History; Validation Scan; charge rollback |
+| **Related written guide** | [12 Bulk Tools](12-SETUP-CONFIGURE-AND-TEST.md#how-to-use-bulk-tools), playbook 41–42 |
+| **Status** | Deferred |
+
 ---
 
 ## Capture notes (when recapture is authorised)
@@ -133,4 +157,4 @@ Keep this list so future recordings match the staff course. Filenames may stay t
 - Do not place extra paid orders.  
 - Do not capture credentials, Cloudflare challenge, or customer PII.  
 - Auth state stays in gitignored `training/playwright/auth/`.  
-- Update this file’s Status column when a binary actually exists and matches 1.0.0-rc.6.
+- Update this file’s Status column when a binary actually exists and matches the live 1.0.0-rc.8 / blocks.4 screens.

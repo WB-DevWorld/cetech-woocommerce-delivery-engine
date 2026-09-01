@@ -1,7 +1,7 @@
 # Troubleshooting FAQ (staff)
 
 **Audience:** Everyday staff and administrators  
-**Version:** 1.0.0-rc.6  
+**Version:** 1.0.0-rc.8 (schema 5; training-site package `1.0.0-dev.blocks.4`)  
 
 Use this guide first. Do **not** edit PHP, run SQL, clear Redis globally, change the database by hand, install Code Snippets, change Nginx, or use SSH. Those steps belong only in the [Technical Support Appendix](09-TECHNICAL-SUPPORT-APPENDIX.md).
 
@@ -74,7 +74,31 @@ Use this guide first. Do **not** edit PHP, run SQL, clear Redis globally, change
 - Ask an administrator to confirm Delivery Charges and that **Delivery** is enabled on the WooCommerce shipping zones where this plugin should operate. Rest of the World is optional unless leftover addresses are intentionally supported. Click-by-click: [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md#how-to-add-the-delivery-shipping-method-in-woocommerce).  
 - If the Delivery Area uses **State / Region**, run **Test an address** with the checkout name (for example `Greater Accra`) **and** with WooCommerce’s short code (for example `AA`). Both should name the same area. Do not rewrite the area unless the test still fails.
 
-**Escalate when:** Selection is present but the fee is missing or $0 unexpectedly. Missing configuration must never silently become free shipping.
+**Escalate when:** Selection is present but the fee is missing or $0 unexpectedly. Missing configuration must never silently become free shipping. Store pickup at **0.00** is allowed and is not a missing charge.
+
+---
+
+## Checkout says delivery pricing is not available (especially with pickup)
+
+**What it means:** Mixed Delivery + Pickup, or Blocks checkout, may have been misread as a missing rate. Pickup at 0.00 is valid.
+
+**Check first:** Is one item Delivery and another Store pickup? Does the Delivery line have a real fee? Is the pickup line FREE / 0.00?
+
+**Safe fixes:** Re-select each item’s option on the product page. Confirm Delivery Charges for the delivery option + area. Do not copy charges onto every city to “make Air work.”
+
+**Escalate when:** A genuine delivery item (not pickup) still has no fee after Preview is Ready and a charge exists.
+
+---
+
+## Test an address shows more than one Delivery Area
+
+**What it means:** **Primary match** is the most specific area. **Also matches** are broader areas (for example a region around a city). Nested overlap is normal.
+
+**Check first:** Region name and short code (`Greater Accra` and `AA`) still name the same areas.
+
+**Safe fixes:** Leave nested city-in-region as designed. Price the option on the broader area if cities should inherit that option. Do **not** duplicate the charge onto every city.
+
+**Escalate when:** The more-specific area has an invalid charge for the selected option (should fail closed) or the wrong option is substituted.
 
 ---
 
@@ -213,4 +237,4 @@ If the name is not in this table, stay on the everyday menu in [00-START-HERE](0
 - What the customer sees (option name + estimate, or the problem)  
 - What you already tried  
 - Exact wording of Ready / Needs Attention  
-- Plugin version shown in WordPress (**1.0.0-rc.6** expected)
+- Plugin version shown in WordPress (**1.0.0-rc.8** expected on the tagged baseline; training site may show **1.0.0-dev.blocks.4**)

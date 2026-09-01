@@ -1,7 +1,7 @@
 # Complete Administrator Guide
 
 **Audience:** Administrators and authorised configuration staff  
-**Version:** CETECH Delivery Engine 1.0.0-rc.6  
+**Version:** CETECH Delivery Engine **1.0.0-rc.8** (schema **5**; training-site package `1.0.0-dev.blocks.4`)  
 **Everyday home:** Delivery Engine → **Overview**  
 **Not everyday:** Technical Diagnostics, private supply screens, Advanced Settings
 
@@ -203,25 +203,25 @@ Administrators / authorised staff.
 Expanding coverage or fixing address matching.
 
 **Key fields**  
-Area name, geography (countries / states / postcodes via the condition builder). For **State / Region**, the WooCommerce checkout name and that country’s short code both match (for example Ghana `Greater Accra` and `AA`). Match mode and priority stay under **Advanced matching**. Optional **Test an Address**.
+Area name, geography (countries / states / postcodes via the condition builder). For **State / Region**, the WooCommerce checkout name and that country’s short code both match (for example Ghana `Greater Accra` and `AA`). Match mode and priority stay under **Advanced matching**. **Test an address** shows **Primary match** and, when more than one area covers the address, **Also matches**.
 
 **Recommended**  
-Areas that match how you sell; test tricky addresses with both the region name and the checkout short code when a State / Region condition is used.
+Areas that match how you sell. A city inside a region is normal. Do **not** copy the same Delivery Charge onto every city so a missing city rate “works.” The selected Delivery Option can use a broader matching area’s charge when the city has none for that option. Test tricky addresses with both the region name and the checkout short code.
 
 **Steps**  
-Add/edit area → define conditions → test an address → ensure a Delivery Charge exists for each sellable option in that area.
+Add/edit area → define conditions → **Test an address** → read Primary match / Also matches → ensure a Delivery Charge exists for each sellable option on the area that should price it (region-level is enough when cities inherit that option).
 
 **Customer experience**  
 Correct fee for their destination (together with Delivery Charges).
 
 **Mistakes**  
-Overlapping unclear areas; areas with no charge defined.
+Treating nested city-in-region overlap as an error; duplicating Air onto every city; leaving an invalid city charge for an option that should fail closed.
 
 **Related**  
-Delivery Charges; WooCommerce shipping zones (method availability). Add **Delivery** only to the zones where this plugin should operate; Rest of the World is optional: [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md#how-to-add-the-delivery-shipping-method-in-woocommerce).
+Delivery Charges; WooCommerce shipping zones (method availability). Add **Delivery** only to the zones where this plugin should operate; Rest of the World is optional: [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md#how-to-add-the-delivery-shipping-method-in-woocommerce). Playbook 31–33.
 
 **Expected result**  
-Address tests match the intended area.
+Address tests match the intended Primary area; Also matches lists broader coverage when it exists.
 
 ---
 
@@ -420,23 +420,54 @@ Administrators.
 Controlled change windows — not daily product edits.
 
 **Primary sections**  
-General / Customer experience / Orders / Setup Guide / Access.
+General / Customer experience / Orders / Setup Guide / Access / **Optional integrations** (status) / **WooCommerce Cart & Checkout Blocks** (status).
 
 **Access**  
 - **Administrator** is a protected full-access role (lock icon). It is not an editable permission row.  
 - Subordinate real WordPress roles (Shop Manager, Editor, …) can be granted Delivery Engine capabilities.  
 - If Administrator access needs repair, a **Restore Administrator Access** notice can appear for users who can manage WordPress options. That repair does **not** live inside Technical Diagnostics.
 
-**Recommended production (Classic Checkout)**  
-Required customer/checkout features stay **ON**. Shipment records and customer tracking links stay **OFF** until an Administrator chooses to turn them on in Settings. Customer timeline, Blocks checkout, and carrier APIs are **not** in this release. Storefront Cash on delivery policy remains a store decision.
+**Recommended production**  
+Required customer/checkout features stay **ON**. Classic Checkout and Cart/Checkout Blocks are both supported. Settings shows Blocks as a **status row**, not an experimental checkbox. Shipment records and customer tracking links stay **OFF** until an Administrator chooses to turn them on. Customer timeline and carrier APIs are **not** in this release. Storefront Cash on delivery policy remains a store decision.
 
-Shipment staff training: [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md). Practice jobs: playbook use cases 20–30.
+**Optional integrations**  
+Detected plugins and whether a Delivery Engine adapter exists. These are **not** compatibility switches. Core delivery does not require WoodMart, WPML, WCML, WCFM, or VitePOS.
+
+Shipment staff training: [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md). Practice jobs: playbook use cases 20–30. Tick every feature: [13 — Feature coverage](13-FEATURE-COVERAGE-AND-CONFIRMATION.md).
 
 **Do not change casually**  
 Advanced switches, Access matrix for subordinate roles without a policy decision.
 
 **Related**  
 WooCommerce **Delivery** shipping method on the zones where this plugin should operate (Rest of the World optional): [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md#how-to-add-the-delivery-shipping-method-in-woocommerce). Technical Support Appendix.
+
+---
+
+## PAGE: Delivery Engine → Bulk Tools
+
+**What this page is for**  
+Preview large catalog or Delivery Charge changes, then apply them in the background. Validation scan. Import / Export. Jobs / History and rollback.
+
+**Who**  
+Administrators and authorised catalog staff only.
+
+**When**  
+A planned change window. Not everyday product edits.
+
+**What you will see**  
+Tabs: **Catalog**, **Import / Export**, **Validation & Cleanup**, **Jobs / History**, **Charges**.
+
+**Recommended**  
+Always **Preview** before Apply. Do not Apply a failed preview. Wait for the job; do not click Apply repeatedly. Prefer QA targets in training.
+
+**Do not change casually**  
+Production catalogue Apply, configuration import, or charge amount jobs without approval.
+
+**Related**  
+Playbook 41–42; [12 — Bulk Tools](12-SETUP-CONFIGURE-AND-TEST.md#how-to-use-bulk-tools).
+
+**Expected result**  
+Preview counts are understandable. Jobs appear in Jobs / History. Rollback restores the previous QA state when used.
 
 ---
 
@@ -447,8 +478,10 @@ WooCommerce **Delivery** shipping method on the zones where this plugin should o
 | Surface | Customer sees |
 |---------|----------------|
 | Product page | Delivery option (bold public name) + Estimated delivery |
-| Cart | Remembered delivery choice (when enabled) |
-| Checkout | WooCommerce shipping using the public Delivery Option label and configured charge |
+| Cart | Remembered delivery choice (when enabled). Pickup is not shown as shipping to the customer address. |
+| Classic Checkout | WooCommerce shipping using the public Delivery Option label and configured charge |
+| Cart/Checkout Blocks | Same selected option, same fee, same public label as Classic |
+| Mixed Delivery + Pickup | Delivery fee stays real; pickup may be FREE / 0.00; no false “pricing is not available” |
 | Thank-you / My Account / email | Compact **Delivery details**: option + estimate (pickup extras only if present) |
 
 **Explicitly omitted from customer output**  

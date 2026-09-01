@@ -1,7 +1,7 @@
 # Glossary (plain language)
 
 **Audience:** All staff  
-**Version:** 1.0.0-rc.6
+**Version:** 1.0.0-rc.8 (schema 5; training-site package `1.0.0-dev.blocks.4`)
 
 Terms match what you see in the Delivery Engine screens. Technical implementation words are avoided unless they appear in the UI.
 
@@ -25,7 +25,11 @@ Terms match what you see in the Delivery Engine screens. Technical implementatio
 
 **Delivery Option** — A delivery choice shown to the customer (the public name they select).
 
-**Delivery Area** — Where the store delivers (geographic coverage used with Delivery Charges). A **State / Region** condition may be the checkout name or that country’s short code (for example Ghana `Greater Accra` or `AA`); both match.
+**Delivery Area** — Where the store delivers (geographic coverage used with Delivery Charges). A **State / Region** condition may be the checkout name or that country’s short code (for example Ghana `Greater Accra` or `AA`); both match. A city area may sit inside a region area.
+
+**Primary match** — The most specific Delivery Area that matches a test address.
+
+**Also matches** — Other active Delivery Areas that also cover that address (usually broader). The selected Delivery Option can use a charge from a broader match when the more-specific area has none for that option. A different option is never substituted.
 
 **Delivery Charge** — How much the customer pays for a Delivery Area + Delivery Option combination.
 
@@ -62,5 +66,11 @@ Terms match what you see in the Delivery Engine screens. Technical implementatio
 **Current estimated delivery** — Later operational timing. Updating it does not overwrite the original.
 
 **Track shipment** — Customer button that appears only when shipment records are on, tracking links are on, and a safe `http` or `https` tracking address is saved.
+
+**Classic Checkout** — WooCommerce shortcode cart/checkout. Still supported.
+
+**Cart/Checkout Blocks** — WooCommerce Blocks cart/checkout. Supported. Settings shows this as status, not an experimental checkbox.
+
+**Bulk Tools** — Administrator screen to preview large catalog or charge changes, then apply them in the background. Tabs: Catalog, Import / Export, Validation & Cleanup, Jobs / History, Charges. Not everyday work.
 
 **Technical Diagnostics** — Hidden support destination. Not for everyday staff.

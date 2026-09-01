@@ -1,12 +1,12 @@
 # Visual Walkthrough (written screen tour)
 
 **Audience:** New staff and trainers  
-**Version:** 1.0.0-rc.6  
-**Screenshots:** Deferred. This tour is written against the live 1.0.0-rc.6 screens. Do not use leftover older images as teaching truth.
+**Version:** 1.0.0-rc.8 (schema 5; training-site package `1.0.0-dev.blocks.4`)  
+**Screenshots:** Deferred. This tour is written against the live screens. Do not use leftover older images as teaching truth.
 
 Walk this path on the live site (read-only unless a trainer authorises a QA edit):
 
-WordPress admin → Overview → Site-wide Defaults → Delivery Options / Areas / Charges → Pickup Locations → Product Exceptions → Needs Attention → Settings → WooCommerce product Delivery tab → Preview Delivery → product page → cart → checkout → WooCommerce order Delivery information → Shipments (only if an Administrator has turned shipment records on).
+WordPress admin → Overview → Site-wide Defaults → Delivery Options / Areas / Charges → Pickup Locations → Product Exceptions → Needs Attention → Settings → Bulk Tools (administrators only) → WooCommerce product Delivery tab → Preview Delivery → product page → cart → Classic checkout **and** Cart/Checkout Blocks (whichever the store uses) → WooCommerce order Delivery information → Shipments (only if an Administrator has turned shipment records on).
 
 For each screen: what you are looking at, what matters, what you can safely change, what to leave alone, what happens after Save.
 
@@ -94,16 +94,16 @@ Assigned products/defaults can show the new label.
 Where the store delivers (condition builder).
 
 **What matters**  
-Address matching. For **State / Region**, the checkout name and that country’s short code both match (for example Ghana `Greater Accra` and `AA`). Advanced matching (mode/priority) stays collapsed until needed.
+Address matching. For **State / Region**, the checkout name and that country’s short code both match (for example Ghana `Greater Accra` and `AA`). **Test an address** shows **Primary match** and **Also matches** when a city sits inside a region. That nested overlap is normal. Advanced matching (mode/priority) stays collapsed until needed.
 
 **Safely change**  
-Authorised geography updates; **Test an Address**.
+Authorised geography updates; **Test an address**.
 
 **Leave alone**  
-Overlapping experimental rules on a live store.
+Copying the same Delivery Charge onto every city so Air “works.” Invalid city charges for an option that should fail closed.
 
 **After Save**  
-Charges that use this area continue to apply to matching addresses.
+Charges that use this area continue to apply to matching addresses. A selected option with no city charge can use a broader matching area’s charge for **that same option**.
 
 ---
 
@@ -186,16 +186,16 @@ Items leave the list when they have a usable setup.
 ## 10. Settings
 
 **What you are looking at**  
-Customer experience, orders, Setup Guide, Access. Advanced switches are collapsed.
+Customer experience, orders, Setup Guide, Access, **WooCommerce Cart & Checkout Blocks** status, **Optional integrations** status. Advanced switches are collapsed.
 
 **What matters**  
-Administrator is a protected full-access role. Subordinate roles are configurable.
+Administrator is a protected full-access role. Subordinate roles are configurable. Blocks and optional integrations are **status**, not experimental checkboxes.
 
 **Safely change**  
 Nothing without administrator authorisation.
 
 **Leave alone**  
-Advanced checkout/runtime switches; Access rows you do not understand.
+Advanced checkout/runtime switches; Access rows you do not understand; treating Optional integrations as compatibility toggles.
 
 **After Save**  
 Storefront/checkout behaviour can change for everyone. This is not a product-level edit.
@@ -285,7 +285,7 @@ Admin saves appear here after reload (and variation re-selection if variable).
 Remembered delivery choice on the line.
 
 **What matters**  
-The choice from the product page should persist. Compatible items can share one charge.
+The choice from the product page should persist. Compatible items can share one charge. Pickup is not presented as shipping to the customer destination. Mixed Delivery + Pickup: delivery keeps its fee; pickup may be FREE / 0.00.
 
 **Safely change**  
 Empty the training cart when finished. Do not enable COD.
@@ -298,19 +298,19 @@ Not a Delivery Engine save.
 
 ---
 
-## 16. Checkout
+## 16. Checkout (Classic and Blocks)
 
 **What you are looking at**  
-Classic Checkout shipping line.
+WooCommerce shipping line on **Classic Checkout** and, if the store uses them, **Cart/Checkout Blocks**.
 
 **What matters**  
-Amount matches the Delivery Charge. Label prefers the public Delivery Option name.
+Amount matches the Delivery Charge. Label prefers the public Delivery Option name. Both checkout types use the same Delivery Engine fees. Store pickup at 0.00 is valid. A missing charge must not become silent free shipping.
 
 **Safely change**  
 Nothing without a real purchase intent.
 
 **Leave alone**  
-Forcing a $0 workaround if the charge is missing.
+Forcing a $0 workaround if the charge is missing; looking for a Delivery Engine “enable Blocks” checkbox.
 
 **After Save**  
 Not applicable.
@@ -370,3 +370,22 @@ Typing delivery prices, regrouping items, creating a fake Store pickup shipment,
 History records who did the work. Customers may see status, current estimate, and **Track shipment** only when tracking links are on and the URL is a safe `http` or `https` address.
 
 Full how-to: [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md). Practice jobs: playbook use cases 20–30.
+
+---
+
+## 20. Delivery Engine → Bulk Tools (administrators)
+
+**What you are looking at**  
+Catalog, Import / Export, Validation & Cleanup, Jobs / History, Charges.
+
+**What matters**  
+Preview before Apply. Background jobs. Rollback from Jobs / History.
+
+**Safely change**  
+QA preview only in training unless a change window is authorised.
+
+**Leave alone**  
+Apply on a failed preview; importing a package onto production without a window.
+
+**After Save**  
+Jobs appear in Jobs / History. Playbook 41–42.

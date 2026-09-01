@@ -1,7 +1,7 @@
 # Quick Start (about 10 minutes)
 
 **Audience:** New staff  
-**Plugin version:** 1.0.0-rc.6  
+**Plugin version:** 1.0.0-rc.8 (schema 5; training-site package `1.0.0-dev.blocks.4`)  
 **Goal:** Do the everyday tasks safely without technical detail.
 
 Screenshots are not included in this revision. Follow the live WordPress screens.
@@ -111,7 +111,7 @@ For a variable product, select the variation first, then the delivery choice.
 
 This is what was saved when the customer ordered. Practice read-only on QA orders **#39721** or **#39724**.
 
-At checkout, the shipping line should show the public Delivery Option name and the configured charge.
+At checkout, the shipping line should show the public Delivery Option name and the configured charge. That is true on **Classic Checkout** and on **Cart/Checkout Blocks**. Store pickup at **0.00** is allowed; a missing charge must not become silent free shipping.
 
 ---
 
@@ -121,6 +121,7 @@ Stop and escalate if you need to:
 
 - change **Delivery Engine → Settings** (especially Advanced switches)  
 - change **Settings → Access**  
+- use **Bulk Tools**  
 - open a screen that is not in the everyday menu  
 - “fix” delivery details on an old paid order  
 - change store-wide pricing or areas without authorisation  
