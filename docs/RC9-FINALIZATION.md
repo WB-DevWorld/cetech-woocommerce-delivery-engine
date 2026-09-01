@@ -188,6 +188,21 @@ Verify only:
 
 Then **STOP**. Beta testers perform practical RC.9 vetting through normal Classic storefront usage.
 
+### Training install status (this session)
+
+**NOT INSTALLED FROM CURSOR.** RC.9 packaging and tag are complete. Cursor could not perform the in-place training install:
+
+- No training SSH host or WP-CLI path is configured (SSH hosts are `flairoc` / `woo-app` / `woo-db` only).
+- `woo-app` serves production `cetechbpa.com`, which does **not** contain the Delivery Engine. It was **not** modified.
+- No training-site credentials exist in local `.env.local`.
+- Browser automation for `training.cetechbpa.com/wp-admin` was unavailable.
+
+FLAIROC was **not** modified. The install ZIP is on the Desktop for in-place replacement without uninstall:
+
+`C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-rc.9.zip`
+
+After a human in-place install, confirm only the six checks above. Do not manufacture another large owner-QA cycle.
+
 ---
 
 ## 11. Next step
