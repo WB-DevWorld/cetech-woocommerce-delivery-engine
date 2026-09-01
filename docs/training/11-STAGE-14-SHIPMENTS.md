@@ -1,6 +1,6 @@
 # Stage 14 shipments — staff training
 
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.8** (schema **5**)  
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.9** (schema **5**)  
 **Audience:** Administrators and authorised shipment staff  
 **Everyday home:** WordPress admin → **Delivery Engine → Overview**  
 **Shipments home:** **Delivery Engine → Shipments** (only after an Administrator turns shipment records on)

@@ -1,7 +1,7 @@
 # How to use each Delivery Engine menu
 
 **Audience:** New staff — start here if you are new to this plugin  
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.8** (schema **5**; training-site package `1.0.0-dev.blocks.4`)  
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.9** (schema **5**)  
 **Open:** WordPress admin left menu → **Delivery Engine** (location-pin icon)
 
 This guide is only about the plugin. Each section is one menu. For every menu you get **how to open it, how to do the work, what to type, which button to press, and how to check it**.

@@ -1,7 +1,7 @@
 # Feature coverage and confirmation
 
 **Audience:** Trainers and administrators  
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.8** (schema **5**). Training-site package **`1.0.0-dev.blocks.4`** also includes Cart/Checkout Blocks and overlapping Delivery Area pricing. This is **not** RC.9 and does **not** retag RC.8.  
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.9** (schema **5**). Includes Cart/Checkout Blocks, overlapping Delivery Area pricing, and constrained fallback. Tagged **1.0.0-rc.8** remains unchanged.  
 **Everyday home:** WordPress admin → **Delivery Engine → Overview**
 
 Every implemented staff-facing feature is either **trained** (staff can do the work from a written guide) or **confirmed** (a trainer or administrator ticks a live pass/fail check). Reading this page is not training. Use the linked guides, then tick the checks on the live site.
@@ -138,7 +138,7 @@ Train staff that these are **not** available. Do not demonstrate them as working
 | WPML / WCML / WCFM / VitePOS adapters | Optional integrations show detection only. Core delivery does not depend on them. |
 | WoodMart as a required integration | Core must work without WoodMart. Do not edit the WoodMart parent theme. |
 | Stage 15 / per-item locations / Return-Refund as a Delivery Engine money workflow | Not this release. WooCommerce remains the owner of payments and refunds. |
-| RC.9 | There is no RC.9. Protected published baseline remains **1.0.0-rc.8**. |
+| Stage 15 / later RC identities | Not this release. Protected published baseline is **1.0.0-rc.9**. Do not retag RC.8 or earlier. |
 
 ---
 

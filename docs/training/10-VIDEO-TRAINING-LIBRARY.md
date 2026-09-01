@@ -1,6 +1,6 @@
 # Video Training Library — CETECH Delivery Engine
 
-**Plugin version:** 1.0.0-rc.8 (schema 5; training-site package `1.0.0-dev.blocks.4`)  
+**Plugin version:** 1.0.0-rc.9 (schema 5)  
 **Status:** Recapture **deferred**. Written guides are the teaching authority until new recordings exist.
 
 Older recordings use different menu names and an older customer layout. **Do not use them as current truth.** If an old name appears in a leftover file, the mapping is only in the [Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md).
@@ -27,7 +27,7 @@ Companion written tour: [04-VISUAL-WALKTHROUGH](04-VISUAL-WALKTHROUGH.md).
 
 ## Intended video index (for later recapture)
 
-Keep this list so future recordings match the staff course. Filenames may stay the same; **content must match the live 1.0.0-rc.8 / blocks.4 screens**.
+Keep this list so future recordings match the staff course. Filenames may stay the same; **content must match the live 1.0.0-rc.9 screens**.
 
 ### 01 — Getting started overview
 
@@ -157,4 +157,4 @@ Keep this list so future recordings match the staff course. Filenames may stay t
 - Do not place extra paid orders.  
 - Do not capture credentials, Cloudflare challenge, or customer PII.  
 - Auth state stays in gitignored `training/playwright/auth/`.  
-- Update this file’s Status column when a binary actually exists and matches the live 1.0.0-rc.8 / blocks.4 screens.
+- Update this file’s Status column when a binary actually exists and matches the live 1.0.0-rc.9 screens.

@@ -3,9 +3,9 @@
 **Audience:** Technical support and developers **only**  
 **Normal staff should not require this document.**
 
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.8** (schema **5**). Training-site package **`1.0.0-dev.blocks.4`** (Cart/Checkout Blocks + overlapping Delivery Area pricing).  
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.9** (schema **5**). Includes Cart/Checkout Blocks, overlapping Delivery Area pricing, and constrained fallback.  
 **Schema target:** `5`  
-**Release identity:** Git tag `v1.0.0-rc.8` (do not rewrite). Tags `v1.0.0-rc.7` through `v1.0.0-rc.2` remain untouched. This is not RC.9.
+**Release identity:** Git tag `v1.0.0-rc.9` (do not rewrite). Tags `v1.0.0-rc.8` through `v1.0.0-rc.2` remain untouched.
 
 If WordPress shows a different plugin version, stop and confirm which package is installed before following this appendix.
 
@@ -37,7 +37,7 @@ Required production switches (Classic Checkout **and** Cart/Checkout Blocks):
 - Show delivery fees at checkout — ON  
 - Save delivery details on orders — ON  
 
-Shipment records and customer tracking links stay **OFF** until an Administrator turns them on in Settings. Not in this release: customer timeline, carrier APIs, automatic tracking updates, Delivery Engine shipment emails. Cart/Checkout Blocks **are** implemented (`1.0.0-dev.blocks.4` on the training site). Settings shows Blocks and optional integrations as **status**, not experimental checkboxes.
+Shipment records and customer tracking links stay **OFF** until an Administrator turns them on in Settings. Not in this release: customer timeline, carrier APIs, automatic tracking updates, Delivery Engine shipment emails. Cart/Checkout Blocks **are** implemented. Settings shows Blocks and optional integrations as **status**, not experimental checkboxes.
 
 Do not flip Advanced cutover switches without a change window and owner approval.
 
@@ -89,17 +89,17 @@ Administrator lockout repair is **Restore Administrator Access**, authorised by 
 - Store pickup is not a delivery shipment.  
 - Suppliers, origins, and private logistics stay off customer surfaces.  
 - Historical order delivery snapshots remain immutable. Shipments are built from that saved order data, not from today’s product settings.  
-- Do not start Stage 15, carrier APIs, WPML/WCML/WCFM/VitePOS adapters, or RC.9 from this appendix.
+- Do not start Stage 15, carrier APIs, or WPML/WCML/WCFM/VitePOS adapters from this appendix.
 
 ---
 
 ## Rollback / release identity
 
-- Protected published baseline: tagged `v1.0.0-rc.8`, schema `5`. Do not retag RC.8 or earlier.  
-- Training-site Blocks package: `1.0.0-dev.blocks.4` (not RC.9). Record: `docs/POST-RC8-BLOCKS-4-CONSTRAINED-FALLBACK.md`.  
-- Historical tagged `v1.0.0-rc.7` (schema `5`) and `v1.0.0-rc.6` (schema `4`) remain untouched.  
+- Protected published baseline: tagged `v1.0.0-rc.9`, schema `5`. Do not retag RC.9 or earlier.  
+- Frozen Blocks.4 source was promoted to RC.9. Record: `docs/RC9-FINALIZATION.md`. Constrained fallback: `docs/POST-RC8-BLOCKS-4-CONSTRAINED-FALLBACK.md`.  
+- Historical tagged `v1.0.0-rc.8` (schema `5`), `v1.0.0-rc.7` (schema `5`) and `v1.0.0-rc.6` (schema `4`) remain untouched.  
 - Historical RC.6 package `cetech-woocommerce-delivery-engine-1.0.0-rc.6.zip` remains immutable (`1059918` bytes, SHA-256 `0d4adbef50462d798a4ff9bf802643bed92a35cdd332ceee13a985dbda2a689d`, source `7e52525`). Full RC.6 record: `docs/STAGE-14H-RC6-FINAL.md`.  
-- Do not alter tags `v1.0.0-rc.8` through `v1.0.0-rc.2`. Do not overwrite historical QA ZIPs.
+- Do not alter tags `v1.0.0-rc.9` through `v1.0.0-rc.2`. Do not overwrite historical QA ZIPs.
 
 Staff training markdown lives in `docs/training/` in the plugin repository. It is **not** gitignored. Screenshot/video binaries and `training/playwright/` auth stay gitignored. Training docs are **not** part of the production plugin ZIP.
 

@@ -1,7 +1,7 @@
 # Quick Start (about 10 minutes)
 
 **Audience:** New staff  
-**Plugin version:** 1.0.0-rc.8 (schema 5; training-site package `1.0.0-dev.blocks.4`)  
+**Plugin version:** 1.0.0-rc.9 (schema 5)  
 **Goal:** Do the everyday tasks safely without technical detail.
 
 Screenshots are not included in this revision. Follow the live WordPress screens.

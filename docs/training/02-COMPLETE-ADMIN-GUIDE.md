@@ -1,7 +1,7 @@
 # Complete Administrator Guide
 
 **Audience:** Administrators and authorised configuration staff  
-**Version:** CETECH Delivery Engine **1.0.0-rc.8** (schema **5**; training-site package `1.0.0-dev.blocks.4`)  
+**Version:** CETECH Delivery Engine **1.0.0-rc.9** (schema **5**)  
 **Everyday home:** Delivery Engine → **Overview**  
 **Not everyday:** Technical Diagnostics, private supply screens, Advanced Settings
 

@@ -1,6 +1,6 @@
 # CETECH Delivery Engine — Staff Training
 
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.8** (schema **5**). Training-site package **`1.0.0-dev.blocks.4`** also includes Cart/Checkout Blocks and overlapping Delivery Area pricing. This is not RC.9.  
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.9** (schema **5**). Includes Cart/Checkout Blocks, overlapping Delivery Area pricing, and constrained fallback. Tagged **1.0.0-rc.8** remains unchanged.  
 **Everyday home:** WordPress admin → **Delivery Engine → Overview**
 
 Staff training for the current plugin. You do **not** need PHP, databases, or plugin architecture.

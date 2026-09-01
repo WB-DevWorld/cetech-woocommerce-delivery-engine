@@ -1,7 +1,7 @@
 # Visual Walkthrough (written screen tour)
 
 **Audience:** New staff and trainers  
-**Version:** 1.0.0-rc.8 (schema 5; training-site package `1.0.0-dev.blocks.4`)  
+**Version:** 1.0.0-rc.9 (schema 5)  
 **Screenshots:** Deferred. This tour is written against the live screens. Do not use leftover older images as teaching truth.
 
 Walk this path on the live site (read-only unless a trainer authorises a QA edit):

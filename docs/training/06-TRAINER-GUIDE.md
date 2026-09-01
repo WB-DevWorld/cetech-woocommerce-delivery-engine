@@ -1,6 +1,6 @@
 # Trainer Guide
 
-**Audience:** People teaching staff to use CETECH Delivery Engine **1.0.0-rc.8** (schema **5**; training-site package `1.0.0-dev.blocks.4`)  
+**Audience:** People teaching staff to use CETECH Delivery Engine **1.0.0-rc.9** (schema **5**)  
 **Companion course:** [05-STAFF-TRAINING-MANUAL](05-STAFF-TRAINING-MANUAL.md)  
 **Coverage register:** [13-FEATURE-COVERAGE-AND-CONFIRMATION.md](13-FEATURE-COVERAGE-AND-CONFIRMATION.md) — tick **every** implemented feature Pass / Fail / N/A. Reading the guides is not confirmation.
 
