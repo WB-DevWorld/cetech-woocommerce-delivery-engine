@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Cart;
 
+use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 
 /**
@@ -39,7 +40,10 @@ final class CartLineCustomerIdentity {
 	 * @param array<string, mixed> $cart_item_data
 	 */
 	public static function identityString( array $intent, array $cart_item_data = [] ): string {
-		$choice = sanitize_key( (string) ( $intent['fulfilment_choice'] ?? '' ) );
+		$context = CustomerCartContext::fromCartItem( $cart_item_data );
+		$choice  = sanitize_key(
+			(string) ( $context?->fulfilment_choice ?? $intent['fulfilment_choice'] ?? '' )
+		);
 
 		if ( '' === $choice ) {
 			return '';
@@ -48,13 +52,26 @@ final class CartLineCustomerIdentity {
 		$offer_segment = 'none';
 
 		if ( FulfilmentChoice::StorePickup->value === $choice ) {
-			$offer_segment = 'pickup';
+			if ( $context instanceof CustomerCartContext ) {
+				$offer_segment = $context->isPickupComplete()
+					? 'p' . (string) $context->pickup_location_id
+					: 'pickup_incomplete';
+			} else {
+				$offer_segment = 'pickup';
+			}
 		} else {
-			$offer_id = isset( $intent['delivery_offer_id'] ) ? (int) $intent['delivery_offer_id'] : 0;
+			$offer_id = $context?->delivery_offer_id;
+			if ( ! is_int( $offer_id ) || $offer_id <= 0 ) {
+				$offer_id = isset( $intent['delivery_offer_id'] ) ? (int) $intent['delivery_offer_id'] : 0;
+			}
 			$offer_segment = $offer_id > 0 ? (string) $offer_id : 'none';
 		}
 
-		return $choice . '|' . $offer_segment . '|' . self::locationToken( $intent, $cart_item_data );
+		$location = $context instanceof CustomerCartContext
+			? $context->cartLocationIdentitySegment()
+			: self::legacyLocationHash( $intent, $cart_item_data );
+
+		return $choice . '|' . $offer_segment . '|' . $location;
 	}
 
 	/**
@@ -62,37 +79,44 @@ final class CartLineCustomerIdentity {
 	 * @param array<string, mixed> $cart_item_data
 	 */
 	public static function locationToken( array $intent, array $cart_item_data = [] ): string {
-		$raw = $cart_item_data[ self::CART_LOCATION_KEY ] ?? null;
+		$context = CustomerCartContext::fromCartItem( $cart_item_data );
 
-		if ( is_array( $raw ) || is_object( $raw ) ) {
-			$encoded = wp_json_encode( $raw );
-			$token   = is_string( $encoded ) ? $encoded : '';
-		} elseif ( null !== $raw && '' !== $raw ) {
-			$token = sanitize_text_field( (string) $raw );
-		} else {
-			$token = '';
+		if ( $context instanceof CustomerCartContext ) {
+			return $context->cartLocationIdentitySegment();
 		}
 
-		if ( '' === $token ) {
+		return self::legacyLocationHash( $intent, $cart_item_data );
+	}
+
+	/**
+	 * Legacy cartstate fixture location: hash only, never raw JSON in the cart id.
+	 *
+	 * @param array<string, mixed> $intent
+	 * @param array<string, mixed> $cart_item_data
+	 */
+	private static function legacyLocationHash( array $intent, array $cart_item_data ): string {
+		$raw = $cart_item_data[ self::CART_LOCATION_KEY ] ?? null;
+		$seed = '';
+
+		if ( is_scalar( $raw ) && '' !== $raw ) {
+			$seed = sanitize_text_field( (string) $raw );
+		}
+
+		if ( '' === $seed ) {
 			foreach ( self::CUSTOMER_LOCATION_INTENT_KEYS as $key ) {
-				if ( ! isset( $intent[ $key ] ) || '' === $intent[ $key ] ) {
+				if ( ! isset( $intent[ $key ] ) || '' === $intent[ $key ] || is_array( $intent[ $key ] ) || is_object( $intent[ $key ] ) ) {
 					continue;
 				}
 
-				if ( is_array( $intent[ $key ] ) || is_object( $intent[ $key ] ) ) {
-					$encoded = wp_json_encode( $intent[ $key ] );
-					$token   = is_string( $encoded ) ? $encoded : '';
-				} else {
-					$token = sanitize_text_field( (string) $intent[ $key ] );
-				}
+				$seed = sanitize_text_field( (string) $intent[ $key ] );
 
-				if ( '' !== $token ) {
+				if ( '' !== $seed ) {
 					break;
 				}
 			}
 		}
 
-		return '' === $token ? '' : strtolower( $token );
+		return '' === $seed ? '' : hash( 'sha256', strtolower( $seed ) );
 	}
 
 	/**
@@ -127,6 +151,28 @@ final class CartLineCustomerIdentity {
 		}
 
 		return $fresh_intent;
+	}
+
+	/**
+	 * Copy customer-owned destination context onto a refreshed cart line.
+	 *
+	 * @param array<string, mixed> $fresh_item
+	 * @param array<string, mixed> $stored_item
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function overlayCustomerContext( array $fresh_item, array $stored_item ): array {
+		$context = CustomerCartContext::fromCartItem( $stored_item );
+
+		if ( $context instanceof CustomerCartContext ) {
+			return $context->applyToCartItem( $fresh_item );
+		}
+
+		if ( isset( $stored_item[ CustomerCartContext::CART_KEY ] ) ) {
+			$fresh_item[ CustomerCartContext::CART_KEY ] = $stored_item[ CustomerCartContext::CART_KEY ];
+		}
+
+		return $fresh_item;
 	}
 
 	/**

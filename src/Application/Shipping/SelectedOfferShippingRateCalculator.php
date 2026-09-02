@@ -151,7 +151,7 @@ final class SelectedOfferShippingRateCalculator {
 				return SelectedOfferShippingRateResult::blocked( self::BLOCK_LINE_INVALID );
 			}
 
-			$group_id = DeliveryGroupIdentity::fromIntent( $intent );
+			$group_id = DeliveryGroupIdentity::fromCartItem( $cart_item );
 
 			if ( null === $group_id || ( '' !== $expected_group && ! hash_equals( $expected_group, $group_id ) ) ) {
 				return SelectedOfferShippingRateResult::blocked( self::BLOCK_GROUP_MISMATCH );

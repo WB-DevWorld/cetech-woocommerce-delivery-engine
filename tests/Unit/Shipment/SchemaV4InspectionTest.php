@@ -20,7 +20,7 @@ final class SchemaV4InspectionTest extends TestCase {
 		$plugin_root = dirname( __DIR__, 3 );
 		$header      = (string) file_get_contents( $plugin_root . '/cetech-woocommerce-delivery-engine.php' );
 
-		self::assertMatchesRegularExpression( "/define(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.peritem\\.1'\s*)/", $header );
+		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.peritem\\.1'\s*\)/", $header );
 		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.peritem\\.1\s*$/m', $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-rc.9' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.blocks.4' )", $header );
@@ -67,6 +67,39 @@ final class SchemaV4InspectionTest extends TestCase {
 		self::assertStringContainsString( "'shipments'", $source );
 		self::assertStringContainsString( "'shipment_items'", $source );
 		self::assertStringContainsString( "'shipment_events'", $source );
+	}
+
+	public function test_delivery_group_id_column_fits_v2_identifier(): void {
+		$statements = ShipmentSchema::create_table_statements( '' );
+		$sql        = $statements[ ShipmentSchema::SHIPMENTS_SUFFIX ];
+
+		self::assertStringContainsString( 'delivery_group_id varchar(191) NOT NULL', $sql );
+		self::assertStringContainsString( 'idempotency_key varchar(255) NOT NULL', $sql );
+		self::assertSame( 5, (int) SchemaVersion::TARGET );
+		self::assertLessThanOrEqual(
+			\CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity::COLUMN_LENGTH,
+			\CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity::worstCaseLength( true )
+		);
+		self::assertLessThanOrEqual(
+			\CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity::COLUMN_LENGTH,
+			\CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity::worstCaseLength( false )
+		);
+		$idempotency = 20 + 1 + \CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity::worstCaseLength( false );
+		self::assertLessThanOrEqual(
+			\CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity::IDEMPOTENCY_KEY_LENGTH,
+			$idempotency
+		);
+	}
+
+	public function test_rc9_tag_is_untouched(): void {
+		$plugin_root = dirname( __DIR__, 3 );
+		$sha = trim( (string) shell_exec( 'git -C ' . escapeshellarg( $plugin_root ) . ' rev-parse "v1.0.0-rc.9^{commit}" 2>NUL' ) );
+
+		if ( '' === $sha ) {
+			$sha = trim( (string) shell_exec( 'git -C ' . escapeshellarg( $plugin_root ) . ' rev-parse "v1.0.0-rc.9^{commit}" 2>/dev/null' ) );
+		}
+
+		self::assertSame( 'e6bc7fba16d9d7b96682f2945c518a33a9a16cd5', $sha );
 	}
 
 	public function test_deactivator_does_not_drop_tables(): void {

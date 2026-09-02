@@ -116,15 +116,15 @@ final class HistoricalShipmentPlanner {
 		string $group_id,
 		array $group
 	): ShipmentPlan|ShipmentPlanResult {
-		$parts = explode( '|', $group_id );
+		$parsed = DeliveryGroupIdentity::parse( $group_id );
 
-		if ( 3 !== count( $parts ) || '' === $parts[0] || '' === $parts[1] ) {
+		if ( ! is_array( $parsed ) || $parsed['reselect'] ) {
 			return ShipmentPlanResult::failure( ShipmentCreationErrorCode::MalformedGroupSnapshot );
 		}
 
-		$availability = $parts[0];
-		$choice       = $parts[1];
-		$offer_id     = ctype_digit( $parts[2] ) ? (int) $parts[2] : null;
+		$availability = $parsed['availability'];
+		$choice       = $parsed['choice'];
+		$offer_id     = ctype_digit( $parsed['offer_segment'] ) ? (int) $parsed['offer_segment'] : null;
 
 		if ( FulfilmentChoice::Delivery->value !== $choice ) {
 			return ShipmentPlanResult::failure( ShipmentCreationErrorCode::MalformedGroupSnapshot );

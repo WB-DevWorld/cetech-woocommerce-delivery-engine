@@ -72,6 +72,12 @@ final class Logger {
 			'internal_cost',
 			'payment_token',
 			'card_number',
+			'first_name',
+			'last_name',
+			'phone',
+			'address_1',
+			'address_2',
+			'address',
 		];
 
 		foreach ( $blocked_keys as $key ) {

@@ -8,6 +8,7 @@ use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionReconciler;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
 use CetechDeliveryEngine\Application\Cart\CartDeliveryReselectionService;
+use CetechDeliveryEngine\Application\Cart\CartCustomerContextMutationService;
 use CetechDeliveryEngine\Application\Checkout\CheckoutDeliverySelectionValidator;
 use CetechDeliveryEngine\Application\ProductRule\ProductDeliveryRuleResolver;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
@@ -674,6 +675,13 @@ final class Plugin {
 				$container->get( Requirements::class ),
 				$container->get( CartDeliverySelectionCapture::class ),
 				$container->get( ProductDeliverySelectionValidator::class )
+			)
+		);
+
+		$this->container->singleton(
+			CartCustomerContextMutationService::class,
+			static fn ( ServiceContainer $container ): CartCustomerContextMutationService => new CartCustomerContextMutationService(
+				$container->get( CartDeliverySelectionReconciler::class )
 			)
 		);
 
