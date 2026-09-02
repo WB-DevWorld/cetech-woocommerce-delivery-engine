@@ -115,6 +115,7 @@ Administrator-language requirement: normal-user admin UI must use operational la
 | `docs/RC8-FINALIZATION.md` | RC.8 release record (promoted from accepted Fulfilment.4) |
 | `docs/RC9-FINALIZATION.md` | RC.9 release record (identity-only promotion from frozen Blocks.4) |
 | `docs/POST-RC9-BLOCKS-LINE-SNAPSHOT.md` | Post-RC.9 native Blocks line-snapshot repair (`1.0.0-dev.blocks-snapshot.1`) |
+| `docs/POST-RC9-BLOCKS-LINE-SNAPSHOT-QA.md` | Local lab browser/CRUD evidence for `1.0.0-dev.blocks-snapshot.1` |
 | `docs/POST-RC8-INTEGRATIONS-COMPATIBILITY-AUDIT.md` | Post-RC.8 integrations/Settings honesty audit (accepted; pre-implementation) |
 | `docs/POST-RC8-BLOCKS-IMPLEMENTATION.md` | Post-RC.8 Settings honesty + real Cart/Checkout Blocks adapter (`1.0.0-dev.blocks.1`) |
 | `docs/POST-RC8-BLOCKS-4-CONSTRAINED-FALLBACK.md` | Constrained vs global Delivery Area fallback (`1.0.0-dev.blocks.4`) |

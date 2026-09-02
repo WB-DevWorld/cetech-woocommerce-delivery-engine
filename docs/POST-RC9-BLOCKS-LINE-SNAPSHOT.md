@@ -12,6 +12,12 @@
 **cartstate.1:** not modified  
 **Not Stage 15.** Not WCFM/WPML/per-item.
 
+**Source SHA:** `54c9894f492906a24d30c939f831f4538d6b0255`  
+**ZIP:** `cetech-woocommerce-delivery-engine-1.0.0-dev.blocks-snapshot.1.zip`  
+**ZIP SHA-256:** `092f3144e2a4b4df474c91513b6a282af08ccc817a5fa007f1f94d5d5229c401`  
+**PHPUnit:** 855 tests, 4891 assertions, OK (5 pre-existing deprecations on PHP 8.5)  
+**Local browser:** native Blocks Delivery order **#25** and Pickup order **#26** on the disposable QA lab (`http://localhost:8088`). Not deployed.
+
 ```text
 READ → AUDIT → PLAN → IMPLEMENT → TEST → DOCUMENT → REVIEW → STOP
 ```
