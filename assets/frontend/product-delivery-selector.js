@@ -3,13 +3,87 @@
  *
  * Does not calculate prices or invent options. Toggles visible display_key radios
  * so only the active fulfilment choice is submitted. Location AJAX asks the server
- * for valid options.
+ * for valid options. One hidden JSON payload is the authoritative customer context.
  */
 (function (window, document) {
 	'use strict';
 
 	function panelRadios(panel) {
 		return panel ? Array.prototype.slice.call(panel.querySelectorAll('input[type="radio"][name]')) : [];
+	}
+
+	function closestSelector(node) {
+		return node && node.closest ? node.closest('[data-cetech-de-selector]') : null;
+	}
+
+	function fieldValue(scope, name) {
+		var field = scope ? scope.querySelector('[name="' + name + '"]') : null;
+		return field ? String(field.value || '') : '';
+	}
+
+	function formatEstimateLine(option, config) {
+		if (!option || option.fulfilment_choice === 'store_pickup') {
+			return '';
+		}
+		if (option.estimate_line) {
+			return String(option.estimate_line);
+		}
+		var raw = String(option.estimate_text || '').replace(/^Estimated(?:\s+delivery)?\s*:?\s+/i, '').trim();
+		if (!raw) {
+			return '';
+		}
+		var prefix = (config && config.i18n && config.i18n.estimated) || 'Estimated delivery';
+		return prefix + ': ' + raw;
+	}
+
+	function currentPayload(root) {
+		var loc = root.querySelector('[data-cetech-de-matching-location]') || root;
+		var checked = root.querySelector('input[name="cetech_de_delivery_option_key"]:checked:not([disabled])');
+		var choiceSwitch = root.querySelector('[data-cetech-de-choice-switch]:checked');
+		return {
+			matching_location: {
+				country: fieldValue(loc, 'cetech_de_matching_country'),
+				state: fieldValue(loc, 'cetech_de_matching_state'),
+				city: fieldValue(loc, 'cetech_de_matching_city'),
+				postcode: fieldValue(loc, 'cetech_de_matching_postcode')
+			},
+			display_key: checked ? String(checked.value || '') : '',
+			fulfilment_choice: choiceSwitch
+				? String(choiceSwitch.value || '')
+				: (checked && checked.closest('[data-cetech-de-choice-panel]')
+					? String(checked.closest('[data-cetech-de-choice-panel]').getAttribute('data-cetech-de-choice-panel') || '')
+					: '')
+		};
+	}
+
+	function ensurePayloadInput(root) {
+		var input = root.querySelector('[data-cetech-de-pdp-context]');
+		if (input) {
+			return input;
+		}
+		var config = window.cetechDeMatchingLocation || {};
+		input = document.createElement('input');
+		input.type = 'hidden';
+		input.name = config.contextField || 'cetech_de_pdp_context';
+		input.setAttribute('data-cetech-de-pdp-context', '1');
+		input.autocomplete = 'off';
+		root.appendChild(input);
+		return input;
+	}
+
+	function writePayload(root) {
+		if (!root) {
+			return;
+		}
+		ensurePayloadInput(root).value = JSON.stringify(currentPayload(root));
+	}
+
+	function prepareSubmit(root) {
+		var checked = root.querySelector('input[name="cetech_de_delivery_option_key"]:checked');
+		if (checked) {
+			checked.disabled = false;
+		}
+		writePayload(root);
 	}
 
 	function setPanelActive(root, choice) {
@@ -26,8 +100,10 @@
 					input.disabled = false;
 					input.required = true;
 				});
-				if (radios.length === 1) {
-					radios[0].checked = true;
+				if (!radios.some(function (input) { return input.checked; })) {
+					if (radios.length === 1) {
+						radios[0].checked = true;
+					}
 				}
 			} else {
 				panel.hidden = true;
@@ -38,6 +114,7 @@
 				});
 			}
 		});
+		writePayload(root);
 	}
 
 	function bind(root) {
@@ -62,6 +139,8 @@
 		}
 
 		bindLocation(root);
+		bindFormSubmit(root);
+		writePayload(root);
 	}
 
 	function bindAll(scope) {
@@ -73,13 +152,25 @@
 		}
 	}
 
-	function fieldValue(root, name) {
-		var field = root.querySelector('[name="' + name + '"]');
-		return field ? String(field.value || '') : '';
+	function bindFormSubmit(root) {
+		var form = root.closest ? root.closest('form.cart, form.variations_form, form') : null;
+		if (!form || form.getAttribute('data-cetech-de-pdp-submit') === '1') {
+			return;
+		}
+		form.addEventListener('submit', function () {
+			var selector = closestSelector(root) || root;
+			prepareSubmit(selector);
+		});
+		form.setAttribute('data-cetech-de-pdp-submit', '1');
 	}
 
 	function bindLocation(root) {
 		if (!root || root.getAttribute('data-cetech-de-location-bound') === '1') {
+			return;
+		}
+
+		if (root.getAttribute('data-cetech-de-variable-selector')) {
+			root.setAttribute('data-cetech-de-location-bound', '1');
 			return;
 		}
 
@@ -93,6 +184,9 @@
 		}
 
 		var timer = null;
+		var requestToken = 0;
+		root.setAttribute('data-cetech-de-options-loading', '0');
+
 		function schedule() {
 			window.clearTimeout(timer);
 			timer = window.setTimeout(fetchOptions, 280);
@@ -105,6 +199,8 @@
 		function fetchOptions() {
 			var status = root.querySelector('[data-cetech-de-status]');
 			var optionsEl = root.querySelector('[data-cetech-de-options]');
+			var token = ++requestToken;
+			root.setAttribute('data-cetech-de-options-loading', '1');
 			if (status) {
 				status.textContent = (config.i18n && config.i18n.loading) || '';
 			}
@@ -114,10 +210,10 @@
 			body.set('nonce', config.nonce);
 			body.set('product_id', String(config.productId || root.getAttribute('data-product-id') || '0'));
 			body.set('variation_id', fieldValue(root, 'cetech_de_delivery_variation_id') || '0');
-			body.set('country', fieldValue(root, 'cetech_de_matching_country'));
-			body.set('state', fieldValue(root, 'cetech_de_matching_state'));
-			body.set('city', fieldValue(root, 'cetech_de_matching_city'));
-			body.set('postcode', fieldValue(root, 'cetech_de_matching_postcode'));
+			body.set('country', fieldValue(locationRoot, 'cetech_de_matching_country'));
+			body.set('state', fieldValue(locationRoot, 'cetech_de_matching_state'));
+			body.set('city', fieldValue(locationRoot, 'cetech_de_matching_city'));
+			body.set('postcode', fieldValue(locationRoot, 'cetech_de_matching_postcode'));
 
 			window.fetch(config.ajaxUrl, {
 				method: 'POST',
@@ -127,6 +223,10 @@
 			}).then(function (response) {
 				return response.json();
 			}).then(function (payload) {
+				if (token !== requestToken) {
+					return;
+				}
+				root.setAttribute('data-cetech-de-options-loading', '0');
 				var data = payload && payload.data ? payload.data : payload;
 				if (!data) {
 					throw new Error('empty');
@@ -138,8 +238,17 @@
 					optionsEl.innerHTML = renderOptionsHtml(data.options || [], data.default_key || '', config);
 					root.removeAttribute('data-cetech-de-switch-bound');
 					bind(root);
+					var radios = optionsEl.querySelectorAll('input[name="cetech_de_delivery_option_key"]:not([disabled])');
+					if (radios.length && !Array.prototype.some.call(radios, function (input) { return input.checked; })) {
+						radios[0].checked = true;
+					}
+					writePayload(root);
 				}
 			}).catch(function () {
+				if (token !== requestToken) {
+					return;
+				}
+				root.setAttribute('data-cetech-de-options-loading', '0');
 				if (status) {
 					status.textContent = (config.i18n && config.i18n.error) || '';
 				}
@@ -206,10 +315,11 @@
 
 	function radioOption(option, defaultKey, config) {
 		var checked = option.display_key === defaultKey || option.is_default;
-		var estimate = option.estimate_text && option.fulfilment_choice !== 'store_pickup'
-			? '<span class="cetech-de-delivery-option__estimate">' + escapeHtml((config.i18n && config.i18n.estimated ? config.i18n.estimated + ': ' : '') + option.estimate_text) + '</span>'
+		var estimateLine = formatEstimateLine(option, config);
+		var estimate = estimateLine
+			? '<span class="cetech-de-delivery-option__estimate">' + escapeHtml(estimateLine) + '</span>'
 			: '';
-		return '<p class="cetech-de-delivery-option cetech-de-delivery-option--radio"><label>' +
+		return '<p class="cetech-de-delivery-option cetech-de-delivery-option--radio" data-cetech-de-choice="' + escapeHtml(option.fulfilment_choice || '') + '"><label>' +
 			'<input type="radio" name="' + escapeHtml((config && config.postField) || 'cetech_de_delivery_option_key') + '" value="' + escapeHtml(option.display_key) + '"' + (checked ? ' checked="checked"' : '') + ' required="required" />' +
 			'<span class="cetech-de-delivery-option__body"><span class="cetech-de-delivery-option__label">' + escapeHtml(option.delivery_offer_public_label || option.pickup_location_label || '') + '</span>' + estimate + '</span></label></p>';
 	}
@@ -218,6 +328,9 @@
 		bind: bind,
 		bindAll: bindAll,
 		setPanelActive: setPanelActive,
+		writePayload: writePayload,
+		currentPayload: currentPayload,
+		formatEstimateLine: formatEstimateLine,
 	};
 
 	function boot() {

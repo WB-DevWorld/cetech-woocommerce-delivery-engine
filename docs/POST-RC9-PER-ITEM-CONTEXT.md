@@ -2,6 +2,7 @@
 
 **Identity:** `1.0.0-dev.peritem.1` (unchanged; no new release identity)  
 **Branch:** `feat/post-rc9-per-item-context`  
+**Foundation SHA:** `72b979cc8b1fcc716d8ecfd4a4e0b97a80acb6a3`  
 **Schema:** `5` (unchanged)  
 **Not:** RC.10, Stage 15, packaging, FLAIROC, training, WCFM, WPML, Blocks location editor
 
@@ -236,10 +237,26 @@ Covered at minimum:
 
 PDP 1–6; package quoting 7–13; cart edit 14–19; use-for-all 20–24; checkout 25–32; privacy 33–36.
 
+Classic two-destination capture (this completion):
+
+1. Context is present in `cart_item_data` before `generateCartId`.
+2. Same product Accra vs Kumasi produces distinct cart IDs.
+3. Browsing default is not read as submitted matching location.
+4. Authoritative `cetech_de_pdp_context` JSON wins over stale Accra POST fields.
+5. Stale display keys cannot validate against a destination that does not quote (Lagos).
+6. One-cart Accra + Kumasi package quoting is **GHS 15 + GHS 22 = 37** (`test_lab_accra_and_kumasi_quote_15_and_22_in_one_cart`).
+7. Same complete destination consolidates.
+8. Variation options request includes location (`need_location` when missing; Accra vs Lagos filter).
+9. ETA renderer does not double-prefix (`format_product_estimate_line`).
+10. Existing cartstate reconciliation remains in the suite.
+11. Blocks snapshot / Store API tests remain in the suite.
+12. Schema target remains **`5`**.
+
 Blocks non-regression: v1 managed lines without `CustomerCartContext` keep the WooCommerce package destination; existing Store API snapshot, pickup, and cartstate tests remain in the suite.
 
-- Full PHPUnit: **950 tests, 5284 assertions, OK** (5 pre-existing deprecations)
-- JS: **6 files / 33 tests passed**
+- Focused PHPUnit (capture / quoting / variation / estimate / cartstate / schema / Store API): **89 tests, 440 assertions, OK** (2 pre-existing deprecations)
+- Full PHPUnit: **958 tests, 5314 assertions, OK** (5 pre-existing deprecations)
+- JS: **6 files / 37 tests passed**
 - PHP lint `src` + `database`: 0 failures
 - `composer validate --no-check-publish`: valid
 
@@ -257,34 +274,111 @@ Lab: `C:\Users\Jane\Desktop\Learning 2026\Cursor\cetech-de-local-qa` (`http://lo
 | F session JSON restore, no address in cart id | **PASS** |
 | G Blocks Store API two same-product lines / different destinations → correct v2 snapshots, no cross-assignment, transient keys removed | **PASS** (order 29) |
 
+## Classic two-destination root cause (Chrome)
+
+Domain fixtures already allowed two destination contexts. The unstable Classic browser cart was **not** a missing random unique key.
+
+WooCommerce 11.0.1 Classic add-to-cart order in the local lab (`class-wc-cart.php`):
+
+1. Classic form POST
+2. `woocommerce_add_to_cart_validation` → `CartDeliverySelectionCapture::validate_add_to_cart`
+3. `WC_Cart::add_to_cart()`
+4. `woocommerce_add_cart_item_data` (priority 10) — **CustomerCartContext must be attached here**
+5. `generate_cart_id()` → `woocommerce_cart_id` → `CartDeliverySelectionReconciler::filter_cart_id` → `CartLineCustomerIdentity::generateCartId()`
+6. `find_product_in_cart` / merge if the ID matches
+7. `woocommerce_add_to_cart`
+8. session write; later `reconcile_cart`
+
+If matching location is missing at step 4, Accra and Kumasi collapse to the same cart ID.
+
+**Real Classic POST / JS defects:**
+
+1. **No single authoritative payload.** Scattered `cetech_de_matching_*` + `cetech_de_delivery_option_key`. Duplicate names (PDP + cart/mini-cart), WooCommerce country/state hidden clones, and first-match `querySelector` could submit Accra after the UI showed Kumasi.
+2. **Location AJAX had no request token.** An Accra response could overwrite Kumasi options. After AJAX, required radios could be unchecked/disabled (`setPanelActive`), so HTML5 blocked submit (empty notices, no PHP). Playwright `requestSubmit()` without the add-to-cart button as submitter omitted `add-to-cart=16`, so WooCommerce never added.
+3. **Browsing session is a PDP convenience default only.** Capture already did not read `cetech_de_browsing_matching_location` as cart authority. Prefill + stale fields still made the second add look like a merge. Cart restore does not use browsing as item state.
+4. **Not** “need a random unique cart key.” Separation comes only from legitimate `CustomerCartContext` before `generate_cart_id`.
+
+**Exact fix:** one JSON field `cetech_de_pdp_context` (`ClassicPdpContextPayload`). Server order: payload → individual POST fields → Store API filter. Never browsing. Server sanitizes → `MatchingLocation` → validates the selected option against that location (`LocationOfferQuoteProbe` / `LocationAwareDeliveryOptions`) → `CustomerCartContext` → cart item. Never trust browser price/ETA/label. Classic delivery without a matching location does **not** attach a location-less delivery context (that would merge). JS writes the payload on submit, scopes field reads to the selector root, aborts stale location AJAX, and enables the checked radio before submit.
+
+Lab ATC mu-plugin (`wp-content/mu-plugins/cetech-de-atc-trace.php`, not shipped) after the fix:
+
+| Add | City | Cart key | Context before cart ID |
+|---|---|---|---|
+| 1 | Accra | `4247f7a0caed579afc46d9a43a14496c` | yes |
+| 2 | Kumasi | `87a9998c68cc168a4703ffd570fa905b` | yes |
+
+PHP received Kumasi. WooCommerce did not merge. Reconciliation did not overwrite Kumasi with Accra. Raw city does not appear in the cart key.
+
+Answers to the ten add-to-cart questions after the fix:
+
+1. Browser submitted Kumasi — **yes** (`cetech_de_pdp_context` + matching fields).
+2. PHP received Kumasi — **yes**.
+3. CustomerCartContext built as Kumasi — **yes**.
+4. Context present before cart ID — **yes**.
+5. Distinct cart ID — **yes**.
+6. WooCommerce merge afterward — **no**.
+7. Reconciliation overwrite with Accra — **no**.
+8. Browsing overwrite submitted item — **no**.
+9. Stale hidden fields — **mitigated** by payload-first.
+10. AJAX visual/new vs submit old — **fixed** with request token + payload written on submit.
+
+## Estimate copy
+
+Stored duration text was `Estimated %1$d–%2$d %3$s`. The PHP renderer prefixes `Estimated delivery:`. AJAX JS concatenated the prefix again → `Estimated delivery: Estimated 3–5 business days`.
+
+One formatting boundary:
+
+- Source duration is duration-only (`3–5 business days`).
+- `DeliveryPresentationLabels::format_product_estimate_line()` prefixes once.
+- Historical snapshots that already store `Estimated …` are stripped only at display.
+- AJAX responses include `estimate_line`. JS prefers that field.
+
+Chrome cart: **Estimated delivery: 3–5 business days** (no double prefix).
+
+## Variable product location-first
+
+Location is part of `cetech_de_variation_delivery_options`. Changing variation, country, state, city, or postcode invalidates the cache and refetches. Missing location returns `need_location`. A display key resolved for variation A / Accra cannot remain selectable for variation B / Kumasi unless server validation still quotes.
+
+Chrome: QA Variable Table Oak / Accra + Walnut / Kumasi → two cart lines, Accra GHS 15 + Kumasi GHS 22 in one cart.
+
 ## Local Docker QA — Classic Stages 3–6
 
 Classic Cart: `/classic-cart/`  
 Classic Checkout: `/classic-checkout/`  
 Lab rates: Accra Standard **GHS 15**, Kumasi Standard **GHS 22** (not the 15/35 fixture amounts).
 
-Plugin copied, not packaged. Identity `1.0.0-dev.peritem.1`, schema **5**.
+Plugin copied, not packaged. Identity `1.0.0-dev.peritem.1`, schema **5**.  
+Evidence: `cetech-de-local-qa/evidence/peritem.classic/`.
 
 Chrome (Playwright Desktop Chrome against `http://localhost:8088`):
 
 | Flow | Result |
 |---|---|
 | 1 PDP Accra + Delivery + QA Chair | **PASS** — matching location fields, QA Local Standard, Delivering to: Accra |
-| 2 same chair → Kumasi second line | **PARTIAL** — Kumasi add/quote (GHS 22) proven; two simultaneous cart lines not stably achieved in Chrome |
-| 3 separate packages/rates | **PARTIAL** — Accra GHS 15 and Kumasi GHS 22 proven on separate carts; not together in one Chrome cart |
-| 4 consolidate Kumasi → Accra | **NOT COMPLETED** in Chrome (depends on two lines) |
-| 5 qty split to another street | **NOT COMPLETED** in Chrome |
-| 6 Delivery + Pickup | **NOT COMPLETED** in Chrome |
-| 7 Use this address for all eligible | **NOT COMPLETED** in Chrome |
-| 8 checkout two addresses | **NOT COMPLETED** in Chrome |
-| 9 incomplete + explicit checkout address | **NOT COMPLETED** in Chrome |
-| 10 admin invalidate / reselection | **NOT COMPLETED** in Chrome |
+| 2 same chair → Kumasi second line | **PASS** — 2 WC lines; payload city Kumasi; cart keys `4247f7a0…` and `87a9998c…` |
+| 3 separate packages/rates in one cart | **PASS** — Accra GHS 15 + Kumasi GHS 22; total DE shipping GHS 37 |
+| 4 consolidate Kumasi → Accra | **PASS** — lines=1 |
+| 5 qty split to another Accra street | **PASS** — qty 1,1 |
+| 6 Delivery + Pickup | **PASS** — pickup zero; delivery quoted |
+| 7 Use this address for all eligible | **PASS** — pickup stayed pickup |
+| 8 multi-address / mixed checkout | **PASS** — after FLOW 5 (two Accra streets completed): checkout notice *Items in this order will be delivered to multiple destinations. Each item keeps its own delivery address.* After FLOW 7: mixed *Store Pickup and Delivery* notice; pickup ignores checkout shipping. Accra+Kumasi simultaneous rates remain FLOW 3 (matching-only PDP lines fail closed until street complete — FLOW 9). |
+| 9 incomplete + explicit checkout address | **PASS** — Place Order blocked; apply control present |
+| 10 admin invalidate / reselection | **PASS** — product + Accra destination survive; line needs reselection |
+| Estimate copy | **PASS** — no `Estimated delivery: Estimated` |
+| Variable Oak/Accra + Walnut/Kumasi | **PASS** — 2 lines; Accra 15 + Kumasi 22 |
 
 Chrome defects found and fixed during QA:
 
 - Cart editor used `woocommerce_form_field` country inside `<details>`, which dumped country names into the item remove control. Cart now uses native matching-location fields and `woocommerce_after_cart_item_name`.
+- Classic same-product two-destination add-to-cart (payload / AJAX token / submitter / location-less context skip) as above.
 
-Remaining Chrome gaps are Playwright/add-to-cart stability, not a substitute for the PHPUnit coverage of package quoting, mutation, use-for-all, and checkout policy.
+Privacy (DOM / request): cart keys and group IDs are hashes; matching identities are SHA-256; generic `data-*` do not carry street, name, or phone. Editor HTML ids are `cetech-de-ctx-{cartKeyHash}-{field}` (suffixes such as `-phone` / `-address-1` name the control, not the customer value). Forms submit customer-owned address fields to the server. ATC trace is lab-only.
+
+Remaining limitations (not blockers for Stages 3–6 Classic completion):
+
+- Full Blocks location editor is still not implemented.
+- FLOW 8 sequential Chrome after FLOW 7 is mixed Pickup + one Accra delivery (use-for-all consolidates same complete destination). Two Accra streets are proven at FLOW 5; Accra+Kumasi simultaneous rates are proven at FLOW 3.
+- FLOW 8 / FLOW 9 do not click WooCommerce **Place order** through to a paid order in this Chrome script.
 
 ## Intentionally excluded
 

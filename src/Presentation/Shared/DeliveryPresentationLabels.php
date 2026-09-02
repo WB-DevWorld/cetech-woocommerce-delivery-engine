@@ -191,16 +191,20 @@ final class DeliveryPresentationLabels {
 	}
 
 	/**
-	 * Prefer clean ETA values without a duplicated "Estimated" prefix when the label already says Estimated delivery.
+	 * Duration/copy only. Callers prefix "Estimated delivery" exactly once via format_product_estimate_line().
+	 *
+	 * Historical snapshots may already store "Estimated …"; those remain as stored and are cleaned here.
 	 */
 	public static function strip_estimated_prefix( string $estimate_text ): string {
 		$trimmed = trim( $estimate_text );
 
-		if ( preg_match( '/^Estimated\s+/iu', $trimmed ) ) {
-			return trim( (string) preg_replace( '/^Estimated\s+/iu', '', $trimmed ) );
+		if ( '' === $trimmed ) {
+			return '';
 		}
 
-		return $trimmed;
+		$stripped = preg_replace( '/^Estimated(?:\s+delivery)?\s*:?\s+/iu', '', $trimmed );
+
+		return is_string( $stripped ) && '' !== $stripped ? $stripped : $trimmed;
 	}
 
 	private static function infer_choice_slug_from_label( string $choice_label ): ?string {

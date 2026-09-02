@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Frontend;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
+use CetechDeliveryEngine\Application\CustomerContext\ClassicPdpContextPayload;
 use CetechDeliveryEngine\Application\CustomerContext\CustomerBrowsingLocationStore;
 use CetechDeliveryEngine\Application\CustomerContext\LocationAwareDeliveryOptions;
 use CetechDeliveryEngine\Application\CustomerContext\MatchingLocationOptionsEndpoint;
@@ -70,12 +71,6 @@ final class ProductDeliverySelectorRenderer {
 
 		$version = defined( 'CETECH_DE_VERSION' ) ? CETECH_DE_VERSION : '1.0.0-rc.3';
 		$base    = defined( 'CETECH_DE_URL' ) ? CETECH_DE_URL : '';
-		$deps    = [];
-
-		if ( function_exists( 'wp_script_is' ) && wp_script_is( 'wc-country-select', 'registered' ) ) {
-			$deps[] = 'wc-country-select';
-			wp_enqueue_script( 'wc-country-select' );
-		}
 
 		wp_enqueue_style(
 			self::STYLE_HANDLE,
@@ -87,7 +82,7 @@ final class ProductDeliverySelectorRenderer {
 		wp_enqueue_script(
 			self::SCRIPT_HANDLE,
 			$base . 'assets/frontend/product-delivery-selector.js',
-			$deps,
+			[],
 			$version,
 			true
 		);
@@ -113,6 +108,7 @@ final class ProductDeliverySelectorRenderer {
 					'estimated'   => __( 'Estimated delivery', 'cetech-woocommerce-delivery-engine' ),
 				],
 				'postField' => CartDeliverySelectionCapture::POST_FIELD,
+				'contextField' => ClassicPdpContextPayload::POST_FIELD,
 			]
 		);
 	}
@@ -236,6 +232,9 @@ final class ProductDeliverySelectorRenderer {
 		echo '<div class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--variable" data-cetech-de-variable-selector="1" data-cetech-de-selector="1" data-product-id="' . esc_attr( (string) $product_id ) . '">';
 		echo '<fieldset class="cetech-de-delivery-selector__fieldset">';
 		echo '<legend class="cetech-de-delivery-selector__title">' . esc_html__( 'Delivery options', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
+		$browsing = $this->browsing_store instanceof CustomerBrowsingLocationStore ? $this->browsing_store->get() : null;
+		echo MatchingLocationFieldRenderer::render( $browsing, 'cetech-de-matching', false ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns escaped HTML.
+		echo $this->pdp_context_input(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		echo '<div class="cetech-de-delivery-selector__status" role="status" aria-live="polite" data-cetech-de-status>';
 		echo esc_html__( 'Select your product options to see delivery choices.', 'cetech-woocommerce-delivery-engine' );
 		echo '</div>';
@@ -321,8 +320,10 @@ final class ProductDeliverySelectorRenderer {
 		echo '<legend class="cetech-de-delivery-selector__title">' . esc_html__( 'Delivery options', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
 
 		if ( $requires ) {
-			echo MatchingLocationFieldRenderer::render( $browsing ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns escaped HTML.
+			echo MatchingLocationFieldRenderer::render( $browsing, 'cetech-de-matching', false ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns escaped HTML.
 		}
+
+		echo $this->pdp_context_input(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 
 		echo '<div class="cetech-de-delivery-selector__status" role="status" aria-live="polite" data-cetech-de-status>';
 		if ( $requires && ( ! $browsing instanceof MatchingLocation || ! $browsing->isPresent() ) ) {
@@ -498,5 +499,9 @@ final class ProductDeliverySelectorRenderer {
 		echo '<h3 class="cetech-de-delivery-selector__title">' . esc_html__( 'Delivery options', 'cetech-woocommerce-delivery-engine' ) . '</h3>';
 		echo '<p class="cetech-de-delivery-selector__notice">' . esc_html( $message ) . '</p>';
 		echo '</div>';
+	}
+
+	private function pdp_context_input(): string {
+		return '<input type="hidden" name="' . esc_attr( ClassicPdpContextPayload::POST_FIELD ) . '" value="" data-cetech-de-pdp-context="1" autocomplete="off" />';
 	}
 }

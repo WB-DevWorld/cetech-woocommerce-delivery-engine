@@ -130,4 +130,39 @@ describe('Product delivery fulfilment switcher', () => {
 		expect(pickupRadio.disabled).toBe(true);
 		expect(deliveryPanel.textContent).toContain('Estimated delivery: 2–4 business days');
 	});
+
+	it('writes one authoritative PDP payload from the selector', () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<fieldset data-cetech-de-selector="1">
+					<div data-cetech-de-matching-location="1">
+						<select name="cetech_de_matching_country"><option value="GH" selected>Ghana</option></select>
+						<select name="cetech_de_matching_state"><option value="AH" selected>Ashanti</option></select>
+						<input name="cetech_de_matching_city" value="Kumasi" />
+						<input name="cetech_de_matching_postcode" value="AK-000" />
+					</div>
+					<input type="radio" name="cetech_de_delivery_option_key" value="in_warehouse:delivery:10" checked />
+					<input type="hidden" name="cetech_de_pdp_context" data-cetech-de-pdp-context="1" value="" />
+				</fieldset>
+			</form>
+		`;
+		const api = loadSelector();
+		api.bindAll(document);
+		const payload = JSON.parse(document.querySelector('[data-cetech-de-pdp-context]').value);
+		expect(payload.matching_location.city).toBe('Kumasi');
+		expect(payload.matching_location.country).toBe('GH');
+		expect(payload.display_key).toBe('in_warehouse:delivery:10');
+	});
+
+	it('uses server estimate_line and does not double-prefix', () => {
+		const api = loadSelector();
+		expect(api.formatEstimateLine(
+			{ fulfilment_choice: 'delivery', estimate_text: 'Estimated 3–5 business days', estimate_line: 'Estimated delivery: 3–5 business days' },
+			{ i18n: { estimated: 'Estimated delivery' } }
+		)).toBe('Estimated delivery: 3–5 business days');
+		expect(api.formatEstimateLine(
+			{ fulfilment_choice: 'delivery', estimate_text: 'Estimated 3–5 business days' },
+			{ i18n: { estimated: 'Estimated delivery' } }
+		)).toBe('Estimated delivery: 3–5 business days');
+	});
 });

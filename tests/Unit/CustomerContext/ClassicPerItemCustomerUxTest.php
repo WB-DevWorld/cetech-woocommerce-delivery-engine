@@ -10,6 +10,7 @@ use CetechDeliveryEngine\Application\Cart\CartLineCustomerIdentity;
 use CetechDeliveryEngine\Application\Checkout\CheckoutAddressPolicy;
 use CetechDeliveryEngine\Application\Checkout\CheckoutDeliverySelectionValidator;
 use CetechDeliveryEngine\Application\CustomerContext\ApplyCustomerContextToEligibleLinesService;
+use CetechDeliveryEngine\Application\CustomerContext\ClassicPdpContextPayload;
 use CetechDeliveryEngine\Application\CustomerContext\CustomerBrowsingLocationStore;
 use CetechDeliveryEngine\Application\CustomerContext\LocationAwareDeliveryOptions;
 use CetechDeliveryEngine\Application\CustomerContext\LocationOfferQuoteProbe;
@@ -31,6 +32,7 @@ use CetechDeliveryEngine\Support\Logger;
 use CetechDeliveryEngine\Tests\Unit\Runtime\InMemoryQuoteRateCardRepository;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
+use ReflectionMethod;
 use WC_Product;
 
 final class ClassicPerItemCustomerUxTest extends TestCase {
@@ -470,6 +472,102 @@ final class ClassicPerItemCustomerUxTest extends TestCase {
 		self::assertInstanceOf( MatchingLocation::class, $location );
 		self::assertSame( 'Accra', $location->city );
 		unset( $_POST );
+	}
+
+	public function test_submitted_pdp_payload_wins_over_stale_matching_fields(): void {
+		$capture = ( new ReflectionClass( CartDeliverySelectionCapture::class ) )->newInstanceWithoutConstructor();
+		$matching = new ReflectionMethod( CartDeliverySelectionCapture::class, 'read_submitted_matching_location' );
+		$key     = new ReflectionMethod( CartDeliverySelectionCapture::class, 'read_submitted_display_key' );
+		if ( \PHP_VERSION_ID < 80500 ) {
+			$matching->setAccessible( true );
+			$key->setAccessible( true );
+		}
+
+		$_POST = [
+			CartDeliverySelectionCapture::POST_MATCHING_COUNTRY  => 'GH',
+			CartDeliverySelectionCapture::POST_MATCHING_STATE    => 'AA',
+			CartDeliverySelectionCapture::POST_MATCHING_CITY     => 'Accra',
+			CartDeliverySelectionCapture::POST_MATCHING_POSTCODE => 'GA-123',
+			CartDeliverySelectionCapture::POST_FIELD             => 'in_warehouse:delivery:10',
+			ClassicPdpContextPayload::POST_FIELD                 => wp_json_encode(
+				[
+					'matching_location' => [
+						'country'  => 'GH',
+						'state'    => 'AH',
+						'city'     => 'Kumasi',
+						'postcode' => 'AK-000',
+					],
+					'display_key'       => 'in_warehouse:delivery:10',
+					'fulfilment_choice' => 'delivery',
+				]
+			),
+		];
+
+		$location = $matching->invoke( $capture );
+		self::assertInstanceOf( MatchingLocation::class, $location );
+		self::assertSame( 'Kumasi', $location->city );
+		self::assertSame( 'in_warehouse:delivery:10', $key->invoke( $capture ) );
+		unset( $_POST );
+	}
+
+	public function test_browsing_default_is_not_read_as_submitted_matching_location(): void {
+		$session = new class() {
+			/** @var array<string, mixed> */
+			public array $data = [];
+
+			public function get( string $key ) {
+				return $this->data[ $key ] ?? null;
+			}
+
+			public function set( string $key, $value ): void {
+				$this->data[ $key ] = $value;
+			}
+		};
+		$GLOBALS['cetech_de_test_wc'] = (object) [ 'session' => $session ];
+		( new CustomerBrowsingLocationStore() )->save( PerItemContextFixtures::matchingAccra() );
+
+		$capture = ( new ReflectionClass( CartDeliverySelectionCapture::class ) )->newInstanceWithoutConstructor();
+		$matching = new ReflectionMethod( CartDeliverySelectionCapture::class, 'read_submitted_matching_location' );
+		if ( \PHP_VERSION_ID < 80500 ) {
+			$matching->setAccessible( true );
+		}
+		$_POST = [];
+		self::assertNull( $matching->invoke( $capture ) );
+		unset( $_POST, $GLOBALS['cetech_de_test_wc'] );
+	}
+
+	public function test_stale_display_key_cannot_validate_against_wrong_destination(): void {
+		$filter   = new LocationAwareDeliveryOptions( $this->probe() );
+		$delivery = $this->option( 'in_warehouse:delivery:10', FulfilmentChoice::Delivery->value, 10 );
+
+		self::assertNotEmpty( $filter->filter( [ $delivery ], PerItemContextFixtures::matchingAccra(), $this->currency() ) );
+		self::assertSame( [], $filter->filter( [ $delivery ], MatchingLocation::fromInput( [ 'country' => 'NG', 'city' => 'Lagos' ] ), $this->currency() ) );
+	}
+
+	public function test_context_exists_before_cart_id_and_second_destination_is_distinct(): void {
+		$intent = $this->intent( 16, 10 );
+		$accra  = PerItemContextFixtures::incompleteContext( 10, PerItemContextFixtures::matchingAccra() );
+		$kumasi = PerItemContextFixtures::incompleteContext( 10, PerItemContextFixtures::matchingKumasi() );
+
+		$accra_data = $accra->applyToCartItem( [ CartDeliverySelectionCapture::CART_SELECTION_KEY => $intent ] );
+		$kumasi_data = $kumasi->applyToCartItem( [ CartDeliverySelectionCapture::CART_SELECTION_KEY => $intent ] );
+
+		$without = CartLineCustomerIdentity::generateCartId( 16, 0, [], [ CartDeliverySelectionCapture::CART_SELECTION_KEY => $intent ] );
+		$accra_id = CartLineCustomerIdentity::generateCartId( 16, 0, [], $accra_data );
+		$kumasi_id = CartLineCustomerIdentity::generateCartId( 16, 0, [], $kumasi_data );
+
+		self::assertNotSame( $without, $accra_id );
+		self::assertNotSame( $accra_id, $kumasi_id );
+		self::assertStringNotContainsString( 'Accra', $accra_id );
+		self::assertStringNotContainsString( 'Kumasi', $kumasi_id );
+	}
+
+	public function test_same_complete_destination_consolidates(): void {
+		$ctx = PerItemContextFixtures::deliveryContext( 10, PerItemContextFixtures::deliveryAccraStreet( '12 Boundary Rd' ) );
+		$a   = PerItemContextFixtures::cartItem( $this->intent( 16, 10 ), $ctx, 1 );
+		$b   = PerItemContextFixtures::cartItem( $this->intent( 16, 10 ), $ctx, 1 );
+
+		self::assertSame( CartLineCustomerIdentity::cartIdFromItem( $a ), CartLineCustomerIdentity::cartIdFromItem( $b ) );
 	}
 
 	/**
