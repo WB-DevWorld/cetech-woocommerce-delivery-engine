@@ -445,3 +445,55 @@ Lab: `C:\Users\Jane\Desktop\Learning 2026\Cursor\cetech-de-local-qa` (`http://lo
 | K post-order admin relabel | **PASS** — order 32 still `QA Local Standard` |
 
 Privacy: Store API extension payloads had no forbidden DE internals. Cart keys remain hashes. Customer street exists only in authorized cart/edit payloads, not in DOM ids.
+
+## Final combined regression + UX hardening
+
+**Identity remains** `1.0.0-dev.peritem.1`. Schema remains **`5`**. Not packaged. Not RC.10.
+
+**Verdict:** READY TO PACKAGE. Do not package until the owner asks.
+
+Narrow runtime fixes in this pass:
+
+- Blocks customer editor mounts from Store API cart/checkout DOM (`#cetech-de-blocks-dom-ui`). PluginArea React context editors are **not** registered, so Change delivery cannot duplicate.
+- Subscribe is debounced; unchanged cart signatures skip `innerHTML` rebuild; click handlers are delegated once; open `<details>` survive refresh.
+- Field `id`/`for` values are `cetech-de-b-{hashedCartKey}-{field}` (never street, name, or phone).
+- Classic quantity radios have unique ids (`-apply-all` / `-apply-split`).
+- Blocks field labels match Classic: Address line 1 / Address line 2 / Quantity to move / Fulfilment and delivery option.
+- Classic + Blocks editors: `max-width: 100%`, overflow protection, 44px tap targets.
+- Pickup option public label uses the location name when present, so two eligible pickup locations are distinguishable (for example QA Accra Pickup vs QA Kumasi Pickup).
+
+WooCommerce still owns **one** taxation / customer-location model. Per-item destinations do **not** mean per-destination tax. Customer copy must not promise that.
+
+On a store with site-wide In Warehouse defaults, an ordinary catalog product is still Delivery Engine-managed unless a product exception removes applicable rules. Lab mixed-cart proof used product-level opt-out (`QA Unmanaged Mug`) plus a native WooCommerce zone method (`QA Native Flat Rate`).
+
+Lab Playwright `per-item-final-regression.spec.ts` (Chromium, `http://localhost:8088`, 2026-09-02): **1 passed**. Evidence: `cetech-de-local-qa/evidence/peritem.final-regression/`.
+
+| Check | Result |
+|------|--------|
+| Classic mixed Delivery + unmanaged | PASS |
+| Blocks mixed Delivery + unmanaged (DE Accra package + native residual) | PASS |
+| Classic mixed Pickup + unmanaged | PASS |
+| Blocks mixed Pickup + unmanaged | PASS |
+| Two managed destinations + unmanaged | PASS |
+| Classic / Blocks refresh session | PASS |
+| Blocks quantity rerender (editors 2→2) | PASS |
+| Responsive 1440 / 768 / 390 Classic + Blocks (no overflow) | PASS |
+| Unique field IDs / Address line 1 copy | PASS |
+| Two pickup locations must choose; separate contexts | PASS |
+| Large Classic + Blocks cart (Chair Accra, Lamp Kumasi, Table Accra, Pickup, unmanaged) | PASS |
+| Checkout address does not rewrite complete Accra/Kumasi | PASS |
+| No matching area failure copy | PASS |
+| Admin invalidation requires reselection | PASS |
+| ORDER A Blocks two destinations `#38` — two shipment plans | PASS |
+| ORDER B Classic Delivery + Pickup `#39` — Delivery plan, pickup skipped | PASS |
+| ORDER C Blocks managed + unmanaged `#40` — DE snapshot on Chair only; native flat rate on Mug; mug not a DE shipment item | PASS |
+| Historical ORDER A unchanged after admin relabel | PASS |
+| Store API privacy / console / no per-destination tax promise | PASS |
+
+Orders:
+
+- **A** `#38` Store API: Accra 15 + Kumasi 22; two destination groups → two plans.
+- **B** `#39` Classic checkout: Store Pickup QA Accra Pickup (0) + Delivery Accra 15; pickup skipped, one Delivery plan.
+- **C** `#40` Store API: Chair v2 snapshot Accra 15; Mug has no `_cetech_de_delivery_snapshot`; shipping `delivery_engine_selected_offer` + native `flat_rate`; planner includes only the Chair.
+
+Known limitation kept: WooCommerce owns one tax/customer-location model. Per-item destinations are not per-destination tax.

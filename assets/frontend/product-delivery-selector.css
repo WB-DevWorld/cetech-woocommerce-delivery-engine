@@ -7,6 +7,14 @@
 
 .cetech-de-product-delivery-selector {
 	margin: 1em 0;
+	max-width: 100%;
+	overflow-x: hidden;
+}
+
+.cetech-de-matching-location,
+.cetech-de-fulfilment-choice,
+.cetech-de-delivery-option-group {
+	max-width: 100%;
 }
 
 .cetech-de-delivery-selector__title {

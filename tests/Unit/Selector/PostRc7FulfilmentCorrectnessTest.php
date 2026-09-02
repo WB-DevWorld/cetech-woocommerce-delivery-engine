@@ -392,7 +392,7 @@ final class PostRc7FulfilmentCorrectnessTest extends TestCase {
 		$pickup  = $options[1];
 		$summary = CartDeliverySelectionCapture::buildPublicSummary( $pickup->toArray() );
 
-		self::assertSame( 'Store pickup', $summary['delivery_offer_public_label'] );
+		self::assertSame( 'Main showroom', $summary['delivery_offer_public_label'] );
 		self::assertSame( 'Main showroom', $summary['pickup_location_label'] );
 		self::assertSame( 'Bring your order number', $summary['pickup_instructions'] );
 

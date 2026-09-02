@@ -247,7 +247,7 @@ final class CartCustomerContextEditorRenderer {
 		if ( $qty > 1 && FulfilmentChoice::Delivery->value === $choice ) {
 			$html .= '<fieldset class="cetech-de-cart-context__qty" data-cetech-de-qty-split="1">';
 			$html .= '<legend>' . esc_html__( 'Apply this change', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
-			$html .= '<label><input type="radio" name="' . esc_attr( CartCustomerContextEditorService::POST_APPLY_MODE ) . '" value="all" checked="checked" /> ';
+			$html .= '<label for="' . esc_attr( $uid . '-apply-all' ) . '"><input type="radio" id="' . esc_attr( $uid . '-apply-all' ) . '" name="' . esc_attr( CartCustomerContextEditorService::POST_APPLY_MODE ) . '" value="all" checked="checked" /> ';
 			$html .= esc_html(
 				sprintf(
 					/* translators: %d: quantity */
@@ -256,7 +256,7 @@ final class CartCustomerContextEditorRenderer {
 				)
 			);
 			$html .= '</label>';
-			$html .= '<label><input type="radio" name="' . esc_attr( CartCustomerContextEditorService::POST_APPLY_MODE ) . '" value="split" /> ';
+			$html .= '<label for="' . esc_attr( $uid . '-apply-split' ) . '"><input type="radio" id="' . esc_attr( $uid . '-apply-split' ) . '" name="' . esc_attr( CartCustomerContextEditorService::POST_APPLY_MODE ) . '" value="split" /> ';
 			$html .= esc_html__( 'Move some quantity', 'cetech-woocommerce-delivery-engine' );
 			$html .= '</label>';
 			$html .= '<p class="cetech-de-cart-context__split-qty" hidden>';

@@ -97,9 +97,90 @@
 			.replace(/"/g, '&quot;');
 	}
 
-	function fieldInput(name, label, value) {
-		return '<label class="cetech-de-blocks-editor__field">' + escapeHtml(label) +
-			'<input type="text" name="' + escapeHtml(name) + '" value="' + escapeHtml(value || '') + '" /></label>';
+	var lastDomUiSignature = '';
+	var applyTimer = null;
+
+	function fieldId(cartItemKey, suffix) {
+		var safe = String(cartItemKey == null ? '' : cartItemKey).replace(/[^a-zA-Z0-9]/g, '').slice(0, 20);
+		if (!safe) {
+			safe = 'x';
+		}
+		return 'cetech-de-b-' + safe + '-' + suffix;
+	}
+
+	function fieldInput(id, name, label, value) {
+		return '<label class="cetech-de-blocks-editor__field" for="' + escapeHtml(id) + '">' + escapeHtml(label) +
+			'<input type="text" id="' + escapeHtml(id) + '" name="' + escapeHtml(name) + '" value="' + escapeHtml(value || '') + '" /></label>';
+	}
+
+	function findDomUiHost() {
+		return document.querySelector('.wp-block-woocommerce-checkout-order-summary-block')
+			|| document.querySelector('.wp-block-woocommerce-cart-order-summary-block')
+			|| document.querySelector('.wc-block-components-sidebar')
+			|| document.querySelector('.wp-block-woocommerce-filled-cart-block')
+			|| document.querySelector('.wp-block-woocommerce-checkout')
+			|| document.querySelector('.wc-block-cart')
+			|| document.querySelector('.wc-block-checkout')
+			|| document.querySelector('.wp-block-woocommerce-checkout-fields-block');
+	}
+
+	function uiSignature(cart) {
+		var extensions = getExtensions(cart);
+		var items = editableItems(cart);
+		return JSON.stringify({
+			items: items.map(function (item) {
+				var ext = item.ext || {};
+				return [
+					item.key,
+					item.quantity,
+					ext.locality,
+					ext.can_split,
+					ext.address_complete,
+					ext.needs_reselection,
+					ext.is_pickup,
+					ext.pickup_location_label,
+					(ext.available_options || []).map(function (option) {
+						return String(option.display_key || '') + (option.selected ? '*' : '');
+					})
+				];
+			}),
+			notices: extensions.notices || [],
+			apply: !!extensions.can_apply_checkout_address,
+			skipped: ((extensions.mutation_result || {}).skipped) || [],
+			failed: ((extensions.mutation_result || {}).failed) || []
+		});
+	}
+
+	function bindDomUiOnce(mount) {
+		if (mount.getAttribute('data-cetech-de-bound') === '1') {
+			return;
+		}
+		mount.setAttribute('data-cetech-de-bound', '1');
+		mount.addEventListener('click', function (event) {
+			var target = event.target;
+			if (!target || !target.closest) {
+				return;
+			}
+			if (target.closest('.cetech-de-blocks-editor__update')) {
+				var editor = target.closest('.cetech-de-blocks-editor');
+				if (editor) {
+					submitCommand(readEditor(editor));
+				}
+				return;
+			}
+			if (target.closest('.cetech-de-blocks-editor__use-for-all')) {
+				var allEditor = target.closest('.cetech-de-blocks-editor');
+				if (allEditor) {
+					var data = readEditor(allEditor);
+					data.action = 'use_for_all';
+					submitCommand(data);
+				}
+				return;
+			}
+			if (target.closest('.cetech-de-blocks-apply-checkout-address')) {
+				submitCommand({ action: 'apply_checkout_address' });
+			}
+		});
 	}
 
 	function readEditor(editor) {
@@ -135,13 +216,8 @@
 		if (!cart) {
 			return;
 		}
-		var host = document.querySelector(
-			'.wp-block-woocommerce-filled-cart-block, .wp-block-woocommerce-checkout, .wc-block-cart, .wc-block-checkout, .wp-block-woocommerce-checkout-fields-block'
-		);
+		var host = findDomUiHost();
 		if (!host) {
-			return;
-		}
-		if (document.querySelector('.cetech-de-blocks-customer-context:not(#cetech-de-blocks-dom-ui)')) {
 			return;
 		}
 		var i18n = (window.cetechDeBlocks && window.cetechDeBlocks.i18n) || {};
@@ -155,8 +231,10 @@
 			if (existingEmpty) {
 				existingEmpty.remove();
 			}
+			lastDomUiSignature = '';
 			return;
 		}
+		var signature = uiSignature(cart);
 		var mount = document.getElementById('cetech-de-blocks-dom-ui');
 		if (!mount) {
 			mount = document.createElement('div');
@@ -164,16 +242,25 @@
 			mount.className = 'cetech-de-blocks-customer-context';
 			host.insertBefore(mount, host.firstChild);
 		}
+		bindDomUiOnce(mount);
+		if (signature === lastDomUiSignature && mount.childNodes.length) {
+			return;
+		}
 		if (mount.contains(document.activeElement) && document.activeElement && /^(INPUT|SELECT|TEXTAREA)$/.test(document.activeElement.tagName)) {
 			return;
 		}
-		var html = '';
+		var openKeys = [];
+		mount.querySelectorAll('details[open]').forEach(function (node) {
+			openKeys.push(node.getAttribute('data-cart-item-key') || '');
+		});
+		var html = '<div class="cetech-de-blocks-notices" aria-live="polite">';
 		notices.forEach(function (notice) {
 			html += '<p class="cetech-de-blocks-notice cetech-de-blocks-notice--' + escapeHtml(notice.code || 'info') + '" role="' + (notice.code === 'incomplete_delivery' ? 'alert' : 'status') + '">' + escapeHtml(notice.message || '') + '</p>';
 		});
 		skipped.concat(failed).forEach(function (row) {
-			html += '<p class="cetech-de-blocks-notice cetech-de-blocks-notice--failure" role="status">' + escapeHtml((row.name ? row.name + ' — ' : '') + (row.reason || '')) + '</p>';
+			html += '<p class="cetech-de-blocks-notice cetech-de-blocks-notice--failure" role="alert">' + escapeHtml((row.name ? row.name + ' — ' : '') + (row.reason || '')) + '</p>';
 		});
+		html += '</div>';
 		if (extensions.can_apply_checkout_address) {
 			html += '<button type="button" class="wc-block-components-button cetech-de-blocks-apply-checkout-address">' +
 				escapeHtml(i18n.applyCheckoutAddress || 'Use checkout shipping address for incomplete delivery items') + '</button>';
@@ -188,6 +275,7 @@
 					selected = option.display_key;
 				}
 			});
+			var optionId = fieldId(item.key, 'option');
 			var options = (ext.available_options || []).map(function (option) {
 				return '<option value="' + escapeHtml(option.display_key) + '"' + (option.display_key === selected ? ' selected' : '') + '>' +
 					escapeHtml(option.estimate_text ? option.label + ' — ' + option.estimate_text : option.label) + '</option>';
@@ -200,23 +288,27 @@
 			html += '<details class="cetech-de-blocks-editor" data-cart-item-key="' + escapeHtml(item.key) + '">';
 			html += '<summary>' + escapeHtml(summary) + '</summary>';
 			html += '<div class="cetech-de-blocks-editor__body">';
-			html += '<label class="cetech-de-blocks-editor__field">' + escapeHtml(i18n.choose || 'Choose a delivery option') +
-				'<select name="cetech_de_delivery_option_key">' + options + '</select></label>';
+			html += '<fieldset class="cetech-de-blocks-editor__options"><legend>' +
+				escapeHtml(i18n.optionLegend || 'Fulfilment and delivery option') + '</legend>';
+			html += '<label class="cetech-de-blocks-editor__field" for="' + escapeHtml(optionId) + '">' +
+				escapeHtml(i18n.choose || 'Choose a delivery option') +
+				'<select id="' + escapeHtml(optionId) + '" name="cetech_de_delivery_option_key">' + options + '</select></label></fieldset>';
 			if (!isPickup) {
-				html += fieldInput('cetech_de_matching_country', i18n.country || 'Country', matching.country);
-				html += fieldInput('cetech_de_matching_state', i18n.state || 'State / Region', matching.state);
-				html += fieldInput('cetech_de_matching_city', i18n.city || 'City', matching.city);
-				html += fieldInput('cetech_de_matching_postcode', i18n.postcode || 'Postcode', matching.postcode);
-				html += fieldInput('cetech_de_address_1', i18n.address1 || 'Address', address.address_1);
-				html += fieldInput('cetech_de_address_2', i18n.address2 || 'Apartment, suite, etc.', address.address_2);
-				html += fieldInput('cetech_de_first_name', i18n.firstName || 'First name', address.first_name);
-				html += fieldInput('cetech_de_last_name', i18n.lastName || 'Last name', address.last_name);
-				html += fieldInput('cetech_de_phone', i18n.phone || 'Phone', address.phone);
+				html += fieldInput(fieldId(item.key, 'country'), 'cetech_de_matching_country', i18n.country || 'Country', matching.country);
+				html += fieldInput(fieldId(item.key, 'state'), 'cetech_de_matching_state', i18n.state || 'State / Region', matching.state);
+				html += fieldInput(fieldId(item.key, 'city'), 'cetech_de_matching_city', i18n.city || 'City', matching.city);
+				html += fieldInput(fieldId(item.key, 'postcode'), 'cetech_de_matching_postcode', i18n.postcode || 'Postcode', matching.postcode);
+				html += fieldInput(fieldId(item.key, 'address-1'), 'cetech_de_address_1', i18n.address1 || 'Address line 1', address.address_1);
+				html += fieldInput(fieldId(item.key, 'address-2'), 'cetech_de_address_2', i18n.address2 || 'Address line 2', address.address_2);
+				html += fieldInput(fieldId(item.key, 'first-name'), 'cetech_de_first_name', i18n.firstName || 'First name', address.first_name);
+				html += fieldInput(fieldId(item.key, 'last-name'), 'cetech_de_last_name', i18n.lastName || 'Last name', address.last_name);
+				html += fieldInput(fieldId(item.key, 'phone'), 'cetech_de_phone', i18n.phone || 'Phone', address.phone);
 			}
 			if (ext.can_split) {
-				html += '<label class="cetech-de-blocks-editor__field"><input type="checkbox" name="cetech_de_apply_mode" /> ' +
+				var splitId = fieldId(item.key, 'split');
+				html += '<label class="cetech-de-blocks-editor__field" for="' + escapeHtml(splitId) + '"><input type="checkbox" id="' + escapeHtml(splitId) + '" name="cetech_de_apply_mode" /> ' +
 					escapeHtml(i18n.split || 'Move some quantity') + '</label>';
-				html += fieldInput('cetech_de_split_qty', i18n.split || 'Move some quantity', '1');
+				html += fieldInput(fieldId(item.key, 'split-qty'), 'cetech_de_split_qty', i18n.splitQty || 'Quantity to move', '1');
 			}
 			html += '<button type="button" class="wc-block-components-button cetech-de-blocks-editor__update">' +
 				escapeHtml(i18n.updateDetails || 'Update') + '</button>';
@@ -227,35 +319,32 @@
 			html += '</div></details>';
 		});
 		mount.innerHTML = html;
-		mount.querySelectorAll('.cetech-de-blocks-editor__update').forEach(function (button) {
-			button.addEventListener('click', function () {
-				var editor = button.closest('.cetech-de-blocks-editor');
-				if (editor) {
-					submitCommand(readEditor(editor));
-				}
-			});
+		openKeys.forEach(function (key) {
+			if (!key) {
+				return;
+			}
+			var details = mount.querySelector('details[data-cart-item-key="' + String(key).replace(/"/g, '') + '"]');
+			if (details) {
+				details.open = true;
+			}
 		});
-		mount.querySelectorAll('.cetech-de-blocks-editor__use-for-all').forEach(function (button) {
-			button.addEventListener('click', function () {
-				var editor = button.closest('.cetech-de-blocks-editor');
-				if (editor) {
-					var data = readEditor(editor);
-					data.action = 'use_for_all';
-					submitCommand(data);
-				}
-			});
-		});
-		mount.querySelectorAll('.cetech-de-blocks-apply-checkout-address').forEach(function (button) {
-			button.addEventListener('click', function () {
-				submitCommand({ action: 'apply_checkout_address' });
-			});
-		});
+		lastDomUiSignature = signature;
+	}
+
+	function scheduleApply() {
+		if (applyTimer) {
+			return;
+		}
+		applyTimer = window.setTimeout(function () {
+			applyTimer = null;
+			apply();
+		}, 120);
 	}
 
 	function subscribe() {
 		if (window.wp && window.wp.data && typeof window.wp.data.subscribe === 'function') {
 			window.wp.data.subscribe(function () {
-				apply();
+				scheduleApply();
 			});
 		}
 	}
@@ -455,245 +544,9 @@
 			});
 	}
 
-		function registerContextEditors() {
-		var wp = window.wp || {};
-		var plugins = wp.plugins || {};
-		var element = wp.element || {};
-		var createElement = element.createElement;
-		var useState = element.useState;
-		var registerPlugin = plugins.registerPlugin;
-		var i18n = (window.cetechDeBlocks && window.cetechDeBlocks.i18n) || {};
-		var blocksCheckout = (window.wc && window.wc.blocksCheckout) || {};
-
-		if (!registerPlugin || !createElement) {
-			return;
-		}
-
-		function field(label, value, onChange) {
-			return createElement(
-				'label',
-				{ className: 'cetech-de-blocks-editor__field' },
-				label,
-				createElement('input', {
-					type: 'text',
-					value: value || '',
-					onChange: function (event) {
-						onChange(event.target.value);
-					}
-				})
-			);
-		}
-
-		function ItemEditor(props) {
-			var ext = props.ext || {};
-			var matching = ext.matching_location || {};
-			var address = ext.delivery_address || {};
-			var selected = (ext.available_options || []).find(function (option) { return option.selected; });
-			var state = useState ? useState({
-				display_key: selected ? selected.display_key : '',
-				country: matching.country || '',
-				state: matching.state || '',
-				city: matching.city || '',
-				postcode: matching.postcode || '',
-				address_1: address.address_1 || '',
-				address_2: address.address_2 || '',
-				first_name: address.first_name || '',
-				last_name: address.last_name || '',
-				phone: address.phone || '',
-				split: false,
-				quantity: 1
-			}) : [{}, function () {}];
-			var values = state[0];
-			var setValues = state[1];
-			function patch(key, value) {
-				var next = Object.assign({}, values);
-				next[key] = value;
-				setValues(next);
-			}
-			function payload(action) {
-				return {
-					action: action,
-					cart_item_key: props.itemKey,
-					display_key: values.display_key,
-					matching_location: {
-						country: values.country,
-						state: values.state,
-						city: values.city,
-						postcode: values.postcode
-					},
-					delivery_address: {
-						address_1: values.address_1,
-						address_2: values.address_2,
-						first_name: values.first_name,
-						last_name: values.last_name,
-						phone: values.phone
-					},
-					quantity: parseInt(values.quantity, 10) || 1
-				};
-			}
-			var options = (ext.available_options || []).map(function (option) {
-				return createElement(
-					'option',
-					{ key: option.display_key, value: option.display_key },
-					option.estimate_text ? option.label + ' — ' + option.estimate_text : option.label
-				);
-			});
-			var isPickup = !!ext.is_pickup;
-			var localityCopy = ext.locality
-				? ' — ' + (isPickup
-					? (ext.pickup_location_label || ext.locality)
-					: ((i18n.deliveringTo || 'Delivering to') + ': ' + ext.locality))
-				: (isPickup && ext.pickup_location_label ? ' — ' + ext.pickup_location_label : '');
-			return createElement(
-				'details',
-				{ className: 'cetech-de-blocks-editor', open: false },
-				createElement(
-					'summary',
-					null,
-					isPickup ? (i18n.changePickup || 'Change pickup') : (i18n.changeDelivery || 'Change delivery'),
-					localityCopy
-				),
-				createElement(
-					'div',
-					{ className: 'cetech-de-blocks-editor__body' },
-					createElement(
-						'label',
-						{ className: 'cetech-de-blocks-editor__field' },
-						i18n.choose || 'Choose a delivery option',
-						createElement(
-							'select',
-							{
-								value: values.display_key,
-								onChange: function (event) {
-									patch('display_key', event.target.value);
-								}
-							},
-							options
-						)
-					),
-					isPickup
-						? null
-						: [
-								field(i18n.country || 'Country', values.country, function (v) { patch('country', v); }),
-								field(i18n.state || 'State / Region', values.state, function (v) { patch('state', v); }),
-								field(i18n.city || 'City', values.city, function (v) { patch('city', v); }),
-								field(i18n.postcode || 'Postcode', values.postcode, function (v) { patch('postcode', v); }),
-								field(i18n.address1 || 'Address', values.address_1, function (v) { patch('address_1', v); }),
-								field(i18n.address2 || 'Apartment, suite, etc.', values.address_2, function (v) { patch('address_2', v); }),
-								field(i18n.firstName || 'First name', values.first_name, function (v) { patch('first_name', v); }),
-								field(i18n.lastName || 'Last name', values.last_name, function (v) { patch('last_name', v); }),
-								field(i18n.phone || 'Phone', values.phone, function (v) { patch('phone', v); })
-							],
-					!isPickup && !values.split && (props.quantity || ext.quantity || 1) > 1
-						? createElement('p', { className: 'cetech-de-blocks-editor__apply-all' }, i18n.applyAllN || 'Apply to all items')
-						: null,
-					ext.can_split
-						? createElement(
-								'label',
-								{ className: 'cetech-de-blocks-editor__field' },
-								createElement('input', {
-									type: 'checkbox',
-									checked: !!values.split,
-									onChange: function (event) {
-										patch('split', event.target.checked);
-									}
-								}),
-								' ',
-								i18n.split || 'Move some quantity'
-							)
-						: null,
-					values.split
-						? field(i18n.split || 'Move some quantity', String(values.quantity), function (v) { patch('quantity', v); })
-						: null,
-					createElement(
-						'button',
-						{
-							type: 'button',
-							className: 'wc-block-components-button cetech-de-blocks-editor__update',
-							onClick: function () {
-								submitCommand(payload(values.split ? 'split_item_context' : 'set_item_context'));
-							}
-						},
-						i18n.updateDetails || 'Update'
-					),
-					isPickup
-						? null
-						: createElement(
-								'button',
-								{
-									type: 'button',
-									className: 'wc-block-components-button cetech-de-blocks-editor__use-for-all',
-									onClick: function () {
-										submitCommand(payload('use_for_all'));
-									}
-								},
-								i18n.useForAll || 'Use this address for all eligible delivery items'
-							)
-				)
-			);
-		}
-
-		function ContextEditors() {
-			var cart = getCartData();
-			var extensions = getExtensions(cart);
-			var items = editableItems(cart);
-			var notices = extensions.notices || [];
-			var skipped = ((extensions.mutation_result || {}).skipped) || [];
-			var failed = ((extensions.mutation_result || {}).failed) || [];
-			if (!items.length && !notices.length && !skipped.length && !failed.length) {
-				return null;
-			}
-			return createElement(
-				'div',
-				{ className: 'cetech-de-blocks-customer-context' },
-				notices.map(function (notice, index) {
-					return createElement(
-						'p',
-						{
-							key: notice.code || index,
-							className: 'cetech-de-blocks-notice cetech-de-blocks-notice--' + (notice.code || 'info'),
-							role: notice.code === 'incomplete_delivery' ? 'alert' : 'status'
-						},
-						notice.message
-					);
-				}),
-				skipped.map(function (row, index) {
-					return createElement(
-						'p',
-						{ key: 'skip-' + index, className: 'cetech-de-blocks-notice cetech-de-blocks-notice--failure', role: 'status' },
-						(row.name ? row.name + ' — ' : '') + (row.reason || '')
-					);
-				}),
-				extensions.can_apply_checkout_address
-					? createElement(
-							'button',
-							{
-								type: 'button',
-								className: 'wc-block-components-button cetech-de-blocks-apply-checkout-address',
-								onClick: function () {
-									submitCommand({ action: 'apply_checkout_address' });
-								}
-							},
-							i18n.applyCheckoutAddress || 'Use checkout shipping address for incomplete delivery items'
-						)
-					: null,
-				items.map(function (item) {
-					return createElement(ItemEditor, {
-						key: item.key,
-						itemKey: item.key,
-						ext: item.ext,
-						quantity: item.quantity
-					});
-				})
-			);
-		}
-
-		['woocommerce-checkout', 'woocommerce-cart'].forEach(function (scope) {
-			registerPlugin('cetech-de-blocks-context-' + scope, {
-				render: ContextEditors,
-				scope: scope
-			});
-		});
+	function registerContextEditors() {
+		// Store API DOM editor (#cetech-de-blocks-dom-ui) is the qualified mount.
+		// PluginArea slot-fills are not required and must not duplicate Change delivery controls.
 	}
 
 	window.CetechDeBlocksCheckout = {
@@ -705,6 +558,8 @@
 		submitCommand: submitCommand,
 		editableItems: editableItems,
 		renderDomUi: renderDomUi,
+		uiSignature: uiSignature,
+		fieldId: fieldId,
 		namespace: NAMESPACE
 	};
 
@@ -716,8 +571,6 @@
 			subscribe();
 			apply();
 			setTimeout(apply, 400);
-			setTimeout(apply, 1500);
-			setTimeout(apply, 3000);
 		});
 	} else {
 		registerSlotFill();
@@ -726,7 +579,5 @@
 		subscribe();
 		apply();
 		setTimeout(apply, 400);
-		setTimeout(apply, 1500);
-		setTimeout(apply, 3000);
 	}
 })(window, document);
