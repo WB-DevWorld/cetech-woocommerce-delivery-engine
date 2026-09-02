@@ -1,3 +1,9 @@
+.cetech-de-blocks-pickup-notes,
+.cetech-de-blocks-customer-context {
+	max-width: 100%;
+	overflow-x: hidden;
+}
+
 .cetech-de-blocks-pickup-notes {
 	margin: 0.5rem 0 1rem;
 }
@@ -9,6 +15,7 @@
 
 .cetech-de-blocks-customer-context {
 	margin: 1rem 0;
+	box-sizing: border-box;
 }
 
 .cetech-de-blocks-notice {
@@ -39,9 +46,41 @@
 	gap: 0.25rem;
 }
 
+.cetech-de-blocks-editor summary {
+	cursor: pointer;
+	min-height: 2.75rem;
+	display: flex;
+	align-items: center;
+}
+
+.cetech-de-blocks-editor input,
+.cetech-de-blocks-editor select,
+.cetech-de-blocks-editor button {
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+.cetech-de-blocks-editor input[type="text"],
+.cetech-de-blocks-editor input[type="number"],
+.cetech-de-blocks-editor select {
+	min-height: 2.75rem;
+	width: 100%;
+}
+
 .cetech-de-blocks-editor__update,
 .cetech-de-blocks-editor__use-for-all,
 .cetech-de-blocks-apply-checkout-address {
 	margin-right: 0.5rem;
 	margin-top: 0.25rem;
+	min-height: 2.75rem;
+	white-space: normal;
+}
+
+@media (max-width: 768px) {
+	.cetech-de-blocks-editor__use-for-all,
+	.cetech-de-blocks-apply-checkout-address {
+		display: block;
+		width: 100%;
+		margin-right: 0;
+	}
 }

@@ -394,7 +394,11 @@ final class ClassicPerItemCustomerUxTest extends TestCase {
 		self::assertStringContainsString( 'Use this address for all eligible delivery items', $src );
 		self::assertStringContainsString( 'Change delivery', $src );
 		self::assertStringContainsString( 'Change pickup', $src );
+		self::assertStringContainsString( '-apply-all', $src );
+		self::assertStringContainsString( '-apply-split', $src );
 		self::assertStringNotContainsString( 'data-group-id', $src );
+		self::assertStringNotContainsString( 'per-destination tax', $src );
+		self::assertStringNotContainsString( 'per destination tax', $src );
 	}
 
 	public function test_editor_context_from_post_builds_delivery_and_pickup_without_mutating_arrays(): void {

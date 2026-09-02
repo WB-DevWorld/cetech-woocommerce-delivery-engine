@@ -269,6 +269,23 @@ final class BlocksPerItemCustomerUxTest extends TestCase {
 		self::assertStringNotContainsString( 'cart_contents =', $handler );
 	}
 
+	public function test_blocks_customer_copy_and_dom_editor_do_not_duplicate_react_editors(): void {
+		$i18n = (string) file_get_contents( dirname( __DIR__, 4 ) . '/src/Integrations/Blocks/BlocksScriptIntegration.php' );
+		$js   = (string) file_get_contents( dirname( __DIR__, 4 ) . '/assets/frontend/blocks-checkout.js' );
+
+		self::assertStringContainsString( 'Address line 1', $i18n );
+		self::assertStringContainsString( 'Address line 2', $i18n );
+		self::assertStringContainsString( 'Quantity to move', $i18n );
+		self::assertStringContainsString( 'Fulfilment and delivery option', $i18n );
+		self::assertStringNotContainsString( 'per-destination tax', $i18n );
+		self::assertStringNotContainsString( 'per destination tax', $i18n );
+		self::assertStringContainsString( 'cetech-de-b-', $js );
+		self::assertStringContainsString( 'lastDomUiSignature', $js );
+		self::assertStringContainsString( 'scheduleApply', $js );
+		self::assertStringNotContainsString( "registerPlugin('cetech-de-blocks-context-", $js );
+		self::assertStringNotContainsString( 'per-destination tax', $js );
+	}
+
 	public function test_schema_target_remains_five(): void {
 		self::assertSame( '5', \CetechDeliveryEngine\Core\Versioning\SchemaVersion::TARGET );
 	}

@@ -87,12 +87,14 @@ final class BlocksScriptIntegration {
 						'state' => __( 'State / Region', 'cetech-woocommerce-delivery-engine' ),
 						'city' => __( 'City', 'cetech-woocommerce-delivery-engine' ),
 						'postcode' => __( 'Postcode', 'cetech-woocommerce-delivery-engine' ),
-						'address1' => __( 'Address', 'cetech-woocommerce-delivery-engine' ),
-						'address2' => __( 'Apartment, suite, etc.', 'cetech-woocommerce-delivery-engine' ),
+						'address1' => __( 'Address line 1', 'cetech-woocommerce-delivery-engine' ),
+						'address2' => __( 'Address line 2', 'cetech-woocommerce-delivery-engine' ),
 						'firstName' => __( 'First name', 'cetech-woocommerce-delivery-engine' ),
 						'lastName' => __( 'Last name', 'cetech-woocommerce-delivery-engine' ),
 						'phone' => __( 'Phone', 'cetech-woocommerce-delivery-engine' ),
 						'applyAllN' => __( 'Apply to all items', 'cetech-woocommerce-delivery-engine' ),
+						'splitQty' => __( 'Quantity to move', 'cetech-woocommerce-delivery-engine' ),
+						'optionLegend' => __( 'Fulfilment and delivery option', 'cetech-woocommerce-delivery-engine' ),
 					],
 				]
 			);

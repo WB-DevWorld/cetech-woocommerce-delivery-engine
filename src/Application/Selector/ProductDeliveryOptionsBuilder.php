@@ -301,7 +301,7 @@ final class ProductDeliveryOptionsBuilder {
 		$location_label = null;
 
 		if ( is_array( $location ) ) {
-			$name = trim( (string) ( $location['location_name'] ?? '' ) );
+			$name = trim( (string) ( $location['location_name'] ?? $location['name'] ?? '' ) );
 
 			if ( '' !== $name ) {
 				$location_label = $name;
@@ -326,6 +326,10 @@ final class ProductDeliveryOptionsBuilder {
 			if ( '' !== $readiness ) {
 				$estimate = $readiness;
 			}
+		}
+
+		if ( is_string( $location_label ) && '' !== $location_label ) {
+			$label = $location_label;
 		}
 
 		$location_id = (int) ( $location['id'] ?? 0 );

@@ -27,6 +27,9 @@
 	padding: 0.75rem;
 	border: 1px solid #c3c4c7;
 	background: #fff;
+	max-width: 100%;
+	overflow-x: hidden;
+	box-sizing: border-box;
 }
 
 .cetech-de-cart-context__option,
@@ -48,10 +51,47 @@
 .cetech-de-matching-location select,
 .cetech-de-matching-location input[type="text"],
 .cetech-de-cart-context__field input[type="text"],
-.cetech-de-cart-context__split-qty input {
+.cetech-de-cart-context__split-qty input,
+.cetech-de-cart-context__editor summary {
 	display: block;
 	width: 100%;
 	max-width: 22rem;
+	box-sizing: border-box;
+}
+
+.cetech-de-matching-location select,
+.cetech-de-matching-location input[type="text"],
+.cetech-de-cart-context__field input[type="text"],
+.cetech-de-cart-context__split-qty input,
+.cetech-de-cart-context__actions .button {
+	min-height: 2.75rem;
+}
+
+.cetech-de-cart-context__editor summary {
+	min-height: 2.75rem;
+	display: flex;
+	align-items: center;
+	max-width: 100%;
+}
+
+.cetech-de-cart-context__actions .button {
+	white-space: normal;
+	max-width: 100%;
+}
+
+@media (max-width: 768px) {
+	.cetech-de-matching-location select,
+	.cetech-de-matching-location input[type="text"],
+	.cetech-de-cart-context__field input[type="text"],
+	.cetech-de-cart-context__split-qty input {
+		max-width: 100%;
+	}
+
+	.cetech-de-cart-context__actions .button {
+		display: block;
+		width: 100%;
+		margin: 0.35rem 0 0;
+	}
 }
 
 .cetech-de-use-checkout-address {
