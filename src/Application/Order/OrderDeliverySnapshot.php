@@ -17,6 +17,13 @@ final class OrderDeliverySnapshot {
 
 	public const META_LINE_SNAPSHOT_VERSION = '_cetech_de_delivery_snapshot_version';
 
+	/**
+	 * Transient Store API mapping key written only when the Classic line-item
+	 * hook cannot yet build a snapshot (order address not copied). Removed after
+	 * the immutable line snapshot is persisted. Not a historical contract field.
+	 */
+	public const META_CART_ITEM_KEY = '_cetech_de_cart_item_key';
+
 	public const META_ORDER_QUOTE_SNAPSHOT = '_cetech_de_delivery_quote_snapshot';
 
 	public const META_ORDER_SNAPSHOT_VERSION = '_cetech_de_order_delivery_snapshot_version';
