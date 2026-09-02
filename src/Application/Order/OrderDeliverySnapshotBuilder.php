@@ -22,8 +22,11 @@ use WC_Order;
  * Builds stable order-time delivery snapshots from cart item data.
  *
  * Does not mutate cart, order totals, or payment flow.
+ *
+ * Not final so unit tests can stub build_line_snapshot / build_package_snapshot
+ * without booting the quote engine.
  */
-final class OrderDeliverySnapshotBuilder {
+class OrderDeliverySnapshotBuilder {
 
 	public function __construct(
 		private CartDeliverySelectionRevalidator $cart_revalidator,

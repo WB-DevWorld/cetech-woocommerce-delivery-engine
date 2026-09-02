@@ -16,12 +16,13 @@ final class SchemaV4InspectionTest extends TestCase {
 		self::assertSame( '5', SchemaVersion::target() );
 	}
 
-	public function test_plugin_version_is_rc9(): void {
+	public function test_plugin_version_is_blocks_snapshot_1(): void {
 		$plugin_root = dirname( __DIR__, 3 );
 		$header      = (string) file_get_contents( $plugin_root . '/cetech-woocommerce-delivery-engine.php' );
 
-		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-rc\\.9'\s*\)/", $header );
-		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-rc\\.9\s*$/m', $header );
+		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.blocks-snapshot\\.1'\s*\)/", $header );
+		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.blocks-snapshot\\.1\s*$/m', $header );
+		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-rc.9' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.blocks.4' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.blocks.3' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.blocks.2' )", $header );

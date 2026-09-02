@@ -260,6 +260,22 @@ final class HistoricalShipmentPlannerTest extends TestCase {
 		self::assertSame( ShipmentCreationErrorCode::MissingOrderItem, $result->error_code );
 	}
 
+	public function test_delivery_line_without_line_snapshot_fails_even_when_package_exists(): void {
+		$group_id = 'in_warehouse|delivery|1';
+		$result   = $this->planner->plan(
+			ShipmentCreationFixtures::context(
+				[
+					new HistoricalShipmentLineContext( 1, 'QA Warehouse Chair', false, false, null ),
+				],
+				ShipmentCreationFixtures::package( [ ShipmentCreationFixtures::group( $group_id, '15.00' ) ] ),
+				[ ShipmentCreationFixtures::shipping_line( $group_id, '15.00' ) ]
+			)
+		);
+
+		self::assertFalse( $result->ok );
+		self::assertSame( ShipmentCreationErrorCode::MissingOrderItem, $result->error_code );
+	}
+
 	public function test_group_item_mismatch_fails_safely(): void {
 		$group_id = 'international|delivery|12';
 		$line     = ShipmentCreationFixtures::line( $group_id );
