@@ -216,6 +216,7 @@ final class CartDeliverySelectionReconciler {
 
 		$fresh_intent = CartLineCustomerIdentity::overlayCustomerOwned( $validation->intent, $stored_intent );
 		$refreshed    = self::apply_refresh( $cart_item, $fresh_intent, $validation->matched_option );
+		$refreshed    = CartLineCustomerIdentity::overlayCustomerContext( $refreshed, $cart_item );
 		$changed      = $refreshed !== $cart_item
 			|| ! CartDeliverySelectionFingerprint::matches( $stored_intent, $fresh_intent );
 
@@ -357,6 +358,7 @@ final class CartDeliverySelectionReconciler {
 		string $product_name = ''
 	): CartReconciliationOutcome {
 		$marked = self::apply_needs_reselection( $cart_item );
+		$marked = CartLineCustomerIdentity::overlayCustomerContext( $marked, $cart_item );
 
 		return new CartReconciliationOutcome(
 			$cart_item_key,

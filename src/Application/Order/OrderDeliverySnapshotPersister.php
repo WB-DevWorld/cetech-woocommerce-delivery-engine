@@ -151,7 +151,7 @@ final class OrderDeliverySnapshotPersister {
 		}
 
 		$order->update_meta_data( OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, $encoded );
-		$order->update_meta_data( OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION, OrderDeliverySnapshot::VERSION );
+		$order->update_meta_data( OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION, $package_snapshot->snapshot_version );
 		$order->save();
 	}
 
@@ -275,7 +275,23 @@ final class OrderDeliverySnapshotPersister {
 
 		$pool = [] !== $exact ? $exact : $loose;
 
-		return $pool[0] ?? null;
+		if ( count( $pool ) !== 1 ) {
+			if ( count( $pool ) > 1 ) {
+				$this->logger->warning(
+					'Ambiguous Store API order-item mapping; refusing to guess.',
+					[
+						'product_id'   => $product_id,
+						'variation_id' => $variation_id,
+						'quantity'     => $quantity,
+						'candidates'   => count( $pool ),
+					]
+				);
+			}
+
+			return null;
+		}
+
+		return $pool[0];
 	}
 
 	private function remember_cart_item_key( WC_Order_Item_Product $item, string $cart_item_key ): void {
@@ -329,10 +345,10 @@ final class OrderDeliverySnapshotPersister {
 
 		if ( method_exists( $item, 'update_meta_data' ) ) {
 			$item->update_meta_data( OrderDeliverySnapshot::META_LINE_SNAPSHOT, $encoded );
-			$item->update_meta_data( OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION, OrderDeliverySnapshot::VERSION );
+			$item->update_meta_data( OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION, $snapshot->snapshot_version );
 		} else {
 			$item->add_meta_data( OrderDeliverySnapshot::META_LINE_SNAPSHOT, $encoded, true );
-			$item->add_meta_data( OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION, OrderDeliverySnapshot::VERSION, true );
+			$item->add_meta_data( OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION, $snapshot->snapshot_version, true );
 		}
 
 		if ( method_exists( $item, 'save' ) ) {

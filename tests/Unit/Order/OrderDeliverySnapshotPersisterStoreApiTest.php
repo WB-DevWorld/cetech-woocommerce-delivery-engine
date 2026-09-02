@@ -387,6 +387,67 @@ final class OrderDeliverySnapshotPersisterStoreApiTest extends TestCase {
 		self::assertSame( '5', SchemaVersion::TARGET );
 	}
 
+	public function test_two_same_product_lines_with_different_destinations_keep_correct_v2_snapshots(): void {
+		$first  = $this->product_item( 1, 16 );
+		$second = $this->product_item( 2, 16 );
+		$order  = $this->managed_order( 60, [ 1 => $first, 2 => $second ] );
+		$phase  = (object) [ 'write' => false ];
+
+		$this->builder->method( 'build_line_snapshot' )->willReturnCallback(
+			function ( string $key ) use ( $phase ): ?OrderDeliveryLineSnapshot {
+				if ( ! $phase->write ) {
+					return null;
+				}
+
+				return 'dest-east' === $key
+					? $this->v2_line_snapshot( 'east-hash', '12 Boundary Rd' )
+					: $this->v2_line_snapshot( 'spin-hash', '88 Spintex Road' );
+			}
+		);
+		$this->builder->method( 'build_package_snapshot' )->willReturn( null );
+
+		$values = [ 'product_id' => 16, 'variation_id' => 0, 'quantity' => 1 ];
+		$this->persister->handle_create_order_line_item( $first, 'dest-east', $values, $order );
+		$this->persister->handle_create_order_line_item( $second, 'dest-spin', $values, $order );
+
+		$phase->write = true;
+		$this->install_cart(
+			[
+				'dest-east' => $values,
+				'dest-spin' => $values,
+			]
+		);
+		$this->persister->handle_store_api_order_update( $order, null );
+
+		self::assertSame( 'east-hash', $this->decode_line( $first )['delivery_location_identity'] );
+		self::assertSame( '12 Boundary Rd', $this->decode_line( $first )['delivery_address']['address_1'] );
+		self::assertSame( 'spin-hash', $this->decode_line( $second )['delivery_location_identity'] );
+		self::assertSame( '88 Spintex Road', $this->decode_line( $second )['delivery_address']['address_1'] );
+		self::assertSame( '2', $first->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION, true ) );
+		self::assertSame( '', $first->get_meta( OrderDeliverySnapshot::META_CART_ITEM_KEY, true ) );
+		self::assertSame( '', $second->get_meta( OrderDeliverySnapshot::META_CART_ITEM_KEY, true ) );
+	}
+
+	public function test_ambiguous_fallback_does_not_guess(): void {
+		$first  = $this->product_item( 1, 16 );
+		$second = $this->product_item( 2, 16 );
+		$order  = $this->managed_order( 61, [ 1 => $first, 2 => $second ] );
+
+		$this->builder->method( 'build_line_snapshot' )->willReturn( $this->v2_line_snapshot( 'should-not-attach', '12 Boundary Rd' ) );
+		$this->builder->method( 'build_package_snapshot' )->willReturn( null );
+
+		$this->install_cart(
+			[
+				'one' => [ 'product_id' => 16, 'variation_id' => 0, 'quantity' => 1 ],
+				'two' => [ 'product_id' => 16, 'variation_id' => 0, 'quantity' => 1 ],
+			]
+		);
+		$this->persister->handle_store_api_order_update( $order, null );
+
+		self::assertSame( '', $first->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT, true ) );
+		self::assertSame( '', $second->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT, true ) );
+	}
+
 	/**
 	 * @param array<int, WC_Order_Item_Product> $items
 	 */
@@ -472,6 +533,43 @@ final class OrderDeliverySnapshotPersisterStoreApiTest extends TestCase {
 			null,
 			'2026-09-02T15:00:00+00:00',
 			'in_warehouse|delivery|1'
+		);
+	}
+
+	private function v2_line_snapshot( string $identity, string $street ): OrderDeliveryLineSnapshot {
+		return new OrderDeliveryLineSnapshot(
+			ProductDeliverySelectionIntent::CONTRACT_VERSION,
+			OrderDeliverySnapshot::VERSION_V2,
+			16,
+			null,
+			'in_warehouse',
+			'delivery',
+			1,
+			'QA Local Standard',
+			null,
+			'3–5 business days',
+			null,
+			1,
+			1,
+			'GHS',
+			'15.0000',
+			OrderDeliverySnapshot::QUOTE_STATUS_QUOTED,
+			null,
+			null,
+			'2026-09-02T15:00:00+00:00',
+			'in_warehouse|delivery|1|' . substr( $identity, 0, 16 ),
+			null,
+			null,
+			null,
+			1,
+			[ 'country' => 'GH', 'city' => 'Accra' ],
+			[
+				'address_1' => $street,
+				'recipient' => [ 'first_name' => 'Ama' ],
+			],
+			'match-hash',
+			$identity,
+			null
 		);
 	}
 
