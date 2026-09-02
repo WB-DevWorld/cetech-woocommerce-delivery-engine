@@ -5,7 +5,7 @@
 **Classic foundation SHA:** `72b979cc8b1fcc716d8ecfd4a4e0b97a80acb6a3`  
 **Classic Chrome completion SHA:** `2ae5a957f254d903c4270c54ac92790b6ad311e4`  
 **Schema:** `5` (unchanged)  
-**Not:** RC.10, Stage 15, packaging, FLAIROC, training, WCFM, WPML
+**Not:** RC.10, Stage 15, FLAIROC, training, WCFM, WPML
 
 Classic Stages 1–6 remain **CLOSED PASS**. Their business semantics were not redesigned. Blocks is an adapter over the same PHP/domain/cart services.
 
@@ -448,7 +448,7 @@ Privacy: Store API extension payloads had no forbidden DE internals. Cart keys r
 
 ## Final combined regression + UX hardening
 
-**Identity remains** `1.0.0-dev.peritem.1`. Schema remains **`5`**. Not packaged. Not RC.10.
+**Identity remains** `1.0.0-dev.peritem.1`. Schema remains **`5`**. Packaged from `72cb7dd` (see packaging section below). Not RC.10.
 
 **Verdict:** READY TO PACKAGE. Do not package until the owner asks.
 
@@ -497,3 +497,25 @@ Orders:
 - **C** `#40` Store API: Chair v2 snapshot Accra 15; Mug has no `_cetech_de_delivery_snapshot`; shipping `delivery_engine_selected_offer` + native `flat_rate`; planner includes only the Chair.
 
 Known limitation kept: WooCommerce owns one tax/customer-location model. Per-item destinations are not per-destination tax.
+
+## Packaged identity `1.0.0-dev.peritem.1`
+
+**PACKAGED SOURCE SHA:** `72cb7ddfcb5ed85765ed167831736ba04a3cdf89`  
+This ZIP was built from that commit with `scripts/build-v1-rc-package.ps1`. It is **not** RC.10. The ZIP was **not** rebuilt after this checksum/docs commit.
+
+| Item | Value |
+|------|--------|
+| Filename | `cetech-woocommerce-delivery-engine-1.0.0-dev.peritem.1.zip` |
+| Version | `1.0.0-dev.peritem.1` |
+| Schema | `5` |
+| Branch | `feat/post-rc9-per-item-context` |
+| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.peritem.1.zip` |
+| Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.peritem.1.zip` |
+| Bytes | `1467494` |
+| SHA-256 | `898db75f2baf1236bdaf216189a15c148f500b24189ba3c374e964d729b6e806` |
+| Build | `scripts/build-v1-rc-package.ps1 -Version 1.0.0-dev.peritem.1 -ZipFileName cetech-woocommerce-delivery-engine-1.0.0-dev.peritem.1.zip` (clean tree; **not** `-AllowDirty`) |
+| RC.9 tag | `v1.0.0-rc.9` still peels to `e6bc7fba16d9d7b96682f2945c518a33a9a16cd5` |
+
+Clean local Docker QA lab: reset to RC.9, then `wp plugin install` of this ZIP (not copied source). Active version `1.0.0-dev.peritem.1`, schema **5**. Package-integrity smoke: Classic Accra+Kumasi 2 lines GHS 15+22; Blocks Accra+Kumasi shipping total GHS 37; Pickup-only GHS 0 DE shipping; no PHP fatal / DE console error.
+
+Do not install this on FLAIROC. Do not retag RC.9. Do not start Stage 15.
