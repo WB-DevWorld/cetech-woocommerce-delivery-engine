@@ -216,6 +216,10 @@ if ( ! class_exists( 'WC_Order_Item_Product', false ) ) {
 			return (string) ( $this->data['sku'] ?? '' );
 		}
 
+		public function get_product_id(): int {
+			return (int) ( $this->data['product_id'] ?? 0 );
+		}
+
 		public function get_variation_id(): int {
 			return (int) ( $this->data['variation_id'] ?? 0 );
 		}
@@ -228,6 +232,22 @@ if ( ! class_exists( 'WC_Order_Item_Product', false ) ) {
 			unset( $single );
 
 			return $this->data['meta'][ $key ] ?? '';
+		}
+
+		public function add_meta_data( string $key, mixed $value, bool $unique = false ): void {
+			unset( $unique );
+			$this->data['meta'][ $key ] = $value;
+		}
+
+		public function update_meta_data( string $key, mixed $value ): void {
+			$this->data['meta'][ $key ] = $value;
+		}
+
+		public function delete_meta_data( string $key ): void {
+			unset( $this->data['meta'][ $key ] );
+		}
+
+		public function save(): void {
 		}
 	}
 }

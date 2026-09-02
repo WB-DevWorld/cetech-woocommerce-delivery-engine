@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-dev.cartstate.1
+Stable tag: 1.0.0-dev.peritem.1
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,12 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-dev.peritem.1 =
+* Per-item customer context foundation on cartstate.1 plus blocks-snapshot.1. Schema remains 5. Tagged 1.0.0-rc.9 is unchanged. Not RC.10. No storefront UI.
+
+= 1.0.0-dev.blocks-snapshot.1 =
+* Native Blocks/Store API checkout now persists the same immutable per-line Delivery Engine snapshot as Classic after the order address is copied. Schema remains 5. Tagged 1.0.0-rc.9 is unchanged.
 
 = 1.0.0-dev.cartstate.1 =
 * Post-RC.9 cart-state reconciliation: existing cart lines refresh to live Delivery Engine configuration, stale admin fingerprints no longer force duplicate shipping groups, and unavailable choices require in-cart reselection instead of remove-and-re-add. Schema remains 5. Tagged 1.0.0-rc.9 is unchanged.
