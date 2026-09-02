@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Frontend;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
+use CetechDeliveryEngine\Application\CustomerContext\CustomerBrowsingLocationStore;
+use CetechDeliveryEngine\Application\CustomerContext\LocationAwareDeliveryOptions;
+use CetechDeliveryEngine\Application\CustomerContext\MatchingLocationOptionsEndpoint;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryRuntimeConfigurationRouter;
 use CetechDeliveryEngine\Application\Pickup\PickupLocationAddressFormatter;
@@ -12,6 +15,7 @@ use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
+use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Domain\Enum\ProductTargetType;
 use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
@@ -34,7 +38,9 @@ final class ProductDeliverySelectorRenderer {
 		private FeatureFlags $feature_flags,
 		private Requirements $requirements,
 		private ProductDeliveryConfigurationSourceInterface $configuration_source,
-		private ProductDeliveryOptionsBuilder $options_builder
+		private ProductDeliveryOptionsBuilder $options_builder,
+		private ?CustomerBrowsingLocationStore $browsing_store = null,
+		private ?LocationAwareDeliveryOptions $location_options = null
 	) {
 	}
 
@@ -64,6 +70,12 @@ final class ProductDeliverySelectorRenderer {
 
 		$version = defined( 'CETECH_DE_VERSION' ) ? CETECH_DE_VERSION : '1.0.0-rc.3';
 		$base    = defined( 'CETECH_DE_URL' ) ? CETECH_DE_URL : '';
+		$deps    = [];
+
+		if ( function_exists( 'wp_script_is' ) && wp_script_is( 'wc-country-select', 'registered' ) ) {
+			$deps[] = 'wc-country-select';
+			wp_enqueue_script( 'wc-country-select' );
+		}
 
 		wp_enqueue_style(
 			self::STYLE_HANDLE,
@@ -75,9 +87,33 @@ final class ProductDeliverySelectorRenderer {
 		wp_enqueue_script(
 			self::SCRIPT_HANDLE,
 			$base . 'assets/frontend/product-delivery-selector.js',
-			[],
+			$deps,
 			$version,
 			true
+		);
+
+		$product    = $this->resolve_product();
+		$product_id = $product instanceof WC_Product ? (int) $product->get_id() : 0;
+
+		wp_localize_script(
+			self::SCRIPT_HANDLE,
+			'cetechDeMatchingLocation',
+			[
+				'ajaxUrl'   => function_exists( 'admin_url' ) ? admin_url( 'admin-ajax.php' ) : '',
+				'action'    => MatchingLocationOptionsEndpoint::ACTION,
+				'nonce'     => function_exists( 'wp_create_nonce' ) ? wp_create_nonce( MatchingLocationOptionsEndpoint::ACTION ) : '',
+				'productId' => $product_id,
+				'i18n'      => [
+					'needLocation' => __( 'Enter your delivery location to see delivery options.', 'cetech-woocommerce-delivery-engine' ),
+					'unavailable' => __( 'Delivery is not available to this location.', 'cetech-woocommerce-delivery-engine' ),
+					'loading'     => __( 'Updating delivery options…', 'cetech-woocommerce-delivery-engine' ),
+					'error'       => __( 'Delivery options are temporarily unavailable. Please try again.', 'cetech-woocommerce-delivery-engine' ),
+					'delivery'    => __( 'Delivery', 'cetech-woocommerce-delivery-engine' ),
+					'storePickup' => __( 'Store pickup', 'cetech-woocommerce-delivery-engine' ),
+					'estimated'   => __( 'Estimated delivery', 'cetech-woocommerce-delivery-engine' ),
+				],
+				'postField' => CartDeliverySelectionCapture::POST_FIELD,
+			]
 		);
 	}
 
@@ -187,7 +223,7 @@ final class ProductDeliverySelectorRenderer {
 		}
 
 		if ( $interactive ) {
-			$this->render_interactive_options( $options );
+			$this->render_interactive_options( $options, (int) $product->get_id() );
 		} else {
 			$this->render_display_options( $options );
 		}
@@ -245,7 +281,7 @@ final class ProductDeliverySelectorRenderer {
 	/**
 	 * @param list<ProductDeliveryOption> $options
 	 */
-	private function render_interactive_options( array $options ): void {
+	private function render_interactive_options( array $options, int $product_id = 0 ): void {
 		$available = array_values(
 			array_filter(
 				$options,
@@ -261,18 +297,39 @@ final class ProductDeliverySelectorRenderer {
 			return;
 		}
 
+		$browsing  = $this->browsing_store instanceof CustomerBrowsingLocationStore ? $this->browsing_store->get() : null;
+		$requires  = $this->location_options instanceof LocationAwareDeliveryOptions
+			? $this->location_options->delivery_requires_matching_location( $available )
+			: false;
+		$currency  = function_exists( 'get_woocommerce_currency' ) ? (string) get_woocommerce_currency() : 'GHS';
+		$visible   = $available;
+		if ( $this->location_options instanceof LocationAwareDeliveryOptions && $requires ) {
+			$visible = $this->location_options->filter( $available, $browsing, $currency );
+		}
+
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- display-only repopulation of customer choice.
 		$posted = isset( $_POST[ CartDeliverySelectionCapture::POST_FIELD ] )
 			? ProductDeliveryOptionsBuilder::normalizeDisplayKey( wp_unslash( (string) $_POST[ CartDeliverySelectionCapture::POST_FIELD ] ) )
 			: '';
-		$selected = '' !== $posted ? $posted : ProductDeliveryOptionsBuilder::defaultDisplayKey( $available );
-		$groups     = ProductDeliveryOptionsBuilder::groupByChoice( $available );
+		$selected = '' !== $posted ? $posted : ProductDeliveryOptionsBuilder::defaultDisplayKey( $visible );
+		$groups     = ProductDeliveryOptionsBuilder::groupByChoice( $visible );
 		$has_switch = [] !== $groups[ FulfilmentChoice::Delivery->value ]
 			&& [] !== $groups[ FulfilmentChoice::StorePickup->value ];
-		$active_choice = $this->active_choice( $available, $selected, $has_switch );
+		$active_choice = $this->active_choice( $visible !== [] ? $visible : $available, $selected, $has_switch || [] !== $groups[ FulfilmentChoice::StorePickup->value ] );
 
-		echo '<fieldset class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--interactive" data-cetech-de-selector="1">';
+		echo '<fieldset class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--interactive" data-cetech-de-selector="1" data-product-id="' . esc_attr( (string) $product_id ) . '">';
 		echo '<legend class="cetech-de-delivery-selector__title">' . esc_html__( 'Delivery options', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
+
+		if ( $requires ) {
+			echo MatchingLocationFieldRenderer::render( $browsing ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns escaped HTML.
+		}
+
+		echo '<div class="cetech-de-delivery-selector__status" role="status" aria-live="polite" data-cetech-de-status>';
+		if ( $requires && ( ! $browsing instanceof MatchingLocation || ! $browsing->isPresent() ) ) {
+			echo esc_html__( 'Enter your delivery location to see delivery options.', 'cetech-woocommerce-delivery-engine' );
+		}
+		echo '</div>';
+		echo '<div class="cetech-de-delivery-selector__options" data-cetech-de-options>';
 
 		if ( $has_switch ) {
 			$this->render_choice_switch( $active_choice );
@@ -297,7 +354,7 @@ final class ProductDeliverySelectorRenderer {
 			echo '</div>';
 		}
 
-		echo '</fieldset>';
+		echo '</div></fieldset>';
 	}
 
 	/**

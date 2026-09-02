@@ -178,38 +178,58 @@ final class CartFulfilmentPackagePresentation {
 	 * @param array<string, mixed> $package
 	 */
 	public static function heading( string $default, array $package ): string {
-		if ( ! self::is_pickup( $package ) ) {
-			return $default;
+		if ( self::is_pickup( $package ) ) {
+			$location = self::location_name( $package );
+
+			if ( '' !== $location ) {
+				return sprintf(
+					/* translators: %s: pickup location name */
+					__( 'Pickup at %s', 'cetech-woocommerce-delivery-engine' ),
+					$location
+				);
+			}
+
+			return __( 'Store Pickup', 'cetech-woocommerce-delivery-engine' );
 		}
 
-		$location = self::location_name( $package );
-
-		if ( '' !== $location ) {
-			return sprintf(
-				/* translators: %s: pickup location name */
-				__( 'Pickup at %s', 'cetech-woocommerce-delivery-engine' ),
-				$location
-			);
+		$meta = DeliveryGroupIdentity::package_meta( $package );
+		if ( is_array( $meta ) && ! empty( $meta['managed'] ) ) {
+			$locality = trim( (string) ( $meta['locality_label'] ?? '' ) );
+			if ( '' !== $locality ) {
+				return sprintf(
+					/* translators: %s: city or locality */
+					__( 'Delivery — %s', 'cetech-woocommerce-delivery-engine' ),
+					$locality
+				);
+			}
 		}
 
-		return __( 'Store Pickup', 'cetech-woocommerce-delivery-engine' );
+		return $default;
 	}
 
 	/**
 	 * @param array<string, mixed> $package
 	 */
 	public static function destination( string $customer_shipping_destination, array $package ): string {
-		if ( ! self::is_pickup( $package ) ) {
-			return $customer_shipping_destination;
+		if ( self::is_pickup( $package ) ) {
+			$address = self::pickup_address( $package );
+
+			if ( '' !== $address ) {
+				return $address;
+			}
+
+			return self::location_name( $package );
 		}
 
-		$address = self::pickup_address( $package );
-
-		if ( '' !== $address ) {
-			return $address;
+		$meta = DeliveryGroupIdentity::package_meta( $package );
+		if ( is_array( $meta ) && ! empty( $meta['managed'] ) ) {
+			$locality = trim( (string) ( $meta['locality_label'] ?? '' ) );
+			if ( '' !== $locality ) {
+				return $locality;
+			}
 		}
 
-		return self::location_name( $package );
+		return $customer_shipping_destination;
 	}
 
 	/**

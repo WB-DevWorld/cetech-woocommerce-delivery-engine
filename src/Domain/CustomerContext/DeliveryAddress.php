@@ -57,6 +57,13 @@ final class DeliveryAddress {
 	}
 
 	/**
+	 * @return array<string, string>
+	 */
+	public function toWcPackageDestination(): array {
+		return $this->matching->toWcPackageDestination( $this->address_1, $this->address_2 );
+	}
+
+	/**
 	 * @return array<string, mixed>
 	 */
 	public function toArray(): array {

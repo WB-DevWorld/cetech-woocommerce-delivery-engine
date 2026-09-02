@@ -17,7 +17,7 @@ use WC_Product;
  *
  * Does not persist selections or hook add-to-cart.
  */
-final class ProductDeliverySelectionValidator {
+final class ProductDeliverySelectionValidator implements ProductDeliverySelectionValidatorInterface {
 
 	public function __construct(
 		private FeatureFlags $feature_flags,

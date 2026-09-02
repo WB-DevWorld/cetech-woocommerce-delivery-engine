@@ -91,6 +91,54 @@ final class CustomerCartContext {
 	}
 
 	/**
+	 * WooCommerce shipping package destination for this line.
+	 *
+	 * Pickup has no delivery destination. Delivery uses customer context, never
+	 * the global checkout shipping address.
+	 *
+	 * @return array<string, string>
+	 */
+	public function toWcPackageDestination(): array {
+		if ( $this->isPickup() ) {
+			return [
+				'country'   => '',
+				'state'     => '',
+				'city'      => '',
+				'postcode'  => '',
+				'address'   => '',
+				'address_2' => '',
+			];
+		}
+
+		if ( $this->hasCompleteDeliveryAddress() && $this->delivery_address instanceof DeliveryAddress ) {
+			return $this->delivery_address->toWcPackageDestination();
+		}
+
+		if ( $this->hasMatchingLocation() && $this->matching_location instanceof MatchingLocation ) {
+			return $this->matching_location->toWcPackageDestination();
+		}
+
+		return [
+			'country'   => '',
+			'state'     => '',
+			'city'      => '',
+			'postcode'  => '',
+			'address'   => '',
+			'address_2' => '',
+		];
+	}
+
+	public function publicLocalityLabel(): string {
+		if ( $this->isPickup() ) {
+			return '';
+		}
+
+		$matching = $this->delivery_address?->matching ?? $this->matching_location;
+
+		return $matching instanceof MatchingLocation ? $matching->publicLocalityLabel() : '';
+	}
+
+	/**
 	 * Cart-line location identity: hashes only. Never raw address JSON.
 	 */
 	public function cartLocationIdentitySegment(): string {

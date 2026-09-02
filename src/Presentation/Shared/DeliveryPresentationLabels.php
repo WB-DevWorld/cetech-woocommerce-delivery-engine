@@ -77,6 +77,14 @@ final class DeliveryPresentationLabels {
 		return __( 'Pickup instructions', 'cetech-woocommerce-delivery-engine' );
 	}
 
+	public static function delivering_to(): string {
+		return __( 'Delivering to', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function change_delivery(): string {
+		return __( 'Change delivery', 'cetech-woocommerce-delivery-engine' );
+	}
+
 	public static function method_label_for_choice( ?string $fulfilment_choice ): string {
 		if ( self::is_store_pickup( $fulfilment_choice ) ) {
 			return self::method();
