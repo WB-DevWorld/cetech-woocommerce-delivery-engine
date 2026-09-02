@@ -331,10 +331,65 @@
 		writePayload: writePayload,
 		currentPayload: currentPayload,
 		formatEstimateLine: formatEstimateLine,
+		storeApiExtensions: storeApiExtensions
 	};
+
+	function storeApiExtensions() {
+		var root = document.querySelector('[data-cetech-de-selector]');
+		if (root && typeof writePayload === 'function') {
+			writePayload(root);
+		}
+		var payload = root ? currentPayload(root) : null;
+		if (!payload) {
+			return {};
+		}
+		return {
+			delivery_option_key: payload.display_key || '',
+			matching_location: payload.matching_location || {},
+			pdp_context: payload
+		};
+	}
+
+	function attachStoreApiAddItem() {
+		var namespace = (window.cetechDeMatchingLocation && window.cetechDeMatchingLocation.storeNamespace) || 'cetech-delivery-engine';
+		function merge(data) {
+			data = data || {};
+			data.extensions = data.extensions || {};
+			data.extensions[namespace] = Object.assign({}, data.extensions[namespace] || {}, storeApiExtensions());
+			return data;
+		}
+		if (window.wp && window.wp.apiFetch && typeof window.wp.apiFetch.use === 'function') {
+			window.wp.apiFetch.use(function (options, next) {
+				var path = String(options.path || options.url || '');
+				if (options.data && /\/wc\/store(?:\/v1)?\/cart\/add-item/.test(path)) {
+					options.data = merge(options.data);
+				}
+				return next(options);
+			});
+		}
+		if (typeof window.fetch === 'function') {
+			var original = window.fetch;
+			window.fetch = function (input, init) {
+				var url = typeof input === 'string' ? input : (input && input.url) || '';
+				if (/\/wc\/store(?:\/v1)?\/cart\/add-item/.test(String(url))) {
+					init = init || {};
+					if (init.body && typeof init.body === 'string') {
+						try {
+							var parsed = JSON.parse(init.body);
+							init = Object.assign({}, init, { body: JSON.stringify(merge(parsed)) });
+						} catch (e) {
+							/* keep original body */
+						}
+					}
+				}
+				return original.call(this, input, init);
+			};
+		}
+	}
 
 	function boot() {
 		bindAll(document);
+		attachStoreApiAddItem();
 	}
 
 	if (document.readyState === 'loading') {

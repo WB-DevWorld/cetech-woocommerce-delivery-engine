@@ -90,7 +90,25 @@ final class CartCustomerContextEditorService {
 			return;
 		}
 
-		$context = $this->context_from_post( $item );
+		$context = $this->contextFromInput(
+			$item,
+			[
+				'display_key'            => isset( $_POST[ CartDeliverySelectionCapture::POST_FIELD ] )
+					? ProductDeliveryOptionsBuilder::normalizeDisplayKey( wp_unslash( (string) $_POST[ CartDeliverySelectionCapture::POST_FIELD ] ) )
+					: '',
+				'matching_country'      => isset( $_POST['cetech_de_matching_country'] ) ? wp_unslash( (string) $_POST['cetech_de_matching_country'] ) : '',
+				'matching_state'        => isset( $_POST['cetech_de_matching_state'] ) ? wp_unslash( (string) $_POST['cetech_de_matching_state'] ) : '',
+				'matching_city'         => isset( $_POST['cetech_de_matching_city'] ) ? wp_unslash( (string) $_POST['cetech_de_matching_city'] ) : '',
+				'matching_postcode'     => isset( $_POST['cetech_de_matching_postcode'] ) ? wp_unslash( (string) $_POST['cetech_de_matching_postcode'] ) : '',
+				'address_1'            => isset( $_POST['cetech_de_address_1'] ) ? wp_unslash( (string) $_POST['cetech_de_address_1'] ) : '',
+				'address_2'            => isset( $_POST['cetech_de_address_2'] ) ? wp_unslash( (string) $_POST['cetech_de_address_2'] ) : '',
+				'first_name'           => isset( $_POST['cetech_de_first_name'] ) ? wp_unslash( (string) $_POST['cetech_de_first_name'] ) : '',
+				'last_name'            => isset( $_POST['cetech_de_last_name'] ) ? wp_unslash( (string) $_POST['cetech_de_last_name'] ) : '',
+				'company'              => isset( $_POST['cetech_de_company'] ) ? wp_unslash( (string) $_POST['cetech_de_company'] ) : '',
+				'phone'                => isset( $_POST['cetech_de_phone'] ) ? wp_unslash( (string) $_POST['cetech_de_phone'] ) : '',
+				'pickup_location_id'   => isset( $_POST['cetech_de_pickup_location_id'] ) ? (int) wp_unslash( (string) $_POST['cetech_de_pickup_location_id'] ) : 0,
+			]
+		);
 		if ( ! $context instanceof CustomerCartContext ) {
 			wc_add_notice( __( 'Please complete the delivery details for this item.', 'cetech-woocommerce-delivery-engine' ), 'error' );
 
@@ -127,11 +145,10 @@ final class CartCustomerContextEditorService {
 
 	/**
 	 * @param array<string, mixed> $item
+	 * @param array<string, mixed> $input
 	 */
-	public function context_from_post( array $item ): ?CustomerCartContext {
-		$display_key = isset( $_POST[ CartDeliverySelectionCapture::POST_FIELD ] )
-			? ProductDeliveryOptionsBuilder::normalizeDisplayKey( wp_unslash( (string) $_POST[ CartDeliverySelectionCapture::POST_FIELD ] ) )
-			: '';
+	public function contextFromInput( array $item, array $input ): ?CustomerCartContext {
+		$display_key = ProductDeliveryOptionsBuilder::normalizeDisplayKey( (string) ( $input['display_key'] ?? '' ) );
 
 		if ( '' === $display_key ) {
 			$intent = CartDeliverySelectionSessionData::normalizeIntent(
@@ -157,38 +174,38 @@ final class CartCustomerContextEditorService {
 		if ( FulfilmentChoice::StorePickup->value === $option->fulfilment_choice ) {
 			$pickup_id = $option->pickup_location_id;
 			if ( ( $pickup_id ?? 0 ) <= 0 ) {
-				$pickup_id = isset( $_POST['cetech_de_pickup_location_id'] )
-					? (int) wp_unslash( (string) $_POST['cetech_de_pickup_location_id'] )
-					: 0;
+				$pickup_id = (int) ( $input['pickup_location_id'] ?? 0 );
 			}
 
 			return CustomerCartContext::pickup( $pickup_id > 0 ? $pickup_id : null );
 		}
 
-		$matching = MatchingLocation::fromInput(
+		$matching_raw = is_array( $input['matching_location'] ?? null ) ? $input['matching_location'] : [];
+		$matching     = MatchingLocation::fromInput(
 			[
-				'country'  => isset( $_POST['cetech_de_matching_country'] ) ? wp_unslash( (string) $_POST['cetech_de_matching_country'] ) : '',
-				'state'    => isset( $_POST['cetech_de_matching_state'] ) ? wp_unslash( (string) $_POST['cetech_de_matching_state'] ) : '',
-				'city'     => isset( $_POST['cetech_de_matching_city'] ) ? wp_unslash( (string) $_POST['cetech_de_matching_city'] ) : '',
-				'postcode' => isset( $_POST['cetech_de_matching_postcode'] ) ? wp_unslash( (string) $_POST['cetech_de_matching_postcode'] ) : '',
+				'country'  => (string) ( $matching_raw['country'] ?? $input['matching_country'] ?? '' ),
+				'state'    => (string) ( $matching_raw['state'] ?? $input['matching_state'] ?? '' ),
+				'city'     => (string) ( $matching_raw['city'] ?? $input['matching_city'] ?? '' ),
+				'postcode' => (string) ( $matching_raw['postcode'] ?? $input['matching_postcode'] ?? '' ),
 			]
 		);
 
-		$street = isset( $_POST['cetech_de_address_1'] ) ? trim( (string) wp_unslash( (string) $_POST['cetech_de_address_1'] ) ) : '';
-		$address = null;
+		$address_raw = is_array( $input['delivery_address'] ?? null ) ? $input['delivery_address'] : [];
+		$street       = trim( (string) ( $address_raw['address_1'] ?? $input['address_1'] ?? '' ) );
+		$address      = null;
 		if ( '' !== $street ) {
 			$address = DeliveryAddress::fromInput(
 				[
-					'country'    => $matching->country,
-					'state'      => $matching->state,
-					'city'       => $matching->city,
-					'postcode'   => $matching->postcode,
+					'country'    => $matching->country !== '' ? $matching->country : (string) ( $address_raw['country'] ?? '' ),
+					'state'      => $matching->state !== '' ? $matching->state : (string) ( $address_raw['state'] ?? '' ),
+					'city'       => $matching->city !== '' ? $matching->city : (string) ( $address_raw['city'] ?? '' ),
+					'postcode'   => $matching->postcode !== '' ? $matching->postcode : (string) ( $address_raw['postcode'] ?? '' ),
 					'address_1'  => $street,
-					'address_2'  => isset( $_POST['cetech_de_address_2'] ) ? wp_unslash( (string) $_POST['cetech_de_address_2'] ) : '',
-					'first_name' => isset( $_POST['cetech_de_first_name'] ) ? wp_unslash( (string) $_POST['cetech_de_first_name'] ) : '',
-					'last_name'  => isset( $_POST['cetech_de_last_name'] ) ? wp_unslash( (string) $_POST['cetech_de_last_name'] ) : '',
-					'company'    => isset( $_POST['cetech_de_company'] ) ? wp_unslash( (string) $_POST['cetech_de_company'] ) : '',
-					'phone'      => isset( $_POST['cetech_de_phone'] ) ? wp_unslash( (string) $_POST['cetech_de_phone'] ) : '',
+					'address_2'  => (string) ( $address_raw['address_2'] ?? $input['address_2'] ?? '' ),
+					'first_name' => (string) ( $address_raw['first_name'] ?? $input['first_name'] ?? '' ),
+					'last_name'  => (string) ( $address_raw['last_name'] ?? $input['last_name'] ?? '' ),
+					'company'    => (string) ( $address_raw['company'] ?? $input['company'] ?? '' ),
+					'phone'      => (string) ( $address_raw['phone'] ?? $input['phone'] ?? '' ),
 				]
 			);
 		}
@@ -196,6 +213,31 @@ final class CartCustomerContextEditorService {
 		$offer_id = $option->delivery_offer_id ?? (int) ( $validated->intent['delivery_offer_id'] ?? 0 );
 
 		return CustomerCartContext::delivery( $offer_id > 0 ? $offer_id : null, $matching, $address );
+	}
+
+	/**
+	 * @param array<string, mixed> $item
+	 */
+	public function context_from_post( array $item ): ?CustomerCartContext {
+		return $this->contextFromInput(
+			$item,
+			[
+				'display_key'          => isset( $_POST[ CartDeliverySelectionCapture::POST_FIELD ] )
+					? ProductDeliveryOptionsBuilder::normalizeDisplayKey( wp_unslash( (string) $_POST[ CartDeliverySelectionCapture::POST_FIELD ] ) )
+					: '',
+				'matching_country'    => isset( $_POST['cetech_de_matching_country'] ) ? wp_unslash( (string) $_POST['cetech_de_matching_country'] ) : '',
+				'matching_state'      => isset( $_POST['cetech_de_matching_state'] ) ? wp_unslash( (string) $_POST['cetech_de_matching_state'] ) : '',
+				'matching_city'       => isset( $_POST['cetech_de_matching_city'] ) ? wp_unslash( (string) $_POST['cetech_de_matching_city'] ) : '',
+				'matching_postcode'   => isset( $_POST['cetech_de_matching_postcode'] ) ? wp_unslash( (string) $_POST['cetech_de_matching_postcode'] ) : '',
+				'address_1'           => isset( $_POST['cetech_de_address_1'] ) ? wp_unslash( (string) $_POST['cetech_de_address_1'] ) : '',
+				'address_2'           => isset( $_POST['cetech_de_address_2'] ) ? wp_unslash( (string) $_POST['cetech_de_address_2'] ) : '',
+				'first_name'          => isset( $_POST['cetech_de_first_name'] ) ? wp_unslash( (string) $_POST['cetech_de_first_name'] ) : '',
+				'last_name'           => isset( $_POST['cetech_de_last_name'] ) ? wp_unslash( (string) $_POST['cetech_de_last_name'] ) : '',
+				'company'             => isset( $_POST['cetech_de_company'] ) ? wp_unslash( (string) $_POST['cetech_de_company'] ) : '',
+				'phone'               => isset( $_POST['cetech_de_phone'] ) ? wp_unslash( (string) $_POST['cetech_de_phone'] ) : '',
+				'pickup_location_id'  => isset( $_POST['cetech_de_pickup_location_id'] ) ? (int) wp_unslash( (string) $_POST['cetech_de_pickup_location_id'] ) : 0,
+			]
+		);
 	}
 
 	/**

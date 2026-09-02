@@ -106,4 +106,37 @@ describe('Blocks cart reselection', () => {
 		expect(needing[0].name).toBe('Cable');
 		expect(needing[0].options[0].display_key).toBe('in_warehouse:delivery:20');
 	});
+
+	it('selects editable managed lines and submits named commands', () => {
+		const api = loadScript();
+		const items = api.editableItems({
+			items: [
+				{
+					key: 'accra',
+					name: 'Chair',
+					quantity: 2,
+					extensions: {
+						'cetech-delivery-engine': {
+							can_edit_context: true,
+							needs_reselection: false,
+							cart_item_key: 'accra',
+							product_name: 'Chair',
+							quantity: 2,
+							locality: 'Accra'
+						}
+					}
+				},
+				{
+					key: 'stale',
+					extensions: {
+						'cetech-delivery-engine': { can_edit_context: false, needs_reselection: true }
+					}
+				}
+			]
+		});
+		expect(items).toHaveLength(1);
+		expect(items[0].key).toBe('accra');
+		expect(typeof api.submitCommand).toBe('function');
+		expect(typeof api.renderDomUi).toBe('function');
+	});
 });

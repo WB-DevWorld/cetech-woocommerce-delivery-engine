@@ -157,7 +157,7 @@ final class CartDeliverySelectionCapture {
 			return $passed;
 		}
 
-		if ( ! $this->is_classic_form_submission() ) {
+		if ( ! $this->is_classic_form_submission() && ! $this->is_blocks_add_to_cart() ) {
 			return $passed;
 		}
 
@@ -234,7 +234,7 @@ final class CartDeliverySelectionCapture {
 		$option  = ProductDeliveryOption::fromArray( $result->matched_option );
 		$context = $this->context_from_submitted_option( $option );
 		if ( $context instanceof CustomerCartContext ) {
-			if ( $context->isDelivery() && $this->is_classic_form_submission() && ! $context->hasMatchingLocation() ) {
+			if ( $context->isDelivery() && ! $context->hasMatchingLocation() ) {
 				return $cart_item_data;
 			}
 
@@ -597,6 +597,12 @@ final class CartDeliverySelectionCapture {
 	private function is_classic_form_submission(): bool {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce add-to-cart form.
 		return isset( $_POST[ self::POST_FIELD ] ) || isset( $_POST[ ClassicPdpContextPayload::POST_FIELD ] );
+	}
+
+	private function is_blocks_add_to_cart(): bool {
+		$option = $GLOBALS['cetech_de_blocks_delivery_option_key'] ?? '';
+
+		return is_string( $option ) && '' !== ProductDeliveryOptionsBuilder::normalizeDisplayKey( $option );
 	}
 
 	private function read_submitted_matching_location(): ?MatchingLocation {

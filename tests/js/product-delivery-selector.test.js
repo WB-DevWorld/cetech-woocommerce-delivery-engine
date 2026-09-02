@@ -152,6 +152,9 @@ describe('Product delivery fulfilment switcher', () => {
 		expect(payload.matching_location.city).toBe('Kumasi');
 		expect(payload.matching_location.country).toBe('GH');
 		expect(payload.display_key).toBe('in_warehouse:delivery:10');
+		const extensions = api.storeApiExtensions();
+		expect(extensions.delivery_option_key).toBe('in_warehouse:delivery:10');
+		expect(extensions.matching_location.city).toBe('Kumasi');
 	});
 
 	it('uses server estimate_line and does not double-prefix', () => {

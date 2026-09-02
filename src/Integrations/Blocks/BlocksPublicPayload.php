@@ -10,8 +10,12 @@ use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionSessionData;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
+use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
+use CetechDeliveryEngine\Domain\CustomerContext\DeliveryAddress;
+use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Presentation\Frontend\CartFulfilmentPackagePresentation;
+use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
 
 /**
  * Customer-safe Store API payloads. Never includes supplier, origin, cost, or internal ids.
@@ -31,6 +35,9 @@ final class BlocksPublicPayload {
 		'logistics_profile',
 		'internal_note',
 		'staff_note',
+		'fingerprint',
+		'matching_identity',
+		'delivery_location_identity',
 	];
 
 	/**
@@ -139,6 +146,34 @@ final class BlocksPublicPayload {
 			'cart_item_key'           => '' !== $cart_item_key ? $cart_item_key : ( is_string( $cart_item['key'] ?? null ) ? (string) $cart_item['key'] : null ),
 		];
 
+		$context = CustomerCartContext::fromCartItem( $cart_item );
+		$qty     = (int) ( $cart_item['quantity'] ?? 1 );
+		$can_edit = is_array( $intent ) && ! $needs_reselection;
+
+		$payload['has_customer_context'] = $context instanceof CustomerCartContext;
+		$payload['address_complete']     = $context instanceof CustomerCartContext && $context->hasCompleteDeliveryAddress();
+		$payload['can_edit_context']      = $can_edit;
+		$payload['can_split']            = $can_edit && $qty > 1;
+		$payload['quantity']              = $qty > 0 ? $qty : 1;
+		$payload['locality']             = $context instanceof CustomerCartContext ? self::nullable_string( $context->publicLocalityLabel() ) : null;
+		$payload['estimate_line']        = $needs_reselection
+			? null
+			: self::nullable_string(
+				DeliveryPresentationLabels::format_product_estimate_line(
+					(string) ( $summary['estimate_text'] ?? '' ),
+					$choice !== '' ? $choice : null
+				)
+			);
+		$payload['matching_location'] = $context instanceof CustomerCartContext
+			? self::public_matching( $context->matching_location )
+			: null;
+		$payload['delivery_address'] = $context instanceof CustomerCartContext
+			? self::public_delivery_address( $context->delivery_address )
+			: null;
+		$payload['available_options'] = $can_edit && null !== $capture
+			? self::available_options( $cart_item, $capture, is_array( $intent ) ? (string) ( $intent['display_key'] ?? '' ) : '' )
+			: [];
+
 		return self::strip_forbidden( $payload );
 	}
 
@@ -170,6 +205,92 @@ final class BlocksPublicPayload {
 		];
 
 		return self::strip_forbidden( $payload );
+	}
+
+	/**
+	 * @param array<string, mixed> $cart_item
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	private static function available_options( array $cart_item, CartDeliverySelectionCapture $capture, string $current_key = '' ): array {
+		$product_id   = (int) ( $cart_item['product_id'] ?? 0 );
+		$variation_id = (int) ( $cart_item['variation_id'] ?? 0 );
+		$assessment   = $capture->assess_product_selection( $product_id, $variation_id );
+		$options       = [];
+
+		foreach ( $assessment['options'] as $option ) {
+			if ( ! $option instanceof ProductDeliveryOption || ! $option->is_available ) {
+				continue;
+			}
+
+			$label = trim( (string) $option->delivery_offer_public_label );
+			if ( '' === $label && FulfilmentChoice::StorePickup->value === $option->fulfilment_choice ) {
+				$label = trim( (string) $option->pickup_location_label );
+				$label = '' !== $label ? $label : __( 'Store pickup', 'cetech-woocommerce-delivery-engine' );
+			}
+
+			$options[] = [
+				'display_key'       => $option->display_key,
+				'label'             => '' !== $label ? $label : __( 'Delivery option', 'cetech-woocommerce-delivery-engine' ),
+				'fulfilment_choice' => $option->fulfilment_choice,
+				'estimate_text'     => self::nullable_string( $option->estimate_text ),
+				'estimate_line'     => self::nullable_string(
+					DeliveryPresentationLabels::format_product_estimate_line(
+						(string) $option->estimate_text,
+						$option->fulfilment_choice
+					)
+				),
+				'is_pickup'          => FulfilmentChoice::StorePickup->value === $option->fulfilment_choice,
+				'selected'           => $current_key !== '' && $option->display_key === $current_key,
+			];
+		}
+
+		return $options;
+	}
+
+	/**
+	 * @return array{country: string, state: string, city: string, postcode: string}|null
+	 */
+	private static function public_matching( ?MatchingLocation $matching ): ?array {
+		if ( ! $matching instanceof MatchingLocation || ! $matching->isPresent() ) {
+			return null;
+		}
+
+		return [
+			'country'  => $matching->country,
+			'state'    => $matching->state,
+			'city'     => $matching->city,
+			'postcode' => $matching->postcode,
+		];
+	}
+
+	/**
+	 * @return array<string, string>|null
+	 */
+	private static function public_delivery_address( ?DeliveryAddress $address ): ?array {
+		if ( ! $address instanceof DeliveryAddress ) {
+			return null;
+		}
+
+		$matching  = self::public_matching( $address->matching ) ?? [
+			'country'  => '',
+			'state'    => '',
+			'city'     => '',
+			'postcode' => '',
+		];
+		$recipient = $address->recipient;
+
+		return array_merge(
+			$matching,
+			[
+				'address_1'  => $address->address_1,
+				'address_2'  => $address->address_2,
+				'first_name' => $recipient->first_name,
+				'last_name'  => $recipient->last_name,
+				'company'    => $recipient->company,
+				'phone'      => $recipient->phone,
+			]
+		);
 	}
 
 	/**
