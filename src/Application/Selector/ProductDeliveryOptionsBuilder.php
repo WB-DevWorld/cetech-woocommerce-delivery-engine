@@ -597,7 +597,7 @@ final class ProductDeliveryOptionsBuilder {
 		if ( $total_min > 0 && $total_max > 0 && $total_min !== $total_max ) {
 			return sprintf(
 				/* translators: 1: minimum duration, 2: maximum duration, 3: duration unit label */
-				__( 'Estimated %1$d–%2$d %3$s', 'cetech-woocommerce-delivery-engine' ),
+				__( '%1$d–%2$d %3$s', 'cetech-woocommerce-delivery-engine' ),
 				$total_min,
 				$total_max,
 				$unit
@@ -608,7 +608,7 @@ final class ProductDeliveryOptionsBuilder {
 
 		return sprintf(
 			/* translators: 1: duration value, 2: duration unit label */
-			__( 'Estimated %1$d %2$s', 'cetech-woocommerce-delivery-engine' ),
+			__( '%1$d %2$s', 'cetech-woocommerce-delivery-engine' ),
 			$value,
 			$unit
 		);

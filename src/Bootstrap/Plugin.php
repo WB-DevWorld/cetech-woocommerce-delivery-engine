@@ -1116,7 +1116,8 @@ final class Plugin {
 				$container->get( Requirements::class ),
 				$container->get( ProductDeliveryConfigurationSourceInterface::class ),
 				$container->get( ProductDeliveryOptionsBuilder::class ),
-				$container->get( VariationRelationshipInspectorInterface::class )
+				$container->get( VariationRelationshipInspectorInterface::class ),
+				$container->get( LocationAwareDeliveryOptions::class )
 			)
 		);
 

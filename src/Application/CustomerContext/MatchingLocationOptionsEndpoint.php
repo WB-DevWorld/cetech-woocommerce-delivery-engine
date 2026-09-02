@@ -11,6 +11,7 @@ use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
+use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
 
 /**
  * AJAX: resolve delivery options for a PDP matching location.
@@ -84,7 +85,12 @@ final class MatchingLocationOptionsEndpoint {
 		$public     = [];
 
 		foreach ( $filtered as $option ) {
-			$public[] = $option->toArray();
+			$row = $option->toArray();
+			$row['estimate_line'] = DeliveryPresentationLabels::format_product_estimate_line(
+				(string) ( $option->estimate_text ?? '' ),
+				$option->fulfilment_choice
+			);
+			$public[] = $row;
 		}
 
 		if ( 'blocked' === $assessment['requirement'] ) {

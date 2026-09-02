@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Cart;
 
+use CetechDeliveryEngine\Application\CustomerContext\ClassicPdpContextPayload;
 use CetechDeliveryEngine\Application\CustomerContext\CustomerBrowsingLocationStore;
 use CetechDeliveryEngine\Application\CustomerContext\LocationOfferQuoteProbe;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
@@ -45,6 +46,8 @@ final class CartDeliverySelectionCapture {
 	public const POST_MATCHING_CITY = 'cetech_de_matching_city';
 
 	public const POST_MATCHING_POSTCODE = 'cetech_de_matching_postcode';
+
+	public const POST_CONTEXT_PAYLOAD = ClassicPdpContextPayload::POST_FIELD;
 
 	public function __construct(
 		private FeatureFlags $feature_flags,
@@ -231,6 +234,10 @@ final class CartDeliverySelectionCapture {
 		$option  = ProductDeliveryOption::fromArray( $result->matched_option );
 		$context = $this->context_from_submitted_option( $option );
 		if ( $context instanceof CustomerCartContext ) {
+			if ( $context->isDelivery() && $this->is_classic_form_submission() && ! $context->hasMatchingLocation() ) {
+				return $cart_item_data;
+			}
+
 			$cart_item_data = $context->applyToCartItem( $cart_item_data );
 			if ( $context->hasMatchingLocation() && $this->browsing_store instanceof CustomerBrowsingLocationStore && $context->matching_location instanceof MatchingLocation ) {
 				$this->browsing_store->save( $context->matching_location );
@@ -467,6 +474,12 @@ final class CartDeliverySelectionCapture {
 	}
 
 	private function read_submitted_display_key(): string {
+		$from_payload = ClassicPdpContextPayload::displayKeyFromPost();
+
+		if ( '' !== $from_payload ) {
+			return $from_payload;
+		}
+
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce add-to-cart form; validated server-side.
 		if ( isset( $_POST[ self::POST_FIELD ] ) ) {
 			// phpcs:ignore WordPress.Security.NonceVerification.Missing
@@ -583,10 +596,15 @@ final class CartDeliverySelectionCapture {
 
 	private function is_classic_form_submission(): bool {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce add-to-cart form.
-		return isset( $_POST[ self::POST_FIELD ] );
+		return isset( $_POST[ self::POST_FIELD ] ) || isset( $_POST[ ClassicPdpContextPayload::POST_FIELD ] );
 	}
 
 	private function read_submitted_matching_location(): ?MatchingLocation {
+		$from_payload = ClassicPdpContextPayload::matchingLocationFromPost();
+		if ( $from_payload instanceof MatchingLocation ) {
+			return $from_payload;
+		}
+
 		$from_post = MatchingLocation::fromInput(
 			[
 				'country'  => $this->posted_text( self::POST_MATCHING_COUNTRY ),

@@ -90,6 +90,18 @@ final class Stage13FCustomerPresentationTest extends TestCase {
 			DeliveryPresentationLabels::format_product_estimate_line( 'Estimated 3–6 business days', 'delivery' )
 		);
 		self::assertSame(
+			'Estimated delivery: 3–6 business days',
+			DeliveryPresentationLabels::format_product_estimate_line( '3–6 business days', 'delivery' )
+		);
+		self::assertSame(
+			'Estimated delivery: About 2 weeks',
+			DeliveryPresentationLabels::format_product_estimate_line( 'About 2 weeks', 'delivery' )
+		);
+		self::assertSame(
+			'Estimated delivery: 2–4 business days',
+			DeliveryPresentationLabels::format_product_estimate_line( 'Estimated delivery: 2–4 business days', 'delivery' )
+		);
+		self::assertSame(
 			'Ready for pickup: 1–2 business days',
 			DeliveryPresentationLabels::format_product_estimate_line( '1–2 business days', 'store_pickup' )
 		);

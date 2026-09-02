@@ -104,6 +104,35 @@ final class PerItemPackageDestinationQuotingTest extends TestCase {
 		self::assertSame( '50.0000', $this->add( $totals['accra'] ?? '0', $totals['kumasi'] ?? '0' ) );
 	}
 
+	public function test_lab_accra_and_kumasi_quote_15_and_22_in_one_cart(): void {
+		$accra  = PerItemContextFixtures::incompleteContext( 10, PerItemContextFixtures::matchingAccra() );
+		$kumasi = PerItemContextFixtures::incompleteContext( 10, PerItemContextFixtures::matchingKumasi() );
+		$intent = $this->intent( 16, 10 );
+		$packages = $this->builder()->split_package(
+			$this->wc_package(
+				[
+					'line-accra'  => PerItemContextFixtures::cartItem( $intent, $accra ),
+					'line-kumasi' => PerItemContextFixtures::cartItem( $intent, $kumasi ),
+				]
+			)
+		);
+
+		self::assertCount( 2, $packages );
+		$calculator = $this->calculator( '22.00' );
+		$totals     = [];
+		foreach ( $packages as $package ) {
+			$city   = strtolower( (string) ( $package['destination']['city'] ?? '' ) );
+			$result = $calculator->calculate_for_package( $package );
+			self::assertTrue( $result->success, (string) $result->block_reason );
+			$totals[ $city ] = $result->total_amount;
+			self::assertStringNotContainsString( 'Boundary', (string) $package[ DeliveryGroupIdentity::PACKAGE_META_KEY ]['group_id'] );
+		}
+
+		self::assertSame( '15.0000', $totals['accra'] ?? null );
+		self::assertSame( '22.0000', $totals['kumasi'] ?? null );
+		self::assertSame( '37.0000', $this->add( $totals['accra'] ?? '0', $totals['kumasi'] ?? '0' ) );
+	}
+
 	public function test_same_zone_different_streets_remain_separate_groups_with_same_rate(): void {
 		$a = PerItemContextFixtures::deliveryContext( 10, PerItemContextFixtures::deliveryAccraStreet( '12 Boundary Rd' ) );
 		$b = PerItemContextFixtures::deliveryContext( 10, PerItemContextFixtures::deliveryAccraStreet( '99 Ring Road' ) );
@@ -285,7 +314,7 @@ final class PerItemPackageDestinationQuotingTest extends TestCase {
 		);
 	}
 
-	private function calculator(): SelectedOfferShippingRateCalculator {
+	private function calculator( string $kumasi_amount = '35.00' ): SelectedOfferShippingRateCalculator {
 		$zone = new class() implements PackageDestinationZoneResolverInterface {
 			public function resolve_zone_id( array $destination ): ?int {
 				$ids = $this->resolve_zone_ids( $destination );
@@ -350,7 +379,7 @@ final class PerItemPackageDestinationQuotingTest extends TestCase {
 							'supplier_id'          => null,
 							'origin_id'            => null,
 							'charge_type'          => RateCardChargeType::FixedPerShipment->value,
-							'base_amount'          => '35.00',
+							'base_amount'          => $kumasi_amount,
 							'base_currency'        => $this->currency(),
 							'priority'             => 100,
 							'status'               => 'active',
