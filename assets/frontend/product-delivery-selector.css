@@ -110,3 +110,11 @@
 .cetech-de-delivery-selector__status[data-state="unavailable"] {
 	font-weight: 600;
 }
+
+.cetech-de-matching-location {
+	margin: 0 0 0.85em;
+}
+
+.cetech-de-matching-location__intro {
+	margin: 0 0 0.5em;
+}

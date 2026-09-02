@@ -4,12 +4,17 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Cart;
 
+use CetechDeliveryEngine\Application\CustomerContext\CustomerBrowsingLocationStore;
+use CetechDeliveryEngine\Application\CustomerContext\LocationOfferQuoteProbe;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidator;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
+use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
+use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
+use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Domain\Enum\ProductTargetType;
 use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
 use WC_Product;
@@ -33,12 +38,22 @@ final class CartDeliverySelectionCapture {
 
 	public const CART_NEEDS_RESELECTION_KEY = 'cetech_de_needs_reselection';
 
+	public const POST_MATCHING_COUNTRY = 'cetech_de_matching_country';
+
+	public const POST_MATCHING_STATE = 'cetech_de_matching_state';
+
+	public const POST_MATCHING_CITY = 'cetech_de_matching_city';
+
+	public const POST_MATCHING_POSTCODE = 'cetech_de_matching_postcode';
+
 	public function __construct(
 		private FeatureFlags $feature_flags,
 		private Requirements $requirements,
 		private ProductDeliveryConfigurationSourceInterface $configuration_source,
 		private ProductDeliveryOptionsBuilder $options_builder,
-		private ProductDeliverySelectionValidator $selection_validator
+		private ProductDeliverySelectionValidator $selection_validator,
+		private ?CustomerBrowsingLocationStore $browsing_store = null,
+		private ?LocationOfferQuoteProbe $quote_probe = null
 	) {
 	}
 
@@ -124,6 +139,50 @@ final class CartDeliverySelectionCapture {
 			return false;
 		}
 
+		$option = ProductDeliveryOption::fromArray( is_array( $result->matched_option ) ? $result->matched_option : [] );
+
+		if ( FulfilmentChoice::StorePickup->value === $option->fulfilment_choice ) {
+			if ( ( $option->pickup_location_id ?? 0 ) <= 0 ) {
+				wc_add_notice(
+					__( 'Please choose a pickup location.', 'cetech-woocommerce-delivery-engine' ),
+					'error'
+				);
+
+				return false;
+			}
+
+			return $passed;
+		}
+
+		if ( ! $this->is_classic_form_submission() ) {
+			return $passed;
+		}
+
+		$matching = $this->read_submitted_matching_location();
+		if ( ! $matching instanceof MatchingLocation || ! $matching->isPresent() ) {
+			wc_add_notice(
+				__( 'Please enter a delivery location for this product.', 'cetech-woocommerce-delivery-engine' ),
+				'error'
+			);
+
+			return false;
+		}
+
+		$offer_id = $option->delivery_offer_id ?? 0;
+		$currency = function_exists( 'get_woocommerce_currency' ) ? (string) get_woocommerce_currency() : 'GHS';
+		if (
+			$this->quote_probe instanceof LocationOfferQuoteProbe
+			&& $offer_id > 0
+			&& ! $this->quote_probe->offer_quotes_for_location( $offer_id, $matching, $currency )
+		) {
+			wc_add_notice(
+				__( 'Delivery is not available to this location. Please choose another location or option.', 'cetech-woocommerce-delivery-engine' ),
+				'error'
+			);
+
+			return false;
+		}
+
 		return $passed;
 	}
 
@@ -169,6 +228,15 @@ final class CartDeliverySelectionCapture {
 		$cart_item_data[ self::CART_SUMMARY_KEY ]   = $summary;
 		$cart_item_data[ self::CART_HASH_KEY ]      = CartDeliverySelectionFingerprint::fromIntent( $result->intent );
 
+		$option  = ProductDeliveryOption::fromArray( $result->matched_option );
+		$context = $this->context_from_submitted_option( $option );
+		if ( $context instanceof CustomerCartContext ) {
+			$cart_item_data = $context->applyToCartItem( $cart_item_data );
+			if ( $context->hasMatchingLocation() && $this->browsing_store instanceof CustomerBrowsingLocationStore && $context->matching_location instanceof MatchingLocation ) {
+				$this->browsing_store->save( $context->matching_location );
+			}
+		}
+
 		return $cart_item_data;
 	}
 
@@ -199,6 +267,13 @@ final class CartDeliverySelectionCapture {
 			$cart_item[ self::CART_NEEDS_RESELECTION_KEY ] = true;
 		} else {
 			unset( $cart_item[ self::CART_NEEDS_RESELECTION_KEY ] );
+		}
+
+		$context = CustomerCartContext::fromArray(
+			is_array( $values[ CustomerCartContext::CART_KEY ] ?? null ) ? $values[ CustomerCartContext::CART_KEY ] : []
+		);
+		if ( $context instanceof CustomerCartContext ) {
+			$cart_item = $context->applyToCartItem( $cart_item );
 		}
 
 		return $cart_item;
@@ -238,6 +313,17 @@ final class CartDeliverySelectionCapture {
 		$choice = is_array( $intent ) ? (string) ( $intent['fulfilment_choice'] ?? '' ) : '';
 
 		$rows = self::formatPublicSummaryRows( $summary, '' !== $choice ? $choice : null );
+
+		$context = CustomerCartContext::fromCartItem( $cart_item );
+		if ( $context instanceof CustomerCartContext && $context->isDelivery() ) {
+			$locality = $context->publicLocalityLabel();
+			if ( '' !== $locality ) {
+				$rows[] = [
+					'key'   => DeliveryPresentationLabels::delivering_to(),
+					'value' => $locality,
+				];
+			}
+		}
 
 		if ( [] === $rows ) {
 			return $item_data;
@@ -493,5 +579,65 @@ final class CartDeliverySelectionCapture {
 			'target_type' => $target_type,
 			'target_id'   => (int) $product->get_id(),
 		];
+	}
+
+	private function is_classic_form_submission(): bool {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce add-to-cart form.
+		return isset( $_POST[ self::POST_FIELD ] );
+	}
+
+	private function read_submitted_matching_location(): ?MatchingLocation {
+		$from_post = MatchingLocation::fromInput(
+			[
+				'country'  => $this->posted_text( self::POST_MATCHING_COUNTRY ),
+				'state'    => $this->posted_text( self::POST_MATCHING_STATE ),
+				'city'     => $this->posted_text( self::POST_MATCHING_CITY ),
+				'postcode' => $this->posted_text( self::POST_MATCHING_POSTCODE ),
+			]
+		);
+
+		if ( $from_post->isPresent() ) {
+			return $from_post;
+		}
+
+		$from_filter = apply_filters( 'cetech_de_submitted_matching_location', null );
+		if ( $from_filter instanceof MatchingLocation && $from_filter->isPresent() ) {
+			return $from_filter;
+		}
+
+		if ( is_array( $from_filter ) ) {
+			$parsed = MatchingLocation::fromInput( $from_filter );
+
+			return $parsed->isPresent() ? $parsed : null;
+		}
+
+		return null;
+	}
+
+	private function context_from_submitted_option( ProductDeliveryOption $option ): ?CustomerCartContext {
+		if ( FulfilmentChoice::StorePickup->value === $option->fulfilment_choice ) {
+			$id = $option->pickup_location_id;
+
+			return CustomerCartContext::pickup( ( $id ?? 0 ) > 0 ? $id : null );
+		}
+
+		$matching = $this->read_submitted_matching_location();
+		$offer_id = $option->delivery_offer_id ?? 0;
+
+		if ( ! $matching instanceof MatchingLocation || ! $matching->isPresent() ) {
+			return CustomerCartContext::delivery( $offer_id > 0 ? $offer_id : null, null, null );
+		}
+
+		return CustomerCartContext::delivery( $offer_id > 0 ? $offer_id : null, $matching, null );
+	}
+
+	private function posted_text( string $key ): string {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- WooCommerce add-to-cart form.
+		if ( ! isset( $_POST[ $key ] ) ) {
+			return '';
+		}
+
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		return (string) wp_unslash( (string) $_POST[ $key ] );
 	}
 }

@@ -79,6 +79,21 @@ final class CustomerContextDomainTest extends TestCase {
 		self::assertNotSame( $a->identity(), $b->identity() );
 	}
 
+	public function test_pickup_package_destination_is_empty(): void {
+		$ctx = CustomerCartContext::pickup( 4 );
+		$dest = $ctx->toWcPackageDestination();
+		self::assertSame( '', $dest['country'] );
+		self::assertSame( '', $dest['address'] );
+	}
+
+	public function test_delivery_package_destination_uses_context_not_street_for_matching_fields(): void {
+		$address = PerItemContextFixtures::deliveryAccraStreet( '12 Boundary Rd' );
+		$dest    = CustomerCartContext::delivery( 10, $address->matching, $address )->toWcPackageDestination();
+		self::assertSame( 'GH', $dest['country'] );
+		self::assertSame( 'Accra', $dest['city'] );
+		self::assertSame( '12 Boundary Rd', $dest['address'] );
+	}
+
 	public function test_city_and_postcode_change_alters_matching_identity(): void {
 		$accra   = MatchingLocation::fromInput( [ 'country' => 'GH', 'state' => 'AA', 'city' => 'Accra', 'postcode' => 'GA-123' ] );
 		$spintex = MatchingLocation::fromInput( [ 'country' => 'GH', 'state' => 'AA', 'city' => 'Spintex', 'postcode' => 'GA-111' ] );

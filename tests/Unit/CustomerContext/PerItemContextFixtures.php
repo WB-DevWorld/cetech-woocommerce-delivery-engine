@@ -66,6 +66,50 @@ final class PerItemContextFixtures {
 		return MatchingLocation::fromInput( self::accraMatching() );
 	}
 
+	public static function matchingKumasi(): MatchingLocation {
+		return MatchingLocation::fromInput(
+			[
+				'country'  => 'GH',
+				'state'    => 'AH',
+				'city'     => 'Kumasi',
+				'postcode' => 'AK-000',
+			]
+		);
+	}
+
+	public static function deliveryKumasi( string $street = '7 Lake Rd' ): DeliveryAddress {
+		return DeliveryAddress::fromInput(
+			[
+				'country'    => 'GH',
+				'state'      => 'AH',
+				'city'       => 'Kumasi',
+				'postcode'   => 'AK-000',
+				'address_1'  => $street,
+				'address_2'  => '',
+				'first_name' => 'Ama',
+				'last_name'  => 'Mensah',
+				'company'    => 'CETECH',
+				'phone'      => '0244000000',
+			]
+		);
+	}
+
+	public static function deliveryAccraStreet( string $street ): DeliveryAddress {
+		return DeliveryAddress::fromInput(
+			array_merge(
+				self::accraMatching(),
+				[
+					'address_1'  => $street,
+					'address_2'  => '',
+					'first_name' => 'Ama',
+					'last_name'  => 'Mensah',
+					'company'    => 'CETECH',
+					'phone'      => '0244000000',
+				]
+			)
+		);
+	}
+
 	public static function deliveryEastLegon( string $street = '12 Boundary Rd' ): DeliveryAddress {
 		return DeliveryAddress::fromInput( self::eastLegonAddress( $street ) );
 	}

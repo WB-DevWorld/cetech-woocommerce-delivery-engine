@@ -1,0 +1,59 @@
+.cetech-de-cart-context {
+	margin: 0.75rem 0 0;
+	font-size: 0.95em;
+}
+
+.cetech-de-cart-context__heading,
+.cetech-de-cart-context__offer,
+.cetech-de-cart-context__row {
+	margin: 0.2rem 0;
+}
+
+.cetech-de-cart-context__heading {
+	font-weight: 600;
+}
+
+.cetech-de-cart-context__editor {
+	margin-top: 0.5rem;
+}
+
+.cetech-de-cart-context__editor summary {
+	cursor: pointer;
+	font-weight: 600;
+}
+
+.cetech-de-cart-context__form {
+	margin-top: 0.75rem;
+	padding: 0.75rem;
+	border: 1px solid #c3c4c7;
+	background: #fff;
+}
+
+.cetech-de-cart-context__option,
+.cetech-de-cart-context__field,
+.cetech-de-cart-context__qty label {
+	display: block;
+	margin: 0.35rem 0;
+}
+
+.cetech-de-cart-context__actions .button {
+	margin: 0.35rem 0.35rem 0 0;
+}
+
+.cetech-de-matching-location__field,
+.cetech-de-matching-location__intro {
+	margin: 0.4rem 0;
+}
+
+.cetech-de-matching-location select,
+.cetech-de-matching-location input[type="text"],
+.cetech-de-cart-context__field input[type="text"],
+.cetech-de-cart-context__split-qty input {
+	display: block;
+	width: 100%;
+	max-width: 22rem;
+}
+
+.cetech-de-use-checkout-address {
+	margin: 1rem 0;
+}

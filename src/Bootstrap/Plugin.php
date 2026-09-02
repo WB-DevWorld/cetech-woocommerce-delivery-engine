@@ -9,7 +9,14 @@ use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionReconciler;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
 use CetechDeliveryEngine\Application\Cart\CartDeliveryReselectionService;
 use CetechDeliveryEngine\Application\Cart\CartCustomerContextMutationService;
+use CetechDeliveryEngine\Application\Cart\CartCustomerContextEditorService;
 use CetechDeliveryEngine\Application\Checkout\CheckoutDeliverySelectionValidator;
+use CetechDeliveryEngine\Application\Checkout\CheckoutAddressPolicy;
+use CetechDeliveryEngine\Application\CustomerContext\ApplyCustomerContextToEligibleLinesService;
+use CetechDeliveryEngine\Application\CustomerContext\CustomerBrowsingLocationStore;
+use CetechDeliveryEngine\Application\CustomerContext\LocationAwareDeliveryOptions;
+use CetechDeliveryEngine\Application\CustomerContext\LocationOfferQuoteProbe;
+use CetechDeliveryEngine\Application\CustomerContext\MatchingLocationOptionsEndpoint;
 use CetechDeliveryEngine\Application\ProductRule\ProductDeliveryRuleResolver;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidator;
@@ -167,6 +174,7 @@ use CetechDeliveryEngine\Presentation\Frontend\CartFulfilmentPackagePresentation
 use CetechDeliveryEngine\Presentation\Frontend\CustomerOrderDeliverySummaryRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\CustomerShipmentRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\CartDeliveryReselectionRenderer;
+use CetechDeliveryEngine\Presentation\Frontend\CartCustomerContextEditorRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\ProductDeliverySelectorRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\VariableDeliverySelectorAssets;
 use CetechDeliveryEngine\Application\Selector\VariationDeliveryOptionsEndpoint;
@@ -310,7 +318,11 @@ final class Plugin {
 		$this->container->get( CartDeliverySelectionRevalidator::class )->register();
 		$this->container->get( CartDeliveryReselectionService::class )->register();
 		$this->container->get( CartDeliveryReselectionRenderer::class )->register();
+		$this->container->get( CartCustomerContextEditorService::class )->register();
+		$this->container->get( CartCustomerContextEditorRenderer::class )->register();
+		$this->container->get( MatchingLocationOptionsEndpoint::class )->register();
 		$this->container->get( CheckoutDeliverySelectionValidator::class )->register();
+		$this->container->get( CheckoutAddressPolicy::class )->register();
 		$this->container->get( ShippingPackageBuilder::class )->register();
 		$this->container->get( CartFulfilmentPackagePresentation::class )->register();
 		$this->container->get( SelectedOfferShippingIntegration::class )->register();
@@ -649,13 +661,35 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			CustomerBrowsingLocationStore::class,
+			static fn (): CustomerBrowsingLocationStore => new CustomerBrowsingLocationStore()
+		);
+
+		$this->container->singleton(
+			LocationOfferQuoteProbe::class,
+			static fn ( ServiceContainer $container ): LocationOfferQuoteProbe => new LocationOfferQuoteProbe(
+				$container->get( PackageDestinationZoneResolver::class ),
+				$container->get( RateQuoteEngine::class )
+			)
+		);
+
+		$this->container->singleton(
+			LocationAwareDeliveryOptions::class,
+			static fn ( ServiceContainer $container ): LocationAwareDeliveryOptions => new LocationAwareDeliveryOptions(
+				$container->get( LocationOfferQuoteProbe::class )
+			)
+		);
+
+		$this->container->singleton(
 			CartDeliverySelectionCapture::class,
 			static fn ( ServiceContainer $container ): CartDeliverySelectionCapture => new CartDeliverySelectionCapture(
 				$container->get( FeatureFlags::class ),
 				$container->get( Requirements::class ),
 				$container->get( ProductDeliveryConfigurationSourceInterface::class ),
 				$container->get( ProductDeliveryOptionsBuilder::class ),
-				$container->get( ProductDeliverySelectionValidator::class )
+				$container->get( ProductDeliverySelectionValidator::class ),
+				$container->get( CustomerBrowsingLocationStore::class ),
+				$container->get( LocationOfferQuoteProbe::class )
 			)
 		);
 
@@ -686,6 +720,46 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			ApplyCustomerContextToEligibleLinesService::class,
+			static fn ( ServiceContainer $container ): ApplyCustomerContextToEligibleLinesService => new ApplyCustomerContextToEligibleLinesService(
+				$container->get( CartCustomerContextMutationService::class ),
+				$container->get( ProductDeliverySelectionValidator::class ),
+				$container->get( LocationOfferQuoteProbe::class )
+			)
+		);
+
+		$this->container->singleton(
+			CartCustomerContextEditorService::class,
+			static fn ( ServiceContainer $container ): CartCustomerContextEditorService => new CartCustomerContextEditorService(
+				$container->get( FeatureFlags::class ),
+				$container->get( Requirements::class ),
+				$container->get( CartCustomerContextMutationService::class ),
+				$container->get( ProductDeliverySelectionValidator::class ),
+				$container->get( ApplyCustomerContextToEligibleLinesService::class )
+			)
+		);
+
+		$this->container->singleton(
+			MatchingLocationOptionsEndpoint::class,
+			static fn ( ServiceContainer $container ): MatchingLocationOptionsEndpoint => new MatchingLocationOptionsEndpoint(
+				$container->get( FeatureFlags::class ),
+				$container->get( Requirements::class ),
+				$container->get( CartDeliverySelectionCapture::class ),
+				$container->get( LocationAwareDeliveryOptions::class ),
+				$container->get( CustomerBrowsingLocationStore::class )
+			)
+		);
+
+		$this->container->singleton(
+			CartCustomerContextEditorRenderer::class,
+			static fn ( ServiceContainer $container ): CartCustomerContextEditorRenderer => new CartCustomerContextEditorRenderer(
+				$container->get( FeatureFlags::class ),
+				$container->get( Requirements::class ),
+				$container->get( CartDeliverySelectionCapture::class )
+			)
+		);
+
+		$this->container->singleton(
 			CartDeliveryReselectionService::class,
 			static fn ( ServiceContainer $container ): CartDeliveryReselectionService => new CartDeliveryReselectionService(
 				$container->get( FeatureFlags::class ),
@@ -711,7 +785,18 @@ final class Plugin {
 				$container->get( FeatureFlags::class ),
 				$container->get( Requirements::class ),
 				$container->get( CartDeliverySelectionCapture::class ),
-				$container->get( CartDeliverySelectionRevalidator::class )
+				$container->get( CartDeliverySelectionRevalidator::class ),
+				$container->get( LocationOfferQuoteProbe::class )
+			)
+		);
+
+		$this->container->singleton(
+			CheckoutAddressPolicy::class,
+			static fn ( ServiceContainer $container ): CheckoutAddressPolicy => new CheckoutAddressPolicy(
+				$container->get( FeatureFlags::class ),
+				$container->get( Requirements::class ),
+				$container->get( ApplyCustomerContextToEligibleLinesService::class ),
+				$container->get( CartCustomerContextMutationService::class )
 			)
 		);
 
@@ -1010,7 +1095,9 @@ final class Plugin {
 				$container->get( FeatureFlags::class ),
 				$container->get( Requirements::class ),
 				$container->get( ProductDeliveryConfigurationSourceInterface::class ),
-				$container->get( ProductDeliveryOptionsBuilder::class )
+				$container->get( ProductDeliveryOptionsBuilder::class ),
+				$container->get( CustomerBrowsingLocationStore::class ),
+				$container->get( LocationAwareDeliveryOptions::class )
 			)
 		);
 

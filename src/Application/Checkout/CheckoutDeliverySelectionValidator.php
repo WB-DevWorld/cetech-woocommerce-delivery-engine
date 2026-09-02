@@ -9,8 +9,11 @@ use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionFingerprint;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidationResult;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionSessionData;
+use CetechDeliveryEngine\Application\CustomerContext\LocationOfferQuoteProbe;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
+use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
+use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use WP_Error;
 
 /**
@@ -24,7 +27,8 @@ final class CheckoutDeliverySelectionValidator {
 		private FeatureFlags $feature_flags,
 		private Requirements $requirements,
 		private CartDeliverySelectionCapture $cart_capture,
-		private CartDeliverySelectionRevalidator $cart_revalidator
+		private CartDeliverySelectionRevalidator $cart_revalidator,
+		private ?LocationOfferQuoteProbe $quote_probe = null
 	) {
 	}
 
@@ -98,8 +102,14 @@ final class CheckoutDeliverySelectionValidator {
 			}
 
 			$affected_keys[] = $key;
+			$message          = $line_result['message'] ?? $this->checkout_error_message( $status, $cart_item );
 
-			if ( ! $customer_message_shown ) {
+			if ( '' !== $message && ( ! $customer_message_shown || isset( $line_result['message'] ) ) ) {
+				$messages[] = $message;
+				if ( ! isset( $line_result['message'] ) ) {
+					$customer_message_shown = true;
+				}
+			} elseif ( ! $customer_message_shown ) {
 				$messages[]             = $this->checkout_error_message( $status, $cart_item );
 				$customer_message_shown = true;
 			}
@@ -115,7 +125,7 @@ final class CheckoutDeliverySelectionValidator {
 	/**
 	 * @param array<string, mixed> $cart_item
 	 *
-	 * @return array{status: string}|null Null when line is out of checkout validation scope.
+	 * @return array{status: string, message?: string}|null Null when line is out of checkout validation scope.
 	 */
 	private function validate_cart_line( string $cart_item_key, array $cart_item ): ?array {
 		$product_id   = (int) ( $cart_item['product_id'] ?? 0 );
@@ -134,7 +144,16 @@ final class CheckoutDeliverySelectionValidator {
 
 			$revalidation = $this->cart_revalidator->revalidate_cart_item( $cart_item_key, $cart_item );
 
-			return [ 'status' => $revalidation->status ];
+			if ( CartDeliverySelectionRevalidationResult::STATUS_VALID !== $revalidation->status ) {
+				return [ 'status' => $revalidation->status ];
+			}
+
+			$context_result = $this->validate_customer_context( $cart_item );
+			if ( null !== $context_result ) {
+				return $context_result;
+			}
+
+			return [ 'status' => CartDeliverySelectionRevalidationResult::STATUS_VALID ];
 		}
 
 		if ( ! $this->cart_capture->should_apply_capture_to_line( $product_id, $variation_id ) ) {
@@ -152,6 +171,106 @@ final class CheckoutDeliverySelectionValidator {
 		}
 
 		return [ 'status' => CartDeliverySelectionRevalidationResult::STATUS_MISSING ];
+	}
+
+	/**
+	 * Fail closed for Classic per-item context. v1 lines without CustomerCartContext
+	 * keep existing selection-only validation (Blocks non-regression).
+	 *
+	 * @param array<string, mixed> $cart_item
+	 *
+	 * @return array{status: string, message: string}|null
+	 */
+	private function validate_customer_context( array $cart_item ): ?array {
+		$context = CustomerCartContext::fromCartItem( $cart_item );
+		if ( ! $context instanceof CustomerCartContext ) {
+			return null;
+		}
+
+		$name = $this->line_name( $cart_item );
+
+		if ( $context->isPickup() ) {
+			if ( ! $context->isPickupComplete() ) {
+				return [
+					'status'  => CartDeliverySelectionRevalidationResult::STATUS_INVALID,
+					'message' => '' !== $name
+						? sprintf(
+							/* translators: %s: product name */
+							__( '“%s” needs a pickup location before you can place this order.', 'cetech-woocommerce-delivery-engine' ),
+							$name
+						)
+						: __( 'Please choose a pickup location before placing this order.', 'cetech-woocommerce-delivery-engine' ),
+				];
+			}
+
+			return null;
+		}
+
+		if ( FulfilmentChoice::Delivery->value !== $context->fulfilment_choice ) {
+			return null;
+		}
+
+		if ( ! $context->hasMatchingLocation() ) {
+			return [
+				'status'  => CartDeliverySelectionRevalidationResult::STATUS_INVALID,
+				'message' => '' !== $name
+					? sprintf(
+						/* translators: %s: product name */
+						__( '“%s” needs a delivery location before you can place this order.', 'cetech-woocommerce-delivery-engine' ),
+						$name
+					)
+					: __( 'Please enter a delivery location before placing this order.', 'cetech-woocommerce-delivery-engine' ),
+			];
+		}
+
+		if ( ! $context->hasCompleteDeliveryAddress() ) {
+			return [
+				'status'  => CartDeliverySelectionRevalidationResult::STATUS_INVALID,
+				'message' => '' !== $name
+					? sprintf(
+						/* translators: %s: product name */
+						__( '“%s” needs a complete delivery address before you can place this order.', 'cetech-woocommerce-delivery-engine' ),
+						$name
+					)
+					: __( 'Please complete the delivery address for each item, or use the checkout shipping address for incomplete delivery items.', 'cetech-woocommerce-delivery-engine' ),
+			];
+		}
+
+		$offer_id = $context->delivery_offer_id ?? 0;
+		$currency = function_exists( 'get_woocommerce_currency' ) ? (string) get_woocommerce_currency() : 'GHS';
+		if (
+			$this->quote_probe instanceof LocationOfferQuoteProbe
+			&& $offer_id > 0
+			&& ! $this->quote_probe->offer_quotes_for_destination( $offer_id, $context->toWcPackageDestination(), $currency )
+		) {
+			return [
+				'status'  => CartDeliverySelectionRevalidationResult::STATUS_INVALID,
+				'message' => '' !== $name
+					? sprintf(
+						/* translators: %s: product name */
+						__( 'Delivery is not available to the selected address for “%s”.', 'cetech-woocommerce-delivery-engine' ),
+						$name
+					)
+					: __( 'Delivery is not available to one of the selected addresses.', 'cetech-woocommerce-delivery-engine' ),
+			];
+		}
+
+		return null;
+	}
+
+	/**
+	 * @param array<string, mixed> $cart_item
+	 */
+	private function line_name( array $cart_item ): string {
+		$data = $cart_item['data'] ?? null;
+		if ( is_object( $data ) && method_exists( $data, 'get_name' ) ) {
+			$name = trim( (string) $data->get_name() );
+			if ( '' !== $name ) {
+				return $name;
+			}
+		}
+
+		return '';
 	}
 
 	/**

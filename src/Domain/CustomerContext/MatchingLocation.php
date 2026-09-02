@@ -61,6 +61,8 @@ final class MatchingLocation {
 	}
 
 	/**
+	 * Matching-level geography for DestinationZoneMatcher (no street).
+	 *
 	 * @return array<string, string>
 	 */
 	public function toDestinationArray(): array {
@@ -70,6 +72,28 @@ final class MatchingLocation {
 			'city'     => $this->city,
 			'postcode' => $this->postcode,
 		];
+	}
+
+	/**
+	 * WooCommerce package destination. Street is optional and never used for area matching.
+	 *
+	 * @return array<string, string>
+	 */
+	public function toWcPackageDestination( string $address = '', string $address_2 = '' ): array {
+		return [
+			'country'   => $this->country_identity,
+			'state'     => $this->state_identity,
+			'city'      => $this->city,
+			'postcode'  => $this->postcode,
+			'address'   => $address,
+			'address_2' => $address_2,
+		];
+	}
+
+	public function publicLocalityLabel(): string {
+		$city = trim( $this->city );
+
+		return '' !== $city ? $city : $this->country;
 	}
 
 	/**
