@@ -109,6 +109,7 @@ final class ProductDeliverySelectorRenderer {
 				],
 				'postField' => CartDeliverySelectionCapture::POST_FIELD,
 				'contextField' => ClassicPdpContextPayload::POST_FIELD,
+				'storeNamespace' => \CetechDeliveryEngine\Integrations\Blocks\BlocksCheckoutAdapter::NAMESPACE,
 			]
 		);
 	}

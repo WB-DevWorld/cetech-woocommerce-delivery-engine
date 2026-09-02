@@ -43,8 +43,9 @@ final class BlocksCheckoutValidation {
 	}
 
 	/**
-	 * Address changes must re-resolve. WooCommerce already recalculates shipping;
-	 * this re-runs DE validation so a stale choice cannot silently survive Place Order.
+	 * Address changes must re-resolve shipping. WooCommerce already recalculates
+	 * shipping. This must NOT mutate complete per-item CustomerCartContext.
+	 * The global Blocks shipping address is never cart-line authority.
 	 *
 	 * @param mixed $customer
 	 * @param mixed $request

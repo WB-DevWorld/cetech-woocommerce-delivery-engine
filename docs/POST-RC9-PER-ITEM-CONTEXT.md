@@ -1,10 +1,13 @@
-# Post-RC.9 per-item customer context — Stages 1–6
+# Post-RC.9 per-item customer context — Stages 1–6 Classic + Blocks customer UX
 
 **Identity:** `1.0.0-dev.peritem.1` (unchanged; no new release identity)  
 **Branch:** `feat/post-rc9-per-item-context`  
-**Foundation SHA:** `72b979cc8b1fcc716d8ecfd4a4e0b97a80acb6a3`  
+**Classic foundation SHA:** `72b979cc8b1fcc716d8ecfd4a4e0b97a80acb6a3`  
+**Classic Chrome completion SHA:** `2ae5a957f254d903c4270c54ac92790b6ad311e4`  
 **Schema:** `5` (unchanged)  
-**Not:** RC.10, Stage 15, packaging, FLAIROC, training, WCFM, WPML, Blocks location editor
+**Not:** RC.10, Stage 15, packaging, FLAIROC, training, WCFM, WPML
+
+Classic Stages 1–6 remain **CLOSED PASS**. Their business semantics were not redesigned. Blocks is an adapter over the same PHP/domain/cart services.
 
 ## Provenance
 
@@ -19,7 +22,7 @@ Cherry-picks only:
 
 WCFM, WPML, and training streams were not merged.
 
-Stages 1–2 remain the domain + cart-state foundation. Stages 3–6 add package-destination quoting and Classic customer UX. Full Blocks location UI is **not** implemented.
+Stages 1–2 remain the domain + cart-state foundation. Stages 3–6 add package-destination quoting and Classic customer UX. The Blocks customer UX stage adapts those same services onto Store API / Cart and Checkout Blocks. Classic semantics are unchanged.
 
 ## CustomerCartContext contract
 
@@ -91,7 +94,18 @@ v1 orders remain readable and are never rewritten. Historical planner accepts 3-
 
 Transient `_cetech_de_cart_item_key` remains preferred. Fallback product/variation/qty mapping claims a candidate only when exactly one remains. Ambiguous fallback fails closed.
 
-Full Blocks location editor is **not** in this stage. Store API package quoting, cartstate reconciliation, snapshot v2, pickup, and shipment planning must not regress. Managed lines **without** `CustomerCartContext` keep the WooCommerce package destination (v1/Blocks compatibility).
+Blocks Cart/Checkout is an adapter over the same services as Classic:
+
+- `CustomerCartContext`
+- `CartCustomerContextMutationService`
+- `CartCustomerContextEditorService`
+- cartstate reconciler
+- `DeliveryGroupIdentity`
+- package builder
+- checkout validator
+- v2 snapshot builder/persister
+
+Blocks JS collects and displays customer choices and calls server-authoritative PHP. It does not invent prices, split quantity locally, or treat the global Blocks shipping address as cart-line authority.
 
 ## Privacy
 
@@ -254,9 +268,9 @@ Classic two-destination capture (this completion):
 
 Blocks non-regression: v1 managed lines without `CustomerCartContext` keep the WooCommerce package destination; existing Store API snapshot, pickup, and cartstate tests remain in the suite.
 
-- Focused PHPUnit (capture / quoting / variation / estimate / cartstate / schema / Store API): **89 tests, 440 assertions, OK** (2 pre-existing deprecations)
-- Full PHPUnit: **958 tests, 5314 assertions, OK** (5 pre-existing deprecations)
-- JS: **6 files / 37 tests passed**
+- Focused PHPUnit (capture / quoting / variation / estimate / cartstate / schema / Store API / Blocks UX): **112 tests, 504 assertions, OK**
+- Full PHPUnit: **973 tests, 5387 assertions, OK** (5 pre-existing deprecations)
+- JS: **6 files / 38 tests passed**
 - PHP lint `src` + `database`: 0 failures
 - `composer validate --no-check-publish`: valid
 
@@ -374,17 +388,60 @@ Chrome defects found and fixed during QA:
 
 Privacy (DOM / request): cart keys and group IDs are hashes; matching identities are SHA-256; generic `data-*` do not carry street, name, or phone. Editor HTML ids are `cetech-de-ctx-{cartKeyHash}-{field}` (suffixes such as `-phone` / `-address-1` name the control, not the customer value). Forms submit customer-owned address fields to the server. ATC trace is lab-only.
 
-Remaining limitations (not blockers for Stages 3–6 Classic completion):
+Remaining limitations (not blockers for Classic Stages 3–6 or Blocks customer UX):
 
-- Full Blocks location editor is still not implemented.
-- FLOW 8 sequential Chrome after FLOW 7 is mixed Pickup + one Accra delivery (use-for-all consolidates same complete destination). Two Accra streets are proven at FLOW 5; Accra+Kumasi simultaneous rates are proven at FLOW 3.
-- FLOW 8 / FLOW 9 do not click WooCommerce **Place order** through to a paid order in this Chrome script.
+- Per-destination tax engine is still not claimed.
+- FLOW 8 / FLOW 9 Classic Chrome do not click WooCommerce **Place order** through to a paid Classic order; Blocks FLOW I/J do place Store API orders.
+- WooCommerce Blocks PluginArea React slot-fills are not required for the customer editor; the cart/checkout page also mounts a DOM editor from Store API data so Change delivery/pickup remains visible.
 
 ## Intentionally excluded
 
 - Packaging / ZIP
 - RC.10 / Stage 15
 - FLAIROC / training / WCFM / WPML
-- Full Blocks location editor (next stage)
 - Per-destination tax engine
 - Schema 6
+
+## Blocks customer UX architecture
+
+Blocks does not own a second rule set. Store API add-to-cart and cart updates sanitize input, resolve current configuration, validate the choice, attach `CustomerCartContext` before cart identity, then let the existing mutation / package / checkout / snapshot services run.
+
+**Add to cart:** `product-delivery-selector.js` injects Store API extensions (`delivery_option_key`, `matching_location`, `pdp_context`) onto `/wc/store/v1/cart/add-item`. `BlocksAddToCartBridge` maps those onto `cetech_de_submitted_*` filters. Capture refuses location-less Delivery context so Accra vs Kumasi cannot merge.
+
+**Public Store API fields (cart item):** fulfilment choice, public option/pickup labels, locality, estimate copy, completeness, `needs_reselection`, `can_edit_context`, `can_split`, matching location (country/state/city/postcode), customer-owned `delivery_address` for this session, `available_options`. Forbidden: group IDs, destination hashes, fingerprints, rule IDs, supplier/origin IDs, private costs, rate-card IDs, configuration fingerprint.
+
+**Cart-level fields:** packages, multi-destination / mixed-fulfilment / incomplete notices, `can_apply_checkout_address`, `mutation_result` (`updated` / `failed` / `unchanged` / `skipped`).
+
+**Commands** (single `woocommerce_store_api_register_update_callback` namespace `cetech-delivery-engine`):
+
+| Action | Service |
+|---|---|
+| `reselect_option` (or omitted `action` + `display_key`) | `CartDeliveryReselectionService::apply_selection` |
+| `set_item_context` | `CartCustomerContextMutationService::updateWholeLine` |
+| `split_item_context` | `CartCustomerContextMutationService::splitQuantity` |
+| `use_for_all` | `ApplyCustomerContextToEligibleLinesService::applyDeliveryLocation` |
+| `apply_checkout_address` | `ApplyCustomerContextToEligibleLinesService::applyCheckoutAddressToIncomplete` |
+
+Handlers never write WooCommerce cart arrays directly. Global Blocks customer/shipping updates only `calculate_shipping()`; they do not mutate complete per-item `CustomerCartContext`.
+
+**UI:** `assets/frontend/blocks-checkout.js` on `/blocks-cart/` and `/blocks-checkout/`. Change delivery / Change pickup, quantity split, use-for-all, checkout-address apply, multi-destination notice, existing cartstate reselection panel.
+
+## Local Docker QA — Blocks flows A–K
+
+Lab: `C:\Users\Jane\Desktop\Learning 2026\Cursor\cetech-de-local-qa` (`http://localhost:8088`). Plugin copied, not packaged. Identity `1.0.0-dev.peritem.1`, schema **5**. Evidence: `cetech-de-local-qa/evidence/peritem.blocks/`. Playwright: `playwright/tests/per-item-blocks.spec.ts`. Qualification used `/blocks-cart/` and `/blocks-checkout/` only (not Classic Cart/Checkout).
+
+| Flow | Result |
+|---|---|
+| A Accra + Kumasi QA Chair | **PASS** — 2 lines, localities Accra\|Kumasi, DE shipping **GHS 37** |
+| B Change Kumasi → Accra | **PASS** — consolidated to 1 Accra line |
+| C qty 2 split 1 to 99 Ring Road | **PASS** — qty 1 + 1 |
+| D Delivery + Pickup | **PASS** — separate; pickup remains pickup |
+| E Use this address for all eligible | **PASS** — Pickup untouched |
+| F two complete destinations | **PASS** — Accra Independence + Kumasi Prempeh retained; multi-destination notice; global Blocks shipping form did not overwrite them |
+| G incomplete Place Order | **PASS** — blocked; explicit apply completed the eligible line |
+| H invalidate offer | **PASS** — product + Accra survive; reselection required |
+| I Store API order two destinations | **PASS** — order **32**, `created_via=store-api`, line snapshots **v2**, Accra 15 + Kumasi 22, no `_cetech_de_cart_item_key`, two historical groups, **2 shipment plans** |
+| J Pickup-only Blocks order | **PASS** — order **33**, shipping 0, pickup v2 snapshot, **0** delivery shipment plans |
+| K post-order admin relabel | **PASS** — order 32 still `QA Local Standard` |
+
+Privacy: Store API extension payloads had no forbidden DE internals. Cart keys remain hashes. Customer street exists only in authorized cart/edit payloads, not in DOM ids.

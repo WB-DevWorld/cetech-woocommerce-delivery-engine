@@ -8,6 +8,7 @@ use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidator;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
+use CetechDeliveryEngine\Integrations\Blocks\BlocksCartContextCommandHandler;
 use CetechDeliveryEngine\Integrations\Blocks\BlocksCheckoutAdapter;
 
 /**
@@ -28,7 +29,8 @@ final class CartDeliveryReselectionService {
 		private Requirements $requirements,
 		private CartDeliverySelectionCapture $cart_capture,
 		private ProductDeliverySelectionValidator $selection_validator,
-		private CartDeliverySelectionReconciler $reconciler
+		private CartDeliverySelectionReconciler $reconciler,
+		private ?BlocksCartContextCommandHandler $context_commands = null
 	) {
 	}
 
@@ -118,6 +120,37 @@ final class CartDeliveryReselectionService {
 	 * @param array<string, mixed> $data
 	 */
 	public function handle_store_api_update( array $data ): void {
+		$action = sanitize_key( (string) ( $data['action'] ?? '' ) );
+
+		if (
+			$this->context_commands instanceof BlocksCartContextCommandHandler
+			&& in_array(
+				$action,
+				[
+					BlocksCartContextCommandHandler::ACTION_SET_ITEM,
+					BlocksCartContextCommandHandler::ACTION_SPLIT,
+					BlocksCartContextCommandHandler::ACTION_USE_FOR_ALL,
+					BlocksCartContextCommandHandler::ACTION_APPLY_CHECKOUT_ADDRESS,
+				],
+				true
+			)
+		) {
+			$this->context_commands->handle( $data );
+
+			return;
+		}
+
+		if ( '' !== $action && BlocksCartContextCommandHandler::ACTION_RESELECT !== $action ) {
+			$class = '\\Automattic\\WooCommerce\\StoreApi\\Exceptions\\RouteException';
+			$message = __( 'That cart update is not recognised.', 'cetech-woocommerce-delivery-engine' );
+
+			if ( class_exists( $class ) ) {
+				throw new $class( 'cetech_de_customer_context', $message, 400 );
+			}
+
+			throw new \RuntimeException( $message );
+		}
+
 		$cart_item_key = isset( $data['cart_item_key'] ) ? sanitize_text_field( (string) $data['cart_item_key'] ) : '';
 		$display_key   = isset( $data['display_key'] )
 			? ProductDeliveryOptionsBuilder::normalizeDisplayKey( (string) $data['display_key'] )

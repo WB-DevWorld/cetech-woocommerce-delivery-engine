@@ -112,6 +112,7 @@ use CetechDeliveryEngine\Infrastructure\Persistence\WpdbRateCardRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbShipmentRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbSupplierRepository;
 use CetechDeliveryEngine\Integrations\Blocks\BlocksAddToCartBridge;
+use CetechDeliveryEngine\Integrations\Blocks\BlocksCartContextCommandHandler;
 use CetechDeliveryEngine\Integrations\Blocks\BlocksCheckoutAdapter;
 use CetechDeliveryEngine\Integrations\Blocks\BlocksCheckoutValidation;
 use CetechDeliveryEngine\Integrations\Blocks\BlocksStoreApiExtension;
@@ -394,7 +395,8 @@ final class Plugin {
 			static fn ( ServiceContainer $container ): BlocksStoreApiExtension => new BlocksStoreApiExtension(
 				$container->get( CartDeliverySelectionCapture::class ),
 				$container->get( CartDeliverySelectionRevalidator::class ),
-				$container->get( ShippingRateCalculationGate::class )
+				$container->get( ShippingRateCalculationGate::class ),
+				$container->get( CheckoutAddressPolicy::class )
 			)
 		);
 
@@ -760,13 +762,24 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			BlocksCartContextCommandHandler::class,
+			static fn ( ServiceContainer $container ): BlocksCartContextCommandHandler => new BlocksCartContextCommandHandler(
+				$container->get( CartCustomerContextEditorService::class ),
+				$container->get( CartCustomerContextMutationService::class ),
+				$container->get( ApplyCustomerContextToEligibleLinesService::class ),
+				$container->get( CheckoutAddressPolicy::class )
+			)
+		);
+
+		$this->container->singleton(
 			CartDeliveryReselectionService::class,
 			static fn ( ServiceContainer $container ): CartDeliveryReselectionService => new CartDeliveryReselectionService(
 				$container->get( FeatureFlags::class ),
 				$container->get( Requirements::class ),
 				$container->get( CartDeliverySelectionCapture::class ),
 				$container->get( ProductDeliverySelectionValidator::class ),
-				$container->get( CartDeliverySelectionReconciler::class )
+				$container->get( CartDeliverySelectionReconciler::class ),
+				$container->get( BlocksCartContextCommandHandler::class )
 			)
 		);
 

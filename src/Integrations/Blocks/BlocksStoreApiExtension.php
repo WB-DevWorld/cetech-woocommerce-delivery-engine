@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Integrations\Blocks;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
+use CetechDeliveryEngine\Application\Checkout\CheckoutAddressPolicy;
 use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
 use CetechDeliveryEngine\Application\Shipping\ShippingRateCalculationGate;
 use CetechDeliveryEngine\Infrastructure\WooCommerce\Shipping\SelectedOfferShippingMethod;
@@ -24,7 +25,8 @@ final class BlocksStoreApiExtension {
 	public function __construct(
 		private CartDeliverySelectionCapture $cart_capture,
 		private CartDeliverySelectionRevalidator $cart_revalidator,
-		private ShippingRateCalculationGate $shipping_gate
+		private ShippingRateCalculationGate $shipping_gate,
+		private ?CheckoutAddressPolicy $address_policy = null
 	) {
 	}
 
@@ -86,6 +88,16 @@ final class BlocksStoreApiExtension {
 			'reselection_options'     => [ 'description' => 'Public delivery options available for reselection.', 'type' => 'array', 'readonly' => true ],
 			'product_name'            => [ 'description' => 'Public product name for the affected cart line.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
 			'cart_item_key'           => [ 'description' => 'WooCommerce cart item key.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'has_customer_context'    => [ 'description' => 'Whether this line has a Delivery Engine customer context.', 'type' => 'boolean', 'readonly' => true ],
+			'address_complete'        => [ 'description' => 'Whether the Delivery address is complete.', 'type' => 'boolean', 'readonly' => true ],
+			'can_edit_context'       => [ 'description' => 'Whether the customer can edit this line context.', 'type' => 'boolean', 'readonly' => true ],
+			'can_split'             => [ 'description' => 'Whether quantity can be split onto another destination.', 'type' => 'boolean', 'readonly' => true ],
+			'quantity'               => [ 'description' => 'Cart line quantity.', 'type' => 'integer', 'readonly' => true ],
+			'locality'              => [ 'description' => 'Customer-safe destination locality.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'estimate_line'         => [ 'description' => 'Formatted estimated delivery line.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'matching_location'     => [ 'description' => 'Customer matching location for editing this cart line.', 'type' => [ 'object', 'null' ], 'readonly' => true ],
+			'delivery_address'      => [ 'description' => 'Customer delivery address for editing this cart line.', 'type' => [ 'object', 'null' ], 'readonly' => true ],
+			'available_options'     => [ 'description' => 'Public delivery options available for this line.', 'type' => 'array', 'readonly' => true ],
 		];
 	}
 
@@ -105,11 +117,20 @@ final class BlocksStoreApiExtension {
 			++$index;
 		}
 
+		$notices = $this->checkout_notices();
+		$mutation = $GLOBALS[ BlocksCartContextCommandHandler::RESULT_GLOBAL ] ?? null;
+
 		return BlocksPublicPayload::strip_forbidden(
 			[
 				'packages'             => $packages,
 				'has_managed_packages' => $this->has_managed_package( $packages ),
 				'runtime_active'       => $this->shipping_gate->is_runtime_active(),
+				'multi_destination'    => (bool) ( $notices['multi_destination'] ?? false ),
+				'mixed_fulfilment'     => (bool) ( $notices['mixed_fulfilment'] ?? false ),
+				'incomplete_delivery'  => (int) ( $notices['incomplete_delivery'] ?? 0 ),
+				'notices'              => $notices['messages'] ?? [],
+				'can_apply_checkout_address' => (int) ( $notices['incomplete_delivery'] ?? 0 ) > 0,
+				'mutation_result'      => is_array( $mutation ) ? $mutation : null,
 			]
 		);
 	}
@@ -134,6 +155,88 @@ final class BlocksStoreApiExtension {
 				'type'        => 'boolean',
 				'readonly'    => true,
 			],
+			'multi_destination'    => [
+				'description' => 'Whether managed Delivery lines have more than one destination.',
+				'type'        => 'boolean',
+				'readonly'    => true,
+			],
+			'mixed_fulfilment'     => [
+				'description' => 'Whether the cart mixes Store Pickup and Delivery.',
+				'type'        => 'boolean',
+				'readonly'    => true,
+			],
+			'incomplete_delivery'  => [
+				'description' => 'Count of Delivery lines missing a complete address.',
+				'type'        => 'integer',
+				'readonly'    => true,
+			],
+			'notices'              => [
+				'description' => 'Customer-safe checkout notices.',
+				'type'        => 'array',
+				'readonly'    => true,
+			],
+			'can_apply_checkout_address' => [
+				'description' => 'Whether the explicit checkout-address action is available.',
+				'type'        => 'boolean',
+				'readonly'    => true,
+			],
+			'mutation_result'      => [
+				'description' => 'Per-line outcome of the last customer-context mutation.',
+				'type'        => [ 'object', 'null' ],
+				'readonly'    => true,
+			],
+		];
+	}
+
+	/**
+	 * @return array{
+	 *     multi_destination: bool,
+	 *     mixed_fulfilment: bool,
+	 *     incomplete_delivery: int,
+	 *     messages: list<array{code: string, message: string}>
+	 * }
+	 */
+	private function checkout_notices(): array {
+		$empty = [
+			'multi_destination'   => false,
+			'mixed_fulfilment'    => false,
+			'incomplete_delivery' => 0,
+			'messages'            => [],
+		];
+
+		if ( ! $this->address_policy instanceof CheckoutAddressPolicy || ! function_exists( 'WC' ) || ! WC()->cart ) {
+			return $empty;
+		}
+
+		$summary = $this->address_policy->summarize_cart( WC()->cart->get_cart() );
+		$messages = [];
+
+		if ( $summary['multi_destination'] ) {
+			$messages[] = [
+				'code'    => 'multi_destination',
+				'message' => __( 'Items in this order will be delivered to multiple destinations. Each item keeps its own delivery address.', 'cetech-woocommerce-delivery-engine' ),
+			];
+		}
+
+		if ( $summary['has_pickup'] && $summary['has_delivery'] ) {
+			$messages[] = [
+				'code'    => 'mixed_fulfilment',
+				'message' => __( 'This order includes Store Pickup and Delivery. Pickup items ignore the checkout shipping address.', 'cetech-woocommerce-delivery-engine' ),
+			];
+		}
+
+		if ( $summary['incomplete_delivery'] > 0 ) {
+			$messages[] = [
+				'code'    => 'incomplete_delivery',
+				'message' => __( 'One or more items need a complete delivery address before you can place this order. Complete the address on those items, or use the checkout shipping address for incomplete delivery items.', 'cetech-woocommerce-delivery-engine' ),
+			];
+		}
+
+		return [
+			'multi_destination'   => $summary['multi_destination'],
+			'mixed_fulfilment'    => $summary['has_pickup'] && $summary['has_delivery'],
+			'incomplete_delivery' => $summary['incomplete_delivery'],
+			'messages'            => $messages,
 		];
 	}
 

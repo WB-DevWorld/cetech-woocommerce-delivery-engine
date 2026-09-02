@@ -6,3 +6,42 @@
 	margin: 0.25rem 0;
 	font-size: 0.95em;
 }
+
+.cetech-de-blocks-customer-context {
+	margin: 1rem 0;
+}
+
+.cetech-de-blocks-notice {
+	margin: 0.5rem 0;
+	padding: 0.5rem 0.75rem;
+	border-left: 4px solid #2271b1;
+}
+
+.cetech-de-blocks-notice--incomplete_delivery,
+.cetech-de-blocks-notice--failure {
+	border-left-color: #b32d2e;
+}
+
+.cetech-de-blocks-editor {
+	margin: 0.75rem 0;
+	padding: 0.5rem 0;
+	border-top: 1px solid #ddd;
+}
+
+.cetech-de-blocks-editor__body {
+	display: grid;
+	gap: 0.5rem;
+	margin-top: 0.5rem;
+}
+
+.cetech-de-blocks-editor__field {
+	display: grid;
+	gap: 0.25rem;
+}
+
+.cetech-de-blocks-editor__update,
+.cetech-de-blocks-editor__use-for-all,
+.cetech-de-blocks-apply-checkout-address {
+	margin-right: 0.5rem;
+	margin-top: 0.25rem;
+}
