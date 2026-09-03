@@ -76,6 +76,10 @@ final class AdminMenu {
 	}
 
 	public function add_menus(): void {
+		if ( AdminPageAccess::current_user_is_restricted() ) {
+			return;
+		}
+
 		if ( ! $this->current_user_has_any_menu_cap() ) {
 			return;
 		}

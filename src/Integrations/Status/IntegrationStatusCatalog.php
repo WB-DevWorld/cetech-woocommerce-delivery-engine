@@ -111,12 +111,56 @@ final class IntegrationStatusCatalog {
 	}
 
 	public function wcfm(): IntegrationStatus {
-		return $this->stub_plugin_status(
+		$label  = __( 'WCFM Marketplace', 'cetech-woocommerce-delivery-engine' );
+		$detail = __(
+			'Supported for administrative isolation. WCFM vendors are kept outside Delivery Engine administration. Vendor-specific Delivery Engine fulfilment controls are not provided.',
+			'cetech-woocommerce-delivery-engine'
+		);
+		$version = $this->defined_version( 'WCFM_VERSION' );
+		$active  = (bool) ( $this->registry->get_detection_statuses()['wcfm'] ?? false );
+		$installed = $active || $this->plugin_file_installed( 'wcfm' );
+
+		if ( ! $installed ) {
+			return new IntegrationStatus(
+				'wcfm',
+				$label,
+				IntegrationStatus::STATE_NOT_INSTALLED,
+				null,
+				false,
+				false,
+				false,
+				false,
+				__( 'Not installed', 'cetech-woocommerce-delivery-engine' ),
+				$detail
+			);
+		}
+
+		if ( ! $active ) {
+			return new IntegrationStatus(
+				'wcfm',
+				$label,
+				IntegrationStatus::STATE_INSTALLED_INACTIVE,
+				$version,
+				true,
+				false,
+				false,
+				false,
+				__( 'Installed but inactive', 'cetech-woocommerce-delivery-engine' ),
+				$detail
+			);
+		}
+
+		return new IntegrationStatus(
 			'wcfm',
-			__( 'WCFM Marketplace', 'cetech-woocommerce-delivery-engine' ),
-			$this->defined_version( 'WCFM_VERSION' ),
-			(bool) ( $this->registry->get_detection_statuses()['wcfm'] ?? false ),
-			__( 'No marketplace adapter is implemented. Delivery Engine capabilities remain first-party WordPress roles. Vendor fulfilment screens are not provided.', 'cetech-woocommerce-delivery-engine' )
+			$label,
+			IntegrationStatus::STATE_SUPPORTED,
+			$version,
+			true,
+			true,
+			false,
+			true,
+			__( 'Supported for administrative isolation', 'cetech-woocommerce-delivery-engine' ),
+			$detail
 		);
 	}
 
