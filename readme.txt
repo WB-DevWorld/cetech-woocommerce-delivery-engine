@@ -49,6 +49,9 @@ No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
 
+= 1.0.0-dev.integrated.1 =
+* Combined candidate: qualified per-item customer context plus WCFM vendor administrative isolation. Restricted vendors cannot POST admin actions even with stale Delivery Engine capabilities. Schema remains 5. Tagged 1.0.0-rc.9 is unchanged. Not RC.10.
+
 = 1.0.0-dev.peritem.1 =
 * Per-item customer context foundation on cartstate.1 plus blocks-snapshot.1. Schema remains 5. Tagged 1.0.0-rc.9 is unchanged. Not RC.10. No storefront UI.
 
