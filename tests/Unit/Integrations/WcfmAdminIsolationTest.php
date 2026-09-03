@@ -11,6 +11,8 @@ use CetechDeliveryEngine\Integrations\Registry\IntegrationRegistry;
 use CetechDeliveryEngine\Integrations\Status\IntegrationStatus;
 use CetechDeliveryEngine\Integrations\Status\IntegrationStatusCatalog;
 use CetechDeliveryEngine\Integrations\WCFM\WcfmVendorIsolation;
+use CetechDeliveryEngine\Presentation\Admin\AdminActionHandler;
+use CetechDeliveryEngine\Presentation\Admin\AdminNoticeService;
 use CetechDeliveryEngine\Presentation\Admin\AdminPageAccess;
 use CetechDeliveryEngine\Support\Logger;
 use PHPUnit\Framework\TestCase;
@@ -135,6 +137,51 @@ final class WcfmAdminIsolationTest extends TestCase {
 			'/function add_menus\(\): void \{\s+if \( AdminPageAccess::current_user_is_restricted\(\) \)/s',
 			$menu
 		);
+
+		$post = (string) file_get_contents( $admin_dir . 'AdminActionHandler.php' );
+		self::assertStringContainsString( 'AdminPageAccess::current_user_is_restricted()', $post );
+		$system = (string) file_get_contents( $admin_dir . 'SystemStatusPage.php' );
+		self::assertMatchesRegularExpression(
+			'/function handle_actions\(\): void \{\s+if \( ! is_admin\(\) \|\| AdminPageAccess::current_user_is_restricted\(\) \)/s',
+			$system
+		);
+		$bulk = (string) file_get_contents( $admin_dir . 'BulkJobProgressEndpoint.php' );
+		self::assertStringContainsString( 'AdminPageAccess::current_user_is_restricted()', $bulk );
+		$preview = (string) file_get_contents( $admin_dir . 'PreviewVariationsEndpoint.php' );
+		self::assertStringContainsString( 'AdminPageAccess::current_user_is_restricted()', $preview );
+		$wizard = (string) file_get_contents( $admin_dir . 'SetupWizardPage.php' );
+		self::assertStringContainsString( 'AdminPageAccess::current_user_is_restricted()', $wizard );
+	}
+
+	public function test_restricted_vendor_cannot_complete_admin_post_even_with_stale_caps(): void {
+		$isolation = $this->vendor_isolation( true, true );
+		foreach ( Capabilities::ALL as $capability ) {
+			$GLOBALS['cetech_de_test_caps'][ $capability ] = true;
+		}
+		$GLOBALS['cetech_de_test_is_admin'] = true;
+		AdminPageAccess::bind( $isolation );
+
+		$_POST = [
+			'cetech_de_action' => 'cetech_de_save_delivery_settings',
+			'cetech_de_nonce'  => 'test-nonce-cetech_de_save_delivery_settings',
+		];
+
+		$handler = new AdminActionHandler( new AdminNoticeService() );
+
+		try {
+			$handler->verify_post(
+				'cetech_de_save_delivery_settings',
+				'cetech_de_save_delivery_settings',
+				'manage_delivery_settings',
+				'cetech-delivery-engine-settings'
+			);
+			self::fail( 'Expected restricted vendor POST to be denied.' );
+		} catch ( RuntimeException $exception ) {
+			self::assertSame( 'wp_die', $exception->getMessage() );
+		}
+
+		self::assertNotNull( $GLOBALS['cetech_de_test_wp_die'] );
+		$_POST = [];
 	}
 
 	public function test_wcfm_vendor_role_is_excluded_from_access_matrix(): void {

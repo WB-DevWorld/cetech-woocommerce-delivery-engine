@@ -32,7 +32,7 @@ final class PreviewVariationsEndpoint {
 			);
 		}
 
-		if ( ! $this->authorization->can_preview() ) {
+		if ( AdminPageAccess::current_user_is_restricted() || ! $this->authorization->can_preview() ) {
 			wp_send_json_error(
 				[ 'message' => __( 'You are not allowed to preview delivery settings.', 'cetech-woocommerce-delivery-engine' ) ],
 				403

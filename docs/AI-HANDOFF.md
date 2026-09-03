@@ -125,6 +125,7 @@ Administrator-language requirement: normal-user admin UI must use operational la
 | `docs/POST-RC9-PER-ITEM-CONTEXT.md` | Post-RC.9 per-item customer context Stages 1–6 (`1.0.0-dev.peritem.1`) |
 | `docs/POST-RC9-WCFM-ISOLATION.md` | Post-RC.9 WCFM administrative isolation (`1.0.0-dev.wcfm.1`) |
 | `docs/POST-RC9-WCFM-ISOLATION-QA.md` | Owner QA package + narrow physical QA instructions for `1.0.0-dev.wcfm.1` |
+| `docs/POST-RC9-INTEGRATED-CANDIDATE.md` | Combined per-item + WCFM candidate (`1.0.0-dev.integrated.1`) |
 | `docs/POST-RC8-INTEGRATIONS-COMPATIBILITY-AUDIT.md` | Post-RC.8 integrations/Settings honesty audit (accepted; pre-implementation) |
 | `docs/POST-RC8-BLOCKS-IMPLEMENTATION.md` | Post-RC.8 Settings honesty + real Cart/Checkout Blocks adapter (`1.0.0-dev.blocks.1`) |
 | `docs/POST-RC9-CART-STATE-RECONCILIATION.md` | Post-RC.9 live cart-state reconciliation (`1.0.0-dev.cartstate.1`) |
