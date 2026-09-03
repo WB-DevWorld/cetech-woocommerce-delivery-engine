@@ -2,7 +2,7 @@
 
 ## CURRENT IMPLEMENTATION STATUS — V1 RC (read first)
 
-**Last updated:** 2026-09-02  
+**Last updated:** 2026-09-03  
 **Staff training:** `docs/training/` covers RC.9 operational features inherited from Blocks.4 (Cart/Checkout Blocks, overlapping Delivery Area pricing, constrained vs global fallback). Coverage matrix: `docs/training/13-FEATURE-COVERAGE-AND-CONFIRMATION.md`. Videos remain deferred; trainers tick live Pass/Fail/N/A. FLAIROC not modified.  
 **Plugin version:** development tree **`1.0.0-dev.integrated.1`** on `feat/post-rc9-integrated-candidate` (schema `5`). Combines qualified per-item `72cb7dd` with WCFM isolation `f09d0b6`/`b3333bf`. Tagged/protected published baseline remains **`1.0.0-rc.9`** (schema `5`, tag `v1.0.0-rc.9`, source `e6bc7fba16d9d7b96682f2945c518a33a9a16cd5`). Do not retag RC.2–RC.9. Do not rebuild the RC.9 ZIP. Do not begin Stage 15. FLAIROC must not be modified. Historical tagged **`1.0.0-rc.8`** / **`1.0.0-rc.7`** (schema `5`) and **`1.0.0-rc.6`** (schema `4`) remain untouched.  
 **Post-RC.9 cart-state reconciliation:** **INCLUDED** — live cart lines refresh to current Delivery Engine configuration; stale admin fingerprints no longer force duplicate shipping groups; unavailable choices require in-cart reselection. Canonical record: `docs/POST-RC9-CART-STATE-RECONCILIATION.md`.  
@@ -90,7 +90,7 @@ This handoff remains the **product vision and domain source of truth**. Much of 
 | Post-RC.9 Blocks line snapshot | **INCLUDED via cherry-pick `54c9894`** — native Blocks/Store API line snapshots. Artifact `docs/POST-RC9-BLOCKS-LINE-SNAPSHOT.md`. |
 | Post-RC.9 per-item customer context | **INCLUDED** from `72cb7dd` / `1.0.0-dev.peritem.1`. Artifact: `docs/POST-RC9-PER-ITEM-CONTEXT.md`. |
 | Post-RC.9 WCFM administrative isolation | **INCLUDED** via cherry-pick `f09d0b6` / `b3333bf`. Artifact: `docs/POST-RC9-WCFM-ISOLATION.md`. |
-| Post-RC.9 combined candidate | **`1.0.0-dev.integrated.1`** — per-item + WCFM isolation. Schema **`5`**. Not RC.10. Not WPML. |
+| Post-RC.9 combined candidate | **`1.0.0-dev.integrated.1`** packaged from `ac2bc94`. ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.integrated.1.zip` (`1475971` bytes, SHA-256 `571f738aa263676d64be6d285686a10a5fea2c48245449b55fe2240466a2d247`). Schema **`5`**. Not RC.10. Not WPML. Artifact: `docs/POST-RC9-INTEGRATED-CANDIDATE.md`. |
 | Next stage | **STOP.** Do **not** begin Stage 15. Do **not** modify FLAIROC. Do **not** retag `v1.0.0-rc.9` or earlier. Do **not** create RC.10. Do not deploy. |
 | Final PHP log (RC.2 smoke) | Marker **546** → inspected through **548** — **PASS**; no new Delivery Engine fatals |
 | Live QA orders | `#39721` (variable); `#39724` (multi-product grouping); owner-QA evidence **`#39733` / `#39734` / `#39735`** (preserve; do not modify remotely) |

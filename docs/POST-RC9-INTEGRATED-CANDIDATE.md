@@ -38,6 +38,47 @@ No high-impact Store API, privacy, or order-access defects found in this pass. B
 
 WooCommerce still owns one tax/customer-location model. Per-item destinations are not per-destination tax.
 
+## Automated results
+
+| Gate | Result |
+|------|--------|
+| PHPUnit | 990 tests, 5577 assertions, OK (5 pre-existing deprecations) |
+| JS (`npm run test:js`) | 41 passed |
+| PHP lint | 558 files, 0 failures |
+| `composer validate --no-check-publish` | valid |
+| Schema | `5` |
+| Capability matrix | `4` |
+
+## Local combined QA
+
+Lab: `C:\Users\Jane\Desktop\Learning 2026\Cursor\cetech-de-local-qa` (`http://localhost:8088`). One reset to RC.9, then candidate replacement **without** a database reset.
+
+- Administrator Delivery Engine menu: PASS
+- Shop Manager Delivery Engine access: PASS
+- WCFM vendor: no DE menu, all direct DE URLs denied, Store Manager works, stale caps stripped: PASS
+- Classic Chair Accra + Kumasi: ₵15.00 + ₵22.00, two lines: PASS
+- Blocks: `total_shipping` `3700` (GHS 37): PASS
+- Pickup: ₵0 Delivery Engine shipping, pickup not presented as a destination delivery: PASS
+- Blocks two-destination order **#30**: v2 line snapshots, Accra + Kumasi, two shipment plans, historical data intact: PASS
+
+## RC.9 upgrade
+
+RC.9 `1.0.0-rc.9` / schema `5` activated first. Config (Options/Areas/Rate Cards/Pickups/product rules) present. Historical RC.9 Blocks order **#25** created on RC.9 (`snapshot_version` 1 at order level). After ZIP replacement: plugin `1.0.0-dev.integrated.1`, schema still `5`, order #25 quote snapshot unchanged, shipment-plan error `missing_order_item` identical to RC.9 (RC.9 Blocks had no line snapshot). Administrator access intact. New per-item cart created after upgrade.
+
+## Package
+
+Packaged from exact tested source `ac2bc94056ebc73f1c6f8ab4a0434f4e68ce7300`.
+
+| Artifact | Value |
+|----------|--------|
+| File | `cetech-woocommerce-delivery-engine-1.0.0-dev.integrated.1.zip` |
+| Bytes | `1475971` |
+| SHA256 | `571f738aa263676d64be6d285686a10a5fea2c48245449b55fe2240466a2d247` |
+
+Extracted packaged-source verification: OK. ZIP reinstall smoke: version/schema, Classic, Blocks, WCFM vendor denial all PASS.
+
+This is **not** RC.10.
+
 ## Intentionally excluded
 
 - WPML
