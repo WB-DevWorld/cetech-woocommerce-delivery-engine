@@ -119,6 +119,8 @@ use CetechDeliveryEngine\Integrations\Blocks\BlocksStoreApiExtension;
 use CetechDeliveryEngine\Integrations\Blocks\BlocksUsageDetector;
 use CetechDeliveryEngine\Integrations\Registry\IntegrationRegistry;
 use CetechDeliveryEngine\Integrations\Status\IntegrationStatusCatalog;
+use CetechDeliveryEngine\Integrations\WCFM\WcfmVendorIsolation;
+use CetechDeliveryEngine\Presentation\Admin\AdminPageAccess;
 use CetechDeliveryEngine\Application\Bulk\BulkJobEngine;
 use CetechDeliveryEngine\Application\Bulk\BulkJobWorker;
 use CetechDeliveryEngine\Application\Bulk\BulkQueueHealth;
@@ -273,6 +275,9 @@ final class Plugin {
 		// Capability matrix must self-heal when an active plugin folder is replaced
 		// without reactivation (activation hooks do not run in that path).
 		$this->container->get( Capabilities::class )->ensure_current();
+		$wcfm_isolation = $this->container->get( WcfmVendorIsolation::class );
+		$wcfm_isolation->harden_vendor_role_capabilities();
+		AdminPageAccess::bind( $wcfm_isolation );
 
 		if ( is_admin() ) {
 			$this->container->get( AdminMenu::class )->register();
@@ -374,8 +379,15 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			WcfmVendorIsolation::class,
+			static fn (): WcfmVendorIsolation => new WcfmVendorIsolation()
+		);
+
+		$this->container->singleton(
 			RoleAccessService::class,
-			static fn (): RoleAccessService => new RoleAccessService()
+			static fn ( ServiceContainer $container ): RoleAccessService => new RoleAccessService(
+				$container->get( WcfmVendorIsolation::class )->excluded_admin_role_slugs()
+			)
 		);
 
 		$this->container->singleton(
