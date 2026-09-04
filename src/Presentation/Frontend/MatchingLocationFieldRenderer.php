@@ -26,7 +26,7 @@ final class MatchingLocationFieldRenderer {
 		];
 	}
 
-	public static function render( ?MatchingLocation $location, string $id_prefix = 'cetech-de-matching', bool $use_woocommerce_fields = true ): string {
+	public static function render( ?MatchingLocation $location, string $id_prefix = 'cetech-de-matching', bool $use_woocommerce_fields = true, bool $show_intro = false ): string {
 		$names   = self::default_names();
 		$country = $location instanceof MatchingLocation ? $location->country : '';
 		$state   = $location instanceof MatchingLocation ? $location->state : '';
@@ -37,10 +37,12 @@ final class MatchingLocationFieldRenderer {
 			$country = (string) WC()->countries->get_base_country();
 		}
 
-		$html  = '<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">';
-		$html .= '<p class="cetech-de-matching-location__intro">'
-			. esc_html__( 'Enter your delivery location to see available options.', 'cetech-woocommerce-delivery-engine' )
-			. '</p>';
+		$html = '<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">';
+		if ( $show_intro ) {
+			$html .= '<p class="cetech-de-matching-location__intro">'
+				. esc_html( \CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy::where_do_you_want_this_item() )
+				. '</p>';
+		}
 
 		if ( $use_woocommerce_fields && function_exists( 'woocommerce_form_field' ) ) {
 			ob_start();

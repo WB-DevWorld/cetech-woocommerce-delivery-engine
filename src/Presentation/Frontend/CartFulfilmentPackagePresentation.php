@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Presentation\Frontend;
 
 use CetechDeliveryEngine\Application\Pickup\PickupLocationAddressFormatter;
 use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
+use CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy;
 
 /**
  * Customer-facing cart/checkout package heading and destination copy.
@@ -24,6 +25,7 @@ final class CartFulfilmentPackagePresentation {
 		add_filter( 'woocommerce_shipping_formatted_destination', [ $this, 'filter_formatted_destination' ], 20, 2 );
 		add_filter( 'woocommerce_formatted_address', [ $this, 'filter_formatted_address' ], 20, 2 );
 		add_filter( 'woocommerce_shipping_show_shipping_calculator', [ $this, 'filter_show_shipping_calculator' ], 20, 3 );
+		add_filter( 'woocommerce_shipping_package_details_array', [ $this, 'filter_package_details' ], 20, 2 );
 		add_filter( 'gettext', [ $this, 'filter_shipping_to_copy' ], 20, 3 );
 		add_action( 'woocommerce_before_template_part', [ $this, 'before_shipping_template' ], 1, 4 );
 		add_action( 'woocommerce_after_template_part', [ $this, 'after_shipping_template' ], 1, 4 );
@@ -91,6 +93,22 @@ final class CartFulfilmentPackagePresentation {
 	}
 
 	/**
+	 * @param mixed $details
+	 * @param mixed $package
+	 *
+	 * @return array<string, string>
+	 */
+	public function filter_package_details( $details, $package = array() ): array {
+		$package = is_array( $package ) ? $package : [];
+
+		if ( self::is_managed( $package ) ) {
+			return [];
+		}
+
+		return is_array( $details ) ? $details : [];
+	}
+
+	/**
 	 * @param mixed $translated
 	 * @param mixed $text
 	 * @param mixed $domain
@@ -101,11 +119,18 @@ final class CartFulfilmentPackagePresentation {
 		unset( $domain );
 
 		if ( ! self::is_pickup( self::$current_package ?? [] ) ) {
+			$package = self::$current_package ?? [];
+			if ( self::is_managed( $package ) && '' !== trim( (string) ( ( DeliveryGroupIdentity::package_meta( $package )['locality_label'] ?? '' ) ) ) ) {
+				if ( self::is_shipping_to_string( $text ) || self::is_shipping_to_string( $translated ) ) {
+					return '';
+				}
+			}
+
 			return $translated;
 		}
 
 		if ( self::is_shipping_to_string( $text ) || self::is_shipping_to_string( $translated ) ) {
-			return __( 'Pickup address: %s', 'cetech-woocommerce-delivery-engine' );
+			return '%s';
 		}
 
 		if ( self::is_change_address_string( $text ) || self::is_change_address_string( $translated ) ) {
@@ -138,7 +163,7 @@ final class CartFulfilmentPackagePresentation {
 		$package = is_array( $args['package'] ?? null ) ? $args['package'] : [];
 		self::$current_package = $package;
 
-		if ( self::is_pickup( $package ) && ! self::$buffering_pickup_shipping ) {
+		if ( self::is_managed( $package ) && ! self::$buffering_pickup_shipping ) {
 			ob_start();
 			self::$buffering_pickup_shipping = true;
 		}
@@ -161,7 +186,7 @@ final class CartFulfilmentPackagePresentation {
 			$html = (string) ob_get_clean();
 			self::$buffering_pickup_shipping = false;
 			$package = is_array( self::$current_package ) ? self::$current_package : [];
-			echo self::rewrite_pickup_package_html( $html, $package ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rewriting WooCommerce template HTML.
+			echo self::rewrite_managed_package_html( $html, $package ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rewriting WooCommerce template HTML.
 		}
 
 		self::$current_package = null;
@@ -181,26 +206,14 @@ final class CartFulfilmentPackagePresentation {
 		if ( self::is_pickup( $package ) ) {
 			$location = self::location_name( $package );
 
-			if ( '' !== $location ) {
-				return sprintf(
-					/* translators: %s: pickup location name */
-					__( 'Pickup at %s', 'cetech-woocommerce-delivery-engine' ),
-					$location
-				);
-			}
-
-			return __( 'Store Pickup', 'cetech-woocommerce-delivery-engine' );
+			return '' !== $location ? $location : CustomerStorefrontCopy::store_pickup();
 		}
 
 		$meta = DeliveryGroupIdentity::package_meta( $package );
 		if ( is_array( $meta ) && ! empty( $meta['managed'] ) ) {
 			$locality = trim( (string) ( $meta['locality_label'] ?? '' ) );
 			if ( '' !== $locality ) {
-				return sprintf(
-					/* translators: %s: city or locality */
-					__( 'Delivery — %s', 'cetech-woocommerce-delivery-engine' ),
-					$locality
-				);
+				return CustomerStorefrontCopy::delivery_to( $locality );
 			}
 		}
 
@@ -222,11 +235,8 @@ final class CartFulfilmentPackagePresentation {
 		}
 
 		$meta = DeliveryGroupIdentity::package_meta( $package );
-		if ( is_array( $meta ) && ! empty( $meta['managed'] ) ) {
-			$locality = trim( (string) ( $meta['locality_label'] ?? '' ) );
-			if ( '' !== $locality ) {
-				return $locality;
-			}
+		if ( is_array( $meta ) && ! empty( $meta['managed'] ) && '' !== trim( (string) ( $meta['locality_label'] ?? '' ) ) ) {
+			return '';
 		}
 
 		return $customer_shipping_destination;
@@ -243,7 +253,13 @@ final class CartFulfilmentPackagePresentation {
 	 * @param array<string, mixed> $package
 	 */
 	public static function shows_shipping_to_copy( array $package ): bool {
-		return ! self::is_pickup( $package );
+		if ( self::is_pickup( $package ) ) {
+			return false;
+		}
+
+		$meta = DeliveryGroupIdentity::package_meta( $package );
+
+		return ! ( is_array( $meta ) && ! empty( $meta['managed'] ) && '' !== trim( (string) ( $meta['locality_label'] ?? '' ) ) );
 	}
 
 	/**
@@ -251,6 +267,39 @@ final class CartFulfilmentPackagePresentation {
 	 */
 	public static function shows_change_address( array $package ): bool {
 		return ! self::is_pickup( $package );
+	}
+
+	/**
+	 * Compact managed shipping rows: keep the rate, drop repeated destination/contents.
+	 *
+	 * @param array<string, mixed> $package
+	 */
+	public static function rewrite_managed_package_html( string $html, array $package ): string {
+		if ( ! self::is_managed( $package ) ) {
+			return $html;
+		}
+
+		if ( self::is_pickup( $package ) ) {
+			$html = self::rewrite_pickup_package_html( $html, $package );
+			$html = (string) preg_replace( '/<p[^>]*class="[^"]*woocommerce-shipping-contents[^"]*"[^>]*>.*?<\/p>/s', '', $html );
+
+			return $html;
+		}
+
+		$meta     = DeliveryGroupIdentity::package_meta( $package );
+		$locality = is_array( $meta ) ? trim( (string) ( $meta['locality_label'] ?? '' ) ) : '';
+		if ( '' === $locality ) {
+			return $html;
+		}
+
+		$html = (string) preg_replace( '/<p[^>]*class="[^"]*woocommerce-shipping-contents[^"]*"[^>]*>.*?<\/p>/s', '', $html );
+		$html = (string) preg_replace( '/<p[^>]*class="[^"]*woocommerce-shipping-destination[^"]*"[^>]*>.*?<\/p>/s', '', $html );
+		$html = (string) preg_replace( '/Shipping to\s+(?:<[^>]+>)?[^<]*(?:<\/[^>]+>)?\.?\s*/i', '', $html );
+		$html = (string) preg_replace( '/<a\b[^>]*>\s*Change address\s*<\/a>/i', '', $html );
+		$delivery_to = CustomerStorefrontCopy::delivery_to( $locality );
+		$html        = (string) preg_replace( '/' . preg_quote( $delivery_to, '/' ) . '\s*:\s*/', '', $html );
+
+		return $html;
 	}
 
 	/**
@@ -264,13 +313,7 @@ final class CartFulfilmentPackagePresentation {
 		}
 
 		$address     = self::pickup_address( $package );
-		$pickup_copy = '' !== $address
-			? sprintf(
-				/* translators: %s: pickup location address */
-				__( 'Pickup address: %s', 'cetech-woocommerce-delivery-engine' ),
-				$address
-			)
-			: '';
+		$pickup_copy = $address;
 		$destination_html = '' !== $pickup_copy
 			? '<p class="woocommerce-shipping-destination">' . esc_html( $pickup_copy ) . '</p>'
 			: '';
@@ -294,6 +337,15 @@ final class CartFulfilmentPackagePresentation {
 		$html = (string) preg_replace( '/<button\b[^>]*>\s*Change address\s*<\/button>/i', '', $html );
 
 		return $html;
+	}
+
+	/**
+	 * @param array<string, mixed> $package
+	 */
+	public static function is_managed( array $package ): bool {
+		$meta = DeliveryGroupIdentity::package_meta( $package );
+
+		return is_array( $meta ) && ! empty( $meta['managed'] );
 	}
 
 	/**

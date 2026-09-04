@@ -238,9 +238,9 @@ final class PerItemPackageDestinationQuotingTest extends TestCase {
 		);
 
 		$label = (string) $packages[0][ DeliveryGroupIdentity::PACKAGE_META_KEY ]['rate_label'];
-		self::assertStringContainsString( 'Delivery — Accra', $label );
+		self::assertStringContainsString( 'Delivery to Accra', $label );
 		self::assertStringNotContainsString( '12 Boundary', $label );
-		self::assertStringNotContainsString( $packages[0][ DeliveryGroupIdentity::PACKAGE_META_KEY ]['group_id'], 'Delivery — Accra' );
+		self::assertStringNotContainsString( $packages[0][ DeliveryGroupIdentity::PACKAGE_META_KEY ]['group_id'], 'Delivery to Accra' );
 	}
 
 	/**

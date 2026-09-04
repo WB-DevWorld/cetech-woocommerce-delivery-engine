@@ -238,7 +238,7 @@ final class BlocksPerItemCustomerUxTest extends TestCase {
 
 		$payload = BlocksPublicPayload::package( $package, 0 );
 
-		self::assertSame( 'Delivery — Accra', $payload['heading'] );
+		self::assertSame( 'Delivery to Accra', $payload['heading'] );
 		self::assertStringNotContainsString( 'Independence', (string) $payload['heading'] );
 		self::assertArrayNotHasKey( 'group_id', $payload );
 		self::assertFalse( BlocksPublicPayload::contains_forbidden( $payload ) );
@@ -276,7 +276,9 @@ final class BlocksPerItemCustomerUxTest extends TestCase {
 		self::assertStringContainsString( 'Address line 1', $i18n );
 		self::assertStringContainsString( 'Address line 2', $i18n );
 		self::assertStringContainsString( 'Quantity to move', $i18n );
-		self::assertStringContainsString( 'Fulfilment and delivery option', $i18n );
+		self::assertStringContainsString( 'Use my checkout address', $i18n );
+		self::assertStringContainsString( 'Your deliveries', $i18n );
+		self::assertStringNotContainsString( 'Fulfilment and delivery option', $i18n );
 		self::assertStringNotContainsString( 'per-destination tax', $i18n );
 		self::assertStringNotContainsString( 'per destination tax', $i18n );
 		self::assertStringContainsString( 'cetech-de-b-', $js );

@@ -86,9 +86,8 @@ final class MatchingLocationOptionsEndpoint {
 
 		foreach ( $filtered as $option ) {
 			$row = $option->toArray();
-			$row['estimate_line'] = DeliveryPresentationLabels::format_product_estimate_line(
-				(string) ( $option->estimate_text ?? '' ),
-				$option->fulfilment_choice
+			$row['estimate_line'] = \CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy::compact_estimate(
+				(string) ( $option->estimate_text ?? '' )
 			);
 			$public[] = $row;
 		}
@@ -110,9 +109,10 @@ final class MatchingLocationOptionsEndpoint {
 		if ( $requires && ( ! $location instanceof MatchingLocation || ! $location->isPresent() ) ) {
 			return [
 				'status'            => 'need_location',
-				'message'           => __( 'Enter your delivery location to see delivery options.', 'cetech-woocommerce-delivery-engine' ),
+				'message'           => '',
 				'options'           => $public,
 				'requires_location' => true,
+				'locality'          => '',
 			];
 		}
 
@@ -138,6 +138,7 @@ final class MatchingLocationOptionsEndpoint {
 			'options'           => $public,
 			'requires_location' => $requires,
 			'default_key'       => ProductDeliveryOptionsBuilder::defaultDisplayKey( $filtered ),
+			'locality'          => $location instanceof MatchingLocation ? $location->publicLocalityLabel() : '',
 		];
 	}
 }

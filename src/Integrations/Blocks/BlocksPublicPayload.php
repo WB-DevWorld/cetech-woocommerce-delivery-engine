@@ -15,6 +15,7 @@ use CetechDeliveryEngine\Domain\CustomerContext\DeliveryAddress;
 use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Presentation\Frontend\CartFulfilmentPackagePresentation;
+use CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy;
 use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
 
 /**
@@ -159,11 +160,16 @@ final class BlocksPublicPayload {
 		$payload['estimate_line']        = $needs_reselection
 			? null
 			: self::nullable_string(
-				DeliveryPresentationLabels::format_product_estimate_line(
-					(string) ( $summary['estimate_text'] ?? '' ),
-					$choice !== '' ? $choice : null
-				)
+				CustomerStorefrontCopy::compact_estimate( (string) ( $summary['estimate_text'] ?? '' ) )
 			);
+		$compact = CustomerStorefrontCopy::cart_line_summary(
+			$choice,
+			$summary,
+			(string) ( $payload['locality'] ?? '' )
+		);
+		$payload['summary_kicker'] = $needs_reselection ? null : ( '' !== $compact['kicker'] ? $compact['kicker'] : null );
+		$payload['summary_title']  = $needs_reselection ? null : ( '' !== $compact['title'] ? $compact['title'] : null );
+		$payload['summary_meta']   = $needs_reselection ? null : ( '' !== $compact['meta'] ? $compact['meta'] : null );
 		$payload['matching_location'] = $context instanceof CustomerCartContext
 			? self::public_matching( $context->matching_location )
 			: null;

@@ -13,6 +13,7 @@ use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
 use CetechDeliveryEngine\Domain\CustomerContext\DeliveryAddress;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
+use CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy;
 
 /**
  * Classic checkout address policy for per-item Delivery Engine context.
@@ -113,41 +114,46 @@ final class CheckoutAddressPolicy {
 
 		if ( $summary['multi_destination'] ) {
 			echo '<div class="woocommerce-info cetech-de-checkout-multi-destination" role="status">';
-			echo esc_html__( 'Items in this order will be delivered to multiple destinations. Each item keeps its own delivery address.', 'cetech-woocommerce-delivery-engine' );
+			echo esc_html( CustomerStorefrontCopy::multi_destination() );
 			echo '</div>';
 		}
 
 		if ( $summary['has_pickup'] && $summary['has_delivery'] ) {
 			echo '<div class="woocommerce-info cetech-de-checkout-mixed-fulfilment" role="status">';
-			echo esc_html__( 'This order includes Store Pickup and Delivery. Pickup items ignore the checkout shipping address.', 'cetech-woocommerce-delivery-engine' );
+			echo esc_html( CustomerStorefrontCopy::mixed_fulfilment() );
 			echo '</div>';
 		}
 
 		if ( $summary['incomplete_delivery'] > 0 ) {
 			echo '<div class="woocommerce-error cetech-de-checkout-incomplete-address" role="alert">';
-			echo esc_html__( 'One or more items need a complete delivery address before you can place this order. Complete the address on those items, or use the checkout shipping address for incomplete delivery items.', 'cetech-woocommerce-delivery-engine' );
-			echo '</div>';
+			echo '<p>' . esc_html( CustomerStorefrontCopy::incomplete_address( $summary['incomplete_delivery'] ) ) . '</p>';
+			echo '<p class="cetech-de-checkout-incomplete-address__actions">';
+			$cart_url = function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : '';
+			if ( '' !== $cart_url ) {
+				echo '<a class="button cetech-de-checkout-incomplete-address__primary" href="' . esc_url( $cart_url ) . '">'
+					. esc_html( CustomerStorefrontCopy::add_delivery_address() )
+					. '</a> ';
+			}
+			$action = function_exists( 'wc_get_checkout_url' ) ? wc_get_checkout_url() : '';
+			echo '<form class="cetech-de-use-checkout-address" method="post" action="' . esc_url( $action ) . '">';
+			echo '<input type="hidden" name="' . esc_attr( self::POST_USE_CHECKOUT_ADDRESS ) . '" value="1" />';
+			echo wp_nonce_field( self::NONCE_ACTION, '_wpnonce', true, false );
+			echo '<button type="submit" class="cetech-de-use-checkout-address__button cetech-de-use-checkout-address__button--secondary">';
+			echo esc_html( CustomerStorefrontCopy::use_my_checkout_address() );
+			echo '</button>';
+			echo '</form>';
+			echo '</p></div>';
+		}
+
+		if ( $summary['has_delivery'] && [] !== $summary['complete_identities'] ) {
+			echo '<p class="cetech-de-checkout-keep-address">'
+				. esc_html( CustomerStorefrontCopy::items_keep_own_address() )
+				. '</p>';
 		}
 	}
 
 	public function render_use_checkout_address_action(): void {
-		if ( ! $this->is_active() || ! function_exists( 'WC' ) || ! WC()->cart ) {
-			return;
-		}
-
-		$summary = $this->summarize_cart( WC()->cart->get_cart() );
-		if ( $summary['incomplete_delivery'] <= 0 ) {
-			return;
-		}
-
-		$action = function_exists( 'wc_get_checkout_url' ) ? wc_get_checkout_url() : '';
-		echo '<form class="cetech-de-use-checkout-address" method="post" action="' . esc_url( $action ) . '">';
-		echo '<input type="hidden" name="' . esc_attr( self::POST_USE_CHECKOUT_ADDRESS ) . '" value="1" />';
-		echo wp_nonce_field( self::NONCE_ACTION, '_wpnonce', true, false );
-		echo '<button type="submit" class="button">';
-		echo esc_html__( 'Use checkout shipping address for incomplete delivery items', 'cetech-woocommerce-delivery-engine' );
-		echo '</button>';
-		echo '</form>';
+		// Secondary action is rendered next to the incomplete-address notice.
 	}
 
 	/**
