@@ -232,7 +232,7 @@ final class CheckoutDeliverySelectionValidator {
 						__( '“%s” needs a complete delivery address before you can place this order.', 'cetech-woocommerce-delivery-engine' ),
 						$name
 					)
-					: __( 'Please complete the delivery address for each item, or use the checkout shipping address for incomplete delivery items.', 'cetech-woocommerce-delivery-engine' ),
+					: __( 'Complete the delivery address before placing your order.', 'cetech-woocommerce-delivery-engine' ),
 			];
 		}
 

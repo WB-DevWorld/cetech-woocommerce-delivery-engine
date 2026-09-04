@@ -113,7 +113,7 @@ final class Stage13FCustomerPresentationTest extends TestCase {
 		);
 
 		self::assertStringContainsString( 'cetech-de-delivery-option__body', $source );
-		self::assertStringContainsString( 'format_product_estimate_line', $source );
+		self::assertStringContainsString( 'compact_estimate', $source );
 		self::assertStringNotContainsString( 'delivery_offer_public_description', $source );
 		self::assertStringNotContainsString( 'fulfilment_availability_label', $source );
 		self::assertStringNotContainsString( 'cetech-de-delivery-availability__heading', $source );

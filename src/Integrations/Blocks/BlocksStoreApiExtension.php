@@ -10,6 +10,7 @@ use CetechDeliveryEngine\Application\Checkout\CheckoutAddressPolicy;
 use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
 use CetechDeliveryEngine\Application\Shipping\ShippingRateCalculationGate;
 use CetechDeliveryEngine\Infrastructure\WooCommerce\Shipping\SelectedOfferShippingMethod;
+use CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy;
 
 /**
  * Registers customer-safe Delivery Engine data on Store API cart / cart-item / checkout.
@@ -95,6 +96,9 @@ final class BlocksStoreApiExtension {
 			'quantity'               => [ 'description' => 'Cart line quantity.', 'type' => 'integer', 'readonly' => true ],
 			'locality'              => [ 'description' => 'Customer-safe destination locality.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
 			'estimate_line'         => [ 'description' => 'Formatted estimated delivery line.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'summary_kicker'        => [ 'description' => 'Compact summary kicker, such as Store Pickup.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'summary_title'         => [ 'description' => 'Compact summary title.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'summary_meta'          => [ 'description' => 'Compact summary meta line.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
 			'matching_location'     => [ 'description' => 'Customer matching location for editing this cart line.', 'type' => [ 'object', 'null' ], 'readonly' => true ],
 			'delivery_address'      => [ 'description' => 'Customer delivery address for editing this cart line.', 'type' => [ 'object', 'null' ], 'readonly' => true ],
 			'available_options'     => [ 'description' => 'Public delivery options available for this line.', 'type' => 'array', 'readonly' => true ],
@@ -119,6 +123,10 @@ final class BlocksStoreApiExtension {
 
 		$notices = $this->checkout_notices();
 		$mutation = $GLOBALS[ BlocksCartContextCommandHandler::RESULT_GLOBAL ] ?? null;
+		$plan = [];
+		if ( function_exists( 'WC' ) && WC()->cart ) {
+			$plan = CustomerStorefrontCopy::delivery_plan( WC()->cart->get_cart() );
+		}
 
 		return BlocksPublicPayload::strip_forbidden(
 			[
@@ -130,6 +138,10 @@ final class BlocksStoreApiExtension {
 				'incomplete_delivery'  => (int) ( $notices['incomplete_delivery'] ?? 0 ),
 				'notices'              => $notices['messages'] ?? [],
 				'can_apply_checkout_address' => (int) ( $notices['incomplete_delivery'] ?? 0 ) > 0,
+				'keep_address_note'    => (bool) ( $notices['keep_address_note'] ?? false )
+					? CustomerStorefrontCopy::items_keep_own_address()
+					: null,
+				'delivery_plan'        => $plan,
 				'mutation_result'      => is_array( $mutation ) ? $mutation : null,
 			]
 		);
@@ -180,6 +192,16 @@ final class BlocksStoreApiExtension {
 				'type'        => 'boolean',
 				'readonly'    => true,
 			],
+			'keep_address_note'    => [
+				'description' => 'Short note that per-item addresses are kept.',
+				'type'        => [ 'string', 'null' ],
+				'readonly'    => true,
+			],
+			'delivery_plan'        => [
+				'description' => 'Compact checkout confirmation grouped by destination.',
+				'type'        => 'array',
+				'readonly'    => true,
+			],
 			'mutation_result'      => [
 				'description' => 'Per-line outcome of the last customer-context mutation.',
 				'type'        => [ 'object', 'null' ],
@@ -201,6 +223,7 @@ final class BlocksStoreApiExtension {
 			'multi_destination'   => false,
 			'mixed_fulfilment'    => false,
 			'incomplete_delivery' => 0,
+			'keep_address_note'    => false,
 			'messages'            => [],
 		];
 
@@ -214,21 +237,21 @@ final class BlocksStoreApiExtension {
 		if ( $summary['multi_destination'] ) {
 			$messages[] = [
 				'code'    => 'multi_destination',
-				'message' => __( 'Items in this order will be delivered to multiple destinations. Each item keeps its own delivery address.', 'cetech-woocommerce-delivery-engine' ),
+				'message' => CustomerStorefrontCopy::multi_destination(),
 			];
 		}
 
 		if ( $summary['has_pickup'] && $summary['has_delivery'] ) {
 			$messages[] = [
 				'code'    => 'mixed_fulfilment',
-				'message' => __( 'This order includes Store Pickup and Delivery. Pickup items ignore the checkout shipping address.', 'cetech-woocommerce-delivery-engine' ),
+				'message' => CustomerStorefrontCopy::mixed_fulfilment(),
 			];
 		}
 
 		if ( $summary['incomplete_delivery'] > 0 ) {
 			$messages[] = [
 				'code'    => 'incomplete_delivery',
-				'message' => __( 'One or more items need a complete delivery address before you can place this order. Complete the address on those items, or use the checkout shipping address for incomplete delivery items.', 'cetech-woocommerce-delivery-engine' ),
+				'message' => CustomerStorefrontCopy::incomplete_address( $summary['incomplete_delivery'] ),
 			];
 		}
 
@@ -236,6 +259,7 @@ final class BlocksStoreApiExtension {
 			'multi_destination'   => $summary['multi_destination'],
 			'mixed_fulfilment'    => $summary['has_pickup'] && $summary['has_delivery'],
 			'incomplete_delivery' => $summary['incomplete_delivery'],
+			'keep_address_note'    => $summary['has_delivery'] && [] !== $summary['complete_identities'],
 			'messages'            => $messages,
 		];
 	}

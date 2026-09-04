@@ -82,7 +82,11 @@ final class DeliveryPresentationLabels {
 	}
 
 	public static function change_delivery(): string {
-		return __( 'Change delivery', 'cetech-woocommerce-delivery-engine' );
+		return CustomerStorefrontCopy::change();
+	}
+
+	public static function delivery_to( string $locality ): string {
+		return CustomerStorefrontCopy::delivery_to( $locality );
 	}
 
 	public static function method_label_for_choice( ?string $fulfilment_choice ): string {

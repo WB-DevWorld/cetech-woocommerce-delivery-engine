@@ -186,7 +186,7 @@ describe('Variable delivery selector controller', () => {
 
 		await flush();
 		expect(controller.optionsEl.textContent).toContain('Offer A');
-		expect(controller.optionsEl.textContent).toContain('Estimated delivery: 2 days');
+		expect(controller.optionsEl.textContent).toContain('2 days');
 		expect(controller.optionsEl.querySelector('.cetech-de-delivery-option__body')).not.toBeNull();
 		expect(controller.optionsEl.querySelector('.cetech-de-delivery-option__description')).toBeNull();
 		expect(controller.variationInput.value).toBe('11');
@@ -205,7 +205,7 @@ describe('Variable delivery selector controller', () => {
 		await flush();
 
 		expect(controller.optionsEl.textContent).toContain('FLAIROC QA Standard Delivery');
-		expect(controller.optionsEl.textContent).toContain('Estimated delivery: 3–6 business days');
+		expect(controller.optionsEl.textContent).toContain('3–6 business days');
 		expect(controller.optionsEl.textContent).not.toContain('QA-only');
 		expect(controller.optionsEl.textContent).not.toContain('In Warehouse');
 	});
@@ -410,7 +410,7 @@ describe('Variable delivery selector controller', () => {
 		await flush();
 
 		expect(controller.optionsEl.textContent).toContain('Standard Delivery');
-		expect(controller.optionsEl.textContent).toContain('Estimated delivery: 2–4 business days');
+		expect(controller.optionsEl.textContent).toContain('2–4 business days');
 		expect(controller.optionsEl.querySelector('[data-cetech-de-choice-switch][value="delivery"]').checked).toBe(true);
 
 		const pickupPanel = controller.optionsEl.querySelector('[data-cetech-de-choice-panel="store_pickup"]');

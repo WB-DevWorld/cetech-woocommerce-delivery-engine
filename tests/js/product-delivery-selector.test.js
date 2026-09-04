@@ -128,7 +128,7 @@ describe('Product delivery fulfilment switcher', () => {
 		expect(deliveryRadio.disabled).toBe(false);
 		expect(pickupRadio.checked).toBe(false);
 		expect(pickupRadio.disabled).toBe(true);
-		expect(deliveryPanel.textContent).toContain('Estimated delivery: 2–4 business days');
+		expect(deliveryPanel.textContent).toContain('2–4 business days');
 	});
 
 	it('writes one authoritative PDP payload from the selector', () => {
@@ -162,10 +162,10 @@ describe('Product delivery fulfilment switcher', () => {
 		expect(api.formatEstimateLine(
 			{ fulfilment_choice: 'delivery', estimate_text: 'Estimated 3–5 business days', estimate_line: 'Estimated delivery: 3–5 business days' },
 			{ i18n: { estimated: 'Estimated delivery' } }
-		)).toBe('Estimated delivery: 3–5 business days');
+		)).toBe('3–5 business days');
 		expect(api.formatEstimateLine(
 			{ fulfilment_choice: 'delivery', estimate_text: 'Estimated 3–5 business days' },
 			{ i18n: { estimated: 'Estimated delivery' } }
-		)).toBe('Estimated delivery: 3–5 business days');
+		)).toBe('3–5 business days');
 	});
 });

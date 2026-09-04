@@ -299,10 +299,14 @@ final class CartDeliverySelectionCapture {
 
 		if ( ! empty( $cart_item[ self::CART_NEEDS_RESELECTION_KEY ] ) ) {
 			$item_data[] = [
-				'key'   => esc_html__( 'Delivery option', 'cetech-woocommerce-delivery-engine' ),
+				'key'   => esc_html__( 'Delivery', 'cetech-woocommerce-delivery-engine' ),
 				'value' => esc_html__( 'Delivery options have changed. Please choose a new option below.', 'cetech-woocommerce-delivery-engine' ),
 			];
 
+			return $item_data;
+		}
+
+		if ( $this->cart_item_data_is_replaced_by_editor() ) {
 			return $item_data;
 		}
 
@@ -344,6 +348,23 @@ final class CartDeliverySelectionCapture {
 		}
 
 		return $item_data;
+	}
+
+	/**
+	 * Classic cart/checkout use CartCustomerContextEditorRenderer as the single
+	 * customer presentation source. Keep item-data only for mini-cart and
+	 * reselection warnings.
+	 */
+	private function cart_item_data_is_replaced_by_editor(): bool {
+		if ( function_exists( 'is_cart' ) && is_cart() ) {
+			return true;
+		}
+
+		if ( function_exists( 'is_checkout' ) && is_checkout() ) {
+			return true;
+		}
+
+		return false;
 	}
 
 	/**

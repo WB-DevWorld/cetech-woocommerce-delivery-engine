@@ -216,38 +216,21 @@ final class ShippingPackageBuilder {
 		string $locality = '',
 		string $pickup_location = ''
 	): string {
+		unset( $pickup_location );
+
 		if ( $is_pickup ) {
-			$base = '' !== $pickup_location
-				? sprintf(
-					/* translators: %s: pickup location name */
-					__( 'Store Pickup — %s', 'cetech-woocommerce-delivery-engine' ),
-					$pickup_location
-				)
-				: __( 'Store pickup', 'cetech-woocommerce-delivery-engine' );
-
-			if ( null !== $display_index && $display_index > 0 ) {
-				return sprintf(
-					/* translators: 1: pickup label, 2: package number */
-					__( '%1$s (%2$d)', 'cetech-woocommerce-delivery-engine' ),
-					$base,
-					$display_index
-				);
-			}
-
-			return $base;
+			return __( 'Store Pickup', 'cetech-woocommerce-delivery-engine' );
 		}
 
 		if ( '' !== $locality ) {
-			$base = sprintf(
+			return sprintf(
 				/* translators: %s: city or locality */
-				__( 'Delivery — %s', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Delivery to %s', 'cetech-woocommerce-delivery-engine' ),
 				$locality
 			);
-		} elseif ( '' !== $offer_label ) {
-			$base = $offer_label;
-		} else {
-			$base = SelectedOfferShippingMethodLabel::default_delivery_label();
 		}
+
+		$base = '' !== $offer_label ? $offer_label : SelectedOfferShippingMethodLabel::default_delivery_label();
 
 		if ( null !== $display_index && $display_index > 0 ) {
 			return sprintf(

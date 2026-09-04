@@ -178,6 +178,7 @@ use CetechDeliveryEngine\Presentation\Frontend\CustomerOrderDeliverySummaryRende
 use CetechDeliveryEngine\Presentation\Frontend\CustomerShipmentRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\CartDeliveryReselectionRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\CartCustomerContextEditorRenderer;
+use CetechDeliveryEngine\Presentation\Frontend\CheckoutDeliveryPlanRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\ProductDeliverySelectorRenderer;
 use CetechDeliveryEngine\Presentation\Frontend\VariableDeliverySelectorAssets;
 use CetechDeliveryEngine\Application\Selector\VariationDeliveryOptionsEndpoint;
@@ -329,6 +330,7 @@ final class Plugin {
 		$this->container->get( MatchingLocationOptionsEndpoint::class )->register();
 		$this->container->get( CheckoutDeliverySelectionValidator::class )->register();
 		$this->container->get( CheckoutAddressPolicy::class )->register();
+		$this->container->get( CheckoutDeliveryPlanRenderer::class )->register();
 		$this->container->get( ShippingPackageBuilder::class )->register();
 		$this->container->get( CartFulfilmentPackagePresentation::class )->register();
 		$this->container->get( SelectedOfferShippingIntegration::class )->register();
@@ -812,6 +814,14 @@ final class Plugin {
 				$container->get( CartDeliverySelectionCapture::class ),
 				$container->get( CartDeliverySelectionRevalidator::class ),
 				$container->get( LocationOfferQuoteProbe::class )
+			)
+		);
+
+		$this->container->singleton(
+			CheckoutDeliveryPlanRenderer::class,
+			static fn ( ServiceContainer $container ): CheckoutDeliveryPlanRenderer => new CheckoutDeliveryPlanRenderer(
+				$container->get( FeatureFlags::class ),
+				$container->get( Requirements::class )
 			)
 		);
 

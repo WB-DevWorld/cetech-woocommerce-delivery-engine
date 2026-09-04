@@ -1,14 +1,11 @@
-/**
- * Stage 13F — compact product-page delivery option hierarchy.
- *
- * Public label on the primary line; estimated delivery secondary underneath.
- * Public description is intentionally omitted from the compact product selector.
- */
-
 .cetech-de-product-delivery-selector {
 	margin: 1em 0;
 	max-width: 100%;
 	overflow-x: hidden;
+	padding: 1rem;
+	border: 1px solid rgba(0, 0, 0, 0.12);
+	background: #fff;
+	box-sizing: border-box;
 }
 
 .cetech-de-matching-location,
@@ -18,8 +15,13 @@
 }
 
 .cetech-de-delivery-selector__title {
+	margin: 0 0 0.75em;
+	font-size: 1.1em;
+	font-weight: 700;
+}
+
+.cetech-de-matching-location__prompt {
 	margin: 0 0 0.5em;
-	font-size: 1em;
 	font-weight: 600;
 }
 
@@ -30,29 +32,36 @@
 }
 
 .cetech-de-delivery-option {
-	margin: 0.65em 0;
+	margin: 0.5em 0;
 }
 
-.cetech-de-delivery-option--radio {
-	margin: 0.65em 0;
+.cetech-de-delivery-option--card {
+	margin: 0.5em 0;
 }
 
-.cetech-de-delivery-option__label-wrap {
+.cetech-de-delivery-option__label-wrap,
+.cetech-de-delivery-option--card label {
 	display: flex;
 	align-items: flex-start;
-	gap: 0.5em;
+	gap: 0.65em;
 	cursor: pointer;
+	padding: 0.65em 0.75em;
+	border: 1px solid rgba(0, 0, 0, 0.12);
+	background: #fff;
+	min-height: 2.75rem;
+	box-sizing: border-box;
 }
 
-.cetech-de-delivery-option__label-wrap input[type="radio"] {
-	margin-top: 0.25em;
+.cetech-de-delivery-option__label-wrap input[type="radio"],
+.cetech-de-delivery-option--card input[type="radio"] {
+	margin-top: 0.3em;
 	flex: 0 0 auto;
 }
 
 .cetech-de-delivery-option__body {
 	display: flex;
 	flex-direction: column;
-	gap: 0.2em;
+	gap: 0.15em;
 	min-width: 0;
 }
 
@@ -62,7 +71,8 @@
 	line-height: 1.35;
 }
 
-.cetech-de-delivery-option__estimate {
+.cetech-de-delivery-option__estimate,
+.cetech-de-delivery-option__meta {
 	display: block;
 	font-weight: 400;
 	font-size: 0.92em;
@@ -81,15 +91,39 @@
 }
 
 .cetech-de-fulfilment-choice {
-	margin: 0 0 0.75em;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.5rem;
+	margin: 0 0 0.85em;
 }
 
 .cetech-de-fulfilment-choice__option {
-	margin: 0.35em 0;
+	margin: 0;
 }
 
-.cetech-de-delivery-option-group[hidden] {
+.cetech-de-fulfilment-choice__option label {
+	display: flex;
+	align-items: center;
+	gap: 0.4em;
+	min-height: 2.75rem;
+	padding: 0 0.75rem;
+	border: 1px solid rgba(0, 0, 0, 0.12);
+	cursor: pointer;
+}
+
+.cetech-de-delivery-option-group[hidden],
+.cetech-de-delivery-selector__location[hidden],
+[data-cetech-de-active-choice="store_pickup"] [data-cetech-de-location-panel] {
 	display: none !important;
+}
+
+.cetech-de-delivery-option-group--pickup {
+	padding-top: 0.25em;
+}
+
+.cetech-de-delivery-option-group__heading {
+	margin: 0 0 0.4em;
+	font-weight: 700;
 }
 
 .cetech-de-pickup-details {
@@ -114,6 +148,10 @@
 	margin: 0.5em 0;
 }
 
+.cetech-de-delivery-selector__status:empty {
+	display: none;
+}
+
 .cetech-de-delivery-selector__status[data-state="error"],
 .cetech-de-delivery-selector__status[data-state="unavailable"] {
 	font-weight: 600;
@@ -125,4 +163,17 @@
 
 .cetech-de-matching-location__intro {
 	margin: 0 0 0.5em;
+}
+
+.cetech-de-matching-location select,
+.cetech-de-matching-location input[type="text"] {
+	min-height: 2.75rem;
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+	.cetech-de-product-delivery-selector {
+		padding: 0.75rem;
+	}
 }

@@ -5,7 +5,7 @@
 **Plugin:** CETECH WooCommerce Delivery Engine  
 **Current protected runtime baseline:** tagged `1.0.0-rc.9` (schema `5`)  
 **Previous protected published tag:** `1.0.0-rc.8` (schema `5`; **do not retag**)  
-**Current development tree:** `1.0.0-dev.integrated.1` on `feat/post-rc9-integrated-candidate` (schema `5`). Combines qualified per-item `72cb7dd` with WCFM isolation `f09d0b6`/`b3333bf`. Tagged RC.9 remains schema `5` and must not be retagged or rebuilt.
+**Current development tree:** `1.0.0-dev.integrated.2` on `feat/post-rc9-customer-ux` (schema `5`). Customer presentation cleanup from qualified `1.0.0-dev.integrated.1` source `ac2bc94`. Tagged RC.9 remains schema `5` and must not be retagged or rebuilt. Do not overwrite the integrated.1 ZIP.
 **Schema target:** `5` on tagged `1.0.0-rc.9`, `1.0.0-rc.8`, and `1.0.0-rc.7`. Tagged RC.6 remains schema `4`.  
 **Text domain:** `cetech-woocommerce-delivery-engine`
 

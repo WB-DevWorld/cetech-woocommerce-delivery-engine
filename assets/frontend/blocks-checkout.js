@@ -261,10 +261,40 @@
 			html += '<p class="cetech-de-blocks-notice cetech-de-blocks-notice--failure" role="alert">' + escapeHtml((row.name ? row.name + ' — ' : '') + (row.reason || '')) + '</p>';
 		});
 		html += '</div>';
-		if (extensions.can_apply_checkout_address) {
-			html += '<button type="button" class="wc-block-components-button cetech-de-blocks-apply-checkout-address">' +
-				escapeHtml(i18n.applyCheckoutAddress || 'Use checkout shipping address for incomplete delivery items') + '</button>';
+		var onCheckout = !!(document.body && (
+			document.body.classList.contains('woocommerce-checkout') ||
+			document.querySelector('.wc-block-checkout')
+		));
+		if (onCheckout && extensions.delivery_plan && extensions.delivery_plan.length) {
+			html += '<section class="cetech-de-delivery-plan"><h2 class="cetech-de-delivery-plan__title">' +
+				escapeHtml(i18n.yourDeliveries || 'Your deliveries') + '</h2>';
+			extensions.delivery_plan.forEach(function (group) {
+				html += '<div class="cetech-de-delivery-plan__group"><h3 class="cetech-de-delivery-plan__heading">' +
+					escapeHtml(group.heading || '') + '</h3>';
+				(group.lines || []).forEach(function (line) {
+					html += '<p class="cetech-de-delivery-plan__line">';
+					if (line.product) {
+						html += '<span class="cetech-de-delivery-plan__product">' + escapeHtml(line.product) + '</span> ';
+					}
+					html += '<span class="cetech-de-delivery-plan__offer">' + escapeHtml(line.estimate || line.offer || '') + '</span></p>';
+				});
+				html += '</div>';
+			});
+			html += '</section>';
 		}
+		if (extensions.keep_address_note) {
+			html += '<p class="cetech-de-checkout-keep-address">' + escapeHtml(extensions.keep_address_note) + '</p>';
+		}
+		if (extensions.can_apply_checkout_address) {
+			html += '<p class="cetech-de-blocks-incomplete-actions">';
+			if (i18n.cartUrl) {
+				html += '<a class="cetech-de-blocks-add-delivery-address" href="' + escapeHtml(i18n.cartUrl) + '">' +
+					escapeHtml(i18n.addDeliveryAddress || 'Add delivery address') + '</a> ';
+			}
+			html += '<button type="button" class="cetech-de-blocks-apply-checkout-address cetech-de-blocks-apply-checkout-address--secondary">' +
+				escapeHtml(i18n.applyCheckoutAddress || 'Use my checkout address') + '</button></p>';
+		}
+		if (!onCheckout) {
 		items.forEach(function (item) {
 			var ext = item.ext || {};
 			var matching = ext.matching_location || {};
@@ -281,15 +311,23 @@
 					escapeHtml(option.estimate_text ? option.label + ' — ' + option.estimate_text : option.label) + '</option>';
 			}).join('');
 			var isPickup = !!ext.is_pickup;
-			var summary = (isPickup ? (i18n.changePickup || 'Change pickup') : (i18n.changeDelivery || 'Change delivery'));
-			if (ext.locality) {
-				summary += ' — ' + (isPickup ? (ext.pickup_location_label || ext.locality) : ((i18n.deliveringTo || 'Delivering to') + ': ' + ext.locality));
+			html += '<div class="cetech-de-blocks-line">';
+			html += '<div class="cetech-de-blocks-line__summary">';
+			if (ext.summary_kicker) {
+				html += '<p class="cetech-de-blocks-line__kicker">' + escapeHtml(ext.summary_kicker) + '</p>';
 			}
+			if (ext.summary_title) {
+				html += '<p class="cetech-de-blocks-line__title">' + escapeHtml(ext.summary_title) + '</p>';
+			}
+			if (ext.summary_meta) {
+				html += '<p class="cetech-de-blocks-line__meta">' + escapeHtml(ext.summary_meta) + '</p>';
+			}
+			html += '</div>';
 			html += '<details class="cetech-de-blocks-editor" data-cart-item-key="' + escapeHtml(item.key) + '">';
-			html += '<summary>' + escapeHtml(summary) + '</summary>';
+			html += '<summary>' + escapeHtml(i18n.change || i18n.changeDelivery || 'Change') + '</summary>';
 			html += '<div class="cetech-de-blocks-editor__body">';
 			html += '<fieldset class="cetech-de-blocks-editor__options"><legend>' +
-				escapeHtml(i18n.optionLegend || 'Fulfilment and delivery option') + '</legend>';
+				escapeHtml(i18n.optionLegend || 'Delivery') + '</legend>';
 			html += '<label class="cetech-de-blocks-editor__field" for="' + escapeHtml(optionId) + '">' +
 				escapeHtml(i18n.choose || 'Choose a delivery option') +
 				'<select id="' + escapeHtml(optionId) + '" name="cetech_de_delivery_option_key">' + options + '</select></label></fieldset>';
@@ -314,10 +352,11 @@
 				escapeHtml(i18n.updateDetails || 'Update') + '</button>';
 			if (!isPickup) {
 				html += '<button type="button" class="wc-block-components-button cetech-de-blocks-editor__use-for-all">' +
-					escapeHtml(i18n.useForAll || 'Use this address for all eligible delivery items') + '</button>';
+					escapeHtml(i18n.useForAll || 'Use this address for all delivery items') + '</button>';
 			}
-			html += '</div></details>';
+			html += '</div></details></div>';
 		});
+		}
 		mount.innerHTML = html;
 		openKeys.forEach(function (key) {
 			if (!key) {
@@ -364,32 +403,7 @@
 		}
 
 		function PickupNotes() {
-			var cart = getCartData();
-			var notes = pickupPackages(getExtensions(cart)).map(function (pkg, index) {
-				var lines = [];
-				if (pkg.pickup_location_label) {
-					lines.push(pkg.pickup_location_label);
-				}
-				if (pkg.pickup_address) {
-					lines.push(pkg.pickup_address);
-				}
-				if (pkg.estimate_text) {
-					lines.push(pkg.estimate_text);
-				}
-				if (!lines.length) {
-					return null;
-				}
-				return createElement(
-					'p',
-					{
-						key: 'cetech-de-pickup-' + index,
-						className: 'cetech-de-blocks-pickup-note'
-					},
-					lines.join(' — ')
-				);
-			});
-
-			return createElement('div', { className: 'cetech-de-blocks-pickup-notes' }, notes);
+			return null;
 		}
 
 		['woocommerce-checkout', 'woocommerce-cart'].forEach(function (scope) {

@@ -184,7 +184,7 @@ final class VariationDeliveryOptionsEndpoint {
 					'need_location',
 					$product_id,
 					$variation_id,
-					__( 'Enter your delivery location to see delivery options.', 'cetech-woocommerce-delivery-engine' ),
+					'',
 					$public_pickup
 				);
 			}
