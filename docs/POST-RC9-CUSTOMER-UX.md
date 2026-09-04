@@ -81,7 +81,30 @@ Stored under `C:\Users\Jane\Desktop\Learning 2026\Cursor\cetech-de-local-qa\evid
 
 Supporting: `03b-classic-cart-change-open.png`, `03c-classic-cart-768.png`, `08-classic-cart-delivery-pickup.png`, `09-wcfm-vendor-denied.png`.
 
-Owner visual acceptance of these screenshots: **APPROVED** (2026-09-04). Packaging of this frozen source follows. ZIP checksums are recorded after the clean-tree build.
+Owner visual acceptance of these screenshots: **APPROVED** (2026-09-04).
+
+## Package
+
+This ZIP was built from the frozen presentation source. **Do not rebuild.** ZIP checksums were added in a later docs-only commit; they do not change the packaged source.
+
+**PACKAGED SOURCE SHA:** `10028a2216619f514dda3ecf7cd1cbb7d50296cc`
+
+| Item | Value |
+|------|--------|
+| Filename | `cetech-woocommerce-delivery-engine-1.0.0-dev.integrated.2.zip` |
+| Version | `1.0.0-dev.integrated.2` |
+| Schema | `5` |
+| Branch | `feat/post-rc9-customer-ux` |
+| Bytes | `1484938` |
+| SHA-256 | `a16a7840f32c8aa95fde3d4ef25c97c39ec995fe1d4ee6036fbb03b8d1a1a9c9` |
+| Dist path | `dist/cetech-woocommerce-delivery-engine-1.0.0-dev.integrated.2.zip` |
+| Desktop copy | `C:\Users\Jane\Desktop\cetech-woocommerce-delivery-engine-1.0.0-dev.integrated.2.zip` |
+| Build | `scripts/build-v1-rc-package.ps1 -Version 1.0.0-dev.integrated.2 -ZipFileName cetech-woocommerce-delivery-engine-1.0.0-dev.integrated.2.zip` (clean tree; **not** `-AllowDirty`) |
+| Autoload verification | Package verification OK |
+| RC.9 tag | `v1.0.0-rc.9` still peels to `e6bc7fba16d9d7b96682f2945c518a33a9a16cd5` |
+| integrated.1 ZIP | untouched (`571f738aa263676d64be6d285686a10a5fea2c48245449b55fe2240466a2d247`) |
+
+Not RC.10. Do not retag RC.9. Do not modify FLAIROC.
 
 ## Known presentation limits
 
