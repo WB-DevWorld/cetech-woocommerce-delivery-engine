@@ -145,4 +145,109 @@ No production mutation.
 
 ## Source and package evidence
 
-To be appended by the docs-only follow-up commit after tests and packaging. The ZIP source SHA must remain the identity/runtime commit, not the later docs evidence tip.
+This section is a docs-only follow-up. It does **not** change packaged runtime bytes. Do not rebuild the ZIP after this commit.
+
+### Packaged runtime/source SHA
+
+```text
+c0000ab97aff8f2829ed9b173e0e6c7432b4eb9e
+```
+
+That SHA is the clean tree from which `1.0.0-dev.qual.1` was packaged. It is the identity commit `7da43bfbbfd05b33832ebc9c8396357a0b511f32` plus one bounded mechanical packaging-identity repair (`integ: recognize 1.0.0-dev.qual.1 as a schema-5 packaging identity`). The historical 11-commit replay was not squashed.
+
+Identity commit (plugin header / `CETECH_DE_VERSION` / readme Stable tag / initial manifest):
+
+```text
+7da43bfbbfd05b33832ebc9c8396357a0b511f32
+```
+
+### Composer
+
+- `composer validate --no-check-publish`: `./composer.json is valid` (exit 0).
+- `composer install --no-dev`: exit 0 (nothing to install; production autoload generated).
+- `composer install` including require-dev: **failed in this workstation environment** (Composer curl error 60 / Avast local-issuer intercept of GitHub dist downloads). Development vendor was therefore copied from the sibling Delivery Engine tree that already had PHPUnit `10.5.64` matching this lockfile, then `composer dump-autoload` was run here. PHPUnit below was executed from that local vendor tree.
+
+### PHP lint
+
+Local CLI is **PHP 8.5.0**, not PHP 8.1. Do not treat these counts as a PHP 8.1 proof. GitHub `Runtime PHP 8.1` is the 8.1 gate after push.
+
+- Runtime lint (`cetech-woocommerce-delivery-engine.php`, `uninstall.php`, `src/`, `database/`): **428 files, 0 failures**, PHP 8.5.0.
+- Full lint (all tracked/non-vendor `*.php`): **573 files, 0 failures**, PHP 8.5.0.
+
+### PHPUnit
+
+Command: `vendor/bin/phpunit`
+
+```text
+PHPUnit 10.5.64
+Runtime: PHP 8.5.0
+Tests: 994
+Assertions: 5596
+Deprecations: 5
+Exit code: 0
+```
+
+### Vitest
+
+`package-lock.json` matched the sibling tree; `node_modules` was copied locally rather than `npm ci` because of the same workstation TLS intercept. Command actually run: `npm run test:js` (`vitest run`).
+
+```text
+Test Files  6 passed (6)
+Tests       41 passed (41)
+Exit code:  0
+Duration    17.60s
+Vitest      v3.2.7
+```
+
+### Control Plane
+
+```text
+php scripts/verify-control-plane.php
+Delivery Engine control plane: OK
+Exit code: 0
+```
+
+### Diff hygiene
+
+`git diff --check origin/master..HEAD` reports inherited trailing whitespace in historical markdown (including `docs/AI-HANDOFF.md`) and a few historical PHP lines from recovered WCFM admin-handler whitespace. CI does not gate on `git diff --check`. No new runtime whitespace was introduced to resolve conflicts.
+
+### Secret/binary scan
+
+Tracked source contains no `.env`, credentials, API keys, private tokens, licensed WoodMart binaries, licensed WPML/WCML plugin binaries, ZIP artifacts, `node_modules`, or development `vendor`/PHPUnit package material.
+
+### Qualification artifact
+
+```text
+filename: cetech-woocommerce-delivery-engine-1.0.0-dev.qual.1.zip
+packaged source SHA: c0000ab97aff8f2829ed9b173e0e6c7432b4eb9e
+bytes: 1515275
+SHA-256: c2f86650854c2e61aef6493459d2ef2f7b3fa7241e822a8da9827fcd32872a16
+```
+
+Built with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/build-v1-rc-package.ps1 `
+  -Version "1.0.0-dev.qual.1" `
+  -ZipFileName "cetech-woocommerce-delivery-engine-1.0.0-dev.qual.1.zip"
+```
+
+No `-AllowDirty`. Tree was clean. Historical `cetech-woocommerce-delivery-engine-1.0.0-dev.integrated.2.zip` was **not** rebuilt or overwritten (still `1484938` bytes, SHA-256 `a16a7840f32c8aa95fde3d4ef25c97c39ec995fe1d4ee6036fbb03b8d1a1a9c9`).
+
+### Package verification
+
+Packager `verify-production-package-autoload.php`: **OK**.
+
+Additional extracted inspection:
+
+- ZIP root: single folder `cetech-woocommerce-delivery-engine/` (605 entries, forward slashes only).
+- Plugin header Version / `CETECH_DE_VERSION` / readme Stable tag: `1.0.0-dev.qual.1`.
+- Production `vendor/autoload.php` present; `vendor/phpunit` absent.
+- Absent from package: `.git/`, `.github/`, `.cursor/`, `node_modules/`, `tests/`, `coverage/`, `build/`, `test-results/`, `.env`, `phpunit.xml`, `package.json`, `package-lock.json`.
+- Packaged non-vendor PHP lint: **431 files, 0 failures**, PHP **8.5.0** (not PHP 8.1).
+
+First packaging attempt from `7da43bf` failed because the production verifier still classified unknown identities as schema 4. That is a packaging-identity expectation (INTEG-01 failure class B), repaired in `c0000ab` by adding `1.0.0-dev.qual` to the existing schema-5 identity list. Product semantics were not changed.
+
+### PHP 8.1 repair preserved
+
+`src/Application/Runtime/EcrToRuntimeConfigurationAdapter.php` blob `10e47f82efac9e2ce5890a4b19a915d08452597d` remains identical to protected `origin/master`.
