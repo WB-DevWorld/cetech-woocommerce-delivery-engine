@@ -94,10 +94,15 @@ final class SchemaV4InspectionTest extends TestCase {
 
 	public function test_rc9_tag_is_untouched(): void {
 		$plugin_root = dirname( __DIR__, 3 );
-		$sha = trim( (string) shell_exec( 'git -C ' . escapeshellarg( $plugin_root ) . ' rev-parse "v1.0.0-rc.9^{commit}" 2>NUL' ) );
+		$git         = 'git -C ' . escapeshellarg( $plugin_root ) . ' rev-parse --verify "v1.0.0-rc.9^{commit}"';
+		$sha         = trim( (string) shell_exec( $git . ' 2>/dev/null' ) );
 
-		if ( '' === $sha ) {
-			$sha = trim( (string) shell_exec( 'git -C ' . escapeshellarg( $plugin_root ) . ' rev-parse "v1.0.0-rc.9^{commit}" 2>/dev/null' ) );
+		if ( 1 !== preg_match( '/^[0-9a-f]{40}$/', $sha ) ) {
+			$sha = trim( (string) shell_exec( $git . ' 2>NUL' ) );
+		}
+
+		if ( 1 !== preg_match( '/^[0-9a-f]{40}$/', $sha ) ) {
+			self::markTestSkipped( 'v1.0.0-rc.9 is not present in this Git clone (shallow CI checkout).' );
 		}
 
 		self::assertSame( 'e6bc7fba16d9d7b96682f2945c518a33a9a16cd5', $sha );
