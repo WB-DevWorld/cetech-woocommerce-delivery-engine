@@ -1,0 +1,42 @@
+# CODEOWNERS routes review; CURRENT-WORK.md + task scope remain the authority for implementation ownership.
+* @wbdevworld
+
+# WS1 — customer/browser surfaces
+/src/Presentation/Frontend/ @Ben-001-sys @wbdevworld
+/assets/frontend/ @Ben-001-sys @wbdevworld
+/docs/workstreams/ws1/ @Ben-001-sys @wbdevworld
+
+# WS2 — Woo runtime/integration and post-order surfaces
+/src/Integrations/ @Emmanuel-coder-prog @wbdevworld
+/src/Application/Cart/ @Emmanuel-coder-prog @wbdevworld
+/src/Application/Checkout/ @Emmanuel-coder-prog @wbdevworld
+/src/Application/Order/ @Emmanuel-coder-prog @wbdevworld
+/src/Application/Pickup/ @Emmanuel-coder-prog @wbdevworld
+/src/Application/Shipment/ @Emmanuel-coder-prog @wbdevworld
+/src/Application/Shipping/ @Emmanuel-coder-prog @wbdevworld
+/src/Presentation/Email/ @Emmanuel-coder-prog @wbdevworld
+/docs/workstreams/ws2/ @Emmanuel-coder-prog @wbdevworld
+
+# WS3 — core/data/security/admin/release/control plane
+/src/Core/ @wbdevworld
+/src/Domain/ @wbdevworld
+/src/Infrastructure/ @wbdevworld
+/src/Bootstrap/ @wbdevworld
+/src/Application/Configuration/ @wbdevworld
+/src/Application/Diagnostics/ @wbdevworld
+/src/Application/ProductRule/ @wbdevworld
+/src/Application/RateQuote/ @wbdevworld
+/src/Application/Runtime/ @wbdevworld
+/src/Presentation/Admin/ @wbdevworld
+/src/Presentation/Cli/ @wbdevworld
+/src/Presentation/Shared/ @wbdevworld
+/assets/admin/ @wbdevworld
+/database/ @wbdevworld
+/scripts/ @wbdevworld
+/.github/ @wbdevworld
+/.cursor/ @wbdevworld
+/docs/team/ @wbdevworld
+/docs/workstreams/ws3/ @wbdevworld
+/AGENTS.md @wbdevworld
+/OWNERSHIP.md @wbdevworld
+/CURRENT-WORK.md @wbdevworld

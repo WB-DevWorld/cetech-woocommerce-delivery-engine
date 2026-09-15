@@ -1,0 +1,100 @@
+name: Delivery Engine CI
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+      - 'ws1/**'
+      - 'ws2/**'
+      - 'ws3/**'
+      - 'fix/**'
+      - 'batch/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: delivery-engine-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime-php81:
+    name: Runtime PHP 8.1
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          coverage: none
+      - name: Lint runtime PHP at declared minimum
+        shell: bash
+        run: |
+          set -euo pipefail
+          targets=(cetech-woocommerce-delivery-engine.php uninstall.php src database)
+          for target in "${targets[@]}"; do
+            if [ -f "$target" ]; then
+              php -l "$target" >/dev/null
+            elif [ -d "$target" ]; then
+              while IFS= read -r -d '' file; do
+                php -l "$file" >/dev/null
+              done < <(find "$target" -type f -name '*.php' -print0)
+            fi
+          done
+
+  php-tests:
+    name: PHP / PHPUnit 8.2
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          tools: composer:v2
+          coverage: none
+      - name: Validate Composer metadata
+        run: composer validate --no-check-publish
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Lint application, tests and tooling
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            php -l "$file" >/dev/null
+          done < <(find . -type f -name '*.php' -not -path './vendor/*' -print0)
+      - name: PHPUnit
+        run: vendor/bin/phpunit
+
+  javascript-tests:
+    name: JavaScript / Vitest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install JavaScript dependencies
+        run: npm ci
+      - name: Vitest
+        run: npm run test:js
+
+  control-plane:
+    name: Control Plane
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          coverage: none
+      - name: Verify team control plane
+        run: php scripts/verify-control-plane.php

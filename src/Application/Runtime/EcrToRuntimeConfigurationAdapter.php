@@ -38,7 +38,7 @@ final class EcrToRuntimeConfigurationAdapter {
 	public function adapt(
 		int $product_id,
 		EffectiveConfigurationSet $set,
-		string $input_target_type = ProductTargetType::Product->value,
+		string $input_target_type = 'product',
 		?int $variation_id = null
 	): array {
 		$input_target_type   = sanitize_key( $input_target_type );
@@ -176,7 +176,7 @@ final class EcrToRuntimeConfigurationAdapter {
 	private function map_slice(
 		int $product_id,
 		EffectiveConfiguration $configuration,
-		string $input_target_type = ProductTargetType::Product->value,
+		string $input_target_type = 'product',
 		?int $variation_id = null
 	): ?array {
 		$availability = $this->resolve_availability( $configuration );

@@ -1,0 +1,9 @@
+---
+description: CETECH Delivery Engine ownership and handoff rules
+alwaysApply: true
+---
+Read AGENTS.md, OWNERSHIP.md, CURRENT-WORK.md and the assigned workstream task before editing.
+Do not cross human workstreams without explicit reassignment recorded in CURRENT-WORK.md.
+Do not edit a central/high-conflict file while another lease is active.
+Create scoped commits and report exact tested SHAs.
+Do not alter release tags, release identity, production environments, schema, or architecture unless the task explicitly authorizes it.

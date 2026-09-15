@@ -1,0 +1,9 @@
+---
+description: CETECH Delivery Engine release and environment safety
+alwaysApply: true
+---
+A source checkout passing tests does not prove a release ZIP.
+For release work, build from a clean committed SHA, verify the extracted package, and record source SHA, bytes and SHA-256.
+Never move an accepted historical tag or overwrite an artifact under the same version.
+Do not mutate production/FLAIROC/training without explicit human authorization.
+Record remote WooCommerce/WordPress side effects; Git rollback does not undo them.
