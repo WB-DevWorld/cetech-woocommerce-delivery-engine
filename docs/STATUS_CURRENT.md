@@ -1,6 +1,6 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-15 (issue #2 local Git recovery).
+Last reconciled: 2026-09-15 (issue #11 INTEG-01 qualification baseline assembly).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
@@ -51,7 +51,7 @@ Those figures are **historical evidence only**. Issue #2 did not rerun product q
 The candidate is NOT RC.10 and is NOT a published release.
 
 ## Remaining pre-RC.10 qualification
-1. Construct a qualification/integration baseline from current protected `master` plus the exact recovered candidate (later issue; not this recovery).
+1. INTEG-01 / issue #11: assemble `batch/pre-rc10-qualification` from protected `master` `0f9c2f06` plus the exact recovered 11-commit runtime delta. Qualification identity `1.0.0-dev.qual.1`. Draft PR only; do not merge. Historical integrated.2 ZIP remains immutable.
 2. WoodMart current-candidate qualification.
 3. WP Rocket + Redis session/cache isolation.
 4. Paid two-destination order -> actual two shipments -> Thank You/My Account/email.
