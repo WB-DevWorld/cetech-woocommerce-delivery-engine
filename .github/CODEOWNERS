@@ -1,0 +1,26 @@
+# CODEOWNERS routes review; CURRENT-WORK.md + task scope remain the authority for implementation ownership.
+* @wbdevworld
+
+# WS1 — customer/browser surfaces
+/src/Presentation/ @Ben-001-sys @wbdevworld
+/assets/ @Ben-001-sys @wbdevworld
+/docs/workstreams/ws1/ @Ben-001-sys @wbdevworld
+
+# WS2 — Woo runtime/integration surfaces
+/src/Integrations/ @Emmanuel-coder-prog @wbdevworld
+/docs/workstreams/ws2/ @Emmanuel-coder-prog @wbdevworld
+
+# WS3 — core/data/security/release/control plane
+/src/Core/ @wbdevworld
+/src/Domain/ @wbdevworld
+/src/Infrastructure/ @wbdevworld
+/src/Bootstrap/ @wbdevworld
+/database/ @wbdevworld
+/scripts/ @wbdevworld
+/.github/ @wbdevworld
+/.cursor/ @wbdevworld
+/docs/team/ @wbdevworld
+/docs/workstreams/ws3/ @wbdevworld
+/AGENTS.md @wbdevworld
+/OWNERSHIP.md @wbdevworld
+/CURRENT-WORK.md @wbdevworld
