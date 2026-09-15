@@ -5,7 +5,8 @@ Status: CONTROL PLANE ACTIVE + LOCAL-ONLY SOURCE RECOVERY RECONCILED
 ## Canonical published truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
 - Canonical published branch: `master`.
-- Current protected `master`: `d2ebc620762c6acd1b3a143ee120bea906c6d205` (`[BOOT] Establish Delivery Engine team control plane and CI`, PR #1).
+- Recovery baseline `master` before reconciliation PR #9: `d2ebc620762c6acd1b3a143ee120bea906c6d205` (`[BOOT] Establish Delivery Engine team control plane and CI`, PR #1).
+- The canonical `master` SHA advances only through the protected PR flow; use the current GitHub `master` branch head when an exact current SHA is required.
 - Pre-bootstrap RC.9-line `master`: `376c0896df0d85b159e8713c79aadb6c9b8a3839`.
 - Published version: `1.0.0-rc.9`.
 - Schema target: `5`.
