@@ -5,8 +5,9 @@ Last reconciled: 2026-09-15 (issue #2 local Git recovery).
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
 - Default/canonical published branch: `master`
-- Current protected `master`: `d2ebc620762c6acd1b3a143ee120bea906c6d205`
-- Pre-bootstrap RC.9-line `master`: `376c0896df0d85b159e8713c79aadb6c9b8a3839` (ancestor of current `master`; not rewritten)
+- Recovery baseline `master` before reconciliation PR #9: `d2ebc620762c6acd1b3a143ee120bea906c6d205`
+- The exact current canonical SHA is the protected GitHub `master` branch head; do not treat the recovery-baseline SHA above as a perpetual branch tip.
+- Pre-bootstrap RC.9-line `master`: `376c0896df0d85b159e8713c79aadb6c9b8a3839` (ancestor of the protected `master` lineage; not rewritten)
 - Repository visibility: public during GitHub Free branch/ruleset protection use
 - Composer license declaration remains `proprietary`; public visibility is not an open-source license grant.
 
@@ -23,6 +24,7 @@ Last reconciled: 2026-09-15 (issue #2 local Git recovery).
 - RC.8: fulfilment-correctness lineage; the local RC.8 tag was not published remotely.
 - RC.9: Cart/Checkout Blocks + settings-honesty published baseline.
 - 2026-09-15 bootstrap: team control plane, CI, release safeguards, and a narrow PHP 8.1 parsing compatibility repair on `master` (`d2ebc620`). That commit does **not** replace post-RC.9 candidate history.
+- 2026-09-15 recovery reconciliation: PR #9 documented the exact recovered refs/evidence on protected `master`; it did **not** merge recovered feature history into `master`.
 
 ## Implemented but unreleased after RC.9 (now recovered onto GitHub)
 Recovered as exact historical SHAs. **Not merged into `master`. Not RC.10.**
@@ -34,7 +36,7 @@ Recovered as exact historical SHAs. **Not merged into `master`. Not RC.10.**
   - unique vs integrated.2: `e85b44d` (runtime) + `3b5b60d` (docs/checksum)
 - Provenance recovery branches for original per-item, integrated.1, cart-state, Blocks snapshot, WCFM, and historical RC.6/RC.7/RC.8 checksum tips: see `docs/recovery/POST-RC9-LOCAL-RECOVERY-REPORT.md`
 
-Both integrated.2 and WPML descend from peeled RC.9 `e6bc7fb`, **not** from later `376c089` staff-training merge. That divergence is expected. Do not rebase them onto `d2ebc620` merely to linearize history.
+Both integrated.2 and WPML descend from peeled RC.9 `e6bc7fb`, **not** from later `376c089` staff-training merge. That divergence is expected. Do not rebase them onto the bootstrap/recovery-control-plane lineage merely to linearize history.
 
 ## integrated.2 historical qualification evidence
 Qualified runtime source: `10028a2216619f514dda3ecf7cd1cbb7d50296cc`.
