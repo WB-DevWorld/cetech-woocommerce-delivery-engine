@@ -7,6 +7,7 @@ $required = [
     'OWNERSHIP.md',
     'CURRENT-WORK.md',
     'SECURITY.md',
+    'LICENSE.md',
     'docs/AUTHORITY.md',
     'docs/STATUS_CURRENT.md',
     'docs/team/COLLABORATION.md',
@@ -25,6 +26,8 @@ $required = [
     '.github/CODEOWNERS',
     '.github/pull_request_template.md',
     '.github/ISSUE_TEMPLATE/task.md',
+    '.github/workflows/ci.yml',
+    '.github/workflows/release-package.yml',
 ];
 
 $missing = array_values(array_filter(
