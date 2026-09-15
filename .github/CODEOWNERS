@@ -8,6 +8,12 @@
 
 # WS2 — Woo runtime/integration surfaces
 /src/Integrations/ @Emmanuel-coder-prog @wbdevworld
+/src/Application/Cart/ @Emmanuel-coder-prog @wbdevworld
+/src/Application/Checkout/ @Emmanuel-coder-prog @wbdevworld
+/src/Application/Order/ @Emmanuel-coder-prog @wbdevworld
+/src/Application/Pickup/ @Emmanuel-coder-prog @wbdevworld
+/src/Application/Shipment/ @Emmanuel-coder-prog @wbdevworld
+/src/Application/Shipping/ @Emmanuel-coder-prog @wbdevworld
 /docs/workstreams/ws2/ @Emmanuel-coder-prog @wbdevworld
 
 # WS3 — core/data/security/release/control plane
@@ -15,6 +21,11 @@
 /src/Domain/ @wbdevworld
 /src/Infrastructure/ @wbdevworld
 /src/Bootstrap/ @wbdevworld
+/src/Application/Configuration/ @wbdevworld
+/src/Application/Diagnostics/ @wbdevworld
+/src/Application/ProductRule/ @wbdevworld
+/src/Application/RateQuote/ @wbdevworld
+/src/Application/Runtime/ @wbdevworld
 /database/ @wbdevworld
 /scripts/ @wbdevworld
 /.github/ @wbdevworld
