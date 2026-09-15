@@ -1,30 +1,38 @@
-# Current Work — Bootstrap State
+# Current Work — Post-RC.9 Local Recovery Reconciled
 
-Status: CONTROL-PLANE BOOTSTRAP + LOCAL-ONLY SOURCE RECOVERY
+Status: CONTROL PLANE ACTIVE + LOCAL-ONLY SOURCE RECOVERY RECONCILED
 
 ## Canonical published truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
 - Canonical published branch: `master`.
-- Canonical `master` SHA at bootstrap start: `376c0896df0d85b159e8713c79aadb6c9b8a3839`.
+- Current protected `master`: `d2ebc620762c6acd1b3a143ee120bea906c6d205` (`[BOOT] Establish Delivery Engine team control plane and CI`, PR #1).
+- Pre-bootstrap RC.9-line `master`: `376c0896df0d85b159e8713c79aadb6c9b8a3839`.
 - Published version: `1.0.0-rc.9`.
 - Schema target: `5`.
+- RC.10: DOES NOT EXIST.
 - Stage 15: NOT STARTED.
-- Existing remote history, published tags and RC.4 release assets survived the ownership transfer.
+- Published remote tags: `v1.0.0-rc.2`, `v1.0.0-rc.4`, `v1.0.0-rc.5`, `v1.0.0-rc.6`, `v1.0.0-rc.9`.
 
-## Local-only recovery still required
-The organization remote does not yet contain the later post-RC.9 contributor/candidate branches that project history says exist locally. Before product work starts, recover/classify them from the richest local object store.
+## Recovered post-RC.9 history (GitHub)
+Issue #2 recovered the local-only candidate history into the organization repository **without merging it into `master`**.
 
-Historical qualified unreleased candidate:
-- branch reported locally: `feat/post-rc9-customer-ux`;
-- qualified packaged runtime source: `10028a2216619f514dda3ecf7cd1cbb7d50296cc`;
-- docs/checksum follow-up: `d534d6a24390f39206f697308f0c4bc42919be46`;
-- artifact: `cetech-woocommerce-delivery-engine-1.0.0-dev.integrated.2.zip`;
-- RC.10: NOT CREATED.
+| Ref | SHA | Role |
+| --- | --- | --- |
+| `feat/post-rc9-customer-ux` | `d534d6a24390f39206f697308f0c4bc42919be46` | ACTIVE_CANDIDATE (integrated.2 docs/checksum tip; packaged runtime `10028a2216619f514dda3ecf7cd1cbb7d50296cc`) |
+| `feat/post-rc9-wpml` | `3b5b60d0d92b2edc00496d536774f8ac907cd6d2` | UNIQUE_STREAM (two commits not reachable from integrated.2) |
+| `recovery/post-rc9-per-item-context` | `093a16460f5948bfd9a1b9fa802df22e46795f76` | PRESERVE_ONLY provenance (per-item docs/checksum; runtime `72cb7dd` is an ancestor of integrated.2) |
+| `recovery/post-rc9-integrated-candidate` | `51ccd3e42720d66c4db5be9c2a52290042680229` | PRESERVE_ONLY (integrated.1 docs/checksum) |
+| `recovery/post-rc9-cart-state` | `ad16df20692500e758b1d64d16ebf14206025f48` | PRESERVE_ONLY original cart-state SHAs |
+| `recovery/post-rc9-blocks-line-snapshot` | `4d0fe4dc39af4be567935eca8c836a804078b7a7` | PRESERVE_ONLY original blocks-snapshot SHAs |
+| `recovery/post-rc9-wcfm-isolation` | `31ea8abda4e4a502b121a671031c27fb886973bf` | PRESERVE_ONLY original WCFM SHAs |
+| `recovery/post-rc6-admin-setup-defects` | `4ebecfb92b843fd9eee2b2bb326673c2ee028d6a` | PRESERVE_ONLY historical RC.6 admin repair |
+| `recovery/post-rc7-fulfilment-correctness` | `c370f84b39e450dd48cedbad27b4061bf9720255` | PRESERVE_ONLY RC.8 checksum docs |
+| `recovery/post-rc6-bulk-r1` | `6b86e248970171d876c812a443d4086eb525d66d` | PRESERVE_ONLY RC.7 checksum docs |
 
-Unique unmerged stream:
-- `feat/post-rc9-wpml` — preserve until reconciled. Exact current SHA must be re-verified locally.
+Full forensic report: `docs/recovery/POST-RC9-LOCAL-RECOVERY-REPORT.md`.
 
 ## Current release-qualification gaps
+These remain later work. They were **not** rerun under issue #2:
 - current candidate on WoodMart;
 - WP Rocket + Redis cross-session isolation;
 - one paid multi-destination order through actual shipment creation, Thank You, My Account and customer email;
@@ -32,21 +40,20 @@ Unique unmerged stream:
 - production rollout/pilot.
 
 ## Active milestone
-P0 — control-plane bootstrap and local-source reconciliation.
+P0 complete for source recovery. Next authorized product step is a later issue that constructs the RC.10 qualification/integration baseline from **current protected `master` plus the exact recovered candidate**. Do not treat recovered branches as already integrated.
 
 ## Integration editor
 WS3 / `@wbdevworld`.
 
 ## Authorized implementation
-No new product feature implementation until local-only source recovery is reconciled and the shared control plane/CI is merged. Qualification planning/evidence collection may proceed only when it cannot mutate unreconciled source or shared live environments.
+No new product feature implementation in this recovery issue. No RC.10 promotion. No Stage 15. No FLAIROC/training/production mutation.
 
 ## Central leases
-- control-plane files: WS3 during bootstrap;
+- recovered candidate identity: frozen at the SHAs above;
 - release identity/tags: frozen;
 - schema: frozen at 5;
-- canonical branch history: no force-push/rewrite.
+- canonical `master`: no force-push/rewrite.
 
 ## Environment authorization
-- Production/FLAIROC/training: NO autonomous mutation during bootstrap.
-- Local read-only/source-recovery work: allowed.
-- Isolated QA lab: only when explicitly assigned after recovery.
+- Production/FLAIROC/training: NO autonomous mutation.
+- Isolated QA lab: only when explicitly assigned after this reconciliation is accepted.
