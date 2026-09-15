@@ -1,0 +1,75 @@
+name: Delivery Engine CI
+
+on:
+  pull_request:
+    branches:
+      - master
+  push:
+    branches:
+      - master
+      - 'ws1/**'
+      - 'ws2/**'
+      - 'ws3/**'
+      - 'fix/**'
+      - 'batch/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: delivery-engine-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  php-tests:
+    name: PHP / PHPUnit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          tools: composer:v2
+          coverage: none
+      - name: Validate Composer metadata
+        run: composer validate --no-check-publish
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: PHP syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do
+            php -l "$file" >/dev/null
+          done < <(find . -type f -name '*.php' -not -path './vendor/*' -print0)
+      - name: PHPUnit
+        run: vendor/bin/phpunit
+
+  javascript-tests:
+    name: JavaScript / Vitest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install JavaScript dependencies
+        run: npm ci
+      - name: Vitest
+        run: npm run test:js
+
+  control-plane:
+    name: Control Plane
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          coverage: none
+      - name: Verify team control plane
+        run: php scripts/verify-control-plane.php
