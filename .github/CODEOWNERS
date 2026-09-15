@@ -2,11 +2,11 @@
 * @wbdevworld
 
 # WS1 — customer/browser surfaces
-/src/Presentation/ @Ben-001-sys @wbdevworld
-/assets/ @Ben-001-sys @wbdevworld
+/src/Presentation/Frontend/ @Ben-001-sys @wbdevworld
+/assets/frontend/ @Ben-001-sys @wbdevworld
 /docs/workstreams/ws1/ @Ben-001-sys @wbdevworld
 
-# WS2 — Woo runtime/integration surfaces
+# WS2 — Woo runtime/integration and post-order surfaces
 /src/Integrations/ @Emmanuel-coder-prog @wbdevworld
 /src/Application/Cart/ @Emmanuel-coder-prog @wbdevworld
 /src/Application/Checkout/ @Emmanuel-coder-prog @wbdevworld
@@ -14,9 +14,10 @@
 /src/Application/Pickup/ @Emmanuel-coder-prog @wbdevworld
 /src/Application/Shipment/ @Emmanuel-coder-prog @wbdevworld
 /src/Application/Shipping/ @Emmanuel-coder-prog @wbdevworld
+/src/Presentation/Email/ @Emmanuel-coder-prog @wbdevworld
 /docs/workstreams/ws2/ @Emmanuel-coder-prog @wbdevworld
 
-# WS3 — core/data/security/release/control plane
+# WS3 — core/data/security/admin/release/control plane
 /src/Core/ @wbdevworld
 /src/Domain/ @wbdevworld
 /src/Infrastructure/ @wbdevworld
@@ -26,6 +27,10 @@
 /src/Application/ProductRule/ @wbdevworld
 /src/Application/RateQuote/ @wbdevworld
 /src/Application/Runtime/ @wbdevworld
+/src/Presentation/Admin/ @wbdevworld
+/src/Presentation/Cli/ @wbdevworld
+/src/Presentation/Shared/ @wbdevworld
+/assets/admin/ @wbdevworld
 /database/ @wbdevworld
 /scripts/ @wbdevworld
 /.github/ @wbdevworld
