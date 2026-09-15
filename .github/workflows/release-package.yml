@@ -1,0 +1,58 @@
+name: Build Release Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release/package version, e.g. 1.0.0-rc.10'
+        required: true
+        type: string
+      ref:
+        description: 'Exact branch, tag or commit SHA to package'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Package and verify
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout exact requested ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+          fetch-depth: 0
+      - name: Setup PHP 8.1
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          tools: composer:v2
+          coverage: none
+      - name: Show source provenance
+        shell: pwsh
+        run: |
+          git status --short
+          git rev-parse HEAD
+          git log -1 --format='%H %cI %s'
+      - name: Build and verify WordPress-installable ZIP
+        shell: pwsh
+        run: |
+          ./scripts/build-v1-rc-package.ps1 -Version '${{ inputs.version }}'
+      - name: List release artifacts
+        shell: pwsh
+        run: |
+          Get-ChildItem -LiteralPath dist | Format-Table Name, Length, LastWriteTime
+          Get-ChildItem -LiteralPath dist -Filter '*.sha256' | ForEach-Object { Get-Content $_.FullName }
+      - name: Upload verified package artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: cetech-delivery-engine-${{ inputs.version }}-${{ github.run_id }}
+          path: |
+            dist/*.zip
+            dist/*.sha256
+          if-no-files-found: error
+          retention-days: 30
