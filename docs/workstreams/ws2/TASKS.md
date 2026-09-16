@@ -1,6 +1,6 @@
 # WS2 Tasks — Emmanuel
 
-Bootstrap queue (do not implement until canonical local-only source recovery is complete):
+Qualification queue against PR #12 / `1.0.0-dev.qual.1` (not canonical `master`, not RC.10). Source recovery is complete. Do not implement on published `master` unless separately authorized. Do not merge the unique WPML stream without explicit milestone authorization.
 
 ## WS2-Q1 — Paid multi-destination Woo lifecycle qualification
 Prove on the exact combined candidate: paid two-destination order, correct order-line snapshots, actual two shipment records, shipment idempotency, Thank You, My Account and customer email. Include one pickup control case with zero delivery charge/no delivery shipment.

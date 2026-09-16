@@ -1,5 +1,7 @@
 # WS3 Status
-State: IN PROGRESS — organization transfer verified; control-plane bootstrap branch active; local-only source recovery still pending.
+State: P0 source recovery COMPLETE. Qualification baseline assembled as PR #12 (`1.0.0-dev.qual.1`). OPEN/DRAFT/**DO NOT MERGE**. Not RC.10.
 
 Canonical organization repo: `WB-DevWorld/cetech-woocommerce-delivery-engine`
-Bootstrap base: `master @ 376c0896df0d85b159e8713c79aadb6c9b8a3839`
+Protected `master`: `b7c9f2bff8a50eab8fcda978c27b73647e49fc74`
+Qualification branch: `batch/pre-rc10-qualification` @ `be586a454cc9a03395b981ef2b07cce445ef8f10`
+WPML remains separate: `feat/post-rc9-wpml` @ `3b5b60d0d92b2edc00496d536774f8ac907cd6d2`

@@ -1,6 +1,6 @@
 # WS1 Tasks — Ben
 
-Bootstrap queue (do not implement until canonical local-only source recovery is complete):
+Qualification queue against PR #12 / `1.0.0-dev.qual.1` (not canonical `master`, not RC.10). Source recovery is complete. Do not implement on published `master` unless separately authorized.
 
 ## WS1-Q1 — Current-candidate WoodMart/customer-surface qualification
 Scope: PDP, variable/swatches, AJAX Add to Cart, mini-cart, Classic cart/checkout, Blocks customer surfaces, responsive/accessibility. Quick View/Buy Now only if enabled in target WoodMart environment.
