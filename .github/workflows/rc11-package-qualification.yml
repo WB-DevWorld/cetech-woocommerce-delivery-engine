@@ -26,12 +26,14 @@ jobs:
           tools: composer:v2
           coverage: none
 
-      - name: Checkout exact RC.11 source
+      - name: Checkout exact RC.11 source on named local branch
         shell: pwsh
         run: |
-          git checkout --detach 384f564f64a2db766ae6907392e95fb366fb8533
+          git checkout -B rc11-package-source 384f564f64a2db766ae6907392e95fb366fb8533
           $head = (git rev-parse HEAD).Trim()
+          $branch = (git branch --show-current).Trim()
           if ($head -ne '384f564f64a2db766ae6907392e95fb366fb8533') { throw "Unexpected RC.11 source: $head" }
+          if ($branch -ne 'rc11-package-source') { throw "Unexpected RC.11 package branch: $branch" }
           git status --short
 
       - name: Build and verify RC.11 package
@@ -60,11 +62,14 @@ jobs:
         shell: pwsh
         run: |
           $rc10Source = Join-Path $env:RUNNER_TEMP 'cetech-rc10-source'
-          git worktree add --detach $rc10Source 'v1.0.0-rc.10'
+          git branch -f rc10-smoke-source d1409258caf1a90675b689ab105471460de4c713
+          git worktree add $rc10Source rc10-smoke-source
           Push-Location $rc10Source
           try {
             $head = (git rev-parse HEAD).Trim()
+            $branch = (git branch --show-current).Trim()
             if ($head -ne 'd1409258caf1a90675b689ab105471460de4c713') { throw "RC.10 tag moved or peeled unexpectedly: $head" }
+            if ($branch -ne 'rc10-smoke-source') { throw "Unexpected RC.10 smoke branch: $branch" }
             ./scripts/build-v1-rc-package.ps1 -Version '1.0.0-rc.10' -ZipFileName 'cetech-woocommerce-delivery-engine-1.0.0-rc.10-smoke.zip'
             Copy-Item -LiteralPath 'dist/cetech-woocommerce-delivery-engine-1.0.0-rc.10-smoke.zip' -Destination "$env:GITHUB_WORKSPACE/dist/cetech-woocommerce-delivery-engine-1.0.0-rc.10-smoke.zip" -Force
             Copy-Item -LiteralPath 'dist/cetech-woocommerce-delivery-engine-1.0.0-rc.10-smoke.zip.sha256' -Destination "$env:GITHUB_WORKSPACE/dist/cetech-woocommerce-delivery-engine-1.0.0-rc.10-smoke.zip.sha256" -Force
