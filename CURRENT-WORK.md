@@ -1,31 +1,43 @@
-# Current Work — Issue #18 PDP delivery price display
+# Current Work — RC.11 Promotion
 
-Status: OWNER-CONTROLLED POST-RC.10 IMPLEMENTATION (NOT ACCEPTED)
+Status: OWNER-CONTROLLED RC.11 RELEASE PROMOTION (NOT DEPLOYED)
 
 ## Canonical published truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
 - Canonical published branch: `master`.
-- Protected runtime baseline: tagged `v1.0.0-rc.10` → `d1409258caf1a90675b689ab105471460de4c713`. Immutable. Do not move the tag or overwrite the RC.10 ZIP.
-- Active development identity: `1.0.0-dev.pdp-price.3` / schema `5`.
+- Protected `master` baseline for RC.11 promotion: `35ff33d6788279a3ab75627f9eb9756b988ccb04`.
+- That master commit integrates the owner-accepted issue #18 candidate `ecb0a69f8375712de0fb7ba53ee8abe2f9b438e5`.
+- Prior tagged release remains immutable: `v1.0.0-rc.10` → `d1409258caf1a90675b689ab105471460de4c713`.
+- RC.11 promotion identity: `1.0.0-rc.11` / schema `5`.
 - Stage 15: NOT STARTED.
 
 ## Active task
-GitHub issue **#18** — `[P2] Show authoritative delivery price on product-page delivery options`.
+GitHub issue **#20** — `[RC11] Promote owner-accepted issue #18 baseline to RC.11`.
 
-- Sole owner: `@wbdevworld`
-- Implementation branch: `fix/pdp-delivery-price-display`
-- Cursor/AI is the owner's implementation, debugging, testing and evidence-collection agent only.
-- `@Ben-001-sys` and `@Emmanuel-coder-prog` have no assigned role on #18.
+- Sole owner / release authority: `@wbdevworld`.
+- Release branch: `release/rc11`.
+- RC.11 is release-promotion-only: no new delivery runtime behavior is authorized beyond protected master `35ff33d6...`.
+- Cursor/AI may build/test/package evidence on the owner's behalf but does not become release authority.
 
-## Authorized implementation
-Bounded PDP customer-facing delivery prices using the same server quote path as cart/checkout. No FLAIROC/training/production mutation. No RC.10 retag. No Stage 15. No WPML overlay merge. A future RC is created only after the owner explicitly authorizes promotion.
+## Qualification required before final RC.11 publication
+- exact release branch/merge source green on all required CI jobs;
+- production ZIP built from the exact final release source;
+- package verifier PASS against the extracted production root;
+- packaged PHP lint PASS;
+- clean-install smoke PASS;
+- RC.10 → RC.11 upgrade smoke PASS;
+- exact ZIP byte size + SHA-256 recorded;
+- final tag must be annotated and must peel to the exact protected-master release commit.
 
 ## Central leases
-- version identity: `1.0.0-dev.pdp-price.3` on `fix/pdp-delivery-price-display`;
-- schema: frozen at 5;
-- tagged `v1.0.0-rc.10`: frozen;
-- canonical `master`: no force-push/rewrite.
+- release identity: `1.0.0-rc.11` on `release/rc11`;
+- schema: frozen at `5`;
+- `v1.0.0-rc.10`: immutable;
+- protected `master`: no force-push/rewrite;
+- no RC.11 tag until final source and artifact evidence are complete.
 
 ## Environment authorization
-- Production/FLAIROC/training: NO autonomous mutation.
-- Isolated local QA lab may be used for bounded PDP/cart price comparison. Physical qualification remains owner-decided.
+- Production / FLAIROC / training: NO deployment or mutation as part of RC.11 promotion.
+- Isolated QA labs may be used for clean-install and RC.10 → RC.11 upgrade smoke.
+- POS repository is outside scope and must not be touched.
+- WPML/WCML and WP Rocket certification remain separate.
