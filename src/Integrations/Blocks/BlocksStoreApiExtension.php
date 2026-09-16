@@ -6,9 +6,11 @@ namespace CetechDeliveryEngine\Integrations\Blocks;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
+use CetechDeliveryEngine\Application\Checkout\CheckoutAddressPolicy;
 use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
 use CetechDeliveryEngine\Application\Shipping\ShippingRateCalculationGate;
 use CetechDeliveryEngine\Infrastructure\WooCommerce\Shipping\SelectedOfferShippingMethod;
+use CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy;
 
 /**
  * Registers customer-safe Delivery Engine data on Store API cart / cart-item / checkout.
@@ -24,7 +26,8 @@ final class BlocksStoreApiExtension {
 	public function __construct(
 		private CartDeliverySelectionCapture $cart_capture,
 		private CartDeliverySelectionRevalidator $cart_revalidator,
-		private ShippingRateCalculationGate $shipping_gate
+		private ShippingRateCalculationGate $shipping_gate,
+		private ?CheckoutAddressPolicy $address_policy = null
 	) {
 	}
 
@@ -81,6 +84,24 @@ final class BlocksStoreApiExtension {
 			'is_pickup'               => [ 'description' => 'Whether this line is store pickup.', 'type' => 'boolean', 'readonly' => true ],
 			'requires_selection'      => [ 'description' => 'Whether a Delivery Engine selection is required.', 'type' => 'boolean', 'readonly' => true ],
 			'selection_valid'         => [ 'description' => 'Whether the captured selection is still valid.', 'type' => [ 'boolean', 'null' ], 'readonly' => true ],
+			'needs_reselection'       => [ 'description' => 'Whether the customer must choose a new delivery option.', 'type' => 'boolean', 'readonly' => true ],
+			'reselection_message'     => [ 'description' => 'Customer-safe reselection message.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'reselection_options'     => [ 'description' => 'Public delivery options available for reselection.', 'type' => 'array', 'readonly' => true ],
+			'product_name'            => [ 'description' => 'Public product name for the affected cart line.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'cart_item_key'           => [ 'description' => 'WooCommerce cart item key.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'has_customer_context'    => [ 'description' => 'Whether this line has a Delivery Engine customer context.', 'type' => 'boolean', 'readonly' => true ],
+			'address_complete'        => [ 'description' => 'Whether the Delivery address is complete.', 'type' => 'boolean', 'readonly' => true ],
+			'can_edit_context'       => [ 'description' => 'Whether the customer can edit this line context.', 'type' => 'boolean', 'readonly' => true ],
+			'can_split'             => [ 'description' => 'Whether quantity can be split onto another destination.', 'type' => 'boolean', 'readonly' => true ],
+			'quantity'               => [ 'description' => 'Cart line quantity.', 'type' => 'integer', 'readonly' => true ],
+			'locality'              => [ 'description' => 'Customer-safe destination locality.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'estimate_line'         => [ 'description' => 'Formatted estimated delivery line.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'summary_kicker'        => [ 'description' => 'Compact summary kicker, such as Store Pickup.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'summary_title'         => [ 'description' => 'Compact summary title.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'summary_meta'          => [ 'description' => 'Compact summary meta line.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'matching_location'     => [ 'description' => 'Customer matching location for editing this cart line.', 'type' => [ 'object', 'null' ], 'readonly' => true ],
+			'delivery_address'      => [ 'description' => 'Customer delivery address for editing this cart line.', 'type' => [ 'object', 'null' ], 'readonly' => true ],
+			'available_options'     => [ 'description' => 'Public delivery options available for this line.', 'type' => 'array', 'readonly' => true ],
 		];
 	}
 
@@ -100,11 +121,28 @@ final class BlocksStoreApiExtension {
 			++$index;
 		}
 
+		$notices = $this->checkout_notices();
+		$mutation = $GLOBALS[ BlocksCartContextCommandHandler::RESULT_GLOBAL ] ?? null;
+		$plan = [];
+		if ( function_exists( 'WC' ) && WC()->cart ) {
+			$plan = CustomerStorefrontCopy::delivery_plan( WC()->cart->get_cart() );
+		}
+
 		return BlocksPublicPayload::strip_forbidden(
 			[
 				'packages'             => $packages,
 				'has_managed_packages' => $this->has_managed_package( $packages ),
 				'runtime_active'       => $this->shipping_gate->is_runtime_active(),
+				'multi_destination'    => (bool) ( $notices['multi_destination'] ?? false ),
+				'mixed_fulfilment'     => (bool) ( $notices['mixed_fulfilment'] ?? false ),
+				'incomplete_delivery'  => (int) ( $notices['incomplete_delivery'] ?? 0 ),
+				'notices'              => $notices['messages'] ?? [],
+				'can_apply_checkout_address' => (int) ( $notices['incomplete_delivery'] ?? 0 ) > 0,
+				'keep_address_note'    => (bool) ( $notices['keep_address_note'] ?? false )
+					? CustomerStorefrontCopy::items_keep_own_address()
+					: null,
+				'delivery_plan'        => $plan,
+				'mutation_result'      => is_array( $mutation ) ? $mutation : null,
 			]
 		);
 	}
@@ -129,6 +167,100 @@ final class BlocksStoreApiExtension {
 				'type'        => 'boolean',
 				'readonly'    => true,
 			],
+			'multi_destination'    => [
+				'description' => 'Whether managed Delivery lines have more than one destination.',
+				'type'        => 'boolean',
+				'readonly'    => true,
+			],
+			'mixed_fulfilment'     => [
+				'description' => 'Whether the cart mixes Store Pickup and Delivery.',
+				'type'        => 'boolean',
+				'readonly'    => true,
+			],
+			'incomplete_delivery'  => [
+				'description' => 'Count of Delivery lines missing a complete address.',
+				'type'        => 'integer',
+				'readonly'    => true,
+			],
+			'notices'              => [
+				'description' => 'Customer-safe checkout notices.',
+				'type'        => 'array',
+				'readonly'    => true,
+			],
+			'can_apply_checkout_address' => [
+				'description' => 'Whether the explicit checkout-address action is available.',
+				'type'        => 'boolean',
+				'readonly'    => true,
+			],
+			'keep_address_note'    => [
+				'description' => 'Short note that per-item addresses are kept.',
+				'type'        => [ 'string', 'null' ],
+				'readonly'    => true,
+			],
+			'delivery_plan'        => [
+				'description' => 'Compact checkout confirmation grouped by destination.',
+				'type'        => 'array',
+				'readonly'    => true,
+			],
+			'mutation_result'      => [
+				'description' => 'Per-line outcome of the last customer-context mutation.',
+				'type'        => [ 'object', 'null' ],
+				'readonly'    => true,
+			],
+		];
+	}
+
+	/**
+	 * @return array{
+	 *     multi_destination: bool,
+	 *     mixed_fulfilment: bool,
+	 *     incomplete_delivery: int,
+	 *     messages: list<array{code: string, message: string}>
+	 * }
+	 */
+	private function checkout_notices(): array {
+		$empty = [
+			'multi_destination'   => false,
+			'mixed_fulfilment'    => false,
+			'incomplete_delivery' => 0,
+			'keep_address_note'    => false,
+			'messages'            => [],
+		];
+
+		if ( ! $this->address_policy instanceof CheckoutAddressPolicy || ! function_exists( 'WC' ) || ! WC()->cart ) {
+			return $empty;
+		}
+
+		$summary = $this->address_policy->summarize_cart( WC()->cart->get_cart() );
+		$messages = [];
+
+		if ( $summary['multi_destination'] ) {
+			$messages[] = [
+				'code'    => 'multi_destination',
+				'message' => CustomerStorefrontCopy::multi_destination(),
+			];
+		}
+
+		if ( $summary['has_pickup'] && $summary['has_delivery'] ) {
+			$messages[] = [
+				'code'    => 'mixed_fulfilment',
+				'message' => CustomerStorefrontCopy::mixed_fulfilment(),
+			];
+		}
+
+		if ( $summary['incomplete_delivery'] > 0 ) {
+			$messages[] = [
+				'code'    => 'incomplete_delivery',
+				'message' => CustomerStorefrontCopy::incomplete_address( $summary['incomplete_delivery'] ),
+			];
+		}
+
+		return [
+			'multi_destination'   => $summary['multi_destination'],
+			'mixed_fulfilment'    => $summary['has_pickup'] && $summary['has_delivery'],
+			'incomplete_delivery' => $summary['incomplete_delivery'],
+			'keep_address_note'    => $summary['has_delivery'] && [] !== $summary['complete_identities'],
+			'messages'            => $messages,
 		];
 	}
 

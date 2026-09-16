@@ -1,8 +1,146 @@
-.cetech-de-blocks-pickup-notes {
-	margin: 0.5rem 0 1rem;
+.cetech-de-blocks-pickup-notes,
+.cetech-de-blocks-customer-context {
+	max-width: 100%;
+	overflow-x: hidden;
 }
 
-.cetech-de-blocks-pickup-note {
-	margin: 0.25rem 0;
-	font-size: 0.95em;
+.cetech-de-blocks-customer-context {
+	margin: 1rem 0;
+	box-sizing: border-box;
+}
+
+.cetech-de-blocks-notice {
+	margin: 0.5rem 0;
+	padding: 0.5rem 0.75rem;
+	border: 1px solid rgba(0, 0, 0, 0.12);
+	border-left-width: 4px;
+	background: #fff;
+}
+
+.cetech-de-blocks-notice--incomplete_delivery,
+.cetech-de-blocks-notice--failure {
+	border-left-color: #b32d2e;
+}
+
+.cetech-de-blocks-line {
+	margin: 0.75rem 0;
+	padding: 0.75rem;
+	border: 1px solid rgba(0, 0, 0, 0.12);
+	background: #fff;
+}
+
+.cetech-de-blocks-line__kicker,
+.cetech-de-blocks-line__title {
+	margin: 0.1rem 0;
+	font-weight: 600;
+}
+
+.cetech-de-blocks-line__meta {
+	margin: 0.1rem 0;
+	opacity: 0.9;
+}
+
+.cetech-de-blocks-editor {
+	margin-top: 0.25rem;
+}
+
+.cetech-de-blocks-editor__body {
+	display: grid;
+	gap: 0.5rem;
+	margin-top: 0.5rem;
+}
+
+.cetech-de-blocks-editor__field {
+	display: grid;
+	gap: 0.25rem;
+}
+
+.cetech-de-blocks-editor summary {
+	cursor: pointer;
+	min-height: 2.75rem;
+	display: inline-flex;
+	align-items: center;
+	font-weight: 600;
+}
+
+.cetech-de-blocks-editor input,
+.cetech-de-blocks-editor select,
+.cetech-de-blocks-editor button {
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+.cetech-de-blocks-editor input[type="text"],
+.cetech-de-blocks-editor input[type="number"],
+.cetech-de-blocks-editor select {
+	min-height: 2.75rem;
+	width: 100%;
+}
+
+.cetech-de-blocks-editor__update,
+.cetech-de-blocks-editor__use-for-all,
+.cetech-de-blocks-apply-checkout-address {
+	margin-right: 0.5rem;
+	margin-top: 0.25rem;
+	min-height: 2.75rem;
+	white-space: normal;
+}
+
+.cetech-de-blocks-incomplete-actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 0.75rem;
+	margin: 0.5rem 0;
+}
+
+.cetech-de-blocks-add-delivery-address {
+	min-height: 2.75rem;
+	display: inline-flex;
+	align-items: center;
+	font-weight: 600;
+}
+
+.cetech-de-blocks-apply-checkout-address--secondary {
+	background: transparent;
+	border: 0;
+	padding: 0;
+	min-height: 2.75rem;
+	text-decoration: underline;
+	cursor: pointer;
+	font: inherit;
+}
+	margin: 0.75rem 0;
+	padding: 0.85rem;
+	border: 1px solid rgba(0, 0, 0, 0.12);
+	background: #fff;
+}
+
+.cetech-de-delivery-plan__title {
+	margin: 0 0 0.6rem;
+	font-size: 1.05em;
+	font-weight: 700;
+}
+
+.cetech-de-delivery-plan__heading {
+	margin: 0.6rem 0 0.15rem;
+	font-size: 1em;
+}
+
+.cetech-de-delivery-plan__line {
+	margin: 0.15rem 0;
+}
+
+.cetech-de-checkout-keep-address {
+	font-size: 0.92em;
+	margin: 0.5rem 0;
+}
+
+@media (max-width: 768px) {
+	.cetech-de-blocks-editor__use-for-all,
+	.cetech-de-blocks-apply-checkout-address {
+		display: block;
+		width: 100%;
+		margin-right: 0;
+	}
 }

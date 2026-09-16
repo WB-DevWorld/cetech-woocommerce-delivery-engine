@@ -266,9 +266,15 @@ $header_source = is_readable( $plugin_header ) ? (string) file_get_contents( $pl
 $is_schema5_release = str_contains( $header_source, '1.0.0-dev.bulk' )
 	|| str_contains( $header_source, '1.0.0-dev.fulfilment' )
 	|| str_contains( $header_source, '1.0.0-dev.blocks' )
+	|| str_contains( $header_source, '1.0.0-dev.cartstate' )
+	|| str_contains( $header_source, '1.0.0-dev.peritem' )
+	|| str_contains( $header_source, '1.0.0-dev.wcfm' )
+	|| str_contains( $header_source, '1.0.0-dev.integrated' )
+	|| str_contains( $header_source, '1.0.0-dev.qual' )
 	|| str_contains( $header_source, '1.0.0-rc.7' )
 	|| str_contains( $header_source, '1.0.0-rc.8' )
-	|| str_contains( $header_source, '1.0.0-rc.9' );
+	|| str_contains( $header_source, '1.0.0-rc.9' )
+	|| str_contains( $header_source, '1.0.0-rc.10' );
 
 if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 	$target = ( new ReflectionClass( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) )->getConstant( 'TARGET' );
@@ -284,7 +290,7 @@ if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 $bulk_js = $package_root . '/assets/admin/bulk-tools.js';
 if ( $is_schema5_release && ! is_readable( $bulk_js ) ) {
 	$failures[] = 'Missing assets/admin/bulk-tools.js';
-} elseif ( is_readable( $bulk_js ) && ( str_contains( $header_source, '1.0.0-dev.bulk.9' ) || str_contains( $header_source, '1.0.0-dev.fulfilment' ) || str_contains( $header_source, '1.0.0-dev.blocks' ) || str_contains( $header_source, '1.0.0-rc.7' ) || str_contains( $header_source, '1.0.0-rc.8' ) || str_contains( $header_source, '1.0.0-rc.9' ) ) ) {
+} elseif ( is_readable( $bulk_js ) && ( str_contains( $header_source, '1.0.0-dev.bulk.9' ) || str_contains( $header_source, '1.0.0-dev.fulfilment' ) || str_contains( $header_source, '1.0.0-dev.blocks' ) || str_contains( $header_source, '1.0.0-dev.cartstate' ) || str_contains( $header_source, '1.0.0-dev.peritem' ) || str_contains( $header_source, '1.0.0-dev.wcfm' ) || str_contains( $header_source, '1.0.0-dev.integrated' ) || str_contains( $header_source, '1.0.0-dev.qual' ) || str_contains( $header_source, '1.0.0-rc.7' ) || str_contains( $header_source, '1.0.0-rc.8' ) || str_contains( $header_source, '1.0.0-rc.9' ) || str_contains( $header_source, '1.0.0-rc.10' ) ) ) {
 	$bulk_js_source = (string) file_get_contents( $bulk_js );
 	if ( ! str_contains( $bulk_js_source, "body.set('advance', '1')" ) ) {
 		$failures[] = 'bulk-tools.js missing bounded AJAX continue (advance=1).';
@@ -634,8 +640,8 @@ if ( '' !== $caps_source ) {
 	if ( ! str_contains( $caps_source, "const VIEW = 'view_delivery_engine'" ) ) {
 		$failures[] = 'Capabilities missing view_delivery_engine.';
 	}
-	if ( ! str_contains( $caps_source, 'const VERSION = 3' ) ) {
-		$failures[] = 'Capabilities VERSION is not 3 in the packaged plugin.';
+	if ( ! str_contains( $caps_source, 'const VERSION = 4' ) ) {
+		$failures[] = 'Capabilities VERSION is not 4 in the packaged plugin.';
 	}
 	if ( ! str_contains( $caps_source, 'administrator_missing_required_capabilities' ) ) {
 		$failures[] = 'Capabilities missing administrator_missing_required_capabilities() self-heal probe.';

@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Integrations\Blocks;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
+use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
 
 /**
  * Maps Store API add-to-cart extension data onto the existing cart-capture contract.
@@ -19,6 +20,8 @@ final class BlocksAddToCartBridge {
 
 	public const EXTENSION_VARIATION_ID = 'variation_id';
 
+	public const EXTENSION_MATCHING_LOCATION = 'matching_location';
+
 	public function __construct(
 		private CartDeliverySelectionCapture $cart_capture
 	) {
@@ -29,6 +32,7 @@ final class BlocksAddToCartBridge {
 		add_filter( 'woocommerce_store_api_add_to_cart_data', [ $this, 'prime_cart_item_data' ], 5, 2 );
 		add_filter( 'cetech_de_submitted_delivery_option_key', [ $this, 'filter_submitted_option_key' ] );
 		add_filter( 'cetech_de_submitted_delivery_variation_id', [ $this, 'filter_submitted_variation_id' ] );
+		add_filter( 'cetech_de_submitted_matching_location', [ $this, 'filter_submitted_matching_location' ] );
 	}
 
 	/**
@@ -65,14 +69,27 @@ final class BlocksAddToCartBridge {
 	}
 
 	/**
+	 * @param mixed $current
+	 *
+	 * @return mixed
+	 */
+	public function filter_submitted_matching_location( $current ) {
+		$stored = $this->request_matching_location();
+
+		return $stored instanceof MatchingLocation ? $stored : $current;
+	}
+
+	/**
 	 * @param mixed $request
 	 */
 	private function store_from_request( $request ): void {
 		$key = $this->read_option_key( $request );
 		$variation_id = $this->read_variation_id( $request );
+		$matching     = $this->read_matching_location( $request );
 
 		$GLOBALS['cetech_de_blocks_delivery_option_key'] = $key;
 		$GLOBALS['cetech_de_blocks_delivery_variation_id'] = $variation_id;
+		$GLOBALS['cetech_de_blocks_matching_location']     = $matching;
 	}
 
 	private function request_option_key(): string {
@@ -87,6 +104,12 @@ final class BlocksAddToCartBridge {
 		return is_numeric( $raw ) ? (int) $raw : 0;
 	}
 
+	private function request_matching_location(): ?MatchingLocation {
+		$raw = $GLOBALS['cetech_de_blocks_matching_location'] ?? null;
+
+		return $raw instanceof MatchingLocation ? $raw : null;
+	}
+
 	/**
 	 * @param mixed $request
 	 */
@@ -96,6 +119,14 @@ final class BlocksAddToCartBridge {
 
 		if ( is_string( $raw ) && '' !== $raw ) {
 			return ProductDeliveryOptionsBuilder::normalizeDisplayKey( $raw );
+		}
+
+		$payload = $extensions['customer_context'] ?? $extensions['pdp_context'] ?? null;
+		if ( is_array( $payload ) && isset( $payload['display_key'] ) && is_string( $payload['display_key'] ) ) {
+			$from_payload = ProductDeliveryOptionsBuilder::normalizeDisplayKey( $payload['display_key'] );
+			if ( '' !== $from_payload ) {
+				return $from_payload;
+			}
 		}
 
 		if ( is_object( $request ) && method_exists( $request, 'get_param' ) ) {
@@ -129,6 +160,36 @@ final class BlocksAddToCartBridge {
 		}
 
 		return 0;
+	}
+
+	/**
+	 * @param mixed $request
+	 */
+	private function read_matching_location( $request ): ?MatchingLocation {
+		$extensions = $this->extensions( $request );
+		$raw        = $extensions[ self::EXTENSION_MATCHING_LOCATION ] ?? null;
+
+		if ( ! is_array( $raw ) ) {
+			$payload = $extensions['customer_context'] ?? $extensions['pdp_context'] ?? null;
+			if ( is_array( $payload ) ) {
+				$raw = $payload['matching_location'] ?? null;
+			}
+		}
+
+		if ( ! is_array( $raw ) ) {
+			return null;
+		}
+
+		$location = MatchingLocation::fromInput(
+			[
+				'country'  => (string) ( $raw['country'] ?? '' ),
+				'state'    => (string) ( $raw['state'] ?? '' ),
+				'city'     => (string) ( $raw['city'] ?? '' ),
+				'postcode' => (string) ( $raw['postcode'] ?? '' ),
+			]
+		);
+
+		return $location->isPresent() ? $location : null;
 	}
 
 	/**

@@ -29,6 +29,10 @@ final class IntegrationStatusCatalogTest extends TestCase {
 			self::assertFalse( $status->adapter_implemented );
 			self::assertFalse( $status->currently_in_use );
 		}
+
+		$wcfm = $catalog->by_key( 'wcfm' );
+		self::assertNotNull( $wcfm );
+		self::assertStringContainsString( 'administrative isolation', $wcfm->detail );
 	}
 
 	public function test_woodmart_absent_is_not_the_active_theme(): void {

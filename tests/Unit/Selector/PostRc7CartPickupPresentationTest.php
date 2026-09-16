@@ -206,7 +206,7 @@ final class PostRc7CartPickupPresentationTest extends TestCase {
 		self::assertSame( $customer, $delivery_destination );
 
 		$pickup_heading = CartFulfilmentPackagePresentation::heading( 'Shipment 1', $pickup );
-		self::assertSame( 'Pickup at CETECH Accra Store', $pickup_heading );
+		self::assertSame( 'CETECH Accra Store', $pickup_heading );
 		self::assertStringNotContainsString( 'Shipping', $pickup_heading );
 		self::assertStringNotContainsString( 'Shipment', $pickup_heading );
 
@@ -225,7 +225,7 @@ final class PostRc7CartPickupPresentationTest extends TestCase {
 		];
 
 		$pickup_heading = $presentation->filter_package_name( 'Shipment 1', 0, $packages['pickup'], 2 );
-		self::assertSame( 'Pickup at CETECH Accra Store', $pickup_heading );
+		self::assertSame( 'CETECH Accra Store', $pickup_heading );
 
 		$pickup_destination = $presentation->filter_formatted_destination( $customer, $raw_address );
 		self::assertStringContainsString( 'Papafio Hills Road', $pickup_destination );
@@ -233,7 +233,7 @@ final class PostRc7CartPickupPresentationTest extends TestCase {
 		self::assertStringNotContainsString( '{', $pickup_destination );
 
 		$pickup_copy = $presentation->filter_shipping_to_copy( 'Shipping to %s.', 'Shipping to %s.', 'woocommerce' );
-		self::assertSame( 'Pickup address: %s', $pickup_copy );
+		self::assertSame( '%s', $pickup_copy );
 
 		$pickup_change = $presentation->filter_shipping_to_copy( 'Change address', 'Change address', 'woocommerce' );
 		self::assertSame( '', $pickup_change );
@@ -273,7 +273,7 @@ final class PostRc7CartPickupPresentationTest extends TestCase {
 		self::assertTrue( $result->success );
 		self::assertSame( '0.0000', $result->total_amount );
 		self::assertSame(
-			'Pickup at CETECH Accra Store',
+			'CETECH Accra Store',
 			CartFulfilmentPackagePresentation::heading( 'Shipping', $packages[0] )
 		);
 	}
@@ -462,8 +462,7 @@ final class PostRc7CartPickupPresentationTest extends TestCase {
 	}
 
 	private function assert_pickup_package_copy( string $html ): void {
-		self::assertStringContainsString( 'Pickup at CETECH Accra Store', $html );
-		self::assertStringContainsString( 'Pickup address:', $html );
+		self::assertStringContainsString( 'CETECH Accra Store', $html );
 		self::assertStringContainsString( 'Papafio Hills Road', $html );
 		self::assertStringContainsString( 'Store Pickup', $html );
 		self::assertStringNotContainsString( 'Shipping to', $html );

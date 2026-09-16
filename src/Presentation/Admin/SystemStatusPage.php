@@ -78,7 +78,11 @@ final class SystemStatusPage {
 	}
 
 	public function handle_actions(): void {
-		if ( ! is_admin() || ! current_user_can( \CetechDeliveryEngine\Core\Capabilities\Capabilities::DIAGNOSTICS ) ) {
+		if ( ! is_admin() || AdminPageAccess::current_user_is_restricted() ) {
+			return;
+		}
+
+		if ( ! current_user_can( \CetechDeliveryEngine\Core\Capabilities\Capabilities::DIAGNOSTICS ) ) {
 			return;
 		}
 

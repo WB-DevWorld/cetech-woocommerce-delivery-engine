@@ -79,12 +79,13 @@ final class ProductDeliveryOptionsBuilder {
 			}
 
 			if ( $emit_pickup ) {
-				$location = $pickup_location;
-				if ( null === $location && [] !== $split['pickup'] ) {
-					$location = $this->default_pickup_location();
-				}
-				if ( null !== $location ) {
-					$options[] = $this->store_pickup_option( $availability_slug, $availability_label, $location );
+				$locations = $this->eligible_pickup_locations( $rule, $split['pickup'] );
+				$count     = count( $locations );
+				foreach ( $locations as $location ) {
+					$suffix = 1 === $count
+						? 'pickup'
+						: 'p' . (string) (int) ( $location['id'] ?? 0 );
+					$options[] = $this->store_pickup_option( $availability_slug, $availability_label, $location, $suffix );
 				}
 			}
 
@@ -282,10 +283,14 @@ final class ProductDeliveryOptionsBuilder {
 	/**
 	 * @param array<string, mixed> $location
 	 */
+	/**
+	 * @param array<string, mixed> $location
+	 */
 	private function store_pickup_option(
 		string $availability_slug,
 		string $availability_label,
-		array $location
+		array $location,
+		string $suffix = 'pickup'
 	): ProductDeliveryOption {
 		$choice_slug  = FulfilmentChoice::StorePickup->value;
 		$choice_label = $this->choice_label( $choice_slug ) ?? __( 'Store pickup', 'cetech-woocommerce-delivery-engine' );
@@ -296,7 +301,7 @@ final class ProductDeliveryOptionsBuilder {
 		$location_label = null;
 
 		if ( is_array( $location ) ) {
-			$name = trim( (string) ( $location['location_name'] ?? '' ) );
+			$name = trim( (string) ( $location['location_name'] ?? $location['name'] ?? '' ) );
 
 			if ( '' !== $name ) {
 				$location_label = $name;
@@ -323,8 +328,14 @@ final class ProductDeliveryOptionsBuilder {
 			}
 		}
 
+		if ( is_string( $location_label ) && '' !== $location_label ) {
+			$label = $location_label;
+		}
+
+		$location_id = (int) ( $location['id'] ?? 0 );
+
 		return new ProductDeliveryOption(
-			$this->display_key( $availability_slug, $choice_slug, 'pickup' ),
+			$this->display_key( $availability_slug, $choice_slug, $suffix ),
 			$availability_slug,
 			$availability_label,
 			$choice_slug,
@@ -339,8 +350,53 @@ final class ProductDeliveryOptionsBuilder {
 			false,
 			$location_label,
 			$address,
-			$instructions
+			$instructions,
+			$location_id > 0 ? $location_id : null
 		);
+	}
+
+	/**
+	 * @param list<int> $pickup_offer_ids
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	private function eligible_pickup_locations( ResolvedProductDeliveryRule $rule, array $pickup_offer_ids ): array {
+		$specific = $this->resolve_pickup_location( $rule );
+		if ( is_array( $specific ) ) {
+			return [ $specific ];
+		}
+
+		if ( null === $this->pickup_locations ) {
+			return [];
+		}
+
+		$rows   = $this->pickup_locations->list( [ 'status' => RecordStatus::Active->value, 'limit' => 50 ] );
+		$active = [];
+
+		foreach ( $rows as $row ) {
+			if ( RecordStatus::Active->value !== (string) ( $row['status'] ?? '' ) ) {
+				continue;
+			}
+
+			$id = (int) ( $row['id'] ?? 0 );
+			if ( $id <= 0 ) {
+				continue;
+			}
+
+			$active[] = $row;
+		}
+
+		if ( [] !== $active ) {
+			return $active;
+		}
+
+		if ( [] !== $pickup_offer_ids ) {
+			$fallback = $this->default_pickup_location();
+
+			return is_array( $fallback ) ? [ $fallback ] : [];
+		}
+
+		return [];
 	}
 
 	/**
@@ -545,7 +601,7 @@ final class ProductDeliveryOptionsBuilder {
 		if ( $total_min > 0 && $total_max > 0 && $total_min !== $total_max ) {
 			return sprintf(
 				/* translators: 1: minimum duration, 2: maximum duration, 3: duration unit label */
-				__( 'Estimated %1$d–%2$d %3$s', 'cetech-woocommerce-delivery-engine' ),
+				__( '%1$d–%2$d %3$s', 'cetech-woocommerce-delivery-engine' ),
 				$total_min,
 				$total_max,
 				$unit
@@ -556,7 +612,7 @@ final class ProductDeliveryOptionsBuilder {
 
 		return sprintf(
 			/* translators: 1: duration value, 2: duration unit label */
-			__( 'Estimated %1$d %2$s', 'cetech-woocommerce-delivery-engine' ),
+			__( '%1$d %2$s', 'cetech-woocommerce-delivery-engine' ),
 			$value,
 			$unit
 		);

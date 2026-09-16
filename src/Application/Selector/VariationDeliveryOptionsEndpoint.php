@@ -4,11 +4,15 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Selector;
 
+use CetechDeliveryEngine\Application\CustomerContext\LocationAwareDeliveryOptions;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
 use CetechDeliveryEngine\Application\Runtime\VariationRelationshipInspectorInterface;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
+use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
+use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Domain\Enum\ProductTargetType;
+use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
 use WC_Product;
 
 /**
@@ -25,7 +29,8 @@ final class VariationDeliveryOptionsEndpoint {
 		private Requirements $requirements,
 		private ProductDeliveryConfigurationSourceInterface $configuration_source,
 		private ProductDeliveryOptionsBuilder $options_builder,
-		private VariationRelationshipInspectorInterface $variation_inspector
+		private VariationRelationshipInspectorInterface $variation_inspector,
+		private ?LocationAwareDeliveryOptions $location_options = null
 	) {
 	}
 
@@ -60,8 +65,16 @@ final class VariationDeliveryOptionsEndpoint {
 
 		$product_id   = isset( $_REQUEST['product_id'] ) ? absint( wp_unslash( (string) $_REQUEST['product_id'] ) ) : 0;
 		$variation_id = isset( $_REQUEST['variation_id'] ) ? absint( wp_unslash( (string) $_REQUEST['variation_id'] ) ) : 0;
+		$location     = MatchingLocation::fromInput(
+			[
+				'country'  => isset( $_REQUEST['country'] ) ? wp_unslash( (string) $_REQUEST['country'] ) : '',
+				'state'    => isset( $_REQUEST['state'] ) ? wp_unslash( (string) $_REQUEST['state'] ) : '',
+				'city'     => isset( $_REQUEST['city'] ) ? wp_unslash( (string) $_REQUEST['city'] ) : '',
+				'postcode' => isset( $_REQUEST['postcode'] ) ? wp_unslash( (string) $_REQUEST['postcode'] ) : '',
+			]
+		);
 
-		$payload = $this->build_payload( $product_id, $variation_id );
+		$payload = $this->build_payload( $product_id, $variation_id, $location->isPresent() ? $location : null );
 
 		wp_send_json_success( $payload );
 	}
@@ -77,7 +90,7 @@ final class VariationDeliveryOptionsEndpoint {
 	 *     options: list<array<string, mixed>>
 	 * }
 	 */
-	public function build_payload( int $product_id, int $variation_id ): array {
+	public function build_payload( int $product_id, int $variation_id, ?MatchingLocation $location = null ): array {
 		if ( $product_id <= 0 || $variation_id <= 0 ) {
 			return $this->payload(
 				'error',
@@ -149,6 +162,36 @@ final class VariationDeliveryOptionsEndpoint {
 			);
 		}
 
+		$requires_location = $this->location_options instanceof LocationAwareDeliveryOptions
+			? $this->location_options->delivery_requires_matching_location( $options )
+			: false;
+
+		if ( $requires_location && $this->location_options instanceof LocationAwareDeliveryOptions ) {
+			$currency = function_exists( 'get_woocommerce_currency' ) ? (string) get_woocommerce_currency() : 'USD';
+			if ( ! $location instanceof MatchingLocation || ! $location->isPresent() ) {
+				$pickup_only = array_values(
+					array_filter(
+						$options,
+						static fn ( ProductDeliveryOption $option ): bool => FulfilmentChoice::StorePickup->value === $option->fulfilment_choice && $option->is_available
+					)
+				);
+				$public_pickup = [];
+				foreach ( $pickup_only as $option ) {
+					$public_pickup[] = $this->public_option_array( $option );
+				}
+
+				return $this->payload(
+					'need_location',
+					$product_id,
+					$variation_id,
+					'',
+					$public_pickup
+				);
+			}
+
+			$options = $this->location_options->filter( $options, $location, $currency );
+		}
+
 		$public_options = [];
 
 		foreach ( $options as $option ) {
@@ -208,11 +251,21 @@ final class VariationDeliveryOptionsEndpoint {
 			'display_key'                       => $option->display_key,
 			'fulfilment_availability_label'     => $option->fulfilment_availability_label,
 			'fulfilment_choice_label'           => $option->fulfilment_choice_label,
+			'fulfilment_choice'                 => $option->fulfilment_choice,
 			'delivery_offer_public_label'       => $option->delivery_offer_public_label,
 			'delivery_offer_public_description' => $option->delivery_offer_public_description,
 			'estimate_text'                     => $option->estimate_text,
+			'estimate_line'                     => DeliveryPresentationLabels::format_product_estimate_line(
+				(string) ( $option->estimate_text ?? '' ),
+				$option->fulfilment_choice
+			),
 			'is_available'                      => $option->is_available,
 			'unavailable_reason'                => $option->is_available ? null : $option->unavailable_reason,
+			'is_default'                        => $option->is_default,
+			'pickup_location_label'             => $option->pickup_location_label,
+			'pickup_address'                    => $option->pickup_address,
+			'pickup_instructions'               => $option->pickup_instructions,
+			'pickup_location_id'                => $option->pickup_location_id,
 		];
 	}
 

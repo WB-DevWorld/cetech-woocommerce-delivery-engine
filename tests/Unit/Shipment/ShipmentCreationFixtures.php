@@ -41,7 +41,7 @@ final class ShipmentCreationFixtures {
 		?int $zone_id = 4
 	): HistoricalShipmentLineContext {
 		$parts = explode( '|', $group_id );
-		if ( 3 === count( $parts ) ) {
+		if ( count( $parts ) >= 3 ) {
 			$availability = $parts[0];
 			$choice       = $parts[1];
 			$offer_id     = ctype_digit( $parts[2] ) ? (int) $parts[2] : $offer_id;

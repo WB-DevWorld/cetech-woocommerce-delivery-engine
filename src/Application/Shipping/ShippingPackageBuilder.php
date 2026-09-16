@@ -7,6 +7,7 @@ namespace CetechDeliveryEngine\Application\Shipping;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionSessionData;
 use CetechDeliveryEngine\Application\Pickup\PickupLocationAddressFormatter;
+use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 
 /**
@@ -190,9 +191,15 @@ final class ShippingPackageBuilder {
 			'estimate_text'           => '' !== $estimate ? $estimate : null,
 			'pickup_instructions'     => '' !== $instructions ? $instructions : null,
 			'display_index'           => null,
+			'locality_label'          => $this->first_locality_label( $contents ),
 			// Stage 13F: genuine WC shipping rate label uses the selected public option label.
-			'rate_label'              => $this->customer_rate_label( $is_pickup, $offer_label, null ),
+			'rate_label'              => $this->customer_rate_label( $is_pickup, $offer_label, null, $this->first_locality_label( $contents ), $pickup_location ),
 		];
+
+		$context = $this->first_customer_context( $contents );
+		if ( $context instanceof CustomerCartContext ) {
+			$package['destination'] = $context->toWcPackageDestination();
+		}
 
 		return $package;
 	}
@@ -202,41 +209,39 @@ final class ShippingPackageBuilder {
 	 *
 	 * Preserves method ID / grouping / snapshots; presentation only.
 	 */
-	private function customer_rate_label( bool $is_pickup, string $offer_label, ?int $display_index ): string {
-		if ( '' !== $offer_label ) {
-			if ( null !== $display_index && $display_index > 0 ) {
-				return sprintf(
-					/* translators: 1: public delivery option label, 2: package number */
-					__( '%1$s (%2$d)', 'cetech-woocommerce-delivery-engine' ),
-					$offer_label,
-					$display_index
-				);
-			}
-
-			return $offer_label;
-		}
+	private function customer_rate_label(
+		bool $is_pickup,
+		string $offer_label,
+		?int $display_index,
+		string $locality = '',
+		string $pickup_location = ''
+	): string {
+		unset( $pickup_location );
 
 		if ( $is_pickup ) {
-			if ( null !== $display_index && $display_index > 0 ) {
-				return sprintf(
-					/* translators: %d: pickup group number */
-					__( 'Store pickup %d', 'cetech-woocommerce-delivery-engine' ),
-					$display_index
-				);
-			}
-
-			return __( 'Store pickup', 'cetech-woocommerce-delivery-engine' );
+			return __( 'Store Pickup', 'cetech-woocommerce-delivery-engine' );
 		}
+
+		if ( '' !== $locality ) {
+			return sprintf(
+				/* translators: %s: city or locality */
+				__( 'Delivery to %s', 'cetech-woocommerce-delivery-engine' ),
+				$locality
+			);
+		}
+
+		$base = '' !== $offer_label ? $offer_label : SelectedOfferShippingMethodLabel::default_delivery_label();
 
 		if ( null !== $display_index && $display_index > 0 ) {
 			return sprintf(
-				/* translators: %d: delivery group number */
-				__( 'Delivery %d', 'cetech-woocommerce-delivery-engine' ),
+				/* translators: 1: delivery label, 2: package number */
+				__( '%1$s (%2$d)', 'cetech-woocommerce-delivery-engine' ),
+				$base,
 				$display_index
 			);
 		}
 
-		return SelectedOfferShippingMethodLabel::default_delivery_label();
+		return $base;
 	}
 
 	/**
@@ -322,6 +327,30 @@ final class ShippingPackageBuilder {
 	}
 
 	/**
+	 * @param array<string, array<string, mixed>> $contents
+	 */
+	private function first_customer_context( array $contents ): ?CustomerCartContext {
+		foreach ( $contents as $cart_item ) {
+			$context = CustomerCartContext::fromCartItem( $cart_item );
+
+			if ( $context instanceof CustomerCartContext ) {
+				return $context;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * @param array<string, array<string, mixed>> $contents
+	 */
+	private function first_locality_label( array $contents ): string {
+		$context = $this->first_customer_context( $contents );
+
+		return $context instanceof CustomerCartContext ? $context->publicLocalityLabel() : '';
+	}
+
+	/**
 	 * @param list<array<string, mixed>> $packages
 	 *
 	 * @return list<array<string, mixed>>
@@ -361,7 +390,13 @@ final class ShippingPackageBuilder {
 			}
 
 			$meta['display_index'] = $display_index;
-			$meta['rate_label']    = $this->customer_rate_label( $is_pickup, $offer_label, $display_index );
+			$meta['rate_label']    = $this->customer_rate_label(
+				$is_pickup,
+				$offer_label,
+				$display_index,
+				trim( (string) ( $meta['locality_label'] ?? '' ) ),
+				trim( (string) ( $meta['pickup_location_label'] ?? '' ) )
+			);
 			$packages[ $index ][ DeliveryGroupIdentity::PACKAGE_META_KEY ] = $meta;
 		}
 

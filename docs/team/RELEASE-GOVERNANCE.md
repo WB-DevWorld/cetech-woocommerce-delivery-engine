@@ -13,4 +13,4 @@ Rules:
 - licensed integrations must be marked PASS/BLOCKED/NOT CERTIFIED honestly;
 - production promotion remains a human decision.
 
-Current RC.10 rule: no RC.10 promotion until the currently declared pre-RC.10 qualification campaign and scope decision are complete, unless a newer explicit human decision changes that gate.
+Current RC.10 rule: owner QA passed. RC.10 is the authorized core collaboration baseline on `release/rc10`. Tag `v1.0.0-rc.10` only after protected merge. WPML/WCML and WP Rocket certification remain separate. Do not start Stage 15.

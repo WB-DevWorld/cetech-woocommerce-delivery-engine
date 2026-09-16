@@ -47,7 +47,13 @@ function loadController() {
 	document.body.innerHTML = `
 		<form class="variations_form cart">
 			<div class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--variable"
-				data-cetech-de-variable-selector="1" data-product-id="100">
+				data-cetech-de-variable-selector="1" data-cetech-de-selector="1" data-product-id="100">
+				<div data-cetech-de-matching-location="1">
+					<select name="cetech_de_matching_country"><option value="GH" selected>Ghana</option></select>
+					<select name="cetech_de_matching_state"><option value="AA" selected>Greater Accra</option></select>
+					<input name="cetech_de_matching_city" value="Accra" />
+					<input name="cetech_de_matching_postcode" value="GA-123" />
+				</div>
 				<div class="cetech-de-delivery-selector__status" role="status" aria-live="polite" data-cetech-de-status></div>
 				<div class="cetech-de-delivery-selector__options" data-cetech-de-options></div>
 				<input type="hidden" name="cetech_de_delivery_variation_id" value="" data-cetech-de-variation-id disabled />
@@ -180,7 +186,7 @@ describe('Variable delivery selector controller', () => {
 
 		await flush();
 		expect(controller.optionsEl.textContent).toContain('Offer A');
-		expect(controller.optionsEl.textContent).toContain('Estimated delivery: 2 days');
+		expect(controller.optionsEl.textContent).toContain('2 days');
 		expect(controller.optionsEl.querySelector('.cetech-de-delivery-option__body')).not.toBeNull();
 		expect(controller.optionsEl.querySelector('.cetech-de-delivery-option__description')).toBeNull();
 		expect(controller.variationInput.value).toBe('11');
@@ -199,7 +205,7 @@ describe('Variable delivery selector controller', () => {
 		await flush();
 
 		expect(controller.optionsEl.textContent).toContain('FLAIROC QA Standard Delivery');
-		expect(controller.optionsEl.textContent).toContain('Estimated delivery: 3–6 business days');
+		expect(controller.optionsEl.textContent).toContain('3–6 business days');
 		expect(controller.optionsEl.textContent).not.toContain('QA-only');
 		expect(controller.optionsEl.textContent).not.toContain('In Warehouse');
 	});
@@ -404,7 +410,7 @@ describe('Variable delivery selector controller', () => {
 		await flush();
 
 		expect(controller.optionsEl.textContent).toContain('Standard Delivery');
-		expect(controller.optionsEl.textContent).toContain('Estimated delivery: 2–4 business days');
+		expect(controller.optionsEl.textContent).toContain('2–4 business days');
 		expect(controller.optionsEl.querySelector('[data-cetech-de-choice-switch][value="delivery"]').checked).toBe(true);
 
 		const pickupPanel = controller.optionsEl.querySelector('[data-cetech-de-choice-panel="store_pickup"]');
@@ -423,5 +429,40 @@ describe('Variable delivery selector controller', () => {
 		expect(pickupPanel.querySelector('.cetech-de-delivery-option__estimate')).toBeNull();
 		expect(deliveryPanel.querySelector('input[type="radio"]').disabled).toBe(true);
 		expect(pickupPanel.querySelector('input[name="cetech_de_delivery_option_key"]').checked).toBe(true);
+	});
+
+	it('includes matching location in the variation option request', async () => {
+		const { $form, ajax } = loadController();
+		ajax.mockReturnValue(createDeferred({ type: 'success', payload: okPayload(11, 'Offer A') }));
+
+		$form.trigger('found_variation', { variation_id: 11 });
+		expect(ajax).toHaveBeenCalled();
+		const data = ajax.mock.calls[0][0].data;
+		expect(data.variation_id).toBe(11);
+		expect(data.country).toBe('GH');
+		expect(data.city).toBe('Accra');
+		expect(data.postcode).toBe('GA-123');
+	});
+
+	it('changing city invalidates cached options and refetches', async () => {
+		const { controller, $form, ajax } = loadController();
+		ajax.mockImplementation((settings) => {
+			const city = settings.data.city;
+			return createDeferred({
+				type: 'success',
+				payload: okPayload(11, city === 'Kumasi' ? 'Kumasi Offer' : 'Accra Offer'),
+			});
+		});
+
+		$form.trigger('found_variation', { variation_id: 11 });
+		await flush();
+		expect(controller.optionsEl.textContent).toContain('Accra Offer');
+
+		const city = document.querySelector('[name="cetech_de_matching_city"]');
+		city.value = 'Kumasi';
+		city.dispatchEvent(new Event('change', { bubbles: true }));
+		await flush();
+		expect(controller.optionsEl.textContent).toContain('Kumasi Offer');
+		expect(controller.optionsEl.textContent).not.toContain('Accra Offer');
 	});
 });

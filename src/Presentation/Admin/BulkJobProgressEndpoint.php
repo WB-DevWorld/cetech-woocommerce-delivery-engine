@@ -20,7 +20,7 @@ final class BulkJobProgressEndpoint {
 	}
 
 	public function handle(): void {
-		if ( ! current_user_can( 'manage_product_delivery_rules' ) ) {
+		if ( AdminPageAccess::current_user_is_restricted() || ! current_user_can( 'manage_product_delivery_rules' ) ) {
 			wp_send_json_error( [ 'message' => 'forbidden' ], 403 );
 		}
 		check_ajax_referer( self::ACTION, 'nonce' );

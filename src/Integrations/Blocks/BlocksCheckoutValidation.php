@@ -43,8 +43,9 @@ final class BlocksCheckoutValidation {
 	}
 
 	/**
-	 * Address changes must re-resolve. WooCommerce already recalculates shipping;
-	 * this re-runs DE validation so a stale choice cannot silently survive Place Order.
+	 * Address changes must re-resolve shipping. WooCommerce already recalculates
+	 * shipping. This must NOT mutate complete per-item CustomerCartContext.
+	 * The global Blocks shipping address is never cart-line authority.
 	 *
 	 * @param mixed $customer
 	 * @param mixed $request
@@ -195,7 +196,7 @@ final class BlocksCheckoutValidation {
 
 	private function stale_choice_message(): string {
 		return __(
-			'A delivery option in your cart is no longer available. Please return to your cart and update the affected product.',
+			'Delivery options for an item in your cart have changed. Please return to your cart and choose a delivery option. You do not need to remove the product.',
 			'cetech-woocommerce-delivery-engine'
 		);
 	}

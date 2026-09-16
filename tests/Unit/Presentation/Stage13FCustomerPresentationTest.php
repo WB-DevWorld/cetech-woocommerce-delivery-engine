@@ -90,6 +90,18 @@ final class Stage13FCustomerPresentationTest extends TestCase {
 			DeliveryPresentationLabels::format_product_estimate_line( 'Estimated 3–6 business days', 'delivery' )
 		);
 		self::assertSame(
+			'Estimated delivery: 3–6 business days',
+			DeliveryPresentationLabels::format_product_estimate_line( '3–6 business days', 'delivery' )
+		);
+		self::assertSame(
+			'Estimated delivery: About 2 weeks',
+			DeliveryPresentationLabels::format_product_estimate_line( 'About 2 weeks', 'delivery' )
+		);
+		self::assertSame(
+			'Estimated delivery: 2–4 business days',
+			DeliveryPresentationLabels::format_product_estimate_line( 'Estimated delivery: 2–4 business days', 'delivery' )
+		);
+		self::assertSame(
 			'Ready for pickup: 1–2 business days',
 			DeliveryPresentationLabels::format_product_estimate_line( '1–2 business days', 'store_pickup' )
 		);
@@ -101,7 +113,7 @@ final class Stage13FCustomerPresentationTest extends TestCase {
 		);
 
 		self::assertStringContainsString( 'cetech-de-delivery-option__body', $source );
-		self::assertStringContainsString( 'format_product_estimate_line', $source );
+		self::assertStringContainsString( 'compact_estimate', $source );
 		self::assertStringNotContainsString( 'delivery_offer_public_description', $source );
 		self::assertStringNotContainsString( 'fulfilment_availability_label', $source );
 		self::assertStringNotContainsString( 'cetech-de-delivery-availability__heading', $source );

@@ -15,6 +15,14 @@ namespace CetechDeliveryEngine\Core\Capabilities;
  */
 final class RoleAccessService {
 
+	/**
+	 * @param list<string> $excluded_role_slugs Explicit role slugs withheld from the Access matrix.
+	 */
+	public function __construct(
+		private array $excluded_role_slugs = []
+	) {
+	}
+
 	public const PERMISSION_VIEW = 'view';
 
 	public const PERMISSION_SITE_WIDE = 'site_wide';
@@ -209,6 +217,9 @@ final class RoleAccessService {
 			if ( 'administrator' === $role['slug'] ) {
 				continue;
 			}
+			if ( $this->is_excluded_role( $role['slug'] ) ) {
+				continue;
+			}
 			$editable[] = $role;
 		}
 
@@ -258,6 +269,9 @@ final class RoleAccessService {
 
 		foreach ( $this->editable_roles() as $role_meta ) {
 			$slug = $role_meta['slug'];
+			if ( $this->is_excluded_role( $slug ) ) {
+				continue;
+			}
 			$role = get_role( $slug );
 			if ( null === $role ) {
 				continue;
@@ -303,6 +317,10 @@ final class RoleAccessService {
 	/**
 	 * @param array<string, mixed> $row
 	 */
+	private function is_excluded_role( string $role_slug ): bool {
+		return in_array( $role_slug, $this->excluded_role_slugs, true );
+	}
+
 	private function posted_enabled( array $row, string $permission_key ): bool {
 		if ( ! array_key_exists( $permission_key, $row ) ) {
 			return false;

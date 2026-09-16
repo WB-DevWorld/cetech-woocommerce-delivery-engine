@@ -4,8 +4,12 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Tests\Unit\Selector;
 
+use CetechDeliveryEngine\Application\CustomerContext\LocationAwareDeliveryOptions;
+use CetechDeliveryEngine\Application\CustomerContext\LocationOfferQuoteProbe;
+use CetechDeliveryEngine\Application\Destination\PackageDestinationZoneResolverInterface;
 use CetechDeliveryEngine\Application\ProductRule\ProductRuleResolutionResult;
 use CetechDeliveryEngine\Application\ProductRule\ResolvedProductDeliveryRule;
+use CetechDeliveryEngine\Application\RateQuote\RateQuoteEngine;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryRuntimeResolution;
 use CetechDeliveryEngine\Application\Runtime\RuntimeConfigurationSource;
@@ -13,11 +17,14 @@ use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Application\Selector\VariationDeliveryOptionsEndpoint;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
+use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentAvailability;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Domain\Enum\ProductTargetType;
+use CetechDeliveryEngine\Domain\Enum\RateCardChargeType;
 use CetechDeliveryEngine\Tests\Unit\Runtime\FixedVariationRelationshipInspector;
 use CetechDeliveryEngine\Tests\Unit\Runtime\InMemoryDeliveryOfferRepository;
+use CetechDeliveryEngine\Tests\Unit\Runtime\InMemoryQuoteRateCardRepository;
 use PHPUnit\Framework\TestCase;
 
 final class VariationDeliveryOptionsEndpointTest extends TestCase {
@@ -31,6 +38,10 @@ final class VariationDeliveryOptionsEndpointTest extends TestCase {
 
 		if ( ! class_exists( 'WooCommerce', false ) ) {
 			eval( 'class WooCommerce {}' ); // phpcs:ignore Squiz.PHP.Eval -- test bootstrap only.
+		}
+
+		if ( ! function_exists( 'get_woocommerce_currency' ) ) {
+			eval( 'function get_woocommerce_currency(): string { return "USD"; }' ); // phpcs:ignore Squiz.PHP.Eval -- test bootstrap only.
 		}
 	}
 
@@ -193,6 +204,46 @@ final class VariationDeliveryOptionsEndpointTest extends TestCase {
 		self::assertArrayNotHasKey( 'logistics_profile_id', $option );
 	}
 
+	public function test_missing_location_returns_need_location_when_delivery_requires_it(): void {
+		$offers = $this->seeded_offers();
+		$source = $this->source_returning_success( self::VARIATION_ID, offer_id: 7 );
+		$endpoint = $this->endpoint(
+			inspector: new FixedVariationRelationshipInspector( [ self::VARIATION_ID => self::PARENT_ID ] ),
+			source: $source,
+			builder: new ProductDeliveryOptionsBuilder( $offers ),
+			location_options: $this->location_options( [] )
+		);
+
+		$payload = $endpoint->build_payload( self::PARENT_ID, self::VARIATION_ID, null );
+
+		self::assertSame( 'need_location', $payload['status'] );
+		self::assertSame( [], $payload['options'] );
+	}
+
+	public function test_location_recomputes_options_for_matching_geography(): void {
+		$offers = $this->seeded_offers();
+		$source = $this->source_returning_success( self::VARIATION_ID, offer_id: 7 );
+		$endpoint = $this->endpoint(
+			inspector: new FixedVariationRelationshipInspector( [ self::VARIATION_ID => self::PARENT_ID ] ),
+			source: $source,
+			builder: new ProductDeliveryOptionsBuilder( $offers ),
+			location_options: $this->location_options( [ 7 ] )
+		);
+
+		$accra = MatchingLocation::fromInput( [ 'country' => 'GH', 'state' => 'AA', 'city' => 'Accra', 'postcode' => 'GA-123' ] );
+		$lagos = MatchingLocation::fromInput( [ 'country' => 'NG', 'city' => 'Lagos' ] );
+
+		$ok = $endpoint->build_payload( self::PARENT_ID, self::VARIATION_ID, $accra );
+		$no = $endpoint->build_payload( self::PARENT_ID, self::VARIATION_ID, $lagos );
+
+		self::assertSame( 'ok', $ok['status'] );
+		self::assertNotEmpty( $ok['options'] );
+		self::assertArrayHasKey( 'estimate_line', $ok['options'][0] );
+		self::assertStringStartsWith( 'Estimated delivery:', (string) $ok['options'][0]['estimate_line'] );
+		self::assertStringNotContainsString( 'Estimated delivery: Estimated', (string) $ok['options'][0]['estimate_line'] );
+		self::assertSame( 'unavailable', $no['status'] );
+	}
+
 	// -------------------------------------------------------------------------
 	// Factories / helpers
 	// -------------------------------------------------------------------------
@@ -206,7 +257,8 @@ final class VariationDeliveryOptionsEndpointTest extends TestCase {
 	private function endpoint(
 		FixedVariationRelationshipInspector $inspector,
 		?ProductDeliveryConfigurationSourceInterface $source = null,
-		?ProductDeliveryOptionsBuilder $builder = null
+		?ProductDeliveryOptionsBuilder $builder = null,
+		?LocationAwareDeliveryOptions $location_options = null
 	): VariationDeliveryOptionsEndpoint {
 		if ( null === $source ) {
 			$source = $this->source_returning_failure( self::VARIATION_ID );
@@ -221,7 +273,52 @@ final class VariationDeliveryOptionsEndpointTest extends TestCase {
 			new Requirements(),
 			$source,
 			$builder,
-			$inspector
+			$inspector,
+			$location_options
+		);
+	}
+
+	/**
+	 * @param list<int> $offer_ids
+	 */
+	private function location_options( array $offer_ids ): LocationAwareDeliveryOptions {
+		$zone = new class() implements PackageDestinationZoneResolverInterface {
+			public function resolve_zone_id( array $destination ): ?int {
+				$ids = $this->resolve_zone_ids( $destination );
+
+				return $ids[0] ?? null;
+			}
+
+			public function resolve_zone_ids( array $destination ): array {
+				$city = strtolower( (string) ( $destination['city'] ?? '' ) );
+
+				return 'accra' === $city ? [ 20 ] : [];
+			}
+		};
+
+		$cards = [];
+		foreach ( $offer_ids as $i => $offer_id ) {
+			$cards[] = [
+				'id'                   => $i + 1,
+				'internal_code'        => 'OFFER' . $offer_id,
+				'delivery_offer_id'    => $offer_id,
+				'destination_zone_id'  => 20,
+				'logistics_profile_id' => null,
+				'supplier_id'          => null,
+				'origin_id'            => null,
+				'charge_type'          => RateCardChargeType::FixedPerShipment->value,
+				'base_amount'          => '15.00',
+				'base_currency'        => function_exists( 'get_woocommerce_currency' ) ? strtoupper( (string) get_woocommerce_currency() ) : 'USD',
+				'priority'             => 100,
+				'status'               => 'active',
+			];
+		}
+
+		return new LocationAwareDeliveryOptions(
+			new LocationOfferQuoteProbe(
+				$zone,
+				new RateQuoteEngine( new InMemoryQuoteRateCardRepository( $cards ) )
+			)
 		);
 	}
 

@@ -13,9 +13,18 @@ final class OrderDeliverySnapshot {
 
 	public const VERSION = '1';
 
+	public const VERSION_V2 = '2';
+
 	public const META_LINE_SNAPSHOT = '_cetech_de_delivery_snapshot';
 
 	public const META_LINE_SNAPSHOT_VERSION = '_cetech_de_delivery_snapshot_version';
+
+	/**
+	 * Transient Store API mapping key written only when the Classic line-item
+	 * hook cannot yet build a snapshot (order address not copied). Removed after
+	 * the immutable line snapshot is persisted. Not a historical contract field.
+	 */
+	public const META_CART_ITEM_KEY = '_cetech_de_cart_item_key';
 
 	public const META_ORDER_QUOTE_SNAPSHOT = '_cetech_de_delivery_quote_snapshot';
 
@@ -62,7 +71,13 @@ final class OrderDeliveryLineSnapshot {
 		public readonly ?string $delivery_group_id = null,
 		public readonly ?string $pickup_location_label = null,
 		public readonly ?string $pickup_address = null,
-		public readonly ?string $pickup_instructions = null
+		public readonly ?string $pickup_instructions = null,
+		public readonly ?int $customer_context_version = null,
+		public readonly ?array $matching_location = null,
+		public readonly ?array $delivery_address = null,
+		public readonly ?string $matching_identity = null,
+		public readonly ?string $delivery_location_identity = null,
+		public readonly ?int $pickup_location_id = null
 	) {
 	}
 
@@ -106,6 +121,15 @@ final class OrderDeliveryLineSnapshot {
 
 		if ( null !== $this->pickup_instructions && '' !== $this->pickup_instructions ) {
 			$data['pickup_instructions'] = $this->pickup_instructions;
+		}
+
+		if ( OrderDeliverySnapshot::VERSION_V2 === $this->snapshot_version ) {
+			$data['customer_context_version'] = $this->customer_context_version;
+			$data['matching_location'] = $this->matching_location;
+			$data['delivery_address'] = $this->delivery_address;
+			$data['matching_identity'] = $this->matching_identity;
+			$data['delivery_location_identity'] = $this->delivery_location_identity;
+			$data['pickup_location_id'] = $this->pickup_location_id;
 		}
 
 		return $data;

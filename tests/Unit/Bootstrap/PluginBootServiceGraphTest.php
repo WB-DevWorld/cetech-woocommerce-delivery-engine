@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Tests\Unit\Bootstrap;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
+use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionReconciler;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
+use CetechDeliveryEngine\Application\Cart\CartDeliveryReselectionService;
 use CetechDeliveryEngine\Application\Checkout\CheckoutDeliverySelectionValidator;
 use CetechDeliveryEngine\Application\Diagnostics\ConfigurationHealthChecker;
 use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotPersister;
@@ -103,8 +105,18 @@ final class PluginBootServiceGraphTest extends TestCase {
 			VariableDeliverySelectorAssets::class,
 			VariationDeliveryOptionsEndpoint::class,
 			CartDeliverySelectionCapture::class,
+			CartDeliverySelectionReconciler::class,
 			CartDeliverySelectionRevalidator::class,
+			CartDeliveryReselectionService::class,
+			\CetechDeliveryEngine\Presentation\Frontend\CartDeliveryReselectionRenderer::class,
+			\CetechDeliveryEngine\Application\Cart\CartCustomerContextEditorService::class,
+			\CetechDeliveryEngine\Presentation\Frontend\CartCustomerContextEditorRenderer::class,
+			\CetechDeliveryEngine\Application\CustomerContext\MatchingLocationOptionsEndpoint::class,
+			\CetechDeliveryEngine\Application\CustomerContext\CustomerBrowsingLocationStore::class,
+			\CetechDeliveryEngine\Application\CustomerContext\LocationOfferQuoteProbe::class,
+			\CetechDeliveryEngine\Application\CustomerContext\LocationAwareDeliveryOptions::class,
 			CheckoutDeliverySelectionValidator::class,
+			\CetechDeliveryEngine\Application\Checkout\CheckoutAddressPolicy::class,
 			ShippingPackageBuilder::class,
 			SelectedOfferShippingIntegration::class,
 			PaidOrderShipmentSubscriber::class,
@@ -127,6 +139,7 @@ final class PluginBootServiceGraphTest extends TestCase {
 			\CetechDeliveryEngine\Presentation\Admin\OverviewPage::class,
 			\CetechDeliveryEngine\Presentation\Admin\SetupWizardPage::class,
 			\CetechDeliveryEngine\Presentation\Admin\ProductDeliveryPanel::class,
+			\CetechDeliveryEngine\Integrations\WCFM\WcfmVendorIsolation::class,
 		];
 
 		foreach ( $eager_ids as $id ) {

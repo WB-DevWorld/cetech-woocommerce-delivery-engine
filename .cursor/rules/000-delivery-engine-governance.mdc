@@ -17,10 +17,10 @@ If a requested action conflicts with a rule, stop and report the conflict rather
 
 Never infer permission to start a later stage.
 
-Preserve released tags/history (`v1.0.0-rc.2`, `v1.0.0-rc.3`, `v1.0.0-rc.4`, `v1.0.0-rc.5`, `v1.0.0-rc.6`, `v1.0.0-rc.7`, `v1.0.0-rc.8`, `v1.0.0-rc.9`).
+Preserve released tags/history (`v1.0.0-rc.2`, `v1.0.0-rc.3`, `v1.0.0-rc.4`, `v1.0.0-rc.5`, `v1.0.0-rc.6`, `v1.0.0-rc.7`, `v1.0.0-rc.8`, `v1.0.0-rc.9`, `v1.0.0-rc.10`).
 
 Never claim a test that was not run.
 
 Do not modify FLAIROC unless the current task explicitly authorises deployment/QA work.
 
-RC.9 (`1.0.0-rc.9`, schema `5`) is the current protected runtime baseline. Do not retag RC.8 or earlier. Do not infer permission to start Stage 15.
+RC.10 (`1.0.0-rc.10`, schema `5`) is the current protected runtime/collaboration baseline after protected merge and tag. Do not retag RC.9 or earlier. Do not infer permission to start Stage 15.

@@ -46,13 +46,15 @@ final class CartDeliverySelectionSessionData {
 	 * @return array{
 	 *     intent: array<string, mixed>,
 	 *     summary: array<string, string|null>,
-	 *     hash: string
+	 *     hash: string,
+	 *     needs_reselection: bool
 	 * }|null
 	 */
 	public static function restoreFromSession( array $values ): ?array {
 		$has_any = isset( $values[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] )
 			|| isset( $values[ CartDeliverySelectionCapture::CART_SUMMARY_KEY ] )
-			|| isset( $values[ CartDeliverySelectionCapture::CART_HASH_KEY ] );
+			|| isset( $values[ CartDeliverySelectionCapture::CART_HASH_KEY ] )
+			|| isset( $values[ CartDeliverySelectionCapture::CART_NEEDS_RESELECTION_KEY ] );
 
 		if ( ! $has_any ) {
 			return null;
@@ -64,10 +66,15 @@ final class CartDeliverySelectionSessionData {
 			return null;
 		}
 
-		$summary = self::normalizeSummary( $values[ CartDeliverySelectionCapture::CART_SUMMARY_KEY ] ?? null );
+		$needs_reselection = ! empty( $values[ CartDeliverySelectionCapture::CART_NEEDS_RESELECTION_KEY ] );
+		$summary           = self::normalizeSummary( $values[ CartDeliverySelectionCapture::CART_SUMMARY_KEY ] ?? null );
 
 		if ( null === $summary ) {
-			return null;
+			if ( ! $needs_reselection ) {
+				return null;
+			}
+
+			$summary = [];
 		}
 
 		$hash = self::normalizeHash( $values[ CartDeliverySelectionCapture::CART_HASH_KEY ] ?? null );
@@ -83,9 +90,10 @@ final class CartDeliverySelectionSessionData {
 		}
 
 		return [
-			'intent'  => $intent,
-			'summary' => $summary,
-			'hash'    => $hash,
+			'intent'             => $intent,
+			'summary'            => $summary,
+			'hash'               => $hash,
+			'needs_reselection'  => $needs_reselection,
 		];
 	}
 
@@ -123,7 +131,7 @@ final class CartDeliverySelectionSessionData {
 			$intent['configuration_fingerprint'] = (string) $fields['configuration_fingerprint'];
 		}
 
-		return $intent;
+		return CartLineCustomerIdentity::overlayCustomerOwned( $intent, $raw );
 	}
 
 	/**
@@ -185,7 +193,8 @@ final class CartDeliverySelectionSessionData {
 		unset(
 			$cart_item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ],
 			$cart_item[ CartDeliverySelectionCapture::CART_SUMMARY_KEY ],
-			$cart_item[ CartDeliverySelectionCapture::CART_HASH_KEY ]
+			$cart_item[ CartDeliverySelectionCapture::CART_HASH_KEY ],
+			$cart_item[ CartDeliverySelectionCapture::CART_NEEDS_RESELECTION_KEY ]
 		);
 
 		return $cart_item;
