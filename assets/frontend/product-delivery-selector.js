@@ -31,6 +31,55 @@
 		return String(option.estimate_text || '').replace(/^Estimated(?:\s+delivery)?\s*:?\s+/i, '').trim();
 	}
 
+	function formatPriceText(option, config) {
+		if (!option) {
+			return '';
+		}
+		if (option.price_text) {
+			return String(option.price_text);
+		}
+		if (option.fulfilment_choice === 'store_pickup') {
+			return (config && config.i18n && config.i18n.free) || 'Free';
+		}
+		return '';
+	}
+
+	function productQuantity(root) {
+		var form = root && root.closest ? root.closest('form.cart, .variations_form, form.variations_form') : null;
+		var field = form ? form.querySelector('input.qty, input[name="quantity"]') : null;
+		if (!field && document.querySelector) {
+			field = document.querySelector('form.cart input.qty, form.cart input[name="quantity"]');
+		}
+		var n = parseInt(field && field.value ? field.value : '1', 10);
+		return n > 0 ? n : 1;
+	}
+
+	function bindQuantityRefresh(root, schedule) {
+		var form = root && root.closest ? root.closest('form.cart, .variations_form') : null;
+		if (!form || form.getAttribute('data-cetech-de-qty-bound') === '1') {
+			return;
+		}
+		form.setAttribute('data-cetech-de-qty-bound', '1');
+		form.addEventListener('change', function (event) {
+			var target = event.target;
+			if (!target || !target.name) {
+				return;
+			}
+			if (target.name === 'quantity' || (target.classList && target.classList.contains('qty'))) {
+				schedule();
+			}
+		});
+		form.addEventListener('input', function (event) {
+			var target = event.target;
+			if (!target || !target.name) {
+				return;
+			}
+			if (target.name === 'quantity' || (target.classList && target.classList.contains('qty'))) {
+				schedule();
+			}
+		});
+	}
+
 	function currentPayload(root) {
 		var loc = root.querySelector('[data-cetech-de-matching-location]') || root;
 		var checked = root.querySelector('input[name="cetech_de_delivery_option_key"]:checked:not([disabled])');
@@ -217,6 +266,7 @@
 
 		locationRoot.addEventListener('change', fetchOptions);
 		locationRoot.addEventListener('input', schedule);
+		bindQuantityRefresh(root, schedule);
 		root.setAttribute('data-cetech-de-location-bound', '1');
 
 		function fetchOptions() {
@@ -237,6 +287,7 @@
 			body.set('state', fieldValue(locationRoot, 'cetech_de_matching_state'));
 			body.set('city', fieldValue(locationRoot, 'cetech_de_matching_city'));
 			body.set('postcode', fieldValue(locationRoot, 'cetech_de_matching_postcode'));
+			body.set('quantity', String(productQuantity(root)));
 
 			window.fetch(config.ajaxUrl, {
 				method: 'POST',
@@ -267,7 +318,7 @@
 					if (choiceSwitch) {
 						previousChoice = String(choiceSwitch.value || '');
 					}
-					optionsEl.innerHTML = renderOptionsHtml(data.options || [], data.default_key || '', config, data.locality || '', previousChoice);
+					optionsEl.innerHTML = renderOptionsHtml(data.options || [], data.default_key || '', config, data.locality || '', previousChoice, data);
 					root.removeAttribute('data-cetech-de-switch-bound');
 					bind(root);
 					var radios = optionsEl.querySelectorAll('input[name="cetech_de_delivery_option_key"]:not([disabled])');
@@ -296,24 +347,40 @@
 			.replace(/"/g, '&quot;');
 	}
 
-	function renderOptionsHtml(options, defaultKey, config, locality, preferredChoice) {
+	function fulfilmentCapabilities(root, data) {
+		var hasDelivery = data && typeof data.has_delivery === 'boolean'
+			? !!data.has_delivery
+			: (root && root.getAttribute('data-cetech-de-has-delivery') === '1');
+		var hasPickup = data && typeof data.has_pickup === 'boolean'
+			? !!data.has_pickup
+			: (root && root.getAttribute('data-cetech-de-has-pickup') === '1');
+		if (root && data) {
+			root.setAttribute('data-cetech-de-has-delivery', hasDelivery ? '1' : '0');
+			root.setAttribute('data-cetech-de-has-pickup', hasPickup ? '1' : '0');
+		}
+		return { hasDelivery: !!hasDelivery, hasPickup: !!hasPickup };
+	}
+
+	function renderOptionsHtml(options, defaultKey, config, locality, preferredChoice, payload) {
 		var delivery = [];
 		var pickup = [];
 		var i18n = (config && config.i18n) || {};
+		var root = document.querySelector('[data-cetech-de-selector]');
 		options.forEach(function (option) {
 			if (!option || !option.is_available) {
 				return;
 			}
 			if (option.fulfilment_choice === 'store_pickup') {
 				pickup.push(option);
-			} else {
+			} else if (option.estimate_text || option.estimate_line) {
 				delivery.push(option);
 			}
 		});
 
+		var caps = fulfilmentCapabilities(root, payload || {});
 		var html = '';
-		var hasSwitch = delivery.length && pickup.length;
-		var pickupActive = preferredChoice === 'store_pickup' && pickup.length > 0;
+		var hasSwitch = (caps.hasDelivery && caps.hasPickup) || (delivery.length && pickup.length);
+		var pickupActive = preferredChoice === 'store_pickup' && (pickup.length > 0 || caps.hasPickup);
 		if (hasSwitch) {
 			html += '<div class="cetech-de-fulfilment-choice" role="radiogroup">';
 			html += optionSwitch('delivery', i18n.delivery || 'Delivery', !pickupActive);
@@ -321,7 +388,7 @@
 			html += '</div>';
 		}
 
-		if (delivery.length) {
+		if (caps.hasDelivery) {
 			html += '<div class="cetech-de-delivery-option-group" data-cetech-de-choice-panel="delivery"' + (pickupActive ? ' hidden' : '') + '>';
 			html += '<p class="cetech-de-delivery-option-group__heading">' + escapeHtml(locality ? ('Delivery to ' + locality) : (i18n.delivery || 'Delivery')) + '</p>';
 			delivery.forEach(function (option) {
@@ -330,7 +397,7 @@
 			html += '</div>';
 		}
 
-		if (pickup.length) {
+		if (caps.hasPickup || pickup.length) {
 			html += '<div class="cetech-de-delivery-option-group cetech-de-delivery-option-group--pickup" data-cetech-de-choice-panel="store_pickup"' + (hasSwitch && !pickupActive ? ' hidden' : '') + '>';
 			html += '<p class="cetech-de-delivery-option-group__heading">' + escapeHtml(i18n.storePickup || 'Store Pickup') + '</p>';
 			pickup.forEach(function (option) {
@@ -352,6 +419,12 @@
 		var checked = option.display_key === defaultKey || option.is_default;
 		var isPickup = option.fulfilment_choice === 'store_pickup';
 		var title = option.delivery_offer_public_label || option.pickup_location_label || '';
+		var price = formatPriceText(option, config);
+		var headline = '<span class="cetech-de-delivery-option__headline"><span class="cetech-de-delivery-option__label">' + escapeHtml(title) + '</span>';
+		if (price) {
+			headline += '<span class="cetech-de-delivery-option__price">' + escapeHtml(price) + '</span>';
+		}
+		headline += '</span>';
 		var meta = '';
 		if (isPickup) {
 			if (option.pickup_location_label && option.pickup_location_label !== title) {
@@ -372,7 +445,7 @@
 		}
 		return '<p class="cetech-de-delivery-option cetech-de-delivery-option--radio cetech-de-delivery-option--card" data-cetech-de-choice="' + escapeHtml(option.fulfilment_choice || '') + '"><label>' +
 			'<input type="radio" name="' + escapeHtml((config && config.postField) || 'cetech_de_delivery_option_key') + '" value="' + escapeHtml(option.display_key) + '"' + (checked ? ' checked="checked"' : '') + ' required="required" />' +
-			'<span class="cetech-de-delivery-option__body"><span class="cetech-de-delivery-option__label">' + escapeHtml(title) + '</span>' + meta + '</span></label></p>';
+			'<span class="cetech-de-delivery-option__body">' + headline + meta + '</span></label></p>';
 	}
 
 	window.CetechDeProductDeliverySelector = {
@@ -382,8 +455,12 @@
 		writePayload: writePayload,
 		currentPayload: currentPayload,
 		formatEstimateLine: formatEstimateLine,
+		formatPriceText: formatPriceText,
+		productQuantity: productQuantity,
 		dismissStaleSelectionNotices: dismissStaleSelectionNotices,
-		storeApiExtensions: storeApiExtensions
+		storeApiExtensions: storeApiExtensions,
+		renderOptionsHtml: renderOptionsHtml,
+		fulfilmentCapabilities: fulfilmentCapabilities
 	};
 
 	function storeApiExtensions() {

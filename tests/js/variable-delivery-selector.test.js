@@ -43,16 +43,27 @@ function flush() {
 	return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-function loadController() {
+function loadController(options = {}) {
+	const emptyLocation = Boolean(options.emptyLocation);
+	const locationFields = emptyLocation
+		? `
+					<select name="cetech_de_matching_country"><option value="">Select…</option><option value="GH">Ghana</option></select>
+					<select name="cetech_de_matching_state"><option value=""></option></select>
+					<input name="cetech_de_matching_city" value="" />
+					<input name="cetech_de_matching_postcode" value="" />
+		`
+		: `
+					<select name="cetech_de_matching_country"><option value="GH" selected>Ghana</option></select>
+					<select name="cetech_de_matching_state"><option value="AA" selected>Greater Accra</option></select>
+					<input name="cetech_de_matching_city" value="Accra" />
+					<input name="cetech_de_matching_postcode" value="GA-123" />
+		`;
 	document.body.innerHTML = `
 		<form class="variations_form cart">
 			<div class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--variable"
 				data-cetech-de-variable-selector="1" data-cetech-de-selector="1" data-product-id="100">
 				<div data-cetech-de-matching-location="1">
-					<select name="cetech_de_matching_country"><option value="GH" selected>Ghana</option></select>
-					<select name="cetech_de_matching_state"><option value="AA" selected>Greater Accra</option></select>
-					<input name="cetech_de_matching_city" value="Accra" />
-					<input name="cetech_de_matching_postcode" value="GA-123" />
+					${locationFields}
 				</div>
 				<div class="cetech-de-delivery-selector__status" role="status" aria-live="polite" data-cetech-de-status></div>
 				<div class="cetech-de-delivery-selector__options" data-cetech-de-options></div>
@@ -83,6 +94,7 @@ function loadController() {
 			pickupAddress: 'Pickup address',
 			pickupInstructions: 'Pickup instructions',
 			fulfilment: 'Fulfilment',
+			free: 'Free',
 		},
 	};
 
@@ -153,6 +165,10 @@ function okPayload(variationId, label = `Offer ${variationId}`) {
 					estimate_text: '2 days',
 					is_available: true,
 					unavailable_reason: null,
+					price_amount: '25.0000',
+					price_currency: 'GHS',
+					price_text: 'GHS 25.00',
+					price_basis: 'per_shipment',
 				},
 			],
 		},
@@ -186,7 +202,9 @@ describe('Variable delivery selector controller', () => {
 
 		await flush();
 		expect(controller.optionsEl.textContent).toContain('Offer A');
+		expect(controller.optionsEl.textContent).toContain('GHS 25.00');
 		expect(controller.optionsEl.textContent).toContain('2 days');
+		expect(controller.optionsEl.querySelector('.cetech-de-delivery-option__price')).not.toBeNull();
 		expect(controller.optionsEl.querySelector('.cetech-de-delivery-option__body')).not.toBeNull();
 		expect(controller.optionsEl.querySelector('.cetech-de-delivery-option__description')).toBeNull();
 		expect(controller.variationInput.value).toBe('11');
@@ -343,7 +361,9 @@ describe('Variable delivery selector controller', () => {
 						options: [
 							{
 								display_key: 'in_warehouse:delivery:1',
+								fulfilment_choice: 'delivery',
 								delivery_offer_public_label: 'Safe Offer',
+								estimate_text: '2–3 business days',
 								is_available: true,
 								supplier_id: 99,
 								configuration_fingerprint: 'abc',
@@ -464,5 +484,92 @@ describe('Variable delivery selector controller', () => {
 		await flush();
 		expect(controller.optionsEl.textContent).toContain('Kumasi Offer');
 		expect(controller.optionsEl.textContent).not.toContain('Accra Offer');
+	});
+
+	it('sends current quantity on variation option fetch', async () => {
+		const { controller, $form, ajax } = loadController();
+		const form = document.querySelector('form.variations_form');
+		const qty = document.createElement('input');
+		qty.type = 'number';
+		qty.name = 'quantity';
+		qty.className = 'qty';
+		qty.value = '3';
+		form.insertBefore(qty, form.firstChild);
+		ajax.mockReturnValue(createDeferred({ type: 'success', payload: okPayload(11, 'Offer A') }));
+
+		$form.trigger('found_variation', { variation_id: 11 });
+		await flush();
+
+		expect(ajax).toHaveBeenCalled();
+		expect(ajax.mock.calls[0][0].data.quantity).toBe(3);
+		expect(controller.optionsEl.textContent).toContain('GHS 25.00');
+	});
+
+	it('shows Delivery/Pickup switch on need_location using capability metadata', async () => {
+		const { controller, $form, ajax } = loadController();
+		ajax.mockReturnValue(
+			createDeferred({
+				type: 'success',
+				payload: {
+					success: true,
+					data: {
+						status: 'need_location',
+						product_id: 100,
+						variation_id: 11,
+						message: '',
+						has_delivery: true,
+						has_pickup: true,
+						available_choices: ['delivery', 'store_pickup'],
+						options: [
+							{
+								display_key: 'in_store:store_pickup:pickup',
+								fulfilment_choice: 'store_pickup',
+								delivery_offer_public_label: 'QA Accra Pickup',
+								is_available: true,
+								price_text: 'Free',
+							},
+						],
+					},
+				},
+			})
+		);
+
+		$form.trigger('found_variation', { variation_id: 11 });
+		await flush();
+
+		expect(controller.optionsEl.querySelectorAll('[data-cetech-de-choice-switch]').length).toBe(2);
+		expect(controller.optionsEl.querySelector('[data-cetech-de-choice-panel="delivery"]')).not.toBeNull();
+		expect(controller.optionsEl.textContent).toContain('QA Accra Pickup');
+		expect(controller.optionsEl.textContent).not.toContain('₵10.00');
+	});
+
+	it('sends empty country before location and keeps need_location instead of unavailable', async () => {
+		const { controller, $form, ajax } = loadController({ emptyLocation: true });
+		ajax.mockReturnValue(
+			createDeferred({
+				type: 'success',
+				payload: {
+					success: true,
+					data: {
+						status: 'need_location',
+						product_id: 100,
+						variation_id: 11,
+						message: '',
+						has_delivery: true,
+						has_pickup: false,
+						available_choices: ['delivery'],
+						options: [],
+					},
+				},
+			})
+		);
+
+		$form.trigger('found_variation', { variation_id: 11 });
+		await flush();
+
+		expect(ajax.mock.calls[0][0].data.country).toBe('');
+		expect(ajax.mock.calls[0][0].data.city).toBe('');
+		expect(controller.statusEl.textContent).not.toContain('not available for this variation');
+		expect(controller.optionsEl.textContent).not.toMatch(/₵\d/);
 	});
 });

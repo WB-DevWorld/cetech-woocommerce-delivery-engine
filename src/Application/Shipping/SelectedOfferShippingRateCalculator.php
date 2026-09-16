@@ -35,6 +35,8 @@ final class SelectedOfferShippingRateCalculator {
 
 	public const BLOCK_GROUP_MISMATCH = 'group_mismatch';
 
+	public const BLOCK_RUNTIME_INACTIVE = 'runtime_inactive';
+
 	public function __construct(
 		private ShippingRateCalculationGate $gate,
 		private PackageDestinationZoneResolverInterface $destination_resolver,
@@ -55,7 +57,7 @@ final class SelectedOfferShippingRateCalculator {
 	 */
 	public function calculate_for_package( array $package ): SelectedOfferShippingRateResult {
 		if ( ! $this->is_runtime_active() ) {
-			return SelectedOfferShippingRateResult::blocked( 'runtime_inactive' );
+			return SelectedOfferShippingRateResult::blocked( self::BLOCK_RUNTIME_INACTIVE );
 		}
 
 		$meta = DeliveryGroupIdentity::package_meta( $package );
@@ -281,7 +283,11 @@ final class SelectedOfferShippingRateCalculator {
 			$quote_result = $this->quote_engine->quote( $request );
 
 			if ( $quote_result->success && null !== $quote_result->amount ) {
-				return SelectedOfferShippingRateResult::quoted( $quote_result->amount->amount(), $currency_code );
+				return SelectedOfferShippingRateResult::quoted(
+					$quote_result->amount->amount(),
+					$currency_code,
+					$quote_result->charge_type
+				);
 			}
 
 			$last_error = (string) ( $quote_result->error_code ?? self::BLOCK_QUOTE_FAILED );
@@ -314,6 +320,38 @@ final class SelectedOfferShippingRateCalculator {
 		);
 
 		return SelectedOfferShippingRateResult::blocked( self::BLOCK_QUOTE_FAILED );
+	}
+
+	/**
+	 * Quote one selected offer for a WooCommerce destination using cart/checkout semantics.
+	 *
+	 * @param array<string, mixed> $cart_item
+	 * @param array<string, mixed> $intent
+	 * @param array<string, mixed> $destination
+	 */
+	public function quote_for_selection(
+		array $cart_item,
+		array $intent,
+		array $destination,
+		string $currency_code
+	): SelectedOfferShippingRateResult {
+		if ( ! $this->is_runtime_active() ) {
+			return SelectedOfferShippingRateResult::blocked( self::BLOCK_RUNTIME_INACTIVE );
+		}
+
+		$zone_ids = $this->destination_resolver->resolve_zone_ids( $destination );
+
+		if ( [] === $zone_ids ) {
+			return SelectedOfferShippingRateResult::blocked( self::BLOCK_DESTINATION_UNRESOLVED );
+		}
+
+		return $this->quote_selected_offer_against_matched_zones(
+			$cart_item,
+			$intent,
+			$zone_ids,
+			$currency_code,
+			'Selected-offer shipping quote blocked for PDP selection.'
+		);
 	}
 
 	/**

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\CustomerContext;
 
+use CetechDeliveryEngine\Application\Selector\CustomerVisibleDeliveryOptionGate;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
@@ -12,12 +13,14 @@ use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
  * Filters product delivery options for a customer matching location.
  *
  * Pickup does not require a delivery destination. Delivery options require a
- * matching location and a valid DE quote for that geography.
+ * matching location and an authoritative DE quote for that geography, product
+ * and quantity. Unquoted delivery options fail closed and are omitted.
  */
 final class LocationAwareDeliveryOptions {
 
 	public function __construct(
-		private LocationOfferQuoteProbe $quote_probe
+		private LocationOfferQuoteProbe $quote_probe,
+		private ?ProductPageDeliveryPriceQuote $price_quote = null
 	) {
 	}
 
@@ -26,7 +29,12 @@ final class LocationAwareDeliveryOptions {
 	 *
 	 * @return list<ProductDeliveryOption>
 	 */
-	public function filter( array $options, ?MatchingLocation $location, string $currency_code = '' ): array {
+	public function filter(
+		array $options,
+		?MatchingLocation $location,
+		string $currency_code = '',
+		?ProductPageQuoteContext $quote_context = null
+	): array {
 		if ( '' === $currency_code ) {
 			$currency_code = function_exists( 'get_woocommerce_currency' ) ? (string) get_woocommerce_currency() : 'USD';
 		}
@@ -35,6 +43,12 @@ final class LocationAwareDeliveryOptions {
 
 		foreach ( $options as $option ) {
 			if ( FulfilmentChoice::StorePickup->value === $option->fulfilment_choice ) {
+				if ( $option->is_available && $this->price_quote instanceof ProductPageDeliveryPriceQuote && $quote_context instanceof ProductPageQuoteContext ) {
+					$price = $this->price_quote->price_for_option( $option, $quote_context, $location, $currency_code );
+					$filtered[] = $price instanceof CustomerFacingDeliveryPrice ? $option->withCustomerPrice( $price ) : $option;
+					continue;
+				}
+
 				$filtered[] = $option;
 				continue;
 			}
@@ -52,7 +66,23 @@ final class LocationAwareDeliveryOptions {
 				continue;
 			}
 
+			if ( $this->price_quote instanceof ProductPageDeliveryPriceQuote && $quote_context instanceof ProductPageQuoteContext ) {
+				$price = $this->price_quote->price_for_option( $option, $quote_context, $location, $currency_code );
+				if ( ! $price instanceof CustomerFacingDeliveryPrice ) {
+					continue;
+				}
+				$priced = $option->withCustomerPrice( $price );
+				if ( ! CustomerVisibleDeliveryOptionGate::is_selectable_pdp_card( $priced ) ) {
+					continue;
+				}
+				$filtered[] = $priced;
+				continue;
+			}
+
 			if ( $this->quote_probe->offer_quotes_for_location( $offer_id, $location, $currency_code ) ) {
+				if ( ! CustomerVisibleDeliveryOptionGate::is_selectable_pdp_card( $option ) ) {
+					continue;
+				}
 				$filtered[] = $option;
 			}
 		}

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Application\Selector;
 
 use CetechDeliveryEngine\Application\CustomerContext\LocationAwareDeliveryOptions;
+use CetechDeliveryEngine\Application\CustomerContext\ProductPageQuoteContext;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
 use CetechDeliveryEngine\Application\Runtime\VariationRelationshipInspectorInterface;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
@@ -65,6 +66,7 @@ final class VariationDeliveryOptionsEndpoint {
 
 		$product_id   = isset( $_REQUEST['product_id'] ) ? absint( wp_unslash( (string) $_REQUEST['product_id'] ) ) : 0;
 		$variation_id = isset( $_REQUEST['variation_id'] ) ? absint( wp_unslash( (string) $_REQUEST['variation_id'] ) ) : 0;
+		$quantity     = isset( $_REQUEST['quantity'] ) ? (int) wp_unslash( (string) $_REQUEST['quantity'] ) : 1;
 		$location     = MatchingLocation::fromInput(
 			[
 				'country'  => isset( $_REQUEST['country'] ) ? wp_unslash( (string) $_REQUEST['country'] ) : '',
@@ -74,7 +76,7 @@ final class VariationDeliveryOptionsEndpoint {
 			]
 		);
 
-		$payload = $this->build_payload( $product_id, $variation_id, $location->isPresent() ? $location : null );
+		$payload = $this->build_payload( $product_id, $variation_id, $location->isPresent() ? $location : null, $quantity );
 
 		wp_send_json_success( $payload );
 	}
@@ -90,7 +92,7 @@ final class VariationDeliveryOptionsEndpoint {
 	 *     options: list<array<string, mixed>>
 	 * }
 	 */
-	public function build_payload( int $product_id, int $variation_id, ?MatchingLocation $location = null ): array {
+	public function build_payload( int $product_id, int $variation_id, ?MatchingLocation $location = null, int $quantity = 1 ): array {
 		if ( $product_id <= 0 || $variation_id <= 0 ) {
 			return $this->payload(
 				'error',
@@ -151,6 +153,7 @@ final class VariationDeliveryOptionsEndpoint {
 		}
 
 		$options = $this->options_builder->buildFromResolution( $result );
+		$caps    = ProductDeliveryFulfilmentCapabilities::from_options( $options );
 
 		if ( [] === $options ) {
 			return $this->payload(
@@ -158,7 +161,8 @@ final class VariationDeliveryOptionsEndpoint {
 				$product_id,
 				$variation_id,
 				__( 'Delivery options are not available for this variation.', 'cetech-woocommerce-delivery-engine' ),
-				[]
+				[],
+				$caps
 			);
 		}
 
@@ -168,13 +172,9 @@ final class VariationDeliveryOptionsEndpoint {
 
 		if ( $requires_location && $this->location_options instanceof LocationAwareDeliveryOptions ) {
 			$currency = function_exists( 'get_woocommerce_currency' ) ? (string) get_woocommerce_currency() : 'USD';
+			$context  = ProductPageQuoteContext::from_request( $product_id, $variation_id, $quantity );
 			if ( ! $location instanceof MatchingLocation || ! $location->isPresent() ) {
-				$pickup_only = array_values(
-					array_filter(
-						$options,
-						static fn ( ProductDeliveryOption $option ): bool => FulfilmentChoice::StorePickup->value === $option->fulfilment_choice && $option->is_available
-					)
-				);
+				$pickup_only = $this->location_options->filter( $options, null, $currency, $context );
 				$public_pickup = [];
 				foreach ( $pickup_only as $option ) {
 					$public_pickup[] = $this->public_option_array( $option );
@@ -185,11 +185,12 @@ final class VariationDeliveryOptionsEndpoint {
 					$product_id,
 					$variation_id,
 					'',
-					$public_pickup
+					$public_pickup,
+					$caps
 				);
 			}
 
-			$options = $this->location_options->filter( $options, $location, $currency );
+			$options = $this->location_options->filter( $options, $location, $currency, $context );
 		}
 
 		$public_options = [];
@@ -209,7 +210,8 @@ final class VariationDeliveryOptionsEndpoint {
 				$product_id,
 				$variation_id,
 				__( 'Delivery options are not available for this variation.', 'cetech-woocommerce-delivery-engine' ),
-				$public_options
+				$public_options,
+				$caps
 			);
 		}
 
@@ -218,7 +220,8 @@ final class VariationDeliveryOptionsEndpoint {
 			$product_id,
 			$variation_id,
 			'',
-			$public_options
+			$public_options,
+			$caps
 		);
 	}
 
@@ -233,13 +236,20 @@ final class VariationDeliveryOptionsEndpoint {
 	 *     options: list<array<string, mixed>>
 	 * }
 	 */
-	private function payload( string $status, int $product_id, int $variation_id, string $message, array $options ): array {
+	private function payload( string $status, int $product_id, int $variation_id, string $message, array $options, array $capabilities = [] ): array {
+		$caps = [] === $capabilities
+			? ProductDeliveryFulfilmentCapabilities::from_options( [] )
+			: $capabilities;
+
 		return [
-			'status'       => $status,
-			'product_id'   => $product_id,
-			'variation_id' => $variation_id,
-			'message'      => $message,
-			'options'      => $options,
+			'status'             => $status,
+			'product_id'         => $product_id,
+			'variation_id'       => $variation_id,
+			'message'            => $message,
+			'options'            => $options,
+			'has_delivery'       => ! empty( $caps['has_delivery'] ),
+			'has_pickup'         => ! empty( $caps['has_pickup'] ),
+			'available_choices'  => $caps['available_choices'] ?? [],
 		];
 	}
 
@@ -266,6 +276,10 @@ final class VariationDeliveryOptionsEndpoint {
 			'pickup_address'                    => $option->pickup_address,
 			'pickup_instructions'               => $option->pickup_instructions,
 			'pickup_location_id'                => $option->pickup_location_id,
+			'price_amount'                      => $option->price_amount,
+			'price_currency'                    => $option->price_currency,
+			'price_text'                        => $option->price_text,
+			'price_basis'                       => $option->price_basis,
 		];
 	}
 

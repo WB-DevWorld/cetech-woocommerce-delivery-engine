@@ -168,4 +168,148 @@ describe('Product delivery fulfilment switcher', () => {
 			{ i18n: { estimated: 'Estimated delivery' } }
 		)).toBe('3–5 business days');
 	});
+
+	it('formats server price_text and pickup Free without inventing zero', () => {
+		const api = loadSelector();
+		expect(api.formatPriceText(
+			{ price_text: 'GHS 25.00', fulfilment_choice: 'delivery' },
+			{ i18n: { free: 'Free' } }
+		)).toBe('GHS 25.00');
+		expect(api.formatPriceText(
+			{ fulfilment_choice: 'store_pickup' },
+			{ i18n: { free: 'Free' } }
+		)).toBe('Free');
+		expect(api.formatPriceText(
+			{ fulfilment_choice: 'delivery' },
+			{ i18n: { free: 'Free' } }
+		)).toBe('');
+	});
+
+	it('reads quantity from the cart form', () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<input type="number" name="quantity" class="qty" value="4" />
+				<div data-cetech-de-selector="1"></div>
+			</form>
+		`;
+		const api = loadSelector();
+		const root = document.querySelector('[data-cetech-de-selector]');
+		expect(api.productQuantity(root)).toBe(4);
+	});
+
+	it('keeps Delivery/Pickup switch from capabilities before priced delivery cards exist', () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<fieldset data-cetech-de-selector="1" data-cetech-de-has-delivery="1" data-cetech-de-has-pickup="1">
+					<div data-cetech-de-location-panel="1" hidden></div>
+					<div data-cetech-de-options></div>
+				</fieldset>
+			</form>
+		`;
+		const api = loadSelector();
+		const html = api.renderOptionsHtml(
+			[{
+				display_key: 'in_store:store_pickup:pickup',
+				fulfilment_choice: 'store_pickup',
+				is_available: true,
+				delivery_offer_public_label: 'QA Accra Pickup',
+				price_text: 'Free',
+			}],
+			'',
+			{ i18n: { delivery: 'Delivery', storePickup: 'Store Pickup' }, postField: 'cetech_de_delivery_option_key' },
+			'',
+			'store_pickup',
+			{ has_delivery: true, has_pickup: true }
+		);
+		document.querySelector('[data-cetech-de-options]').innerHTML = html;
+		api.bindAll(document);
+
+		expect(document.querySelectorAll('[data-cetech-de-choice-switch]').length).toBe(2);
+		expect(document.querySelector('[data-cetech-de-choice-panel="delivery"]')).not.toBeNull();
+		expect(document.querySelector('[data-cetech-de-choice-panel="delivery"] input[name="cetech_de_delivery_option_key"]')).toBeNull();
+		expect(document.querySelector('[data-cetech-de-choice-switch][value="store_pickup"]').checked).toBe(true);
+
+		const deliverySwitch = document.querySelector('[data-cetech-de-choice-switch][value="delivery"]');
+		deliverySwitch.checked = true;
+		deliverySwitch.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(document.querySelector('[data-cetech-de-location-panel]').hidden).toBe(false);
+		expect(document.querySelector('[data-cetech-de-choice-panel="delivery"]').hidden).toBe(false);
+	});
+
+	it('omits priced delivery cards that have no estimate from AJAX HTML', () => {
+		const api = loadSelector();
+		const html = api.renderOptionsHtml(
+			[
+				{
+					display_key: 'in_store:delivery:2',
+					fulfilment_choice: 'delivery',
+					is_available: true,
+					delivery_offer_public_label: 'Same Day Delivery',
+					price_text: '₵10.00',
+				},
+				{
+					display_key: 'in_store:delivery:1',
+					fulfilment_choice: 'delivery',
+					is_available: true,
+					delivery_offer_public_label: 'Standard Delivery',
+					estimate_text: '2–3 business days',
+					price_text: '₵12.00',
+				},
+			],
+			'',
+			{ i18n: { delivery: 'Delivery' }, postField: 'cetech_de_delivery_option_key' },
+			'Accra',
+			'delivery',
+			{ has_delivery: true, has_pickup: false }
+		);
+		expect(html).toContain('Standard Delivery');
+		expect(html).toContain('2–3 business days');
+		expect(html).not.toContain('Same Day Delivery');
+		expect(html).not.toContain('cetech-de-matching-location');
+	});
+
+	it('quantity change before location posts an empty country', async () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<input class="qty" name="quantity" value="1" />
+				<fieldset class="cetech-de-product-delivery-selector" data-cetech-de-selector="1" data-product-id="16">
+					<div data-cetech-de-location-panel="1">
+						<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">
+							<select name="cetech_de_matching_country"><option value="">Select…</option><option value="GH">Ghana</option></select>
+							<select name="cetech_de_matching_state"><option value=""></option></select>
+							<input name="cetech_de_matching_city" value="" />
+							<input name="cetech_de_matching_postcode" value="" />
+						</div>
+					</div>
+					<div data-cetech-de-status></div>
+					<div data-cetech-de-options></div>
+				</fieldset>
+			</form>
+		`;
+		window.cetechDeMatchingLocation = {
+			ajaxUrl: '/admin-ajax.php',
+			action: 'cetech_de_matching_location_options',
+			nonce: 'n',
+			productId: 16,
+			i18n: { loading: 'Loading' },
+		};
+		window.fetch = async (_url, init) => {
+			window.__cetechLastBody = String(init.body || '');
+			return {
+				json: async () => ({
+					success: true,
+					data: { status: 'need_location', message: '', options: [], has_delivery: true, has_pickup: true },
+				}),
+			};
+		};
+		const api = loadSelector();
+		api.bindAll(document);
+		const qty = document.querySelector('input.qty');
+		qty.value = '3';
+		qty.dispatchEvent(new Event('change', { bubbles: true }));
+		await new Promise((r) => setTimeout(r, 350));
+		expect(window.__cetechLastBody).toContain('quantity=3');
+		expect(window.__cetechLastBody).not.toContain('country=GH');
+		expect(document.querySelector('[data-cetech-de-status]').textContent).not.toContain('not available');
+	});
 });
