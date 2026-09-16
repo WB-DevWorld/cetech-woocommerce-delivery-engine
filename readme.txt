@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-dev.qual.1
+Stable tag: 1.0.0-rc.10
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,9 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-rc.10 =
+* Promotes the owner-qualified 1.0.0-dev.qual.1 core runtime to the tagged collaboration baseline. Schema remains 5. Not Stage 15. WPML/WCML and WP Rocket certification remain separate. Historical 1.0.0-dev.qual.1 and tagged 1.0.0-rc.9 remain unchanged.
 
 = 1.0.0-dev.qual.1 =
 * Pre-RC.10 qualification identity for the reconciled batch branch. Combines protected master (including the PHP 8.1 compatibility repair) with the recovered integrated.2 runtime delta. NON-RELEASE, UNTAGGED, PRE-RC.10, QUALIFICATION-ONLY. Not RC.10. Does not rebuild or replace historical 1.0.0-dev.integrated.2.

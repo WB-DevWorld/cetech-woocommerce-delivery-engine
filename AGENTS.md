@@ -38,4 +38,4 @@ Never move an existing release tag or overwrite a release artifact under the sam
 Release packages must be built from a clean committed SHA and the extracted ZIP must be verified.
 
 ## Current release baseline
-See `docs/STATUS_CURRENT.md`. Do not infer RC.10 exists unless repository/release truth proves it.
+See `docs/STATUS_CURRENT.md`. Do not infer a later release than the documented current baseline. Do not infer Stage 15 has started.

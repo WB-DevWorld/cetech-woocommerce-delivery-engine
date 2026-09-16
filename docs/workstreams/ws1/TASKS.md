@@ -1,6 +1,6 @@
 # WS1 Tasks — Ben
 
-Bootstrap queue (do not implement until canonical local-only source recovery is complete):
+Post-RC.10 collaboration queue (starts from the protected RC.10 baseline after merge; do not implement on published RC.9 `master`):
 
 ## WS1-Q1 — Current-candidate WoodMart/customer-surface qualification
 Scope: PDP, variable/swatches, AJAX Add to Cart, mini-cart, Classic cart/checkout, Blocks customer surfaces, responsive/accessibility. Quick View/Buy Now only if enabled in target WoodMart environment.
