@@ -1,0 +1,231 @@
+name: RC11 Package Qualification
+
+on:
+  push:
+    branches:
+      - ops/rc11-package
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    name: Build RC.10 smoke + RC.11 final packages
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - name: Checkout qualification branch
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup PHP 8.1
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.1'
+          tools: composer:v2
+          coverage: none
+
+      - name: Checkout exact RC.11 source
+        shell: pwsh
+        run: |
+          git checkout --detach 384f564f64a2db766ae6907392e95fb366fb8533
+          $head = (git rev-parse HEAD).Trim()
+          if ($head -ne '384f564f64a2db766ae6907392e95fb366fb8533') { throw "Unexpected RC.11 source: $head" }
+          git status --short
+
+      - name: Build and verify RC.11 package
+        shell: pwsh
+        run: |
+          ./scripts/build-v1-rc-package.ps1 -Version '1.0.0-rc.11' -ZipFileName 'cetech-woocommerce-delivery-engine-1.0.0-rc.11.zip'
+          Get-ChildItem -LiteralPath dist | Format-Table Name, Length, LastWriteTime
+          Get-Content 'dist/cetech-woocommerce-delivery-engine-1.0.0-rc.11.zip.sha256'
+
+      - name: Lint packaged RC.11 PHP
+        shell: pwsh
+        run: |
+          $extract = Join-Path $env:RUNNER_TEMP 'rc11-extract'
+          if (Test-Path $extract) { Remove-Item -LiteralPath $extract -Recurse -Force }
+          Expand-Archive -LiteralPath 'dist/cetech-woocommerce-delivery-engine-1.0.0-rc.11.zip' -DestinationPath $extract -Force
+          $files = @(Get-ChildItem -LiteralPath $extract -Recurse -Filter '*.php' -File)
+          $fail = 0
+          foreach ($file in $files) {
+            & php -l $file.FullName | Out-Null
+            if ($LASTEXITCODE -ne 0) { $fail++ }
+          }
+          Write-Host "Packaged PHP lint: $($files.Count) files; failures=$fail"
+          if ($fail -ne 0) { throw 'Packaged PHP lint failed.' }
+
+      - name: Build immutable RC.10 smoke input from protected tag
+        shell: pwsh
+        run: |
+          $rc10Source = Join-Path $env:RUNNER_TEMP 'cetech-rc10-source'
+          git worktree add --detach $rc10Source 'v1.0.0-rc.10'
+          Push-Location $rc10Source
+          try {
+            $head = (git rev-parse HEAD).Trim()
+            if ($head -ne 'd1409258caf1a90675b689ab105471460de4c713') { throw "RC.10 tag moved or peeled unexpectedly: $head" }
+            ./scripts/build-v1-rc-package.ps1 -Version '1.0.0-rc.10' -ZipFileName 'cetech-woocommerce-delivery-engine-1.0.0-rc.10-smoke.zip'
+            Copy-Item -LiteralPath 'dist/cetech-woocommerce-delivery-engine-1.0.0-rc.10-smoke.zip' -Destination "$env:GITHUB_WORKSPACE/dist/cetech-woocommerce-delivery-engine-1.0.0-rc.10-smoke.zip" -Force
+            Copy-Item -LiteralPath 'dist/cetech-woocommerce-delivery-engine-1.0.0-rc.10-smoke.zip.sha256' -Destination "$env:GITHUB_WORKSPACE/dist/cetech-woocommerce-delivery-engine-1.0.0-rc.10-smoke.zip.sha256" -Force
+          }
+          finally {
+            Pop-Location
+          }
+
+      - name: Upload package qualification artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rc11-package-qualification-${{ github.run_id }}
+          path: |
+            dist/cetech-woocommerce-delivery-engine-1.0.0-rc.11.zip
+            dist/cetech-woocommerce-delivery-engine-1.0.0-rc.11.zip.sha256
+            dist/cetech-woocommerce-delivery-engine-1.0.0-rc.10-smoke.zip
+            dist/cetech-woocommerce-delivery-engine-1.0.0-rc.10-smoke.zip.sha256
+          if-no-files-found: error
+          retention-days: 30
+
+  smoke:
+    name: WordPress clean-install and RC.10 upgrade smoke
+    needs: package
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Download packages
+        uses: actions/download-artifact@v4
+        with:
+          name: rc11-package-qualification-${{ github.run_id }}
+          path: artifacts
+
+      - name: Show artifact provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          ls -l artifacts
+          sha256sum artifacts/*.zip
+          cat artifacts/*.sha256
+
+      - name: Write isolated WordPress lab
+        shell: bash
+        run: |
+          cat > docker-compose.yml <<'YAML'
+          services:
+            db:
+              image: mariadb:11.4
+              environment:
+                MARIADB_DATABASE: wordpress
+                MARIADB_USER: wordpress
+                MARIADB_PASSWORD: wordpress
+                MARIADB_ROOT_PASSWORD: root
+              healthcheck:
+                test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+                interval: 5s
+                timeout: 5s
+                retries: 30
+            wordpress:
+              image: wordpress:php8.2-apache
+              depends_on:
+                db:
+                  condition: service_healthy
+              environment:
+                WORDPRESS_DB_HOST: db:3306
+                WORDPRESS_DB_USER: wordpress
+                WORDPRESS_DB_PASSWORD: wordpress
+                WORDPRESS_DB_NAME: wordpress
+              volumes:
+                - wp_data:/var/www/html
+            wpcli:
+              image: wordpress:cli-php8.2
+              depends_on:
+                db:
+                  condition: service_healthy
+                wordpress:
+                  condition: service_started
+              user: "33:33"
+              environment:
+                WORDPRESS_DB_HOST: db:3306
+                WORDPRESS_DB_USER: wordpress
+                WORDPRESS_DB_PASSWORD: wordpress
+                WORDPRESS_DB_NAME: wordpress
+              volumes:
+                - wp_data:/var/www/html
+                - ./artifacts:/workspace/artifacts:ro
+              working_dir: /var/www/html
+          volumes:
+            wp_data:
+          YAML
+
+      - name: Start clean lab and install WordPress/WooCommerce
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose up -d db wordpress
+          for i in $(seq 1 60); do
+            if docker compose exec -T wordpress test -f /var/www/html/wp-config.php; then break; fi
+            sleep 2
+          done
+          docker compose run --rm wpcli core install --url=http://localhost --title=RC11-QA --admin_user=admin --admin_password=admin123 --admin_email=qa@example.com
+          docker compose run --rm wpcli plugin install woocommerce --activate
+
+      - name: RC.11 clean-install smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose run --rm wpcli plugin install /workspace/artifacts/cetech-woocommerce-delivery-engine-1.0.0-rc.11.zip --activate
+          version=$(docker compose run --rm wpcli eval 'echo defined("CETECH_DE_VERSION") ? CETECH_DE_VERSION : "missing";')
+          schema=$(docker compose run --rm wpcli option get cetech_de_db_version)
+          tables=$(docker compose run --rm wpcli eval 'echo \CetechDeliveryEngine\Infrastructure\Persistence\ConfigurationTables::all_exist() ? "all_tables_ok" : "missing_tables";')
+          echo "clean version=$version schema=$schema tables=$tables"
+          test "$version" = "1.0.0-rc.11"
+          test "$schema" = "5"
+          test "$tables" = "all_tables_ok"
+
+      - name: Reset isolated lab for upgrade smoke
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose down -v
+          docker compose up -d db wordpress
+          for i in $(seq 1 60); do
+            if docker compose exec -T wordpress test -f /var/www/html/wp-config.php; then break; fi
+            sleep 2
+          done
+          docker compose run --rm wpcli core install --url=http://localhost --title=RC11-UPGRADE --admin_user=admin --admin_password=admin123 --admin_email=qa@example.com
+          docker compose run --rm wpcli plugin install woocommerce --activate
+
+      - name: Install RC.10 and seed retained configuration data
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose run --rm wpcli plugin install /workspace/artifacts/cetech-woocommerce-delivery-engine-1.0.0-rc.10-smoke.zip --activate
+          version=$(docker compose run --rm wpcli eval 'echo CETECH_DE_VERSION;')
+          schema=$(docker compose run --rm wpcli option get cetech_de_db_version)
+          tables=$(docker compose run --rm wpcli eval 'echo \CetechDeliveryEngine\Infrastructure\Persistence\ConfigurationTables::all_exist() ? "all_tables_ok" : "missing_tables";')
+          echo "rc10 version=$version schema=$schema tables=$tables"
+          test "$version" = "1.0.0-rc.10"
+          test "$schema" = "5"
+          test "$tables" = "all_tables_ok"
+          docker compose run --rm wpcli db query "INSERT INTO wp_delivery_engine_delivery_offers (internal_code, internal_name, public_label, route, status) VALUES ('RC11_UPGRADE_SENTINEL','RC11 Upgrade Sentinel','RC11 Upgrade Sentinel','delivery','active');"
+          docker compose run --rm wpcli option update cetech_rc11_upgrade_sentinel keep_me
+
+      - name: Upgrade RC.10 to RC.11 and verify retention
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker compose run --rm wpcli plugin install /workspace/artifacts/cetech-woocommerce-delivery-engine-1.0.0-rc.11.zip --force --activate
+          version=$(docker compose run --rm wpcli eval 'echo CETECH_DE_VERSION;')
+          schema=$(docker compose run --rm wpcli option get cetech_de_db_version)
+          tables=$(docker compose run --rm wpcli eval 'echo \CetechDeliveryEngine\Infrastructure\Persistence\ConfigurationTables::all_exist() ? "all_tables_ok" : "missing_tables";')
+          sentinel=$(docker compose run --rm wpcli db query "SELECT COUNT(*) FROM wp_delivery_engine_delivery_offers WHERE internal_code='RC11_UPGRADE_SENTINEL';" --skip-column-names | tr -d '\r')
+          option_sentinel=$(docker compose run --rm wpcli option get cetech_rc11_upgrade_sentinel | tr -d '\r')
+          echo "upgrade version=$version schema=$schema tables=$tables sentinel=$sentinel option=$option_sentinel"
+          test "$version" = "1.0.0-rc.11"
+          test "$schema" = "5"
+          test "$tables" = "all_tables_ok"
+          test "$sentinel" = "1"
+          test "$option_sentinel" = "keep_me"
+
+      - name: Tear down lab
+        if: always()
+        shell: bash
+        run: docker compose down -v || true
