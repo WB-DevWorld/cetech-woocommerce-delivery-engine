@@ -141,6 +141,7 @@ jobs:
                 - wp_data:/var/www/html
             wpcli:
               image: wordpress:cli-php8.2
+              entrypoint: ["wp"]
               depends_on:
                 db:
                   condition: service_healthy
