@@ -8,7 +8,7 @@
 
 ## Behaviour
 
-Product-page delivery options now attach additive public price fields from the same `SelectedOfferShippingRateCalculator::quote_for_selection()` path used at cart/checkout:
+Product-page delivery options now attach additive public price fields from the same `SelectedOfferShippingRateCalculator` quote path as cart/checkout (`quote_for_selection()` and equivalent `calculate_for_package()` for a single managed delivery group). Delivery quotes require the shipping-rate runtime gate (`is_runtime_active()`). Pickup Free remains explicit and does not imply that the delivery shipping runtime is active.
 
 - `price_amount`, `price_currency`, `price_text`, `price_basis`
 - Pickup is explicit Free/zero without a rate-card quote
@@ -18,10 +18,12 @@ Product-page delivery options now attach additive public price fields from the s
 
 ## Tests run (not owner acceptance)
 
-- PHPUnit: 1002 tests, 5634 assertions, 5 pre-existing deprecations, exit 0
+- PHPUnit: 1005 tests, 5671 assertions, 5 pre-existing deprecations, exit 0
 - Vitest: 44 tests passed
-- `php -l` on new PHP files: no syntax errors
-- Live Storefront/WoodMart PDP vs cart browser comparison: **not run** (no authorized isolated WordPress lab in this session). Owner physical QA remains required.
+- Control plane: OK
+- composer validate --no-check-publish: valid
+- `php -l` on 577 non-vendor PHP files: no syntax errors
+- Live Storefront/WoodMart PDP vs cart browser comparison: **not run**. Owner physical QA remains required.
 
 ## Intentionally excluded
 

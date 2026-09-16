@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Tests\Unit\CustomerContext;
 
+use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\CustomerContext\CustomerFacingDeliveryPrice;
 use CetechDeliveryEngine\Application\CustomerContext\LocationAwareDeliveryOptions;
 use CetechDeliveryEngine\Application\CustomerContext\LocationOfferQuoteProbe;
@@ -15,6 +16,7 @@ use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidationResult;
 use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidatorInterface;
 use CetechDeliveryEngine\Application\Shipping\CartLineShippingAssessorInterface;
+use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
 use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingRateCalculator;
 use CetechDeliveryEngine\Application\Shipping\ShippingRateCalculationGate;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
@@ -27,64 +29,49 @@ use PHPUnit\Framework\TestCase;
 
 final class ProductPageDeliveryPriceQuoteTest extends TestCase {
 
-	public function test_pdp_quote_matches_cart_quote_for_identical_selection(): void {
-		$calculator = $this->calculator(
-			[
-				$this->card( 1, 11, 20, '12.0000', RateCardChargeType::FixedPerShipment->value ),
-			],
-			[ 20 ]
-		);
-		$quote = $this->price_quote( $calculator );
+	protected function setUp(): void {
+		$GLOBALS['cetech_de_test_options'] = [];
 
-		$intent    = $this->intent( 11 );
-		$cart_item = $this->cart_item( 2 );
-		$destination = [ 'country' => 'GH', 'state' => 'AA', 'city' => 'Accra', 'postcode' => '00233' ];
+		if ( ! class_exists( 'WooCommerce', false ) ) {
+			eval( 'class WooCommerce {}' ); // phpcs:ignore Squiz.PHP.Eval.Discouraged -- test bootstrap only.
+		}
 
-		$pdp  = $quote->price_for_intent( $intent, $cart_item, $destination, 'GHS' );
-		$cart = $calculator->quote_for_selection( $cart_item, $intent, $destination, 'GHS' );
-
-		self::assertNotNull( $pdp );
-		self::assertTrue( $cart->success );
-		self::assertSame( $cart->total_amount, $pdp->amount );
-		self::assertSame( 'GHS', $pdp->currency );
-		self::assertSame( CustomerFacingDeliveryPrice::BASIS_PER_SHIPMENT, $pdp->basis );
-		self::assertSame( 'GHS 12.00', $pdp->text );
+		if ( ! function_exists( 'get_woocommerce_currency' ) ) {
+			eval( 'function get_woocommerce_currency(): string { return "USD"; }' ); // phpcs:ignore Squiz.PHP.Eval.Discouraged -- test bootstrap only.
+		}
 	}
 
-	public function test_fixed_per_shipment_does_not_multiply_quantity(): void {
-		$calculator = $this->calculator(
-			[
-				$this->card( 1, 11, 20, '25.0000', RateCardChargeType::FixedPerShipment->value ),
-			],
-			[ 20 ]
+	public function test_pdp_matches_calculate_for_package_fixed_per_shipment(): void {
+		$this->assert_pdp_matches_package(
+			RateCardChargeType::FixedPerShipment->value,
+			'12.0000',
+			2,
+			'12.0000',
+			CustomerFacingDeliveryPrice::BASIS_PER_SHIPMENT
 		);
-		$quote = $this->price_quote( $calculator );
-
-		$one = $quote->price_for_intent( $this->intent( 11 ), $this->cart_item( 1 ), [ 'country' => 'GH' ], 'GHS' );
-		$two = $quote->price_for_intent( $this->intent( 11 ), $this->cart_item( 3 ), [ 'country' => 'GH' ], 'GHS' );
-
-		self::assertSame( '25.0000', $one?->amount );
-		self::assertSame( '25.0000', $two?->amount );
 	}
 
-	public function test_fixed_per_item_scales_with_quantity(): void {
-		$calculator = $this->calculator(
-			[
-				$this->card( 1, 11, 20, '10.0000', RateCardChargeType::FixedPerItem->value ),
-			],
-			[ 20 ]
+	public function test_pdp_matches_calculate_for_package_fixed_per_item_quantity_one(): void {
+		$this->assert_pdp_matches_package(
+			RateCardChargeType::FixedPerItem->value,
+			'10.0000',
+			1,
+			'10.0000',
+			CustomerFacingDeliveryPrice::BASIS_PER_ITEM
 		);
-		$quote = $this->price_quote( $calculator );
-
-		$one = $quote->price_for_intent( $this->intent( 11 ), $this->cart_item( 1 ), [ 'country' => 'GH' ], 'GHS' );
-		$two = $quote->price_for_intent( $this->intent( 11 ), $this->cart_item( 3 ), [ 'country' => 'GH' ], 'GHS' );
-
-		self::assertSame( '10.0000', $one?->amount );
-		self::assertSame( '30.0000', $two?->amount );
-		self::assertSame( CustomerFacingDeliveryPrice::BASIS_PER_ITEM, $two?->basis );
 	}
 
-	public function test_specific_area_then_broader_area_fallback_matches_checkout(): void {
+	public function test_pdp_matches_calculate_for_package_fixed_per_item_quantity_greater_than_one(): void {
+		$this->assert_pdp_matches_package(
+			RateCardChargeType::FixedPerItem->value,
+			'10.0000',
+			3,
+			'30.0000',
+			CustomerFacingDeliveryPrice::BASIS_PER_ITEM
+		);
+	}
+
+	public function test_specific_area_then_broader_area_fallback_matches_calculate_for_package(): void {
 		$calculator = $this->calculator(
 			[
 				$this->card( 2, 11, 30, '8.0000', RateCardChargeType::FixedPerShipment->value ),
@@ -92,17 +79,74 @@ final class ProductPageDeliveryPriceQuoteTest extends TestCase {
 			[ 20, 30 ]
 		);
 		$quote = $this->price_quote( $calculator );
+		$intent = $this->intent( 11 );
+		$cart_item = $this->cart_item( 1 );
+		$destination = $this->destination();
+		$currency = $this->store_currency();
 
-		$pdp  = $quote->price_for_intent( $this->intent( 11 ), $this->cart_item( 1 ), [ 'country' => 'GH' ], 'GHS' );
-		$cart = $calculator->quote_for_selection( $this->cart_item( 1 ), $this->intent( 11 ), [ 'country' => 'GH' ], 'GHS' );
+		$pdp     = $quote->price_for_intent( $intent, $cart_item, $destination, $currency );
+		$package = $calculator->calculate_for_package( $this->managed_package( $cart_item, $intent, $destination ) );
 
-		self::assertSame( '8.0000', $pdp?->amount );
-		self::assertSame( $cart->total_amount, $pdp?->amount );
+		self::assertNotNull( $pdp );
+		self::assertTrue( $package->success );
+		self::assertSame( '8.0000', $pdp->amount );
+		self::assertSame( $package->total_amount, $pdp->amount );
+		self::assertSame( $currency, $pdp->currency );
 	}
 
-	public function test_pickup_is_explicit_free(): void {
-		$calculator = $this->calculator( [], [] );
+	public function test_delivery_quotes_when_runtime_active(): void {
+		$calculator = $this->calculator(
+			[
+				$this->card( 1, 11, 20, '12.0000', RateCardChargeType::FixedPerShipment->value ),
+			],
+			[ 20 ],
+			true
+		);
+
+		self::assertTrue( $calculator->is_runtime_active() );
+
+		$pdp = $this->price_quote( $calculator )->price_for_intent(
+			$this->intent( 11 ),
+			$this->cart_item( 1 ),
+			$this->destination(),
+			$this->store_currency()
+		);
+
+		self::assertNotNull( $pdp );
+		self::assertSame( '12.0000', $pdp->amount );
+	}
+
+	public function test_delivery_quote_fails_closed_when_runtime_inactive(): void {
+		$calculator = $this->calculator(
+			[
+				$this->card( 1, 11, 20, '12.0000', RateCardChargeType::FixedPerShipment->value ),
+			],
+			[ 20 ],
+			false
+		);
+		$intent     = $this->intent( 11 );
+		$cart_item  = $this->cart_item( 1 );
+		$destination = $this->destination();
+		$currency   = $this->store_currency();
+
+		self::assertFalse( $calculator->is_runtime_active() );
+
+		$pdp     = $this->price_quote( $calculator )->price_for_intent( $intent, $cart_item, $destination, $currency );
+		$direct  = $calculator->quote_for_selection( $cart_item, $intent, $destination, $currency );
+		$package = $calculator->calculate_for_package( $this->managed_package( $cart_item, $intent, $destination ) );
+
+		self::assertNull( $pdp );
+		self::assertFalse( $direct->success );
+		self::assertSame( SelectedOfferShippingRateCalculator::BLOCK_RUNTIME_INACTIVE, $direct->block_reason );
+		self::assertFalse( $package->success );
+		self::assertSame( SelectedOfferShippingRateCalculator::BLOCK_RUNTIME_INACTIVE, $package->block_reason );
+	}
+
+	public function test_pickup_free_does_not_imply_shipping_runtime_is_active(): void {
+		$calculator = $this->calculator( [], [], false );
 		$quote      = $this->price_quote( $calculator );
+
+		self::assertFalse( $calculator->is_runtime_active() );
 
 		$price = $quote->price_for_intent(
 			[
@@ -110,8 +154,30 @@ final class ProductPageDeliveryPriceQuoteTest extends TestCase {
 				'delivery_offer_id' => 0,
 			],
 			$this->cart_item( 1 ),
-			[ 'country' => 'GH' ],
-			'GHS'
+			$this->destination(),
+			$this->store_currency()
+		);
+
+		self::assertNotNull( $price );
+		self::assertSame( '0.0000', $price->amount );
+		self::assertSame( 'Free', $price->text );
+		self::assertSame( CustomerFacingDeliveryPrice::BASIS_FREE, $price->basis );
+	}
+
+	public function test_pickup_is_explicit_free_when_runtime_active(): void {
+		$calculator = $this->calculator( [], [], true );
+		$quote      = $this->price_quote( $calculator );
+
+		self::assertTrue( $calculator->is_runtime_active() );
+
+		$price = $quote->price_for_intent(
+			[
+				'fulfilment_choice' => 'store_pickup',
+				'delivery_offer_id' => 0,
+			],
+			$this->cart_item( 1 ),
+			$this->destination(),
+			$this->store_currency()
 		);
 
 		self::assertNotNull( $price );
@@ -124,7 +190,7 @@ final class ProductPageDeliveryPriceQuoteTest extends TestCase {
 		$calculator = $this->calculator( [], [ 20 ] );
 		$quote      = $this->price_quote( $calculator );
 
-		$price = $quote->price_for_intent( $this->intent( 11 ), $this->cart_item( 1 ), [ 'country' => 'GH' ], 'GHS' );
+		$price = $quote->price_for_intent( $this->intent( 11 ), $this->cart_item( 1 ), $this->destination(), $this->store_currency() );
 
 		self::assertNull( $price );
 	}
@@ -197,11 +263,45 @@ final class ProductPageDeliveryPriceQuoteTest extends TestCase {
 					'postcode' => '00233',
 				]
 			),
-			'GHS',
+			$this->store_currency(),
 			ProductPageQuoteContext::from_request( 16, 0, 1 )
 		);
 
 		self::assertSame( [], $filtered );
+	}
+
+	private function assert_pdp_matches_package(
+		string $charge_type,
+		string $base_amount,
+		int $quantity,
+		string $expected_amount,
+		string $expected_basis
+	): void {
+		$calculator = $this->calculator(
+			[
+				$this->card( 1, 11, 20, $base_amount, $charge_type ),
+			],
+			[ 20 ]
+		);
+		$quote       = $this->price_quote( $calculator );
+		$intent      = $this->intent( 11 );
+		$cart_item   = $this->cart_item( $quantity );
+		$destination = $this->destination();
+		$currency    = $this->store_currency();
+
+		$pdp     = $quote->price_for_intent( $intent, $cart_item, $destination, $currency );
+		$package = $calculator->calculate_for_package( $this->managed_package( $cart_item, $intent, $destination ) );
+
+		self::assertNotNull( $pdp );
+		self::assertTrue( $package->success );
+		self::assertSame( $expected_amount, $pdp->amount );
+		self::assertSame( $package->total_amount, $pdp->amount );
+		self::assertSame( $currency, $pdp->currency );
+		self::assertSame( $currency, $package->currency );
+		self::assertSame( $expected_basis, $pdp->basis );
+		self::assertSame( 16, (int) $cart_item['product_id'] );
+		self::assertSame( 11, (int) $intent['delivery_offer_id'] );
+		self::assertSame( 44, (int) $intent['rule_id'] );
 	}
 
 	private function price_quote( SelectedOfferShippingRateCalculator $calculator ): ProductPageDeliveryPriceQuote {
@@ -215,7 +315,7 @@ final class ProductPageDeliveryPriceQuoteTest extends TestCase {
 	 * @param list<array<string, mixed>> $cards
 	 * @param list<int>                  $zone_ids
 	 */
-	private function calculator( array $cards, array $zone_ids ): SelectedOfferShippingRateCalculator {
+	private function calculator( array $cards, array $zone_ids, bool $runtime_active = true ): SelectedOfferShippingRateCalculator {
 		$zones = $this->createStub( PackageDestinationZoneResolverInterface::class );
 		$zones->method( 'resolve_zone_ids' )->willReturn( $zone_ids );
 
@@ -228,23 +328,77 @@ final class ProductPageDeliveryPriceQuoteTest extends TestCase {
 			]
 		);
 
+		$assessor = new class() implements CartLineShippingAssessorInterface {
+			public function assess_line( string $cart_item_key, array $cart_item ): array {
+				$intent = $cart_item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] ?? null;
+
+				return [
+					'action' => 'quote',
+					'intent' => is_array( $intent ) ? $intent : [],
+				];
+			}
+		};
+
 		return new SelectedOfferShippingRateCalculator(
-			new ShippingRateCalculationGate( new FeatureFlags(), new Requirements() ),
+			new ShippingRateCalculationGate( $this->flags( $runtime_active ), new Requirements() ),
 			$zones,
-			$this->createStub( CartLineShippingAssessorInterface::class ),
+			$assessor,
 			new RateQuoteEngine( $this->cards( $cards ) ),
 			$rules,
 			new Logger()
 		);
 	}
 
+	private function flags( bool $runtime_active ): FeatureFlags {
+		$flags = new FeatureFlags();
+		$flags->ensure_defaults();
+		$flags->set( 'enable_product_delivery_selector', $runtime_active );
+		$flags->set( 'enable_cart_delivery_selection_capture', $runtime_active );
+		$flags->set( 'enable_checkout_delivery_selection_validation', $runtime_active );
+		$flags->set( 'enable_woocommerce_shipping_rate_calculation', $runtime_active );
+
+		return $flags;
+	}
+
+	/**
+	 * @param array<string, mixed> $cart_item
+	 * @param array<string, mixed> $intent
+	 * @param array<string, mixed> $destination
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function managed_package( array $cart_item, array $intent, array $destination ): array {
+		$line = $cart_item;
+		$line[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] = $intent;
+
+		return [
+			'contents'    => [
+				'line-a' => $line,
+			],
+			'destination' => $destination,
+			DeliveryGroupIdentity::PACKAGE_META_KEY => [
+				'managed'   => true,
+				'group_id'  => DeliveryGroupIdentity::compose(
+					(string) $intent['fulfilment_availability'],
+					(string) $intent['fulfilment_choice'],
+					(string) (int) $intent['delivery_offer_id']
+				),
+				'is_pickup' => false,
+			],
+		];
+	}
+
 	/**
 	 * @param list<array<string, mixed>> $rows
 	 */
 	private function cards( array $rows ): RateCardRepositoryInterface {
-		return new class( $rows ) implements RateCardRepositoryInterface {
-			/** @param list<array<string, mixed>> $rows */
-			public function __construct( private array $rows ) {
+		$currency = $this->store_currency();
+
+		return new class( $rows, $currency ) implements RateCardRepositoryInterface {
+			/**
+			 * @param list<array<string, mixed>> $rows
+			 */
+			public function __construct( private array $rows, private string $currency ) {
 			}
 
 			public function findById( int $id ): ?array {
@@ -294,10 +448,11 @@ final class ProductPageDeliveryPriceQuoteTest extends TestCase {
 			public function listActiveForQuoteMatch( int $delivery_offer_id, int $destination_zone_id, string $currency_code ): array {
 				$out = [];
 				foreach ( $this->rows as $row ) {
+					$row_currency = strtoupper( (string) ( $row['base_currency'] ?? $this->currency ) );
 					if (
 						(int) ( $row['delivery_offer_id'] ?? 0 ) === $delivery_offer_id
 						&& (int) ( $row['destination_zone_id'] ?? 0 ) === $destination_zone_id
-						&& strtoupper( (string) ( $row['base_currency'] ?? '' ) ) === strtoupper( $currency_code )
+						&& $row_currency === strtoupper( $currency_code )
 					) {
 						$out[] = $row;
 					}
@@ -322,7 +477,7 @@ final class ProductPageDeliveryPriceQuoteTest extends TestCase {
 			'origin_id'            => 9,
 			'charge_type'          => $charge_type,
 			'base_amount'          => $amount,
-			'base_currency'        => 'GHS',
+			'base_currency'        => $this->store_currency(),
 			'priority'             => 100,
 			'status'               => 'active',
 		];
@@ -353,5 +508,23 @@ final class ProductPageDeliveryPriceQuoteTest extends TestCase {
 			'variation_id' => 0,
 			'quantity'     => $quantity,
 		];
+	}
+
+	/**
+	 * @return array<string, string>
+	 */
+	private function destination(): array {
+		return [
+			'country'  => 'GH',
+			'state'    => 'AA',
+			'city'     => 'Accra',
+			'postcode' => '00233',
+		];
+	}
+
+	private function store_currency(): string {
+		return function_exists( 'get_woocommerce_currency' )
+			? strtoupper( (string) get_woocommerce_currency() )
+			: 'USD';
 	}
 }

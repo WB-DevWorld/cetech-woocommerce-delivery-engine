@@ -35,6 +35,8 @@ final class SelectedOfferShippingRateCalculator {
 
 	public const BLOCK_GROUP_MISMATCH = 'group_mismatch';
 
+	public const BLOCK_RUNTIME_INACTIVE = 'runtime_inactive';
+
 	public function __construct(
 		private ShippingRateCalculationGate $gate,
 		private PackageDestinationZoneResolverInterface $destination_resolver,
@@ -55,7 +57,7 @@ final class SelectedOfferShippingRateCalculator {
 	 */
 	public function calculate_for_package( array $package ): SelectedOfferShippingRateResult {
 		if ( ! $this->is_runtime_active() ) {
-			return SelectedOfferShippingRateResult::blocked( 'runtime_inactive' );
+			return SelectedOfferShippingRateResult::blocked( self::BLOCK_RUNTIME_INACTIVE );
 		}
 
 		$meta = DeliveryGroupIdentity::package_meta( $package );
@@ -333,6 +335,10 @@ final class SelectedOfferShippingRateCalculator {
 		array $destination,
 		string $currency_code
 	): SelectedOfferShippingRateResult {
+		if ( ! $this->is_runtime_active() ) {
+			return SelectedOfferShippingRateResult::blocked( self::BLOCK_RUNTIME_INACTIVE );
+		}
+
 		$zone_ids = $this->destination_resolver->resolve_zone_ids( $destination );
 
 		if ( [] === $zone_ids ) {
