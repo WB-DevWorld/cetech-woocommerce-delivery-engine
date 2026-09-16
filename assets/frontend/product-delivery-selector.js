@@ -318,7 +318,7 @@
 					if (choiceSwitch) {
 						previousChoice = String(choiceSwitch.value || '');
 					}
-					optionsEl.innerHTML = renderOptionsHtml(data.options || [], data.default_key || '', config, data.locality || '', previousChoice);
+					optionsEl.innerHTML = renderOptionsHtml(data.options || [], data.default_key || '', config, data.locality || '', previousChoice, data);
 					root.removeAttribute('data-cetech-de-switch-bound');
 					bind(root);
 					var radios = optionsEl.querySelectorAll('input[name="cetech_de_delivery_option_key"]:not([disabled])');
@@ -347,24 +347,40 @@
 			.replace(/"/g, '&quot;');
 	}
 
-	function renderOptionsHtml(options, defaultKey, config, locality, preferredChoice) {
+	function fulfilmentCapabilities(root, data) {
+		var hasDelivery = data && typeof data.has_delivery === 'boolean'
+			? !!data.has_delivery
+			: (root && root.getAttribute('data-cetech-de-has-delivery') === '1');
+		var hasPickup = data && typeof data.has_pickup === 'boolean'
+			? !!data.has_pickup
+			: (root && root.getAttribute('data-cetech-de-has-pickup') === '1');
+		if (root && data) {
+			root.setAttribute('data-cetech-de-has-delivery', hasDelivery ? '1' : '0');
+			root.setAttribute('data-cetech-de-has-pickup', hasPickup ? '1' : '0');
+		}
+		return { hasDelivery: !!hasDelivery, hasPickup: !!hasPickup };
+	}
+
+	function renderOptionsHtml(options, defaultKey, config, locality, preferredChoice, payload) {
 		var delivery = [];
 		var pickup = [];
 		var i18n = (config && config.i18n) || {};
+		var root = document.querySelector('[data-cetech-de-selector]');
 		options.forEach(function (option) {
 			if (!option || !option.is_available) {
 				return;
 			}
 			if (option.fulfilment_choice === 'store_pickup') {
 				pickup.push(option);
-			} else {
+			} else if (option.estimate_text || option.estimate_line) {
 				delivery.push(option);
 			}
 		});
 
+		var caps = fulfilmentCapabilities(root, payload || {});
 		var html = '';
-		var hasSwitch = delivery.length && pickup.length;
-		var pickupActive = preferredChoice === 'store_pickup' && pickup.length > 0;
+		var hasSwitch = (caps.hasDelivery && caps.hasPickup) || (delivery.length && pickup.length);
+		var pickupActive = preferredChoice === 'store_pickup' && (pickup.length > 0 || caps.hasPickup);
 		if (hasSwitch) {
 			html += '<div class="cetech-de-fulfilment-choice" role="radiogroup">';
 			html += optionSwitch('delivery', i18n.delivery || 'Delivery', !pickupActive);
@@ -372,7 +388,7 @@
 			html += '</div>';
 		}
 
-		if (delivery.length) {
+		if (caps.hasDelivery) {
 			html += '<div class="cetech-de-delivery-option-group" data-cetech-de-choice-panel="delivery"' + (pickupActive ? ' hidden' : '') + '>';
 			html += '<p class="cetech-de-delivery-option-group__heading">' + escapeHtml(locality ? ('Delivery to ' + locality) : (i18n.delivery || 'Delivery')) + '</p>';
 			delivery.forEach(function (option) {
@@ -381,7 +397,7 @@
 			html += '</div>';
 		}
 
-		if (pickup.length) {
+		if (caps.hasPickup || pickup.length) {
 			html += '<div class="cetech-de-delivery-option-group cetech-de-delivery-option-group--pickup" data-cetech-de-choice-panel="store_pickup"' + (hasSwitch && !pickupActive ? ' hidden' : '') + '>';
 			html += '<p class="cetech-de-delivery-option-group__heading">' + escapeHtml(i18n.storePickup || 'Store Pickup') + '</p>';
 			pickup.forEach(function (option) {
@@ -442,7 +458,9 @@
 		formatPriceText: formatPriceText,
 		productQuantity: productQuantity,
 		dismissStaleSelectionNotices: dismissStaleSelectionNotices,
-		storeApiExtensions: storeApiExtensions
+		storeApiExtensions: storeApiExtensions,
+		renderOptionsHtml: renderOptionsHtml,
+		fulfilmentCapabilities: fulfilmentCapabilities
 	};
 
 	function storeApiExtensions() {

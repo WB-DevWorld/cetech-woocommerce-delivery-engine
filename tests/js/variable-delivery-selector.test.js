@@ -350,7 +350,9 @@ describe('Variable delivery selector controller', () => {
 						options: [
 							{
 								display_key: 'in_warehouse:delivery:1',
+								fulfilment_choice: 'delivery',
 								delivery_offer_public_label: 'Safe Offer',
+								estimate_text: '2–3 business days',
 								is_available: true,
 								supplier_id: 99,
 								configuration_fingerprint: 'abc',
@@ -490,5 +492,43 @@ describe('Variable delivery selector controller', () => {
 		expect(ajax).toHaveBeenCalled();
 		expect(ajax.mock.calls[0][0].data.quantity).toBe(3);
 		expect(controller.optionsEl.textContent).toContain('GHS 25.00');
+	});
+
+	it('shows Delivery/Pickup switch on need_location using capability metadata', async () => {
+		const { controller, $form, ajax } = loadController();
+		ajax.mockReturnValue(
+			createDeferred({
+				type: 'success',
+				payload: {
+					success: true,
+					data: {
+						status: 'need_location',
+						product_id: 100,
+						variation_id: 11,
+						message: '',
+						has_delivery: true,
+						has_pickup: true,
+						available_choices: ['delivery', 'store_pickup'],
+						options: [
+							{
+								display_key: 'in_store:store_pickup:pickup',
+								fulfilment_choice: 'store_pickup',
+								delivery_offer_public_label: 'QA Accra Pickup',
+								is_available: true,
+								price_text: 'Free',
+							},
+						],
+					},
+				},
+			})
+		);
+
+		$form.trigger('found_variation', { variation_id: 11 });
+		await flush();
+
+		expect(controller.optionsEl.querySelectorAll('[data-cetech-de-choice-switch]').length).toBe(2);
+		expect(controller.optionsEl.querySelector('[data-cetech-de-choice-panel="delivery"]')).not.toBeNull();
+		expect(controller.optionsEl.textContent).toContain('QA Accra Pickup');
+		expect(controller.optionsEl.textContent).not.toContain('₵10.00');
 	});
 });

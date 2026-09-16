@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\CustomerContext;
 
+use CetechDeliveryEngine\Application\Selector\ProductDeliveryFulfilmentCapabilities;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
@@ -84,6 +85,7 @@ final class MatchingLocationOptionsEndpoint {
 		$currency   = function_exists( 'get_woocommerce_currency' ) ? (string) get_woocommerce_currency() : 'GHS';
 		$context    = ProductPageQuoteContext::from_request( $product_id, $variation_id, $quantity );
 		$filtered   = $this->location_options->filter( $all, $location, $currency, $context );
+		$caps       = ProductDeliveryFulfilmentCapabilities::from_options( $all );
 		$public     = [];
 
 		foreach ( $filtered as $option ) {
@@ -95,12 +97,15 @@ final class MatchingLocationOptionsEndpoint {
 		}
 
 		if ( 'blocked' === $assessment['requirement'] ) {
-			return [
-				'status'            => 'unavailable',
-				'message'           => __( 'Delivery is currently unavailable for this product.', 'cetech-woocommerce-delivery-engine' ),
-				'options'           => $public,
-				'requires_location' => $requires,
-			];
+			return $this->with_capabilities(
+				[
+					'status'            => 'unavailable',
+					'message'           => __( 'Delivery is currently unavailable for this product.', 'cetech-woocommerce-delivery-engine' ),
+					'options'           => $public,
+					'requires_location' => $requires,
+				],
+				$caps
+			);
 		}
 
 		$delivery_visible = array_filter(
@@ -109,13 +114,16 @@ final class MatchingLocationOptionsEndpoint {
 		);
 
 		if ( $requires && ( ! $location instanceof MatchingLocation || ! $location->isPresent() ) ) {
-			return [
-				'status'            => 'need_location',
-				'message'           => '',
-				'options'           => $public,
-				'requires_location' => true,
-				'locality'          => '',
-			];
+			return $this->with_capabilities(
+				[
+					'status'            => 'need_location',
+					'message'           => '',
+					'options'           => $public,
+					'requires_location' => true,
+					'locality'          => '',
+				],
+				$caps
+			);
 		}
 
 		if ( $requires && [] === $delivery_visible && $location instanceof MatchingLocation ) {
@@ -125,22 +133,42 @@ final class MatchingLocationOptionsEndpoint {
 			);
 
 			if ( [] === $pickup_only ) {
-				return [
-					'status'            => 'unavailable',
-					'message'           => __( 'Delivery is not available to this location.', 'cetech-woocommerce-delivery-engine' ),
-					'options'           => [],
-					'requires_location' => true,
-				];
+				return $this->with_capabilities(
+					[
+						'status'            => 'unavailable',
+						'message'           => __( 'Delivery is not available to this location.', 'cetech-woocommerce-delivery-engine' ),
+						'options'           => [],
+						'requires_location' => true,
+					],
+					$caps
+				);
 			}
 		}
 
-		return [
-			'status'            => 'ok',
-			'message'           => '',
-			'options'           => $public,
-			'requires_location' => $requires,
-			'default_key'       => ProductDeliveryOptionsBuilder::defaultDisplayKey( $filtered ),
-			'locality'          => $location instanceof MatchingLocation ? $location->publicLocalityLabel() : '',
-		];
+		return $this->with_capabilities(
+			[
+				'status'            => 'ok',
+				'message'           => '',
+				'options'           => $public,
+				'requires_location' => $requires,
+				'default_key'       => ProductDeliveryOptionsBuilder::defaultDisplayKey( $filtered ),
+				'locality'          => $location instanceof MatchingLocation ? $location->publicLocalityLabel() : '',
+			],
+			$caps
+		);
+	}
+
+	/**
+	 * @param array<string, mixed> $payload
+	 * @param array{has_delivery: bool, has_pickup: bool, available_choices: list<string>} $caps
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function with_capabilities( array $payload, array $caps ): array {
+		$payload['has_delivery']      = ! empty( $caps['has_delivery'] );
+		$payload['has_pickup']        = ! empty( $caps['has_pickup'] );
+		$payload['available_choices'] = $caps['available_choices'];
+
+		return $payload;
 	}
 }

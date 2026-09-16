@@ -249,15 +249,8 @@
 
 			if (payload.status === 'need_location') {
 				this.setStatus(payload.message || ((config.i18n && config.i18n.selectOptions) || ''), 'need-location');
-				var pickups = Array.isArray(payload.options) ? payload.options.filter(function (option) {
-					return option && option.is_available && String(option.fulfilment_choice || '') === 'store_pickup';
-				}) : [];
-				if (pickups.length) {
-					this.renderOptions(pickups, variationId);
-					this.setVariationBinding(variationId);
-				} else if (this.optionsEl) {
-					this.optionsEl.innerHTML = '';
-				}
+				this.renderOptions(Array.isArray(payload.options) ? payload.options : [], variationId, payload);
+				this.setVariationBinding(variationId);
 				return;
 			}
 
@@ -281,11 +274,11 @@
 			}
 
 			this.setStatus('', '');
-			this.renderOptions(available, variationId);
+			this.renderOptions(available, variationId, payload);
 			this.setVariationBinding(variationId);
 		},
 
-		renderOptions: function (options, variationId) {
+		renderOptions: function (options, variationId, payload) {
 			if (!this.optionsEl) {
 				return;
 			}
@@ -306,12 +299,15 @@
 				}
 				if (String(option.fulfilment_choice || '') === 'store_pickup') {
 					groups.store_pickup.push(option);
-				} else {
+				} else if (option.estimate_text || option.estimate_line) {
 					groups.delivery.push(option);
 				}
 			});
 
-			var hasSwitch = groups.delivery.length > 0 && groups.store_pickup.length > 0;
+			var caps = window.CetechDeProductDeliverySelector && window.CetechDeProductDeliverySelector.fulfilmentCapabilities
+				? window.CetechDeProductDeliverySelector.fulfilmentCapabilities(this.root, payload || {})
+				: { hasDelivery: groups.delivery.length > 0, hasPickup: groups.store_pickup.length > 0 };
+			var hasSwitch = (caps.hasDelivery && caps.hasPickup) || (groups.delivery.length > 0 && groups.store_pickup.length > 0);
 			var defaultKey = '';
 			options.forEach(function (option) {
 				if (option && option.is_default && option.display_key) {
@@ -339,12 +335,12 @@
 				fragment.appendChild(this.renderChoiceSwitch(activeChoice, i18n));
 			}
 
-			if (groups.delivery.length) {
+			if (caps.hasDelivery || groups.delivery.length) {
 				fragment.appendChild(
 					this.renderChoicePanel('delivery', groups.delivery, variationId, fieldName, defaultKey, hasSwitch && activeChoice !== 'delivery', estimatePrefix, i18n)
 				);
 			}
-			if (groups.store_pickup.length) {
+			if (caps.hasPickup || groups.store_pickup.length) {
 				fragment.appendChild(
 					this.renderChoicePanel('store_pickup', groups.store_pickup, variationId, fieldName, defaultKey, hasSwitch && activeChoice !== 'store_pickup', estimatePrefix, i18n)
 				);

@@ -222,6 +222,9 @@ final class VariationDeliveryOptionsEndpointTest extends TestCase {
 
 		self::assertSame( 'need_location', $payload['status'] );
 		self::assertSame( [], $payload['options'] );
+		self::assertTrue( $payload['has_delivery'] );
+		self::assertFalse( $payload['has_pickup'] );
+		self::assertSame( [ 'delivery' ], $payload['available_choices'] );
 	}
 
 	public function test_location_recomputes_options_for_matching_geography(): void {

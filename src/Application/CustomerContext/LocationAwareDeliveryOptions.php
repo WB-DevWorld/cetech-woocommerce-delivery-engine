@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\CustomerContext;
 
+use CetechDeliveryEngine\Application\Selector\CustomerVisibleDeliveryOptionGate;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
@@ -70,11 +71,18 @@ final class LocationAwareDeliveryOptions {
 				if ( ! $price instanceof CustomerFacingDeliveryPrice ) {
 					continue;
 				}
-				$filtered[] = $option->withCustomerPrice( $price );
+				$priced = $option->withCustomerPrice( $price );
+				if ( ! CustomerVisibleDeliveryOptionGate::is_selectable_pdp_card( $priced ) ) {
+					continue;
+				}
+				$filtered[] = $priced;
 				continue;
 			}
 
 			if ( $this->quote_probe->offer_quotes_for_location( $offer_id, $location, $currency_code ) ) {
+				if ( ! CustomerVisibleDeliveryOptionGate::is_selectable_pdp_card( $option ) ) {
+					continue;
+				}
 				$filtered[] = $option;
 			}
 		}

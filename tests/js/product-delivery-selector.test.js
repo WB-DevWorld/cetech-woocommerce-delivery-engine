@@ -196,4 +196,75 @@ describe('Product delivery fulfilment switcher', () => {
 		const root = document.querySelector('[data-cetech-de-selector]');
 		expect(api.productQuantity(root)).toBe(4);
 	});
+
+	it('keeps Delivery/Pickup switch from capabilities before priced delivery cards exist', () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<fieldset data-cetech-de-selector="1" data-cetech-de-has-delivery="1" data-cetech-de-has-pickup="1">
+					<div data-cetech-de-location-panel="1" hidden></div>
+					<div data-cetech-de-options></div>
+				</fieldset>
+			</form>
+		`;
+		const api = loadSelector();
+		const html = api.renderOptionsHtml(
+			[{
+				display_key: 'in_store:store_pickup:pickup',
+				fulfilment_choice: 'store_pickup',
+				is_available: true,
+				delivery_offer_public_label: 'QA Accra Pickup',
+				price_text: 'Free',
+			}],
+			'',
+			{ i18n: { delivery: 'Delivery', storePickup: 'Store Pickup' }, postField: 'cetech_de_delivery_option_key' },
+			'',
+			'store_pickup',
+			{ has_delivery: true, has_pickup: true }
+		);
+		document.querySelector('[data-cetech-de-options]').innerHTML = html;
+		api.bindAll(document);
+
+		expect(document.querySelectorAll('[data-cetech-de-choice-switch]').length).toBe(2);
+		expect(document.querySelector('[data-cetech-de-choice-panel="delivery"]')).not.toBeNull();
+		expect(document.querySelector('[data-cetech-de-choice-panel="delivery"] input[name="cetech_de_delivery_option_key"]')).toBeNull();
+		expect(document.querySelector('[data-cetech-de-choice-switch][value="store_pickup"]').checked).toBe(true);
+
+		const deliverySwitch = document.querySelector('[data-cetech-de-choice-switch][value="delivery"]');
+		deliverySwitch.checked = true;
+		deliverySwitch.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(document.querySelector('[data-cetech-de-location-panel]').hidden).toBe(false);
+		expect(document.querySelector('[data-cetech-de-choice-panel="delivery"]').hidden).toBe(false);
+	});
+
+	it('omits priced delivery cards that have no estimate from AJAX HTML', () => {
+		const api = loadSelector();
+		const html = api.renderOptionsHtml(
+			[
+				{
+					display_key: 'in_store:delivery:2',
+					fulfilment_choice: 'delivery',
+					is_available: true,
+					delivery_offer_public_label: 'Same Day Delivery',
+					price_text: '₵10.00',
+				},
+				{
+					display_key: 'in_store:delivery:1',
+					fulfilment_choice: 'delivery',
+					is_available: true,
+					delivery_offer_public_label: 'Standard Delivery',
+					estimate_text: '2–3 business days',
+					price_text: '₵12.00',
+				},
+			],
+			'',
+			{ i18n: { delivery: 'Delivery' }, postField: 'cetech_de_delivery_option_key' },
+			'Accra',
+			'delivery',
+			{ has_delivery: true, has_pickup: false }
+		);
+		expect(html).toContain('Standard Delivery');
+		expect(html).toContain('2–3 business days');
+		expect(html).not.toContain('Same Day Delivery');
+		expect(html).not.toContain('cetech-de-matching-location');
+	});
 });

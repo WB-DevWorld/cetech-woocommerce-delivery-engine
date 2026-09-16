@@ -13,6 +13,8 @@ use CetechDeliveryEngine\Application\CustomerContext\ProductPageQuoteContext;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryRuntimeConfigurationRouter;
 use CetechDeliveryEngine\Application\Pickup\PickupLocationAddressFormatter;
+use CetechDeliveryEngine\Application\Selector\CustomerVisibleDeliveryOptionGate;
+use CetechDeliveryEngine\Application\Selector\ProductDeliveryFulfilmentCapabilities;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
@@ -235,7 +237,7 @@ final class ProductDeliverySelectorRenderer {
 		$product = $this->resolve_product();
 		$product_id = $product instanceof WC_Product ? (int) $product->get_id() : 0;
 
-		echo '<div class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--variable" data-cetech-de-variable-selector="1" data-cetech-de-selector="1" data-product-id="' . esc_attr( (string) $product_id ) . '">';
+		echo '<div class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--variable" data-cetech-de-variable-selector="1" data-cetech-de-selector="1" data-product-id="' . esc_attr( (string) $product_id ) . '" data-cetech-de-has-delivery="0" data-cetech-de-has-pickup="0">';
 		echo '<fieldset class="cetech-de-delivery-selector__fieldset">';
 		echo '<legend class="cetech-de-delivery-selector__title">' . esc_html( CustomerStorefrontCopy::delivery_and_pickup() ) . '</legend>';
 		$browsing = $this->browsing_store instanceof CustomerBrowsingLocationStore ? $this->browsing_store->get() : null;
@@ -322,15 +324,16 @@ final class ProductDeliverySelectorRenderer {
 		$posted = isset( $_POST[ CartDeliverySelectionCapture::POST_FIELD ] )
 			? ProductDeliveryOptionsBuilder::normalizeDisplayKey( wp_unslash( (string) $_POST[ CartDeliverySelectionCapture::POST_FIELD ] ) )
 			: '';
-		$selected = '' !== $posted ? $posted : ProductDeliveryOptionsBuilder::defaultDisplayKey( $visible );
-		$groups     = ProductDeliveryOptionsBuilder::groupByChoice( $visible );
-		$has_switch = [] !== $groups[ FulfilmentChoice::Delivery->value ]
-			&& [] !== $groups[ FulfilmentChoice::StorePickup->value ];
-		$active_choice = $this->active_choice( $visible !== [] ? $visible : $available, $selected, $has_switch || [] !== $groups[ FulfilmentChoice::StorePickup->value ] );
+		$capabilities = ProductDeliveryFulfilmentCapabilities::from_options( $available );
+		$has_switch   = ProductDeliveryFulfilmentCapabilities::has_switch( $capabilities );
+		$selected     = '' !== $posted ? $posted : ProductDeliveryOptionsBuilder::defaultDisplayKey( $visible !== [] ? $visible : $available );
+		$visible      = CustomerVisibleDeliveryOptionGate::selectable_pdp_cards( $visible );
+		$groups       = ProductDeliveryOptionsBuilder::groupByChoice( $visible );
+		$active_choice = $this->active_choice( $visible !== [] ? $visible : $available, $selected, $has_switch || ! empty( $capabilities['has_pickup'] ) );
 
 		$locality = $browsing instanceof MatchingLocation ? $browsing->publicLocalityLabel() : '';
 
-		echo '<fieldset class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--interactive" data-cetech-de-selector="1" data-product-id="' . esc_attr( (string) $product_id ) . '" data-cetech-de-active-choice="' . esc_attr( $active_choice ) . '">';
+		echo '<fieldset class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--interactive" data-cetech-de-selector="1" data-product-id="' . esc_attr( (string) $product_id ) . '" data-cetech-de-active-choice="' . esc_attr( $active_choice ) . '" data-cetech-de-has-delivery="' . ( ! empty( $capabilities['has_delivery'] ) ? '1' : '0' ) . '" data-cetech-de-has-pickup="' . ( ! empty( $capabilities['has_pickup'] ) ? '1' : '0' ) . '">';
 		echo '<legend class="cetech-de-delivery-selector__title">' . esc_html( CustomerStorefrontCopy::delivery_and_pickup() ) . '</legend>';
 
 		if ( $requires ) {
@@ -350,7 +353,7 @@ final class ProductDeliverySelectorRenderer {
 			$this->render_choice_switch( $active_choice );
 		}
 
-		if ( [] !== $groups[ FulfilmentChoice::Delivery->value ] ) {
+		if ( ! empty( $capabilities['has_delivery'] ) ) {
 			$hidden = $has_switch && FulfilmentChoice::Delivery->value !== $active_choice;
 			echo '<div class="cetech-de-delivery-option-group" data-cetech-de-choice-panel="' . esc_attr( FulfilmentChoice::Delivery->value ) . '"' . ( $hidden ? ' hidden' : '' ) . '>';
 			echo '<p class="cetech-de-delivery-option-group__heading">' . esc_html( CustomerStorefrontCopy::delivery_to( $locality ) ) . '</p>';
@@ -360,7 +363,7 @@ final class ProductDeliverySelectorRenderer {
 			echo '</div>';
 		}
 
-		if ( [] !== $groups[ FulfilmentChoice::StorePickup->value ] ) {
+		if ( ! empty( $capabilities['has_pickup'] ) ) {
 			$hidden = $has_switch && FulfilmentChoice::StorePickup->value !== $active_choice;
 			echo '<div class="cetech-de-delivery-option-group cetech-de-delivery-option-group--pickup" data-cetech-de-choice-panel="' . esc_attr( FulfilmentChoice::StorePickup->value ) . '"' . ( $hidden ? ' hidden' : '' ) . '>';
 			echo '<p class="cetech-de-delivery-option-group__heading">' . esc_html( CustomerStorefrontCopy::store_pickup() ) . '</p>';

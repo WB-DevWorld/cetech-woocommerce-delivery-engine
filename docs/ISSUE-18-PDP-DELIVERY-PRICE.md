@@ -2,14 +2,18 @@
 
 **Status:** Implementation candidate for owner review. Not accepted. Not a release.
 
-**Identity:** `1.0.0-dev.pdp-price.1` (schema `5`)  
+**Identity:** `1.0.0-dev.pdp-price.2` (schema `5`)  
 **Branch:** `fix/pdp-delivery-price-display`  
+**Rejected predecessor:** `1.0.0-dev.pdp-price.1` @ `f527c9f6edeaff06b08b342327faae6cbdd4772d`  
 **Baseline:** tagged `v1.0.0-rc.10` @ `d1409258caf1a90675b689ab105471460de4c713` (immutable)
 
 ## Behaviour
 
 Product-page delivery options now attach additive public price fields from the same `SelectedOfferShippingRateCalculator` quote path as cart/checkout (`quote_for_selection()` and equivalent `calculate_for_package()` for a single managed delivery group). Delivery quotes require the shipping-rate runtime gate (`is_runtime_active()`). Pickup Free remains explicit and does not imply that the delivery shipping runtime is active.
 
+- Delivery/Pickup switch is based on unfiltered fulfilment capability, not currently quoted cards
+- Delivery cards require a real configured estimate; priced options without ETA fail closed
+- Compact two-column matching-location grid on PDP (single column on narrow viewports)
 - `price_amount`, `price_currency`, `price_text`, `price_basis`
 - Pickup is explicit Free/zero without a rate-card quote
 - Unquoted delivery options fail closed and are omitted
@@ -18,12 +22,13 @@ Product-page delivery options now attach additive public price fields from the s
 
 ## Tests run (not owner acceptance)
 
-- PHPUnit: 1005 tests, 5671 assertions, 5 pre-existing deprecations, exit 0
-- Vitest: 44 tests passed
+- PHPUnit: 1010 tests, 5688 assertions, 5 pre-existing deprecations, exit 0
+- Vitest: 47 tests passed
 - Control plane: OK
 - composer validate --no-check-publish: valid
-- `php -l` on 577 non-vendor PHP files: no syntax errors
-- Live Storefront/WoodMart PDP vs cart browser comparison: **not run**. Owner physical QA remains required.
+- `php -l` on 580 non-vendor PHP files: no syntax errors
+- Runtime PHP 8.1 lint of plugin bootstrap/src/database: required before package
+- Live Storefront/WoodMart PDP vs cart browser comparison: **isolated lab after package**
 
 ## Intentionally excluded
 

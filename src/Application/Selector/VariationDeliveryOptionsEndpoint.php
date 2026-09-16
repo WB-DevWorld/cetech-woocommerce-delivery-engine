@@ -153,6 +153,7 @@ final class VariationDeliveryOptionsEndpoint {
 		}
 
 		$options = $this->options_builder->buildFromResolution( $result );
+		$caps    = ProductDeliveryFulfilmentCapabilities::from_options( $options );
 
 		if ( [] === $options ) {
 			return $this->payload(
@@ -160,7 +161,8 @@ final class VariationDeliveryOptionsEndpoint {
 				$product_id,
 				$variation_id,
 				__( 'Delivery options are not available for this variation.', 'cetech-woocommerce-delivery-engine' ),
-				[]
+				[],
+				$caps
 			);
 		}
 
@@ -183,7 +185,8 @@ final class VariationDeliveryOptionsEndpoint {
 					$product_id,
 					$variation_id,
 					'',
-					$public_pickup
+					$public_pickup,
+					$caps
 				);
 			}
 
@@ -207,7 +210,8 @@ final class VariationDeliveryOptionsEndpoint {
 				$product_id,
 				$variation_id,
 				__( 'Delivery options are not available for this variation.', 'cetech-woocommerce-delivery-engine' ),
-				$public_options
+				$public_options,
+				$caps
 			);
 		}
 
@@ -216,7 +220,8 @@ final class VariationDeliveryOptionsEndpoint {
 			$product_id,
 			$variation_id,
 			'',
-			$public_options
+			$public_options,
+			$caps
 		);
 	}
 
@@ -231,13 +236,20 @@ final class VariationDeliveryOptionsEndpoint {
 	 *     options: list<array<string, mixed>>
 	 * }
 	 */
-	private function payload( string $status, int $product_id, int $variation_id, string $message, array $options ): array {
+	private function payload( string $status, int $product_id, int $variation_id, string $message, array $options, array $capabilities = [] ): array {
+		$caps = [] === $capabilities
+			? ProductDeliveryFulfilmentCapabilities::from_options( [] )
+			: $capabilities;
+
 		return [
-			'status'       => $status,
-			'product_id'   => $product_id,
-			'variation_id' => $variation_id,
-			'message'      => $message,
-			'options'      => $options,
+			'status'             => $status,
+			'product_id'         => $product_id,
+			'variation_id'       => $variation_id,
+			'message'            => $message,
+			'options'            => $options,
+			'has_delivery'       => ! empty( $caps['has_delivery'] ),
+			'has_pickup'         => ! empty( $caps['has_pickup'] ),
+			'available_choices'  => $caps['available_choices'] ?? [],
 		];
 	}
 
