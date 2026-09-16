@@ -4,11 +4,14 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Selector;
 
+use CetechDeliveryEngine\Application\CustomerContext\CustomerFacingDeliveryPrice;
+
 /**
  * Customer-safe product-page delivery option (display-only contract).
  *
- * Does not contain supplier/origin data, prices, rate cards, or cart persistence fields.
- * Pickup location fields are public catalog copy only — not per-item location architecture.
+ * Does not contain supplier/origin data, rate cards, or cart persistence fields.
+ * Optional customer-facing price fields are additive and remain empty until an
+ * authoritative server quote is attached. Pickup location fields are public catalog copy only.
  */
 final class ProductDeliveryOption {
 
@@ -31,7 +34,11 @@ final class ProductDeliveryOption {
 		public readonly ?string $pickup_location_label = null,
 		public readonly ?string $pickup_address = null,
 		public readonly ?string $pickup_instructions = null,
-		public readonly ?int $pickup_location_id = null
+		public readonly ?int $pickup_location_id = null,
+		public readonly ?string $price_amount = null,
+		public readonly ?string $price_currency = null,
+		public readonly ?string $price_text = null,
+		public readonly ?string $price_basis = null
 	) {
 	}
 
@@ -57,6 +64,10 @@ final class ProductDeliveryOption {
 			'pickup_address'                    => $this->pickup_address,
 			'pickup_instructions'               => $this->pickup_instructions,
 			'pickup_location_id'                => $this->pickup_location_id,
+			'price_amount'                      => $this->price_amount,
+			'price_currency'                    => $this->price_currency,
+			'price_text'                        => $this->price_text,
+			'price_basis'                       => $this->price_basis,
 		];
 	}
 
@@ -81,7 +92,11 @@ final class ProductDeliveryOption {
 			isset( $data['pickup_location_label'] ) ? (string) $data['pickup_location_label'] : null,
 			isset( $data['pickup_address'] ) ? (string) $data['pickup_address'] : null,
 			isset( $data['pickup_instructions'] ) ? (string) $data['pickup_instructions'] : null,
-			isset( $data['pickup_location_id'] ) ? (int) $data['pickup_location_id'] : null
+			isset( $data['pickup_location_id'] ) ? (int) $data['pickup_location_id'] : null,
+			isset( $data['price_amount'] ) ? (string) $data['price_amount'] : null,
+			isset( $data['price_currency'] ) ? (string) $data['price_currency'] : null,
+			isset( $data['price_text'] ) ? (string) $data['price_text'] : null,
+			isset( $data['price_basis'] ) ? (string) $data['price_basis'] : null
 		);
 	}
 
@@ -103,7 +118,39 @@ final class ProductDeliveryOption {
 			$this->pickup_location_label,
 			$this->pickup_address,
 			$this->pickup_instructions,
-			$this->pickup_location_id
+			$this->pickup_location_id,
+			$this->price_amount,
+			$this->price_currency,
+			$this->price_text,
+			$this->price_basis
+		);
+	}
+
+	public function withCustomerPrice( CustomerFacingDeliveryPrice $price ): self {
+		$public = $price->to_public_array();
+
+		return new self(
+			$this->display_key,
+			$this->fulfilment_availability,
+			$this->fulfilment_availability_label,
+			$this->fulfilment_choice,
+			$this->fulfilment_choice_label,
+			$this->delivery_offer_id,
+			$this->delivery_offer_public_label,
+			$this->delivery_offer_public_description,
+			$this->estimate_text,
+			$this->is_available,
+			$this->unavailable_reason,
+			$this->contract_version,
+			$this->is_default,
+			$this->pickup_location_label,
+			$this->pickup_address,
+			$this->pickup_instructions,
+			$this->pickup_location_id,
+			$public['price_amount'],
+			$public['price_currency'],
+			$public['price_text'],
+			$public['price_basis']
 		);
 	}
 }

@@ -31,6 +31,55 @@
 		return String(option.estimate_text || '').replace(/^Estimated(?:\s+delivery)?\s*:?\s+/i, '').trim();
 	}
 
+	function formatPriceText(option, config) {
+		if (!option) {
+			return '';
+		}
+		if (option.price_text) {
+			return String(option.price_text);
+		}
+		if (option.fulfilment_choice === 'store_pickup') {
+			return (config && config.i18n && config.i18n.free) || 'Free';
+		}
+		return '';
+	}
+
+	function productQuantity(root) {
+		var form = root && root.closest ? root.closest('form.cart, .variations_form, form.variations_form') : null;
+		var field = form ? form.querySelector('input.qty, input[name="quantity"]') : null;
+		if (!field && document.querySelector) {
+			field = document.querySelector('form.cart input.qty, form.cart input[name="quantity"]');
+		}
+		var n = parseInt(field && field.value ? field.value : '1', 10);
+		return n > 0 ? n : 1;
+	}
+
+	function bindQuantityRefresh(root, schedule) {
+		var form = root && root.closest ? root.closest('form.cart, .variations_form') : null;
+		if (!form || form.getAttribute('data-cetech-de-qty-bound') === '1') {
+			return;
+		}
+		form.setAttribute('data-cetech-de-qty-bound', '1');
+		form.addEventListener('change', function (event) {
+			var target = event.target;
+			if (!target || !target.name) {
+				return;
+			}
+			if (target.name === 'quantity' || (target.classList && target.classList.contains('qty'))) {
+				schedule();
+			}
+		});
+		form.addEventListener('input', function (event) {
+			var target = event.target;
+			if (!target || !target.name) {
+				return;
+			}
+			if (target.name === 'quantity' || (target.classList && target.classList.contains('qty'))) {
+				schedule();
+			}
+		});
+	}
+
 	function currentPayload(root) {
 		var loc = root.querySelector('[data-cetech-de-matching-location]') || root;
 		var checked = root.querySelector('input[name="cetech_de_delivery_option_key"]:checked:not([disabled])');
@@ -217,6 +266,7 @@
 
 		locationRoot.addEventListener('change', fetchOptions);
 		locationRoot.addEventListener('input', schedule);
+		bindQuantityRefresh(root, schedule);
 		root.setAttribute('data-cetech-de-location-bound', '1');
 
 		function fetchOptions() {
@@ -237,6 +287,7 @@
 			body.set('state', fieldValue(locationRoot, 'cetech_de_matching_state'));
 			body.set('city', fieldValue(locationRoot, 'cetech_de_matching_city'));
 			body.set('postcode', fieldValue(locationRoot, 'cetech_de_matching_postcode'));
+			body.set('quantity', String(productQuantity(root)));
 
 			window.fetch(config.ajaxUrl, {
 				method: 'POST',
@@ -352,6 +403,12 @@
 		var checked = option.display_key === defaultKey || option.is_default;
 		var isPickup = option.fulfilment_choice === 'store_pickup';
 		var title = option.delivery_offer_public_label || option.pickup_location_label || '';
+		var price = formatPriceText(option, config);
+		var headline = '<span class="cetech-de-delivery-option__headline"><span class="cetech-de-delivery-option__label">' + escapeHtml(title) + '</span>';
+		if (price) {
+			headline += '<span class="cetech-de-delivery-option__price">' + escapeHtml(price) + '</span>';
+		}
+		headline += '</span>';
 		var meta = '';
 		if (isPickup) {
 			if (option.pickup_location_label && option.pickup_location_label !== title) {
@@ -372,7 +429,7 @@
 		}
 		return '<p class="cetech-de-delivery-option cetech-de-delivery-option--radio cetech-de-delivery-option--card" data-cetech-de-choice="' + escapeHtml(option.fulfilment_choice || '') + '"><label>' +
 			'<input type="radio" name="' + escapeHtml((config && config.postField) || 'cetech_de_delivery_option_key') + '" value="' + escapeHtml(option.display_key) + '"' + (checked ? ' checked="checked"' : '') + ' required="required" />' +
-			'<span class="cetech-de-delivery-option__body"><span class="cetech-de-delivery-option__label">' + escapeHtml(title) + '</span>' + meta + '</span></label></p>';
+			'<span class="cetech-de-delivery-option__body">' + headline + meta + '</span></label></p>';
 	}
 
 	window.CetechDeProductDeliverySelector = {
@@ -382,6 +439,8 @@
 		writePayload: writePayload,
 		currentPayload: currentPayload,
 		formatEstimateLine: formatEstimateLine,
+		formatPriceText: formatPriceText,
+		productQuantity: productQuantity,
 		dismissStaleSelectionNotices: dismissStaleSelectionNotices,
 		storeApiExtensions: storeApiExtensions
 	};

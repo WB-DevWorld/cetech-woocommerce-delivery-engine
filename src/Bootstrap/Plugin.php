@@ -17,6 +17,8 @@ use CetechDeliveryEngine\Application\CustomerContext\CustomerBrowsingLocationSto
 use CetechDeliveryEngine\Application\CustomerContext\LocationAwareDeliveryOptions;
 use CetechDeliveryEngine\Application\CustomerContext\LocationOfferQuoteProbe;
 use CetechDeliveryEngine\Application\CustomerContext\MatchingLocationOptionsEndpoint;
+use CetechDeliveryEngine\Application\CustomerContext\ProductPageDeliveryPriceQuote;
+use CetechDeliveryEngine\Application\CustomerContext\ProductPageQuoteContext;
 use CetechDeliveryEngine\Application\ProductRule\ProductDeliveryRuleResolver;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidator;
@@ -690,9 +692,18 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			ProductPageDeliveryPriceQuote::class,
+			static fn ( ServiceContainer $container ): ProductPageDeliveryPriceQuote => new ProductPageDeliveryPriceQuote(
+				$container->get( SelectedOfferShippingRateCalculator::class ),
+				$container->get( ProductDeliverySelectionValidator::class )
+			)
+		);
+
+		$this->container->singleton(
 			LocationAwareDeliveryOptions::class,
 			static fn ( ServiceContainer $container ): LocationAwareDeliveryOptions => new LocationAwareDeliveryOptions(
-				$container->get( LocationOfferQuoteProbe::class )
+				$container->get( LocationOfferQuoteProbe::class ),
+				$container->get( ProductPageDeliveryPriceQuote::class )
 			)
 		);
 

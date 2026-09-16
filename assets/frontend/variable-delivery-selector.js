@@ -31,6 +31,7 @@
 
 			this.bindWooCommerceEvents();
 			this.bindMatchingLocation();
+			this.bindQuantity();
 			this.showSelectOptions();
 		},
 
@@ -78,26 +79,53 @@
 			if (!this.root) {
 				return;
 			}
+
+			var self = this;
 			var locationRoot = this.root.querySelector('[data-cetech-de-matching-location]');
 			if (!locationRoot || locationRoot.getAttribute('data-cetech-de-variable-location-bound') === '1') {
 				return;
 			}
-			var self = this;
+			locationRoot.setAttribute('data-cetech-de-variable-location-bound', '1');
 			var timer = null;
-			function onChange() {
+			function schedule() {
+				window.clearTimeout(timer);
+				timer = window.setTimeout(function () {
+					if (self.currentVariationId) {
+						self.fetchOptions(self.currentVariationId);
+					}
+				}, 280);
+			}
+			locationRoot.addEventListener('change', function () {
 				self.cache = Object.create(null);
 				self.invalidateSelection();
-				if (self.currentVariationId > 0) {
+				if (self.currentVariationId) {
+					self.fetchOptions(self.currentVariationId);
+				}
+			});
+			locationRoot.addEventListener('input', schedule);
+		},
+
+		bindQuantity: function () {
+			if (!this.root) {
+				return;
+			}
+			var self = this;
+			var form = this.root.closest ? this.root.closest('form.cart, .variations_form') : null;
+			if (!form || form.getAttribute('data-cetech-de-variable-qty-bound') === '1') {
+				return;
+			}
+			form.setAttribute('data-cetech-de-variable-qty-bound', '1');
+			function maybeRefresh(event) {
+				var target = event.target;
+				if (!target || (target.name !== 'quantity' && !(target.classList && target.classList.contains('qty')))) {
+					return;
+				}
+				if (self.currentVariationId) {
 					self.fetchOptions(self.currentVariationId);
 				}
 			}
-			function schedule() {
-				window.clearTimeout(timer);
-				timer = window.setTimeout(onChange, 280);
-			}
-			locationRoot.addEventListener('change', onChange);
-			locationRoot.addEventListener('input', schedule);
-			locationRoot.setAttribute('data-cetech-de-variable-location-bound', '1');
+			form.addEventListener('change', maybeRefresh);
+			form.addEventListener('input', maybeRefresh);
 		},
 
 		readMatchingLocation: function () {
@@ -127,10 +155,13 @@
 			var token = ++this.requestToken;
 			var productId = parseInt(config.productId || (this.root && this.root.getAttribute('data-product-id')) || 0, 10);
 			var location = this.readMatchingLocation();
+			var quantity = (window.CetechDeProductDeliverySelector && window.CetechDeProductDeliverySelector.productQuantity)
+				? window.CetechDeProductDeliverySelector.productQuantity(this.root)
+				: 1;
 
 			this.showLoading();
 
-			var cacheKey = productId + ':' + variationId + ':' + location.country + ':' + location.state + ':' + location.city + ':' + location.postcode;
+			var cacheKey = productId + ':' + variationId + ':' + location.country + ':' + location.state + ':' + location.city + ':' + location.postcode + ':' + quantity;
 			if (this.cache[cacheKey]) {
 				if (token === this.requestToken && variationId === this.currentVariationId) {
 					this.renderResponse(this.cache[cacheKey], variationId);
@@ -156,7 +187,8 @@
 					country: location.country,
 					state: location.state,
 					city: location.city,
-					postcode: location.postcode
+					postcode: location.postcode,
+					quantity: quantity
 				}
 			});
 
@@ -403,7 +435,20 @@
 			var labelText = document.createElement('span');
 			labelText.className = 'cetech-de-delivery-option__label';
 			labelText.textContent = String(option.delivery_offer_public_label || '');
-			body.appendChild(labelText);
+
+			var headline = document.createElement('span');
+			headline.className = 'cetech-de-delivery-option__headline';
+			headline.appendChild(labelText);
+			var priceText = window.CetechDeProductDeliverySelector && window.CetechDeProductDeliverySelector.formatPriceText
+				? window.CetechDeProductDeliverySelector.formatPriceText(option, { i18n: i18n })
+				: String(option.price_text || '');
+			if (priceText) {
+				var price = document.createElement('span');
+				price.className = 'cetech-de-delivery-option__price';
+				price.textContent = priceText;
+				headline.appendChild(price);
+			}
+			body.appendChild(headline);
 
 			if (option.estimate_text && String(option.fulfilment_choice || '') !== 'store_pickup') {
 				var estimateLine = option.estimate_line

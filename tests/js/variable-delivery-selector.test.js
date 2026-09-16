@@ -83,6 +83,7 @@ function loadController() {
 			pickupAddress: 'Pickup address',
 			pickupInstructions: 'Pickup instructions',
 			fulfilment: 'Fulfilment',
+			free: 'Free',
 		},
 	};
 
@@ -153,6 +154,10 @@ function okPayload(variationId, label = `Offer ${variationId}`) {
 					estimate_text: '2 days',
 					is_available: true,
 					unavailable_reason: null,
+					price_amount: '25.0000',
+					price_currency: 'GHS',
+					price_text: 'GHS 25.00',
+					price_basis: 'per_shipment',
 				},
 			],
 		},
@@ -186,7 +191,9 @@ describe('Variable delivery selector controller', () => {
 
 		await flush();
 		expect(controller.optionsEl.textContent).toContain('Offer A');
+		expect(controller.optionsEl.textContent).toContain('GHS 25.00');
 		expect(controller.optionsEl.textContent).toContain('2 days');
+		expect(controller.optionsEl.querySelector('.cetech-de-delivery-option__price')).not.toBeNull();
 		expect(controller.optionsEl.querySelector('.cetech-de-delivery-option__body')).not.toBeNull();
 		expect(controller.optionsEl.querySelector('.cetech-de-delivery-option__description')).toBeNull();
 		expect(controller.variationInput.value).toBe('11');
@@ -464,5 +471,24 @@ describe('Variable delivery selector controller', () => {
 		await flush();
 		expect(controller.optionsEl.textContent).toContain('Kumasi Offer');
 		expect(controller.optionsEl.textContent).not.toContain('Accra Offer');
+	});
+
+	it('sends current quantity on variation option fetch', async () => {
+		const { controller, $form, ajax } = loadController();
+		const form = document.querySelector('form.variations_form');
+		const qty = document.createElement('input');
+		qty.type = 'number';
+		qty.name = 'quantity';
+		qty.className = 'qty';
+		qty.value = '3';
+		form.insertBefore(qty, form.firstChild);
+		ajax.mockReturnValue(createDeferred({ type: 'success', payload: okPayload(11, 'Offer A') }));
+
+		$form.trigger('found_variation', { variation_id: 11 });
+		await flush();
+
+		expect(ajax).toHaveBeenCalled();
+		expect(ajax.mock.calls[0][0].data.quantity).toBe(3);
+		expect(controller.optionsEl.textContent).toContain('GHS 25.00');
 	});
 });

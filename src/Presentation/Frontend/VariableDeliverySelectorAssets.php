@@ -95,6 +95,7 @@ final class VariableDeliverySelectorAssets {
 					'pickupAddress'     => __( 'Pickup address', 'cetech-woocommerce-delivery-engine' ),
 					'pickupInstructions'=> __( 'Pickup instructions', 'cetech-woocommerce-delivery-engine' ),
 					'fulfilment'        => __( 'Fulfilment', 'cetech-woocommerce-delivery-engine' ),
+					'free'              => __( 'Free', 'cetech-woocommerce-delivery-engine' ),
 				],
 				'postField'           => 'cetech_de_delivery_option_key',
 				'postVariationField'  => 'cetech_de_delivery_variation_id',

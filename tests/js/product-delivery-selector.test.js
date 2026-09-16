@@ -168,4 +168,32 @@ describe('Product delivery fulfilment switcher', () => {
 			{ i18n: { estimated: 'Estimated delivery' } }
 		)).toBe('3–5 business days');
 	});
+
+	it('formats server price_text and pickup Free without inventing zero', () => {
+		const api = loadSelector();
+		expect(api.formatPriceText(
+			{ price_text: 'GHS 25.00', fulfilment_choice: 'delivery' },
+			{ i18n: { free: 'Free' } }
+		)).toBe('GHS 25.00');
+		expect(api.formatPriceText(
+			{ fulfilment_choice: 'store_pickup' },
+			{ i18n: { free: 'Free' } }
+		)).toBe('Free');
+		expect(api.formatPriceText(
+			{ fulfilment_choice: 'delivery' },
+			{ i18n: { free: 'Free' } }
+		)).toBe('');
+	});
+
+	it('reads quantity from the cart form', () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<input type="number" name="quantity" class="qty" value="4" />
+				<div data-cetech-de-selector="1"></div>
+			</form>
+		`;
+		const api = loadSelector();
+		const root = document.querySelector('[data-cetech-de-selector]');
+		expect(api.productQuantity(root)).toBe(4);
+	});
 });

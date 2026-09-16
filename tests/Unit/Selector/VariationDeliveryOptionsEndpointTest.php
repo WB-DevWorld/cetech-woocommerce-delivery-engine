@@ -198,6 +198,10 @@ final class VariationDeliveryOptionsEndpointTest extends TestCase {
 		self::assertArrayHasKey( 'fulfilment_choice_label', $option );
 		self::assertArrayHasKey( 'delivery_offer_public_label', $option );
 		self::assertArrayHasKey( 'is_available', $option );
+		self::assertArrayHasKey( 'price_amount', $option );
+		self::assertArrayHasKey( 'price_currency', $option );
+		self::assertArrayHasKey( 'price_text', $option );
+		self::assertArrayHasKey( 'price_basis', $option );
 		// Private fields must NOT be present.
 		self::assertArrayNotHasKey( 'supplier_id', $option );
 		self::assertArrayNotHasKey( 'origin_id', $option );

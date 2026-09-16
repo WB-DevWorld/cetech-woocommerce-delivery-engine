@@ -1,6 +1,6 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-16 (RC.10 promotion candidate after owner QA PASS).
+Last reconciled: 2026-09-16 (post-RC.10 issue #18 candidate `1.0.0-dev.pdp-price.1`).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
@@ -19,14 +19,19 @@ Last reconciled: 2026-09-16 (RC.10 promotion candidate after owner QA PASS).
 - Local-only tags `v1.0.0-rc.3`, `v1.0.0-rc.7`, `v1.0.0-rc.8` remain unpublished by design
 - Stage 15 has **not** started
 
-## RC.10 promotion candidate
-- Release branch: `release/rc10`
+## RC.10 protected baseline
+- Tag: `v1.0.0-rc.10` → `d1409258caf1a90675b689ab105471460de4c713`
 - Version identity: `1.0.0-rc.10`
 - Schema: `5`
-- Owner QA: **PASS** — eligible for RC.10 promotion as the **core collaboration baseline**
-- Canonical record: `docs/RC10-FINALIZATION.md`
-- Tag `v1.0.0-rc.10` is created only after protected merge
+- Immutable. Do not retag. Do not overwrite the RC.10 ZIP.
 - This is **not** Stage 15
+
+## Post-RC.10 issue #18 (not a release)
+- Branch: `fix/pdp-delivery-price-display`
+- Candidate identity: `1.0.0-dev.pdp-price.1`
+- Owner: `@wbdevworld`
+- Status: implementation/qualification candidate; not owner-accepted
+- Artifact: `docs/ISSUE-18-PDP-DELIVERY-PRICE.md`
 
 ## Qualification provenance (not to be merged as PR #12)
 - Historical qualification PR: **#12** — OPEN/DRAFT/**DO NOT MERGE**

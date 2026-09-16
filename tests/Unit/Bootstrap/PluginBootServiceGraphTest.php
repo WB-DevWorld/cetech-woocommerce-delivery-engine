@@ -114,6 +114,7 @@ final class PluginBootServiceGraphTest extends TestCase {
 			\CetechDeliveryEngine\Application\CustomerContext\MatchingLocationOptionsEndpoint::class,
 			\CetechDeliveryEngine\Application\CustomerContext\CustomerBrowsingLocationStore::class,
 			\CetechDeliveryEngine\Application\CustomerContext\LocationOfferQuoteProbe::class,
+			\CetechDeliveryEngine\Application\CustomerContext\ProductPageDeliveryPriceQuote::class,
 			\CetechDeliveryEngine\Application\CustomerContext\LocationAwareDeliveryOptions::class,
 			CheckoutDeliverySelectionValidator::class,
 			\CetechDeliveryEngine\Application\Checkout\CheckoutAddressPolicy::class,

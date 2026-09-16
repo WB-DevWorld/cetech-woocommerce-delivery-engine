@@ -9,6 +9,7 @@ use CetechDeliveryEngine\Application\CustomerContext\ClassicPdpContextPayload;
 use CetechDeliveryEngine\Application\CustomerContext\CustomerBrowsingLocationStore;
 use CetechDeliveryEngine\Application\CustomerContext\LocationAwareDeliveryOptions;
 use CetechDeliveryEngine\Application\CustomerContext\MatchingLocationOptionsEndpoint;
+use CetechDeliveryEngine\Application\CustomerContext\ProductPageQuoteContext;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryRuntimeConfigurationRouter;
 use CetechDeliveryEngine\Application\Pickup\PickupLocationAddressFormatter;
@@ -109,6 +110,7 @@ final class ProductDeliverySelectorRenderer {
 					'estimated'   => __( 'Estimated delivery', 'cetech-woocommerce-delivery-engine' ),
 					'selectOption' => __( 'Please select a delivery option for this product.', 'cetech-woocommerce-delivery-engine' ),
 					'enterLocation' => __( 'Please enter a delivery location for this product.', 'cetech-woocommerce-delivery-engine' ),
+					'free'          => __( 'Free', 'cetech-woocommerce-delivery-engine' ),
 				],
 				'postField' => CartDeliverySelectionCapture::POST_FIELD,
 				'contextField' => ClassicPdpContextPayload::POST_FIELD,
@@ -308,7 +310,12 @@ final class ProductDeliverySelectorRenderer {
 		$currency  = function_exists( 'get_woocommerce_currency' ) ? (string) get_woocommerce_currency() : 'GHS';
 		$visible   = $available;
 		if ( $this->location_options instanceof LocationAwareDeliveryOptions && $requires ) {
-			$visible = $this->location_options->filter( $available, $browsing, $currency );
+			$visible = $this->location_options->filter(
+				$available,
+				$browsing,
+				$currency,
+				ProductPageQuoteContext::from_request( $product_id, 0, $this->current_quantity() )
+			);
 		}
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- display-only repopulation of customer choice.
@@ -417,7 +424,10 @@ final class ProductDeliverySelectorRenderer {
 
 		echo '<li class="' . esc_attr( $class ) . '">';
 		echo '<div class="cetech-de-delivery-option__body">';
+		echo '<span class="cetech-de-delivery-option__headline">';
 		echo '<span class="cetech-de-delivery-option__label">' . esc_html( $label ) . '</span>';
+		$this->render_price( $option );
+		echo '</span>';
 		$this->render_estimate_line( $option );
 		echo '</div>';
 
@@ -448,7 +458,10 @@ final class ProductDeliverySelectorRenderer {
 		echo '<label for="' . esc_attr( $input_id ) . '" class="cetech-de-delivery-option__label-wrap">';
 		echo '<input type="radio" name="' . esc_attr( CartDeliverySelectionCapture::POST_FIELD ) . '" id="' . esc_attr( $input_id ) . '" value="' . esc_attr( $option->display_key ) . '"' . ( $checked ? ' checked="checked"' : '' ) . ( $disabled ? ' disabled="disabled"' : '' ) . ' required="required" />';
 		echo '<span class="cetech-de-delivery-option__body">';
+		echo '<span class="cetech-de-delivery-option__headline">';
 		echo '<span class="cetech-de-delivery-option__label">' . esc_html( $label ) . '</span>';
+		$this->render_price( $option );
+		echo '</span>';
 		if ( $is_pickup ) {
 			$this->render_pickup_card_meta( $option );
 		} else {
@@ -508,6 +521,25 @@ final class ProductDeliverySelectorRenderer {
 		}
 
 		echo '</div>';
+	}
+
+	private function render_price( ProductDeliveryOption $option ): void {
+		$text = trim( (string) ( $option->price_text ?? '' ) );
+		if ( '' === $text ) {
+			return;
+		}
+
+		$basis = sanitize_key( (string) ( $option->price_basis ?? '' ) );
+		echo '<span class="cetech-de-delivery-option__price"' . ( '' !== $basis ? ' data-cetech-de-price-basis="' . esc_attr( $basis ) . '"' : '' ) . '>';
+		echo esc_html( $text );
+		echo '</span>';
+	}
+
+	private function current_quantity(): int {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- display quote uses posted WooCommerce quantity.
+		$qty = isset( $_REQUEST['quantity'] ) ? (int) wp_unslash( (string) $_REQUEST['quantity'] ) : 1;
+
+		return $qty > 0 ? $qty : 1;
 	}
 
 	private function render_estimate_line( ProductDeliveryOption $option ): void {

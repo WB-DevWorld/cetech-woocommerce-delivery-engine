@@ -43,6 +43,7 @@ final class MatchingLocationOptionsEndpoint {
 
 		$product_id   = isset( $_REQUEST['product_id'] ) ? absint( wp_unslash( (string) $_REQUEST['product_id'] ) ) : 0;
 		$variation_id = isset( $_REQUEST['variation_id'] ) ? absint( wp_unslash( (string) $_REQUEST['variation_id'] ) ) : 0;
+		$quantity     = isset( $_REQUEST['quantity'] ) ? (int) wp_unslash( (string) $_REQUEST['quantity'] ) : 1;
 		$location     = MatchingLocation::fromInput(
 			[
 				'country'  => isset( $_REQUEST['country'] ) ? wp_unslash( (string) $_REQUEST['country'] ) : '',
@@ -56,7 +57,7 @@ final class MatchingLocationOptionsEndpoint {
 			$this->browsing_store->save( $location );
 		}
 
-		wp_send_json_success( $this->build_payload( $product_id, $variation_id, $location->isPresent() ? $location : null ) );
+		wp_send_json_success( $this->build_payload( $product_id, $variation_id, $location->isPresent() ? $location : null, $quantity ) );
 	}
 
 	/**
@@ -67,7 +68,7 @@ final class MatchingLocationOptionsEndpoint {
 	 *     requires_location: bool
 	 * }
 	 */
-	public function build_payload( int $product_id, int $variation_id, ?MatchingLocation $location ): array {
+	public function build_payload( int $product_id, int $variation_id, ?MatchingLocation $location, int $quantity = 1 ): array {
 		if ( ! $this->requirements->is_woocommerce_active() || ! $this->feature_flags->is_enabled( 'enable_product_delivery_selector' ) ) {
 			return [
 				'status'            => 'error',
@@ -81,7 +82,8 @@ final class MatchingLocationOptionsEndpoint {
 		$all        = $assessment['options'];
 		$requires   = $this->location_options->delivery_requires_matching_location( $all );
 		$currency   = function_exists( 'get_woocommerce_currency' ) ? (string) get_woocommerce_currency() : 'GHS';
-		$filtered   = $this->location_options->filter( $all, $location, $currency );
+		$context    = ProductPageQuoteContext::from_request( $product_id, $variation_id, $quantity );
+		$filtered   = $this->location_options->filter( $all, $location, $currency, $context );
 		$public     = [];
 
 		foreach ( $filtered as $option ) {
