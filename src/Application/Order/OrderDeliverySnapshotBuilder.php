@@ -13,6 +13,8 @@ use CetechDeliveryEngine\Application\RateQuote\RateQuoteEngine;
 use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionIntent;
 use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
 use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingRateCalculator;
+use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
+use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
 use CetechDeliveryEngine\Domain\DeliveryOffer\DeliveryOfferRepositoryInterface;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Infrastructure\WooCommerce\Shipping\SelectedOfferShippingMethod;
@@ -22,8 +24,11 @@ use WC_Order;
  * Builds stable order-time delivery snapshots from cart item data.
  *
  * Does not mutate cart, order totals, or payment flow.
+ *
+ * Not final so unit tests can stub build_line_snapshot / build_package_snapshot
+ * without booting the quote engine.
  */
-final class OrderDeliverySnapshotBuilder {
+class OrderDeliverySnapshotBuilder {
 
 	public function __construct(
 		private CartDeliverySelectionRevalidator $cart_revalidator,
@@ -64,7 +69,11 @@ final class OrderDeliverySnapshotBuilder {
 			$cart_item_values[ CartDeliverySelectionCapture::CART_SUMMARY_KEY ] ?? null
 		);
 
-		$destination_zone_id = $this->resolve_order_destination_zone_id( $order );
+		$context             = CustomerCartContext::fromCartItem( $cart_item_values );
+		$snapshot_version    = $context instanceof CustomerCartContext
+			? OrderDeliverySnapshot::VERSION_V2
+			: OrderDeliverySnapshot::VERSION;
+		$destination_zone_id = $this->resolve_line_destination_zone_id( $order, $context );
 		$currency_code       = $order->get_currency();
 		$quantity            = (int) ( $cart_item_values['quantity'] ?? 0 );
 
@@ -108,7 +117,9 @@ final class OrderDeliverySnapshotBuilder {
 		$summary = is_array( $summary ) ? $summary : [];
 		$offer_label = $summary['delivery_offer_public_label'] ?? null;
 		$estimate    = $summary['estimate_text'] ?? null;
-		$group_id    = DeliveryGroupIdentity::fromIntent( $intent );
+		$group_id    = $context instanceof CustomerCartContext
+			? DeliveryGroupIdentity::forHistorical( $intent, $context )
+			: DeliveryGroupIdentity::fromIntent( $intent );
 		$description = $this->public_description( $delivery_offer_id > 0 ? $delivery_offer_id : null );
 
 		if ( FulfilmentChoice::StorePickup->value === $choice ) {
@@ -116,9 +127,13 @@ final class OrderDeliverySnapshotBuilder {
 			$description  = '' !== $instructions ? sanitize_text_field( $instructions ) : $description;
 		}
 
+		if ( $context instanceof CustomerCartContext && null === $group_id ) {
+			return null;
+		}
+
 		return new OrderDeliveryLineSnapshot(
 			ProductDeliverySelectionIntent::CONTRACT_VERSION,
-			OrderDeliverySnapshot::VERSION,
+			$snapshot_version,
 			(int) ( $intent['product_id'] ?? $cart_item_values['product_id'] ?? 0 ),
 			$this->nullable_positive_int( $intent['variation_id'] ?? $cart_item_values['variation_id'] ?? null ),
 			sanitize_key( (string) ( $intent['fulfilment_availability'] ?? '' ) ),
@@ -145,7 +160,13 @@ final class OrderDeliverySnapshotBuilder {
 				: null,
 			FulfilmentChoice::StorePickup->value === $choice
 				? $this->nullable_summary_text( $summary['pickup_instructions'] ?? null )
-				: null
+				: null,
+			$context instanceof CustomerCartContext ? $context->contract_version : null,
+			$context?->matching_location?->toArray(),
+			$context?->delivery_address?->toArray(),
+			$context?->matching_identity,
+			$context?->delivery_location_identity,
+			$context?->pickup_location_id
 		);
 	}
 
@@ -166,6 +187,7 @@ final class OrderDeliverySnapshotBuilder {
 		$delivery_index        = 0;
 		$pickup_index          = 0;
 		$group_count           = 0;
+		$package_version       = OrderDeliverySnapshot::VERSION;
 
 		foreach ( $order->get_items( 'shipping' ) as $shipping_item ) {
 			if ( ! is_object( $shipping_item ) || ! method_exists( $shipping_item, 'get_method_id' ) ) {
@@ -210,6 +232,17 @@ final class OrderDeliverySnapshotBuilder {
 				? $group_meta
 				: 'shipping-line-' . (string) $group_count;
 
+			$historical_group = DeliveryGroupIdentity::stripRuntimeSuffix( $group_id ) ?? $group_id;
+			$parsed            = DeliveryGroupIdentity::parse( $historical_group );
+
+			if ( is_array( $parsed ) && 2 === $parsed['version'] ) {
+				$package_version = OrderDeliverySnapshot::VERSION_V2;
+			}
+
+			if ( is_string( $historical_group ) && '' !== $historical_group ) {
+				$group_id = $historical_group;
+			}
+
 			$groups[] = new OrderDeliveryGroupSnapshot(
 				$group_id,
 				SelectedOfferShippingMethod::METHOD_ID,
@@ -235,7 +268,7 @@ final class OrderDeliverySnapshotBuilder {
 		}
 
 		return new OrderDeliveryPackageSnapshot(
-			OrderDeliverySnapshot::VERSION,
+			$package_version,
 			$shipping_method_id,
 			$shipping_method_label,
 			$package_total,
@@ -253,6 +286,14 @@ final class OrderDeliverySnapshotBuilder {
 		}
 
 		return number_format( (float) $left + (float) $right, 4, '.', '' );
+	}
+
+	private function resolve_line_destination_zone_id( WC_Order $order, ?CustomerCartContext $context ): ?int {
+		if ( $context instanceof CustomerCartContext && $context->hasMatchingLocation() && $context->matching_location instanceof MatchingLocation ) {
+			return $this->destination_resolver->resolve_zone_id( $context->matching_location->toDestinationArray() );
+		}
+
+		return $this->resolve_order_destination_zone_id( $order );
 	}
 
 	private function resolve_order_destination_zone_id( WC_Order $order ): ?int {

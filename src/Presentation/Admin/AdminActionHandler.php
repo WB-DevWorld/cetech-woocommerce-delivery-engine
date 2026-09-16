@@ -35,6 +35,10 @@ final class AdminActionHandler {
 			return false;
 		}
 
+		if ( AdminPageAccess::current_user_is_restricted() ) {
+			AdminPageAccess::require_capability( $capability );
+		}
+
 		if ( ! is_admin() || ! current_user_can( $capability ) ) {
 			$this->fail_post( $redirect_page_slug, __( 'You do not have permission to perform this action.', 'cetech-woocommerce-delivery-engine' ) );
 

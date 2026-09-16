@@ -8,6 +8,7 @@ use CetechDeliveryEngine\Core\Capabilities\Capabilities;
 use CetechDeliveryEngine\Core\Versioning\MigrationDiscovery;
 use CetechDeliveryEngine\Core\Versioning\MigrationRunner;
 use CetechDeliveryEngine\Core\Versioning\SchemaVersion;
+use CetechDeliveryEngine\Integrations\WCFM\WcfmVendorIsolation;
 use CetechDeliveryEngine\Support\Logger;
 
 /**
@@ -31,6 +32,7 @@ final class Activator {
 
 		$capabilities = new Capabilities();
 		$capabilities->register();
+		( new WcfmVendorIsolation() )->harden_vendor_role_capabilities();
 
 		$feature_flags = new FeatureFlags();
 		$feature_flags->ensure_defaults();

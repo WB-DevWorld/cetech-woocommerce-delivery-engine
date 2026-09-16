@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-rc.9
+Stable tag: 1.0.0-dev.qual.1
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -48,6 +48,24 @@ No. WooCommerce is the only required dependency.
 No. Phase 1A is a safe core skeleton only.
 
 == Changelog ==
+
+= 1.0.0-dev.qual.1 =
+* Pre-RC.10 qualification identity for the reconciled batch branch. Combines protected master (including the PHP 8.1 compatibility repair) with the recovered integrated.2 runtime delta. NON-RELEASE, UNTAGGED, PRE-RC.10, QUALIFICATION-ONLY. Not RC.10. Does not rebuild or replace historical 1.0.0-dev.integrated.2.
+
+= 1.0.0-dev.integrated.2 =
+* Customer storefront presentation cleanup: one delivery summary, progressive Change editor, compact checkout confirmation, and simpler incomplete-address copy. Schema remains 5. Business logic, rates, snapshots, and tagged 1.0.0-rc.9 are unchanged. Not RC.10. Does not rebuild 1.0.0-dev.integrated.1.
+
+= 1.0.0-dev.integrated.1 =
+* Combined candidate: qualified per-item customer context plus WCFM vendor administrative isolation. Restricted vendors cannot POST admin actions even with stale Delivery Engine capabilities. Schema remains 5. Tagged 1.0.0-rc.9 is unchanged. Not RC.10.
+
+= 1.0.0-dev.peritem.1 =
+* Per-item customer context foundation on cartstate.1 plus blocks-snapshot.1. Schema remains 5. Tagged 1.0.0-rc.9 is unchanged. Not RC.10. No storefront UI.
+
+= 1.0.0-dev.blocks-snapshot.1 =
+* Native Blocks/Store API checkout now persists the same immutable per-line Delivery Engine snapshot as Classic after the order address is copied. Schema remains 5. Tagged 1.0.0-rc.9 is unchanged.
+
+= 1.0.0-dev.cartstate.1 =
+* Post-RC.9 cart-state reconciliation: existing cart lines refresh to live Delivery Engine configuration, stale admin fingerprints no longer force duplicate shipping groups, and unavailable choices require in-cart reselection instead of remove-and-re-add. Schema remains 5. Tagged 1.0.0-rc.9 is unchanged.
 
 = 1.0.0-rc.9 =
 * Promotes the frozen 1.0.0-dev.blocks.4 Cart/Checkout Blocks runtime to the tagged release candidate. Schema remains 5. No behaviour change versus Blocks.4. Not Stage 15. Historical 1.0.0-dev.blocks.1–blocks.4 packages and tagged 1.0.0-rc.8 remain unchanged.

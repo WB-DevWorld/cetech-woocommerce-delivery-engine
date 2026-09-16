@@ -52,9 +52,9 @@ final class OrderDeliverySnapshotReader {
 		$snapshot_version          = isset( $decoded['snapshot_version'] ) ? (string) $decoded['snapshot_version'] : '';
 		$contract_version          = isset( $decoded['contract_version'] ) ? (string) $decoded['contract_version'] : '';
 
-		if (
-			( null !== $stored_version_normalized && OrderDeliverySnapshot::VERSION !== $stored_version_normalized )
-			|| OrderDeliverySnapshot::VERSION !== $snapshot_version
+		if ( ! $this->is_supported_snapshot_version( $snapshot_version )
+			|| ( null !== $stored_version_normalized && ! $this->is_supported_snapshot_version( $stored_version_normalized ) )
+			|| ( null !== $stored_version_normalized && $stored_version_normalized !== $snapshot_version )
 			|| ProductDeliverySelectionIntent::CONTRACT_VERSION !== $contract_version
 		) {
 			return new OrderDeliveryLineReadResult( true, null, OrderDeliveryLineReadResult::ERROR_VERSION_MISMATCH, $stored_version_normalized );
@@ -101,7 +101,13 @@ final class OrderDeliverySnapshotReader {
 			$this->nullable_string( $decoded['delivery_group_id'] ?? null ),
 			$this->nullable_string( $decoded['pickup_location_label'] ?? null ),
 			$this->nullable_string( $decoded['pickup_address'] ?? null ),
-			$this->nullable_string( $decoded['pickup_instructions'] ?? null )
+			$this->nullable_string( $decoded['pickup_instructions'] ?? null ),
+			$this->nullable_positive_int( $decoded['customer_context_version'] ?? null ),
+			$this->nullable_array( $decoded['matching_location'] ?? null ),
+			$this->nullable_array( $decoded['delivery_address'] ?? null ),
+			$this->nullable_string( $decoded['matching_identity'] ?? null ),
+			$this->nullable_string( $decoded['delivery_location_identity'] ?? null ),
+			$this->nullable_positive_int( $decoded['pickup_location_id'] ?? null )
 		);
 
 		return new OrderDeliveryLineReadResult( true, $snapshot, OrderDeliveryLineReadResult::ERROR_NONE, $stored_version_normalized );
@@ -124,9 +130,9 @@ final class OrderDeliverySnapshotReader {
 		$stored_version_normalized = $this->normalize_version( $stored_version );
 		$snapshot_version          = isset( $decoded['snapshot_version'] ) ? (string) $decoded['snapshot_version'] : '';
 
-		if (
-			( null !== $stored_version_normalized && OrderDeliverySnapshot::VERSION !== $stored_version_normalized )
-			|| OrderDeliverySnapshot::VERSION !== $snapshot_version
+		if ( ! $this->is_supported_snapshot_version( $snapshot_version )
+			|| ( null !== $stored_version_normalized && ! $this->is_supported_snapshot_version( $stored_version_normalized ) )
+			|| ( null !== $stored_version_normalized && $stored_version_normalized !== $snapshot_version )
 		) {
 			return new OrderDeliveryPackageReadResult( true, null, OrderDeliveryPackageReadResult::ERROR_VERSION_MISMATCH, $stored_version_normalized );
 		}
@@ -237,6 +243,20 @@ final class OrderDeliverySnapshotReader {
 		$string = trim( (string) $value );
 
 		return '' !== $string ? $string : null;
+	}
+
+	/**
+	 * @param mixed $value
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	private function nullable_array( mixed $value ): ?array {
+		return is_array( $value ) ? $value : null;
+	}
+
+	private function is_supported_snapshot_version( string $version ): bool {
+		return OrderDeliverySnapshot::VERSION === $version
+			|| OrderDeliverySnapshot::VERSION_V2 === $version;
 	}
 }
 

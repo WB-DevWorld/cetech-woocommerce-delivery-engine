@@ -5,6 +5,7 @@
 **Plugin:** CETECH WooCommerce Delivery Engine  
 **Current protected runtime baseline:** tagged `1.0.0-rc.9` (schema `5`)  
 **Previous protected published tag:** `1.0.0-rc.8` (schema `5`; **do not retag**)  
+**Current development tree:** untagged qualification identity `1.0.0-dev.qual.1` on `batch/pre-rc10-qualification` (schema `5`). This is not RC.10 and must not replace historical `1.0.0-dev.integrated.2`. Tagged RC.9 remains schema `5` and must not be retagged or rebuilt. Do not overwrite the historical integrated.1 or integrated.2 ZIPs.
 **Schema target:** `5` on tagged `1.0.0-rc.9`, `1.0.0-rc.8`, and `1.0.0-rc.7`. Tagged RC.6 remains schema `4`.  
 **Text domain:** `cetech-woocommerce-delivery-engine`
 

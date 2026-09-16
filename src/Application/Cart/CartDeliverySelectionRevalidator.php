@@ -61,6 +61,20 @@ final class CartDeliverySelectionRevalidator {
 	 * @param array<string, mixed> $cart_item
 	 */
 	public function revalidate_cart_item( string $cart_item_key, array $cart_item ): CartDeliverySelectionRevalidationResult {
+		if ( ! empty( $cart_item[ CartDeliverySelectionCapture::CART_NEEDS_RESELECTION_KEY ] ) ) {
+			$stored_intent = CartDeliverySelectionSessionData::normalizeIntent(
+				$cart_item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] ?? null
+			);
+
+			return new CartDeliverySelectionRevalidationResult(
+				$cart_item_key,
+				CartDeliverySelectionRevalidationResult::STATUS_NEEDS_RESELECTION,
+				$this->customer_warning_message( $cart_item ),
+				$stored_intent,
+				null
+			);
+		}
+
 		$stored_raw = $cart_item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] ?? null;
 
 		if ( null === $stored_raw ) {
@@ -79,7 +93,7 @@ final class CartDeliverySelectionRevalidator {
 			return new CartDeliverySelectionRevalidationResult(
 				$cart_item_key,
 				CartDeliverySelectionRevalidationResult::STATUS_INVALID,
-				$this->customer_warning_message(),
+				$this->customer_warning_message( $cart_item ),
 				null,
 				null
 			);
@@ -93,7 +107,7 @@ final class CartDeliverySelectionRevalidator {
 			return new CartDeliverySelectionRevalidationResult(
 				$cart_item_key,
 				CartDeliverySelectionRevalidationResult::STATUS_INVALID,
-				$this->customer_warning_message(),
+				$this->customer_warning_message( $cart_item ),
 				$stored_intent,
 				null
 			);
@@ -111,7 +125,7 @@ final class CartDeliverySelectionRevalidator {
 			return new CartDeliverySelectionRevalidationResult(
 				$cart_item_key,
 				$status,
-				$this->customer_warning_message(),
+				$this->customer_warning_message( $cart_item ),
 				$stored_intent,
 				null
 			);
@@ -121,7 +135,7 @@ final class CartDeliverySelectionRevalidator {
 			return new CartDeliverySelectionRevalidationResult(
 				$cart_item_key,
 				CartDeliverySelectionRevalidationResult::STATUS_INVALID,
-				$this->customer_warning_message(),
+				$this->customer_warning_message( $cart_item ),
 				$stored_intent,
 				null
 			);
@@ -131,7 +145,7 @@ final class CartDeliverySelectionRevalidator {
 			return new CartDeliverySelectionRevalidationResult(
 				$cart_item_key,
 				CartDeliverySelectionRevalidationResult::STATUS_STALE,
-				$this->customer_warning_message(),
+				$this->customer_warning_message( $cart_item ),
 				$stored_intent,
 				$result->intent
 			);
@@ -158,6 +172,10 @@ final class CartDeliverySelectionRevalidator {
 				continue;
 			}
 
+			if ( CartDeliverySelectionRevalidationResult::STATUS_NEEDS_RESELECTION === $result->status ) {
+				continue;
+			}
+
 			if ( $shown ) {
 				break;
 			}
@@ -167,9 +185,36 @@ final class CartDeliverySelectionRevalidator {
 		}
 	}
 
-	private function customer_warning_message(): string {
+	/**
+	 * @param array<string, mixed> $cart_item
+	 */
+	private function customer_warning_message( array $cart_item = [] ): string {
+		$name = '';
+		$data = $cart_item['data'] ?? null;
+
+		if ( is_object( $data ) && method_exists( $data, 'get_name' ) ) {
+			$name = trim( (string) $data->get_name() );
+		}
+
+		if ( '' === $name && function_exists( 'wc_get_product' ) ) {
+			$product_id = (int) ( $cart_item['product_id'] ?? 0 );
+			$product    = $product_id > 0 ? wc_get_product( $product_id ) : false;
+
+			if ( is_object( $product ) && method_exists( $product, 'get_name' ) ) {
+				$name = trim( (string) $product->get_name() );
+			}
+		}
+
+		if ( '' !== $name ) {
+			return sprintf(
+				/* translators: %s: product name */
+				__( 'Delivery options for “%s” have changed. Please choose a delivery option in your cart. You do not need to remove the product.', 'cetech-woocommerce-delivery-engine' ),
+				$name
+			);
+		}
+
 		return __(
-			'A delivery option in your cart is no longer available. Please remove and re-add the product.',
+			'Delivery options for an item in your cart have changed. Please choose a delivery option. You do not need to remove the product.',
 			'cetech-woocommerce-delivery-engine'
 		);
 	}

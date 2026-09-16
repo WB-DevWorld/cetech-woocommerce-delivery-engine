@@ -1295,6 +1295,10 @@ final class SetupWizardPage {
 	}
 
 	private function verified( string $action ): bool {
+		if ( AdminPageAccess::current_user_is_restricted() ) {
+			AdminPageAccess::require_capability( 'manage_delivery_settings' );
+		}
+
 		if ( self::ACTION_SAVE_LATER === $action && isset( $_POST['cetech_de_save_later_nonce'] ) ) {
 			$nonce = sanitize_text_field( wp_unslash( (string) $_POST['cetech_de_save_later_nonce'] ) );
 

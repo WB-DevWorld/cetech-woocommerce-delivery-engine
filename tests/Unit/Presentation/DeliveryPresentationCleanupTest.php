@@ -95,6 +95,7 @@ final class DeliveryPresentationCleanupTest extends TestCase {
 
 		self::assertContains( OrderDeliverySnapshot::META_LINE_SNAPSHOT, $hidden );
 		self::assertContains( OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION, $hidden );
+		self::assertContains( OrderDeliverySnapshot::META_CART_ITEM_KEY, $hidden );
 		self::assertContains( OrderShippingItemPresentationGuard::GROUP_ID_META_KEY, $hidden );
 		self::assertContains( '_qty', $hidden );
 	}

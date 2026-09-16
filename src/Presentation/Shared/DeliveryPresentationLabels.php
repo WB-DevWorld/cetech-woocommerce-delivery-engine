@@ -77,6 +77,18 @@ final class DeliveryPresentationLabels {
 		return __( 'Pickup instructions', 'cetech-woocommerce-delivery-engine' );
 	}
 
+	public static function delivering_to(): string {
+		return __( 'Delivering to', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function change_delivery(): string {
+		return CustomerStorefrontCopy::change();
+	}
+
+	public static function delivery_to( string $locality ): string {
+		return CustomerStorefrontCopy::delivery_to( $locality );
+	}
+
 	public static function method_label_for_choice( ?string $fulfilment_choice ): string {
 		if ( self::is_store_pickup( $fulfilment_choice ) ) {
 			return self::method();
@@ -183,16 +195,20 @@ final class DeliveryPresentationLabels {
 	}
 
 	/**
-	 * Prefer clean ETA values without a duplicated "Estimated" prefix when the label already says Estimated delivery.
+	 * Duration/copy only. Callers prefix "Estimated delivery" exactly once via format_product_estimate_line().
+	 *
+	 * Historical snapshots may already store "Estimated …"; those remain as stored and are cleaned here.
 	 */
 	public static function strip_estimated_prefix( string $estimate_text ): string {
 		$trimmed = trim( $estimate_text );
 
-		if ( preg_match( '/^Estimated\s+/iu', $trimmed ) ) {
-			return trim( (string) preg_replace( '/^Estimated\s+/iu', '', $trimmed ) );
+		if ( '' === $trimmed ) {
+			return '';
 		}
 
-		return $trimmed;
+		$stripped = preg_replace( '/^Estimated(?:\s+delivery)?\s*:?\s+/iu', '', $trimmed );
+
+		return is_string( $stripped ) && '' !== $stripped ? $stripped : $trimmed;
 	}
 
 	private static function infer_choice_slug_from_label( string $choice_label ): ?string {

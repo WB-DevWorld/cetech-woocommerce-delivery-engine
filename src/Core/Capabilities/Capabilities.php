@@ -27,7 +27,7 @@ final class Capabilities {
 	 * Bump when the capability matrix changes so existing installs receive new caps
 	 * without requiring a fresh activation.
 	 */
-	public const VERSION = 3;
+	public const VERSION = 4;
 
 	public const VERSION_OPTION = 'cetech_de_capabilities_version';
 
@@ -122,7 +122,13 @@ final class Capabilities {
 				return;
 			}
 
-			$this->grant_v3_caps_additively();
+			if ( $stored < 3 ) {
+				$this->grant_v3_caps_additively();
+			}
+
+			// Version 4 records WCFM vendor capability stripping. The strip itself
+			// is performed by WcfmVendorIsolation on every boot so later WCFM
+			// installs are covered without a schema change.
 			update_option( self::VERSION_OPTION, self::VERSION, false );
 		}
 

@@ -54,6 +54,7 @@ final class OrderDeliverySnapshotAdminDisplay {
 		$protected = [
 			OrderDeliverySnapshot::META_LINE_SNAPSHOT,
 			OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION,
+			OrderDeliverySnapshot::META_CART_ITEM_KEY,
 			OrderShippingItemPresentationGuard::GROUP_ID_META_KEY,
 		];
 

@@ -36,7 +36,7 @@ final class ProductDeliveryPanel {
 	 * @return array<string, array<string, mixed>>
 	 */
 	public function add_tab( array $tabs ): array {
-		if ( ! current_user_can( 'manage_product_delivery_rules' ) ) {
+		if ( AdminPageAccess::current_user_is_restricted() || ! current_user_can( 'manage_product_delivery_rules' ) ) {
 			return $tabs;
 		}
 
@@ -51,7 +51,7 @@ final class ProductDeliveryPanel {
 	}
 
 	public function render_product_panel(): void {
-		if ( ! current_user_can( 'manage_product_delivery_rules' ) ) {
+		if ( AdminPageAccess::current_user_is_restricted() || ! current_user_can( 'manage_product_delivery_rules' ) ) {
 			return;
 		}
 
@@ -71,7 +71,7 @@ final class ProductDeliveryPanel {
 	 */
 	public function render_variation_panel( int $loop, array $variation_data, \WP_Post $variation ): void {
 		unset( $loop, $variation_data );
-		if ( ! current_user_can( 'manage_product_delivery_rules' ) ) {
+		if ( AdminPageAccess::current_user_is_restricted() || ! current_user_can( 'manage_product_delivery_rules' ) ) {
 			return;
 		}
 

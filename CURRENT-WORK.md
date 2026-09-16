@@ -1,14 +1,16 @@
-# Current Work — Post-RC.9 Local Recovery Reconciled
+# Current Work — Pre-RC.10 Qualification Baseline Assembly
 
-Status: CONTROL PLANE ACTIVE + LOCAL-ONLY SOURCE RECOVERY RECONCILED
+Status: CONTROL PLANE ACTIVE + INTEG-01 QUALIFICATION BASELINE IN ASSEMBLY
 
 ## Canonical published truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
 - Canonical published branch: `master`.
+- Protected `master` at INTEG-01 assembly start: `0f9c2f06f9da0e15840fe27c8b28f7d146a5dd8d`.
 - Recovery baseline `master` before reconciliation PR #9: `d2ebc620762c6acd1b3a143ee120bea906c6d205` (`[BOOT] Establish Delivery Engine team control plane and CI`, PR #1).
-- The canonical `master` SHA advances only through the protected PR flow; use the current GitHub `master` branch head when an exact current SHA is required.
+- The canonical `master` SHA advances only through the protected PR flow; this batch branch must not be merged by INTEG-01.
 - Pre-bootstrap RC.9-line `master`: `376c0896df0d85b159e8713c79aadb6c9b8a3839`.
 - Published version: `1.0.0-rc.9`.
+- Qualification identity on `batch/pre-rc10-qualification`: `1.0.0-dev.qual.1` (NON-RELEASE, UNTAGGED, PRE-RC.10).
 - Schema target: `5`.
 - RC.10: DOES NOT EXIST.
 - Stage 15: NOT STARTED.
@@ -41,16 +43,17 @@ These remain later work. They were **not** rerun under issue #2:
 - production rollout/pilot.
 
 ## Active milestone
-P0 complete for source recovery. Next authorized product step is a later issue that constructs the RC.10 qualification/integration baseline from **current protected `master` plus the exact recovered candidate**. Do not treat recovered branches as already integrated.
+INTEG-01 / issue #11 is assembling the neutral qualification baseline on `batch/pre-rc10-qualification` as untagged `1.0.0-dev.qual.1`. Do not merge this branch to `master`. Do not treat recovered `feat/post-rc9-customer-ux` as the canonical assembly surface. WPML remains a separate overlay.
 
 ## Integration editor
 WS3 / `@wbdevworld`.
 
 ## Authorized implementation
-No new product feature implementation in this recovery issue. No RC.10 promotion. No Stage 15. No FLAIROC/training/production mutation.
+Assemble the batch branch, preserve provenance, maintain qualification identity, and run source/package gates. No RC.10 promotion. No Stage 15. No FLAIROC/training/production mutation. No WS1/WS2 product redesign.
 
 ## Central leases
-- recovered candidate identity: frozen at the SHAs above;
+- qualification identity: `1.0.0-dev.qual.1` on `batch/pre-rc10-qualification`;
+- recovered candidate identity: frozen at the historical SHAs above;
 - release identity/tags: frozen;
 - schema: frozen at 5;
 - canonical `master`: no force-push/rewrite.

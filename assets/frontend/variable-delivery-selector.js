@@ -30,6 +30,7 @@
 			this.variationInput = this.root.querySelector('[data-cetech-de-variation-id]');
 
 			this.bindWooCommerceEvents();
+			this.bindMatchingLocation();
 			this.showSelectOptions();
 		},
 
@@ -73,6 +74,46 @@
 			this.showSelectOptions();
 		},
 
+		bindMatchingLocation: function () {
+			if (!this.root) {
+				return;
+			}
+			var locationRoot = this.root.querySelector('[data-cetech-de-matching-location]');
+			if (!locationRoot || locationRoot.getAttribute('data-cetech-de-variable-location-bound') === '1') {
+				return;
+			}
+			var self = this;
+			var timer = null;
+			function onChange() {
+				self.cache = Object.create(null);
+				self.invalidateSelection();
+				if (self.currentVariationId > 0) {
+					self.fetchOptions(self.currentVariationId);
+				}
+			}
+			function schedule() {
+				window.clearTimeout(timer);
+				timer = window.setTimeout(onChange, 280);
+			}
+			locationRoot.addEventListener('change', onChange);
+			locationRoot.addEventListener('input', schedule);
+			locationRoot.setAttribute('data-cetech-de-variable-location-bound', '1');
+		},
+
+		readMatchingLocation: function () {
+			var loc = this.root ? this.root.querySelector('[data-cetech-de-matching-location]') : null;
+			function value(name) {
+				var field = loc ? loc.querySelector('[name="' + name + '"]') : null;
+				return field ? String(field.value || '') : '';
+			}
+			return {
+				country: value('cetech_de_matching_country'),
+				state: value('cetech_de_matching_state'),
+				city: value('cetech_de_matching_city'),
+				postcode: value('cetech_de_matching_postcode')
+			};
+		},
+
 		extractVariationId: function (variation) {
 			if (!variation || typeof variation !== 'object') {
 				return 0;
@@ -85,10 +126,11 @@
 			this.abortRequest();
 			var token = ++this.requestToken;
 			var productId = parseInt(config.productId || (this.root && this.root.getAttribute('data-product-id')) || 0, 10);
+			var location = this.readMatchingLocation();
 
 			this.showLoading();
 
-			var cacheKey = productId + ':' + variationId;
+			var cacheKey = productId + ':' + variationId + ':' + location.country + ':' + location.state + ':' + location.city + ':' + location.postcode;
 			if (this.cache[cacheKey]) {
 				if (token === this.requestToken && variationId === this.currentVariationId) {
 					this.renderResponse(this.cache[cacheKey], variationId);
@@ -110,7 +152,11 @@
 					action: config.action,
 					nonce: config.nonce,
 					product_id: productId,
-					variation_id: variationId
+					variation_id: variationId,
+					country: location.country,
+					state: location.state,
+					city: location.city,
+					postcode: location.postcode
 				}
 			});
 
@@ -164,11 +210,30 @@
 		},
 
 		renderResponse: function (payload, variationId) {
-			if (!payload || payload.status !== 'ok') {
-				if (payload && payload.status === 'unavailable') {
+			if (!payload) {
+				this.showError();
+				return;
+			}
+
+			if (payload.status === 'need_location') {
+				this.setStatus(payload.message || ((config.i18n && config.i18n.selectOptions) || ''), 'need-location');
+				var pickups = Array.isArray(payload.options) ? payload.options.filter(function (option) {
+					return option && option.is_available && String(option.fulfilment_choice || '') === 'store_pickup';
+				}) : [];
+				if (pickups.length) {
+					this.renderOptions(pickups, variationId);
+					this.setVariationBinding(variationId);
+				} else if (this.optionsEl) {
+					this.optionsEl.innerHTML = '';
+				}
+				return;
+			}
+
+			if (payload.status !== 'ok') {
+				if (payload.status === 'unavailable') {
 					this.showUnavailable(payload.message);
 				} else {
-					this.showError(payload && payload.message);
+					this.showError(payload.message);
 				}
 				return;
 			}
@@ -341,11 +406,15 @@
 			body.appendChild(labelText);
 
 			if (option.estimate_text && String(option.fulfilment_choice || '') !== 'store_pickup') {
-				var rawEstimate = String(option.estimate_text).replace(/^Estimated\s+/i, '').trim();
-				if (rawEstimate) {
+				var estimateLine = option.estimate_line
+					? String(option.estimate_line)
+					: (window.CetechDeProductDeliverySelector && window.CetechDeProductDeliverySelector.formatEstimateLine
+						? window.CetechDeProductDeliverySelector.formatEstimateLine(option, { i18n: { estimated: estimatePrefix } })
+						: estimatePrefix + ': ' + String(option.estimate_text).replace(/^Estimated(?:\s+delivery)?\s*:?\s+/i, '').trim());
+				if (estimateLine) {
 					var eta = document.createElement('span');
 					eta.className = 'cetech-de-delivery-option__estimate';
-					eta.textContent = estimatePrefix + ': ' + rawEstimate;
+					eta.textContent = estimateLine;
 					body.appendChild(eta);
 				}
 			}

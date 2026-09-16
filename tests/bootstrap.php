@@ -629,6 +629,15 @@ if ( ! function_exists( 'wp_parse_url' ) ) {
 	}
 }
 
+if ( ! function_exists( 'WC' ) ) {
+	/**
+	 * @return object|null
+	 */
+	function WC() {
+		return $GLOBALS['cetech_de_test_wc'] ?? null;
+	}
+}
+
 require_once __DIR__ . '/stubs/woocommerce-product-stub.php';
 
 require_once __DIR__ . '/stubs/woocommerce-order-stub.php';
