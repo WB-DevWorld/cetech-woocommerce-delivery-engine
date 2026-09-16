@@ -1,6 +1,6 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-16 (post-RC.10 issue #18 candidate `1.0.0-dev.pdp-price.2`).
+Last reconciled: 2026-09-16 (post-RC.10 issue #18 candidate `1.0.0-dev.pdp-price.3`).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
@@ -28,7 +28,7 @@ Last reconciled: 2026-09-16 (post-RC.10 issue #18 candidate `1.0.0-dev.pdp-price
 
 ## Post-RC.10 issue #18 (not a release)
 - Branch: `fix/pdp-delivery-price-display`
-- Candidate identity: `1.0.0-dev.pdp-price.2`
+- Candidate identity: `1.0.0-dev.pdp-price.3`
 - Owner: `@wbdevworld`
 - Status: implementation/qualification candidate; not owner-accepted
 - Artifact: `docs/ISSUE-18-PDP-DELIVERY-PRICE.md`

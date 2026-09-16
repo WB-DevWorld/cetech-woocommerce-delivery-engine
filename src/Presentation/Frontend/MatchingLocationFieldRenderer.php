@@ -26,14 +26,22 @@ final class MatchingLocationFieldRenderer {
 		];
 	}
 
-	public static function render( ?MatchingLocation $location, string $id_prefix = 'cetech-de-matching', bool $use_woocommerce_fields = true, bool $show_intro = false ): string {
+	public static function render( ?MatchingLocation $location, string $id_prefix = 'cetech-de-matching', bool $use_woocommerce_fields = true, bool $show_intro = false, bool $default_to_base_country = true ): string {
 		$names   = self::default_names();
 		$country = $location instanceof MatchingLocation ? $location->country : '';
 		$state   = $location instanceof MatchingLocation ? $location->state : '';
 		$city    = $location instanceof MatchingLocation ? $location->city : '';
 		$postcode = $location instanceof MatchingLocation ? $location->postcode : '';
 
-		if ( '' === $country && function_exists( 'WC' ) && is_object( WC() ) && isset( WC()->countries ) && is_object( WC()->countries ) && method_exists( WC()->countries, 'get_base_country' ) ) {
+		if (
+			$default_to_base_country
+			&& '' === $country
+			&& function_exists( 'WC' )
+			&& is_object( WC() )
+			&& isset( WC()->countries )
+			&& is_object( WC()->countries )
+			&& method_exists( WC()->countries, 'get_base_country' )
+		) {
 			$country = (string) WC()->countries->get_base_country();
 		}
 

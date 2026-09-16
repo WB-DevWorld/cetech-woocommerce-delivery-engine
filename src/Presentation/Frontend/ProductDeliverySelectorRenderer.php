@@ -242,7 +242,7 @@ final class ProductDeliverySelectorRenderer {
 		echo '<legend class="cetech-de-delivery-selector__title">' . esc_html( CustomerStorefrontCopy::delivery_and_pickup() ) . '</legend>';
 		$browsing = $this->browsing_store instanceof CustomerBrowsingLocationStore ? $this->browsing_store->get() : null;
 		echo '<p class="cetech-de-matching-location__prompt">' . esc_html( CustomerStorefrontCopy::where_do_you_want_this_item() ) . '</p>';
-		echo MatchingLocationFieldRenderer::render( $browsing, 'cetech-de-matching', false ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns escaped HTML.
+		echo MatchingLocationFieldRenderer::render( $browsing, 'cetech-de-matching', false, false, false ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns escaped HTML.
 		echo $this->pdp_context_input(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		echo '<div class="cetech-de-delivery-selector__status" role="status" aria-live="polite" data-cetech-de-status>';
 		echo esc_html__( 'Select your product options to see delivery choices.', 'cetech-woocommerce-delivery-engine' );
@@ -340,7 +340,7 @@ final class ProductDeliverySelectorRenderer {
 			$location_hidden = FulfilmentChoice::StorePickup->value === $active_choice;
 			echo '<div class="cetech-de-delivery-selector__location"' . ( $location_hidden ? ' hidden' : '' ) . ' data-cetech-de-location-panel="1">';
 			echo '<p class="cetech-de-matching-location__prompt">' . esc_html( CustomerStorefrontCopy::where_do_you_want_this_item() ) . '</p>';
-			echo MatchingLocationFieldRenderer::render( $browsing, 'cetech-de-matching', false ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns escaped HTML.
+			echo MatchingLocationFieldRenderer::render( $browsing, 'cetech-de-matching', false, false, false ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns escaped HTML.
 			echo '</div>';
 		}
 

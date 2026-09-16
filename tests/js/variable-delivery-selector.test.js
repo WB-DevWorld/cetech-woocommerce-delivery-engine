@@ -43,16 +43,27 @@ function flush() {
 	return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
-function loadController() {
+function loadController(options = {}) {
+	const emptyLocation = Boolean(options.emptyLocation);
+	const locationFields = emptyLocation
+		? `
+					<select name="cetech_de_matching_country"><option value="">Select…</option><option value="GH">Ghana</option></select>
+					<select name="cetech_de_matching_state"><option value=""></option></select>
+					<input name="cetech_de_matching_city" value="" />
+					<input name="cetech_de_matching_postcode" value="" />
+		`
+		: `
+					<select name="cetech_de_matching_country"><option value="GH" selected>Ghana</option></select>
+					<select name="cetech_de_matching_state"><option value="AA" selected>Greater Accra</option></select>
+					<input name="cetech_de_matching_city" value="Accra" />
+					<input name="cetech_de_matching_postcode" value="GA-123" />
+		`;
 	document.body.innerHTML = `
 		<form class="variations_form cart">
 			<div class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--variable"
 				data-cetech-de-variable-selector="1" data-cetech-de-selector="1" data-product-id="100">
 				<div data-cetech-de-matching-location="1">
-					<select name="cetech_de_matching_country"><option value="GH" selected>Ghana</option></select>
-					<select name="cetech_de_matching_state"><option value="AA" selected>Greater Accra</option></select>
-					<input name="cetech_de_matching_city" value="Accra" />
-					<input name="cetech_de_matching_postcode" value="GA-123" />
+					${locationFields}
 				</div>
 				<div class="cetech-de-delivery-selector__status" role="status" aria-live="polite" data-cetech-de-status></div>
 				<div class="cetech-de-delivery-selector__options" data-cetech-de-options></div>
@@ -530,5 +541,35 @@ describe('Variable delivery selector controller', () => {
 		expect(controller.optionsEl.querySelector('[data-cetech-de-choice-panel="delivery"]')).not.toBeNull();
 		expect(controller.optionsEl.textContent).toContain('QA Accra Pickup');
 		expect(controller.optionsEl.textContent).not.toContain('₵10.00');
+	});
+
+	it('sends empty country before location and keeps need_location instead of unavailable', async () => {
+		const { controller, $form, ajax } = loadController({ emptyLocation: true });
+		ajax.mockReturnValue(
+			createDeferred({
+				type: 'success',
+				payload: {
+					success: true,
+					data: {
+						status: 'need_location',
+						product_id: 100,
+						variation_id: 11,
+						message: '',
+						has_delivery: true,
+						has_pickup: false,
+						available_choices: ['delivery'],
+						options: [],
+					},
+				},
+			})
+		);
+
+		$form.trigger('found_variation', { variation_id: 11 });
+		await flush();
+
+		expect(ajax.mock.calls[0][0].data.country).toBe('');
+		expect(ajax.mock.calls[0][0].data.city).toBe('');
+		expect(controller.statusEl.textContent).not.toContain('not available for this variation');
+		expect(controller.optionsEl.textContent).not.toMatch(/₵\d/);
 	});
 });

@@ -285,11 +285,52 @@ final class VariationDeliveryOptionsEndpointTest extends TestCase {
 		);
 	}
 
+	public function test_quantity_without_location_stays_need_location(): void {
+		$offers = $this->seeded_offers();
+		$source = $this->source_returning_success( self::VARIATION_ID, offer_id: 7 );
+		$endpoint = $this->endpoint(
+			inspector: new FixedVariationRelationshipInspector( [ self::VARIATION_ID => self::PARENT_ID ] ),
+			source: $source,
+			builder: new ProductDeliveryOptionsBuilder( $offers ),
+			location_options: $this->location_options( [] )
+		);
+
+		$payload = $endpoint->build_payload( self::PARENT_ID, self::VARIATION_ID, null, 3 );
+
+		self::assertSame( 'need_location', $payload['status'] );
+		self::assertTrue( $payload['has_delivery'] );
+		self::assertSame( [], $payload['options'] );
+		self::assertStringNotContainsString( 'not available for this variation', (string) ( $payload['message'] ?? '' ) );
+	}
+
+	public function test_explicit_country_only_location_remains_quotable(): void {
+		$offers = $this->seeded_offers();
+		$source = $this->source_returning_success( self::VARIATION_ID, offer_id: 7 );
+		$endpoint = $this->endpoint(
+			inspector: new FixedVariationRelationshipInspector( [ self::VARIATION_ID => self::PARENT_ID ] ),
+			source: $source,
+			builder: new ProductDeliveryOptionsBuilder( $offers ),
+			location_options: $this->location_options( [ 7 ], true )
+		);
+
+		$country_only = MatchingLocation::fromInput( [ 'country' => 'GH' ] );
+		self::assertTrue( $country_only->isPresent() );
+
+		$payload = $endpoint->build_payload( self::PARENT_ID, self::VARIATION_ID, $country_only, 1 );
+
+		self::assertSame( 'ok', $payload['status'] );
+		self::assertNotEmpty( $payload['options'] );
+		self::assertTrue( $payload['has_delivery'] );
+	}
+
 	/**
 	 * @param list<int> $offer_ids
 	 */
-	private function location_options( array $offer_ids ): LocationAwareDeliveryOptions {
-		$zone = new class() implements PackageDestinationZoneResolverInterface {
+	private function location_options( array $offer_ids, bool $match_country_only = false ): LocationAwareDeliveryOptions {
+		$zone = new class( $match_country_only ) implements PackageDestinationZoneResolverInterface {
+			public function __construct( private bool $match_country_only ) {
+			}
+
 			public function resolve_zone_id( array $destination ): ?int {
 				$ids = $this->resolve_zone_ids( $destination );
 
@@ -297,9 +338,18 @@ final class VariationDeliveryOptionsEndpointTest extends TestCase {
 			}
 
 			public function resolve_zone_ids( array $destination ): array {
-				$city = strtolower( (string) ( $destination['city'] ?? '' ) );
+				$city    = strtolower( (string) ( $destination['city'] ?? '' ) );
+				$country = strtoupper( (string) ( $destination['country'] ?? '' ) );
 
-				return 'accra' === $city ? [ 20 ] : [];
+				if ( 'accra' === $city ) {
+					return [ 20 ];
+				}
+
+				if ( $this->match_country_only && 'GH' === $country && '' === $city ) {
+					return [ 20 ];
+				}
+
+				return [];
 			}
 		};
 

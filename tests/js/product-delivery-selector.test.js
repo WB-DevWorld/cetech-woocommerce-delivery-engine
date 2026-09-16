@@ -267,4 +267,49 @@ describe('Product delivery fulfilment switcher', () => {
 		expect(html).not.toContain('Same Day Delivery');
 		expect(html).not.toContain('cetech-de-matching-location');
 	});
+
+	it('quantity change before location posts an empty country', async () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<input class="qty" name="quantity" value="1" />
+				<fieldset class="cetech-de-product-delivery-selector" data-cetech-de-selector="1" data-product-id="16">
+					<div data-cetech-de-location-panel="1">
+						<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">
+							<select name="cetech_de_matching_country"><option value="">Select…</option><option value="GH">Ghana</option></select>
+							<select name="cetech_de_matching_state"><option value=""></option></select>
+							<input name="cetech_de_matching_city" value="" />
+							<input name="cetech_de_matching_postcode" value="" />
+						</div>
+					</div>
+					<div data-cetech-de-status></div>
+					<div data-cetech-de-options></div>
+				</fieldset>
+			</form>
+		`;
+		window.cetechDeMatchingLocation = {
+			ajaxUrl: '/admin-ajax.php',
+			action: 'cetech_de_matching_location_options',
+			nonce: 'n',
+			productId: 16,
+			i18n: { loading: 'Loading' },
+		};
+		window.fetch = async (_url, init) => {
+			window.__cetechLastBody = String(init.body || '');
+			return {
+				json: async () => ({
+					success: true,
+					data: { status: 'need_location', message: '', options: [], has_delivery: true, has_pickup: true },
+				}),
+			};
+		};
+		const api = loadSelector();
+		api.bindAll(document);
+		const qty = document.querySelector('input.qty');
+		qty.value = '3';
+		qty.dispatchEvent(new Event('change', { bubbles: true }));
+		await new Promise((r) => setTimeout(r, 350));
+		expect(window.__cetechLastBody).toContain('quantity=3');
+		expect(window.__cetechLastBody).not.toContain('country=GH');
+		expect(document.querySelector('[data-cetech-de-status]').textContent).not.toContain('not available');
+	});
 });

@@ -574,55 +574,6 @@ final class ProductDeliveryOptionsBuilder {
 	 * @param array<string, mixed> $offer
 	 */
 	private function format_estimate_text( array $offer ): ?string {
-		$total_min = 0;
-		$total_max = 0;
-
-		foreach ( [ 'default_processing', 'default_transit', 'default_final_mile' ] as $prefix ) {
-			$min_key = $prefix . '_min';
-			$max_key = $prefix . '_max';
-			$min     = isset( $offer[ $min_key ] ) && '' !== $offer[ $min_key ] ? (int) $offer[ $min_key ] : 0;
-			$max     = isset( $offer[ $max_key ] ) && '' !== $offer[ $max_key ] ? (int) $offer[ $max_key ] : 0;
-
-			if ( $min > 0 ) {
-				$total_min += $min;
-			}
-
-			if ( $max > 0 ) {
-				$total_max += $max;
-			}
-		}
-
-		if ( $total_min <= 0 && $total_max <= 0 ) {
-			return null;
-		}
-
-		$unit = $this->duration_unit_label( (string) ( $offer['duration_unit'] ?? 'business_days' ) );
-
-		if ( $total_min > 0 && $total_max > 0 && $total_min !== $total_max ) {
-			return sprintf(
-				/* translators: 1: minimum duration, 2: maximum duration, 3: duration unit label */
-				__( '%1$d–%2$d %3$s', 'cetech-woocommerce-delivery-engine' ),
-				$total_min,
-				$total_max,
-				$unit
-			);
-		}
-
-		$value = $total_max > 0 ? $total_max : $total_min;
-
-		return sprintf(
-			/* translators: 1: duration value, 2: duration unit label */
-			__( '%1$d %2$s', 'cetech-woocommerce-delivery-engine' ),
-			$value,
-			$unit
-		);
-	}
-
-	private function duration_unit_label( string $unit ): string {
-		return match ( $unit ) {
-			'business_days' => __( 'business days', 'cetech-woocommerce-delivery-engine' ),
-			'days'          => __( 'days', 'cetech-woocommerce-delivery-engine' ),
-			default         => __( 'days', 'cetech-woocommerce-delivery-engine' ),
-		};
+		return DeliveryEstimateFormatter::from_offer( $offer );
 	}
 }

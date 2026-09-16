@@ -12,6 +12,15 @@ use PHPUnit\Framework\TestCase;
 
 final class CustomerContextDomainTest extends TestCase {
 
+	public function test_country_only_matching_location_is_present_without_city_or_postcode(): void {
+		$location = MatchingLocation::fromInput( [ 'country' => 'GH' ] );
+
+		self::assertTrue( $location->isPresent() );
+		self::assertSame( 'GH', $location->country_identity );
+		self::assertSame( '', $location->city_identity );
+		self::assertSame( '', $location->postcode );
+	}
+
 	public function test_matching_location_normalization(): void {
 		$location = PerItemContextFixtures::matchingAccra();
 
