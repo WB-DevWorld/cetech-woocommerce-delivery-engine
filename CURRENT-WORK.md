@@ -1,43 +1,48 @@
-# Current Work — RC.11 Promotion
+# Current Work — Post-RC.11 Baseline
 
-Status: OWNER-CONTROLLED RC.11 RELEASE PROMOTION (NOT DEPLOYED)
+Status: RC.11 TAGGED / TEAM BASELINE ACTIVE / NOT DEPLOYED
 
-## Canonical published truth
+## Canonical repository truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
-- Canonical published branch: `master`.
-- Protected `master` baseline for RC.11 promotion: `35ff33d6788279a3ab75627f9eb9756b988ccb04`.
-- That master commit integrates the owner-accepted issue #18 candidate `ecb0a69f8375712de0fb7ba53ee8abe2f9b438e5`.
-- Prior tagged release remains immutable: `v1.0.0-rc.10` → `d1409258caf1a90675b689ab105471460de4c713`.
-- RC.11 promotion identity: `1.0.0-rc.11` / schema `5`.
+- Canonical development branch: protected `master`.
+- Current tagged release candidate: `v1.0.0-rc.11`.
+- RC.11 annotated tag object: `acaae9bfc9758cdee1b3f2ec47e94848e83f87da`.
+- RC.11 tag peels to immutable release source: `384f564f64a2db766ae6907392e95fb366fb8533`.
+- RC.11 version identity: `1.0.0-rc.11`; schema: `5`.
+- Final qualified RC.11 ZIP: `cetech-woocommerce-delivery-engine-1.0.0-rc.11.zip`.
+- Final qualified ZIP bytes: `1,545,789`.
+- Final qualified ZIP SHA-256: `97423a95273f6148ee855d1fb8a66c6c66e47aa20cb2c5868ecf2f84b2a9a521`.
+- Prior RC.10 remains immutable: `v1.0.0-rc.10` → `d1409258caf1a90675b689ab105471460de4c713`.
 - Stage 15: NOT STARTED.
 
-## Active task
-GitHub issue **#20** — `[RC11] Promote owner-accepted issue #18 baseline to RC.11`.
+## RC.11 qualification truth
+- Issue #18 PDP delivery-price correction: owner accepted, integrated, closed completed.
+- RC.11 promotion issue #20: closed completed.
+- RC.11 promotion PR #21 merged to release source `384f564f64a2db766ae6907392e95fb366fb8533`.
+- PR #21 exact-head CI run `35144591865`: PASS on all four required jobs.
+- Protected-master post-merge CI run `35144871814`: PASS on all four required jobs.
+- Final package + WordPress qualification run `35145775218`: PASS.
+- Production package verifier: PASS.
+- Packaged PHP lint: `448 files / 0 failures`.
+- Clean install: `version=1.0.0-rc.11 schema=5 tables=all_tables_ok`.
+- RC.10 → RC.11 upgrade/data retention: `version=1.0.0-rc.11 schema=5 tables=all_tables_ok sentinel=1 option=keep_me`.
 
-- Sole owner / release authority: `@wbdevworld`.
-- Release branch: `release/rc11`.
-- RC.11 is release-promotion-only: no new delivery runtime behavior is authorized beyond protected master `35ff33d6...`.
-- Cursor/AI may build/test/package evidence on the owner's behalf but does not become release authority.
+## What RC.11 adds over RC.10
+The accepted issue #18 correction adds authoritative customer-facing delivery prices on location-qualified PDP delivery options while preserving cart/checkout pricing truth. It includes quantity-aware fixed-per-item pricing, fixed-per-shipment behavior, price + configured ETA cards, Delivery/Pickup capability before quoting, no implicit store-country PDP quote, fail-closed unquoted delivery, public-safe pricing payloads, and qualified Storefront/WoodMart/mobile behavior.
 
-## Qualification required before final RC.11 publication
-- exact release branch/merge source green on all required CI jobs;
-- production ZIP built from the exact final release source;
-- package verifier PASS against the extracted production root;
-- packaged PHP lint PASS;
-- clean-install smoke PASS;
-- RC.10 → RC.11 upgrade smoke PASS;
-- exact ZIP byte size + SHA-256 recorded;
-- final tag must be annotated and must peel to the exact protected-master release commit.
-
-## Central leases
-- release identity: `1.0.0-rc.11` on `release/rc11`;
-- schema: frozen at `5`;
-- `v1.0.0-rc.10`: immutable;
-- protected `master`: no force-push/rewrite;
-- no RC.11 tag until final source and artifact evidence are complete.
+## Development baseline after release closeout
+- Immutable release anchor: `v1.0.0-rc.11` / `384f564f64a2db766ae6907392e95fb366fb8533`.
+- New development work should branch from the **latest protected `master`**, which may advance beyond the immutable release source through docs-only or later owner-authorized work.
+- Never move/reuse the RC.11 tag or overwrite the qualified ZIP identity.
 
 ## Environment authorization
-- Production / FLAIROC / training: NO deployment or mutation as part of RC.11 promotion.
-- Isolated QA labs may be used for clean-install and RC.10 → RC.11 upgrade smoke.
-- POS repository is outside scope and must not be touched.
-- WPML/WCML and WP Rocket certification remain separate.
+- FLAIROC: no RC.11 deployment authorized.
+- Training site: no RC.11 deployment authorized.
+- Production: no RC.11 deployment authorized.
+- POS repository: outside scope / must not be touched.
+- WPML/WCML certification remains separate.
+- WP Rocket certification remains separate/unqualified.
+- Stage 15 remains not started.
+
+## Current next work
+No automatic next feature/release stage is authorized by RC.11 finalization. Production rollout/pilot, WPML/WCML certification, WP Rocket certification, Stage 15, or further feature work each require a separate explicit owner decision.
