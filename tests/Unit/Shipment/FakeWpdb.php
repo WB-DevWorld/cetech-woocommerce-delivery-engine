@@ -37,6 +37,8 @@ final class FakeWpdb {
 
 	public ?string $fail_next_update_table = null;
 
+	public ?string $fail_next_update_column = null;
+
 	/** @var array<string, list<array<string, mixed>>>|null */
 	private ?array $transaction_tables = null;
 
@@ -205,6 +207,12 @@ final class FakeWpdb {
 		if ( $this->fail_next_update_table === $table ) {
 			$this->fail_next_update_table = null;
 			$this->last_error             = 'Simulated update failure';
+
+			return false;
+		}
+		if ( null !== $this->fail_next_update_column && array_key_exists( $this->fail_next_update_column, $data ) && count( $data ) <= 3 ) {
+			$this->fail_next_update_column = null;
+			$this->last_error              = 'Simulated column update failure';
 
 			return false;
 		}

@@ -31,9 +31,9 @@ final class WpdbProviderMappingRepository implements ProviderMappingRepositoryIn
 
 		global $wpdb;
 		$table = TableNames::for( GeographySchema::MAPPINGS_SUFFIX );
-		$sql   = "SELECT external_id FROM `{$table}` WHERE location_id = %d AND provider = %s LIMIT 1";
+		$sql   = "SELECT external_id FROM `{$table}` WHERE location_id = %d AND provider = %s AND generation_token = %s LIMIT 1";
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$value = $wpdb->get_var( $wpdb->prepare( $sql, $location_id, $provider->value ) );
+		$value = $wpdb->get_var( $wpdb->prepare( $sql, $location_id, $provider->value, '' ) );
 
 		return is_string( $value ) && '' !== $value ? $value : null;
 	}

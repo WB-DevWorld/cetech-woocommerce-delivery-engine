@@ -104,7 +104,7 @@ final class Geo5TechnicalCorrectionTest extends TestCase {
 		self::assertNotSame( $token_a, $pack->target_token() );
 		$this->run_import( $importer, $packs, $pack, $success );
 		self::assertSame( GeographyPackStatus::Ready, $packs->find_by_id( $pack->id )?->status );
-		self::assertFalse( $geo->locations->find_by_id( $failed_id )?->isActive() );
+		self::assertFalse( (bool) $geo->locations->find_by_id( $failed_id )?->isActive() );
 		self::assertNull( $geo->locations->find_location_id( GeographyProvider::GeoNames, '77' ) );
 		$ok = $geo->locations->find_location_id( GeographyProvider::GeoNames, '88' );
 		self::assertNotNull( $ok );

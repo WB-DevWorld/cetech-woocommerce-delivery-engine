@@ -33,6 +33,8 @@ final class GeographyPackService {
 
 	public const MAX_UNCOMPRESSED_BYTES = 262144000;
 
+	public const LOCK_TTL_SECONDS = 120;
+
 	public function __construct(
 		private GeographyPackRepositoryInterface $packs,
 		private GeoNamesPackImporter $importer,
@@ -109,12 +111,13 @@ final class GeographyPackService {
 			return $this->packs->find_by_id( $pack->id ) ?? $pack;
 		}
 
-		$version  = $this->dataset_version( $file_path, $checksum );
-		$locked   = $this->acquire_lifecycle_lock( $pack->id, 'update' );
-		if ( ! $locked ) {
+		$version = $this->dataset_version( $file_path, $checksum );
+		$owner   = $this->acquire_lifecycle_lock( $pack->id, 'update' );
+		if ( '' === $owner ) {
 			return $this->packs->find_by_id( $pack->id ) ?? $pack;
 		}
 		try {
+			$pack   = $this->packs->find_by_id( $pack->id ) ?? $pack;
 			$pack   = $this->importer->begin_dataset( $pack, $file_path, $checksum, $version );
 			$stored = $this->store_generation_file( $pack->country_code, $pack->target_token(), $checksum, $file_path );
 			if ( '' === $stored ) {
@@ -141,7 +144,7 @@ final class GeographyPackService {
 
 			return $this->packs->find_by_id( $pack->id ) ?? $pack;
 		} finally {
-			$this->release_lifecycle_lock( $pack->id );
+			$this->release_lifecycle_lock( $pack->id, $owner );
 		}
 	}
 
@@ -177,7 +180,8 @@ final class GeographyPackService {
 			}
 		}
 
-		if ( ! $this->acquire_lifecycle_lock( $pack->id, 'retry' ) ) {
+		$owner = $this->acquire_lifecycle_lock( $pack->id, 'retry' );
+		if ( '' === $owner ) {
 			return $this->packs->find_by_id( $pack->id ) ?? $pack;
 		}
 		try {
@@ -196,7 +200,7 @@ final class GeographyPackService {
 
 			return $this->packs->find_by_id( $pack->id ) ?? $pack;
 		} finally {
-			$this->release_lifecycle_lock( $pack->id );
+			$this->release_lifecycle_lock( $pack->id, $owner );
 		}
 	}
 
@@ -210,7 +214,8 @@ final class GeographyPackService {
 		}
 		$this->woo_bootstrap->bootstrap_country( $country_code );
 		$pack = $this->importer->ensure_pack( $country_code, '' );
-		if ( ! $this->acquire_lifecycle_lock( $pack->id, 'begin' ) ) {
+		$owner = $this->acquire_lifecycle_lock( $pack->id, 'begin' );
+		if ( '' === $owner ) {
 			return $this->packs->find_by_id( $pack->id ) ?? $pack;
 		}
 		try {
@@ -262,7 +267,7 @@ final class GeographyPackService {
 
 			return $this->packs->find_by_id( $pack->id ) ?? $pack;
 		} finally {
-			$this->release_lifecycle_lock( $pack->id );
+			$this->release_lifecycle_lock( $pack->id, $owner );
 		}
 	}
 
@@ -273,7 +278,8 @@ final class GeographyPackService {
 	 */
 	public function download_tick( int $pack_id, string $country_code, string $generation_token = '' ): array {
 		$country_code = strtoupper( trim( $country_code ) );
-		if ( ! $this->acquire_lifecycle_lock( $pack_id, 'download' ) ) {
+		$owner = $this->acquire_lifecycle_lock( $pack_id, 'download' );
+		if ( '' === $owner ) {
 			return [ 'status' => 'noop', 'reason' => 'locked' ];
 		}
 		try {
@@ -326,7 +332,7 @@ final class GeographyPackService {
 
 			return $this->complete_official_source( $pack_id, $generation_token, $txt );
 		} finally {
-			$this->release_lifecycle_lock( $pack_id );
+			$this->release_lifecycle_lock( $pack_id, $owner );
 		}
 	}
 
@@ -426,7 +432,8 @@ final class GeographyPackService {
 	 * @return array<string, mixed>
 	 */
 	public function tick( int $pack_id, string $file_path, int $batch_size = 100, string $generation_token = '' ): array {
-		if ( ! $this->acquire_lifecycle_lock( $pack_id, 'tick' ) ) {
+		$owner = $this->acquire_lifecycle_lock( $pack_id, 'tick' );
+		if ( '' === $owner ) {
 			return [ 'status' => 'noop', 'reason' => 'locked' ];
 		}
 		try {
@@ -443,7 +450,7 @@ final class GeographyPackService {
 
 			return $this->run_tick( $pack, $file_path, $batch_size, $generation_token );
 		} finally {
-			$this->release_lifecycle_lock( $pack_id );
+			$this->release_lifecycle_lock( $pack_id, $owner );
 		}
 	}
 
@@ -574,20 +581,50 @@ final class GeographyPackService {
 		return $generation_token !== $expected;
 	}
 
-	private function acquire_lifecycle_lock( int $pack_id, string $holder ): bool {
-		$key = 'cetech_de_geo_pack_cas_' . $pack_id;
-		if ( function_exists( 'add_option' ) ) {
-			return add_option( $key, $holder, '', false );
+	private function acquire_lifecycle_lock( int $pack_id, string $role ): string {
+		$key   = 'cetech_de_geo_pack_cas_' . $pack_id;
+		$now   = time();
+		$owner = $role . ':' . bin2hex( random_bytes( 8 ) );
+		$lease = [
+			'owner'       => $owner,
+			'role'        => $role,
+			'acquired_at' => $now,
+			'expires_at'  => $now + self::LOCK_TTL_SECONDS,
+		];
+		if ( ! function_exists( 'add_option' ) ) {
+			return $owner;
 		}
-
-		return true;
-	}
-
-	private function release_lifecycle_lock( int $pack_id ): void {
-		$key = 'cetech_de_geo_pack_cas_' . $pack_id;
+		if ( add_option( $key, $lease, '', false ) ) {
+			return $owner;
+		}
+		$existing = function_exists( 'get_option' ) ? get_option( $key, false ) : false;
+		if ( ! is_array( $existing ) ) {
+			return '';
+		}
+		$expires = (int) ( $existing['expires_at'] ?? 0 );
+		if ( $expires >= $now ) {
+			return '';
+		}
 		if ( function_exists( 'delete_option' ) ) {
 			delete_option( $key );
 		}
+		if ( add_option( $key, $lease, '', false ) ) {
+			return $owner;
+		}
+
+		return '';
+	}
+
+	private function release_lifecycle_lock( int $pack_id, string $owner ): void {
+		if ( '' === $owner || ! function_exists( 'get_option' ) || ! function_exists( 'delete_option' ) ) {
+			return;
+		}
+		$key      = 'cetech_de_geo_pack_cas_' . $pack_id;
+		$existing = get_option( $key, false );
+		if ( ! is_array( $existing ) || (string) ( $existing['owner'] ?? '' ) !== $owner ) {
+			return;
+		}
+		delete_option( $key );
 	}
 
 	private function store_generation_file( string $country_code, string $generation_token, string $checksum, string $source_path ): string {

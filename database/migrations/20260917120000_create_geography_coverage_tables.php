@@ -74,8 +74,9 @@ return new class implements VerifiableMigrationInterface {
 		$this->assert_index_present( GeographySchema::LOCATIONS_SUFFIX, 'location_key' );
 		$this->assert_index_present( GeographySchema::LOCATIONS_SUFFIX, 'country_parent_type_status' );
 		$this->assert_index_present( GeographySchema::LOCATIONS_SUFFIX, 'country_normalized' );
-		$this->assert_index_present( GeographySchema::ALIASES_SUFFIX, 'location_normalized_alias' );
-		$this->assert_index_present( GeographySchema::MAPPINGS_SUFFIX, 'provider_external' );
+		$this->assert_index_present( GeographySchema::LOCATIONS_SUFFIX, 'draft_generation_token' );
+		$this->assert_index_present( GeographySchema::ALIASES_SUFFIX, 'location_normalized_generation' );
+		$this->assert_index_present( GeographySchema::MAPPINGS_SUFFIX, 'provider_external_generation' );
 		$this->assert_index_present( CoverageSchema::GROUPS_SUFFIX, 'zone_status_order' );
 		$this->assert_index_present( CoverageSchema::MEMBERS_SUFFIX, 'group_location_membership' );
 		$this->assert_index_present( CoverageSchema::POSTCODES_SUFFIX, 'group_postcode_mode' );

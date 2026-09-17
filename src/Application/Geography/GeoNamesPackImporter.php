@@ -99,6 +99,10 @@ final class GeoNamesPackImporter {
 		if ( '' === $token || $token !== $pack->target_token() ) {
 			$token = $this->new_attempt_token( $pack );
 		}
+		$previous = trim( (string) ( $pack->progress['target_token'] ?? '' ) );
+		if ( '' !== $previous && $previous !== $token ) {
+			$this->locations->abandon_generation( $previous );
+		}
 		$progress['dataset_checksum']    = $checksum;
 		$progress['active_generation']   = $active;
 		$progress['target_generation']   = $target;
@@ -248,7 +252,39 @@ final class GeoNamesPackImporter {
 					];
 				}
 				try {
-					$this->locations->promote_generation( $token );
+					$this->locations->promote_generation(
+						$token,
+						function () use ( $pack, $last, $processed, $imported, $skipped, $progress, $phase, $target, $token ): void {
+							$this->packs->update_progress(
+								$pack->id,
+								GeographyPackStatus::Ready,
+								(string) $last,
+								[
+									'processed'         => $processed,
+									'imported'          => $imported,
+									'skipped'           => $skipped,
+									'total'             => (int) ( $progress['total'] ?? 0 ),
+									'phase'             => $phase,
+									'scanned'           => 0,
+									'target_generation' => $target,
+									'target_token'      => $token,
+									'target_checksum'   => (string) ( $progress['target_checksum'] ?? $pack->checksum ),
+									'dataset_checksum'  => (string) ( $progress['dataset_checksum'] ?? $pack->checksum ),
+									'active_generation' => $target,
+									'attempt_seq'       => (int) ( $progress['attempt_seq'] ?? $target ),
+									'staging_identity'  => $token,
+									'last_successful'   => [
+										'checksum'         => (string) ( $progress['dataset_checksum'] ?? $pack->checksum ),
+										'dataset_version'  => $pack->dataset_version,
+										'source_reference' => $pack->source_reference,
+										'generation_token' => $token,
+									],
+								],
+								'',
+								gmdate( 'Y-m-d H:i:s' )
+							);
+						}
+					);
 				} catch ( \Throwable $e ) {
 					$this->packs->update_progress(
 						$pack->id,
@@ -305,14 +341,16 @@ final class GeoNamesPackImporter {
 				]
 				: $pack->last_successful(),
 		];
-		$this->packs->update_progress(
-			$pack->id,
-			$status,
-			(string) $last,
-			$progress,
-			'',
-			$complete ? gmdate( 'Y-m-d H:i:s' ) : null
-		);
+		if ( ! $complete ) {
+			$this->packs->update_progress(
+				$pack->id,
+				$status,
+				(string) $last,
+				$progress,
+				'',
+				null
+			);
+		}
 
 		return [
 			'status'    => $status->value,
@@ -483,7 +521,8 @@ final class GeoNamesPackImporter {
 					$existing->ancestry_path,
 					$existing->generation,
 					$this->encode_draft( $draft ),
-					$existing->generation_token
+					$existing->generation_token,
+					$token
 				)
 			);
 
@@ -497,7 +536,8 @@ final class GeoNamesPackImporter {
 				$existing->normalized_name,
 				'',
 				'former_name',
-				false
+				false,
+				$token
 			);
 		}
 
@@ -748,7 +788,7 @@ final class GeoNamesPackImporter {
 			return;
 		}
 		foreach ( $pending as $item ) {
-			$this->aliases->add_alias( $location_id, $item['alias'], $item['normalized'], '', $item['type'], false );
+			$this->aliases->add_alias( $location_id, $item['alias'], $item['normalized'], '', $item['type'], false, $token );
 		}
 	}
 
@@ -830,7 +870,8 @@ final class GeoNamesPackImporter {
 				$location->ancestry_path,
 				$location->generation,
 				$this->encode_draft( $draft ),
-				$location->generation_token
+				$location->generation_token,
+				(string) ( $draft['generation_token'] ?? '' )
 			)
 		);
 	}

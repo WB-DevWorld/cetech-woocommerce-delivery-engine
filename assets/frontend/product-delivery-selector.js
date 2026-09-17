@@ -560,6 +560,34 @@
 			refreshPostcode();
 		}
 
+		function copyFieldIdentity(from, to) {
+			if (!from || !to) {
+				return;
+			}
+			if (from.id) {
+				to.id = from.id;
+			}
+			if (from.className) {
+				to.className = from.className;
+			}
+			['aria-label', 'aria-labelledby', 'aria-describedby', 'aria-required', 'aria-invalid', 'aria-controls', 'aria-expanded', 'role', 'title', 'required'].forEach(function (name) {
+				var value = from.getAttribute(name);
+				if (value !== null) {
+					to.setAttribute(name, value);
+				}
+			});
+			if (from.required) {
+				to.required = true;
+			}
+			var autocomplete = from.getAttribute('autocomplete');
+			to.setAttribute('autocomplete', autocomplete || 'address-level1');
+			Array.prototype.forEach.call(from.attributes || [], function (attr) {
+				if (attr && attr.name && attr.name.indexOf('data-') === 0) {
+					to.setAttribute(attr.name, attr.value);
+				}
+			});
+		}
+
 		function ensureRegionSelect() {
 			var current = regionField();
 			if (current && current.tagName === 'SELECT') {
@@ -570,8 +598,11 @@
 				return current;
 			}
 			var select = document.createElement('select');
-			select.name = 'cetech_de_matching_state';
-			select.setAttribute('autocomplete', 'address-level1');
+			select.name = current && current.name ? current.name : 'cetech_de_matching_state';
+			copyFieldIdentity(current, select);
+			if (!select.getAttribute('autocomplete')) {
+				select.setAttribute('autocomplete', 'address-level1');
+			}
 			if (current && current.parentNode) {
 				current.parentNode.replaceChild(select, current);
 			} else {

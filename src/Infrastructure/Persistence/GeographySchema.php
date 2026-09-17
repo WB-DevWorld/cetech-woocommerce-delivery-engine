@@ -76,6 +76,7 @@ final class GeographySchema {
 				ancestry_path varchar(191) NOT NULL DEFAULT '',
 				generation int unsigned NOT NULL DEFAULT 0,
 				generation_token varchar(64) NOT NULL DEFAULT '',
+				draft_generation_token varchar(64) NOT NULL DEFAULT '',
 				draft_json longtext NULL,
 				created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -88,6 +89,7 @@ final class GeographySchema {
 				KEY ancestry_path (ancestry_path),
 				KEY generation_status (generation, status),
 				KEY generation_token (generation_token),
+				KEY draft_generation_token (draft_generation_token),
 				KEY status (status)
 			) ENGINE=InnoDB {$charset_collate};",
 			self::ALIASES_SUFFIX => "CREATE TABLE {$aliases} (
@@ -103,9 +105,10 @@ final class GeographySchema {
 				created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				PRIMARY KEY  (id),
-				UNIQUE KEY location_normalized_alias (location_id, normalized_alias),
+				UNIQUE KEY location_normalized_generation (location_id, normalized_alias, generation_token),
 				KEY normalized_alias (normalized_alias),
 				KEY location_id (location_id),
+				KEY generation_token (generation_token),
 				KEY status (status)
 			) ENGINE=InnoDB {$charset_collate};",
 			self::MAPPINGS_SUFFIX => "CREATE TABLE {$mappings} (
@@ -164,9 +167,11 @@ final class GeographySchema {
 				'KEY ancestry_path (ancestry_path)',
 				'generation',
 				'generation_token',
+				'draft_generation_token',
 				'draft_json',
 				'KEY generation_status (generation, status)',
 				'KEY generation_token (generation_token)',
+				'KEY draft_generation_token (draft_generation_token)',
 				'ENGINE=InnoDB',
 			],
 			self::ALIASES_SUFFIX => [
@@ -174,7 +179,8 @@ final class GeographySchema {
 				'alias',
 				'normalized_alias',
 				'generation_token',
-				'UNIQUE KEY location_normalized_alias (location_id, normalized_alias)',
+				'UNIQUE KEY location_normalized_generation (location_id, normalized_alias, generation_token)',
+				'KEY generation_token (generation_token)',
 				'KEY normalized_alias (normalized_alias)',
 				'ENGINE=InnoDB',
 			],

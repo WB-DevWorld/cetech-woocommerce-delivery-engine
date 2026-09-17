@@ -1,6 +1,6 @@
 # Post-RC.11 Canonical Geography & Delivery Area Coverage
 
-Status: ISSUE #23 GEO.5 TECHNICAL CORRECTIONS / NOT MERGED / NOT RC.12
+Status: ISSUE #23 GEO.6 TECHNICAL CORRECTIONS / NOT MERGED / NOT RC.12
 
 Owner: `@wbdevworld`
 
@@ -18,7 +18,9 @@ Rejected technical-review candidate: `1.0.0-dev.geo.3` (`fdff226cbe6837a3ac508bc
 
 Rejected technical-review candidate: `1.0.0-dev.geo.4` (`48f6a39436bc2464d4e2cfdb47221c7c59542706`). Frozen package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.4.zip` SHA-256 `775ff1b7f31fdffb3ea246f1642693f86dd3e01fd0cb99c729add4831e535456`. Do not physically QA geo.4.
 
-Current technical-correction candidate identity: `1.0.0-dev.geo.5`
+Rejected technical-review candidate: `1.0.0-dev.geo.5` (`f5da0b6b528e19ae57eedd9bc9bfee5ce05cc57b`). Frozen package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.5.zip` SHA-256 `720a663800b57205637d02b9669eb9930b28b9dc6d1e2b180de6aea10edfa4ee`. Do not physically QA geo.5.
+
+Current technical-correction candidate identity: `1.0.0-dev.geo.6`
 
 Target schema: `6`
 

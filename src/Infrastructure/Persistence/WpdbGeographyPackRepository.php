@@ -90,14 +90,20 @@ final class WpdbGeographyPackRepository implements GeographyPackRepositoryInterf
 
 		if ( $id > 0 ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-			$wpdb->update( $table, $row, [ 'id' => $id ] );
+			$result = $wpdb->update( $table, $row, [ 'id' => $id ] );
+			if ( false === $result ) {
+				throw new \RuntimeException( 'Failed to update geography pack ' . $id . '.' );
+			}
 
 			return $this->find_by_id( $id ) ?? GeographyPack::fromRow( $row + [ 'id' => $id ] );
 		}
 
 		$row['created_at'] = $now;
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$wpdb->insert( $table, $row );
+		$inserted = $wpdb->insert( $table, $row );
+		if ( false === $inserted ) {
+			throw new \RuntimeException( 'Failed to insert geography pack.' );
+		}
 
 		return $this->find_by_id( (int) $wpdb->insert_id ) ?? GeographyPack::fromRow( $row + [ 'id' => (int) $wpdb->insert_id ] );
 	}
@@ -141,7 +147,10 @@ final class WpdbGeographyPackRepository implements GeographyPackRepositoryInterf
 		}
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->update( $table, $data, [ 'id' => $id ] );
+		$result = $wpdb->update( $table, $data, [ 'id' => $id ] );
+		if ( false === $result ) {
+			throw new \RuntimeException( 'Failed to update geography pack progress for pack ' . $id . '.' );
+		}
 	}
 
 	/**

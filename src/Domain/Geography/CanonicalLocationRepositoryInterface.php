@@ -67,11 +67,19 @@ interface CanonicalLocationRepositoryInterface {
 
 	/**
 	 * Activate Inactive rows and apply drafts for one immutable staging token.
-	 * Must be transactional. Throws on any persistence failure.
+	 * Must be transactional and include any pack Ready/provenance callback.
+	 * Throws on any persistence failure.
+	 *
+	 * @param callable|null $finalize Invoked inside the same transaction after geography writes.
 	 *
 	 * @return int Number of rows promoted.
 	 */
-	public function promote_generation( string $generation_token ): int;
+	public function promote_generation( string $generation_token, ?callable $finalize = null ): int;
+
+	/**
+	 * Delete abandoned/superseded staging for one token. Never deletes Active business geography.
+	 */
+	public function abandon_generation( string $generation_token ): void;
 
 	/**
 	 * Exact administrative match using type-neutral core names. Null when zero or more than one candidate.

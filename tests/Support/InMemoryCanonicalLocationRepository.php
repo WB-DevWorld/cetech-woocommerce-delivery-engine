@@ -28,6 +28,10 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	/** @var array<string, string> */
 	private array $external_by_location = [];
 
+	public bool $fail_next_ancestry = false;
+
+	public bool $fail_next_staged_mapping_delete = false;
+
 	private int $next_id = 1;
 
 	public function seed(
@@ -254,7 +258,8 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			$path,
 			$location->generation,
 			$location->draft_json,
-			$location->generation_token
+			$location->generation_token,
+			$location->draft_generation_token
 		);
 		$this->locations[ $id ] = $saved;
 
@@ -262,6 +267,10 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	}
 
 	public function update_ancestry_path( int $id, string $path ): void {
+		if ( $this->fail_next_ancestry ) {
+			$this->fail_next_ancestry = false;
+			throw new \RuntimeException( 'Failed to update ancestry path for location ' . $id . '.' );
+		}
 		$existing = $this->locations[ $id ] ?? null;
 		if ( $existing instanceof CanonicalLocation ) {
 			$this->locations[ $id ] = new CanonicalLocation(
@@ -280,7 +289,8 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 				$path,
 				$existing->generation,
 				$existing->draft_json,
-				$existing->generation_token
+				$existing->generation_token,
+				$existing->draft_generation_token
 			);
 		}
 	}
@@ -303,7 +313,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		return $updated;
 	}
 
-	public function promote_generation( string $generation_token ): int {
+	public function promote_generation( string $generation_token, ?callable $finalize = null ): int {
 		$generation_token = trim( $generation_token );
 		if ( '' === $generation_token ) {
 			throw new \RuntimeException( 'Promotion requires a generation token.' );
@@ -317,10 +327,12 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		try {
 			$activated = 0;
 			foreach ( $this->locations as $location ) {
-				$draft = '' !== $location->draft_json ? json_decode( $location->draft_json, true ) : null;
-				if ( is_array( $draft ) && (string) ( $draft['generation_token'] ?? '' ) === $generation_token ) {
-					$this->apply_draft_in_memory( $location, $draft );
-					$location = $this->locations[ $location->id ] ?? $location;
+				if ( $location->draft_generation_token === $generation_token && '' !== $location->draft_json ) {
+					$draft = json_decode( $location->draft_json, true );
+					if ( is_array( $draft ) ) {
+						$this->apply_draft_in_memory( $location, $draft );
+						$location = $this->locations[ $location->id ] ?? $location;
+					}
 				}
 				if ( $location->generation_token === $generation_token && RecordStatus::Inactive === $location->status ) {
 					$this->locations[ $location->id ] = new CanonicalLocation(
@@ -339,20 +351,75 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 						$location->ancestry_path,
 						$location->generation,
 						'',
-						$generation_token
+						$generation_token,
+						''
 					);
 					++$activated;
 				}
 			}
 			$this->activate_staged_mappings( $generation_token );
+			$this->activate_staged_aliases( $generation_token );
+			if ( is_callable( $finalize ) ) {
+				$finalize();
+			}
 
 			return $activated;
 		} catch ( \Throwable $e ) {
-			$this->locations             = $snapshot_locations;
-			$this->aliases               = $snapshot_aliases;
-			$this->mapping_rows          = $snapshot_mappings;
-			$this->external_by_location  = $snapshot_external;
+			$this->locations            = $snapshot_locations;
+			$this->aliases              = $snapshot_aliases;
+			$this->mapping_rows         = $snapshot_mappings;
+			$this->external_by_location = $snapshot_external;
 			throw $e;
+		}
+	}
+
+	public function abandon_generation( string $generation_token ): void {
+		$generation_token = trim( $generation_token );
+		if ( '' === $generation_token ) {
+			return;
+		}
+
+		foreach ( $this->locations as $id => $location ) {
+			if ( $location->generation_token === $generation_token && RecordStatus::Inactive === $location->status ) {
+				unset( $this->locations[ $id ], $this->aliases[ $id ] );
+				continue;
+			}
+			if ( $location->draft_generation_token === $generation_token && RecordStatus::Active === $location->status ) {
+				$this->locations[ $id ] = new CanonicalLocation(
+					$location->id,
+					$location->location_key,
+					$location->country_code,
+					$location->parent_location_id,
+					$location->location_type,
+					$location->administrative_level,
+					$location->canonical_name,
+					$location->normalized_name,
+					$location->ascii_name,
+					$location->latitude,
+					$location->longitude,
+					$location->status,
+					$location->ancestry_path,
+					$location->generation,
+					'',
+					$location->generation_token,
+					''
+				);
+			}
+		}
+		foreach ( $this->mapping_rows as $key => $row ) {
+			if ( $row['generation_token'] === $generation_token ) {
+				unset( $this->mapping_rows[ $key ] );
+			}
+		}
+		foreach ( $this->aliases as $location_id => $list ) {
+			$kept = [];
+			foreach ( $list as $alias ) {
+				if ( ( $alias['generation_token'] ?? '' ) === $generation_token ) {
+					continue;
+				}
+				$kept[] = $alias;
+			}
+			$this->aliases[ $location_id ] = $kept;
 		}
 	}
 
@@ -380,7 +447,8 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 				$location->ancestry_path,
 				$location->generation,
 				'',
-				$location->generation_token
+				$location->generation_token,
+				''
 			)
 		);
 		$former = trim( (string) ( $draft['former_name'] ?? '' ) );
@@ -437,8 +505,10 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			if ( $row['generation_token'] !== $generation_token ) {
 				continue;
 			}
-			$live_key = $this->mapping_key( explode( ':', $key )[0] ?? '', $this->external_from_mapping_key( $key ), '' );
-			unset( $live_key );
+			if ( $this->fail_next_staged_mapping_delete ) {
+				$this->fail_next_staged_mapping_delete = false;
+				throw new \RuntimeException( 'Failed to delete staged mapping.' );
+			}
 			$provider_external = $this->provider_external_from_key( $key );
 			$live              = $this->mapping_key( $provider_external['provider'], $provider_external['external_id'], '' );
 			$this->mapping_rows[ $live ] = [
@@ -451,6 +521,36 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			if ( $key !== $live ) {
 				unset( $this->mapping_rows[ $key ] );
 			}
+		}
+	}
+
+	private function activate_staged_aliases( string $generation_token ): void {
+		foreach ( $this->aliases as $location_id => $list ) {
+			$kept = [];
+			foreach ( $list as $alias ) {
+				if ( ( $alias['generation_token'] ?? '' ) !== $generation_token ) {
+					$kept[] = $alias;
+					continue;
+				}
+				$this->add_alias(
+					$location_id,
+					$alias['alias'],
+					$alias['normalized'],
+					'',
+					(string) ( $alias['type'] ?? 'alternate' ),
+					false,
+					''
+				);
+			}
+			$this->aliases[ $location_id ] = $this->aliases[ $location_id ] ?? $kept;
+			$merged = [];
+			foreach ( $this->aliases[ $location_id ] as $alias ) {
+				if ( ( $alias['generation_token'] ?? '' ) === $generation_token ) {
+					continue;
+				}
+				$merged[] = $alias;
+			}
+			$this->aliases[ $location_id ] = $merged;
 		}
 	}
 
@@ -522,6 +622,9 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			if ( RecordStatus::Active->value !== ( $alias['status'] ?? RecordStatus::Active->value ) ) {
 				continue;
 			}
+			if ( '' !== ( $alias['generation_token'] ?? '' ) ) {
+				continue;
+			}
 			if ( str_starts_with( $alias['normalized'], $query ) ) {
 				return true;
 			}
@@ -537,6 +640,9 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 					continue;
 				}
 				if ( RecordStatus::Active->value !== ( $alias['status'] ?? RecordStatus::Active->value ) ) {
+					continue;
+				}
+				if ( '' !== ( $alias['generation_token'] ?? '' ) ) {
 					continue;
 				}
 				$location = $this->locations[ $location_id ] ?? null;
@@ -560,6 +666,9 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			if ( RecordStatus::Active->value !== ( $row['status'] ?? RecordStatus::Active->value ) ) {
 				continue;
 			}
+			if ( '' !== ( $row['generation_token'] ?? '' ) ) {
+				continue;
+			}
 			$out[] = $row['alias'];
 		}
 
@@ -569,7 +678,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	public function add_alias( int $location_id, string $alias, string $normalized_alias, string $language_code = '', string $alias_type = 'alternate', bool $preferred = false, string $generation_token = '' ): void {
 		unset( $language_code, $preferred );
 		foreach ( $this->aliases[ $location_id ] ?? [] as $existing ) {
-			if ( $existing['normalized'] === $normalized_alias ) {
+			if ( $existing['normalized'] === $normalized_alias && ( $existing['generation_token'] ?? '' ) === $generation_token ) {
 				return;
 			}
 		}

@@ -191,10 +191,11 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		if ( '' !== $search ) {
 			$like    = $wpdb->esc_like( $search ) . '%';
 			$aliases = TableNames::for( GeographySchema::ALIASES_SUFFIX );
-			$sql    .= " AND (normalized_name LIKE %s OR ascii_name LIKE %s OR EXISTS (SELECT 1 FROM `{$aliases}` als WHERE als.location_id = `{$table}`.id AND als.status = %s AND als.normalized_alias LIKE %s))";
+			$sql    .= " AND (normalized_name LIKE %s OR ascii_name LIKE %s OR EXISTS (SELECT 1 FROM `{$aliases}` als WHERE als.location_id = `{$table}`.id AND als.status = %s AND als.generation_token = %s AND als.normalized_alias LIKE %s))";
 			$args[]  = $like;
 			$args[]  = $like;
 			$args[]  = RecordStatus::Active->value;
+			$args[]  = '';
 			$args[]  = $like;
 		}
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -220,10 +221,11 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		if ( '' !== $search ) {
 			$like    = $wpdb->esc_like( $search ) . '%';
 			$aliases = TableNames::for( GeographySchema::ALIASES_SUFFIX );
-			$sql    .= " AND (normalized_name LIKE %s OR ascii_name LIKE %s OR EXISTS (SELECT 1 FROM `{$aliases}` als WHERE als.location_id = `{$table}`.id AND als.status = %s AND als.normalized_alias LIKE %s))";
+			$sql    .= " AND (normalized_name LIKE %s OR ascii_name LIKE %s OR EXISTS (SELECT 1 FROM `{$aliases}` als WHERE als.location_id = `{$table}`.id AND als.status = %s AND als.generation_token = %s AND als.normalized_alias LIKE %s))";
 			$args[]  = $like;
 			$args[]  = $like;
 			$args[]  = RecordStatus::Active->value;
+			$args[]  = '';
 			$args[]  = $like;
 		}
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -255,10 +257,11 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		if ( '' !== $query ) {
 			$like    = $wpdb->esc_like( $query ) . '%';
 			$aliases = TableNames::for( GeographySchema::ALIASES_SUFFIX );
-			$sql    .= " AND (normalized_name LIKE %s OR ascii_name LIKE %s OR EXISTS (SELECT 1 FROM `{$aliases}` als WHERE als.location_id = `{$table}`.id AND als.status = %s AND als.normalized_alias LIKE %s))";
+			$sql    .= " AND (normalized_name LIKE %s OR ascii_name LIKE %s OR EXISTS (SELECT 1 FROM `{$aliases}` als WHERE als.location_id = `{$table}`.id AND als.status = %s AND als.generation_token = %s AND als.normalized_alias LIKE %s))";
 			$args[]  = $like;
 			$args[]  = $like;
 			$args[]  = RecordStatus::Active->value;
+			$args[]  = '';
 			$args[]  = $like;
 		}
 		$sql   .= ' ORDER BY canonical_name ASC LIMIT %d OFFSET %d';
@@ -319,10 +322,11 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 			'longitude'           => $location->longitude,
 			'status'              => $location->status->value,
 			'ancestry_path'       => $location->ancestry_path,
-			'generation'          => $location->generation,
-			'generation_token'    => $location->generation_token,
-			'draft_json'          => $location->draft_json,
-			'updated_at'          => $now,
+			'generation'             => $location->generation,
+			'generation_token'       => $location->generation_token,
+			'draft_generation_token' => $location->draft_generation_token,
+			'draft_json'             => $location->draft_json,
+			'updated_at'             => $now,
 		];
 
 		if ( $location->id > 0 ) {
@@ -357,7 +361,7 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		global $wpdb;
 		$table = $this->table_name();
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->update(
+		$result = $wpdb->update(
 			$table,
 			[
 				'ancestry_path' => $path,
@@ -365,6 +369,9 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 			],
 			[ 'id' => $id ]
 		);
+		if ( false === $result ) {
+			throw new \RuntimeException( 'Failed to update ancestry path for location ' . $id . '.' );
+		}
 	}
 
 	public function rebuild_descendant_ancestry( int $root_id, string $old_path, string $new_path, int $limit = 2000 ): int {
@@ -384,7 +391,7 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		return $total;
 	}
 
-	public function promote_generation( string $generation_token ): int {
+	public function promote_generation( string $generation_token, ?callable $finalize = null ): int {
 		$generation_token = trim( $generation_token );
 		if ( '' === $generation_token ) {
 			throw new \RuntimeException( 'Promotion requires a generation token.' );
@@ -395,13 +402,13 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$wpdb->query( 'START TRANSACTION' );
 		try {
-			$sql = "SELECT * FROM `{$table}` WHERE status = %s";
+			$sql = "SELECT * FROM `{$table}` WHERE draft_generation_token = %s";
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$active_rows = $wpdb->get_results( $wpdb->prepare( $sql, RecordStatus::Active->value ), ARRAY_A );
-			foreach ( is_array( $active_rows ) ? $active_rows : [] as $row ) {
+			$draft_rows = $wpdb->get_results( $wpdb->prepare( $sql, $generation_token ), ARRAY_A );
+			foreach ( is_array( $draft_rows ) ? $draft_rows : [] as $row ) {
 				$location = CanonicalLocation::fromRow( $row );
 				$draft    = '' !== $location->draft_json ? json_decode( $location->draft_json, true ) : null;
-				if ( ! is_array( $draft ) || (string) ( $draft['generation_token'] ?? '' ) !== $generation_token ) {
+				if ( ! is_array( $draft ) ) {
 					continue;
 				}
 				$this->apply_draft( $location, $draft );
@@ -432,11 +439,101 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 				++$activated;
 			}
 			$this->activate_remaining_staged_mappings( $generation_token );
+			$this->activate_remaining_staged_aliases( $generation_token );
+			if ( is_callable( $finalize ) ) {
+				$finalize();
+			}
 
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			$wpdb->query( 'COMMIT' );
 
 			return $activated;
+		} catch ( \Throwable $e ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->query( 'ROLLBACK' );
+			throw $e;
+		}
+	}
+
+	public function abandon_generation( string $generation_token ): void {
+		$generation_token = trim( $generation_token );
+		if ( '' === $generation_token ) {
+			return;
+		}
+
+		global $wpdb;
+		$locations = $this->table_name();
+		$mappings  = TableNames::for( GeographySchema::MAPPINGS_SUFFIX );
+		$aliases   = TableNames::for( GeographySchema::ALIASES_SUFFIX );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->query( 'START TRANSACTION' );
+		try {
+			$sql = "SELECT * FROM `{$locations}` WHERE generation_token = %s AND status = %s";
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$staged_rows = $wpdb->get_results( $wpdb->prepare( $sql, $generation_token, RecordStatus::Inactive->value ), ARRAY_A );
+			foreach ( is_array( $staged_rows ) ? $staged_rows : [] as $row ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+				$deleted = $wpdb->delete( $locations, [ 'id' => (int) ( $row['id'] ?? 0 ), 'status' => RecordStatus::Inactive->value ] );
+				if ( false === $deleted ) {
+					throw new \RuntimeException( 'Failed to abandon staged location ' . (int) ( $row['id'] ?? 0 ) . '.' );
+				}
+			}
+
+			$sql = "SELECT * FROM `{$locations}` WHERE draft_generation_token = %s";
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$draft_rows = $wpdb->get_results( $wpdb->prepare( $sql, $generation_token ), ARRAY_A );
+			foreach ( is_array( $draft_rows ) ? $draft_rows : [] as $row ) {
+				$location = CanonicalLocation::fromRow( $row );
+				if ( RecordStatus::Active !== $location->status ) {
+					continue;
+				}
+				$this->save(
+					new CanonicalLocation(
+						$location->id,
+						$location->location_key,
+						$location->country_code,
+						$location->parent_location_id,
+						$location->location_type,
+						$location->administrative_level,
+						$location->canonical_name,
+						$location->normalized_name,
+						$location->ascii_name,
+						$location->latitude,
+						$location->longitude,
+						$location->status,
+						$location->ancestry_path,
+						$location->generation,
+						'',
+						$location->generation_token,
+						''
+					)
+				);
+			}
+
+			$sql = "SELECT * FROM `{$mappings}` WHERE generation_token = %s";
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$mapping_rows = $wpdb->get_results( $wpdb->prepare( $sql, $generation_token ), ARRAY_A );
+			foreach ( is_array( $mapping_rows ) ? $mapping_rows : [] as $row ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+				$deleted = $wpdb->delete( $mappings, [ 'id' => (int) ( $row['id'] ?? 0 ) ] );
+				if ( false === $deleted ) {
+					throw new \RuntimeException( 'Failed to abandon staged mapping ' . (int) ( $row['id'] ?? 0 ) . '.' );
+				}
+			}
+
+			$sql = "SELECT * FROM `{$aliases}` WHERE generation_token = %s";
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$alias_rows = $wpdb->get_results( $wpdb->prepare( $sql, $generation_token ), ARRAY_A );
+			foreach ( is_array( $alias_rows ) ? $alias_rows : [] as $row ) {
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+				$deleted = $wpdb->delete( $aliases, [ 'id' => (int) ( $row['id'] ?? 0 ) ] );
+				if ( false === $deleted ) {
+					throw new \RuntimeException( 'Failed to abandon staged alias ' . (int) ( $row['id'] ?? 0 ) . '.' );
+				}
+			}
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$wpdb->query( 'COMMIT' );
 		} catch ( \Throwable $e ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			$wpdb->query( 'ROLLBACK' );
@@ -510,7 +607,8 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 				$existing->ancestry_path,
 				$existing->generation,
 				'',
-				$existing->generation_token
+				$existing->generation_token,
+				''
 			)
 		);
 		$former = trim( (string) ( $draft['former_name'] ?? '' ) );
@@ -570,7 +668,10 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 				]
 			);
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-			$wpdb->delete( $mappings, [ 'id' => (int) ( $row['id'] ?? 0 ) ] );
+			$deleted = $wpdb->delete( $mappings, [ 'id' => (int) ( $row['id'] ?? 0 ) ] );
+			if ( false === $deleted ) {
+				throw new \RuntimeException( 'Failed to delete staged mapping ' . (int) ( $row['id'] ?? 0 ) . '.' );
+			}
 		}
 	}
 
@@ -595,7 +696,32 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 				]
 			);
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-			$wpdb->delete( $mappings, [ 'id' => (int) ( $row['id'] ?? 0 ) ] );
+			$deleted = $wpdb->delete( $mappings, [ 'id' => (int) ( $row['id'] ?? 0 ) ] );
+			if ( false === $deleted ) {
+				throw new \RuntimeException( 'Failed to delete staged mapping ' . (int) ( $row['id'] ?? 0 ) . '.' );
+			}
+		}
+	}
+
+	private function activate_remaining_staged_aliases( string $generation_token ): void {
+		global $wpdb;
+		$aliases = TableNames::for( GeographySchema::ALIASES_SUFFIX );
+		$sql     = "SELECT * FROM `{$aliases}` WHERE generation_token = %s";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $generation_token ), ARRAY_A );
+		foreach ( is_array( $rows ) ? $rows : [] as $row ) {
+			$location_id = (int) ( $row['location_id'] ?? 0 );
+			$alias       = (string) ( $row['alias'] ?? '' );
+			$normalized  = (string) ( $row['normalized_alias'] ?? '' );
+			if ( $location_id <= 0 || '' === $alias || '' === $normalized ) {
+				continue;
+			}
+			$this->write_live_alias( $location_id, $alias, $normalized, (string) ( $row['alias_type'] ?? 'alternate' ) );
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$deleted = $wpdb->delete( $aliases, [ 'id' => (int) ( $row['id'] ?? 0 ) ] );
+			if ( false === $deleted ) {
+				throw new \RuntimeException( 'Failed to delete staged alias ' . (int) ( $row['id'] ?? 0 ) . '.' );
+			}
 		}
 	}
 
@@ -603,24 +729,28 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		global $wpdb;
 		$table = TableNames::for( GeographySchema::ALIASES_SUFFIX );
 		$now   = gmdate( 'Y-m-d H:i:s' );
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$result = $wpdb->query(
-			$wpdb->prepare(
-				"INSERT INTO `{$table}` (location_id, alias, normalized_alias, language_code, alias_type, is_preferred, status, generation_token, created_at, updated_at)
-				VALUES (%d, %s, %s, %s, %s, %d, %s, %s, %s, %s)
-				ON DUPLICATE KEY UPDATE alias = VALUES(alias), updated_at = VALUES(updated_at), status = VALUES(status), generation_token = VALUES(generation_token)",
-				$location_id,
-				$alias,
-				$normalized,
-				'',
-				$type,
-				0,
-				RecordStatus::Active->value,
-				'',
-				$now,
-				$now
-			)
-		);
+		$sql   = "SELECT * FROM `{$table}` WHERE location_id = %d AND normalized_alias = %s AND generation_token = %s LIMIT 1";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$existing = $wpdb->get_row( $wpdb->prepare( $sql, $location_id, $normalized, '' ), ARRAY_A );
+		$row      = [
+			'location_id'      => $location_id,
+			'alias'            => $alias,
+			'normalized_alias' => $normalized,
+			'language_code'    => '',
+			'alias_type'       => $type,
+			'is_preferred'     => 0,
+			'status'           => RecordStatus::Active->value,
+			'generation_token' => '',
+			'updated_at'       => $now,
+		];
+		if ( is_array( $existing ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result = $wpdb->update( $table, $row, [ 'id' => (int) ( $existing['id'] ?? 0 ) ] );
+		} else {
+			$row['created_at'] = $now;
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$result = $wpdb->insert( $table, $row );
+		}
 		if ( false === $result ) {
 			throw new \RuntimeException( 'Failed to write location alias.' );
 		}
@@ -643,26 +773,30 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 			$encoded = '{}';
 		}
 		$pack_id = isset( $mapping['pack_id'] ) && '' !== (string) $mapping['pack_id'] ? (int) $mapping['pack_id'] : null;
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$result = $wpdb->query(
-			$wpdb->prepare(
-				"INSERT INTO `{$table}` (location_id, provider, external_id, pack_id, dataset_version, provider_parent_reference, feature_class, feature_code, provider_metadata_json, generation_token, created_at, updated_at)
-				VALUES (%d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-				ON DUPLICATE KEY UPDATE location_id = VALUES(location_id), pack_id = VALUES(pack_id), dataset_version = VALUES(dataset_version), provider_parent_reference = VALUES(provider_parent_reference), feature_class = VALUES(feature_class), feature_code = VALUES(feature_code), provider_metadata_json = VALUES(provider_metadata_json), updated_at = VALUES(updated_at)",
-				$location_id,
-				$provider,
-				$external,
-				$pack_id,
-				(string) ( $mapping['dataset_version'] ?? '' ),
-				(string) ( $mapping['provider_parent_reference'] ?? '' ),
-				(string) ( $mapping['feature_class'] ?? '' ),
-				(string) ( $mapping['feature_code'] ?? '' ),
-				$encoded,
-				'',
-				$now,
-				$now
-			)
-		);
+		$sql     = "SELECT * FROM `{$table}` WHERE provider = %s AND external_id = %s AND generation_token = %s LIMIT 1";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$existing = $wpdb->get_row( $wpdb->prepare( $sql, $provider, $external, '' ), ARRAY_A );
+		$row      = [
+			'location_id'               => $location_id,
+			'provider'                  => $provider,
+			'external_id'               => $external,
+			'pack_id'                   => $pack_id,
+			'dataset_version'           => (string) ( $mapping['dataset_version'] ?? '' ),
+			'provider_parent_reference' => (string) ( $mapping['provider_parent_reference'] ?? '' ),
+			'feature_class'             => (string) ( $mapping['feature_class'] ?? '' ),
+			'feature_code'              => (string) ( $mapping['feature_code'] ?? '' ),
+			'provider_metadata_json'    => $encoded,
+			'generation_token'          => '',
+			'updated_at'                => $now,
+		];
+		if ( is_array( $existing ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result = $wpdb->update( $table, $row, [ 'id' => (int) ( $existing['id'] ?? 0 ) ] );
+		} else {
+			$row['created_at'] = $now;
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$result = $wpdb->insert( $table, $row );
+		}
 		if ( false === $result ) {
 			throw new \RuntimeException( 'Failed to write provider mapping.' );
 		}

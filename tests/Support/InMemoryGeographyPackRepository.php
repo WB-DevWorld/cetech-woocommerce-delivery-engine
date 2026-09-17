@@ -16,6 +16,10 @@ final class InMemoryGeographyPackRepository implements GeographyPackRepositoryIn
 
 	private int $next_id = 1;
 
+	public bool $fail_next_progress = false;
+
+	public bool $fail_next_ready_progress = false;
+
 	public function find_by_id( int $id ): ?GeographyPack {
 		return $this->packs[ $id ] ?? null;
 	}
@@ -56,6 +60,11 @@ final class InMemoryGeographyPackRepository implements GeographyPackRepositoryIn
 		string $last_error = '',
 		?string $installed_at = null
 	): void {
+		if ( $this->fail_next_progress || ( $this->fail_next_ready_progress && GeographyPackStatus::Ready === $status ) ) {
+			$this->fail_next_progress       = false;
+			$this->fail_next_ready_progress = false;
+			throw new \RuntimeException( 'Simulated pack progress failure.' );
+		}
 		$existing = $this->packs[ $id ] ?? null;
 		if ( ! $existing instanceof GeographyPack ) {
 			return;

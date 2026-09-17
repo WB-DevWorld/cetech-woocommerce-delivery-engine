@@ -529,14 +529,15 @@ describe('Product delivery fulfilment switcher', () => {
 		expect(document.querySelector('[name="cetech_de_matching_location_key"]').value).toBe('loc-akwatia');
 	});
 
-	it('replaces a Woo text region field with a canonical select when ADM1 children exist', async () => {
+		it('replaces a Woo text region field with a canonical select when ADM1 children exist', async () => {
 		document.body.innerHTML = `
 			<form class="cart">
 				<fieldset data-cetech-de-selector="1">
 					<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">
 						<p data-cetech-de-field="country"><select name="cetech_de_matching_country"><option value="">Select…</option><option value="XX">No Woo States</option></select></p>
 						<p data-cetech-de-reveal="region" hidden>
-							<input name="cetech_de_matching_state" type="text" />
+							<label for="billing_state">Region / State</label>
+							<input id="billing_state" class="input-text state_select woodmart-state" name="cetech_de_matching_state" type="text" aria-label="Region / State" aria-required="true" autocomplete="address-level1" data-placeholder="State" data-input-classes="state_select" />
 						</p>
 						<p data-cetech-de-reveal="locality" hidden>
 							<input name="cetech_de_matching_city" />
@@ -565,7 +566,17 @@ describe('Product delivery fulfilment switcher', () => {
 		country.dispatchEvent(new Event('change', { bubbles: true }));
 		await expect.poll(() => document.querySelector('[name="cetech_de_matching_state"]')?.tagName || '').toBe('SELECT');
 		expect(document.querySelector('[data-cetech-de-reveal="region"]').hidden).toBe(false);
-		expect(document.querySelector('[name="cetech_de_matching_state"]').options.length).toBeGreaterThan(1);
+		const region = document.querySelector('[name="cetech_de_matching_state"]');
+		expect(region.options.length).toBeGreaterThan(1);
+		expect(region.id).toBe('billing_state');
+		expect(region.className).toContain('state_select');
+		expect(region.className).toContain('woodmart-state');
+		expect(region.getAttribute('aria-label')).toBe('Region / State');
+		expect(region.getAttribute('aria-required')).toBe('true');
+		expect(region.getAttribute('autocomplete')).toBe('address-level1');
+		expect(region.getAttribute('data-placeholder')).toBe('State');
+		expect(region.getAttribute('data-input-classes')).toBe('state_select');
+		expect(document.querySelector('label[for="billing_state"]')).not.toBeNull();
 	});
 
 	it('skips the administrative step when the country has no ADM1 children', async () => {
