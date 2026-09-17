@@ -33,7 +33,12 @@ final class PackageDestinationZoneResolver implements PackageDestinationZoneReso
 			(string) ( $destination['country'] ?? '' ),
 			(string) ( $destination['state'] ?? '' ),
 			(string) ( $destination['city'] ?? '' ),
-			(string) ( $destination['postcode'] ?? '' )
+			(string) ( $destination['postcode'] ?? '' ),
+			[
+				'canonical_location_key' => (string) ( $destination['canonical_location_key'] ?? '' ),
+				'state'                  => (string) ( $destination['state'] ?? '' ),
+				'state_label'            => (string) ( $destination['state_label'] ?? $destination['state'] ?? '' ),
+			]
 		);
 
 		$ids = [];

@@ -100,6 +100,7 @@ final class CartCustomerContextEditorService {
 				'matching_state'        => isset( $_POST['cetech_de_matching_state'] ) ? wp_unslash( (string) $_POST['cetech_de_matching_state'] ) : '',
 				'matching_city'         => isset( $_POST['cetech_de_matching_city'] ) ? wp_unslash( (string) $_POST['cetech_de_matching_city'] ) : '',
 				'matching_postcode'     => isset( $_POST['cetech_de_matching_postcode'] ) ? wp_unslash( (string) $_POST['cetech_de_matching_postcode'] ) : '',
+				'matching_location_key' => isset( $_POST['cetech_de_matching_location_key'] ) ? wp_unslash( (string) $_POST['cetech_de_matching_location_key'] ) : '',
 				'address_1'            => isset( $_POST['cetech_de_address_1'] ) ? wp_unslash( (string) $_POST['cetech_de_address_1'] ) : '',
 				'address_2'            => isset( $_POST['cetech_de_address_2'] ) ? wp_unslash( (string) $_POST['cetech_de_address_2'] ) : '',
 				'first_name'           => isset( $_POST['cetech_de_first_name'] ) ? wp_unslash( (string) $_POST['cetech_de_first_name'] ) : '',
@@ -183,10 +184,11 @@ final class CartCustomerContextEditorService {
 		$matching_raw = is_array( $input['matching_location'] ?? null ) ? $input['matching_location'] : [];
 		$matching     = MatchingLocation::fromInput(
 			[
-				'country'  => (string) ( $matching_raw['country'] ?? $input['matching_country'] ?? '' ),
-				'state'    => (string) ( $matching_raw['state'] ?? $input['matching_state'] ?? '' ),
-				'city'     => (string) ( $matching_raw['city'] ?? $input['matching_city'] ?? '' ),
-				'postcode' => (string) ( $matching_raw['postcode'] ?? $input['matching_postcode'] ?? '' ),
+				'country'                 => (string) ( $matching_raw['country'] ?? $input['matching_country'] ?? '' ),
+				'state'                   => (string) ( $matching_raw['state'] ?? $input['matching_state'] ?? '' ),
+				'city'                    => (string) ( $matching_raw['city'] ?? $input['matching_city'] ?? '' ),
+				'postcode'                => (string) ( $matching_raw['postcode'] ?? $input['matching_postcode'] ?? '' ),
+				'canonical_location_key'  => (string) ( $matching_raw['canonical_location_key'] ?? $input['matching_location_key'] ?? '' ),
 			]
 		);
 

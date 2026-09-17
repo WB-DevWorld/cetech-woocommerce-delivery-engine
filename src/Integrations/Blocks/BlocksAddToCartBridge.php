@@ -182,10 +182,11 @@ final class BlocksAddToCartBridge {
 
 		$location = MatchingLocation::fromInput(
 			[
-				'country'  => (string) ( $raw['country'] ?? '' ),
-				'state'    => (string) ( $raw['state'] ?? '' ),
-				'city'     => (string) ( $raw['city'] ?? '' ),
-				'postcode' => (string) ( $raw['postcode'] ?? '' ),
+				'country'                 => (string) ( $raw['country'] ?? '' ),
+				'state'                   => (string) ( $raw['state'] ?? '' ),
+				'city'                    => (string) ( $raw['city'] ?? '' ),
+				'postcode'                => (string) ( $raw['postcode'] ?? '' ),
+				'canonical_location_key'  => (string) ( $raw['canonical_location_key'] ?? $raw['location_key'] ?? '' ),
 			]
 		);
 

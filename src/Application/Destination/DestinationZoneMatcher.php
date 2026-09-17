@@ -4,9 +4,13 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Destination;
 
+use CetechDeliveryEngine\Application\Coverage\CoverageGroupMatcher;
+use CetechDeliveryEngine\Application\Geography\CanonicalLocationResolver;
+use CetechDeliveryEngine\Domain\Coverage\CoverageMatchDiagnostic;
 use CetechDeliveryEngine\Domain\Enum\DestinationRuleMatchMode;
 use CetechDeliveryEngine\Domain\Enum\DestinationRuleType;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
+use CetechDeliveryEngine\Domain\Geography\ResolvedDestination;
 use CetechDeliveryEngine\Domain\Zone\DestinationRuleRepositoryInterface;
 use CetechDeliveryEngine\Domain\Zone\DestinationZoneRepositoryInterface;
 
@@ -28,12 +32,26 @@ final class DestinationZoneMatcher {
 
 	public const SPECIFICITY_POSTCODE = 4;
 
+	/** @var list<CoverageMatchDiagnostic> */
+	private array $last_diagnostics = [];
+
 	public function __construct(
 		private DestinationZoneRepositoryInterface $zone_repository,
 		private DestinationRuleRepositoryInterface $rule_repository,
-		private ?RegionCodeLabelMatcher $region_matcher = null
+		private ?RegionCodeLabelMatcher $region_matcher = null,
+		private ?CoverageGroupMatcher $coverage_matcher = null,
+		private ?CanonicalLocationResolver $canonical_resolver = null
 	) {
 		$this->region_matcher = $region_matcher ?? new RegionCodeLabelMatcher();
+	}
+
+	/**
+	 * Admin/test diagnostics from the most recent match_all() call. Never customer-facing.
+	 *
+	 * @return list<CoverageMatchDiagnostic>
+	 */
+	public function last_diagnostics(): array {
+		return $this->last_diagnostics;
 	}
 
 	/**
@@ -66,12 +84,16 @@ final class DestinationZoneMatcher {
 		string $country_code,
 		string $region,
 		string $city,
-		string $postcode
+		string $postcode,
+		array $context = []
 	): array {
 		$country_code = strtoupper( trim( $country_code ) );
 		$region       = strtolower( trim( $region ) );
 		$city         = strtolower( trim( $city ) );
 		$postcode     = strtoupper( trim( $postcode ) );
+		$this->last_diagnostics = [];
+
+		$resolved = $this->resolve_destination( $country_code, $region, $city, $postcode, $context );
 
 		$zones = $this->zone_repository->list(
 			[
@@ -94,6 +116,17 @@ final class DestinationZoneMatcher {
 
 			if ( self::is_unrestricted_fallback( $zone, $rules ) ) {
 				$unrestricted_fallback = $zone;
+				continue;
+			}
+
+			$coverage = $this->match_coverage( $zone_id, $resolved );
+			if ( is_array( $coverage ) ) {
+				if ( $coverage['matched'] ) {
+					$candidates[] = [
+						'zone'        => $zone,
+						'specificity' => (int) $coverage['specificity'],
+					];
+				}
 				continue;
 			}
 
@@ -267,5 +300,54 @@ final class DestinationZoneMatcher {
 		}
 
 		return $postcode === $rule_value;
+	}
+
+	/**
+	 * @param array<string, mixed> $context
+	 */
+	private function resolve_destination(
+		string $country_code,
+		string $region,
+		string $city,
+		string $postcode,
+		array $context
+	): ?ResolvedDestination {
+		if ( ! $this->canonical_resolver instanceof CanonicalLocationResolver ) {
+			return null;
+		}
+
+		$key = (string) ( $context['canonical_location_key'] ?? '' );
+
+		return $this->canonical_resolver->resolve(
+			$country_code,
+			(string) ( $context['state'] ?? $region ),
+			(string) ( $context['state_label'] ?? $region ),
+			$city,
+			$postcode,
+			$key
+		);
+	}
+
+	/**
+	 * @return array{matched:bool,specificity:int}|null Null when the zone has no usable coverage groups.
+	 */
+	private function match_coverage( int $zone_id, ?ResolvedDestination $resolved ): ?array {
+		if ( ! $this->coverage_matcher instanceof CoverageGroupMatcher || ! $resolved instanceof ResolvedDestination ) {
+			return null;
+		}
+
+		$result = $this->coverage_matcher->match_zone( $zone_id, $resolved );
+		if ( isset( $result['diagnostic'] ) && $result['diagnostic'] instanceof CoverageMatchDiagnostic ) {
+			$this->last_diagnostics[] = $result['diagnostic'];
+		}
+
+		if ( 'no_usable_coverage_group' === ( $result['diagnostic']->fallback_reason ?? '' ) ) {
+			return null;
+		}
+
+		return [
+			'matched'     => (bool) $result['matched'],
+			'specificity' => (int) $result['specificity'],
+		];
 	}
 }

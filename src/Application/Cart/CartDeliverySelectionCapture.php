@@ -47,6 +47,8 @@ final class CartDeliverySelectionCapture {
 
 	public const POST_MATCHING_POSTCODE = 'cetech_de_matching_postcode';
 
+	public const POST_MATCHING_LOCATION_KEY = 'cetech_de_matching_location_key';
+
 	public const POST_CONTEXT_PAYLOAD = ClassicPdpContextPayload::POST_FIELD;
 
 	public function __construct(
@@ -634,10 +636,11 @@ final class CartDeliverySelectionCapture {
 
 		$from_post = MatchingLocation::fromInput(
 			[
-				'country'  => $this->posted_text( self::POST_MATCHING_COUNTRY ),
-				'state'    => $this->posted_text( self::POST_MATCHING_STATE ),
-				'city'     => $this->posted_text( self::POST_MATCHING_CITY ),
-				'postcode' => $this->posted_text( self::POST_MATCHING_POSTCODE ),
+				'country'                 => $this->posted_text( self::POST_MATCHING_COUNTRY ),
+				'state'                   => $this->posted_text( self::POST_MATCHING_STATE ),
+				'city'                    => $this->posted_text( self::POST_MATCHING_CITY ),
+				'postcode'                => $this->posted_text( self::POST_MATCHING_POSTCODE ),
+				'canonical_location_key'  => $this->posted_text( self::POST_MATCHING_LOCATION_KEY ),
 			]
 		);
 

@@ -47,10 +47,11 @@ final class MatchingLocationOptionsEndpoint {
 		$quantity     = isset( $_REQUEST['quantity'] ) ? (int) wp_unslash( (string) $_REQUEST['quantity'] ) : 1;
 		$location     = MatchingLocation::fromInput(
 			[
-				'country'  => isset( $_REQUEST['country'] ) ? wp_unslash( (string) $_REQUEST['country'] ) : '',
-				'state'    => isset( $_REQUEST['state'] ) ? wp_unslash( (string) $_REQUEST['state'] ) : '',
-				'city'     => isset( $_REQUEST['city'] ) ? wp_unslash( (string) $_REQUEST['city'] ) : '',
-				'postcode' => isset( $_REQUEST['postcode'] ) ? wp_unslash( (string) $_REQUEST['postcode'] ) : '',
+				'country'                 => isset( $_REQUEST['country'] ) ? wp_unslash( (string) $_REQUEST['country'] ) : '',
+				'state'                   => isset( $_REQUEST['state'] ) ? wp_unslash( (string) $_REQUEST['state'] ) : '',
+				'city'                    => isset( $_REQUEST['city'] ) ? wp_unslash( (string) $_REQUEST['city'] ) : '',
+				'postcode'                => isset( $_REQUEST['postcode'] ) ? wp_unslash( (string) $_REQUEST['postcode'] ) : '',
+				'canonical_location_key'  => isset( $_REQUEST['location_key'] ) ? wp_unslash( (string) $_REQUEST['location_key'] ) : '',
 			]
 		);
 
