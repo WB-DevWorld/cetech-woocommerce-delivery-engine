@@ -6,6 +6,7 @@
 	border: 1px solid rgba(0, 0, 0, 0.12);
 	background: #fff;
 	box-sizing: border-box;
+	--cetech-de-delivery-fee-accent: var(--wp--preset--color--primary, var(--woocommerce, currentColor));
 }
 
 .cetech-de-matching-location,
@@ -61,15 +62,12 @@
 .cetech-de-delivery-option__body {
 	display: flex;
 	flex-direction: column;
-	gap: 0.15em;
+	gap: 0.2em;
 	min-width: 0;
 }
 
 .cetech-de-delivery-option__headline {
-	display: flex;
-	align-items: baseline;
-	justify-content: space-between;
-	gap: 0.75em;
+	display: block;
 	min-width: 0;
 }
 
@@ -82,10 +80,11 @@
 
 .cetech-de-delivery-option__price {
 	display: block;
-	font-weight: 600;
+	margin-left: 0;
+	font-weight: 700;
+	font-size: 1.15em;
 	line-height: 1.35;
-	white-space: nowrap;
-	margin-left: auto;
+	color: var(--cetech-de-delivery-fee-accent, currentColor);
 }
 
 .cetech-de-delivery-option__estimate,
@@ -130,7 +129,9 @@
 
 .cetech-de-delivery-option-group[hidden],
 .cetech-de-delivery-selector__location[hidden],
-[data-cetech-de-active-choice="store_pickup"] [data-cetech-de-location-panel] {
+[data-cetech-de-active-choice="store_pickup"] [data-cetech-de-location-panel],
+.cetech-de-matching-location [hidden],
+.cetech-de-matching-location [data-cetech-de-reveal][hidden] {
 	display: none !important;
 }
 
@@ -180,10 +181,14 @@
 	grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 	gap: 0.45rem 0.75rem;
 	align-items: end;
+	border: 0;
+	padding: 0;
+	min-width: 0;
 }
 
 .cetech-de-matching-location__intro,
-.cetech-de-matching-location__prompt {
+.cetech-de-matching-location__prompt,
+.cetech-de-matching-location legend {
 	grid-column: 1 / -1;
 }
 
@@ -205,12 +210,35 @@
 
 .cetech-de-matching-location select,
 .cetech-de-matching-location input[type="text"],
+.cetech-de-matching-location input[type="search"],
 .cetech-de-matching-location .form-row input,
 .cetech-de-matching-location .form-row select {
 	min-height: 2.75rem;
 	width: 100% !important;
 	max-width: 100%;
 	box-sizing: border-box;
+}
+
+.cetech-de-locality-results {
+	list-style: none;
+	margin: 0.15rem 0 0;
+	padding: 0;
+	border: 1px solid rgba(0, 0, 0, 0.12);
+	max-height: 12rem;
+	overflow: auto;
+	background: #fff;
+	grid-column: 1 / -1;
+}
+
+.cetech-de-locality-results [role="option"] {
+	padding: 0.45rem 0.65rem;
+	min-height: 2.75rem;
+	cursor: pointer;
+}
+
+.cetech-de-locality-results [role="option"]:focus,
+.cetech-de-locality-results [role="option"]:hover {
+	outline: 2px solid currentColor;
 }
 
 .cetech-de-delivery-selector__location {
@@ -221,10 +249,22 @@
 	.cetech-de-matching-location {
 		grid-template-columns: 1fr;
 	}
+
+	.cetech-de-product-delivery-selector {
+		padding: 0.5rem 0;
+		border: 0;
+		background: transparent;
+	}
+
+	.cetech-de-delivery-option-group,
+	.cetech-de-fulfilment-choice {
+		padding: 0;
+		border: 0;
+	}
 }
 
 @media (max-width: 768px) {
 	.cetech-de-product-delivery-selector {
-		padding: 0.75rem;
+		padding: 0.75rem 0;
 	}
 }

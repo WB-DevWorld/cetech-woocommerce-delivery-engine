@@ -45,7 +45,8 @@ final class AdminMenu {
 		private ShipmentsPage $shipments_page,
 		private BulkToolsPage $bulk_tools_page,
 		private ?NeedsAttentionCountQuery $needs_attention_count = null,
-		private ?ShipmentActivityCursor $shipment_activity = null
+		private ?ShipmentActivityCursor $shipment_activity = null,
+		private ?LocationPacksPage $location_packs_page = null
 	) {
 	}
 
@@ -68,6 +69,9 @@ final class AdminMenu {
 		add_action( 'admin_init', [ $this->needs_attention_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->shipments_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->bulk_tools_page, 'handle_actions' ] );
+		if ( $this->location_packs_page instanceof LocationPacksPage ) {
+			add_action( 'admin_init', [ $this->location_packs_page, 'handle_actions' ] );
+		}
 		add_action( 'admin_init', [ $this->overview_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->setup_wizard_page, 'handle_actions' ] );
 		add_filter( 'set_screen_option_' . BulkAdminListPreferences::OPTION, [ BulkToolsPage::class, 'filter_screen_option' ], 10, 3 );
@@ -180,6 +184,16 @@ final class AdminMenu {
 				DestinationZonesPage::SLUG,
 				[ $this->destination_zones_page, 'render' ]
 			);
+			if ( $this->location_packs_page instanceof LocationPacksPage ) {
+				add_submenu_page(
+					$parent_slug,
+					__( 'Location Packs', 'cetech-woocommerce-delivery-engine' ),
+					__( 'Location Packs', 'cetech-woocommerce-delivery-engine' ),
+					'manage_delivery_zones',
+					LocationPacksPage::SLUG,
+					[ $this->location_packs_page, 'render' ]
+				);
+			}
 		}
 
 		if ( current_user_can( 'manage_delivery_rate_cards' ) ) {
@@ -319,6 +333,7 @@ final class AdminMenu {
 			'Site-wide Defaults',
 			'Delivery Options',
 			'Delivery Areas',
+			'Location Packs',
 			'Delivery Charges',
 			'Pickup Locations',
 			'Product Exceptions',

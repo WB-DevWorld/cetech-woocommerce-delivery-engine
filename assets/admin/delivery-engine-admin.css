@@ -1150,3 +1150,34 @@
 		clip: rect(0, 0, 0, 0);
 	}
 }
+
+.cetech-de-coverage-builder {
+	margin: 1.5em 0;
+}
+
+.cetech-de-coverage-group {
+	margin: 0 0 1em;
+	padding: 1em;
+	border: 1px solid #dcdcde;
+	background: #fff;
+}
+
+.cetech-de-coverage-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 0.4rem;
+	list-style: none;
+	margin: 0 0 0.75em;
+	padding: 0;
+}
+
+.cetech-de-coverage-chips li {
+	display: inline-flex;
+	align-items: center;
+	gap: 0.25rem;
+	padding: 0.2rem 0.5rem;
+	border: 1px solid #dcdcde;
+	border-radius: 999px;
+	min-height: 2rem;
+}
+

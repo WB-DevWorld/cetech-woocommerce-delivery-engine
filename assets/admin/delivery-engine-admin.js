@@ -498,5 +498,127 @@
 
 	});
 
+	function coverageBuilder() {
+		var root = document.querySelector('[data-cetech-de-coverage-builder]');
+		if (!root || root.getAttribute('data-cetech-de-coverage-bound') === '1') {
+			return;
+		}
+		root.setAttribute('data-cetech-de-coverage-bound', '1');
+		var geo = window.cetechDeGeography || {};
+		var nextIndex = root.querySelectorAll('.cetech-de-coverage-group').length;
+
+		root.addEventListener('click', function (event) {
+			var add = event.target.closest('[data-cetech-de-add-coverage-group]');
+			if (add) {
+				event.preventDefault();
+				var holder = root.querySelector('[data-cetech-de-coverage-groups]');
+				if (!holder) {
+					return;
+				}
+				holder.insertAdjacentHTML('beforeend', coverageGroupTemplate(nextIndex));
+				nextIndex += 1;
+				return;
+			}
+			var clear = event.target.closest('[data-cetech-de-clear-members]');
+			if (clear) {
+				event.preventDefault();
+				var group = clear.closest('.cetech-de-coverage-group');
+				if (group) {
+					var chips = group.querySelector('.cetech-de-coverage-chips');
+					if (chips) {
+						chips.innerHTML = '';
+					}
+				}
+				return;
+			}
+			var remove = event.target.closest('[data-remove-member]');
+			if (remove) {
+				event.preventDefault();
+				var item = remove.closest('li');
+				if (item) {
+					item.remove();
+				}
+			}
+		});
+
+		var searchTimer = null;
+		var searchToken = 0;
+		root.addEventListener('input', function (event) {
+			var input = event.target.closest('[data-cetech-de-locality-search]');
+			if (!input || !geo.ajaxUrl) {
+				return;
+			}
+			window.clearTimeout(searchTimer);
+			searchTimer = window.setTimeout(function () {
+				var token = ++searchToken;
+				var group = input.closest('.cetech-de-coverage-group');
+				var body = new window.URLSearchParams();
+				body.set('action', geo.searchAction);
+				body.set('nonce', geo.searchNonce || '');
+				body.set('q', input.value || '');
+				body.set('request_token', String(token));
+				body.set('country', 'GH');
+				window.fetch(geo.ajaxUrl, {
+					method: 'POST',
+					credentials: 'same-origin',
+					headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+					body: body.toString()
+				}).then(function (response) { return response.json(); }).then(function (payload) {
+					if (token !== searchToken || !group) {
+						return;
+					}
+					var data = payload && payload.data ? payload.data : payload;
+					var items = data && data.items ? data.items : [];
+					var list = group.querySelector('.cetech-de-coverage-chips');
+					if (!list) {
+						return;
+					}
+					items.forEach(function (item) {
+						if (list.querySelector('[value="' + String(item.id) + '"]')) {
+							return;
+						}
+						var li = document.createElement('li');
+						li.textContent = item.name + ' ';
+						var btn = document.createElement('button');
+						btn.type = 'button';
+						btn.className = 'button-link';
+						btn.setAttribute('data-remove-member', String(item.id));
+						btn.textContent = '×';
+						li.appendChild(btn);
+						var hidden = document.createElement('input');
+						hidden.type = 'hidden';
+						var index = Array.prototype.indexOf.call(root.querySelectorAll('.cetech-de-coverage-group'), group);
+						hidden.name = 'coverage_groups[' + index + '][members][]';
+						hidden.value = String(item.id);
+						li.appendChild(hidden);
+						list.appendChild(li);
+					});
+				}).catch(function () { /* keep */ });
+			}, 280);
+		});
+	}
+
+	function coverageGroupTemplate(index) {
+		return '<fieldset class="cetech-de-coverage-group"><legend>Coverage group ' + (index + 1) + '</legend>' +
+			'<p><label>Coverage <select name="coverage_groups[' + index + '][mode]">' +
+			'<option value="entire_area">Entire selected area</option>' +
+			'<option value="selected_descendants" selected>Selected locations</option>' +
+			'<option value="entire_except">Entire selected area except…</option>' +
+			'</select></label></p>' +
+			'<input type="hidden" name="coverage_groups[' + index + '][root_location_id]" value="" />' +
+			'<input type="hidden" name="coverage_groups[' + index + '][root_key]" value="" />' +
+			'<p><label>Localities<br /><input type="search" class="regular-text" data-cetech-de-locality-search placeholder="Search…" /></label></p>' +
+			'<ul class="cetech-de-coverage-chips"></ul>' +
+			'<p><button type="button" class="button" data-cetech-de-select-all>Select all</button> ' +
+			'<button type="button" class="button" data-cetech-de-clear-members>Clear</button></p></fieldset>';
+	}
+
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', coverageBuilder);
+	} else {
+		coverageBuilder();
+	}
+
 })();
+
 
