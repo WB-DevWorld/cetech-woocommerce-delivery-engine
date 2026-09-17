@@ -12,9 +12,9 @@ final class SchemaVersion {
 	public const OPTION_NAME = 'cetech_de_db_version';
 
 	/**
-	 * Target schema version for the current plugin tree (post-RC.6 bulk job engine).
+	 * Target schema version for the current plugin tree (post-RC.11 canonical geography).
 	 */
-	public const TARGET = '5';
+	public const TARGET = '6';
 
 	/**
 	 * Legacy foundation schema version before configuration tables existed.

@@ -134,6 +134,13 @@ $table_suffixes = [
 	'bulk_jobs',
 	'bulk_job_items',
 	'bulk_recipes',
+	'geography_packs',
+	'geography_locations',
+	'geography_location_aliases',
+	'geography_provider_mappings',
+	'destination_coverage_groups',
+	'destination_coverage_members',
+	'destination_coverage_postcodes',
 ];
 
 foreach ( $table_suffixes as $suffix ) {
