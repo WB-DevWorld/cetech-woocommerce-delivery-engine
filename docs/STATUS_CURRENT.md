@@ -1,6 +1,6 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-16 (RC.11 tagged release-candidate closeout).
+Last reconciled: 2026-09-17 (issue #23 canonical geography stream opened on `feat/canonical-geography-coverage`).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
@@ -83,11 +83,20 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - 2026-09-16 issue #18 owner acceptance, integration and post-merge CI completed.
 - 2026-09-16 RC.11 promotion, final package qualification, annotated tag and closeout completed.
 
+## Active post-RC.11 implementation stream
+- Issue `#23` / draft PR `#24` / branch `feat/canonical-geography-coverage`.
+- Identity: `1.0.0-dev.geo.1`; target schema: `6`.
+- Sole owner: `@wbdevworld`. Ben/Emmanuel are not required reviewers for this stream.
+- RC.11 remains the immutable tagged release candidate. This stream is not RC.12 and must not be packaged as `1.0.0-rc.11`.
+- Architecture: `docs/POST-RC11-CANONICAL-GEOGRAPHY-COVERAGE.md`.
+- Historical qualification PR `#12` / `1.0.0-dev.qual.1` is provenance only.
+
 ## Remaining separate work
-1. Production rollout/pilot only if separately and explicitly owner-authorized.
-2. WPML/WCML overlay decision and licensed-dependency certification if included later.
-3. WP Rocket certification when a legitimate package is available.
-4. Any further product/runtime work only under a new explicitly authorized task.
+1. Owner physical QA and acceptance of issue #23 (`1.0.0-dev.geo.1` / schema `6`) before any merge.
+2. Production rollout/pilot only if separately and explicitly owner-authorized.
+3. WPML/WCML overlay decision and licensed-dependency certification if included later.
+4. WP Rocket certification when a legitimate package is available.
+5. Any further product/runtime work only under a new explicitly authorized task. Do not infer RC.12 or Stage 15.
 
 ## Deferred / not started
 - Stage 15 is NOT STARTED.

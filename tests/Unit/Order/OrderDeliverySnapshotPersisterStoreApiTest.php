@@ -384,7 +384,7 @@ final class OrderDeliverySnapshotPersisterStoreApiTest extends TestCase {
 	}
 
 	public function test_schema_target_remains_five(): void {
-		self::assertSame( '5', SchemaVersion::TARGET );
+		self::assertSame( '6', SchemaVersion::TARGET );
 	}
 
 	public function test_two_same_product_lines_with_different_destinations_keep_correct_v2_snapshots(): void {

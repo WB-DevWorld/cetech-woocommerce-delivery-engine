@@ -1,10 +1,11 @@
-# Current Work — Post-RC.11 Baseline
+# Current Work — Post-RC.11 Canonical Geography Stream
 
-Status: RC.11 TAGGED / TEAM BASELINE ACTIVE / NOT DEPLOYED
+Status: ISSUE #23 ACTIVE / SOLE-OWNER IMPLEMENTATION / NOT MERGED / NOT RC.12
 
 ## Canonical repository truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
 - Canonical development branch: protected `master`.
+- Current protected `master`: `72fa354d52b49ffd9cbc32862a6b2e3d7117ea4e`.
 - Current tagged release candidate: `v1.0.0-rc.11`.
 - RC.11 annotated tag object: `acaae9bfc9758cdee1b3f2ec47e94848e83f87da`.
 - RC.11 tag peels to immutable release source: `384f564f64a2db766ae6907392e95fb366fb8533`.
@@ -14,35 +15,46 @@ Status: RC.11 TAGGED / TEAM BASELINE ACTIVE / NOT DEPLOYED
 - Final qualified ZIP SHA-256: `97423a95273f6148ee855d1fb8a66c6c66e47aa20cb2c5868ecf2f84b2a9a521`.
 - Prior RC.10 remains immutable: `v1.0.0-rc.10` → `d1409258caf1a90675b689ab105471460de4c713`.
 - Stage 15: NOT STARTED.
+- RC.12: DOES NOT EXIST and is not implied by this stream.
 
-## RC.11 qualification truth
-- Issue #18 PDP delivery-price correction: owner accepted, integrated, closed completed.
-- RC.11 promotion issue #20: closed completed.
-- RC.11 promotion PR #21 merged to release source `384f564f64a2db766ae6907392e95fb366fb8533`.
-- PR #21 exact-head CI run `35144591865`: PASS on all four required jobs.
-- Protected-master post-merge CI run `35144871814`: PASS on all four required jobs.
-- Final package + WordPress qualification run `35145775218`: PASS.
-- Production package verifier: PASS.
-- Packaged PHP lint: `448 files / 0 failures`.
-- Clean install: `version=1.0.0-rc.11 schema=5 tables=all_tables_ok`.
-- RC.10 → RC.11 upgrade/data retention: `version=1.0.0-rc.11 schema=5 tables=all_tables_ok sentinel=1 option=keep_me`.
+## Active stream — issue #23
+- Issue: `#23 — [POST-RC11] Canonical geography, coverage groups, cascading location UX, and delivery-card redesign`.
+- Draft PR: `#24`.
+- Implementation branch: `feat/canonical-geography-coverage`.
+- Branch created from exact protected master: `72fa354d52b49ffd9cbc32862a6b2e3d7117ea4e`.
+- Architecture baseline commit: `657e1f9481e1cfe974d2d70fe52a8da28b4176f0`.
+- Architecture document: `docs/POST-RC11-CANONICAL-GEOGRAPHY-COVERAGE.md`.
+- Development identity: `1.0.0-dev.geo.1`.
+- Target schema: `6`.
+- Implementation: complete vertical candidate on `feat/canonical-geography-coverage`; not packaged as RC.11; not merged; not self-accepted.
+- Automated gates run locally: Composer validate, non-vendor PHP lint, PHPUnit (1048), Vitest (51), Control Plane OK. GitHub CI pending push of the candidate SHA. Local PHP is 8.5; GitHub CI will run declared PHP 8.1 lint.
+- Do not package this work as `1.0.0-rc.11`.
+- Keep PR #24 Draft. Do not merge. Do not self-accept.
 
-## What RC.11 adds over RC.10
-The accepted issue #18 correction adds authoritative customer-facing delivery prices on location-qualified PDP delivery options while preserving cart/checkout pricing truth. It includes quantity-aware fixed-per-item pricing, fixed-per-shipment behavior, price + configured ETA cards, Delivery/Pickup capability before quoting, no implicit store-country PDP quote, fail-closed unquoted delivery, public-safe pricing payloads, and qualified Storefront/WoodMart/mobile behavior.
+## Ownership
+Sole owner / product / architecture / QA / acceptance authority: `@wbdevworld`.
 
-## Development baseline after release closeout
-- Immutable release anchor: `v1.0.0-rc.11` / `384f564f64a2db766ae6907392e95fb366fb8533`.
-- New development work should branch from the **latest protected `master`**, which may advance beyond the immutable release source through docs-only or later owner-authorized work.
-- Never move/reuse the RC.11 tag or overwrite the qualified ZIP identity.
+Cursor/AI is the owner's implementation, testing, migration, packaging and evidence-collection agent.
+
+Ben (`@Ben-001-sys`) and Emmanuel (`@Emmanuel-coder-prog`) have **no** implementation, review, approval or ownership requirement for issue #23 unless the human owner later delegates something explicitly in this file.
+
+## Central leases
+- plugin bootstrap / version identity: `@wbdevworld` (issue #23 → `1.0.0-dev.geo.1`);
+- schema / migrations: `@wbdevworld` (schema `6`);
+- destination matching / Effective geography contracts: `@wbdevworld`;
+- published release identity/tags: frozen at `v1.0.0-rc.11`;
+- canonical `master`: no force-push/rewrite;
+- PR #12 / `1.0.0-dev.qual.1` remains historical qualification provenance and is **not** the current implementation surface.
 
 ## Environment authorization
-- FLAIROC: no RC.11 deployment authorized.
-- Training site: no RC.11 deployment authorized.
-- Production: no RC.11 deployment authorized.
+- Isolated local QA lab / owner-qa-geo evidence folder: permitted for this stream.
+- FLAIROC: NO autonomous mutation.
+- Training site: NO autonomous mutation.
+- Production: NO autonomous mutation.
 - POS repository: outside scope / must not be touched.
-- WPML/WCML certification remains separate.
-- WP Rocket certification remains separate/unqualified.
-- Stage 15 remains not started.
+- WPML/WCML: do not merge.
+- WP Rocket certification: do not expand.
+- Stage 15: not started.
 
-## Current next work
-No automatic next feature/release stage is authorized by RC.11 finalization. Production rollout/pilot, WPML/WCML certification, WP Rocket certification, Stage 15, or further feature work each require a separate explicit owner decision.
+## Explicit non-actions
+Do not move, rebuild or overwrite RC.11. Do not reuse the RC.11 identity. Do not create RC.12 merely because this implementation succeeds. Do not request Ben/Emmanuel approval.

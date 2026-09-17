@@ -51,6 +51,17 @@ final class MatchingLocationFieldRendererTest extends TestCase {
 		self::assertDoesNotMatchRegularExpression( '/<option value="NG"[^>]*selected/', $html );
 	}
 
+	public function test_progressive_reveal_hides_region_and_locality_until_country(): void {
+		$html = MatchingLocationFieldRenderer::render( null, 'cetech-de-matching', false, true, false );
+
+		self::assertStringContainsString( '<fieldset', $html );
+		self::assertStringContainsString( 'City / Town', $html );
+		self::assertStringContainsString( 'data-cetech-de-reveal="region"', $html );
+		self::assertStringContainsString( 'data-cetech-de-location-key', $html );
+		self::assertMatchesRegularExpression( '/data-cetech-de-reveal="region"[^>]*hidden/', $html );
+		self::assertMatchesRegularExpression( '/data-cetech-de-reveal="locality"[^>]*hidden/', $html );
+	}
+
 	public function test_explicit_country_only_location_is_selected(): void {
 		$this->stub_store_country( 'NG' );
 		$location = MatchingLocation::fromInput( [ 'country' => 'GH' ] );

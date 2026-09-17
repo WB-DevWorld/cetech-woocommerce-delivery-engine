@@ -151,6 +151,7 @@ describe('Product delivery fulfilment switcher', () => {
 		const payload = JSON.parse(document.querySelector('[data-cetech-de-pdp-context]').value);
 		expect(payload.matching_location.city).toBe('Kumasi');
 		expect(payload.matching_location.country).toBe('GH');
+		expect(payload.matching_location.canonical_location_key).toBe('');
 		expect(payload.display_key).toBe('in_warehouse:delivery:10');
 		const extensions = api.storeApiExtensions();
 		expect(extensions.delivery_option_key).toBe('in_warehouse:delivery:10');
@@ -173,8 +174,8 @@ describe('Product delivery fulfilment switcher', () => {
 		const api = loadSelector();
 		expect(api.formatPriceText(
 			{ price_text: 'GHS 25.00', fulfilment_choice: 'delivery' },
-			{ i18n: { free: 'Free' } }
-		)).toBe('GHS 25.00');
+			{ i18n: { free: 'Free', deliveryFee: 'Delivery fee' } }
+		)).toBe('Delivery fee: GHS 25.00');
 		expect(api.formatPriceText(
 			{ fulfilment_choice: 'store_pickup' },
 			{ i18n: { free: 'Free' } }
@@ -183,6 +184,32 @@ describe('Product delivery fulfilment switcher', () => {
 			{ fulfilment_choice: 'delivery' },
 			{ i18n: { free: 'Free' } }
 		)).toBe('');
+	});
+
+	it('renders delivery cards as name, ETA, then labelled fee', () => {
+		const api = loadSelector();
+		const html = api.renderOptionsHtml(
+			[{
+				display_key: 'in_store:delivery:11',
+				fulfilment_choice: 'delivery',
+				delivery_offer_public_label: 'Standard Delivery',
+				estimate_text: '1–3 business days',
+				estimate_line: '1–3 business days',
+				price_text: 'GH₵50.00',
+				is_available: true
+			}],
+			'in_store:delivery:11',
+			{ i18n: { deliveryFee: 'Delivery fee', delivery: 'Delivery', storePickup: 'Store Pickup' } },
+			'Accra',
+			'delivery',
+			{ has_delivery: true, has_pickup: false }
+		);
+		const priceAt = html.indexOf('Delivery fee: GH₵50.00');
+		const etaAt = html.indexOf('1–3 business days');
+		const nameAt = html.indexOf('Standard Delivery');
+		expect(nameAt).toBeGreaterThan(-1);
+		expect(etaAt).toBeGreaterThan(nameAt);
+		expect(priceAt).toBeGreaterThan(etaAt);
 	});
 
 	it('reads quantity from the cart form', () => {
@@ -311,5 +338,43 @@ describe('Product delivery fulfilment switcher', () => {
 		expect(window.__cetechLastBody).toContain('quantity=3');
 		expect(window.__cetechLastBody).not.toContain('country=GH');
 		expect(document.querySelector('[data-cetech-de-status]').textContent).not.toContain('not available');
+	});
+
+	it('progressively reveals region then locality and resets children on ancestor change', () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<fieldset data-cetech-de-selector="1">
+					<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">
+						<p data-cetech-de-field="country"><select name="cetech_de_matching_country"><option value="">Select…</option><option value="GH">Ghana</option></select></p>
+						<p data-cetech-de-reveal="region" hidden><select name="cetech_de_matching_state"><option value="">Select…</option><option value="AA" data-location-key="loc-ga">Greater Accra</option></select></p>
+						<p data-cetech-de-reveal="locality" hidden>
+							<input name="cetech_de_matching_city" value="Accra" />
+							<ul class="cetech-de-locality-results" hidden></ul>
+						</p>
+						<p data-cetech-de-reveal="postcode" hidden><input name="cetech_de_matching_postcode" value="GA-123" /></p>
+						<input type="hidden" name="cetech_de_matching_location_key" data-cetech-de-location-key="1" value="loc-accra" />
+					</div>
+					<div data-cetech-de-options><p>Standard Delivery</p></div>
+					<input type="hidden" data-cetech-de-pdp-context="1" name="cetech_de_pdp_context" value="" />
+				</fieldset>
+			</form>
+		`;
+		window.cetechDeMatchingLocation = { ajaxUrl: '', geography: {} };
+		const api = loadSelector();
+		api.bindAll(document);
+		const country = document.querySelector('[name="cetech_de_matching_country"]');
+		country.value = 'GH';
+		country.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(document.querySelector('[data-cetech-de-reveal="region"]').hidden).toBe(false);
+		expect(document.querySelector('[data-cetech-de-reveal="locality"]').hidden).toBe(true);
+		expect(document.querySelector('[name="cetech_de_matching_city"]').value).toBe('');
+		expect(document.querySelector('[name="cetech_de_matching_location_key"]').value).toBe('');
+		expect(document.querySelector('[data-cetech-de-options]').innerHTML).toBe('');
+
+		const region = document.querySelector('[name="cetech_de_matching_state"]');
+		region.value = 'AA';
+		region.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(document.querySelector('[data-cetech-de-reveal="locality"]').hidden).toBe(false);
+		expect(document.querySelector('[name="cetech_de_matching_postcode"]').value).toBe('');
 	});
 });
