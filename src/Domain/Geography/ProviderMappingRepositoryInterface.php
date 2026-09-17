@@ -8,7 +8,7 @@ use CetechDeliveryEngine\Domain\Enum\GeographyProvider;
 
 interface ProviderMappingRepositoryInterface {
 
-	public function find_location_id( GeographyProvider $provider, string $external_id ): ?int;
+	public function find_location_id( GeographyProvider $provider, string $external_id, string $target_token = '' ): ?int;
 
 	public function find_external_id( int $location_id, GeographyProvider $provider ): ?string;
 
@@ -24,7 +24,8 @@ interface ProviderMappingRepositoryInterface {
 		string $provider_parent_reference = '',
 		string $feature_class = '',
 		string $feature_code = '',
-		array $metadata = []
+		array $metadata = [],
+		string $generation_token = ''
 	): void;
 
 	/**

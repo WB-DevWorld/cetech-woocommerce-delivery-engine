@@ -528,4 +528,78 @@ describe('Product delivery fulfilment switcher', () => {
 		expect(document.querySelector('[name="cetech_de_matching_city"]').value).toBe('Akwatia');
 		expect(document.querySelector('[name="cetech_de_matching_location_key"]').value).toBe('loc-akwatia');
 	});
+
+	it('replaces a Woo text region field with a canonical select when ADM1 children exist', async () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<fieldset data-cetech-de-selector="1">
+					<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">
+						<p data-cetech-de-field="country"><select name="cetech_de_matching_country"><option value="">Select…</option><option value="XX">No Woo States</option></select></p>
+						<p data-cetech-de-reveal="region" hidden>
+							<input name="cetech_de_matching_state" type="text" />
+						</p>
+						<p data-cetech-de-reveal="locality" hidden>
+							<input name="cetech_de_matching_city" />
+							<ul class="cetech-de-locality-results" hidden></ul>
+						</p>
+						<input type="hidden" name="cetech_de_matching_location_key" data-cetech-de-location-key="1" value="" />
+					</div>
+					<div data-cetech-de-options></div>
+				</fieldset>
+			</form>
+		`;
+		window.cetechDeMatchingLocation = {
+			ajaxUrl: '/wp-admin/admin-ajax.php',
+			geography: { childrenAction: 'cetech_de_geography_children', childrenNonce: 'n' }
+		};
+		window.fetch = async () => ({
+			json: async () => ({
+				success: true,
+				data: { items: [{ key: 'loc-xx-adm', name: 'Central District' }], skip_admin: false }
+			})
+		});
+		const api = loadSelector();
+		api.bindAll(document);
+		const country = document.querySelector('[name="cetech_de_matching_country"]');
+		country.value = 'XX';
+		country.dispatchEvent(new Event('change', { bubbles: true }));
+		await expect.poll(() => document.querySelector('[name="cetech_de_matching_state"]')?.tagName || '').toBe('SELECT');
+		expect(document.querySelector('[data-cetech-de-reveal="region"]').hidden).toBe(false);
+		expect(document.querySelector('[name="cetech_de_matching_state"]').options.length).toBeGreaterThan(1);
+	});
+
+	it('skips the administrative step when the country has no ADM1 children', async () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<fieldset data-cetech-de-selector="1">
+					<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">
+						<p data-cetech-de-field="country"><select name="cetech_de_matching_country"><option value="">Select…</option><option value="SG">Singapore</option></select></p>
+						<p data-cetech-de-reveal="region" hidden>
+							<select name="cetech_de_matching_state"><option value="">Select…</option></select>
+						</p>
+						<p data-cetech-de-reveal="locality" hidden>
+							<input name="cetech_de_matching_city" />
+							<ul class="cetech-de-locality-results" hidden></ul>
+						</p>
+						<input type="hidden" name="cetech_de_matching_location_key" data-cetech-de-location-key="1" value="" />
+					</div>
+					<div data-cetech-de-options></div>
+				</fieldset>
+			</form>
+		`;
+		window.cetechDeMatchingLocation = {
+			ajaxUrl: '/wp-admin/admin-ajax.php',
+			geography: { childrenAction: 'cetech_de_geography_children', childrenNonce: 'n' }
+		};
+		window.fetch = async () => ({
+			json: async () => ({ success: true, data: { items: [], skip_admin: true } })
+		});
+		const api = loadSelector();
+		api.bindAll(document);
+		const country = document.querySelector('[name="cetech_de_matching_country"]');
+		country.value = 'SG';
+		country.dispatchEvent(new Event('change', { bubbles: true }));
+		await expect.poll(() => document.querySelector('[data-cetech-de-reveal="locality"]')?.hidden === false).toBe(true);
+		expect(document.querySelector('[data-cetech-de-reveal="region"]').hidden).toBe(true);
+	});
 });

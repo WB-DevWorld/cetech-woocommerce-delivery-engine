@@ -35,6 +35,8 @@ final class FakeWpdb {
 
 	public ?string $fail_next_delete_table = null;
 
+	public ?string $fail_next_update_table = null;
+
 	/** @var array<string, list<array<string, mixed>>>|null */
 	private ?array $transaction_tables = null;
 
@@ -200,6 +202,12 @@ final class FakeWpdb {
 	public function update( string $table, array $data, array $where, $format = null, $where_format = null ) {
 		unset( $format, $where_format );
 		$this->last_error = '';
+		if ( $this->fail_next_update_table === $table ) {
+			$this->fail_next_update_table = null;
+			$this->last_error             = 'Simulated update failure';
+
+			return false;
+		}
 		$updated          = 0;
 
 		foreach ( $this->tables[ $table ] ?? [] as $index => $row ) {

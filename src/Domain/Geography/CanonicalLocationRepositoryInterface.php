@@ -23,7 +23,7 @@ interface CanonicalLocationRepositoryInterface {
 	/**
 	 * Exact normalized name under an optional parent. Never fuzzy.
 	 */
-	public function find_exact_child( string $country_code, ?int $parent_id, string $normalized_name, ?GeographyLocationType $type = null, ?int $include_generation = null ): ?CanonicalLocation;
+	public function find_exact_child( string $country_code, ?int $parent_id, string $normalized_name, ?GeographyLocationType $type = null, ?int $include_generation = null, string $include_token = '' ): ?CanonicalLocation;
 
 	/**
 	 * @return list<CanonicalLocation>
@@ -36,6 +36,11 @@ interface CanonicalLocationRepositoryInterface {
 	 * Count self-excluded descendants (direct and nested) under a parent.
 	 */
 	public function count_descendants( int $parent_id, ?GeographyLocationType $type = null, string $search = '' ): int;
+
+	/**
+	 * Count Active localities in a country, optionally constrained to a parent subtree.
+	 */
+	public function count_localities( string $country_code, ?int $parent_id, string $query = '' ): int;
 
 	/**
 	 * Server-side locality search. Bounded. Exact prefix / contains of normalized names and aliases.
@@ -61,11 +66,12 @@ interface CanonicalLocationRepositoryInterface {
 	public function rebuild_descendant_ancestry( int $root_id, string $old_path, string $new_path, int $limit = 2000 ): int;
 
 	/**
-	 * Activate Inactive rows for a completed pack generation and apply drafts.
+	 * Activate Inactive rows and apply drafts for one immutable staging token.
+	 * Must be transactional. Throws on any persistence failure.
 	 *
 	 * @return int Number of rows promoted.
 	 */
-	public function promote_generation( int $generation ): int;
+	public function promote_generation( string $generation_token ): int;
 
 	/**
 	 * Exact administrative match using type-neutral core names. Null when zero or more than one candidate.

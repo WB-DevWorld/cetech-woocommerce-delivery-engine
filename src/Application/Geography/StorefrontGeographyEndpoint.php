@@ -70,14 +70,7 @@ final class StorefrontGeographyEndpoint {
 			wp_send_json_success( $cached );
 		}
 
-		$items = [];
-		foreach ( $this->locations->list_children( $parent_location->id, $location_type, 200, 0 ) as $child ) {
-			$items[] = $this->customer_item( $child );
-		}
-		$payload = [
-			'items' => $items,
-			'label' => GeographyAdminLabels::administrative_area_label( $country ),
-		];
+		$payload = $this->children_result_for( $parent_location, $country, $location_type );
 		$this->cache_set( $cache_key, $payload );
 
 		wp_send_json_success( $payload );
@@ -121,9 +114,7 @@ final class StorefrontGeographyEndpoint {
 		foreach ( $this->locations->search_localities( $country, $parent_id, $query, $limit, ( $page - 1 ) * $limit ) as $location ) {
 			$items[] = $this->customer_item( $location );
 		}
-		$total = null !== $parent_id
-			? $this->locations->count_descendants( $parent_id, GeographyLocationType::Locality, $query )
-			: count( $items );
+		$total = $this->locations->count_localities( $country, $parent_id, $query );
 
 		$payload = [
 			'items'         => $items,
@@ -190,6 +181,45 @@ final class StorefrontGeographyEndpoint {
 	}
 
 	/**
+	 * Canonical administrative children for a country or parent, independent of Woo SELECT vs text.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function children_result( string $country, string $parent = '', string $type = '' ): array {
+		$country       = strtoupper( trim( $country ) );
+		$location_type = GeographyLocationType::tryFrom( $type ) ?? GeographyLocationType::Administrative;
+		$parent        = trim( $parent );
+		$parent_location = '' !== $parent
+			? $this->resolver->require_valid_key( $parent, $country )
+			: $this->locations->find_country( $country );
+		if ( null === $parent_location ) {
+			return [
+				'items'      => [],
+				'label'      => GeographyAdminLabels::administrative_area_label( $country ),
+				'skip_admin' => GeographyLocationType::Administrative === $location_type,
+			];
+		}
+
+		return $this->children_result_for( $parent_location, $country, $location_type );
+	}
+
+	/**
+	 * @return array<string, mixed>
+	 */
+	private function children_result_for( \CetechDeliveryEngine\Domain\Geography\CanonicalLocation $parent_location, string $country, GeographyLocationType $location_type ): array {
+		$items = [];
+		foreach ( $this->locations->list_children( $parent_location->id, $location_type, 200, 0 ) as $child ) {
+			$items[] = $this->customer_item( $child );
+		}
+
+		return [
+			'items'      => $items,
+			'label'      => GeographyAdminLabels::administrative_area_label( $country ),
+			'skip_admin' => GeographyLocationType::Administrative === $location_type && [] === $items,
+		];
+	}
+
+	/**
 	 * @return array<string, mixed>
 	 */
 	public function search_result( string $country, string $parent, string $query, int $page = 1, string $token = '' ): array {
@@ -213,9 +243,7 @@ final class StorefrontGeographyEndpoint {
 		foreach ( $this->locations->search_localities( $country, $parent_id, $query, $limit, ( $page - 1 ) * $limit ) as $location ) {
 			$items[] = $this->customer_item( $location );
 		}
-		$total = null !== $parent_id
-			? $this->locations->count_descendants( $parent_id, GeographyLocationType::Locality, $query )
-			: count( $items );
+		$total = $this->locations->count_localities( $country, $parent_id, $query );
 
 		return [
 			'items'         => $items,

@@ -85,17 +85,18 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 
 ## Active post-RC.11 implementation stream
 - Issue `#23` / draft PR `#24` / branch `feat/canonical-geography-coverage`.
-- Identity: `1.0.0-dev.geo.4`; target schema: `6`.
+- Identity: `1.0.0-dev.geo.5`; target schema: `6`.
 - Rejected technical-review candidate: `1.0.0-dev.geo.1` / `606730e2535896cb18e415b14d62bbb57d050578` — do not send to physical QA.
 - Rejected technical-review candidate: `1.0.0-dev.geo.2` / `a52e2aafc97274b74ec14f8b451395b73c9541af` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.2.zip`, SHA-256 `6bde464b249ee6f17831e00d39110c8b10f89f441db3e1b453622a5d95f6b4a5`. Do not physically QA geo.2.
 - Rejected technical-review candidate: `1.0.0-dev.geo.3` / `fdff226cbe6837a3ac508bc6677c8e56771ec229` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.3.zip`, SHA-256 `1c1af4dcfbc6767402b6e7dfacde9a87270ac5ccb8a950788e130c9d130b49b8`. Do not physically QA geo.3.
+- Rejected technical-review candidate: `1.0.0-dev.geo.4` / `48f6a39436bc2464d4e2cfdb47221c7c59542706` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.4.zip`, SHA-256 `775ff1b7f31fdffb3ea246f1642693f86dd3e01fd0cb99c729add4831e535456`. Do not physically QA geo.4.
 - Sole owner: `@wbdevworld`. Ben/Emmanuel are not required reviewers for this stream.
 - RC.11 remains the immutable tagged release candidate. This stream is not RC.12 and must not be packaged as `1.0.0-rc.11`.
 - Architecture: `docs/POST-RC11-CANONICAL-GEOGRAPHY-COVERAGE.md`.
 - Historical qualification PR `#12` / `1.0.0-dev.qual.1` is provenance only.
 
 ## Remaining separate work
-1. Owner independent review then physical QA of issue #23 (`1.0.0-dev.geo.4` / schema `6`) before any merge.
+1. Owner independent review then physical QA of issue #23 (`1.0.0-dev.geo.5` / schema `6`) before any merge.
 2. Production rollout/pilot only if separately and explicitly owner-authorized.
 3. WPML/WCML overlay decision and licensed-dependency certification if included later.
 4. WP Rocket certification when a legitimate package is available.

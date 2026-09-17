@@ -213,12 +213,17 @@ final class GeoNamesPackImporterTest extends TestCase {
 		$id = $geo->locations->find_location_id( GeographyProvider::GeoNames, '88' );
 		self::assertNotNull( $id );
 		$before = $geo->locations->find_by_id( $id );
-		file_put_contents( $file, $this->row( '88', 'New Town', 'New Town', 'P', 'PPL', '01', '', '', '' ) . "\n" );
+		file_put_contents( $file, $this->row( '88', 'New Town', 'New Town', 'P', 'PPL', '01', '', 'Old Town,Accra Town', '' ) . "\n" );
+		$pack = $packs->find_by_id( $pack->id );
+		self::assertNotNull( $pack );
+		self::assertSame( GeographyPackStatus::Ready, $pack->status );
 		$pack = $importer->begin_dataset( $pack, $file, 'bbb', '2' );
+		self::assertSame( 'Old Town', $geo->locations->find_by_id( $id )?->canonical_name );
 		$guard = 0;
 		$result = [ 'status' => '' ];
 		while ( GeographyPackStatus::Ready->value !== ( $result['status'] ?? '' ) && $guard < 30 ) {
 			$pack   = $packs->find_by_id( $pack->id );
+			self::assertSame( 'Old Town', $geo->locations->find_by_id( $id )?->canonical_name );
 			$result = $importer->import_batch( $pack, $file, 20 );
 			++$guard;
 		}
@@ -227,6 +232,7 @@ final class GeoNamesPackImporterTest extends TestCase {
 		self::assertSame( $before?->location_key, $after?->location_key );
 		self::assertSame( 'New Town', $after?->canonical_name );
 		self::assertContains( 'Old Town', $geo->locations->list_for_location( $id ) );
+		self::assertContains( 'Accra Town', $geo->locations->list_for_location( $id ) );
 
 		unlink( $file );
 	}

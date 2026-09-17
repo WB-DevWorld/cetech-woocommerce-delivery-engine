@@ -73,9 +73,7 @@ final class AdminGeographyEndpoint {
 
 		$parent_id = $parent_location?->id;
 		$limit     = $select_all ? CoverageConfigurationValidator::SELECT_ALL_LIMIT : 25;
-		$total     = null !== $parent_id
-			? $this->locations->count_descendants( $parent_id, GeographyLocationType::Locality, $query )
-			: 0;
+		$total     = $this->locations->count_localities( $country, $parent_id, $query );
 
 		if ( $select_all && $total > CoverageConfigurationValidator::SELECT_ALL_LIMIT ) {
 			wp_send_json_success(
@@ -108,7 +106,7 @@ final class AdminGeographyEndpoint {
 				'items'         => $items,
 				'page'          => $page,
 				'request_token' => $token,
-				'total'         => $total > 0 ? $total : count( $items ),
+				'total'         => $total,
 				'has_more'      => ( $page * $limit ) < $total,
 				'label'         => GeographyAdminLabels::administrative_area_label( $country ),
 			]

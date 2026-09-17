@@ -19,11 +19,11 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	/** @var array<int, CanonicalLocation> */
 	private array $locations = [];
 
-	/** @var array<int, list<array{alias:string,normalized:string}>> */
+	/** @var array<int, list<array{alias:string,normalized:string,type:string,generation_token:string,status:string}>> */
 	private array $aliases = [];
 
-	/** @var array<string, int> */
-	private array $mappings = [];
+	/** @var array<string, array{location_id:int, generation_token:string, pack_id:?int, dataset_version:string}> */
+	private array $mapping_rows = [];
 
 	/** @var array<string, string> */
 	private array $external_by_location = [];
@@ -100,12 +100,13 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		return null;
 	}
 
-	public function find_exact_child( string $country_code, ?int $parent_id, string $normalized_name, ?GeographyLocationType $type = null, ?int $include_generation = null ): ?CanonicalLocation {
+	public function find_exact_child( string $country_code, ?int $parent_id, string $normalized_name, ?GeographyLocationType $type = null, ?int $include_generation = null, string $include_token = '' ): ?CanonicalLocation {
 		$country_code    = strtoupper( trim( $country_code ) );
 		$normalized_name = GeographyNameNormalizer::normalize( $normalized_name );
 		foreach ( $this->locations as $location ) {
 			$visible = $location->isActive()
-				|| ( null !== $include_generation && $include_generation > 0 && $location->generation === $include_generation );
+				|| ( '' !== $include_token && $location->generation_token === $include_token )
+				|| ( null !== $include_generation && $include_generation > 0 && $location->generation === $include_generation && ( '' === $include_token || $location->generation_token === $include_token ) );
 			if ( ! $visible || $location->country_code !== $country_code || $location->normalized_name !== $normalized_name ) {
 				continue;
 			}
@@ -183,6 +184,10 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		return $count;
 	}
 
+	public function count_localities( string $country_code, ?int $parent_id, string $query = '' ): int {
+		return count( $this->search_localities( $country_code, $parent_id, $query, 100000, 0 ) );
+	}
+
 	public function search_localities( string $country_code, ?int $parent_id, string $query, int $limit = 25, int $offset = 0 ): array {
 		$country_code = strtoupper( trim( $country_code ) );
 		$query        = GeographyNameNormalizer::normalize( $query );
@@ -248,7 +253,8 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			$location->status,
 			$path,
 			$location->generation,
-			$location->draft_json
+			$location->draft_json,
+			$location->generation_token
 		);
 		$this->locations[ $id ] = $saved;
 
@@ -273,7 +279,8 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 				$existing->status,
 				$path,
 				$existing->generation,
-				$existing->draft_json
+				$existing->draft_json,
+				$existing->generation_token
 			);
 		}
 	}
@@ -296,72 +303,175 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		return $updated;
 	}
 
-	public function promote_generation( int $generation ): int {
-		if ( $generation <= 0 ) {
-			return 0;
+	public function promote_generation( string $generation_token ): int {
+		$generation_token = trim( $generation_token );
+		if ( '' === $generation_token ) {
+			throw new \RuntimeException( 'Promotion requires a generation token.' );
 		}
 
-		$activated = 0;
-		foreach ( $this->locations as $location ) {
-			$draft = '' !== $location->draft_json ? json_decode( $location->draft_json, true ) : null;
-			if ( is_array( $draft ) && (int) ( $draft['generation'] ?? 0 ) === $generation ) {
-				$name   = trim( (string) ( $draft['canonical_name'] ?? $location->canonical_name ) );
-				$parent = isset( $draft['parent_location_id'] ) ? (int) $draft['parent_location_id'] : $location->parent_location_id;
-				$old    = $location->ancestry_path;
-				$saved  = $this->save(
-					new CanonicalLocation(
+		$snapshot_locations = $this->locations;
+		$snapshot_aliases   = $this->aliases;
+		$snapshot_mappings  = $this->mapping_rows;
+		$snapshot_external  = $this->external_by_location;
+
+		try {
+			$activated = 0;
+			foreach ( $this->locations as $location ) {
+				$draft = '' !== $location->draft_json ? json_decode( $location->draft_json, true ) : null;
+				if ( is_array( $draft ) && (string) ( $draft['generation_token'] ?? '' ) === $generation_token ) {
+					$this->apply_draft_in_memory( $location, $draft );
+					$location = $this->locations[ $location->id ] ?? $location;
+				}
+				if ( $location->generation_token === $generation_token && RecordStatus::Inactive === $location->status ) {
+					$this->locations[ $location->id ] = new CanonicalLocation(
 						$location->id,
 						$location->location_key,
 						$location->country_code,
-						( $parent ?? 0 ) > 0 ? $parent : null,
+						$location->parent_location_id,
 						$location->location_type,
 						$location->administrative_level,
-						'' !== $name ? $name : $location->canonical_name,
-						GeographyNameNormalizer::normalize( '' !== $name ? $name : $location->canonical_name ),
-						(string) ( $draft['ascii_name'] ?? $location->ascii_name ),
-						isset( $draft['latitude'] ) ? (float) $draft['latitude'] : $location->latitude,
-						isset( $draft['longitude'] ) ? (float) $draft['longitude'] : $location->longitude,
-						$location->status,
+						$location->canonical_name,
+						$location->normalized_name,
+						$location->ascii_name,
+						$location->latitude,
+						$location->longitude,
+						RecordStatus::Active,
 						$location->ancestry_path,
 						$location->generation,
-						''
-					)
-				);
-				if ( ( $parent ?? 0 ) > 0 && $parent !== $location->parent_location_id ) {
-					$parent_loc = $this->locations[ (int) $parent ] ?? null;
-					if ( $parent_loc instanceof CanonicalLocation ) {
-						$new_path = LocationAncestry::append_path( $parent_loc->ancestry_path, $location->id );
-						$this->update_ancestry_path( $location->id, $new_path );
-						if ( '' !== $old && $old !== $new_path ) {
-							$this->rebuild_descendant_ancestry( $location->id, $old, $new_path );
-						}
-					}
+						'',
+						$generation_token
+					);
+					++$activated;
 				}
-				$location = $this->locations[ $location->id ] ?? $saved;
 			}
-			if ( $location->generation === $generation && RecordStatus::Inactive === $location->status ) {
-				$this->locations[ $location->id ] = new CanonicalLocation(
-					$location->id,
-					$location->location_key,
-					$location->country_code,
-					$location->parent_location_id,
-					$location->location_type,
-					$location->administrative_level,
-					$location->canonical_name,
-					$location->normalized_name,
-					$location->ascii_name,
-					$location->latitude,
-					$location->longitude,
-					RecordStatus::Active,
-					$location->ancestry_path,
-					$location->generation,
-					''
-				);
-				++$activated;
+			$this->activate_staged_mappings( $generation_token );
+
+			return $activated;
+		} catch ( \Throwable $e ) {
+			$this->locations             = $snapshot_locations;
+			$this->aliases               = $snapshot_aliases;
+			$this->mapping_rows          = $snapshot_mappings;
+			$this->external_by_location  = $snapshot_external;
+			throw $e;
+		}
+	}
+
+	/**
+	 * @param array<string, mixed> $draft
+	 */
+	private function apply_draft_in_memory( CanonicalLocation $location, array $draft ): void {
+		$name   = trim( (string) ( $draft['canonical_name'] ?? $location->canonical_name ) );
+		$parent = isset( $draft['parent_location_id'] ) ? (int) $draft['parent_location_id'] : $location->parent_location_id;
+		$old    = $location->ancestry_path;
+		$this->save(
+			new CanonicalLocation(
+				$location->id,
+				$location->location_key,
+				$location->country_code,
+				( $parent ?? 0 ) > 0 ? $parent : null,
+				$location->location_type,
+				$location->administrative_level,
+				'' !== $name ? $name : $location->canonical_name,
+				GeographyNameNormalizer::normalize( '' !== $name ? $name : $location->canonical_name ),
+				(string) ( $draft['ascii_name'] ?? $location->ascii_name ),
+				isset( $draft['latitude'] ) ? (float) $draft['latitude'] : $location->latitude,
+				isset( $draft['longitude'] ) ? (float) $draft['longitude'] : $location->longitude,
+				$location->status,
+				$location->ancestry_path,
+				$location->generation,
+				'',
+				$location->generation_token
+			)
+		);
+		$former = trim( (string) ( $draft['former_name'] ?? '' ) );
+		if ( '' !== $former ) {
+			$this->add_alias( $location->id, $former, GeographyNameNormalizer::normalize( $former ), '', 'former_name', false );
+		}
+		foreach ( $draft['aliases'] ?? [] as $alias_row ) {
+			if ( ! is_array( $alias_row ) ) {
+				continue;
+			}
+			$alias = trim( (string) ( $alias_row['alias'] ?? '' ) );
+			$norm  = trim( (string) ( $alias_row['normalized'] ?? GeographyNameNormalizer::normalize( $alias ) ) );
+			if ( '' === $alias || '' === $norm ) {
+				continue;
+			}
+			$this->add_alias( $location->id, $alias, $norm, '', (string) ( $alias_row['type'] ?? 'alternate' ), false );
+		}
+		foreach ( $draft['mappings'] ?? [] as $mapping ) {
+			if ( ! is_array( $mapping ) ) {
+				continue;
+			}
+			$provider = GeographyProvider::tryFrom( (string) ( $mapping['provider'] ?? '' ) );
+			$external = trim( (string) ( $mapping['external_id'] ?? '' ) );
+			if ( ! $provider instanceof GeographyProvider || '' === $external ) {
+				continue;
+			}
+			$this->upsert(
+				$location->id,
+				$provider,
+				$external,
+				isset( $mapping['pack_id'] ) ? (int) $mapping['pack_id'] : null,
+				(string) ( $mapping['dataset_version'] ?? '' ),
+				(string) ( $mapping['provider_parent_reference'] ?? '' ),
+				(string) ( $mapping['feature_class'] ?? '' ),
+				(string) ( $mapping['feature_code'] ?? '' ),
+				is_array( $mapping['metadata'] ?? null ) ? $mapping['metadata'] : [],
+				''
+			);
+		}
+		if ( ( $parent ?? 0 ) > 0 && $parent !== $location->parent_location_id ) {
+			$parent_loc = $this->locations[ (int) $parent ] ?? null;
+			if ( $parent_loc instanceof CanonicalLocation ) {
+				$new_path = LocationAncestry::append_path( $parent_loc->ancestry_path, $location->id );
+				$this->update_ancestry_path( $location->id, $new_path );
+				if ( '' !== $old && $old !== $new_path ) {
+					$this->rebuild_descendant_ancestry( $location->id, $old, $new_path );
+				}
 			}
 		}
+	}
 
-		return $activated;
+	private function activate_staged_mappings( string $generation_token ): void {
+		foreach ( $this->mapping_rows as $key => $row ) {
+			if ( $row['generation_token'] !== $generation_token ) {
+				continue;
+			}
+			$live_key = $this->mapping_key( explode( ':', $key )[0] ?? '', $this->external_from_mapping_key( $key ), '' );
+			unset( $live_key );
+			$provider_external = $this->provider_external_from_key( $key );
+			$live              = $this->mapping_key( $provider_external['provider'], $provider_external['external_id'], '' );
+			$this->mapping_rows[ $live ] = [
+				'location_id'      => $row['location_id'],
+				'generation_token' => '',
+				'pack_id'          => $row['pack_id'],
+				'dataset_version'  => $row['dataset_version'],
+			];
+			$this->external_by_location[ $row['location_id'] . ':' . $provider_external['provider'] ] = $provider_external['external_id'];
+			if ( $key !== $live ) {
+				unset( $this->mapping_rows[ $key ] );
+			}
+		}
+	}
+
+	private function mapping_key( string $provider, string $external_id, string $token ): string {
+		return $provider . "\0" . $external_id . "\0" . $token;
+	}
+
+	/**
+	 * @return array{provider:string,external_id:string}
+	 */
+	private function provider_external_from_key( string $key ): array {
+		$parts = explode( "\0", $key );
+
+		return [
+			'provider'    => (string) ( $parts[0] ?? '' ),
+			'external_id' => (string) ( $parts[1] ?? '' ),
+		];
+	}
+
+	private function external_from_mapping_key( string $key ): string {
+		return $this->provider_external_from_key( $key )['external_id'];
 	}
 
 	public function find_unique_administrative_core( string $country_code, int $parent_id, string $name, ?int $level = null ): ?CanonicalLocation {
@@ -409,6 +519,9 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 
 	private function alias_contains( int $location_id, string $query ): bool {
 		foreach ( $this->aliases[ $location_id ] ?? [] as $alias ) {
+			if ( RecordStatus::Active->value !== ( $alias['status'] ?? RecordStatus::Active->value ) ) {
+				continue;
+			}
 			if ( str_starts_with( $alias['normalized'], $query ) ) {
 				return true;
 			}
@@ -421,6 +534,9 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		foreach ( $this->aliases as $location_id => $list ) {
 			foreach ( $list as $alias ) {
 				if ( $alias['normalized'] !== $normalized_alias ) {
+					continue;
+				}
+				if ( RecordStatus::Active->value !== ( $alias['status'] ?? RecordStatus::Active->value ) ) {
 					continue;
 				}
 				$location = $this->locations[ $location_id ] ?? null;
@@ -439,23 +555,46 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	}
 
 	public function list_for_location( int $location_id ): array {
-		return array_map( static fn ( array $row ): string => $row['alias'], $this->aliases[ $location_id ] ?? [] );
+		$out = [];
+		foreach ( $this->aliases[ $location_id ] ?? [] as $row ) {
+			if ( RecordStatus::Active->value !== ( $row['status'] ?? RecordStatus::Active->value ) ) {
+				continue;
+			}
+			$out[] = $row['alias'];
+		}
+
+		return $out;
 	}
 
-	public function add_alias( int $location_id, string $alias, string $normalized_alias, string $language_code = '', string $alias_type = 'alternate', bool $preferred = false ): void {
+	public function add_alias( int $location_id, string $alias, string $normalized_alias, string $language_code = '', string $alias_type = 'alternate', bool $preferred = false, string $generation_token = '' ): void {
+		unset( $language_code, $preferred );
 		foreach ( $this->aliases[ $location_id ] ?? [] as $existing ) {
 			if ( $existing['normalized'] === $normalized_alias ) {
 				return;
 			}
 		}
 		$this->aliases[ $location_id ][] = [
-			'alias'      => $alias,
-			'normalized' => $normalized_alias,
+			'alias'            => $alias,
+			'normalized'       => $normalized_alias,
+			'type'             => $alias_type,
+			'generation_token' => $generation_token,
+			'status'           => RecordStatus::Active->value,
 		];
 	}
 
-	public function find_location_id( GeographyProvider $provider, string $external_id ): ?int {
-		return $this->mappings[ $provider->value . ':' . $external_id ] ?? null;
+	public function find_location_id( GeographyProvider $provider, string $external_id, string $target_token = '' ): ?int {
+		$live = $this->mapping_rows[ $this->mapping_key( $provider->value, $external_id, '' ) ] ?? null;
+		if ( is_array( $live ) ) {
+			return $live['location_id'];
+		}
+		if ( '' !== $target_token ) {
+			$staged = $this->mapping_rows[ $this->mapping_key( $provider->value, $external_id, $target_token ) ] ?? null;
+			if ( is_array( $staged ) ) {
+				return $staged['location_id'];
+			}
+		}
+
+		return null;
 	}
 
 	public function find_external_id( int $location_id, GeographyProvider $provider ): ?string {
@@ -471,10 +610,20 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		string $provider_parent_reference = '',
 		string $feature_class = '',
 		string $feature_code = '',
-		array $metadata = []
+		array $metadata = [],
+		string $generation_token = ''
 	): void {
-		$this->mappings[ $provider->value . ':' . $external_id ] = $location_id;
-		$this->external_by_location[ $location_id . ':' . $provider->value ] = $external_id;
+		unset( $provider_parent_reference, $feature_class, $feature_code, $metadata );
+		$key = $this->mapping_key( $provider->value, $external_id, $generation_token );
+		$this->mapping_rows[ $key ] = [
+			'location_id'      => $location_id,
+			'generation_token' => $generation_token,
+			'pack_id'          => $pack_id,
+			'dataset_version'  => $dataset_version,
+		];
+		if ( '' === $generation_token ) {
+			$this->external_by_location[ $location_id . ':' . $provider->value ] = $external_id;
+		}
 	}
 
 	public function find_mapping( GeographyProvider $provider, string $external_id ): ?array {

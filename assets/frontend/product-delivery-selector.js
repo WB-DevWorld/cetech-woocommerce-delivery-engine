@@ -537,8 +537,13 @@
 			clearField(locationRoot, 'cetech_de_matching_postcode');
 			clearField(locationRoot, 'cetech_de_matching_location_key');
 			var country = countryField();
-			setReveal(locationRoot, 'region', !!(country && country.value));
-			setReveal(locationRoot, 'locality', false);
+			if (config.ajaxUrl && geo.childrenAction && country && country.value) {
+				setReveal(locationRoot, 'region', false);
+				setReveal(locationRoot, 'locality', false);
+			} else {
+				setReveal(locationRoot, 'region', !!(country && country.value));
+				setReveal(locationRoot, 'locality', false);
+			}
 			setReveal(locationRoot, 'postcode', false);
 			clearOptions();
 			loadChildren('administrative', '');
@@ -553,6 +558,27 @@
 			setReveal(locationRoot, 'postcode', false);
 			clearOptions();
 			refreshPostcode();
+		}
+
+		function ensureRegionSelect() {
+			var current = regionField();
+			if (current && current.tagName === 'SELECT') {
+				return current;
+			}
+			var wrap = locationRoot.querySelector('[data-cetech-de-field="region"], [data-cetech-de-reveal="region"]');
+			if (!wrap) {
+				return current;
+			}
+			var select = document.createElement('select');
+			select.name = 'cetech_de_matching_state';
+			select.setAttribute('autocomplete', 'address-level1');
+			if (current && current.parentNode) {
+				current.parentNode.replaceChild(select, current);
+			} else {
+				wrap.appendChild(select);
+			}
+			select.addEventListener('change', onRegionChange);
+			return select;
 		}
 
 		function loadChildren(type, parentKey) {
@@ -577,10 +603,22 @@
 				if (data && data.label) {
 					applyRegionLabel(locationRoot, data.label);
 				}
-				var region = regionField();
-				if (!region || region.tagName !== 'SELECT' || type !== 'administrative') {
+				if (type !== 'administrative') {
 					return;
 				}
+				if (!items.length || data.skip_admin) {
+					setReveal(locationRoot, 'region', false);
+					setReveal(locationRoot, 'locality', true);
+					return;
+				}
+				var region = ensureRegionSelect();
+				if (!region || region.tagName !== 'SELECT') {
+					setReveal(locationRoot, 'region', false);
+					setReveal(locationRoot, 'locality', true);
+					return;
+				}
+				setReveal(locationRoot, 'region', true);
+				setReveal(locationRoot, 'locality', false);
 				var current = region.value;
 				region.innerHTML = '<option value="">' + escapeHtml('Select…') + '</option>';
 				items.forEach(function (item) {

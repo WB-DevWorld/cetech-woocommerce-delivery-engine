@@ -29,7 +29,8 @@ final class CanonicalLocation {
 		public readonly RecordStatus $status,
 		public readonly string $ancestry_path,
 		public readonly int $generation = 0,
-		public readonly string $draft_json = ''
+		public readonly string $draft_json = '',
+		public readonly string $generation_token = ''
 	) {
 	}
 
@@ -105,7 +106,8 @@ final class CanonicalLocation {
 			$status,
 			(string) ( $row['ancestry_path'] ?? '' ),
 			(int) ( $row['generation'] ?? 0 ),
-			(string) ( $row['draft_json'] ?? '' )
+			(string) ( $row['draft_json'] ?? '' ),
+			(string) ( $row['generation_token'] ?? '' )
 		);
 	}
 }
