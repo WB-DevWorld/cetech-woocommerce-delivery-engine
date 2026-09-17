@@ -326,23 +326,25 @@ final class Plugin {
 		);
 		add_action(
 			GeographyPackService::HOOK,
-			function ( $pack_id = 0, $source_path = '' ): void {
-				$path = is_array( $pack_id ) ? (string) ( $pack_id['source_path'] ?? '' ) : (string) $source_path;
-				$id   = is_array( $pack_id ) ? (int) ( $pack_id['pack_id'] ?? 0 ) : (int) $pack_id;
-				$this->container->get( GeographyPackService::class )->tick( $id, $path, 200 );
+			function ( $pack_id = 0, $source_path = '', $generation_token = '' ): void {
+				$path  = is_array( $pack_id ) ? (string) ( $pack_id['source_path'] ?? '' ) : (string) $source_path;
+				$id    = is_array( $pack_id ) ? (int) ( $pack_id['pack_id'] ?? 0 ) : (int) $pack_id;
+				$token = is_array( $pack_id ) ? (string) ( $pack_id['generation_token'] ?? '' ) : (string) $generation_token;
+				$this->container->get( GeographyPackService::class )->tick( $id, $path, 200, $token );
 			},
 			10,
-			2
+			3
 		);
 		add_action(
 			GeographyPackService::DOWNLOAD_HOOK,
-			function ( $pack_id = 0, $country_code = '' ): void {
+			function ( $pack_id = 0, $country_code = '', $generation_token = '' ): void {
 				$id      = is_array( $pack_id ) ? (int) ( $pack_id['pack_id'] ?? 0 ) : (int) $pack_id;
 				$country = is_array( $pack_id ) ? (string) ( $pack_id['country_code'] ?? '' ) : (string) $country_code;
-				$this->container->get( GeographyPackService::class )->download_tick( $id, $country );
+				$token   = is_array( $pack_id ) ? (string) ( $pack_id['generation_token'] ?? '' ) : (string) $generation_token;
+				$this->container->get( GeographyPackService::class )->download_tick( $id, $country, $token );
 			},
 			10,
-			2
+			3
 		);
 
 		if ( ! $requirements->is_woocommerce_active() ) {
@@ -706,7 +708,8 @@ final class Plugin {
 				$container->get( RateCardRepositoryInterface::class ),
 				$container->get( ProductDeliveryRuleRepositoryInterface::class ),
 				$container->get( ProductTargetResolver::class ),
-				$container->get( FeatureFlags::class )
+				$container->get( FeatureFlags::class ),
+				$container->get( CoverageGroupRepositoryInterface::class )
 			)
 		);
 
@@ -1265,7 +1268,8 @@ final class Plugin {
 			LocationPacksPage::class,
 			static fn ( ServiceContainer $container ): LocationPacksPage => new LocationPacksPage(
 				$container->get( GeographyPackService::class ),
-				$container->get( AdminActionHandler::class )
+				$container->get( AdminActionHandler::class ),
+				$container->get( Schema6CoverageUpgradeService::class )
 			)
 		);
 

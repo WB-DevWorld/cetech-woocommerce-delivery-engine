@@ -152,10 +152,14 @@ final class StorefrontGeographyEndpoint {
 	 * @return array{key:string,name:string,type:string,code?:string}
 	 */
 	public function customer_item( \CetechDeliveryEngine\Domain\Geography\CanonicalLocation $location ): array {
-		$item = [
-			'key'  => $location->location_key,
-			'name' => $location->canonical_name,
-			'type' => $location->location_type->value,
+		$breadcrumb = $this->locations->display_breadcrumb( $location );
+		$label      = '' !== $breadcrumb ? $location->canonical_name . ' — ' . $breadcrumb : $location->canonical_name;
+		$item       = [
+			'key'        => $location->location_key,
+			'name'       => $location->canonical_name,
+			'type'       => $location->location_type->value,
+			'label'      => $label,
+			'breadcrumb' => $breadcrumb,
 		];
 		$code = $this->public_woo_code( $location );
 		if ( '' !== $code ) {

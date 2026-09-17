@@ -23,7 +23,7 @@ interface CanonicalLocationRepositoryInterface {
 	/**
 	 * Exact normalized name under an optional parent. Never fuzzy.
 	 */
-	public function find_exact_child( string $country_code, ?int $parent_id, string $normalized_name, ?GeographyLocationType $type = null ): ?CanonicalLocation;
+	public function find_exact_child( string $country_code, ?int $parent_id, string $normalized_name, ?GeographyLocationType $type = null, ?int $include_generation = null ): ?CanonicalLocation;
 
 	/**
 	 * @return list<CanonicalLocation>
@@ -59,4 +59,21 @@ interface CanonicalLocationRepositoryInterface {
 	 * @return int Number of descendant rows updated (excluding $root_id).
 	 */
 	public function rebuild_descendant_ancestry( int $root_id, string $old_path, string $new_path, int $limit = 2000 ): int;
+
+	/**
+	 * Activate Inactive rows for a completed pack generation and apply drafts.
+	 *
+	 * @return int Number of rows promoted.
+	 */
+	public function promote_generation( int $generation ): int;
+
+	/**
+	 * Exact administrative match using type-neutral core names. Null when zero or more than one candidate.
+	 */
+	public function find_unique_administrative_core( string $country_code, int $parent_id, string $name, ?int $level = null ): ?CanonicalLocation;
+
+	/**
+	 * Customer-safe breadcrumb excluding the country name.
+	 */
+	public function display_breadcrumb( CanonicalLocation $location ): string;
 }

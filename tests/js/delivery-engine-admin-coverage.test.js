@@ -255,4 +255,101 @@ describe('Admin coverage builder', () => {
 		expect(tokens[1]).toBe('1');
 		vi.useRealTimers();
 	});
+
+	it('applies the server administrative label after country change', async () => {
+		window.fetch = vi.fn(() =>
+			jsonResponse({
+				items: [{ id: 2, key: 'loc-ga', name: 'Greater Accra' }],
+				label: 'Region',
+				request_token: '1'
+			})
+		);
+		document.body.innerHTML = `
+			<div data-cetech-de-coverage-builder data-countries='{"GH":"Ghana","US":"United States"}'>
+				<fieldset class="cetech-de-coverage-group">
+					<select data-cetech-de-coverage-country>
+						<option value="">Select…</option>
+						<option value="GH">Ghana</option>
+						<option value="US">United States</option>
+					</select>
+					<div data-cetech-de-admin-browser>
+						<p><label>Administrative area<br /><select data-cetech-de-coverage-root><option value="">Select…</option></select></label></p>
+					</div>
+				</fieldset>
+			</div>
+		`;
+		loadAdmin();
+		const country = document.querySelector('[data-cetech-de-coverage-country]');
+		country.value = 'GH';
+		country.dispatchEvent(new Event('change', { bubbles: true }));
+		await expect.poll(() => document.querySelector('[data-cetech-de-admin-browser] label')?.textContent || '').toContain('Region');
+	});
+
+	it('shows disambiguated search labels without selecting them as the stored name', async () => {
+		vi.useFakeTimers();
+		window.fetch = vi.fn(() =>
+			jsonResponse({
+				items: [
+					{
+						id: 11,
+						key: 'loc-akwatia',
+						name: 'Akwatia',
+						label: 'Akwatia — Denkyembour District, Eastern Region'
+					}
+				],
+				request_token: '1'
+			})
+		);
+		document.body.innerHTML = `
+			<div data-cetech-de-coverage-builder data-countries='{"GH":"Ghana"}'>
+				<fieldset class="cetech-de-coverage-group">
+					<select data-cetech-de-coverage-country><option value="GH" selected>Ghana</option></select>
+					<input type="hidden" data-cetech-de-root-key value="loc-gh" />
+					<input data-cetech-de-locality-search data-cetech-de-search-target="include" />
+					<ul data-cetech-de-search-results="include" hidden></ul>
+					<ul data-cetech-de-chips="include"></ul>
+				</fieldset>
+			</div>
+		`;
+		loadAdmin();
+		const input = document.querySelector('[data-cetech-de-locality-search]');
+		input.value = 'Akw';
+		input.dispatchEvent(new Event('input', { bubbles: true }));
+		await vi.advanceTimersByTimeAsync(320);
+		await Promise.resolve();
+		const option = document.querySelector('[data-cetech-de-search-results="include"] [role="option"]');
+		expect(option.textContent).toContain('Denkyembour District');
+		expect(option.getAttribute('aria-label')).toContain('Eastern Region');
+		option.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+		const chip = document.querySelector('[data-cetech-de-chips="include"] li');
+		expect(chip.textContent).toContain('Akwatia');
+		expect(chip.textContent).not.toContain('Denkyembour');
+		expect(chip.querySelector('input[type="hidden"]').value).toBe('11');
+		vi.useRealTimers();
+	});
+
+	it('removes a middle coverage group and reindexes remaining form names', () => {
+		window.confirm = vi.fn(() => true);
+		document.body.innerHTML = `
+			<div data-cetech-de-coverage-builder data-countries='{"GH":"Ghana","US":"United States","CA":"Canada"}'>
+				<div data-cetech-de-coverage-groups></div>
+				<button type="button" data-cetech-de-add-coverage-group>Add</button>
+			</div>
+		`;
+		loadAdmin();
+		document.querySelector('[data-cetech-de-add-coverage-group]').click();
+		document.querySelector('[data-cetech-de-add-coverage-group]').click();
+		document.querySelector('[data-cetech-de-add-coverage-group]').click();
+		const groups = document.querySelectorAll('.cetech-de-coverage-group');
+		expect(groups.length).toBe(3);
+		groups[0].querySelector('[data-cetech-de-coverage-country]').value = 'GH';
+		groups[1].querySelector('[data-cetech-de-coverage-country]').value = 'US';
+		groups[2].querySelector('[data-cetech-de-coverage-country]').value = 'CA';
+		groups[1].querySelector('[data-cetech-de-remove-coverage-group]').click();
+		const remaining = document.querySelectorAll('.cetech-de-coverage-group');
+		expect(remaining.length).toBe(2);
+		expect(remaining[0].querySelector('[name="coverage_groups[0][country]"]').value).toBe('GH');
+		expect(remaining[1].querySelector('[name="coverage_groups[1][country]"]').value).toBe('CA');
+		expect(remaining[1].querySelector('legend').textContent).toBe('Coverage group 2');
+	});
 });

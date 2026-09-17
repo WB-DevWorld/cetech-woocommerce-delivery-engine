@@ -160,6 +160,7 @@ final class CoverageConfigurationValidator {
 		}
 
 		$resolve = ! empty( $row['resolve_review'] );
+		$confirm_scope = ! empty( $row['confirm_scope_replacement'] );
 		$status  = RecordStatus::Active->value;
 		$review  = ! empty( $row['review_required'] );
 		$legacy  = is_array( $row['legacy_migration'] ?? null ) ? $row['legacy_migration'] : [];
@@ -168,6 +169,24 @@ final class CoverageConfigurationValidator {
 			$review = $previous->review_required;
 			$legacy = $previous->legacy_migration;
 			if ( $resolve && $previous->review_required ) {
+				if ( $this->is_unresolved_legacy_city( $previous ) ) {
+					$mapped_locality = [] !== $includes;
+					if ( ! $mapped_locality && ! $confirm_scope ) {
+						$errors[] = sprintf(
+							'%s cannot be activated as entire-area coverage while a migrated city is still unresolved. Map the city or confirm a broader replacement scope.',
+							$label
+						);
+
+						return [ 'errors' => $errors, 'group' => null ];
+					}
+					if ( $confirm_scope && ! $mapped_locality ) {
+						$legacy['scope_replacement'] = [
+							'previous_scope' => $this->legacy_scope_label( $previous, $root ),
+							'replacement'    => sprintf( 'Entire %s', $root->canonical_name ),
+							'confirmed_at'   => gmdate( 'Y-m-d H:i:s' ),
+						];
+					}
+				}
 				$review = false;
 				$status = RecordStatus::Active->value;
 			} elseif ( $previous->review_required ) {
@@ -280,5 +299,25 @@ final class CoverageConfigurationValidator {
 		}
 
 		return $out;
+	}
+
+	private function is_unresolved_legacy_city( CoverageGroup $group ): bool {
+		$legacy = $group->legacy_migration;
+		if ( 'unmapped_city' === (string) ( $legacy['reason'] ?? '' ) ) {
+			return true;
+		}
+		$cities = $legacy['unmapped_cities'] ?? [];
+
+		return is_array( $cities ) && [] !== $cities;
+	}
+
+	private function legacy_scope_label( CoverageGroup $group, CanonicalLocation $root ): string {
+		$legacy  = $group->legacy_migration;
+		$country = strtoupper( (string) ( ( $legacy['countries'][0] ?? '' ) ) );
+		$region  = (string) ( $legacy['regions'][0] ?? $root->canonical_name );
+		$city    = (string) ( ( $legacy['unmapped_cities'][0] ?? ( $legacy['cities'][0] ?? '' ) ) );
+		$parts   = array_values( array_filter( [ $country, $region, $city ] ) );
+
+		return implode( ' > ', $parts );
 	}
 }

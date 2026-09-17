@@ -101,14 +101,14 @@ final class WpdbCoverageGroupRepository implements CoverageGroupRepositoryInterf
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 			$updated = $wpdb->update( $table, $row, [ 'id' => $id ] );
 			if ( false === $updated ) {
-				return CoverageGroup::fromRow( $row + [ 'id' => $id ] );
+				throw new \RuntimeException( 'Coverage group update failed.' );
 			}
 		} else {
 			$row['created_at'] = $now;
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 			$inserted = $wpdb->insert( $table, $row );
 			if ( false === $inserted ) {
-				return CoverageGroup::fromRow( $row + [ 'id' => 0 ] );
+				throw new \RuntimeException( 'Coverage group insert failed.' );
 			}
 			$id = (int) $wpdb->insert_id;
 		}
@@ -133,7 +133,10 @@ final class WpdbCoverageGroupRepository implements CoverageGroupRepositoryInterf
 		$this->replace_postcodes( $id, [] );
 		$table = TableNames::for( CoverageSchema::GROUPS_SUFFIX );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->delete( $table, [ 'id' => $id ], [ '%d' ] );
+		$deleted = $wpdb->delete( $table, [ 'id' => $id ], [ '%d' ] );
+		if ( false === $deleted ) {
+			throw new \RuntimeException( 'Coverage group delete failed.' );
+		}
 	}
 
 	public function delete_by_zone( int $zone_id ): void {
@@ -146,7 +149,10 @@ final class WpdbCoverageGroupRepository implements CoverageGroupRepositoryInterf
 		global $wpdb;
 		$table = TableNames::for( CoverageSchema::MEMBERS_SUFFIX );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->delete( $table, [ 'coverage_group_id' => $group_id ], [ '%d' ] );
+		$deleted = $wpdb->delete( $table, [ 'coverage_group_id' => $group_id ], [ '%d' ] );
+		if ( false === $deleted ) {
+			throw new \RuntimeException( 'Coverage member delete failed.' );
+		}
 		$now = gmdate( 'Y-m-d H:i:s' );
 		$seen = [];
 		foreach ( $members as $member ) {
@@ -158,7 +164,7 @@ final class WpdbCoverageGroupRepository implements CoverageGroupRepositoryInterf
 			}
 			$seen[ $key ] = true;
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-			$wpdb->insert(
+			$inserted = $wpdb->insert(
 				$table,
 				[
 					'coverage_group_id' => $group_id,
@@ -167,6 +173,9 @@ final class WpdbCoverageGroupRepository implements CoverageGroupRepositoryInterf
 					'created_at'        => $now,
 				]
 			);
+			if ( false === $inserted ) {
+				throw new \RuntimeException( 'Coverage member insert failed.' );
+			}
 		}
 	}
 
@@ -174,7 +183,10 @@ final class WpdbCoverageGroupRepository implements CoverageGroupRepositoryInterf
 		global $wpdb;
 		$table = TableNames::for( CoverageSchema::POSTCODES_SUFFIX );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->delete( $table, [ 'coverage_group_id' => $group_id ], [ '%d' ] );
+		$deleted = $wpdb->delete( $table, [ 'coverage_group_id' => $group_id ], [ '%d' ] );
+		if ( false === $deleted ) {
+			throw new \RuntimeException( 'Coverage postcode delete failed.' );
+		}
 		$now  = gmdate( 'Y-m-d H:i:s' );
 		$seen = [];
 		foreach ( $postcodes as $postcode ) {
@@ -186,7 +198,7 @@ final class WpdbCoverageGroupRepository implements CoverageGroupRepositoryInterf
 			}
 			$seen[ $key ] = true;
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-			$wpdb->insert(
+			$inserted = $wpdb->insert(
 				$table,
 				[
 					'coverage_group_id' => $group_id,
@@ -198,6 +210,9 @@ final class WpdbCoverageGroupRepository implements CoverageGroupRepositoryInterf
 					'updated_at'        => $now,
 				]
 			);
+			if ( false === $inserted ) {
+				throw new \RuntimeException( 'Coverage postcode insert failed.' );
+			}
 		}
 	}
 

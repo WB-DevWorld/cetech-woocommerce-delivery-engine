@@ -126,7 +126,9 @@ final class DestinationZonesPage {
 		$coverage   = new OverlappingDeliveryAreaCoverage(
 			$this->zone_repository,
 			$this->rule_repository,
-			$this->rate_card_repository
+			$this->rate_card_repository,
+			null,
+			$this->coverage_groups
 		);
 		$uncovered  = $coverage->uncovered_zone_ids();
 		$overlap_warnings = $coverage->warnings();
@@ -189,11 +191,17 @@ final class DestinationZonesPage {
 				$zone_id = (int) ( $zone['id'] ?? 0 );
 				$rules   = $this->rule_repository->listByZoneId( $zone_id );
 				$summary = $this->summarize_rules( $rules );
+				$canonical = '';
+				if ( $this->coverage_groups instanceof CoverageGroupRepositoryInterface && $this->locations instanceof CanonicalLocationRepositoryInterface ) {
+					$canonical = ( new \CetechDeliveryEngine\Application\Coverage\CoverageGroupSummarizer( $this->locations ) )->summarize(
+						$this->coverage_groups->list_by_zone( $zone_id )
+					);
+				}
 				$rate_count = $rate_cards_by_zone[ $zone_id ] ?? 0;
 
 				$rows[] = [
 					'<strong>' . esc_html( (string) ( $zone['public_label'] ?? $zone['internal_name'] ?? '' ) ) . '</strong>',
-					esc_html( $this->location_label( $zone, $summary ) ),
+					esc_html( '' !== $canonical ? $canonical : $this->location_label( $zone, $summary ) ),
 					esc_html(
 						sprintf(
 							/* translators: %d number of delivery options */
@@ -444,6 +452,7 @@ final class DestinationZonesPage {
 		}
 		echo '<div data-cetech-de-coverage-groups></div>';
 		echo '<p><button type="button" class="button" data-cetech-de-add-coverage-group>' . esc_html__( '+ Add another coverage group', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
+		echo '<p><label><input type="checkbox" name="confirm_drop_canonical" value="1" /> ' . esc_html__( 'If I remove every coverage group, stop using canonical coverage for this Delivery Area. Do not silently fall back to hidden legacy conditions.', 'cetech-woocommerce-delivery-engine' ) . '</label></p>';
 		echo '</div>';
 	}
 
@@ -483,6 +492,22 @@ final class DestinationZonesPage {
 		}
 		if ( $group->review_required ) {
 			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Review required: this group was converted from legacy rules or could not be mapped with full confidence. Saving other fields will not clear this warning.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			$unmapped_city = 'unmapped_city' === (string) ( $group->legacy_migration['reason'] ?? '' )
+				|| ( isset( $group->legacy_migration['unmapped_cities'] ) && is_array( $group->legacy_migration['unmapped_cities'] ) && [] !== $group->legacy_migration['unmapped_cities'] );
+			if ( $unmapped_city ) {
+				$legacy_city = (string) ( $group->legacy_migration['unmapped_cities'][0] ?? ( $group->legacy_migration['cities'][0] ?? 'unresolved city' ) );
+				$region      = $root?->canonical_name ?? (string) ( $group->legacy_migration['regions'][0] ?? 'selected area' );
+				echo '<p>' . esc_html(
+					sprintf(
+						/* translators: 1: country, 2: region, 3: city */
+						__( 'Previous legacy scope: %1$s > %2$s > %3$s. Mapping this to the entire selected area is broader coverage.', 'cetech-woocommerce-delivery-engine' ),
+						(string) ( $group->legacy_migration['countries'][0] ?? 'GH' ),
+						$region,
+						$legacy_city
+					)
+				) . '</p>';
+				echo '<p><label><input type="checkbox" name="' . esc_attr( $prefix ) . '[confirm_scope_replacement]" value="1" /> ' . esc_html__( 'Confirm replacement with entire selected area', 'cetech-woocommerce-delivery-engine' ) . '</label></p>';
+			}
 			echo '<p><label><input type="checkbox" name="' . esc_attr( $prefix ) . '[resolve_review]" value="1" /> ' . esc_html__( 'I reviewed this migrated coverage', 'cetech-woocommerce-delivery-engine' ) . '</label></p></div>';
 			echo '<input type="hidden" name="' . esc_attr( $prefix ) . '[review_required]" value="1" />';
 		}
@@ -566,6 +591,7 @@ final class DestinationZonesPage {
 		echo '</tbody></table>';
 		echo '<p><button type="button" class="button" data-cetech-de-add-postcode>' . esc_html__( 'Add postcode', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
 		echo '</div>';
+		echo '<p><button type="button" class="button-link-delete" data-cetech-de-remove-coverage-group>' . esc_html__( 'Remove coverage group', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
 		echo '</fieldset>';
 	}
 
@@ -799,10 +825,11 @@ final class DestinationZonesPage {
 		}
 
 		$coverage_persisted = true;
-		if ( is_array( $coverage_posted ) ) {
+		if ( is_array( $coverage_posted ) || $this->posted_confirm_drop_canonical() ) {
 			$validated_groups = is_array( $coverage_valid['groups'] ?? null ) ? $coverage_valid['groups'] : [];
-			if ( [] === $validated_groups && $this->zone_has_active_coverage( $saved_id ) ) {
-				// A blank or skipped coverage payload must not wipe live schema-6 coverage.
+			if ( [] === $validated_groups && $this->zone_has_active_coverage( $saved_id ) && ! $this->posted_confirm_drop_canonical() ) {
+				$this->action_handler->notices()->flash_error( __( 'Removing the last canonical coverage group requires an explicit confirmation. Hidden legacy conditions will not be used automatically.', 'cetech-woocommerce-delivery-engine' ) );
+				$coverage_persisted = false;
 			} else {
 				$coverage_persisted = $this->persist_posted_coverage( $saved_id, $validated_groups );
 			}
@@ -911,10 +938,21 @@ final class DestinationZonesPage {
 			$this->action_handler->redirect( self::SLUG );
 		}
 
-		$this->rule_repository->deleteByZoneId( $id );
+		$deleted = false;
+		if ( $this->coverage_groups instanceof CoverageGroupRepositoryInterface ) {
+			$cleanup = new \CetechDeliveryEngine\Application\Coverage\DeliveryAreaCoverageCleanup(
+				$this->coverage_groups,
+				$this->rule_repository,
+				$this->zone_repository
+			);
+			$deleted = $cleanup->hard_delete_zone( $id );
+		} else {
+			$this->rule_repository->deleteByZoneId( $id );
+			$deleted = $this->zone_repository->hardDelete( $id );
+		}
 
-		if ( ! $this->zone_repository->hardDelete( $id ) ) {
-			$this->action_handler->notices()->flash_error( __( 'Unable to delete destination zone.', 'cetech-woocommerce-delivery-engine' ) );
+		if ( ! $deleted ) {
+			$this->action_handler->notices()->flash_error( __( 'Unable to delete destination zone. The previous record was kept.', 'cetech-woocommerce-delivery-engine' ) );
 			$this->action_handler->redirect( self::SLUG );
 		}
 
@@ -1147,6 +1185,12 @@ final class DestinationZonesPage {
 		}
 
 		$existing = $this->coverage_groups->list_by_zone( $zone_id );
+		if ( [] === $validated_groups && $this->zone_has_usable_groups( $existing ) && ! $this->posted_confirm_drop_canonical() ) {
+			$this->action_handler->notices()->flash_error( __( 'Removing the last canonical coverage group requires an explicit confirmation. Hidden legacy conditions will not be used automatically.', 'cetech-woocommerce-delivery-engine' ) );
+
+			return false;
+		}
+
 		$by_id    = [];
 		foreach ( $existing as $group ) {
 			$by_id[ $group->id ] = $group;
@@ -1187,6 +1231,24 @@ final class DestinationZonesPage {
 	/**
 	 * @return list<array<string, mixed>>|null
 	 */
+	private function posted_confirm_drop_canonical(): bool {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		return ! empty( $_POST['confirm_drop_canonical'] );
+	}
+
+	/**
+	 * @param list<\CetechDeliveryEngine\Domain\Coverage\CoverageGroup> $groups
+	 */
+	private function zone_has_usable_groups( array $groups ): bool {
+		foreach ( $groups as $group ) {
+			if ( $group->isUsable() ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	private function posted_coverage_groups(): ?array {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
 		if ( ! isset( $_POST['coverage_groups'] ) || ! is_array( $_POST['coverage_groups'] ) ) {

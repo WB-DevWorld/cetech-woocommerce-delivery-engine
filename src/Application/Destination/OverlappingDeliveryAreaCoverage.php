@@ -28,7 +28,8 @@ final class OverlappingDeliveryAreaCoverage {
 		private DestinationZoneRepositoryInterface $zone_repository,
 		private DestinationRuleRepositoryInterface $rule_repository,
 		private RateCardRepositoryInterface $rate_card_repository,
-		private ?RegionCodeLabelMatcher $region_matcher = null
+		private ?RegionCodeLabelMatcher $region_matcher = null,
+		private ?\CetechDeliveryEngine\Domain\Coverage\CoverageGroupRepositoryInterface $coverage_groups = null
 	) {
 		$this->region_matcher = $region_matcher ?? new RegionCodeLabelMatcher();
 	}
@@ -45,10 +46,24 @@ final class OverlappingDeliveryAreaCoverage {
 	public function warnings(): array {
 		$active = $this->active_zones_with_rules();
 		$warnings = [];
+		$canonical_overlap_noted = [];
 
 		foreach ( $this->pairs( $active ) as $pair ) {
 			$left  = $pair[0];
 			$right = $pair[1];
+
+			$left_canonical_only  = ! empty( $left['canonical'] ) && [] === $left['rules'];
+			$right_canonical_only = ! empty( $right['canonical'] ) && [] === $right['rules'];
+			if ( $left_canonical_only || $right_canonical_only ) {
+				$canonical_zone = $left_canonical_only ? $left['zone'] : $right['zone'];
+				$other_zone     = $left_canonical_only ? $right['zone'] : $left['zone'];
+				$cid            = (int) ( $canonical_zone['id'] ?? 0 );
+				if ( $cid > 0 && ! isset( $canonical_overlap_noted[ $cid ] ) ) {
+					$canonical_overlap_noted[ $cid ] = true;
+					$warnings[] = $this->canonical_overlap_warning( $canonical_zone, $other_zone );
+				}
+				continue;
+			}
 
 			if ( ! $this->rules_are_compatible( $left['rules'], $right['rules'] ) ) {
 				continue;
@@ -77,6 +92,11 @@ final class OverlappingDeliveryAreaCoverage {
 		$active = $this->active_zones_with_rules();
 
 		foreach ( $this->pairs( $active ) as $pair ) {
+			$left_canonical_only  = ! empty( $pair[0]['canonical'] ) && [] === $pair[0]['rules'];
+			$right_canonical_only = ! empty( $pair[1]['canonical'] ) && [] === $pair[1]['rules'];
+			if ( $left_canonical_only || $right_canonical_only ) {
+				return true;
+			}
 			if ( ! $this->rules_are_compatible( $pair[0]['rules'], $pair[1]['rules'] ) ) {
 				continue;
 			}
@@ -124,6 +144,11 @@ final class OverlappingDeliveryAreaCoverage {
 				continue;
 			}
 
+			if ( ! empty( $item['canonical'] ) && [] === $item['rules'] ) {
+				$uncovered[] = $zone_id;
+				continue;
+			}
+
 			$rank = DestinationZoneMatcher::geographic_specificity_rank( $item['rules'], ! empty( $item['zone']['is_fallback'] ) );
 			$inherits = false;
 
@@ -168,18 +193,33 @@ final class OverlappingDeliveryAreaCoverage {
 			}
 
 			$rules = $this->rule_repository->listByZoneId( $zone_id );
+			$has_canonical = $this->zone_has_canonical_coverage( $zone_id );
 
-			if ( [] === $rules || DestinationZoneMatcher::is_unrestricted_fallback( $zone, $rules ) ) {
+			if ( ( [] === $rules || DestinationZoneMatcher::is_unrestricted_fallback( $zone, $rules ) ) && ! $has_canonical ) {
 				continue;
 			}
 
 			$out[] = [
-				'zone'  => $zone,
-				'rules' => $rules,
+				'zone'       => $zone,
+				'rules'      => $rules,
+				'canonical'  => $has_canonical,
 			];
 		}
 
 		return $out;
+	}
+
+	private function zone_has_canonical_coverage( int $zone_id ): bool {
+		if ( ! $this->coverage_groups instanceof \CetechDeliveryEngine\Domain\Coverage\CoverageGroupRepositoryInterface ) {
+			return false;
+		}
+		foreach ( $this->coverage_groups->list_by_zone( $zone_id ) as $group ) {
+			if ( $group->isUsable() ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -322,6 +362,30 @@ final class OverlappingDeliveryAreaCoverage {
 	 *
 	 * @return array{code: string, title: string, message: string, zone_id: int, details: string}
 	 */
+	/**
+	 * @param array<string, mixed> $canonical
+	 * @param array<string, mixed> $other
+	 *
+	 * @return array{code: string, title: string, message: string, zone_id: int, details: string}
+	 */
+	private function canonical_overlap_warning( array $canonical, array $other ): array {
+		$canonical_label = $this->zone_label( $canonical );
+		$other_label     = $this->zone_label( $other );
+
+		return [
+			'code'    => 'canonical_coverage_overlap_unproven',
+			'title'   => __( 'Canonical coverage overlap cannot be proven from legacy rules', 'cetech-woocommerce-delivery-engine' ),
+			'message' => sprintf(
+				/* translators: 1: canonical area name, 2: other area name */
+				__( 'Delivery Area "%1$s" uses canonical coverage. Overlap with other Delivery Areas (including "%2$s") cannot be proven from legacy destination rules.', 'cetech-woocommerce-delivery-engine' ),
+				$canonical_label,
+				$other_label
+			),
+			'zone_id' => (int) ( $canonical['id'] ?? 0 ),
+			'details' => $canonical_label . ' / ' . $other_label,
+		];
+	}
+
 	private function ambiguous_warning( array $left, array $right ): array {
 		$left_label  = $this->zone_label( $left );
 		$right_label = $this->zone_label( $right );

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Tests\Unit\Persistence;
 
 use CetechDeliveryEngine\Domain\Enum\CoverageMode;
+use CetechDeliveryEngine\Domain\Enum\CoverageMembership;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbCoverageGroupRepository;
 use CetechDeliveryEngine\Tests\Unit\Shipment\FakeWpdb;
@@ -238,5 +239,146 @@ final class WpdbCoverageGroupRepositoryTest extends TestCase {
 		self::assertFalse( $resolved->review_required );
 		self::assertSame( RecordStatus::Active, $resolved->status );
 		self::assertSame( $original->id, $resolved->id );
+	}
+
+	public function test_member_delete_failure_rolls_back(): void {
+		$original = $this->seed_coverage_with_member_and_postcode( 51 );
+		$this->wpdb->fail_next_delete_table = 'wp_delivery_engine_destination_coverage_members';
+		$saved = $this->repository->replace_for_zone(
+			51,
+			[
+				[
+					'id'               => $original->id,
+					'root_location_id' => 8,
+					'coverage_mode'    => CoverageMode::EntireArea->value,
+					'status'           => RecordStatus::Active->value,
+					'members'          => [
+						[ 'location_id' => 99, 'membership' => CoverageMembership::Include->value ],
+					],
+				],
+			]
+		);
+		self::assertSame( [], $saved );
+		$kept = $this->repository->list_by_zone( 51 )[0];
+		self::assertSame( $original->id, $kept->id );
+		self::assertSame( 5, $kept->root_location_id );
+		self::assertSame( 7, $kept->members[0]->location_id );
+	}
+
+	public function test_member_insert_failure_rolls_back(): void {
+		$original = $this->seed_coverage_with_member_and_postcode( 52 );
+		$this->wpdb->fail_next_insert_table = 'wp_delivery_engine_destination_coverage_members';
+		$saved = $this->repository->replace_for_zone(
+			52,
+			[
+				[
+					'id'               => $original->id,
+					'root_location_id' => 8,
+					'coverage_mode'    => CoverageMode::EntireArea->value,
+					'status'           => RecordStatus::Active->value,
+					'members'          => [
+						[ 'location_id' => 99, 'membership' => CoverageMembership::Include->value ],
+					],
+				],
+			]
+		);
+		self::assertSame( [], $saved );
+		$kept = $this->repository->list_by_zone( 52 )[0];
+		self::assertSame( 7, $kept->members[0]->location_id );
+	}
+
+	public function test_postcode_delete_failure_rolls_back(): void {
+		$original = $this->seed_coverage_with_member_and_postcode( 53 );
+		$this->wpdb->fail_next_delete_table = 'wp_delivery_engine_destination_coverage_postcodes';
+		$saved = $this->repository->replace_for_zone(
+			53,
+			[
+				[
+					'id'               => $original->id,
+					'root_location_id' => 8,
+					'coverage_mode'    => CoverageMode::EntireArea->value,
+					'status'           => RecordStatus::Active->value,
+					'postcodes'        => [
+						[ 'postcode_value' => 'ZZ-9', 'match_mode' => 'exact' ],
+					],
+				],
+			]
+		);
+		self::assertSame( [], $saved );
+		$kept = $this->repository->list_by_zone( 53 )[0];
+		self::assertSame( 'GA-1', $kept->postcodes[0]->postcode_value );
+	}
+
+	public function test_postcode_insert_failure_rolls_back(): void {
+		$original = $this->seed_coverage_with_member_and_postcode( 54 );
+		$this->wpdb->fail_next_insert_table = 'wp_delivery_engine_destination_coverage_postcodes';
+		$saved = $this->repository->replace_for_zone(
+			54,
+			[
+				[
+					'id'               => $original->id,
+					'root_location_id' => 8,
+					'coverage_mode'    => CoverageMode::EntireArea->value,
+					'status'           => RecordStatus::Active->value,
+					'postcodes'        => [
+						[ 'postcode_value' => 'ZZ-9', 'match_mode' => 'exact' ],
+					],
+				],
+			]
+		);
+		self::assertSame( [], $saved );
+		$kept = $this->repository->list_by_zone( 54 )[0];
+		self::assertSame( 'GA-1', $kept->postcodes[0]->postcode_value );
+	}
+
+	public function test_obsolete_group_delete_failure_rolls_back(): void {
+		$first = $this->repository->save_group(
+			[
+				'zone_id'          => 55,
+				'root_location_id' => 5,
+				'coverage_mode'    => CoverageMode::EntireArea->value,
+				'status'           => RecordStatus::Active->value,
+			]
+		);
+		$second = $this->repository->save_group(
+			[
+				'zone_id'          => 55,
+				'root_location_id' => 6,
+				'coverage_mode'    => CoverageMode::EntireArea->value,
+				'status'           => RecordStatus::Active->value,
+			]
+		);
+		$this->wpdb->fail_next_delete_table = 'wp_delivery_engine_destination_coverage_groups';
+		$saved = $this->repository->replace_for_zone(
+			55,
+			[
+				[
+					'id'               => $first->id,
+					'root_location_id' => 5,
+					'coverage_mode'    => CoverageMode::EntireArea->value,
+					'status'           => RecordStatus::Active->value,
+				],
+			]
+		);
+		self::assertSame( [], $saved );
+		self::assertCount( 2, $this->repository->list_by_zone( 55 ) );
+		self::assertNotNull( $this->repository->find_by_id( $second->id ) );
+	}
+
+	private function seed_coverage_with_member_and_postcode( int $zone_id ): \CetechDeliveryEngine\Domain\Coverage\CoverageGroup {
+		return $this->repository->save_group(
+			[
+				'zone_id'          => $zone_id,
+				'root_location_id' => 5,
+				'coverage_mode'    => CoverageMode::EntireArea->value,
+				'status'           => RecordStatus::Active->value,
+				'members'          => [
+					[ 'location_id' => 7, 'membership' => CoverageMembership::Include->value ],
+				],
+				'postcodes'        => [
+					[ 'postcode_value' => 'GA-1', 'match_mode' => 'exact' ],
+				],
+			]
+		);
 	}
 }

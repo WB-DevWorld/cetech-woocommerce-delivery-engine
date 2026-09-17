@@ -534,6 +534,39 @@
 			return Array.prototype.indexOf.call(root.querySelectorAll('.cetech-de-coverage-group'), group);
 		}
 
+		function applyAdminLabel(group, label) {
+			if (!group || !label) {
+				return;
+			}
+			var wrap = group.querySelector('[data-cetech-de-admin-browser] > p');
+			var select = wrap ? wrap.querySelector('select') : null;
+			var lab = wrap ? wrap.querySelector('label') : null;
+			if (!lab || !select) {
+				return;
+			}
+			lab.textContent = '';
+			lab.appendChild(document.createTextNode(label));
+			lab.appendChild(document.createElement('br'));
+			lab.appendChild(select);
+		}
+
+		function reindexCoverageGroups() {
+			Array.prototype.forEach.call(root.querySelectorAll('.cetech-de-coverage-group'), function (group, index) {
+				var legend = group.querySelector('legend');
+				if (legend) {
+					legend.textContent = 'Coverage group ' + (index + 1);
+				}
+				Array.prototype.forEach.call(group.querySelectorAll('[name]'), function (field) {
+					var name = field.getAttribute('name') || '';
+					if (name.indexOf('coverage_groups[') !== 0) {
+						return;
+					}
+					field.setAttribute('name', name.replace(/^coverage_groups\[\d+]/, 'coverage_groups[' + index + ']'));
+				});
+			});
+			nextIndex = root.querySelectorAll('.cetech-de-coverage-group').length;
+		}
+
 		function countryOf(group) {
 			var field = group.querySelector('[data-cetech-de-coverage-country]');
 			return field ? String(field.value || '') : '';
@@ -637,9 +670,12 @@
 				var li = document.createElement('li');
 				li.setAttribute('role', 'option');
 				li.tabIndex = -1;
-				li.textContent = item.name || '';
+				var resultLabel = item.label || item.name || '';
+				li.textContent = resultLabel;
+				li.setAttribute('aria-label', resultLabel);
 				li.setAttribute('data-id', String(item.id || ''));
 				li.setAttribute('data-key', item.key || '');
+				li.setAttribute('data-name', item.name || '');
 				list.appendChild(li);
 			});
 			var more = list.querySelector('[data-cetech-de-load-more]');
@@ -756,6 +792,9 @@
 			body.set('country', country);
 			fetchJson(body).then(function (payload) {
 				var data = payload && payload.data ? payload.data : payload;
+				if (data && data.label) {
+					applyAdminLabel(group, data.label);
+				}
 				var items = data && data.items ? data.items : [];
 				var current = select.value;
 				select.innerHTML = '<option value="">Select…</option>';
@@ -818,6 +857,26 @@
 		}
 
 		root.addEventListener('click', function (event) {
+			var removeGroup = event.target.closest('[data-cetech-de-remove-coverage-group]');
+			if (removeGroup) {
+				event.preventDefault();
+				var groupToRemove = removeGroup.closest('.cetech-de-coverage-group');
+				if (!groupToRemove) {
+					return;
+				}
+				if (!window.confirm('Remove this coverage group? Remaining groups keep their own locations.')) {
+					return;
+				}
+				var remaining = root.querySelectorAll('.cetech-de-coverage-group').length;
+				if (remaining <= 1) {
+					if (!window.confirm('This is the last canonical coverage group. Removing it stops canonical coverage. Hidden legacy conditions will not be used automatically.')) {
+						return;
+					}
+				}
+				groupToRemove.remove();
+				reindexCoverageGroups();
+				return;
+			}
 			var add = event.target.closest('[data-cetech-de-add-coverage-group]');
 			if (add) {
 				event.preventDefault();
@@ -923,7 +982,7 @@
 				chooseResult(group, target, {
 					id: option.getAttribute('data-id'),
 					key: option.getAttribute('data-key'),
-					name: option.textContent
+					name: option.getAttribute('data-name') || option.textContent
 				});
 			}
 		});
@@ -1026,7 +1085,7 @@
 					chooseResult(group, results.getAttribute('data-cetech-de-search-results'), {
 						id: option.getAttribute('data-id'),
 						key: option.getAttribute('data-key'),
-						name: option.textContent
+						name: option.getAttribute('data-name') || option.textContent
 					});
 				}
 			}
@@ -1052,6 +1111,7 @@
 			options += '<option value="' + code + '">' + String(countries[code]).replace(/</g, '') + '</option>';
 		});
 		return '<fieldset class="cetech-de-coverage-group" data-cetech-de-coverage-group><legend>Coverage group ' + (index + 1) + '</legend>' +
+			'<p><button type="button" class="button-link-delete" data-cetech-de-remove-coverage-group>Remove coverage group</button></p>' +
 			'<p><label>Country<br /><select name="coverage_groups[' + index + '][country]" data-cetech-de-coverage-country>' + options + '</select></label></p>' +
 			'<div data-cetech-de-admin-browser><p><label>Administrative area<br /><select data-cetech-de-coverage-root><option value="">Select…</option></select></label></p></div>' +
 			'<p><label>Coverage <select name="coverage_groups[' + index + '][mode]" data-cetech-de-coverage-mode>' +

@@ -481,6 +481,35 @@
 		var geo = config.geography || {};
 		var searchToken = 0;
 
+		function applyRegionLabel(rootEl, label) {
+			if (!rootEl || !label) {
+				return;
+			}
+			var wrap = rootEl.querySelector('[data-cetech-de-field="region"], [data-cetech-de-reveal="region"]');
+			if (!wrap) {
+				return;
+			}
+			var select = wrap.querySelector('select');
+			if (select) {
+				select.setAttribute('aria-label', label);
+			}
+			var lab = wrap.querySelector('label');
+			if (lab) {
+				var text = lab.childNodes[0];
+				if (text && text.nodeType === 3) {
+					text.textContent = label;
+					return;
+				}
+			}
+			var span = wrap.querySelector('.cetech-de-admin-label');
+			if (!span) {
+				span = document.createElement('span');
+				span.className = 'cetech-de-admin-label';
+				wrap.insertBefore(span, wrap.firstChild);
+			}
+			span.textContent = label;
+		}
+
 		function countryField() {
 			return locationRoot.querySelector('[name="cetech_de_matching_country"]');
 		}
@@ -545,6 +574,9 @@
 			}).then(function (response) { return response.json(); }).then(function (payload) {
 				var data = payload && payload.data ? payload.data : payload;
 				var items = data && data.items ? data.items : [];
+				if (data && data.label) {
+					applyRegionLabel(locationRoot, data.label);
+				}
 				var region = regionField();
 				if (!region || region.tagName !== 'SELECT' || type !== 'administrative') {
 					return;
@@ -637,7 +669,9 @@
 					var li = document.createElement('li');
 					li.setAttribute('role', 'option');
 					li.tabIndex = 0;
-					li.textContent = item.name || '';
+					var resultLabel = item.label || item.name || '';
+					li.textContent = resultLabel;
+					li.setAttribute('aria-label', resultLabel);
 					li.setAttribute('data-key', item.key || '');
 					li.addEventListener('click', function () { selectLocality(item); });
 					li.addEventListener('keydown', function (event) {

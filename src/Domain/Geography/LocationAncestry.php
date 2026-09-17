@@ -52,6 +52,28 @@ final class LocationAncestry {
 		return $candidate->parent_location_id === $root->id;
 	}
 
+	/**
+	 * Prefix used for descendant lookups when the parent ancestry path is known.
+	 * Never a middle-wildcard such as %/id/%.
+	 */
+	public static function descendant_like_prefix( string $parent_ancestry_path, int $parent_id = 0 ): string {
+		$path = trim( $parent_ancestry_path );
+		if ( '' === $path && $parent_id > 0 ) {
+			$path = '/' . $parent_id . '/';
+		}
+		if ( '' === $path ) {
+			return '';
+		}
+		if ( ! str_starts_with( $path, '/' ) ) {
+			$path = '/' . $path;
+		}
+		if ( ! str_ends_with( $path, '/' ) ) {
+			$path .= '/';
+		}
+
+		return $path;
+	}
+
 	public static function append_path( string $parent_path, int $id ): string {
 		$base = trim( $parent_path );
 		if ( '' === $base ) {

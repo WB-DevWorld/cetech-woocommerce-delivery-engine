@@ -79,10 +79,8 @@ final class Geo3TechnicalCorrectionTest extends TestCase {
 			8,
 			[ $saved ]
 		);
-		self::assertTrue( $resolved['ok'] );
-		self::assertFalse( $resolved['groups'][0]['review_required'] );
-		self::assertTrue( $resolved['groups'][0]['resolve_review'] );
-		self::assertSame( RecordStatus::Active->value, $resolved['groups'][0]['status'] );
+		self::assertFalse( $resolved['ok'] );
+		self::assertNotEmpty( $resolved['errors'] );
 	}
 
 	public function test_foreign_group_id_is_rejected_by_validator(): void {

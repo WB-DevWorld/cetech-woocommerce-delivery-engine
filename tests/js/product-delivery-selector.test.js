@@ -446,4 +446,86 @@ describe('Product delivery fulfilment switcher', () => {
 		const postcodeRequest = bodies.find((body) => body.includes('cetech_de_geography_postcode_relevance') && body.includes('parent_key=loc-accra'));
 		expect(postcodeRequest).toBeTruthy();
 	});
+
+	it('applies the server region label after country change', async () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<fieldset data-cetech-de-selector="1">
+					<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">
+						<p data-cetech-de-field="country"><select name="cetech_de_matching_country"><option value="">Select…</option><option value="GH">Ghana</option><option value="US">United States</option></select></p>
+						<p data-cetech-de-reveal="region" hidden><select name="cetech_de_matching_state"><option value="">Select…</option></select></p>
+						<p data-cetech-de-reveal="locality" hidden>
+							<input name="cetech_de_matching_city" />
+							<ul class="cetech-de-locality-results" hidden></ul>
+						</p>
+						<input type="hidden" name="cetech_de_matching_location_key" data-cetech-de-location-key="1" value="" />
+					</div>
+					<div data-cetech-de-options></div>
+				</fieldset>
+			</form>
+		`;
+		window.cetechDeMatchingLocation = {
+			ajaxUrl: '/wp-admin/admin-ajax.php',
+			geography: { childrenAction: 'cetech_de_geography_children', childrenNonce: 'n' }
+		};
+		window.fetch = async () => ({
+			json: async () => ({ success: true, data: { items: [{ key: 'loc-ga', name: 'Greater Accra', code: 'AA' }], label: 'Region' } })
+		});
+		const api = loadSelector();
+		api.bindAll(document);
+		const country = document.querySelector('[name="cetech_de_matching_country"]');
+		country.value = 'GH';
+		country.dispatchEvent(new Event('change', { bubbles: true }));
+		await expect.poll(() => document.querySelector('.cetech-de-admin-label')?.textContent || '').toBe('Region');
+		expect(document.querySelector('[name="cetech_de_matching_state"]').getAttribute('aria-label')).toBe('Region');
+	});
+
+	it('renders disambiguated locality results and stores the canonical key', async () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<fieldset data-cetech-de-selector="1">
+					<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">
+						<p data-cetech-de-field="country"><select name="cetech_de_matching_country"><option value="GH" selected>Ghana</option></select></p>
+						<p data-cetech-de-reveal="region"><select name="cetech_de_matching_state"><option value="AA" selected data-location-key="loc-ga">Greater Accra</option></select></p>
+						<p data-cetech-de-reveal="locality">
+							<input name="cetech_de_matching_city" />
+							<ul class="cetech-de-locality-results" hidden></ul>
+						</p>
+						<input type="hidden" name="cetech_de_matching_location_key" data-cetech-de-location-key="1" value="" />
+					</div>
+					<div data-cetech-de-options></div>
+				</fieldset>
+			</form>
+		`;
+		window.cetechDeMatchingLocation = {
+			ajaxUrl: '/wp-admin/admin-ajax.php',
+			geography: { searchAction: 'cetech_de_geography_locality_search', searchNonce: 'n' }
+		};
+		window.fetch = async () => ({
+			json: async () => ({
+				success: true,
+				data: {
+					items: [
+						{
+							key: 'loc-akwatia',
+							name: 'Akwatia',
+							label: 'Akwatia — Denkyembour District, Eastern Region'
+						}
+					]
+				}
+			})
+		});
+		const api = loadSelector();
+		api.bindAll(document);
+		const city = document.querySelector('[name="cetech_de_matching_city"]');
+		city.value = 'Akw';
+		city.dispatchEvent(new Event('input', { bubbles: true }));
+		await new Promise((r) => setTimeout(r, 350));
+		const option = document.querySelector('.cetech-de-locality-results [role="option"]');
+		expect(option.textContent).toContain('Denkyembour District');
+		expect(option.getAttribute('aria-label')).toContain('Eastern Region');
+		option.click();
+		expect(document.querySelector('[name="cetech_de_matching_city"]').value).toBe('Akwatia');
+		expect(document.querySelector('[name="cetech_de_matching_location_key"]').value).toBe('loc-akwatia');
+	});
 });

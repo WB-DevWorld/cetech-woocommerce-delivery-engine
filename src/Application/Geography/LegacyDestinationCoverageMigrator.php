@@ -46,11 +46,16 @@ final class LegacyDestinationCoverageMigrator {
 	 */
 	public function migrate( bool $force = false ): array {
 		$report = [
-			'zones'           => 0,
-			'converted'       => 0,
-			'skipped'         => 0,
-			'review_required' => 0,
-			'warnings'        => [],
+			'zones'                 => 0,
+			'scanned'               => 0,
+			'converted'             => 0,
+			'skipped'               => 0,
+			'skipped_manual'        => 0,
+			'reconciled'            => 0,
+			'still_review_required' => 0,
+			'activated'             => 0,
+			'review_required'       => 0,
+			'warnings'              => [],
 		];
 
 		foreach ( $this->zones->list( [ 'limit' => 5000 ] ) as $zone ) {
@@ -59,11 +64,21 @@ final class LegacyDestinationCoverageMigrator {
 				continue;
 			}
 			++$report['zones'];
+			++$report['scanned'];
 
 			$existing = $this->groups->list_by_zone( $zone_id );
-			if ( [] !== $existing && ! $force ) {
-				++$report['skipped'];
-				continue;
+			if ( [] !== $existing ) {
+				if ( $this->has_protected_canonical_coverage( $existing ) ) {
+					if ( $this->is_manual_or_resolved_coverage( $existing ) ) {
+						++$report['skipped_manual'];
+					}
+					++$report['skipped'];
+					continue;
+				}
+				if ( ! $force || ! $this->is_revisit_candidate( $existing ) ) {
+					++$report['skipped'];
+					continue;
+				}
 			}
 
 			$rules = $this->rules->listByZoneId( $zone_id );
@@ -78,21 +93,36 @@ final class LegacyDestinationCoverageMigrator {
 				continue;
 			}
 
-			if ( $force ) {
-				$this->groups->delete_by_zone( $zone_id );
-			}
-
-			foreach ( $payloads as $payload ) {
-				$saved = $this->groups->save_group( $payload );
-				++$report['converted'];
-				if ( $saved->review_required ) {
-					++$report['review_required'];
+			try {
+				$saved_groups = $this->groups->replace_for_zone( $zone_id, $payloads );
+				if ( [] === $saved_groups && [] !== $payloads ) {
 					$report['warnings'][] = [
 						'zone_id' => $zone_id,
-						'reason'  => (string) ( $saved->legacy_migration['reason'] ?? 'review_required' ),
-						'legacy'  => $saved->legacy_migration,
+						'reason'  => 'coverage_replace_failed',
 					];
+					continue;
 				}
+				foreach ( $saved_groups as $saved ) {
+					++$report['converted'];
+					++$report['reconciled'];
+					if ( $saved->review_required ) {
+						++$report['review_required'];
+						++$report['still_review_required'];
+						$report['warnings'][] = [
+							'zone_id' => $zone_id,
+							'reason'  => (string) ( $saved->legacy_migration['reason'] ?? 'review_required' ),
+							'legacy'  => $saved->legacy_migration,
+						];
+					} elseif ( $saved->isUsable() ) {
+						++$report['activated'];
+					}
+				}
+			} catch ( \Throwable $e ) {
+				$report['warnings'][] = [
+					'zone_id' => $zone_id,
+					'reason'  => 'coverage_replace_failed',
+					'error'   => $e->getMessage(),
+				];
 			}
 		}
 
@@ -379,7 +409,7 @@ final class LegacyDestinationCoverageMigrator {
 			'sort_order'       => $sort,
 			'status'           => $status->value,
 			'review_required'  => $review,
-			'legacy_migration' => $legacy + [ 'reason' => $reason ],
+			'legacy_migration' => $legacy + [ 'reason' => $reason, 'origin' => 'legacy_migration' ],
 			'members'          => $members,
 			'postcodes'        => $postcodes,
 		];
@@ -408,7 +438,7 @@ final class LegacyDestinationCoverageMigrator {
 			'sort_order'       => $sort,
 			'status'           => $status->value,
 			'review_required'  => $review,
-			'legacy_migration' => $legacy + [ 'reason' => $reason ],
+			'legacy_migration' => $legacy + [ 'reason' => $reason, 'origin' => 'legacy_migration' ],
 			'members'          => [],
 			'postcodes'        => $postcodes,
 		];
@@ -434,7 +464,7 @@ final class LegacyDestinationCoverageMigrator {
 			'sort_order'       => 10,
 			'status'           => RecordStatus::Inactive->value,
 			'review_required'  => true,
-			'legacy_migration' => $legacy + [ 'reason' => $reason ],
+			'legacy_migration' => $legacy + [ 'reason' => $reason, 'origin' => 'legacy_migration' ],
 			'members'          => [],
 			'postcodes'        => $postcodes,
 		];
@@ -442,5 +472,55 @@ final class LegacyDestinationCoverageMigrator {
 
 	private function resolve_named( string $country_code, int $parent_id, string $name, GeographyLocationType $type ): ?CanonicalLocation {
 		return $this->resolver->exact_named_child( $country_code, $parent_id, $name, $type );
+	}
+
+	/**
+	 * @param list<\CetechDeliveryEngine\Domain\Coverage\CoverageGroup> $groups
+	 */
+	private function has_protected_canonical_coverage( array $groups ): bool {
+		foreach ( $groups as $group ) {
+			if ( $group->isUsable() ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * @param list<\CetechDeliveryEngine\Domain\Coverage\CoverageGroup> $groups
+	 */
+	private function is_manual_or_resolved_coverage( array $groups ): bool {
+		foreach ( $groups as $group ) {
+			if ( ! $group->isUsable() ) {
+				continue;
+			}
+			$origin = (string) ( $group->legacy_migration['origin'] ?? '' );
+			if ( 'legacy_migration' !== $origin || isset( $group->legacy_migration['scope_replacement'] ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * @param list<\CetechDeliveryEngine\Domain\Coverage\CoverageGroup> $groups
+	 */
+	private function is_revisit_candidate( array $groups ): bool {
+		if ( [] === $groups ) {
+			return true;
+		}
+		foreach ( $groups as $group ) {
+			$origin = (string) ( $group->legacy_migration['origin'] ?? '' );
+			if ( 'legacy_migration' !== $origin ) {
+				return false;
+			}
+			if ( $group->isUsable() ) {
+				return false;
+			}
+		}
+
+		return true;
 	}
 }

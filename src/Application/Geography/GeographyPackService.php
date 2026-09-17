@@ -36,7 +36,8 @@ final class GeographyPackService {
 	public function __construct(
 		private GeographyPackRepositoryInterface $packs,
 		private GeoNamesPackImporter $importer,
-		private WooCommerceGeographyBootstrap $woo_bootstrap
+		private WooCommerceGeographyBootstrap $woo_bootstrap,
+		private GeoNamesPackPreflight $preflight = new GeoNamesPackPreflight()
 	) {
 	}
 
@@ -73,7 +74,7 @@ final class GeographyPackService {
 			return $this->update( $country_code, $file_path );
 		}
 
-		$this->enqueue_tick( $pack->id, $file_path );
+		$this->enqueue_tick( $pack->id, $file_path, $pack->target_token() );
 
 		return $this->packs->find_by_id( $pack->id ) ?? $pack;
 	}
@@ -95,10 +96,32 @@ final class GeographyPackService {
 		}
 
 		$checksum = $this->checksum_of( $file_path );
+		$preflight = $this->preflight->validate( $file_path, $country_code );
+		if ( ! $preflight['ok'] ) {
+			$this->packs->update_progress(
+				$pack->id,
+				GeographyPackStatus::Failed,
+				'0',
+				$pack->progress,
+				$this->preflight_error_message( (string) $preflight['error'] )
+			);
+
+			return $this->packs->find_by_id( $pack->id ) ?? $pack;
+		}
+
 		$version  = $this->dataset_version( $file_path, $checksum );
 		$pack     = $this->importer->begin_dataset( $pack, $file_path, $checksum, $version );
-		$this->bump_revision();
-		$this->enqueue_tick( $pack->id, $file_path );
+		$stored   = $this->store_generation_file( $pack->country_code, $pack->target_generation(), $checksum, $file_path );
+		if ( '' !== $stored && $stored !== $file_path ) {
+			$pack = $this->packs->save(
+				[
+					'id'               => $pack->id,
+					'source_reference' => $stored,
+				]
+			);
+			$file_path = $stored;
+		}
+		$this->enqueue_tick( $pack->id, $file_path, $pack->target_token() );
 
 		return $this->packs->find_by_id( $pack->id ) ?? $pack;
 	}
@@ -142,7 +165,7 @@ final class GeographyPackService {
 			$pack->progress,
 			''
 		);
-		$this->enqueue_tick( $pack->id, $file_path );
+		$this->enqueue_tick( $pack->id, $file_path, $pack->target_token() );
 
 		return $this->packs->find_by_id( $pack->id ) ?? $pack;
 	}
@@ -170,7 +193,7 @@ final class GeographyPackService {
 			return $this->packs->find_by_id( $pack->id ) ?? $pack;
 		}
 
-		$this->packs->save(
+		$pack = $this->packs->save(
 			[
 				'id'               => $pack->id,
 				'country_code'     => $pack->country_code,
@@ -185,21 +208,22 @@ final class GeographyPackService {
 				'attribution_text' => GeoNamesPackImporter::ATTRIBUTION,
 				'status'           => GeographyPackStatus::Pending->value,
 				'import_cursor'    => '0',
-				'progress'         => [ 'phase' => 'download', 'processed' => 0, 'imported' => 0, 'skipped' => 0, 'total' => 0 ],
+				'progress'         => [
+					'phase'              => 'download',
+					'processed'          => 0,
+					'imported'           => 0,
+					'skipped'            => 0,
+					'total'              => 0,
+					'active_generation'  => (int) ( $pack->progress['active_generation'] ?? 0 ),
+					'target_generation'  => (int) ( $pack->progress['active_generation'] ?? 0 ) + 1,
+					'target_token'       => bin2hex( random_bytes( 8 ) ),
+					'last_successful'    => $pack->last_successful(),
+				],
 				'last_error'       => '',
 			]
 		);
 
-		if ( function_exists( 'as_enqueue_async_action' ) ) {
-			as_enqueue_async_action(
-				self::DOWNLOAD_HOOK,
-				[
-					'pack_id'      => $pack->id,
-					'country_code' => $country_code,
-				],
-				self::GROUP
-			);
-		}
+		$this->enqueue_download( $pack->id, $country_code, $pack->target_token() );
 
 		return $this->packs->find_by_id( $pack->id ) ?? $pack;
 	}
@@ -209,11 +233,17 @@ final class GeographyPackService {
 	 *
 	 * @return array<string, mixed>
 	 */
-	public function download_tick( int $pack_id, string $country_code ): array {
+	public function download_tick( int $pack_id, string $country_code, string $generation_token = '' ): array {
 		$country_code = strtoupper( trim( $country_code ) );
 		$pack         = $this->packs->find_by_id( $pack_id );
 		if ( ! $pack instanceof GeographyPack ) {
 			return [ 'status' => 'missing' ];
+		}
+		if ( '' === $generation_token ) {
+			$generation_token = $pack->target_token();
+		}
+		if ( $this->is_stale_token( $pack, $generation_token ) ) {
+			return [ 'status' => 'noop', 'reason' => 'stale_generation' ];
 		}
 
 		$url = self::geonames_url( $country_code );
@@ -263,7 +293,7 @@ final class GeographyPackService {
 
 		$ext = strtolower( (string) pathinfo( $original_name, PATHINFO_EXTENSION ) );
 		if ( 'txt' === $ext ) {
-			$dest = $dir . '/' . $country_code . '.txt';
+			$dest = $dir . '/' . $country_code . '.incoming.txt';
 			if ( ! @copy( $tmp_path, $dest ) ) {
 				return '';
 			}
@@ -288,12 +318,33 @@ final class GeographyPackService {
 	/**
 	 * @return array<string, mixed>
 	 */
-	public function tick( int $pack_id, string $file_path, int $batch_size = 100 ): array {
+	public function tick( int $pack_id, string $file_path, int $batch_size = 100, string $generation_token = '' ): array {
 		$pack = $this->packs->find_by_id( $pack_id );
 		if ( ! $pack instanceof GeographyPack ) {
 			return [ 'status' => 'missing' ];
 		}
+		if ( '' === $generation_token ) {
+			$generation_token = $pack->target_token();
+		}
+		if ( $this->is_stale_token( $pack, $generation_token ) ) {
+			return [ 'status' => 'noop', 'reason' => 'stale_generation' ];
+		}
+		if ( ! $this->acquire_pack_lock( $pack->id ) ) {
+			return [ 'status' => 'noop', 'reason' => 'locked' ];
+		}
 
+		try {
+			return $this->run_tick( $pack, $file_path, $batch_size );
+		} finally {
+			$this->release_pack_lock( $pack->id );
+		}
+	}
+
+	/**
+	 * @return array<string, mixed>
+	 */
+	private function run_tick( GeographyPack $pack, string $file_path, int $batch_size ): array {
+		$pack_id = $pack->id;
 		if ( '' === $file_path ) {
 			$file_path = (string) $pack->source_reference;
 		}
@@ -320,7 +371,8 @@ final class GeographyPackService {
 		$result = $this->importer->import_batch( $pack, $file_path, $batch_size );
 		$status = (string) ( $result['status'] ?? '' );
 		if ( GeographyPackStatus::Importing->value === $status ) {
-			$this->enqueue_tick( $pack_id, $file_path );
+			$fresh = $this->packs->find_by_id( $pack_id );
+			$this->enqueue_tick( $pack_id, $file_path, $fresh instanceof GeographyPack ? $fresh->target_token() : $pack->target_token() );
 		}
 		if ( GeographyPackStatus::Ready->value === $status ) {
 			$this->bump_revision();
@@ -357,17 +409,100 @@ final class GeographyPackService {
 		return $date . '.' . substr( $checksum, 0, 12 );
 	}
 
-	private function enqueue_tick( int $pack_id, string $file_path ): void {
+	private function enqueue_tick( int $pack_id, string $file_path, string $generation_token = '' ): void {
 		if ( function_exists( 'as_enqueue_async_action' ) ) {
-			as_enqueue_async_action(
-				self::HOOK,
-				[
-					'pack_id'     => $pack_id,
-					'source_path' => $file_path,
-				],
-				self::GROUP
-			);
+			$group = $this->pack_action_group( $pack_id );
+			if ( function_exists( 'as_unschedule_all_actions' ) ) {
+				as_unschedule_all_actions( self::HOOK, null, $group );
+			}
+			$args = [
+				'pack_id'          => $pack_id,
+				'source_path'      => $file_path,
+				'generation_token' => $generation_token,
+			];
+			as_enqueue_async_action( self::HOOK, $args, $group, true );
 		}
+	}
+
+	private function enqueue_download( int $pack_id, string $country_code, string $generation_token ): void {
+		if ( ! function_exists( 'as_enqueue_async_action' ) ) {
+			return;
+		}
+		$group = $this->pack_action_group( $pack_id );
+		if ( function_exists( 'as_unschedule_all_actions' ) ) {
+			as_unschedule_all_actions( self::DOWNLOAD_HOOK, null, $group );
+			as_unschedule_all_actions( self::HOOK, null, $group );
+		}
+		as_enqueue_async_action(
+			self::DOWNLOAD_HOOK,
+			[
+				'pack_id'          => $pack_id,
+				'country_code'     => $country_code,
+				'generation_token' => $generation_token,
+			],
+			$group,
+			true
+		);
+	}
+
+	private function pack_action_group( int $pack_id ): string {
+		return self::GROUP . '-' . $pack_id;
+	}
+
+	private function is_stale_token( GeographyPack $pack, string $generation_token ): bool {
+		$expected = $pack->target_token();
+		if ( '' === $expected ) {
+			return false;
+		}
+
+		return $generation_token !== $expected;
+	}
+
+	private function acquire_pack_lock( int $pack_id ): bool {
+		if ( ! function_exists( 'get_transient' ) || ! function_exists( 'set_transient' ) ) {
+			return true;
+		}
+		$key = 'cetech_de_geo_pack_lock_' . $pack_id;
+		if ( false !== get_transient( $key ) ) {
+			return false;
+		}
+		set_transient( $key, 1, 45 );
+
+		return true;
+	}
+
+	private function release_pack_lock( int $pack_id ): void {
+		if ( function_exists( 'delete_transient' ) ) {
+			delete_transient( 'cetech_de_geo_pack_lock_' . $pack_id );
+		}
+	}
+
+	private function store_generation_file( string $country_code, int $generation, string $checksum, string $source_path ): string {
+		$dir = $this->storage_dir();
+		if ( '' === $dir || ! is_readable( $source_path ) || $generation <= 0 ) {
+			return $source_path;
+		}
+		$dest = $dir . '/' . strtoupper( $country_code ) . '.' . $generation . '.' . substr( $checksum, 0, 12 ) . '.txt';
+		if ( $dest === $source_path ) {
+			return $source_path;
+		}
+		if ( ! @copy( $source_path, $dest ) ) {
+			return $source_path;
+		}
+
+		return $dest;
+	}
+
+	private function preflight_error_message( string $code ): string {
+		return match ( $code ) {
+			'empty' => 'The geography pack file is empty.',
+			'corrupt' => 'The geography pack file is not valid GeoNames tabular data.',
+			'wrong_country' => 'The geography pack does not contain rows for the selected country.',
+			'zero_relevant_geography' => 'The geography pack has no usable geography rows.',
+			'minimum_hierarchy_missing' => 'The geography pack is missing a minimum viable administrative hierarchy.',
+			'unreadable' => 'The geography pack file is not readable.',
+			default => 'The geography pack failed preflight validation.',
+		};
 	}
 
 	private function bump_revision(): void {
@@ -492,7 +627,7 @@ final class GeographyPackService {
 			return '';
 		}
 
-		$target = $dest_real . DIRECTORY_SEPARATOR . $country_code . '.txt';
+		$target = $dest_real . DIRECTORY_SEPARATOR . $country_code . '.incoming.txt';
 		if ( ! str_starts_with( $target, $dest_real ) ) {
 			$zip->close();
 

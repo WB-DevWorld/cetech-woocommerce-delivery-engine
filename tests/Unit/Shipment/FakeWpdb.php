@@ -33,6 +33,8 @@ final class FakeWpdb {
 
 	public ?string $fail_next_insert_table = null;
 
+	public ?string $fail_next_delete_table = null;
+
 	/** @var array<string, list<array<string, mixed>>>|null */
 	private ?array $transaction_tables = null;
 
@@ -227,6 +229,12 @@ final class FakeWpdb {
 	public function delete( string $table, array $where, $where_format = null ) {
 		unset( $where_format );
 		$this->last_error = '';
+		if ( $this->fail_next_delete_table === $table ) {
+			$this->fail_next_delete_table = null;
+			$this->last_error             = 'Simulated delete failure';
+
+			return false;
+		}
 		$deleted          = 0;
 		$kept             = [];
 

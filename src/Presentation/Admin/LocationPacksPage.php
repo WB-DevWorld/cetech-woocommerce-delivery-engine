@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Geography\AdminGeographyEndpoint;
 use CetechDeliveryEngine\Application\Geography\GeographyPackService;
+use CetechDeliveryEngine\Application\Geography\Schema6CoverageUpgradeService;
 use CetechDeliveryEngine\Domain\Enum\GeographyPackStatus;
 
 final class LocationPacksPage {
@@ -16,9 +17,12 @@ final class LocationPacksPage {
 
 	private const ACTION_TICK = 'cetech_de_tick_location_pack';
 
+	private const ACTION_RECONCILE = 'cetech_de_reconcile_legacy_coverage';
+
 	public function __construct(
 		private GeographyPackService $packs,
-		private AdminActionHandler $action_handler
+		private AdminActionHandler $action_handler,
+		private ?Schema6CoverageUpgradeService $upgrade = null
 	) {
 	}
 
@@ -80,6 +84,36 @@ final class LocationPacksPage {
 				$this->packs->retry( $pack_id );
 			}
 			$this->packs->tick( $pack_id, '', 150 );
+		}
+
+		if ( $this->action_handler->verify_post( self::ACTION_RECONCILE, self::ACTION_RECONCILE, 'manage_delivery_zones', self::SLUG ) ) {
+			if ( ! $this->upgrade instanceof Schema6CoverageUpgradeService ) {
+				$this->action_handler->notices()->add_error( __( 'Legacy coverage reconciliation is not available.', 'cetech-woocommerce-delivery-engine' ) );
+				return;
+			}
+			$result = $this->upgrade->reconcile( true );
+			$migration = is_array( $result['migration'] ?? null ) ? $result['migration'] : [];
+			$this->action_handler->notices()->add_success(
+				sprintf(
+					/* translators: 1: scanned, 2: skipped manual, 3: reconciled, 4: still review, 5: activated */
+					__( 'Safe reconciliation finished. Scanned %1$d, skipped manual %2$d, reconciled %3$d, still review required %4$d, activated %5$d.', 'cetech-woocommerce-delivery-engine' ),
+					(int) ( $migration['scanned'] ?? 0 ),
+					(int) ( $migration['skipped_manual'] ?? 0 ),
+					(int) ( $migration['reconciled'] ?? 0 ),
+					(int) ( $migration['still_review_required'] ?? 0 ),
+					(int) ( $migration['activated'] ?? 0 )
+				)
+			);
+			$warnings = is_array( $migration['warnings'] ?? null ) ? $migration['warnings'] : [];
+			if ( [] !== $warnings ) {
+				$this->action_handler->notices()->add_warning(
+					sprintf(
+						/* translators: %d warning count */
+						_n( '%d reconciliation warning was recorded.', '%d reconciliation warnings were recorded.', count( $warnings ), 'cetech-woocommerce-delivery-engine' ),
+						count( $warnings )
+					)
+				);
+			}
 		}
 	}
 
@@ -154,6 +188,14 @@ final class LocationPacksPage {
 			}
 			echo '</td></tr>';
 		}
-		echo '</tbody></table></div>';
+		echo '</tbody></table>';
+
+		echo '<h2>' . esc_html__( 'Safe post-pack reconciliation', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
+		echo '<p>' . esc_html__( 'Revisit only Delivery Areas with no coverage, migration-generated review-required groups, or unresolved migration records. Active manually created canonical coverage is never replaced.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '<form method="post">';
+		wp_nonce_field( self::ACTION_RECONCILE, self::ACTION_RECONCILE );
+		submit_button( __( 'Run safe legacy reconciliation', 'cetech-woocommerce-delivery-engine' ), 'secondary' );
+		echo '</form>';
+		echo '</div>';
 	}
 }

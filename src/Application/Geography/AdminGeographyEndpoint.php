@@ -92,10 +92,14 @@ final class AdminGeographyEndpoint {
 
 		$items = [];
 		foreach ( $this->locations->search_localities( $country, $parent_id, $query, $limit, ( $page - 1 ) * $limit ) as $location ) {
-			$items[] = [
-				'key'  => $location->location_key,
-				'id'   => $location->id,
-				'name' => $location->canonical_name,
+			$breadcrumb = $this->locations->display_breadcrumb( $location );
+			$label      = '' !== $breadcrumb ? $location->canonical_name . ' — ' . $breadcrumb : $location->canonical_name;
+			$items[]    = [
+				'key'        => $location->location_key,
+				'id'         => $location->id,
+				'name'       => $location->canonical_name,
+				'label'      => $label,
+				'breadcrumb' => $breadcrumb,
 			];
 		}
 

@@ -32,7 +32,11 @@ final class WpdbLocationAliasRepository implements LocationAliasRepositoryInterf
 		if ( null !== $parent_id && $parent_id > 0 ) {
 			$sql   .= ' AND (loc.parent_location_id = %d OR loc.ancestry_path LIKE %s)';
 			$args[] = $parent_id;
-			$args[] = '%/' . $parent_id . '/%';
+			$parent = $this->locations->find_by_id( $parent_id );
+			$path   = $parent instanceof CanonicalLocation && '' !== $parent->ancestry_path
+				? $parent->ancestry_path
+				: '/' . $parent_id . '/';
+			$args[] = $wpdb->esc_like( $path ) . '%';
 		}
 		$sql .= ' LIMIT 1';
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared

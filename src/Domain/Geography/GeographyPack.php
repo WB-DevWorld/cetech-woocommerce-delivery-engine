@@ -69,6 +69,18 @@ final class GeographyPack {
 		);
 	}
 
+	public function active_generation(): int {
+		return (int) ( $this->progress['active_generation'] ?? 0 );
+	}
+
+	public function target_generation(): int {
+		return (int) ( $this->progress['target_generation'] ?? 0 );
+	}
+
+	public function target_token(): string {
+		return (string) ( $this->progress['target_token'] ?? '' );
+	}
+
 	public function has_usable_dataset(): bool {
 		$successful = $this->last_successful();
 		if ( [] !== $successful && '' !== (string) ( $successful['checksum'] ?? '' ) ) {

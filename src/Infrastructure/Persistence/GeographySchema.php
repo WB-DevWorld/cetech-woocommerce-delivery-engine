@@ -74,6 +74,8 @@ final class GeographySchema {
 				longitude decimal(10,7) DEFAULT NULL,
 				status varchar(16) NOT NULL,
 				ancestry_path varchar(191) NOT NULL DEFAULT '',
+				generation int unsigned NOT NULL DEFAULT 0,
+				draft_json longtext NULL,
 				created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				PRIMARY KEY  (id),
@@ -83,6 +85,7 @@ final class GeographySchema {
 				KEY parent_id (parent_location_id),
 				KEY type_level (location_type, administrative_level),
 				KEY ancestry_path (ancestry_path),
+				KEY generation_status (generation, status),
 				KEY status (status)
 			) ENGINE=InnoDB {$charset_collate};",
 			self::ALIASES_SUFFIX => "CREATE TABLE {$aliases} (
@@ -155,6 +158,9 @@ final class GeographySchema {
 				'KEY country_parent_type_status (country_code, parent_location_id, location_type, status)',
 				'KEY country_normalized (country_code, normalized_name, parent_location_id)',
 				'KEY ancestry_path (ancestry_path)',
+				'generation',
+				'draft_json',
+				'KEY generation_status (generation, status)',
 				'ENGINE=InnoDB',
 			],
 			self::ALIASES_SUFFIX => [

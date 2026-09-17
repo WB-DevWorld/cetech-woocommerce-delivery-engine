@@ -296,6 +296,7 @@ $is_schema5_release = str_contains( $header_source, '1.0.0-dev.bulk' )
 
 $is_schema6_release = str_contains( $header_source, '1.0.0-dev.geo' );
 
+$target = 'unknown';
 if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 	$target = ( new ReflectionClass( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) )->getConstant( 'TARGET' );
 	if ( $is_schema6_release ) {
@@ -733,7 +734,7 @@ fwrite( STDOUT, "Package verification OK\n" );
 fwrite( STDOUT, "- ConfigurationHealthChecker autoloads from Application\\Diagnostics\n" );
 fwrite( STDOUT, "- Plugin.php import present\n" );
 fwrite( STDOUT, "- Boot factory class references resolve\n" );
-fwrite( STDOUT, "- Schema target 4; main ECR + variable ECR flags default OFF\n" );
+fwrite( STDOUT, "- Schema target " . (string) $target . "; main ECR + variable ECR flags default OFF\n" );
 fwrite( STDOUT, "- Stage 6 variation endpoint/router/inspector/assets present\n" );
 fwrite( STDOUT, "- Variable frontend JS/CSS present with found_variation/reset_data/requestToken\n" );
 fwrite( STDOUT, "- Stage 8 grouping/shipping/order snapshot classes autoload\n" );

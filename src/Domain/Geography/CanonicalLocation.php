@@ -27,7 +27,9 @@ final class CanonicalLocation {
 		public readonly ?float $latitude,
 		public readonly ?float $longitude,
 		public readonly RecordStatus $status,
-		public readonly string $ancestry_path
+		public readonly string $ancestry_path,
+		public readonly int $generation = 0,
+		public readonly string $draft_json = ''
 	) {
 	}
 
@@ -101,7 +103,9 @@ final class CanonicalLocation {
 			isset( $row['latitude'] ) && '' !== (string) $row['latitude'] ? (float) $row['latitude'] : null,
 			isset( $row['longitude'] ) && '' !== (string) $row['longitude'] ? (float) $row['longitude'] : null,
 			$status,
-			(string) ( $row['ancestry_path'] ?? '' )
+			(string) ( $row['ancestry_path'] ?? '' ),
+			(int) ( $row['generation'] ?? 0 ),
+			(string) ( $row['draft_json'] ?? '' )
 		);
 	}
 }

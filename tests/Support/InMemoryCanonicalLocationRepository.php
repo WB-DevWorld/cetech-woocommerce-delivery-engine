@@ -100,11 +100,13 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		return null;
 	}
 
-	public function find_exact_child( string $country_code, ?int $parent_id, string $normalized_name, ?GeographyLocationType $type = null ): ?CanonicalLocation {
+	public function find_exact_child( string $country_code, ?int $parent_id, string $normalized_name, ?GeographyLocationType $type = null, ?int $include_generation = null ): ?CanonicalLocation {
 		$country_code    = strtoupper( trim( $country_code ) );
 		$normalized_name = GeographyNameNormalizer::normalize( $normalized_name );
 		foreach ( $this->locations as $location ) {
-			if ( ! $location->isActive() || $location->country_code !== $country_code || $location->normalized_name !== $normalized_name ) {
+			$visible = $location->isActive()
+				|| ( null !== $include_generation && $include_generation > 0 && $location->generation === $include_generation );
+			if ( ! $visible || $location->country_code !== $country_code || $location->normalized_name !== $normalized_name ) {
 				continue;
 			}
 			$parent = $parent_id ?? 0;
@@ -144,7 +146,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		$search = GeographyNameNormalizer::normalize( $search );
 		$count  = 0;
 		foreach ( $this->list_children( $parent_id, $type, 10000, 0 ) as $location ) {
-			if ( '' === $search || str_contains( $location->normalized_name, $search ) ) {
+			if ( '' === $search || str_starts_with( $location->normalized_name, $search ) ) {
 				++$count;
 			}
 		}
@@ -172,7 +174,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			if ( $type instanceof GeographyLocationType && $location->location_type !== $type ) {
 				continue;
 			}
-			if ( '' !== $search && ! str_contains( $location->normalized_name, $search ) && ! str_contains( GeographyNameNormalizer::normalize( $location->ascii_name ), $search ) && ! $this->alias_contains( $location->id, $search ) ) {
+			if ( '' !== $search && ! str_starts_with( $location->normalized_name, $search ) && ! str_starts_with( GeographyNameNormalizer::normalize( $location->ascii_name ), $search ) && ! $this->alias_contains( $location->id, $search ) ) {
 				continue;
 			}
 			++$count;
@@ -193,7 +195,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			if ( $parent instanceof CanonicalLocation && ! LocationAncestry::is_self_or_descendant( $location, $parent ) ) {
 				continue;
 			}
-			if ( '' !== $query && ! str_contains( $location->normalized_name, $query ) && ! str_contains( GeographyNameNormalizer::normalize( $location->ascii_name ), $query ) && ! $this->alias_contains( $location->id, $query ) ) {
+			if ( '' !== $query && ! str_starts_with( $location->normalized_name, $query ) && ! str_starts_with( GeographyNameNormalizer::normalize( $location->ascii_name ), $query ) && ! $this->alias_contains( $location->id, $query ) ) {
 				continue;
 			}
 			$out[] = $location;
@@ -244,7 +246,9 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			$location->latitude,
 			$location->longitude,
 			$location->status,
-			$path
+			$path,
+			$location->generation,
+			$location->draft_json
 		);
 		$this->locations[ $id ] = $saved;
 
@@ -267,7 +271,9 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 				$existing->latitude,
 				$existing->longitude,
 				$existing->status,
-				$path
+				$path,
+				$existing->generation,
+				$existing->draft_json
 			);
 		}
 	}
@@ -279,9 +285,6 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 
 		$updated = 0;
 		foreach ( $this->locations as $location ) {
-			if ( $updated >= $limit ) {
-				break;
-			}
 			if ( $location->id === $root_id || ! str_starts_with( $location->ancestry_path, $old_path ) ) {
 				continue;
 			}
@@ -293,9 +296,120 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		return $updated;
 	}
 
+	public function promote_generation( int $generation ): int {
+		if ( $generation <= 0 ) {
+			return 0;
+		}
+
+		$activated = 0;
+		foreach ( $this->locations as $location ) {
+			$draft = '' !== $location->draft_json ? json_decode( $location->draft_json, true ) : null;
+			if ( is_array( $draft ) && (int) ( $draft['generation'] ?? 0 ) === $generation ) {
+				$name   = trim( (string) ( $draft['canonical_name'] ?? $location->canonical_name ) );
+				$parent = isset( $draft['parent_location_id'] ) ? (int) $draft['parent_location_id'] : $location->parent_location_id;
+				$old    = $location->ancestry_path;
+				$saved  = $this->save(
+					new CanonicalLocation(
+						$location->id,
+						$location->location_key,
+						$location->country_code,
+						( $parent ?? 0 ) > 0 ? $parent : null,
+						$location->location_type,
+						$location->administrative_level,
+						'' !== $name ? $name : $location->canonical_name,
+						GeographyNameNormalizer::normalize( '' !== $name ? $name : $location->canonical_name ),
+						(string) ( $draft['ascii_name'] ?? $location->ascii_name ),
+						isset( $draft['latitude'] ) ? (float) $draft['latitude'] : $location->latitude,
+						isset( $draft['longitude'] ) ? (float) $draft['longitude'] : $location->longitude,
+						$location->status,
+						$location->ancestry_path,
+						$location->generation,
+						''
+					)
+				);
+				if ( ( $parent ?? 0 ) > 0 && $parent !== $location->parent_location_id ) {
+					$parent_loc = $this->locations[ (int) $parent ] ?? null;
+					if ( $parent_loc instanceof CanonicalLocation ) {
+						$new_path = LocationAncestry::append_path( $parent_loc->ancestry_path, $location->id );
+						$this->update_ancestry_path( $location->id, $new_path );
+						if ( '' !== $old && $old !== $new_path ) {
+							$this->rebuild_descendant_ancestry( $location->id, $old, $new_path );
+						}
+					}
+				}
+				$location = $this->locations[ $location->id ] ?? $saved;
+			}
+			if ( $location->generation === $generation && RecordStatus::Inactive === $location->status ) {
+				$this->locations[ $location->id ] = new CanonicalLocation(
+					$location->id,
+					$location->location_key,
+					$location->country_code,
+					$location->parent_location_id,
+					$location->location_type,
+					$location->administrative_level,
+					$location->canonical_name,
+					$location->normalized_name,
+					$location->ascii_name,
+					$location->latitude,
+					$location->longitude,
+					RecordStatus::Active,
+					$location->ancestry_path,
+					$location->generation,
+					''
+				);
+				++$activated;
+			}
+		}
+
+		return $activated;
+	}
+
+	public function find_unique_administrative_core( string $country_code, int $parent_id, string $name, ?int $level = null ): ?CanonicalLocation {
+		$core = GeographyNameNormalizer::administrative_core( $name );
+		if ( '' === $core || $parent_id <= 0 ) {
+			return null;
+		}
+		$matches = [];
+		foreach ( $this->locations as $location ) {
+			if ( ! $location->isActive() || ! $location->isAdministrative() || $location->parent_location_id !== $parent_id ) {
+				continue;
+			}
+			if ( null !== $level && $level > 0 && $location->administrative_level !== $level ) {
+				continue;
+			}
+			if ( GeographyNameNormalizer::administrative_core( $location->canonical_name ) === $core
+				|| GeographyNameNormalizer::administrative_core( $location->ascii_name ) === $core ) {
+				$matches[ $location->id ] = $location;
+			}
+		}
+
+		return 1 === count( $matches ) ? array_values( $matches )[0] : null;
+	}
+
+	public function display_breadcrumb( CanonicalLocation $location ): string {
+		$ids = array_values(
+			array_filter(
+				array_map( 'intval', explode( '/', trim( $location->ancestry_path, '/' ) ) )
+			)
+		);
+		$names = [];
+		foreach ( array_reverse( $ids ) as $id ) {
+			if ( $id === $location->id ) {
+				continue;
+			}
+			$node = $this->locations[ $id ] ?? null;
+			if ( ! $node instanceof CanonicalLocation || $node->isCountry() ) {
+				continue;
+			}
+			$names[] = $node->canonical_name;
+		}
+
+		return implode( ', ', $names );
+	}
+
 	private function alias_contains( int $location_id, string $query ): bool {
 		foreach ( $this->aliases[ $location_id ] ?? [] as $alias ) {
-			if ( str_contains( $alias['normalized'], $query ) ) {
+			if ( str_starts_with( $alias['normalized'], $query ) ) {
 				return true;
 			}
 		}

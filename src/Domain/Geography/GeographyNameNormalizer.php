@@ -20,6 +20,45 @@ final class GeographyNameNormalizer {
 		return self::fold_ascii( $folded );
 	}
 
+	/**
+	 * Country-neutral administrative core name. Strips trailing type tokens
+	 * such as region/state/province so "Greater Accra Region" and
+	 * "Greater Accra" can reconcile when the remainder is unique.
+	 */
+	public static function administrative_core( string $raw ): string {
+		$normalized = self::normalize( $raw );
+		$tokens     = preg_split( '/\s+/', $normalized ) ?: [];
+		$suffixes   = [
+			'region',
+			'state',
+			'province',
+			'prefecture',
+			'district',
+			'county',
+			'municipality',
+			'territory',
+			'division',
+			'oblast',
+			'governorate',
+			'department',
+			'parish',
+			'canton',
+			'voivodeship',
+			'emirate',
+			'krai',
+			'area',
+			'zone',
+			'borough',
+			'township',
+			'commune',
+		];
+		while ( count( $tokens ) > 1 && in_array( (string) end( $tokens ), $suffixes, true ) ) {
+			array_pop( $tokens );
+		}
+
+		return implode( ' ', $tokens );
+	}
+
 	public static function fold_ascii( string $value ): string {
 		if ( '' === $value ) {
 			return '';
