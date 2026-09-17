@@ -12,8 +12,6 @@ use CetechDeliveryEngine\Domain\Enum\GeographyLocationType;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Domain\Geography\CanonicalLocation;
 use CetechDeliveryEngine\Domain\Geography\CanonicalLocationRepositoryInterface;
-use CetechDeliveryEngine\Domain\Geography\GeographyNameNormalizer;
-use CetechDeliveryEngine\Domain\Geography\LocationAncestry;
 use CetechDeliveryEngine\Domain\Zone\DestinationRuleRepositoryInterface;
 use CetechDeliveryEngine\Domain\Zone\DestinationZoneRepositoryInterface;
 
@@ -236,9 +234,6 @@ final class LegacyDestinationCoverageMigrator {
 		$unmapped_city   = [];
 		foreach ( $cities as $city ) {
 			$found = $this->resolve_named( $country_code, $parent_for_city->id, $city, GeographyLocationType::Locality );
-			if ( ! $found instanceof CanonicalLocation ) {
-				$found = $this->ensure_named_locality( $country_code, $parent_for_city, $city );
-			}
 			if ( $found instanceof CanonicalLocation ) {
 				$city_locations[] = $found;
 			} else {
@@ -264,6 +259,7 @@ final class LegacyDestinationCoverageMigrator {
 			$root = $region_loc instanceof CanonicalLocation ? $region_loc : $country;
 			$review = count( $city_locations ) > 1;
 			$reason = $review ? 'duplicate_legacy_same_level' : 'legacy_single_location';
+			$status = $review ? RecordStatus::Inactive : RecordStatus::Active;
 			if ( 1 === count( $city_locations ) && ! $region_loc instanceof CanonicalLocation ) {
 				return [
 					$this->entire_group(
@@ -287,7 +283,7 @@ final class LegacyDestinationCoverageMigrator {
 					$legacy,
 					$reason,
 					$review,
-					RecordStatus::Active,
+					$status,
 					$postcodes,
 					10
 				),
@@ -446,41 +442,5 @@ final class LegacyDestinationCoverageMigrator {
 
 	private function resolve_named( string $country_code, int $parent_id, string $name, GeographyLocationType $type ): ?CanonicalLocation {
 		return $this->resolver->exact_named_child( $country_code, $parent_id, $name, $type );
-	}
-
-	private function ensure_named_locality( string $country_code, CanonicalLocation $parent, string $name ): ?CanonicalLocation {
-		$name = trim( $name );
-		if ( '' === $name ) {
-			return null;
-		}
-
-		$existing = $this->resolve_named( $country_code, $parent->id, $name, GeographyLocationType::Locality );
-		if ( $existing instanceof CanonicalLocation ) {
-			return $existing;
-		}
-
-		$saved = $this->locations->save(
-			new CanonicalLocation(
-				0,
-				GeographyNameNormalizer::new_location_key(),
-				$country_code,
-				$parent->id,
-				GeographyLocationType::Locality,
-				null,
-				$name,
-				GeographyNameNormalizer::normalize( $name ),
-				GeographyNameNormalizer::fold_ascii( $name ),
-				null,
-				null,
-				RecordStatus::Active,
-				LocationAncestry::append_path( $parent->ancestry_path, 0 )
-			)
-		);
-		$this->locations->update_ancestry_path(
-			$saved->id,
-			LocationAncestry::append_path( $parent->ancestry_path, $saved->id )
-		);
-
-		return $this->locations->find_by_id( $saved->id ) ?? $saved;
 	}
 }

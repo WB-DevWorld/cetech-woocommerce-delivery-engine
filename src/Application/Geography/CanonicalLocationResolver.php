@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Application\Geography;
 
 use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
+use CetechDeliveryEngine\Domain\Enum\CanonicalResolutionContext;
 use CetechDeliveryEngine\Domain\Enum\GeographyLocationType;
 use CetechDeliveryEngine\Domain\Geography\CanonicalLocation;
 use CetechDeliveryEngine\Domain\Geography\CanonicalLocationRepositoryInterface;
@@ -28,14 +29,18 @@ final class CanonicalLocationResolver {
 	) {
 	}
 
-	public function resolve_from_matching( MatchingLocation $matching ): ResolvedDestination {
+	public function resolve_from_matching(
+		MatchingLocation $matching,
+		CanonicalResolutionContext $context = CanonicalResolutionContext::WooCommerceDestination
+	): ResolvedDestination {
 		return $this->resolve(
 			$matching->country_identity,
 			$matching->state_identity,
 			$matching->state,
 			$matching->city,
 			$matching->postcode,
-			$matching->canonical_location_key
+			$matching->canonical_location_key,
+			$context
 		);
 	}
 
@@ -45,7 +50,8 @@ final class CanonicalLocationResolver {
 		string $admin_label,
 		string $locality_label,
 		string $postcode,
-		string $canonical_key = ''
+		string $canonical_key = '',
+		CanonicalResolutionContext $context = CanonicalResolutionContext::WooCommerceDestination
 	): ResolvedDestination {
 		$country_code  = strtoupper( trim( $country_code ) );
 		$admin_code    = trim( $admin_code );
@@ -80,8 +86,14 @@ final class CanonicalLocationResolver {
 		}
 
 		$parent_for_locality = $admin instanceof CanonicalLocation ? $admin : $country;
-		$pack_ready          = $this->country_has_ready_pack( $country_code );
-		if ( $parent_for_locality instanceof CanonicalLocation && '' !== $locality_label && ( ! $pack_ready || '' !== $canonical_key ) ) {
+		$pack_usable         = $this->country_has_usable_pack( $country_code );
+		$allow_text_locality = CanonicalResolutionContext::WooCommerceDestination === $context
+			|| ! $pack_usable
+			|| '' !== $canonical_key;
+		if ( CanonicalResolutionContext::ShopperSelector === $context && $pack_usable && '' !== $locality_label && '' === $canonical_key ) {
+			$allow_text_locality = false;
+		}
+		if ( $parent_for_locality instanceof CanonicalLocation && '' !== $locality_label && $allow_text_locality ) {
 			$locality = $this->exact_under_parent( $country_code, $parent_for_locality->id, $locality_label, GeographyLocationType::Locality );
 		}
 
@@ -149,17 +161,21 @@ final class CanonicalLocationResolver {
 		return $this->aliases->find_exact( $country_code, $normalized, $parent_id );
 	}
 
-	public function country_has_ready_pack( string $country_code ): bool {
+	public function country_has_usable_pack( string $country_code ): bool {
 		if ( ! $this->packs instanceof GeographyPackRepositoryInterface ) {
 			return false;
 		}
 		foreach ( $this->packs->list_all() as $pack ) {
-			if ( $pack->country_code === strtoupper( $country_code ) && 'ready' === $pack->status->value ) {
+			if ( $pack->country_code === strtoupper( $country_code ) && $pack->has_usable_dataset() ) {
 				return true;
 			}
 		}
 
 		return false;
+	}
+
+	public function country_has_ready_pack( string $country_code ): bool {
+		return $this->country_has_usable_pack( $country_code );
 	}
 
 	private function ancestry_agrees( CanonicalLocation $location, ?CanonicalLocation $country, string $admin_code, string $admin_label ): bool {

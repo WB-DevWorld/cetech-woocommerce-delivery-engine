@@ -377,4 +377,73 @@ describe('Product delivery fulfilment switcher', () => {
 		expect(document.querySelector('[data-cetech-de-reveal="locality"]').hidden).toBe(false);
 		expect(document.querySelector('[name="cetech_de_matching_postcode"]').value).toBe('');
 	});
+
+	it('selecting a locality requests delivery options with the canonical key', async () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<fieldset data-cetech-de-selector="1" data-product-id="16">
+					<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">
+						<select name="cetech_de_matching_country"><option value="GH" selected>Ghana</option></select>
+						<select name="cetech_de_matching_state"><option value="AA" selected data-location-key="loc-ga">Greater Accra</option></select>
+						<input name="cetech_de_matching_city" value="" />
+						<ul class="cetech-de-locality-results" hidden></ul>
+						<input type="hidden" name="cetech_de_matching_location_key" data-cetech-de-location-key="1" value="" />
+					</div>
+					<div data-cetech-de-status></div>
+					<div data-cetech-de-options></div>
+				</fieldset>
+			</form>
+		`;
+		const bodies = [];
+		window.cetechDeMatchingLocation = {
+			ajaxUrl: '/admin-ajax.php',
+			action: 'cetech_de_matching_location_options',
+			nonce: 'n',
+			productId: 16,
+			geography: {
+				searchAction: 'cetech_de_geography_locality_search',
+				searchNonce: 's',
+				postcodeAction: 'cetech_de_geography_postcode_relevance',
+				postcodeNonce: 'p'
+			}
+		};
+		window.fetch = async (_url, init) => {
+			const body = String(init && init.body ? init.body : '');
+			bodies.push(body);
+			if (body.includes('cetech_de_geography_locality_search')) {
+				return {
+					json: async () => ({
+						success: true,
+						data: { items: [{ key: 'loc-accra', name: 'Accra' }], has_more: false, request_token: '1' }
+					})
+				};
+			}
+			if (body.includes('cetech_de_geography_postcode_relevance')) {
+				return { json: async () => ({ success: true, data: { visible: false } }) };
+			}
+			return {
+				json: async () => ({
+					success: true,
+					data: { status: 'ok', message: '', options: [], has_delivery: true, has_pickup: false }
+				})
+			};
+		};
+		const api = loadSelector();
+		api.bindAll(document);
+		const city = document.querySelector('[name="cetech_de_matching_city"]');
+		city.value = 'Acc';
+		city.dispatchEvent(new Event('input', { bubbles: true }));
+		await new Promise((r) => setTimeout(r, 350));
+		const option = document.querySelector('.cetech-de-locality-results [role="option"]');
+		expect(option).toBeTruthy();
+		option.click();
+		await new Promise((r) => setTimeout(r, 50));
+		expect(document.querySelector('[name="cetech_de_matching_city"]').value).toBe('Accra');
+		expect(document.querySelector('[name="cetech_de_matching_location_key"]').value).toBe('loc-accra');
+		const optionsRequest = bodies.find((body) => body.includes('cetech_de_matching_location_options') && body.includes('location_key=loc-accra'));
+		expect(optionsRequest).toBeTruthy();
+		expect(optionsRequest).toContain('city=Accra');
+		const postcodeRequest = bodies.find((body) => body.includes('cetech_de_geography_postcode_relevance') && body.includes('parent_key=loc-accra'));
+		expect(postcodeRequest).toBeTruthy();
+	});
 });

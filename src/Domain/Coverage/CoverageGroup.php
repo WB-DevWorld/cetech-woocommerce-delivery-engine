@@ -30,7 +30,7 @@ final class CoverageGroup {
 	}
 
 	public function isUsable(): bool {
-		return RecordStatus::Active === $this->status && $this->root_location_id > 0;
+		return RecordStatus::Active === $this->status && ! $this->review_required && $this->root_location_id > 0;
 	}
 
 	/**

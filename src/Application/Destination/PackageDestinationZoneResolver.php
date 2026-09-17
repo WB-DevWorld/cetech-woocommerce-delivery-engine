@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Destination;
 
+use CetechDeliveryEngine\Domain\Enum\CanonicalResolutionContext;
+
 /**
  * Resolves destination zone IDs from a WooCommerce shipping package destination.
  */
@@ -38,6 +40,7 @@ final class PackageDestinationZoneResolver implements PackageDestinationZoneReso
 				'canonical_location_key' => (string) ( $destination['canonical_location_key'] ?? '' ),
 				'state'                  => (string) ( $destination['state'] ?? '' ),
 				'state_label'            => (string) ( $destination['state_label'] ?? $destination['state'] ?? '' ),
+				'resolution_context'     => (string) ( $destination['resolution_context'] ?? CanonicalResolutionContext::WooCommerceDestination->value ),
 			]
 		);
 

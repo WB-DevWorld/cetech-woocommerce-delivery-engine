@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\CustomerContext;
 
+use CetechDeliveryEngine\Application\Geography\CanonicalLocationResolver;
 use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
 
 /**
@@ -15,6 +16,11 @@ use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
 final class CustomerBrowsingLocationStore {
 
 	public const SESSION_KEY = 'cetech_de_browsing_matching_location';
+
+	public function __construct(
+		private ?CanonicalLocationResolver $resolver = null
+	) {
+	}
 
 	public function get(): ?MatchingLocation {
 		if ( ! function_exists( 'WC' ) ) {
@@ -32,8 +38,11 @@ final class CustomerBrowsingLocationStore {
 		}
 
 		$location = MatchingLocation::fromArray( $raw );
+		if ( ! $location->isPresent() ) {
+			return null;
+		}
 
-		return $location->isPresent() ? $location : null;
+		return $this->sanitize_restored( $location );
 	}
 
 	public function save( MatchingLocation $location ): void {
@@ -46,13 +55,42 @@ final class CustomerBrowsingLocationStore {
 			return;
 		}
 
+		$location = $this->sanitize_restored( $location );
 		$wc->session->set(
 			self::SESSION_KEY,
 			[
-				'country'  => $location->country,
-				'state'    => $location->state,
-				'city'     => $location->city,
-				'postcode' => $location->postcode,
+				'country'                => $location->country,
+				'state'                  => $location->state,
+				'city'                   => $location->city,
+				'postcode'               => $location->postcode,
+				'canonical_location_key' => $location->canonical_location_key,
+			]
+		);
+	}
+
+	private function sanitize_restored( MatchingLocation $location ): MatchingLocation {
+		if ( ! $this->resolver instanceof CanonicalLocationResolver ) {
+			return $location;
+		}
+		$country = $location->country_identity;
+		if ( ! $this->resolver->country_has_usable_pack( $country ) ) {
+			return $location;
+		}
+		$key = $location->canonical_location_key;
+		if ( '' !== $key && null !== $this->resolver->require_valid_key( $key, $country ) ) {
+			return $location;
+		}
+		if ( '' === trim( $location->city ) ) {
+			return $location;
+		}
+
+		return MatchingLocation::fromInput(
+			[
+				'country'                => $location->country,
+				'state'                  => $location->state,
+				'city'                   => '',
+				'postcode'               => $location->postcode,
+				'canonical_location_key' => '',
 			]
 		);
 	}

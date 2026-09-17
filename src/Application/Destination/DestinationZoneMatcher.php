@@ -7,6 +7,7 @@ namespace CetechDeliveryEngine\Application\Destination;
 use CetechDeliveryEngine\Application\Coverage\CoverageGroupMatcher;
 use CetechDeliveryEngine\Application\Geography\CanonicalLocationResolver;
 use CetechDeliveryEngine\Domain\Coverage\CoverageMatchDiagnostic;
+use CetechDeliveryEngine\Domain\Enum\CanonicalResolutionContext;
 use CetechDeliveryEngine\Domain\Enum\DestinationRuleMatchMode;
 use CetechDeliveryEngine\Domain\Enum\DestinationRuleType;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
@@ -24,13 +25,23 @@ final class DestinationZoneMatcher {
 
 	public const SPECIFICITY_FALLBACK = 0;
 
-	public const SPECIFICITY_COUNTRY = 1;
+	public const SPECIFICITY_COUNTRY = 10;
 
-	public const SPECIFICITY_REGION = 2;
+	public const SPECIFICITY_ADM1 = 20;
 
-	public const SPECIFICITY_CITY = 3;
+	public const SPECIFICITY_REGION = 20;
 
-	public const SPECIFICITY_POSTCODE = 4;
+	public const SPECIFICITY_ADM2 = 30;
+
+	public const SPECIFICITY_ADM3 = 40;
+
+	public const SPECIFICITY_ADM4 = 50;
+
+	public const SPECIFICITY_LOCALITY = 60;
+
+	public const SPECIFICITY_CITY = 60;
+
+	public const SPECIFICITY_POSTCODE = 70;
 
 	/** @var list<CoverageMatchDiagnostic> */
 	private array $last_diagnostics = [];
@@ -70,7 +81,7 @@ final class DestinationZoneMatcher {
 
 	/**
 	 * Every matching active Delivery Area, ordered by configured priority, then
-	 * geographic specificity (postcode > city > region > country > fallback),
+		 * geographic specificity (postcode > locality > ADM4 > ADM3 > ADM2 > ADM1 > country > fallback),
 	 * then a deterministic name/code tie-break. Database creation order is not
 	 * a business ranking.
 	 *
@@ -318,6 +329,8 @@ final class DestinationZoneMatcher {
 		}
 
 		$key = (string) ( $context['canonical_location_key'] ?? '' );
+		$policy = CanonicalResolutionContext::tryFrom( (string) ( $context['resolution_context'] ?? '' ) )
+			?? CanonicalResolutionContext::WooCommerceDestination;
 
 		return $this->canonical_resolver->resolve(
 			$country_code,
@@ -325,7 +338,8 @@ final class DestinationZoneMatcher {
 			(string) ( $context['state_label'] ?? $region ),
 			$city,
 			$postcode,
-			$key
+			$key,
+			$policy
 		);
 	}
 

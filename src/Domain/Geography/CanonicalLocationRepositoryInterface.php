@@ -52,4 +52,11 @@ interface CanonicalLocationRepositoryInterface {
 	public function save( CanonicalLocation $location ): CanonicalLocation;
 
 	public function update_ancestry_path( int $id, string $path ): void;
+
+	/**
+	 * Rewrite descendant ancestry after a node is re-parented.
+	 *
+	 * @return int Number of descendant rows updated (excluding $root_id).
+	 */
+	public function rebuild_descendant_ancestry( int $root_id, string $old_path, string $new_path, int $limit = 2000 ): int;
 }

@@ -483,7 +483,7 @@ final class DestinationZonesPage {
 		}
 		if ( $group->review_required ) {
 			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Review required: this group was converted from legacy rules or could not be mapped with full confidence. Saving other fields will not clear this warning.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
-			echo '<p><label><input type="checkbox" name="' . esc_attr( $prefix ) . '[resolve_review]" value="1" /> ' . esc_html__( 'I have reviewed this coverage group and accept it as the live Delivery Area.', 'cetech-woocommerce-delivery-engine' ) . '</label></p></div>';
+			echo '<p><label><input type="checkbox" name="' . esc_attr( $prefix ) . '[resolve_review]" value="1" /> ' . esc_html__( 'I reviewed this migrated coverage', 'cetech-woocommerce-delivery-engine' ) . '</label></p></div>';
 			echo '<input type="hidden" name="' . esc_attr( $prefix ) . '[review_required]" value="1" />';
 		}
 
@@ -495,6 +495,7 @@ final class DestinationZonesPage {
 		}
 		echo '</select></p>';
 
+		echo '<div data-cetech-de-admin-browser>';
 		echo '<p><label for="cetech-de-coverage-root-' . esc_attr( (string) $index ) . '">' . esc_html( $admin_label ) . '</label><br />';
 		echo '<select id="cetech-de-coverage-root-' . esc_attr( (string) $index ) . '" data-cetech-de-coverage-root>';
 		if ( $root ) {
@@ -506,6 +507,7 @@ final class DestinationZonesPage {
 			echo '<option value="">' . esc_html__( 'Select…', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		}
 		echo '</select></p>';
+		echo '</div>';
 
 		echo '<p><label>' . esc_html__( 'Coverage', 'cetech-woocommerce-delivery-engine' ) . ' ';
 		echo '<select name="' . esc_attr( $prefix ) . '[mode]" data-cetech-de-coverage-mode>';
@@ -740,7 +742,11 @@ final class DestinationZonesPage {
 		$existing_id     = isset( $input['id'] ) ? (int) $input['id'] : 0;
 		$coverage_valid  = [ 'ok' => true, 'errors' => [], 'groups' => [] ];
 		if ( is_array( $coverage_posted ) && $this->coverage_validator instanceof CoverageConfigurationValidator ) {
-			$coverage_valid = $this->coverage_validator->validate( $coverage_posted );
+			$existing_groups = [];
+			if ( $existing_id > 0 && $this->coverage_groups instanceof CoverageGroupRepositoryInterface ) {
+				$existing_groups = $this->coverage_groups->list_by_zone( $existing_id );
+			}
+			$coverage_valid = $this->coverage_validator->validate( $coverage_posted, '', $existing_id, $existing_groups );
 			if ( ! $coverage_valid['ok'] ) {
 				$errors = array_merge( $errors, $coverage_valid['errors'] );
 			}
@@ -783,22 +789,27 @@ final class DestinationZonesPage {
 			$this->action_handler->redirect( self::SLUG );
 		}
 
-		$has_active_coverage = $this->zone_has_active_coverage( $saved_id ) || ( is_array( $coverage_posted ) && [] !== ( $coverage_valid['groups'] ?? [] ) );
-		if ( $has_active_coverage && $existing_id > 0 ) {
-			// Schema-6 coverage is authority. Keep legacy destination_rules as immutable evidence.
+		$canonical_submitted = is_array( $coverage_posted ) && [] !== ( $coverage_valid['groups'] ?? [] );
+		if ( $canonical_submitted ) {
+			// Schema-6 coverage is exclusive authority. Keep any prior destination_rules as evidence.
 		} elseif ( ! $this->rule_repository->replaceForZone( $saved_id, $rule_result['rules'] ) ) {
 			$this->action_handler->notices()->stash_form_draft( self::SLUG, array_merge( $input, [ 'id' => $saved_id ] ) );
 			$this->action_handler->notices()->flash_error( __( 'Destination zone saved, but destination rules could not be updated.', 'cetech-woocommerce-delivery-engine' ) );
 			$this->action_handler->redirect( self::SLUG, [ 'action' => 'edit', 'id' => $saved_id ] );
 		}
 
+		$coverage_persisted = true;
 		if ( is_array( $coverage_posted ) ) {
 			$validated_groups = is_array( $coverage_valid['groups'] ?? null ) ? $coverage_valid['groups'] : [];
 			if ( [] === $validated_groups && $this->zone_has_active_coverage( $saved_id ) ) {
 				// A blank or skipped coverage payload must not wipe live schema-6 coverage.
 			} else {
-				$this->persist_posted_coverage( $saved_id, $validated_groups );
+				$coverage_persisted = $this->persist_posted_coverage( $saved_id, $validated_groups );
 			}
+		}
+
+		if ( ! $coverage_persisted ) {
+			$this->action_handler->redirect( self::SLUG, [ 'action' => 'edit', 'id' => $saved_id ] );
 		}
 
 		$zone_audit = $this->audit_logger->log(
@@ -1111,26 +1122,27 @@ final class DestinationZonesPage {
 		return $normalized;
 	}
 
-	private function persist_posted_coverage( int $zone_id, ?array $validated_groups = null ): void {
+	private function persist_posted_coverage( int $zone_id, ?array $validated_groups = null ): bool {
 		if ( ! $this->coverage_groups instanceof CoverageGroupRepositoryInterface ) {
-			return;
+			return true;
 		}
 
 		if ( null === $validated_groups ) {
 			$posted = $this->posted_coverage_groups();
 			if ( ! is_array( $posted ) ) {
-				return;
+				return true;
 			}
 			if ( $this->coverage_validator instanceof CoverageConfigurationValidator ) {
-				$result = $this->coverage_validator->validate( $posted );
+				$existing_groups = $this->coverage_groups->list_by_zone( $zone_id );
+				$result          = $this->coverage_validator->validate( $posted, '', $zone_id, $existing_groups );
 				if ( ! $result['ok'] ) {
 					$this->action_handler->notices()->flash_error( implode( ' ', $result['errors'] ) );
 
-					return;
+					return false;
 				}
 				$validated_groups = $result['groups'];
 			} else {
-				return;
+				return true;
 			}
 		}
 
@@ -1156,7 +1168,20 @@ final class DestinationZonesPage {
 			$payloads[]        = $row;
 		}
 
-		$this->coverage_groups->replace_for_zone( $zone_id, $payloads );
+		try {
+			$saved = $this->coverage_groups->replace_for_zone( $zone_id, $payloads );
+			if ( [] === $saved && [] !== $payloads ) {
+				$this->action_handler->notices()->flash_error( __( 'Coverage could not be saved. The previous working configuration was kept.', 'cetech-woocommerce-delivery-engine' ) );
+
+				return false;
+			}
+		} catch ( \InvalidArgumentException $e ) {
+			$this->action_handler->notices()->flash_error( __( 'Coverage could not be saved because a coverage group does not belong to this Delivery Area.', 'cetech-woocommerce-delivery-engine' ) );
+
+			return false;
+		}
+
+		return true;
 	}
 
 	/**

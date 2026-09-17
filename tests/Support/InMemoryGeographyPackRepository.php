@@ -36,6 +36,9 @@ final class InMemoryGeographyPackRepository implements GeographyPackRepositoryIn
 
 	public function save( array $payload ): GeographyPack {
 		$id = (int) ( $payload['id'] ?? 0 );
+		if ( $id > 0 && isset( $this->packs[ $id ] ) ) {
+			$payload = $this->merge_existing( $this->packs[ $id ], $payload );
+		}
 		if ( $id <= 0 ) {
 			$id = $this->next_id++;
 		}
@@ -57,6 +60,17 @@ final class InMemoryGeographyPackRepository implements GeographyPackRepositoryIn
 		if ( ! $existing instanceof GeographyPack ) {
 			return;
 		}
+		if ( ! array_key_exists( 'last_successful', $progress ) && isset( $existing->progress['last_successful'] ) ) {
+			$progress['last_successful'] = $existing->progress['last_successful'];
+		}
+		if ( GeographyPackStatus::Ready === $status ) {
+			$progress['last_successful'] = [
+				'checksum'         => '' !== (string) ( $progress['dataset_checksum'] ?? '' ) ? (string) $progress['dataset_checksum'] : $existing->checksum,
+				'dataset_version'  => $existing->dataset_version,
+				'source_reference' => $existing->source_reference,
+				'installed_at'     => $installed_at ?? $existing->installed_at,
+			];
+		}
 		$this->packs[ $id ] = new GeographyPack(
 			$existing->id,
 			$existing->country_code,
@@ -75,5 +89,50 @@ final class InMemoryGeographyPackRepository implements GeographyPackRepositoryIn
 			$last_error,
 			$installed_at ?? $existing->installed_at
 		);
+	}
+
+	/**
+	 * @param array<string, mixed> $payload
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function merge_existing( GeographyPack $existing, array $payload ): array {
+		$merged = [
+			'id'               => $existing->id,
+			'country_code'     => $existing->country_code,
+			'provider'         => $existing->provider->value,
+			'dataset_name'     => $existing->dataset_name,
+			'dataset_version'  => $existing->dataset_version,
+			'source_url'       => $existing->source_url,
+			'source_reference' => $existing->source_reference,
+			'checksum'         => $existing->checksum,
+			'license_name'     => $existing->license_name,
+			'license_url'      => $existing->license_url,
+			'attribution_text' => $existing->attribution_text,
+			'status'           => $existing->status->value,
+			'import_cursor'    => $existing->import_cursor,
+			'progress'         => $existing->progress,
+			'last_error'       => $existing->last_error,
+			'installed_at'     => $existing->installed_at,
+		];
+		foreach ( $payload as $key => $value ) {
+			if ( 'progress' === $key && is_array( $value ) ) {
+				$progress = $existing->progress;
+				foreach ( $value as $progress_key => $progress_value ) {
+					$progress[ $progress_key ] = $progress_value;
+				}
+				if ( ! array_key_exists( 'last_successful', $value ) && isset( $existing->progress['last_successful'] ) ) {
+					$progress['last_successful'] = $existing->progress['last_successful'];
+				}
+				$merged['progress'] = $progress;
+				continue;
+			}
+			$merged[ $key ] = $value;
+		}
+		if ( ! array_key_exists( 'installed_at', $payload ) ) {
+			$merged['installed_at'] = $existing->installed_at;
+		}
+
+		return $merged;
 	}
 }

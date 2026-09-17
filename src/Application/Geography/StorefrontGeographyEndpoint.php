@@ -225,7 +225,7 @@ final class StorefrontGeographyEndpoint {
 
 	public function country_has_locality_pack( string $country_code ): bool {
 		foreach ( $this->packs->list_all() as $pack ) {
-			if ( $pack->country_code === strtoupper( $country_code ) && 'ready' === $pack->status->value ) {
+			if ( $pack->country_code === strtoupper( $country_code ) && $pack->has_usable_dataset() ) {
 				return true;
 			}
 		}

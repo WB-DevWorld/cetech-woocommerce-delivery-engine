@@ -33,12 +33,12 @@ final class Geo2TechnicalCorrectionTest extends TestCase {
 	public function test_plugin_boot_runs_schema6_upgrade_after_migrations(): void {
 		$source = (string) file_get_contents( dirname( __DIR__, 3 ) . '/src/Bootstrap/Plugin.php' );
 		$runner = strpos( $source, '$migration_runner->run();' );
-		$upgrade = strpos( $source, 'Schema6CoverageUpgradeService::class )->run()' );
+		$upgrade = strpos( $source, 'Schema6CoverageUpgradeService::class )->maybe_run()' );
 		self::assertNotFalse( $runner );
 		self::assertNotFalse( $upgrade );
 		self::assertGreaterThan( $runner, $upgrade );
 		self::assertStringNotContainsString(
-			'LegacyDestinationCoverageMigrator::class )->migrate()',
+			'Schema6CoverageUpgradeService::class )->run()',
 			$source
 		);
 	}
@@ -103,8 +103,12 @@ final class Geo2TechnicalCorrectionTest extends TestCase {
 		self::assertNotNull( $locations->find_country( 'US' ) );
 		$accra_groups = $groups->list_by_zone( 1 );
 		self::assertCount( 1, $accra_groups );
-		self::assertFalse( $accra_groups[0]->review_required );
-		self::assertSame( RecordStatus::Active, $accra_groups[0]->status );
+		self::assertTrue( $accra_groups[0]->review_required );
+		self::assertSame( RecordStatus::Inactive, $accra_groups[0]->status );
+		self::assertSame( 'unmapped_city', $accra_groups[0]->legacy_migration['reason'] ?? '' );
+		$ghana = $locations->find_country( 'GH' );
+		self::assertNotNull( $ghana );
+		self::assertNull( $locations->find_exact_child( 'GH', $ghana->id, 'accra', GeographyLocationType::Locality ) );
 		self::assertNotEmpty( $rules->listByZoneId( 1 ) );
 
 		$multi = $groups->list_by_zone( 2 );
@@ -230,12 +234,15 @@ final class Geo2TechnicalCorrectionTest extends TestCase {
 			]
 		);
 		$resolver = new CanonicalLocationResolver( $geo->locations, $geo->locations, $packs );
-		$typed    = $resolver->resolve( 'GH', 'AA', 'Greater Accra', 'Accra', '', '' );
+		$typed    = $resolver->resolve( 'GH', 'AA', 'Greater Accra', 'Accra', '', '', \CetechDeliveryEngine\Domain\Enum\CanonicalResolutionContext::ShopperSelector );
 		self::assertTrue( $typed->hasCanonicalLocation() );
 		self::assertSame( $geo->greater_accra->id, $typed->location_id() );
 		self::assertNotSame( $geo->accra->id, $typed->location_id() );
 
-		$selected = $resolver->resolve( 'GH', 'AA', 'Greater Accra', 'Accra', '', 'loc-accra' );
+		$woo = $resolver->resolve( 'GH', 'AA', 'Greater Accra', 'Accra', '', '', \CetechDeliveryEngine\Domain\Enum\CanonicalResolutionContext::WooCommerceDestination );
+		self::assertSame( $geo->accra->id, $woo->location_id() );
+
+		$selected = $resolver->resolve( 'GH', 'AA', 'Greater Accra', 'Accra', '', 'loc-accra', \CetechDeliveryEngine\Domain\Enum\CanonicalResolutionContext::ShopperSelector );
 		self::assertSame( $geo->accra->id, $selected->location_id() );
 
 		$country_only = $resolver->resolve( 'GH', '', '', '', '', '' );
@@ -425,8 +432,13 @@ final class Geo2TechnicalCorrectionTest extends TestCase {
 		self::assertNotNull( $locations->find_country( 'GH' ) );
 		$converted = $groups->list_by_zone( $zone_id );
 		self::assertCount( 1, $converted );
-		self::assertFalse( $converted[0]->review_required );
-		self::assertSame( RecordStatus::Active, $converted[0]->status );
+		self::assertTrue( $converted[0]->review_required );
+		self::assertSame( RecordStatus::Inactive, $converted[0]->status );
+		self::assertSame( 'unmapped_city', $converted[0]->legacy_migration['reason'] ?? '' );
+		$ghana = $locations->find_country( 'GH' );
+		$region = $locations->find_exact_child( 'GH', $ghana->id, 'greater accra', GeographyLocationType::Administrative );
+		self::assertNotNull( $region );
+		self::assertNull( $locations->find_exact_child( 'GH', $region->id, 'accra', GeographyLocationType::Locality ) );
 		self::assertNotEmpty( $rules->listByZoneId( $zone_id ) );
 		unset( $GLOBALS['cetech_de_test_wc'], $GLOBALS['wpdb'] );
 	}

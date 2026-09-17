@@ -69,6 +69,44 @@ final class GeographyPack {
 		);
 	}
 
+	public function has_usable_dataset(): bool {
+		$successful = $this->last_successful();
+		if ( [] !== $successful && '' !== (string) ( $successful['checksum'] ?? '' ) ) {
+			return true;
+		}
+
+		return GeographyPackStatus::Ready === $this->status && '' !== $this->checksum;
+	}
+
+	/**
+	 * @return array<string, mixed>
+	 */
+	public function last_successful(): array {
+		$raw = $this->progress['last_successful'] ?? [];
+
+		return is_array( $raw ) ? $raw : [];
+	}
+
+	public function active_dataset_version(): string {
+		$successful = $this->last_successful();
+		$version    = (string) ( $successful['dataset_version'] ?? '' );
+		if ( '' !== $version ) {
+			return $version;
+		}
+
+		return GeographyPackStatus::Ready === $this->status ? $this->dataset_version : '';
+	}
+
+	public function active_checksum(): string {
+		$successful = $this->last_successful();
+		$checksum   = (string) ( $successful['checksum'] ?? '' );
+		if ( '' !== $checksum ) {
+			return $checksum;
+		}
+
+		return GeographyPackStatus::Ready === $this->status ? $this->checksum : '';
+	}
+
 	public function publicAdminRow(): array {
 		$source = $this->source_reference;
 		if ( '' !== $source ) {
@@ -80,11 +118,15 @@ final class GeographyPack {
 			'country_code'     => $this->country_code,
 			'provider'         => $this->provider->value,
 			'dataset_name'     => $this->dataset_name,
-			'dataset_version'  => '' !== $this->dataset_version ? $this->dataset_version : '—',
-			'checksum'         => $this->checksum,
+			'dataset_version'  => '' !== $this->active_dataset_version() ? $this->active_dataset_version() : '—',
+			'checksum'         => $this->active_checksum(),
 			'source_url'       => $this->source_url,
 			'source_file'      => $source,
 			'status'           => $this->status->value,
+			'usable'           => $this->has_usable_dataset(),
+			'update_status'    => $this->status->value,
+			'target_dataset_version' => $this->dataset_version,
+			'target_checksum'  => $this->checksum,
 			'license_name'     => $this->license_name,
 			'license_url'      => $this->license_url,
 			'attribution_text' => $this->attribution_text,

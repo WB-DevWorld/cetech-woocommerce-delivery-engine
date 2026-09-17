@@ -177,9 +177,13 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		}
 		$search = GeographyNameNormalizer::normalize( $search );
 		if ( '' !== $search ) {
-			$sql   .= ' AND (normalized_name LIKE %s OR ascii_name LIKE %s)';
-			$args[] = '%' . $wpdb->esc_like( $search ) . '%';
-			$args[] = '%' . $wpdb->esc_like( $search ) . '%';
+			$like    = '%' . $wpdb->esc_like( $search ) . '%';
+			$aliases = TableNames::for( GeographySchema::ALIASES_SUFFIX );
+			$sql    .= " AND (normalized_name LIKE %s OR ascii_name LIKE %s OR EXISTS (SELECT 1 FROM `{$aliases}` als WHERE als.location_id = `{$table}`.id AND als.status = %s AND als.normalized_alias LIKE %s))";
+			$args[]  = $like;
+			$args[]  = $like;
+			$args[]  = RecordStatus::Active->value;
+			$args[]  = $like;
 		}
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$count = $wpdb->get_var( $wpdb->prepare( $sql, ...$args ) );
@@ -310,6 +314,32 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 			],
 			[ 'id' => $id ]
 		);
+	}
+
+	public function rebuild_descendant_ancestry( int $root_id, string $old_path, string $new_path, int $limit = 2000 ): int {
+		if ( $root_id <= 0 || '' === $old_path || $old_path === $new_path ) {
+			return 0;
+		}
+
+		global $wpdb;
+		$table = $this->table_name();
+		$like  = $wpdb->esc_like( $old_path ) . '%';
+		$limit = max( 1, min( 5000, $limit ) );
+		$sql   = "SELECT id, ancestry_path FROM `{$table}` WHERE id != %d AND ancestry_path LIKE %s LIMIT %d";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $root_id, $like, $limit ), ARRAY_A );
+		$updated = 0;
+		foreach ( is_array( $rows ) ? $rows : [] as $row ) {
+			$path = (string) ( $row['ancestry_path'] ?? '' );
+			if ( ! str_starts_with( $path, $old_path ) ) {
+				continue;
+			}
+			$suffix = substr( $path, strlen( $old_path ) );
+			$this->update_ancestry_path( (int) ( $row['id'] ?? 0 ), $new_path . $suffix );
+			++$updated;
+		}
+
+		return $updated;
 	}
 
 	private function compute_path( CanonicalLocation $location ): string {

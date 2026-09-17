@@ -21,7 +21,8 @@ final class AdminGeographyEndpoint {
 		private CanonicalLocationResolver $resolver,
 		private \CetechDeliveryEngine\Domain\Geography\CanonicalLocationRepositoryInterface $locations,
 		private GeographyPackService $packs,
-		private CoverageGroupRepositoryInterface $groups
+		private CoverageGroupRepositoryInterface $groups,
+		private ?Schema6CoverageUpgradeService $upgrade = null
 	) {
 	}
 
@@ -123,6 +124,13 @@ final class AdminGeographyEndpoint {
 			wp_send_json_success( [ 'pack' => $pack->publicAdminRow() ] );
 		}
 
+		if ( 'reconcile' === $op ) {
+			$result = $this->upgrade instanceof Schema6CoverageUpgradeService
+				? $this->upgrade->reconcile( true )
+				: [ 'skipped' => true ];
+			wp_send_json_success( $result );
+		}
+
 		$pack = $this->packs->find( $pack_id );
 		wp_send_json_success( [ 'pack' => $pack?->publicAdminRow() ] );
 	}
@@ -145,23 +153,26 @@ final class AdminGeographyEndpoint {
 		$items = [];
 		foreach ( $this->locations->list_children( $parent_location->id, GeographyLocationType::Administrative, 250, 0 ) as $child ) {
 			$items[] = [
-				'key'  => $child->location_key,
-				'id'   => $child->id,
-				'name' => $child->canonical_name,
+				'key'          => $child->location_key,
+				'id'           => $child->id,
+				'name'         => $child->canonical_name,
+				'has_children' => $this->locations->count_children( $child->id, GeographyLocationType::Administrative ) > 0,
+				'level'        => $child->administrative_level,
 			];
 		}
 		if ( $parent_location->isCountry() ) {
 			array_unshift(
 				$items,
 				[
-					'key'  => $parent_location->location_key,
-					'id'   => $parent_location->id,
-					'name' => sprintf(
+					'key'          => $parent_location->location_key,
+					'id'           => $parent_location->id,
+					'name'         => sprintf(
 						/* translators: %s country name */
 						__( 'Entire %s', 'cetech-woocommerce-delivery-engine' ),
 						$parent_location->canonical_name
 					),
 					'entire_country' => true,
+					'has_children'   => false,
 				]
 			);
 		}
@@ -170,11 +181,13 @@ final class AdminGeographyEndpoint {
 			[
 				'items'         => $items,
 				'request_token' => $token,
+				'has_more'      => false,
 				'root'          => [
 					'key'  => $parent_location->location_key,
 					'id'   => $parent_location->id,
 					'name' => $parent_location->canonical_name,
 				],
+				'can_select_root' => true,
 				'label'         => GeographyAdminLabels::administrative_area_label( $country ),
 			]
 		);

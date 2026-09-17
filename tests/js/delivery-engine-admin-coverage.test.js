@@ -211,4 +211,48 @@ describe('Admin coverage builder', () => {
 		expect(document.querySelectorAll('[data-cetech-de-chips="exclude"] li').length).toBe(0);
 		vi.useRealTimers();
 	});
+
+	it('uses independent search tokens for two coverage groups', async () => {
+		vi.useFakeTimers();
+		const tokens = [];
+		window.fetch = vi.fn((url, init) => {
+			const body = String(init && init.body ? init.body : '');
+			const match = body.match(/request_token=(\d+)/);
+			tokens.push(match ? match[1] : '');
+			return jsonResponse({
+				items: [{ id: 11, key: 'loc-accra', name: 'Accra' }],
+				request_token: match ? match[1] : '1',
+				has_more: false,
+				total: 1
+			});
+		});
+		document.body.innerHTML = `
+			<div data-cetech-de-coverage-builder data-countries='{"GH":"Ghana"}'>
+				<fieldset class="cetech-de-coverage-group">
+					<select data-cetech-de-coverage-country><option value="GH" selected>Ghana</option></select>
+					<input type="hidden" data-cetech-de-root-key value="loc-ga" />
+					<input data-cetech-de-locality-search data-cetech-de-search-target="include" />
+					<ul data-cetech-de-search-results="include" hidden></ul>
+				</fieldset>
+				<fieldset class="cetech-de-coverage-group">
+					<select data-cetech-de-coverage-country><option value="GH" selected>Ghana</option></select>
+					<input type="hidden" data-cetech-de-root-key value="loc-ga" />
+					<input data-cetech-de-locality-search data-cetech-de-search-target="include" />
+					<ul data-cetech-de-search-results="include" hidden></ul>
+				</fieldset>
+			</div>
+		`;
+		loadAdmin();
+		const inputs = document.querySelectorAll('[data-cetech-de-locality-search]');
+		inputs[0].value = 'Acc';
+		inputs[0].dispatchEvent(new Event('input', { bubbles: true }));
+		inputs[1].value = 'Tem';
+		inputs[1].dispatchEvent(new Event('input', { bubbles: true }));
+		await vi.advanceTimersByTimeAsync(320);
+		await Promise.resolve();
+		expect(tokens.length).toBe(2);
+		expect(tokens[0]).toBe('1');
+		expect(tokens[1]).toBe('1');
+		vi.useRealTimers();
+	});
 });

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Coverage;
 
+use CetechDeliveryEngine\Domain\Coverage\CoverageGroup;
 use CetechDeliveryEngine\Domain\Enum\CoverageMembership;
 use CetechDeliveryEngine\Domain\Enum\CoverageMode;
 use CetechDeliveryEngine\Domain\Enum\DestinationRuleMatchMode;
@@ -26,19 +27,26 @@ final class CoverageConfigurationValidator {
 
 	/**
 	 * @param list<array<string, mixed>> $groups
+	 * @param list<CoverageGroup>        $existing_groups
 	 *
 	 * @return array{ok:bool,errors:list<string>,groups:list<array<string, mixed>>}
 	 */
-	public function validate( array $groups, string $fallback_country = '' ): array {
+	public function validate( array $groups, string $fallback_country = '', int $zone_id = 0, array $existing_groups = [] ): array {
 		$errors   = [];
 		$cleaned  = [];
 		$fallback_country = strtoupper( trim( $fallback_country ) );
+		$existing_by_id   = [];
+		foreach ( $existing_groups as $existing ) {
+			if ( $existing instanceof CoverageGroup ) {
+				$existing_by_id[ $existing->id ] = $existing;
+			}
+		}
 
 		foreach ( $groups as $index => $row ) {
 			if ( ! is_array( $row ) ) {
 				continue;
 			}
-			$result = $this->validate_group( $row, $index, $fallback_country );
+			$result = $this->validate_group( $row, $index, $fallback_country, $zone_id, $existing_by_id );
 			if ( [] !== $result['errors'] ) {
 				$errors = array_merge( $errors, $result['errors'] );
 				continue;
@@ -56,11 +64,12 @@ final class CoverageConfigurationValidator {
 	}
 
 	/**
-	 * @param array<string, mixed> $row
+	 * @param array<string, mixed>        $row
+	 * @param array<int, CoverageGroup>   $existing_by_id
 	 *
 	 * @return array{errors:list<string>,group:?array<string, mixed>}
 	 */
-	private function validate_group( array $row, int $index, string $fallback_country ): array {
+	private function validate_group( array $row, int $index, string $fallback_country, int $zone_id, array $existing_by_id ): array {
 		$label   = sprintf( 'Coverage group %d', $index + 1 );
 		$errors  = [];
 		$country = strtoupper( trim( (string) ( $row['country'] ?? $fallback_country ) ) );
@@ -77,7 +86,22 @@ final class CoverageConfigurationValidator {
 			return [ 'errors' => $errors, 'group' => null ];
 		}
 
+		$posted_id = (int) ( $row['id'] ?? 0 );
+		$previous  = $posted_id > 0 ? ( $existing_by_id[ $posted_id ] ?? null ) : null;
+		if ( $posted_id > 0 && ( $zone_id > 0 || [] !== $existing_by_id ) ) {
+			if ( ! $previous instanceof CoverageGroup || ( $zone_id > 0 && $previous->zone_id !== $zone_id ) ) {
+				$errors[] = sprintf( '%s refers to a coverage group that does not belong to this Delivery Area.', $label );
+
+				return [ 'errors' => $errors, 'group' => null ];
+			}
+		}
+
 		$root = $this->resolve_root( $row, $country );
+		if ( is_string( $root ) ) {
+			$errors[] = $root;
+
+			return [ 'errors' => $errors, 'group' => null ];
+		}
 		if ( ! $root instanceof CanonicalLocation || ! $root->isActive() ) {
 			$errors[] = sprintf( '%s needs a valid country or administrative area.', $label );
 
@@ -135,16 +159,39 @@ final class CoverageConfigurationValidator {
 			$members[] = [ 'location_id' => $id, 'membership' => CoverageMembership::Exclude->value ];
 		}
 
+		$resolve = ! empty( $row['resolve_review'] );
+		$status  = RecordStatus::Active->value;
+		$review  = ! empty( $row['review_required'] );
+		$legacy  = is_array( $row['legacy_migration'] ?? null ) ? $row['legacy_migration'] : [];
+		if ( $previous instanceof CoverageGroup ) {
+			$status = $previous->status->value;
+			$review = $previous->review_required;
+			$legacy = $previous->legacy_migration;
+			if ( $resolve && $previous->review_required ) {
+				$review = false;
+				$status = RecordStatus::Active->value;
+			} elseif ( $previous->review_required ) {
+				$status = $previous->status->value;
+			}
+		} elseif ( $review && ! $resolve ) {
+			$status = RecordStatus::Inactive->value;
+		}
+
+		if ( $review && ! $resolve ) {
+			$status = RecordStatus::Inactive->value;
+		}
+
 		return [
 			'errors' => [],
 			'group'  => [
-				'id'               => (int) ( $row['id'] ?? 0 ),
+				'id'               => $posted_id,
 				'root_location_id' => $root->id,
 				'coverage_mode'    => $mode->value,
 				'sort_order'       => (int) ( $row['sort_order'] ?? ( ( $index + 1 ) * 10 ) ),
-				'status'           => RecordStatus::Active->value,
-				'review_required'  => ! empty( $row['review_required'] ),
-				'legacy_migration' => is_array( $row['legacy_migration'] ?? null ) ? $row['legacy_migration'] : [],
+				'status'           => $status,
+				'review_required'  => $review,
+				'legacy_migration' => $legacy,
+				'resolve_review'   => $resolve,
 				'members'          => $members,
 				'postcodes'        => $postcodes,
 			],
@@ -153,13 +200,19 @@ final class CoverageConfigurationValidator {
 
 	/**
 	 * @param array<string, mixed> $row
+	 *
+	 * @return CanonicalLocation|string|null Location, or an error string when a supplied root is invalid.
 	 */
-	private function resolve_root( array $row, string $country ): ?CanonicalLocation {
+	private function resolve_root( array $row, string $country ): CanonicalLocation|string|null {
 		$root_id  = (int) ( $row['root_location_id'] ?? 0 );
 		$root_key = trim( (string) ( $row['root_key'] ?? '' ) );
+		$supplied = $root_id > 0 || '' !== $root_key;
 		$root     = $root_id > 0 ? $this->locations->find_by_id( $root_id ) : null;
 		if ( ! $root instanceof CanonicalLocation && '' !== $root_key ) {
 			$root = $this->locations->find_by_key( $root_key );
+		}
+		if ( $supplied && ( ! $root instanceof CanonicalLocation || ! $root->isActive() || ( '' !== $country && $root->country_code !== $country ) ) ) {
+			return sprintf( 'Coverage group root is invalid, inactive, or does not belong to the selected country.' );
 		}
 		if ( ! $root instanceof CanonicalLocation && '' !== $country ) {
 			$root = $this->locations->find_country( $country );

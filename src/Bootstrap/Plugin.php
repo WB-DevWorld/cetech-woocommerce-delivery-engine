@@ -298,7 +298,7 @@ final class Plugin {
 		$migration_runner = $this->container->get( MigrationRunner::class );
 		$migration_runner->run();
 		if ( \CetechDeliveryEngine\Infrastructure\Persistence\ConfigurationTables::exists( \CetechDeliveryEngine\Infrastructure\Persistence\CoverageSchema::GROUPS_SUFFIX ) ) {
-			$this->container->get( Schema6CoverageUpgradeService::class )->run();
+			$this->container->get( Schema6CoverageUpgradeService::class )->maybe_run();
 		}
 
 		// Capability matrix must self-heal when an active plugin folder is replaced
@@ -730,7 +730,9 @@ final class Plugin {
 
 		$this->container->singleton(
 			CustomerBrowsingLocationStore::class,
-			static fn (): CustomerBrowsingLocationStore => new CustomerBrowsingLocationStore()
+			static fn ( ServiceContainer $container ): CustomerBrowsingLocationStore => new CustomerBrowsingLocationStore(
+				$container->get( CanonicalLocationResolver::class )
+			)
 		);
 
 		$this->container->singleton(
@@ -823,7 +825,8 @@ final class Plugin {
 				$container->get( Requirements::class ),
 				$container->get( CartDeliverySelectionCapture::class ),
 				$container->get( LocationAwareDeliveryOptions::class ),
-				$container->get( CustomerBrowsingLocationStore::class )
+				$container->get( CustomerBrowsingLocationStore::class ),
+				$container->get( CanonicalLocationResolver::class )
 			)
 		);
 
@@ -1962,7 +1965,8 @@ final class Plugin {
 				$container->get( CanonicalLocationResolver::class ),
 				$container->get( CanonicalLocationRepositoryInterface::class ),
 				$container->get( GeographyPackService::class ),
-				$container->get( CoverageGroupRepositoryInterface::class )
+				$container->get( CoverageGroupRepositoryInterface::class ),
+				$container->get( Schema6CoverageUpgradeService::class )
 			)
 		);
 

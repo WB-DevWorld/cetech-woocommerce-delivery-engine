@@ -181,13 +181,20 @@ final class CoverageGroupMatcher {
 			$ids[] = $member->location_id;
 		}
 		$loaded = $this->locations->find_by_ids( $ids );
+		$best   = null;
+		$best_rank = -1;
 		foreach ( $loaded as $member_location ) {
-			if ( LocationAncestry::is_self_or_descendant( $location, $member_location ) ) {
-				return $member_location;
+			if ( ! LocationAncestry::is_self_or_descendant( $location, $member_location ) ) {
+				continue;
+			}
+			$rank = $this->specificity_from_constraint( $member_location, false );
+			if ( $rank > $best_rank ) {
+				$best      = $member_location;
+				$best_rank = $rank;
 			}
 		}
 
-		return null;
+		return $best;
 	}
 
 	private function postcodes_match( CoverageGroup $group, string $postcode ): bool {
@@ -215,12 +222,15 @@ final class CoverageGroupMatcher {
 			return DestinationZoneMatcher::SPECIFICITY_POSTCODE;
 		}
 		if ( $constraint->isLocality() ) {
-			return DestinationZoneMatcher::SPECIFICITY_CITY;
+			return DestinationZoneMatcher::SPECIFICITY_LOCALITY;
 		}
 		if ( $constraint->isAdministrative() ) {
-			$level = $constraint->administrative_level ?? 1;
-
-			return $level >= 2 ? DestinationZoneMatcher::SPECIFICITY_CITY : DestinationZoneMatcher::SPECIFICITY_REGION;
+			return match ( $constraint->administrative_level ?? 1 ) {
+				4 => DestinationZoneMatcher::SPECIFICITY_ADM4,
+				3 => DestinationZoneMatcher::SPECIFICITY_ADM3,
+				2 => DestinationZoneMatcher::SPECIFICITY_ADM2,
+				default => DestinationZoneMatcher::SPECIFICITY_ADM1,
+			};
 		}
 
 		return DestinationZoneMatcher::SPECIFICITY_COUNTRY;

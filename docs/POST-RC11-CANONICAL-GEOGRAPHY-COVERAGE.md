@@ -1,6 +1,6 @@
 # Post-RC.11 Canonical Geography & Delivery Area Coverage
 
-Status: IMPLEMENTATION BASELINE / ISSUE #23
+Status: TECHNICAL CORRECTIONS COMPLETE — READY FOR INDEPENDENT REVIEW / ISSUE #23 / NOT MERGED / NOT RC.12
 
 Owner: `@wbdevworld`
 
@@ -12,7 +12,9 @@ Immutable release anchor: `v1.0.0-rc.11` -> `384f564f64a2db766ae6907392e95fb366f
 
 Rejected technical-review candidate: `1.0.0-dev.geo.1` (`606730e2535896cb18e415b14d62bbb57d050578`). Do not reuse that package identity or send it to physical QA.
 
-Current technical-correction candidate identity: `1.0.0-dev.geo.2`
+Rejected technical-review candidate: `1.0.0-dev.geo.2` (`a52e2aafc97274b74ec14f8b451395b73c9541af`). Frozen package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.2.zip` SHA-256 `6bde464b249ee6f17831e00d39110c8b10f89f441db3e1b453622a5d95f6b4a5`. Do not physically QA geo.2.
+
+Current technical-correction candidate identity: `1.0.0-dev.geo.3`
 
 Target schema: `6`
 

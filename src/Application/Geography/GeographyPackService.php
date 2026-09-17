@@ -29,6 +29,10 @@ final class GeographyPackService {
 
 	public const GEONAMES_URL_PATTERN = '#^https://download\.geonames\.org/export/dump/[A-Z]{2}\.zip$#';
 
+	public const MAX_ARCHIVE_BYTES = 83886080;
+
+	public const MAX_UNCOMPRESSED_BYTES = 262144000;
+
 	public function __construct(
 		private GeographyPackRepositoryInterface $packs,
 		private GeoNamesPackImporter $importer,
@@ -395,28 +399,49 @@ final class GeographyPackService {
 		if ( ! function_exists( 'wp_safe_remote_get' ) ) {
 			return false;
 		}
+		if ( is_file( $destination ) ) {
+			$this->safe_unlink( $destination );
+		}
 		$response = wp_safe_remote_get(
 			$url,
 			[
-				'timeout'     => 60,
-				'redirection' => 2,
-				'sslverify'   => true,
+				'timeout'             => 120,
+				'redirection'         => 2,
+				'sslverify'           => true,
+				'stream'              => true,
+				'filename'            => $destination,
+				'limit_response_size' => self::MAX_ARCHIVE_BYTES,
 			]
 		);
 		if ( is_wp_error( $response ) ) {
+			$this->safe_unlink( $destination );
+
 			return false;
 		}
 		$code = (int) wp_remote_retrieve_response_code( $response );
-		$body = wp_remote_retrieve_body( $response );
-		if ( 200 !== $code || '' === $body ) {
+		if ( 200 !== $code || ! is_readable( $destination ) ) {
+			$this->safe_unlink( $destination );
+
+			return false;
+		}
+		$size = filesize( $destination );
+		if ( ! is_int( $size ) || $size <= 0 || $size > self::MAX_ARCHIVE_BYTES ) {
+			$this->safe_unlink( $destination );
+
 			return false;
 		}
 
-		return false !== file_put_contents( $destination, $body );
+		return true;
 	}
 
 	private function extract_gazetteer_zip( string $zip_path, string $dest_dir, string $country_code ): string {
 		if ( ! class_exists( \ZipArchive::class ) ) {
+			return '';
+		}
+		$size = @filesize( $zip_path );
+		if ( ! is_int( $size ) || $size <= 0 || $size > self::MAX_ARCHIVE_BYTES ) {
+			$this->safe_unlink( $zip_path );
+
 			return '';
 		}
 		$zip = new \ZipArchive();
@@ -432,35 +457,81 @@ final class GeographyPackService {
 			return '';
 		}
 
+		$expected = strtoupper( $country_code ) . '.txt';
+		$chosen   = null;
+		$uncompressed = 0;
 		for ( $i = 0; $i < $zip->numFiles; $i++ ) {
-			$name = (string) $zip->getNameIndex( $i );
-			if ( '' === $name || str_contains( $name, '..' ) || str_starts_with( $name, '/' ) || str_contains( $name, '\\' ) ) {
-				continue;
+			$stat = $zip->statIndex( $i );
+			$name = is_array( $stat ) ? (string) ( $stat['name'] ?? '' ) : (string) $zip->getNameIndex( $i );
+			if ( '' === $name || str_contains( $name, '..' ) || str_starts_with( $name, '/' ) || str_contains( $name, '\\' ) || preg_match( '#^[A-Za-z]:#', $name ) ) {
+				$zip->close();
+				$this->safe_unlink( $zip_path );
+
+				return '';
+			}
+			$uncompressed += (int) ( is_array( $stat ) ? ( $stat['size'] ?? 0 ) : 0 );
+			if ( $uncompressed > self::MAX_UNCOMPRESSED_BYTES ) {
+				$zip->close();
+				$this->safe_unlink( $zip_path );
+
+				return '';
 			}
 			$base = basename( $name );
 			if ( ! str_ends_with( strtolower( $base ), '.txt' ) ) {
 				continue;
 			}
-			$target = $dest_real . DIRECTORY_SEPARATOR . $country_code . '.txt';
-			if ( ! str_starts_with( $target, $dest_real ) ) {
-				continue;
+			if ( 0 === strcasecmp( $base, $expected ) ) {
+				$chosen = $name;
+			} elseif ( null === $chosen ) {
+				$chosen = $name;
 			}
-			$stream = $zip->getStream( $name );
-			if ( ! is_resource( $stream ) ) {
-				continue;
-			}
-			$out = fopen( $target, 'wb' );
-			if ( false === $out ) {
-				fclose( $stream );
-				continue;
-			}
-			stream_copy_to_stream( $stream, $out );
-			fclose( $stream );
-			fclose( $out );
-			$extracted = $target;
-			break;
 		}
+		if ( null === $chosen || 0 !== strcasecmp( basename( $chosen ), $expected ) ) {
+			$zip->close();
+
+			return '';
+		}
+
+		$target = $dest_real . DIRECTORY_SEPARATOR . $country_code . '.txt';
+		if ( ! str_starts_with( $target, $dest_real ) ) {
+			$zip->close();
+
+			return '';
+		}
+		$stream = $zip->getStream( $chosen );
+		if ( ! is_resource( $stream ) ) {
+			$zip->close();
+
+			return '';
+		}
+		$out = fopen( $target, 'wb' );
+		if ( false === $out ) {
+			fclose( $stream );
+			$zip->close();
+
+			return '';
+		}
+		$written = 0;
+		while ( ! feof( $stream ) ) {
+			$chunk = fread( $stream, 8192 );
+			if ( ! is_string( $chunk ) || '' === $chunk ) {
+				break;
+			}
+			$written += strlen( $chunk );
+			if ( $written > self::MAX_UNCOMPRESSED_BYTES ) {
+				fclose( $stream );
+				fclose( $out );
+				$zip->close();
+				$this->safe_unlink( $target );
+
+				return '';
+			}
+			fwrite( $out, $chunk );
+		}
+		fclose( $stream );
+		fclose( $out );
 		$zip->close();
+		$extracted = $target;
 
 		return $extracted;
 	}

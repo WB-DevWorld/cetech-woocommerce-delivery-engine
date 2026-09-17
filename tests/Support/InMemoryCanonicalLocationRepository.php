@@ -172,7 +172,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			if ( $type instanceof GeographyLocationType && $location->location_type !== $type ) {
 				continue;
 			}
-			if ( '' !== $search && ! str_contains( $location->normalized_name, $search ) && ! str_contains( GeographyNameNormalizer::normalize( $location->ascii_name ), $search ) ) {
+			if ( '' !== $search && ! str_contains( $location->normalized_name, $search ) && ! str_contains( GeographyNameNormalizer::normalize( $location->ascii_name ), $search ) && ! $this->alias_contains( $location->id, $search ) ) {
 				continue;
 			}
 			++$count;
@@ -270,6 +270,27 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 				$path
 			);
 		}
+	}
+
+	public function rebuild_descendant_ancestry( int $root_id, string $old_path, string $new_path, int $limit = 2000 ): int {
+		if ( $root_id <= 0 || '' === $old_path || $old_path === $new_path ) {
+			return 0;
+		}
+
+		$updated = 0;
+		foreach ( $this->locations as $location ) {
+			if ( $updated >= $limit ) {
+				break;
+			}
+			if ( $location->id === $root_id || ! str_starts_with( $location->ancestry_path, $old_path ) ) {
+				continue;
+			}
+			$suffix = substr( $location->ancestry_path, strlen( $old_path ) );
+			$this->update_ancestry_path( $location->id, $new_path . $suffix );
+			++$updated;
+		}
+
+		return $updated;
 	}
 
 	private function alias_contains( int $location_id, string $query ): bool {

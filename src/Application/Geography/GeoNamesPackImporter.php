@@ -90,6 +90,21 @@ final class GeoNamesPackImporter {
 	public function begin_dataset( GeographyPack $pack, string $source_path, string $checksum, string $dataset_version ): GeographyPack {
 		$progress = $this->empty_progress();
 		$progress['dataset_checksum'] = $checksum;
+		$progress['update_dataset']   = [
+			'checksum'         => $checksum,
+			'dataset_version'  => $dataset_version,
+			'source_reference' => $source_path,
+		];
+		if ( isset( $pack->progress['last_successful'] ) && is_array( $pack->progress['last_successful'] ) ) {
+			$progress['last_successful'] = $pack->progress['last_successful'];
+		} elseif ( $pack->has_usable_dataset() ) {
+			$progress['last_successful'] = [
+				'checksum'         => $pack->active_checksum(),
+				'dataset_version'  => $pack->active_dataset_version(),
+				'source_reference' => $pack->source_reference,
+				'installed_at'     => $pack->installed_at,
+			];
+		}
 
 		return $this->packs->save(
 			[
@@ -378,6 +393,7 @@ final class GeoNamesPackImporter {
 			$new_parent = $parent->id;
 		}
 
+		$old_path  = $existing->ancestry_path;
 		$updated = new CanonicalLocation(
 			$existing->id,
 			$existing->location_key,
@@ -396,10 +412,11 @@ final class GeoNamesPackImporter {
 		$this->locations->save( $updated );
 
 		if ( $may_reparent && $parent instanceof CanonicalLocation && $new_parent === $parent->id ) {
-			$this->locations->update_ancestry_path(
-				$existing->id,
-				LocationAncestry::append_path( $parent->ancestry_path, $existing->id )
-			);
+			$new_path = LocationAncestry::append_path( $parent->ancestry_path, $existing->id );
+			$this->locations->update_ancestry_path( $existing->id, $new_path );
+			if ( '' !== $old_path && $old_path !== $new_path ) {
+				$this->locations->rebuild_descendant_ancestry( $existing->id, $old_path, $new_path );
+			}
 		}
 	}
 

@@ -115,11 +115,39 @@ final class InMemoryCoverageGroupRepository implements CoverageGroupRepositoryIn
 	}
 
 	public function replace_for_zone( int $zone_id, array $groups ): array {
-		$this->delete_by_zone( $zone_id );
-		$saved = [];
+		$existing = $this->list_by_zone( $zone_id );
+		$owned    = [];
+		foreach ( $existing as $group ) {
+			$owned[ $group->id ] = true;
+		}
+
 		foreach ( $groups as $payload ) {
-			$payload['zone_id'] = $zone_id;
-			$saved[]            = $this->save_group( $payload );
+			if ( ! is_array( $payload ) ) {
+				continue;
+			}
+			$id = (int) ( $payload['id'] ?? 0 );
+			if ( $id > 0 && ! isset( $owned[ $id ] ) ) {
+				throw new \InvalidArgumentException( 'Coverage group does not belong to this Delivery Area.' );
+			}
+		}
+
+		$kept  = [];
+		$saved = [];
+		foreach ( $groups as $index => $payload ) {
+			if ( ! is_array( $payload ) ) {
+				continue;
+			}
+			$payload['zone_id']    = $zone_id;
+			$payload['sort_order'] = (int) ( $payload['sort_order'] ?? ( ( $index + 1 ) * 10 ) );
+			$group                 = $this->save_group( $payload );
+			$saved[]               = $group;
+			$kept[ $group->id ]    = true;
+		}
+
+		foreach ( $existing as $old ) {
+			if ( ! isset( $kept[ $old->id ] ) ) {
+				$this->delete_group( $old->id );
+			}
 		}
 
 		return $saved;

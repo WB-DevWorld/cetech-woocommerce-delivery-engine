@@ -97,9 +97,10 @@ final class LegacyDestinationCoverageMigratorTest extends TestCase {
 		self::assertCount( 3, $or_group->members );
 
 		$materialized = $groups->list_by_zone( 3 )[0];
-		self::assertFalse( $materialized->review_required );
-		self::assertSame( RecordStatus::Active, $materialized->status );
-		self::assertNotNull( $geo->locations->find_exact_child( 'GH', $geo->greater_accra->id, 'not a real town', \CetechDeliveryEngine\Domain\Enum\GeographyLocationType::Locality ) );
+		self::assertTrue( $materialized->review_required );
+		self::assertSame( RecordStatus::Inactive, $materialized->status );
+		self::assertSame( 'unmapped_city', $materialized->legacy_migration['reason'] );
+		self::assertNull( $geo->locations->find_exact_child( 'GH', $geo->greater_accra->id, 'not a real town', \CetechDeliveryEngine\Domain\Enum\GeographyLocationType::Locality ) );
 		self::assertNotEmpty( $rules->listByZoneId( 3 ) );
 	}
 }

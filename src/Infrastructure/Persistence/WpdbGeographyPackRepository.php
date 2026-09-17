@@ -57,6 +57,12 @@ final class WpdbGeographyPackRepository implements GeographyPackRepositoryInterf
 		$table = TableNames::for( GeographySchema::PACKS_SUFFIX );
 		$now   = gmdate( 'Y-m-d H:i:s' );
 		$id    = (int) ( $payload['id'] ?? 0 );
+		if ( $id > 0 ) {
+			$existing = $this->find_by_id( $id );
+			if ( $existing instanceof GeographyPack ) {
+				$payload = $this->merge_existing( $existing, $payload );
+			}
+		}
 		$progress = isset( $payload['progress'] ) && is_array( $payload['progress'] ) ? $payload['progress'] : [];
 		$encoded  = wp_json_encode( $progress );
 		if ( ! is_string( $encoded ) ) {
@@ -78,7 +84,7 @@ final class WpdbGeographyPackRepository implements GeographyPackRepositoryInterf
 			'import_cursor'     => (string) ( $payload['import_cursor'] ?? '0' ),
 			'progress_json'     => $encoded,
 			'last_error'        => (string) ( $payload['last_error'] ?? '' ),
-			'installed_at'      => $payload['installed_at'] ?? null,
+			'installed_at'      => array_key_exists( 'installed_at', $payload ) ? ( $payload['installed_at'] ?? null ) : null,
 			'updated_at'        => $now,
 		];
 
@@ -105,6 +111,18 @@ final class WpdbGeographyPackRepository implements GeographyPackRepositoryInterf
 		?string $installed_at = null
 	): void {
 		global $wpdb;
+		$existing = $this->find_by_id( $id );
+		if ( $existing instanceof GeographyPack && ! array_key_exists( 'last_successful', $progress ) && isset( $existing->progress['last_successful'] ) ) {
+			$progress['last_successful'] = $existing->progress['last_successful'];
+		}
+		if ( GeographyPackStatus::Ready === $status ) {
+			$progress['last_successful'] = [
+				'checksum'          => $existing instanceof GeographyPack ? ( '' !== (string) ( $progress['dataset_checksum'] ?? '' ) ? (string) $progress['dataset_checksum'] : $existing->checksum ) : (string) ( $progress['dataset_checksum'] ?? '' ),
+				'dataset_version'   => $existing instanceof GeographyPack ? $existing->dataset_version : '',
+				'source_reference'  => $existing instanceof GeographyPack ? $existing->source_reference : '',
+				'installed_at'      => $installed_at ?? ( $existing?->installed_at ),
+			];
+		}
 		$table   = TableNames::for( GeographySchema::PACKS_SUFFIX );
 		$encoded = wp_json_encode( $progress );
 		if ( ! is_string( $encoded ) ) {
@@ -124,5 +142,50 @@ final class WpdbGeographyPackRepository implements GeographyPackRepositoryInterf
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$wpdb->update( $table, $data, [ 'id' => $id ] );
+	}
+
+	/**
+	 * @param array<string, mixed> $payload
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function merge_existing( GeographyPack $existing, array $payload ): array {
+		$merged = [
+			'id'               => $existing->id,
+			'country_code'     => $existing->country_code,
+			'provider'         => $existing->provider->value,
+			'dataset_name'     => $existing->dataset_name,
+			'dataset_version'  => $existing->dataset_version,
+			'source_url'       => $existing->source_url,
+			'source_reference' => $existing->source_reference,
+			'checksum'         => $existing->checksum,
+			'license_name'     => $existing->license_name,
+			'license_url'      => $existing->license_url,
+			'attribution_text' => $existing->attribution_text,
+			'status'           => $existing->status->value,
+			'import_cursor'    => $existing->import_cursor,
+			'progress'         => $existing->progress,
+			'last_error'       => $existing->last_error,
+			'installed_at'     => $existing->installed_at,
+		];
+		foreach ( $payload as $key => $value ) {
+			if ( 'progress' === $key && is_array( $value ) ) {
+				$progress = $existing->progress;
+				foreach ( $value as $progress_key => $progress_value ) {
+					$progress[ $progress_key ] = $progress_value;
+				}
+				if ( ! array_key_exists( 'last_successful', $value ) && isset( $existing->progress['last_successful'] ) ) {
+					$progress['last_successful'] = $existing->progress['last_successful'];
+				}
+				$merged['progress'] = $progress;
+				continue;
+			}
+			$merged[ $key ] = $value;
+		}
+		if ( ! array_key_exists( 'installed_at', $payload ) ) {
+			$merged['installed_at'] = $existing->installed_at;
+		}
+
+		return $merged;
 	}
 }

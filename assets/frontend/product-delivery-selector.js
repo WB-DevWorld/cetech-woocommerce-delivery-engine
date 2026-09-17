@@ -523,6 +523,7 @@
 			setReveal(locationRoot, 'locality', !!(region && region.value));
 			setReveal(locationRoot, 'postcode', false);
 			clearOptions();
+			refreshPostcode();
 		}
 
 		function loadChildren(type, parentKey) {
@@ -563,42 +564,76 @@
 			}).catch(function () { /* keep existing options */ });
 		}
 
-		function searchLocalities(query) {
+		function currentParentKey() {
+			var key = keyField();
+			if (key && key.value) {
+				return key.value;
+			}
+			var region = regionField();
+			if (region && region.options && region.selectedIndex >= 0) {
+				var selected = region.options[region.selectedIndex];
+				return (selected && selected.getAttribute('data-location-key')) || '';
+			}
+			return '';
+		}
+
+		function searchLocalities(query, page, append) {
 			if (!config.ajaxUrl || !geo.searchAction) {
 				return;
 			}
-			var token = ++searchToken;
-			var country = countryField();
-			var region = regionField();
-			var selectedRegion = region && region.options && region.selectedIndex >= 0 ? region.options[region.selectedIndex] : null;
-			var parentKey = selectedRegion ? (selectedRegion.getAttribute('data-location-key') || '') : '';
-			if (!parentKey && region && region.value && region.value.indexOf('-') !== -1 && region.value.length > 8) {
-				parentKey = region.value;
-			}
+			page = page || 1;
 			var list = locationRoot.querySelector('.cetech-de-locality-results');
+			var token = append ? parseInt(list && list.getAttribute('data-token') ? list.getAttribute('data-token') : '0', 10) : ++searchToken;
+			var country = countryField();
+			var parentKey = currentParentKey();
+			if (!parentKey) {
+				var region = regionField();
+				var selectedRegion = region && region.options && region.selectedIndex >= 0 ? region.options[region.selectedIndex] : null;
+				parentKey = selectedRegion ? (selectedRegion.getAttribute('data-location-key') || '') : '';
+				if (!parentKey && region && region.value && region.value.indexOf('-') !== -1 && region.value.length > 8) {
+					parentKey = region.value;
+				}
+			}
 			var body = new window.URLSearchParams();
 			body.set('action', geo.searchAction);
 			body.set('nonce', geo.searchNonce || '');
 			body.set('country', country ? country.value : '');
 			body.set('parent_key', parentKey);
 			body.set('q', query || '');
+			body.set('page', String(page));
 			body.set('request_token', String(token));
+			if (list) {
+				list.setAttribute('data-token', String(token));
+			}
 			window.fetch(config.ajaxUrl, {
 				method: 'POST',
 				credentials: 'same-origin',
 				headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
 				body: body.toString()
 			}).then(function (response) { return response.json(); }).then(function (payload) {
-				if (token !== searchToken) {
+				if (token !== searchToken && !append) {
+					return;
+				}
+				if (list && String(list.getAttribute('data-token') || '') !== String(token)) {
 					return;
 				}
 				var data = payload && payload.data ? payload.data : payload;
 				if (!list) {
 					return;
 				}
-				list.innerHTML = '';
+				if (!append) {
+					list.innerHTML = '';
+				}
+				var seen = {};
+				Array.prototype.forEach.call(list.querySelectorAll('[role="option"]'), function (option) {
+					seen[option.getAttribute('data-key') || ''] = true;
+				});
 				var items = data && data.items ? data.items : [];
 				items.forEach(function (item) {
+					if (seen[item.key || '']) {
+						return;
+					}
+					seen[item.key || ''] = true;
 					var li = document.createElement('li');
 					li.setAttribute('role', 'option');
 					li.tabIndex = 0;
@@ -613,10 +648,28 @@
 					});
 					list.appendChild(li);
 				});
-				list.hidden = items.length === 0;
+				var more = list.querySelector('[data-cetech-de-locality-more]');
+				if (more) {
+					more.remove();
+				}
+				if (data && data.has_more) {
+					var button = document.createElement('button');
+					button.type = 'button';
+					button.className = 'button-link';
+					button.setAttribute('data-cetech-de-locality-more', '1');
+					button.setAttribute('data-page', String(page + 1));
+					button.textContent = 'Load more';
+					button.addEventListener('click', function (event) {
+						event.preventDefault();
+						var city = cityField();
+						searchLocalities(city ? city.value : query, page + 1, true);
+					});
+					list.appendChild(button);
+				}
+				list.hidden = list.querySelectorAll('[role="option"]').length === 0;
 				var city = cityField();
 				if (city) {
-					city.setAttribute('aria-expanded', items.length ? 'true' : 'false');
+					city.setAttribute('aria-expanded', list.hidden ? 'false' : 'true');
 				}
 			}).catch(function () { /* keep */ });
 		}
@@ -635,7 +688,9 @@
 				list.hidden = true;
 				list.innerHTML = '';
 			}
+			clearOptions();
 			refreshPostcode();
+			locationRoot.dispatchEvent(new Event('change', { bubbles: true }));
 		}
 
 		function refreshPostcode() {
@@ -647,6 +702,7 @@
 			body.set('action', geo.postcodeAction);
 			body.set('nonce', geo.postcodeNonce || '');
 			body.set('country', country ? country.value : '');
+			body.set('parent_key', currentParentKey());
 			window.fetch(config.ajaxUrl, {
 				method: 'POST',
 				credentials: 'same-origin',

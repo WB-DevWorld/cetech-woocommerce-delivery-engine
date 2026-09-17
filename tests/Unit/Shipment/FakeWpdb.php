@@ -429,6 +429,26 @@ final class FakeWpdb {
 		}
 
 		$where = [];
+		$in    = [];
+
+		if ( preg_match_all(
+			'/(?:`([a-z0-9_]+)`|([a-z0-9_]+))\s+IN\s+\(([\d,\s]+)\)/i',
+			$where_sql,
+			$in_matches,
+			PREG_SET_ORDER
+		) ) {
+			foreach ( $in_matches as $in_match ) {
+				$column = ( $in_match[1] ?? '' ) !== '' ? $in_match[1] : (string) ( $in_match[2] ?? '' );
+				if ( '' === $column ) {
+					continue;
+				}
+				$values = [];
+				foreach ( explode( ',', $in_match[3] ) as $value ) {
+					$values[] = trim( $value );
+				}
+				$in[ $column ] = $values;
+			}
+		}
 
 		if ( preg_match_all(
 			'/(?:`([a-z0-9_]+)`|([a-z0-9_]+))\s*=\s*(?:\'((?:\\\\\'|[^\'])*)\'|(\d+)|NULL)/i',
@@ -471,6 +491,7 @@ final class FakeWpdb {
 			'table'   => $matches[2],
 			'count'   => 0 === strcasecmp( $matches[1], 'COUNT(*)' ),
 			'where'   => $where,
+			'in'      => $in,
 			'or_any'  => $or_any,
 			'order'   => $order,
 			'limit'   => isset( $matches[5] ) && '' !== $matches[5] ? (int) $matches[5] : null,
@@ -579,6 +600,12 @@ final class FakeWpdb {
 		foreach ( $rows as $row ) {
 			if ( ! $this->row_matches( $row, $parsed['where'] ) ) {
 				continue;
+			}
+
+			foreach ( $parsed['in'] ?? [] as $column => $values ) {
+				if ( ! in_array( (string) ( $row[ $column ] ?? '' ), $values, true ) ) {
+					continue 2;
+				}
 			}
 
 			if ( [] !== $parsed['or_any'] && ! $this->row_matches_any( $row, $parsed['or_any'] ) ) {

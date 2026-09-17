@@ -99,18 +99,24 @@ final class WpdbCoverageGroupRepository implements CoverageGroupRepositoryInterf
 
 		if ( $id > 0 ) {
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-			$wpdb->update( $table, $row, [ 'id' => $id ] );
+			$updated = $wpdb->update( $table, $row, [ 'id' => $id ] );
+			if ( false === $updated ) {
+				return CoverageGroup::fromRow( $row + [ 'id' => $id ] );
+			}
 		} else {
 			$row['created_at'] = $now;
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-			$wpdb->insert( $table, $row );
+			$inserted = $wpdb->insert( $table, $row );
+			if ( false === $inserted ) {
+				return CoverageGroup::fromRow( $row + [ 'id' => 0 ] );
+			}
 			$id = (int) $wpdb->insert_id;
 		}
 
-		if ( isset( $payload['members'] ) && is_array( $payload['members'] ) ) {
+		if ( $id > 0 && isset( $payload['members'] ) && is_array( $payload['members'] ) ) {
 			$this->replace_members( $id, $payload['members'] );
 		}
-		if ( isset( $payload['postcodes'] ) && is_array( $payload['postcodes'] ) ) {
+		if ( $id > 0 && isset( $payload['postcodes'] ) && is_array( $payload['postcodes'] ) ) {
 			$this->replace_postcodes( $id, $payload['postcodes'] );
 		}
 
@@ -198,21 +204,60 @@ final class WpdbCoverageGroupRepository implements CoverageGroupRepositoryInterf
 	public function replace_for_zone( int $zone_id, array $groups ): array {
 		global $wpdb;
 		$wpdb->query( 'START TRANSACTION' );
-		$this->delete_by_zone( $zone_id );
-		$saved = [];
-		foreach ( $groups as $index => $payload ) {
-			$payload['zone_id']    = $zone_id;
-			$payload['sort_order'] = (int) ( $payload['sort_order'] ?? ( ( $index + 1 ) * 10 ) );
-			$saved[]               = $this->save_group( $payload );
-			if ( '' !== (string) $wpdb->last_error ) {
-				$wpdb->query( 'ROLLBACK' );
-
-				return [];
+		try {
+			$existing = $this->list_by_zone( $zone_id );
+			$owned    = [];
+			foreach ( $existing as $group ) {
+				$owned[ $group->id ] = true;
 			}
-		}
-		$wpdb->query( 'COMMIT' );
 
-		return $saved;
+			foreach ( $groups as $payload ) {
+				if ( ! is_array( $payload ) ) {
+					continue;
+				}
+				$id = (int) ( $payload['id'] ?? 0 );
+				if ( $id > 0 && ! isset( $owned[ $id ] ) ) {
+					throw new \InvalidArgumentException( 'Coverage group does not belong to this Delivery Area.' );
+				}
+			}
+
+			$kept  = [];
+			$saved = [];
+			foreach ( $groups as $index => $payload ) {
+				if ( ! is_array( $payload ) ) {
+					continue;
+				}
+				$payload['zone_id']    = $zone_id;
+				$payload['sort_order'] = (int) ( $payload['sort_order'] ?? ( ( $index + 1 ) * 10 ) );
+				$group                 = $this->save_group( $payload );
+				if ( '' !== (string) $wpdb->last_error || $group->id <= 0 ) {
+					throw new \RuntimeException( 'Coverage persistence failed.' );
+				}
+				$saved[]           = $group;
+				$kept[ $group->id ] = true;
+			}
+
+			foreach ( $existing as $old ) {
+				if ( isset( $kept[ $old->id ] ) ) {
+					continue;
+				}
+				$this->delete_group( $old->id );
+				if ( '' !== (string) $wpdb->last_error ) {
+					throw new \RuntimeException( 'Coverage persistence failed.' );
+				}
+			}
+
+			$wpdb->query( 'COMMIT' );
+
+			return $saved;
+		} catch ( \InvalidArgumentException $e ) {
+			$wpdb->query( 'ROLLBACK' );
+			throw $e;
+		} catch ( \Throwable $e ) {
+			$wpdb->query( 'ROLLBACK' );
+
+			return [];
+		}
 	}
 
 	public function count_review_required(): int {

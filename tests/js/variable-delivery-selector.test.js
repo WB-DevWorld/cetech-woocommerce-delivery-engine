@@ -572,4 +572,28 @@ describe('Variable delivery selector controller', () => {
 		expect(controller.statusEl.textContent).not.toContain('not available for this variation');
 		expect(controller.optionsEl.textContent).not.toMatch(/₵\d/);
 	});
+
+	it('selecting a locality invalidates cache and requests options with the canonical key', async () => {
+		const { $form, ajax } = loadController();
+		ajax.mockReturnValue(createDeferred({ type: 'success', payload: okPayload(11) }));
+		$form.trigger('found_variation', { variation_id: 11 });
+		await flush();
+		ajax.mockClear();
+		ajax.mockReturnValue(createDeferred({ type: 'success', payload: okPayload(11) }));
+		const loc = document.querySelector('[data-cetech-de-matching-location]');
+		let key = loc.querySelector('[name="cetech_de_matching_location_key"]');
+		if (!key) {
+			key = document.createElement('input');
+			key.type = 'hidden';
+			key.name = 'cetech_de_matching_location_key';
+			loc.appendChild(key);
+		}
+		key.value = 'loc-accra';
+		loc.querySelector('[name="cetech_de_matching_city"]').value = 'Accra';
+		loc.dispatchEvent(new Event('change', { bubbles: true }));
+		await flush();
+		expect(ajax).toHaveBeenCalled();
+		expect(ajax.mock.calls[0][0].data.location_key).toBe('loc-accra');
+		expect(ajax.mock.calls[0][0].data.city).toBe('Accra');
+	});
 });
