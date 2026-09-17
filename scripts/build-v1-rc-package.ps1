@@ -164,13 +164,18 @@ if (Test-Path $DocsTrainingPath) {
 }
 
 Write-Step 'Pruning nested development directories from staging'
-$nestedPrune = @('node_modules', '.git', 'tests', 'coverage', 'playwright-report', 'test-results')
+$nestedPrune = @('node_modules', '.git', 'tests', 'playwright-report', 'test-results')
 Get-ChildItem -LiteralPath $StagePluginDir -Recurse -Directory -Force -ErrorAction SilentlyContinue |
     Where-Object { $nestedPrune -contains $_.Name } |
     Sort-Object { $_.FullName.Length } -Descending |
     ForEach-Object {
         Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
     }
+
+$RootCoverageReport = Join-Path $StagePluginDir 'coverage'
+if (Test-Path $RootCoverageReport) {
+    Remove-Item -LiteralPath $RootCoverageReport -Recurse -Force -ErrorAction SilentlyContinue
+}
 
 $VendorAutoload = Join-Path $StagePluginDir 'vendor/autoload.php'
 if (-not (Test-Path (Join-Path $StagePluginDir 'composer.json'))) {
