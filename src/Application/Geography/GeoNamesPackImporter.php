@@ -19,6 +19,19 @@ use CetechDeliveryEngine\Domain\Geography\ProviderMappingRepositoryInterface;
 
 /**
  * Batched, resumable, idempotent GeoNames country gazetteer importer.
+ *
+ * Hierarchy is provider-neutral:
+ * country → ADM1 → ADM2 → ADM3 → ADM4 → locality
+ * as far as the source data provides. Localities attach to the deepest
+ * resolvable administrative ancestor. PCLI/PCL* rows update the existing
+ * country node and never create a duplicate country child.
+ *
+ * Provider rename/move/coordinate updates rewrite provider-derived metadata
+ * on the existing canonical location and keep the internal ID. Former names
+ * are stored as aliases. Provider rows that disappear from a later dataset
+ * are not deleted or deactivated automatically: Delivery Areas that reference
+ * the canonical ID keep working until a merchant reviews them. Deprecation is
+ * a later explicit review action, not an implicit import side-effect.
  */
 final class GeoNamesPackImporter {
 
@@ -29,6 +42,13 @@ final class GeoNamesPackImporter {
 	public const LICENSE_URL = 'https://creativecommons.org/licenses/by/4.0/';
 
 	public const ATTRIBUTION = 'This product uses GeoNames gazetteer data (https://www.geonames.org/) licensed under CC BY 4.0.';
+
+	public const MAX_SCAN_PER_TICK = 2500;
+
+	public const MAX_SECONDS_PER_TICK = 4.0;
+
+	/** @var list<string> */
+	public const PHASES = [ 'admin1', 'admin2', 'admin3', 'admin4', 'locality' ];
 
 	public function __construct(
 		private CanonicalLocationRepositoryInterface $locations,
@@ -59,12 +79,36 @@ final class GeoNamesPackImporter {
 				'license_url'      => self::LICENSE_URL,
 				'attribution_text' => self::ATTRIBUTION,
 				'status'           => GeographyPackStatus::Pending->value,
-				'progress'         => [
-					'processed' => 0,
-					'imported'  => 0,
-					'skipped'   => 0,
-					'total'     => 0,
-				],
+				'progress'         => $this->empty_progress(),
+			]
+		);
+	}
+
+	/**
+	 * Reset import state for a new dataset. Canonical IDs/mappings are preserved.
+	 */
+	public function begin_dataset( GeographyPack $pack, string $source_path, string $checksum, string $dataset_version ): GeographyPack {
+		$progress = $this->empty_progress();
+		$progress['dataset_checksum'] = $checksum;
+
+		return $this->packs->save(
+			[
+				'id'               => $pack->id,
+				'country_code'     => $pack->country_code,
+				'provider'         => $pack->provider->value,
+				'dataset_name'     => $pack->dataset_name !== '' ? $pack->dataset_name : 'gazetteer',
+				'dataset_version'  => $dataset_version,
+				'source_url'       => $pack->source_url !== '' ? $pack->source_url : sprintf( self::SOURCE_URL_PATTERN, $pack->country_code ),
+				'source_reference' => $source_path,
+				'checksum'         => $checksum,
+				'license_name'     => $pack->license_name !== '' ? $pack->license_name : self::LICENSE_NAME,
+				'license_url'      => $pack->license_url !== '' ? $pack->license_url : self::LICENSE_URL,
+				'attribution_text' => $pack->attribution_text !== '' ? $pack->attribution_text : self::ATTRIBUTION,
+				'status'           => GeographyPackStatus::Importing->value,
+				'import_cursor'    => '0',
+				'progress'         => $progress,
+				'last_error'       => '',
+				'installed_at'     => $pack->installed_at,
 			]
 		);
 	}
@@ -99,15 +143,21 @@ final class GeoNamesPackImporter {
 		$imported  = (int) ( $progress['imported'] ?? 0 );
 		$skipped   = (int) ( $progress['skipped'] ?? 0 );
 		$last      = $cursor;
-		$seen      = 0;
-		$phase     = (string) ( $progress['phase'] ?? 'admin' );
-		if ( ! in_array( $phase, [ 'admin', 'locality' ], true ) ) {
-			$phase = 'admin';
+		$phase     = (string) ( $progress['phase'] ?? 'admin1' );
+		if ( ! in_array( $phase, self::PHASES, true ) ) {
+			$phase = 'admin' === $phase ? 'admin1' : ( 'locality' === $phase ? 'locality' : 'admin1' );
 		}
 
-		foreach ( $this->parser->iterate_file( $file_path, $cursor, $batch_size ) as $row ) {
+		$eof     = false;
+		$scanned = 0;
+		foreach ( $this->parser->iterate_file( $file_path, $cursor, $batch_size, self::MAX_SCAN_PER_TICK, self::MAX_SECONDS_PER_TICK ) as $row ) {
+			if ( ! empty( $row['_batch_end'] ) ) {
+				$last    = (int) ( $row['_file_offset'] ?? $last );
+				$eof     = ! empty( $row['_eof'] );
+				$scanned = (int) ( $row['_scanned'] ?? $scanned );
+				continue;
+			}
 			$last = (int) ( $row['_file_offset'] ?? $last );
-			++$seen;
 			if ( ! empty( $row['_skip'] ) ) {
 				++$skipped;
 				++$processed;
@@ -118,13 +168,17 @@ final class GeoNamesPackImporter {
 				++$processed;
 				continue;
 			}
-			$is_admin = ! empty( $row['is_admin'] );
-			if ( 'admin' === $phase && ! $is_admin ) {
-				++$skipped;
+			if ( ! empty( $row['is_country'] ) ) {
+				$did = $this->upsert_row( $pack, $country, $row );
+				if ( $did ) {
+					++$imported;
+				} else {
+					++$skipped;
+				}
 				++$processed;
 				continue;
 			}
-			if ( 'locality' === $phase && $is_admin ) {
+			if ( ! $this->row_matches_phase( $row, $phase ) ) {
 				++$skipped;
 				++$processed;
 				continue;
@@ -139,21 +193,28 @@ final class GeoNamesPackImporter {
 			++$processed;
 		}
 
-		$eof = $seen < $batch_size;
-		if ( $eof && 'admin' === $phase ) {
-			$phase   = 'locality';
-			$last    = 0;
-			$eof     = false;
-			$status  = GeographyPackStatus::Importing;
+		$complete = false;
+		if ( $eof ) {
+			$idx = array_search( $phase, self::PHASES, true );
+			if ( is_int( $idx ) && $idx < count( self::PHASES ) - 1 ) {
+				$phase = self::PHASES[ $idx + 1 ];
+				$last  = 0;
+				$status = GeographyPackStatus::Importing;
+			} else {
+				$status   = GeographyPackStatus::Ready;
+				$complete = true;
+			}
 		} else {
-			$status = $eof ? GeographyPackStatus::Ready : GeographyPackStatus::Importing;
+			$status = GeographyPackStatus::Importing;
 		}
+
 		$progress = [
 			'processed' => $processed,
 			'imported'  => $imported,
 			'skipped'   => $skipped,
 			'total'     => (int) ( $progress['total'] ?? 0 ),
 			'phase'     => $phase,
+			'scanned'   => $scanned,
 		];
 		$this->packs->update_progress(
 			$pack->id,
@@ -161,7 +222,7 @@ final class GeoNamesPackImporter {
 			(string) $last,
 			$progress,
 			'',
-			$eof ? gmdate( 'Y-m-d H:i:s' ) : null
+			$complete ? gmdate( 'Y-m-d H:i:s' ) : null
 		);
 
 		return [
@@ -170,8 +231,24 @@ final class GeoNamesPackImporter {
 			'imported'  => $imported,
 			'skipped'   => $skipped,
 			'cursor'    => $last,
-			'complete'  => $eof,
+			'phase'     => $phase,
+			'complete'  => $complete,
 		];
+	}
+
+	/**
+	 * @param array<string, mixed> $row
+	 */
+	private function row_matches_phase( array $row, string $phase ): bool {
+		$level = isset( $row['admin_level'] ) ? (int) $row['admin_level'] : 0;
+		return match ( $phase ) {
+			'admin1' => ! empty( $row['is_admin'] ) && 1 === $level,
+			'admin2' => ! empty( $row['is_admin'] ) && 2 === $level,
+			'admin3' => ! empty( $row['is_admin'] ) && 3 === $level,
+			'admin4' => ! empty( $row['is_admin'] ) && 4 === $level,
+			'locality' => ! empty( $row['is_locality'] ),
+			default => false,
+		};
 	}
 
 	/**
@@ -183,58 +260,43 @@ final class GeoNamesPackImporter {
 			return false;
 		}
 
-		$existing_id = $this->mappings->find_location_id( GeographyProvider::GeoNames, $external );
-		$parent      = $this->resolve_parent( $country, $row );
-		$name        = (string) ( $row['name'] ?? '' );
+		if ( ! empty( $row['is_country'] ) ) {
+			return $this->map_country_feature( $pack, $country, $row );
+		}
+
+		$name = (string) ( $row['name'] ?? '' );
 		if ( '' === $name ) {
 			return false;
 		}
 
-		$type  = ! empty( $row['is_admin'] ) ? GeographyLocationType::Administrative : GeographyLocationType::Locality;
-		$level = isset( $row['admin_level'] ) ? (int) $row['admin_level'] : null;
+		$parent = $this->resolve_parent( $country, $row );
+		$type   = ! empty( $row['is_admin'] ) ? GeographyLocationType::Administrative : GeographyLocationType::Locality;
+		$level  = isset( $row['admin_level'] ) ? (int) $row['admin_level'] : null;
 		if ( GeographyLocationType::Administrative === $type && ( $level ?? 0 ) <= 0 ) {
 			$level = 1;
 		}
 
+		$existing_id = $this->mappings->find_location_id( GeographyProvider::GeoNames, $external );
 		if ( null !== $existing_id ) {
 			$existing = $this->locations->find_by_id( $existing_id );
 			if ( $existing instanceof CanonicalLocation ) {
+				$this->apply_provider_update( $existing, $parent, $row );
 				$this->store_aliases( $existing->id, $row );
-				$this->mappings->upsert(
-					$existing->id,
-					GeographyProvider::GeoNames,
-					$external,
-					$pack->id,
-					(string) ( $row['modified'] ?? '' ),
-					(string) ( $row['admin1'] ?? '' ),
-					(string) ( $row['feature_class'] ?? '' ),
-					(string) ( $row['feature_code'] ?? '' ),
-					[ 'ascii_name' => (string) ( $row['ascii_name'] ?? '' ) ]
-				);
-
+				$this->store_mappings( $existing->id, $pack, $row, $level );
 				return true;
 			}
 		}
 
 		$by_name = $this->locations->find_exact_child(
 			$country->country_code,
-			$parent?->id,
+			$parent->id,
 			GeographyNameNormalizer::normalize( $name ),
 			$type
 		);
 		if ( $by_name instanceof CanonicalLocation ) {
-			$this->mappings->upsert(
-				$by_name->id,
-				GeographyProvider::GeoNames,
-				$external,
-				$pack->id,
-				(string) ( $row['modified'] ?? '' ),
-				(string) ( $row['admin1'] ?? '' ),
-				(string) ( $row['feature_class'] ?? '' ),
-				(string) ( $row['feature_code'] ?? '' )
-			);
+			$this->apply_provider_update( $by_name, $parent, $row );
+			$this->store_mappings( $by_name->id, $pack, $row, $level );
 			$this->store_aliases( $by_name->id, $row );
-
 			return true;
 		}
 
@@ -243,7 +305,7 @@ final class GeoNamesPackImporter {
 				0,
 				GeographyNameNormalizer::new_location_key(),
 				$country->country_code,
-				$parent?->id,
+				$parent->id,
 				$type,
 				$level,
 				$name,
@@ -252,71 +314,186 @@ final class GeoNamesPackImporter {
 				isset( $row['latitude'] ) ? (float) $row['latitude'] : null,
 				isset( $row['longitude'] ) ? (float) $row['longitude'] : null,
 				RecordStatus::Active,
-				LocationAncestry::append_path( $parent?->ancestry_path ?? $country->ancestry_path, 0 )
+				LocationAncestry::append_path( $parent->ancestry_path, 0 )
 			)
 		);
 		$this->locations->update_ancestry_path(
 			$saved->id,
-			LocationAncestry::append_path( $parent?->ancestry_path ?? $country->ancestry_path, $saved->id )
+			LocationAncestry::append_path( $parent->ancestry_path, $saved->id )
 		);
-		$this->mappings->upsert(
-			$saved->id,
-			GeographyProvider::GeoNames,
-			$external,
-			$pack->id,
-			(string) ( $row['modified'] ?? '' ),
-			(string) ( $row['admin1'] ?? '' ),
-			(string) ( $row['feature_class'] ?? '' ),
-			(string) ( $row['feature_code'] ?? '' )
-		);
-		if ( 'ADM1' === (string) ( $row['feature_code'] ?? '' ) && '' !== trim( (string) ( $row['admin1'] ?? '' ) ) ) {
-			$this->mappings->upsert(
-				$saved->id,
-				GeographyProvider::GeoNames,
-				$country->country_code . '.' . trim( (string) $row['admin1'] ),
-				$pack->id,
-				(string) ( $row['modified'] ?? '' ),
-				(string) ( $row['admin1'] ?? '' ),
-				'A',
-				'ADM1'
-			);
-		}
+		$this->store_mappings( $saved->id, $pack, $row, $level );
 		$this->store_aliases( $saved->id, $row );
 
 		return true;
 	}
 
 	/**
+	 * GeoNames PCLI/PCL* maps onto the existing canonical country. Never Ghana→Ghana.
+	 *
+	 * @param array<string, mixed> $row
+	 */
+	private function map_country_feature( GeographyPack $pack, CanonicalLocation $country, array $row ): bool {
+		$this->apply_provider_update( $country, null, $row, false );
+		$this->mappings->upsert(
+			$country->id,
+			GeographyProvider::GeoNames,
+			(string) $row['geoname_id'],
+			$pack->id,
+			(string) ( $row['modified'] ?? $pack->dataset_version ),
+			'',
+			(string) ( $row['feature_class'] ?? 'A' ),
+			(string) ( $row['feature_code'] ?? 'PCLI' ),
+			[ 'ascii_name' => (string) ( $row['ascii_name'] ?? '' ) ]
+		);
+		$this->store_aliases( $country->id, $row );
+
+		return true;
+	}
+
+	/**
+	 * Preserve canonical identity. Update name/parent/coordinates from provider data.
+	 *
+	 * @param array<string, mixed> $row
+	 */
+	private function apply_provider_update( CanonicalLocation $existing, ?CanonicalLocation $parent, array $row, bool $may_reparent = true ): void {
+		$name  = trim( (string) ( $row['name'] ?? $existing->canonical_name ) );
+		$ascii = trim( (string) ( $row['ascii_name'] ?? $existing->ascii_name ) );
+		if ( '' === $name ) {
+			$name = $existing->canonical_name;
+		}
+
+		if ( $name !== $existing->canonical_name ) {
+			$this->aliases->add_alias(
+				$existing->id,
+				$existing->canonical_name,
+				$existing->normalized_name,
+				'',
+				'former_name',
+				false
+			);
+		}
+
+		$new_parent = $existing->parent_location_id;
+		if ( $may_reparent && $parent instanceof CanonicalLocation && $parent->id !== $existing->id ) {
+			$new_parent = $parent->id;
+		}
+
+		$updated = new CanonicalLocation(
+			$existing->id,
+			$existing->location_key,
+			$existing->country_code,
+			$new_parent,
+			$existing->location_type,
+			$existing->administrative_level,
+			$name,
+			GeographyNameNormalizer::normalize( $name ),
+			'' !== $ascii ? GeographyNameNormalizer::normalize( $ascii ) : $existing->ascii_name,
+			isset( $row['latitude'] ) ? (float) $row['latitude'] : $existing->latitude,
+			isset( $row['longitude'] ) ? (float) $row['longitude'] : $existing->longitude,
+			$existing->status,
+			$existing->ancestry_path
+		);
+		$this->locations->save( $updated );
+
+		if ( $may_reparent && $parent instanceof CanonicalLocation && $new_parent === $parent->id ) {
+			$this->locations->update_ancestry_path(
+				$existing->id,
+				LocationAncestry::append_path( $parent->ancestry_path, $existing->id )
+			);
+		}
+	}
+
+	/**
+	 * @param array<string, mixed> $row
+	 */
+	private function store_mappings( int $location_id, GeographyPack $pack, array $row, ?int $level ): void {
+		$external = (string) ( $row['geoname_id'] ?? '' );
+		$this->mappings->upsert(
+			$location_id,
+			GeographyProvider::GeoNames,
+			$external,
+			$pack->id,
+			(string) ( $row['modified'] ?? $pack->dataset_version ),
+			(string) ( $row['admin1'] ?? '' ),
+			(string) ( $row['feature_class'] ?? '' ),
+			(string) ( $row['feature_code'] ?? '' ),
+			[ 'ascii_name' => (string) ( $row['ascii_name'] ?? '' ) ]
+		);
+
+		$code_key = $this->admin_code_key( $pack->country_code, $row, $level ?? 0 );
+		if ( '' !== $code_key ) {
+			$this->mappings->upsert(
+				$location_id,
+				GeographyProvider::GeoNames,
+				$code_key,
+				$pack->id,
+				(string) ( $row['modified'] ?? $pack->dataset_version ),
+				(string) ( $row['admin1'] ?? '' ),
+				'A',
+				(string) ( $row['feature_code'] ?? '' )
+			);
+		}
+	}
+
+	/**
+	 * Deepest resolvable canonical administrative ancestor for this row.
+	 *
 	 * @param array<string, mixed> $row
 	 */
 	private function resolve_parent( CanonicalLocation $country, array $row ): CanonicalLocation {
+		$own_level = isset( $row['admin_level'] ) ? (int) $row['admin_level'] : 0;
+		if ( ! empty( $row['is_locality'] ) ) {
+			$own_level = 5;
+		}
+
+		foreach ( [ 4, 3, 2, 1 ] as $level ) {
+			if ( $own_level > 0 && $level >= $own_level ) {
+				continue;
+			}
+			$key = $this->admin_code_key( $country->country_code, $row, $level );
+			if ( '' === $key ) {
+				continue;
+			}
+			$mapped = $this->mappings->find_location_id( GeographyProvider::GeoNames, $key );
+			if ( null === $mapped ) {
+				continue;
+			}
+			$location = $this->locations->find_by_id( $mapped );
+			if ( $location instanceof CanonicalLocation ) {
+				return $location;
+			}
+		}
+
 		$admin1 = trim( (string) ( $row['admin1'] ?? '' ) );
-		if ( '' === $admin1 ) {
-			return $country;
-		}
-
-		$geonames_admin_key = $country->country_code . '.' . $admin1;
-		$mapped             = $this->mappings->find_location_id( GeographyProvider::GeoNames, $geonames_admin_key );
-		if ( null !== $mapped ) {
-			$location = $this->locations->find_by_id( $mapped );
-
-			return $location instanceof CanonicalLocation ? $location : $country;
-		}
-
-		$mapped = $this->mappings->find_location_id( GeographyProvider::GeoNames, 'ADM1:' . $country->country_code . ':' . $admin1 );
-		if ( null !== $mapped ) {
-			$location = $this->locations->find_by_id( $mapped );
-
-			return $location instanceof CanonicalLocation ? $location : $country;
-		}
-
-		foreach ( $this->locations->list_children( $country->id, GeographyLocationType::Administrative, 200, 0 ) as $admin ) {
-			if ( $admin->normalized_name === GeographyNameNormalizer::normalize( $admin1 ) ) {
-				return $admin;
+		if ( '' !== $admin1 ) {
+			foreach ( $this->locations->list_children( $country->id, GeographyLocationType::Administrative, 250, 0 ) as $admin ) {
+				if ( $admin->normalized_name === GeographyNameNormalizer::normalize( $admin1 ) ) {
+					return $admin;
+				}
 			}
 		}
 
 		return $country;
+	}
+
+	/**
+	 * @param array<string, mixed> $row
+	 */
+	private function admin_code_key( string $country_code, array $row, int $level ): string {
+		if ( $level < 1 ) {
+			return '';
+		}
+		$parts = [ $country_code ];
+		for ( $i = 1; $i <= $level; $i++ ) {
+			$field = 'admin' . $i;
+			$value = trim( (string) ( $row[ $field ] ?? '' ) );
+			if ( '' === $value ) {
+				return '';
+			}
+			$parts[] = $value;
+		}
+
+		return implode( '.', $parts );
 	}
 
 	/**
@@ -339,5 +516,18 @@ final class GeoNamesPackImporter {
 			}
 			$this->aliases->add_alias( $location_id, $alias, $normalized, '', 'alternate', false );
 		}
+	}
+
+	/**
+	 * @return array<string, mixed>
+	 */
+	private function empty_progress(): array {
+		return [
+			'processed' => 0,
+			'imported'  => 0,
+			'skipped'   => 0,
+			'total'     => 0,
+			'phase'     => 'admin1',
+		];
 	}
 }

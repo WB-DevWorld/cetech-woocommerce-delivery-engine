@@ -21,8 +21,9 @@ final class SchemaV6InspectionTest extends TestCase {
 		$plugin_root = dirname( __DIR__, 3 );
 		$header      = (string) file_get_contents( $plugin_root . '/cetech-woocommerce-delivery-engine.php' );
 
-		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.geo\\.1'\s*\)/", $header );
-		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.geo\\.1\s*$/m', $header );
+		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.geo\\.2'\s*\)/", $header );
+		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.geo\\.2\s*$/m', $header );
+		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo.1' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-rc.11' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-rc.12' )", $header );
 	}
@@ -59,7 +60,23 @@ final class SchemaV6InspectionTest extends TestCase {
 		self::assertStringContainsString( "'geography_packs'", $source );
 		self::assertStringContainsString( "'geography_locations'", $source );
 		self::assertStringContainsString( "'destination_coverage_groups'", $source );
+		self::assertStringContainsString( "'destination_rules'", $source );
 		$migration = (string) file_get_contents( dirname( __DIR__, 3 ) . '/database/migrations/20260917120000_create_geography_coverage_tables.php' );
+		$coverage  = (string) file_get_contents( dirname( __DIR__, 3 ) . '/src/Infrastructure/Persistence/CoverageSchema.php' );
+		self::assertStringContainsString( 'destination_coverage_groups', $coverage );
+		self::assertStringContainsString( 'Does not drop destination_rules', $migration );
 		self::assertStringNotContainsString( 'DROP TABLE', $migration );
+	}
+
+	public function test_schema6_upgrade_bootstraps_referenced_countries_before_legacy_conversion(): void {
+		$upgrade = (string) file_get_contents( dirname( __DIR__, 3 ) . '/src/Application/Geography/Schema6CoverageUpgradeService.php' );
+		self::assertStringContainsString( 'referenced_country_codes', $upgrade );
+		self::assertStringContainsString( 'bootstrap_country', $upgrade );
+		self::assertStringContainsString( '$this->migrator->migrate()', $upgrade );
+		$boot = strpos( $upgrade, 'bootstrap_country' );
+		$migrate = strpos( $upgrade, '$this->migrator->migrate()' );
+		self::assertNotFalse( $boot );
+		self::assertNotFalse( $migrate );
+		self::assertGreaterThan( $boot, $migrate );
 	}
 }

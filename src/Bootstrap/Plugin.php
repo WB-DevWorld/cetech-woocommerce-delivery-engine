@@ -27,13 +27,16 @@ use CetechDeliveryEngine\Application\Destination\DestinationZoneMatcher;
 use CetechDeliveryEngine\Application\Destination\PackageDestinationZoneResolver;
 use CetechDeliveryEngine\Application\Destination\RegionCodeLabelMatcher;
 use CetechDeliveryEngine\Application\Destination\WooCommerceStateCatalogInterface;
+use CetechDeliveryEngine\Application\Coverage\CoverageConfigurationValidator;
 use CetechDeliveryEngine\Application\Coverage\CoverageGroupMatcher;
 use CetechDeliveryEngine\Application\Geography\AdminGeographyEndpoint;
 use CetechDeliveryEngine\Application\Geography\CanonicalLocationResolver;
 use CetechDeliveryEngine\Application\Geography\GeoNamesGazetteerParser;
 use CetechDeliveryEngine\Application\Geography\GeoNamesPackImporter;
 use CetechDeliveryEngine\Application\Geography\GeographyPackService;
+use CetechDeliveryEngine\Application\Geography\GeographyPostcodeRelevance;
 use CetechDeliveryEngine\Application\Geography\LegacyDestinationCoverageMigrator;
+use CetechDeliveryEngine\Application\Geography\Schema6CoverageUpgradeService;
 use CetechDeliveryEngine\Application\Geography\StorefrontGeographyEndpoint;
 use CetechDeliveryEngine\Application\Geography\WooCommerceGeographyBootstrap;
 use CetechDeliveryEngine\Domain\Coverage\CoverageGroupRepositoryInterface;
@@ -295,7 +298,7 @@ final class Plugin {
 		$migration_runner = $this->container->get( MigrationRunner::class );
 		$migration_runner->run();
 		if ( \CetechDeliveryEngine\Infrastructure\Persistence\ConfigurationTables::exists( \CetechDeliveryEngine\Infrastructure\Persistence\CoverageSchema::GROUPS_SUFFIX ) ) {
-			$this->container->get( LegacyDestinationCoverageMigrator::class )->migrate();
+			$this->container->get( Schema6CoverageUpgradeService::class )->run();
 		}
 
 		// Capability matrix must self-heal when an active plugin folder is replaced
@@ -327,6 +330,16 @@ final class Plugin {
 				$path = is_array( $pack_id ) ? (string) ( $pack_id['source_path'] ?? '' ) : (string) $source_path;
 				$id   = is_array( $pack_id ) ? (int) ( $pack_id['pack_id'] ?? 0 ) : (int) $pack_id;
 				$this->container->get( GeographyPackService::class )->tick( $id, $path, 200 );
+			},
+			10,
+			2
+		);
+		add_action(
+			GeographyPackService::DOWNLOAD_HOOK,
+			function ( $pack_id = 0, $country_code = '' ): void {
+				$id      = is_array( $pack_id ) ? (int) ( $pack_id['pack_id'] ?? 0 ) : (int) $pack_id;
+				$country = is_array( $pack_id ) ? (string) ( $pack_id['country_code'] ?? '' ) : (string) $country_code;
+				$this->container->get( GeographyPackService::class )->download_tick( $id, $country );
 			},
 			10,
 			2
@@ -1240,7 +1253,8 @@ final class Plugin {
 				$container->get( AdminRecordDependencyChecker::class ),
 				$container->get( CoverageGroupRepositoryInterface::class ),
 				$container->get( CanonicalLocationRepositoryInterface::class ),
-				$container->get( CanonicalLocationResolver::class )
+				$container->get( CanonicalLocationResolver::class ),
+				$container->get( CoverageConfigurationValidator::class )
 			)
 		);
 
@@ -1867,7 +1881,24 @@ final class Plugin {
 			CanonicalLocationResolver::class,
 			static fn ( ServiceContainer $container ): CanonicalLocationResolver => new CanonicalLocationResolver(
 				$container->get( CanonicalLocationRepositoryInterface::class ),
-				$container->get( LocationAliasRepositoryInterface::class )
+				$container->get( LocationAliasRepositoryInterface::class ),
+				$container->get( GeographyPackRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			CoverageConfigurationValidator::class,
+			static fn ( ServiceContainer $container ): CoverageConfigurationValidator => new CoverageConfigurationValidator(
+				$container->get( CanonicalLocationRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			GeographyPostcodeRelevance::class,
+			static fn ( ServiceContainer $container ): GeographyPostcodeRelevance => new GeographyPostcodeRelevance(
+				$container->get( CoverageGroupRepositoryInterface::class ),
+				$container->get( CanonicalLocationRepositoryInterface::class ),
+				$container->get( DestinationZoneRepositoryInterface::class )
 			)
 		);
 
@@ -1920,7 +1951,8 @@ final class Plugin {
 				$container->get( CanonicalLocationRepositoryInterface::class ),
 				$container->get( CanonicalLocationResolver::class ),
 				$container->get( GeographyPackRepositoryInterface::class ),
-				$container->get( ProviderMappingRepositoryInterface::class )
+				$container->get( ProviderMappingRepositoryInterface::class ),
+				$container->get( GeographyPostcodeRelevance::class )
 			)
 		);
 
@@ -1942,6 +1974,16 @@ final class Plugin {
 				$container->get( CoverageGroupRepositoryInterface::class ),
 				$container->get( CanonicalLocationRepositoryInterface::class ),
 				$container->get( CanonicalLocationResolver::class )
+			)
+		);
+
+		$this->container->singleton(
+			Schema6CoverageUpgradeService::class,
+			static fn ( ServiceContainer $container ): Schema6CoverageUpgradeService => new Schema6CoverageUpgradeService(
+				$container->get( DestinationZoneRepositoryInterface::class ),
+				$container->get( DestinationRuleRepositoryInterface::class ),
+				$container->get( WooCommerceGeographyBootstrap::class ),
+				$container->get( LegacyDestinationCoverageMigrator::class )
 			)
 		);
 

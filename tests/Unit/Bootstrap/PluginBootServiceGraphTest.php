@@ -113,6 +113,8 @@ final class PluginBootServiceGraphTest extends TestCase {
 			\CetechDeliveryEngine\Presentation\Frontend\CartCustomerContextEditorRenderer::class,
 			\CetechDeliveryEngine\Application\CustomerContext\MatchingLocationOptionsEndpoint::class,
 			\CetechDeliveryEngine\Application\Geography\StorefrontGeographyEndpoint::class,
+			\CetechDeliveryEngine\Application\Geography\Schema6CoverageUpgradeService::class,
+			\CetechDeliveryEngine\Application\Coverage\CoverageConfigurationValidator::class,
 			\CetechDeliveryEngine\Application\Coverage\CoverageGroupMatcher::class,
 			\CetechDeliveryEngine\Presentation\Admin\LocationPacksPage::class,
 			\CetechDeliveryEngine\Application\CustomerContext\CustomerBrowsingLocationStore::class,

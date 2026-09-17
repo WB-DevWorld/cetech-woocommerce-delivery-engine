@@ -9,6 +9,7 @@ use CetechDeliveryEngine\Domain\Enum\GeographyLocationType;
 use CetechDeliveryEngine\Domain\Geography\CanonicalLocation;
 use CetechDeliveryEngine\Domain\Geography\CanonicalLocationRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\GeographyNameNormalizer;
+use CetechDeliveryEngine\Domain\Geography\GeographyPackRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\LocationAliasRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\LocationAncestry;
 use CetechDeliveryEngine\Domain\Geography\ResolvedDestination;
@@ -22,7 +23,8 @@ final class CanonicalLocationResolver {
 
 	public function __construct(
 		private CanonicalLocationRepositoryInterface $locations,
-		private LocationAliasRepositoryInterface $aliases
+		private LocationAliasRepositoryInterface $aliases,
+		private ?GeographyPackRepositoryInterface $packs = null
 	) {
 	}
 
@@ -78,7 +80,8 @@ final class CanonicalLocationResolver {
 		}
 
 		$parent_for_locality = $admin instanceof CanonicalLocation ? $admin : $country;
-		if ( $parent_for_locality instanceof CanonicalLocation && '' !== $locality_label ) {
+		$pack_ready          = $this->country_has_ready_pack( $country_code );
+		if ( $parent_for_locality instanceof CanonicalLocation && '' !== $locality_label && ( ! $pack_ready || '' !== $canonical_key ) ) {
 			$locality = $this->exact_under_parent( $country_code, $parent_for_locality->id, $locality_label, GeographyLocationType::Locality );
 		}
 
@@ -144,6 +147,19 @@ final class CanonicalLocationResolver {
 		}
 
 		return $this->aliases->find_exact( $country_code, $normalized, $parent_id );
+	}
+
+	public function country_has_ready_pack( string $country_code ): bool {
+		if ( ! $this->packs instanceof GeographyPackRepositoryInterface ) {
+			return false;
+		}
+		foreach ( $this->packs->list_all() as $pack ) {
+			if ( $pack->country_code === strtoupper( $country_code ) && 'ready' === $pack->status->value ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private function ancestry_agrees( CanonicalLocation $location, ?CanonicalLocation $country, string $admin_code, string $admin_label ): bool {

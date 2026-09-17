@@ -83,7 +83,7 @@ final class LegacyDestinationCoverageMigratorTest extends TestCase {
 
 		self::assertSame( 3, $first['converted'] );
 		self::assertSame( 3, $second['skipped'] );
-		self::assertGreaterThanOrEqual( 2, $first['review_required'] );
+		self::assertGreaterThanOrEqual( 1, $first['review_required'] );
 
 		$accra = $groups->list_by_zone( 1 )[0];
 		self::assertFalse( $accra->review_required );
@@ -96,10 +96,10 @@ final class LegacyDestinationCoverageMigratorTest extends TestCase {
 		self::assertSame( 'duplicate_legacy_same_level', $or_group->legacy_migration['reason'] );
 		self::assertCount( 3, $or_group->members );
 
-		$unknown = $groups->list_by_zone( 3 )[0];
-		self::assertTrue( $unknown->review_required );
-		self::assertSame( RecordStatus::Inactive, $unknown->status );
-		self::assertSame( 'unmapped_city', $unknown->legacy_migration['reason'] );
+		$materialized = $groups->list_by_zone( 3 )[0];
+		self::assertFalse( $materialized->review_required );
+		self::assertSame( RecordStatus::Active, $materialized->status );
+		self::assertNotNull( $geo->locations->find_exact_child( 'GH', $geo->greater_accra->id, 'not a real town', \CetechDeliveryEngine\Domain\Enum\GeographyLocationType::Locality ) );
 		self::assertNotEmpty( $rules->listByZoneId( 3 ) );
 	}
 }

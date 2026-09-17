@@ -152,6 +152,35 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		return $count;
 	}
 
+	public function count_descendants( int $parent_id, ?GeographyLocationType $type = null, string $search = '' ): int {
+		$search = GeographyNameNormalizer::normalize( $search );
+		$parent = $this->locations[ $parent_id ] ?? null;
+		if ( ! $parent instanceof CanonicalLocation ) {
+			return 0;
+		}
+		$count = 0;
+		foreach ( $this->locations as $location ) {
+			if ( $location->id === $parent_id || ! $location->isActive() ) {
+				continue;
+			}
+			if ( ! LocationAncestry::is_self_or_descendant( $location, $parent ) ) {
+				continue;
+			}
+			if ( $location->id === $parent->id ) {
+				continue;
+			}
+			if ( $type instanceof GeographyLocationType && $location->location_type !== $type ) {
+				continue;
+			}
+			if ( '' !== $search && ! str_contains( $location->normalized_name, $search ) && ! str_contains( GeographyNameNormalizer::normalize( $location->ascii_name ), $search ) ) {
+				continue;
+			}
+			++$count;
+		}
+
+		return $count;
+	}
+
 	public function search_localities( string $country_code, ?int $parent_id, string $query, int $limit = 25, int $offset = 0 ): array {
 		$country_code = strtoupper( trim( $country_code ) );
 		$query        = GeographyNameNormalizer::normalize( $query );
@@ -164,7 +193,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			if ( $parent instanceof CanonicalLocation && ! LocationAncestry::is_self_or_descendant( $location, $parent ) ) {
 				continue;
 			}
-			if ( '' !== $query && ! str_contains( $location->normalized_name, $query ) && ! str_contains( GeographyNameNormalizer::normalize( $location->ascii_name ), $query ) ) {
+			if ( '' !== $query && ! str_contains( $location->normalized_name, $query ) && ! str_contains( GeographyNameNormalizer::normalize( $location->ascii_name ), $query ) && ! $this->alias_contains( $location->id, $query ) ) {
 				continue;
 			}
 			$out[] = $location;
@@ -241,6 +270,16 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 				$path
 			);
 		}
+	}
+
+	private function alias_contains( int $location_id, string $query ): bool {
+		foreach ( $this->aliases[ $location_id ] ?? [] as $alias ) {
+			if ( str_contains( $alias['normalized'], $query ) ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	public function find_exact( string $country_code, string $normalized_alias, ?int $parent_id = null ): ?CanonicalLocation {

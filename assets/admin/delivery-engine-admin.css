@@ -1171,13 +1171,27 @@
 	padding: 0;
 }
 
-.cetech-de-coverage-chips li {
-	display: inline-flex;
-	align-items: center;
-	gap: 0.25rem;
-	padding: 0.2rem 0.5rem;
+.cetech-de-coverage-results,
+.cetech-de-locality-results {
+	list-style: none;
+	margin: 0 0 0.75em;
+	padding: 0;
+	max-height: 12rem;
+	overflow: auto;
 	border: 1px solid #dcdcde;
-	border-radius: 999px;
-	min-height: 2rem;
+	background: #fff;
+}
+
+.cetech-de-coverage-results [role="option"],
+.cetech-de-locality-results [role="option"] {
+	padding: 0.4rem 0.6rem;
+	cursor: pointer;
+}
+
+.cetech-de-coverage-results [role="option"][aria-selected="true"],
+.cetech-de-locality-results [role="option"][aria-selected="true"],
+.cetech-de-coverage-results [role="option"]:hover,
+.cetech-de-locality-results [role="option"]:hover {
+	background: #f0f6fc;
 }
 

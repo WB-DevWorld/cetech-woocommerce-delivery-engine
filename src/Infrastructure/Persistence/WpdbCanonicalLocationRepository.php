@@ -116,7 +116,7 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 
 		global $wpdb;
 		$table  = $this->table_name();
-		$limit  = max( 1, min( 100, $limit ) );
+		$limit  = max( 1, min( 250, $limit ) );
 		$offset = max( 0, $offset );
 		$args   = [ $parent_id, RecordStatus::Active->value ];
 		$sql    = "SELECT * FROM `{$table}` WHERE parent_location_id = %d AND status = %s";
@@ -161,6 +161,32 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		return (int) $count;
 	}
 
+	public function count_descendants( int $parent_id, ?GeographyLocationType $type = null, string $search = '' ): int {
+		if ( $parent_id <= 0 ) {
+			return 0;
+		}
+
+		global $wpdb;
+		$table = $this->table_name();
+		$path  = '%/' . $parent_id . '/%';
+		$args  = [ $parent_id, $path, RecordStatus::Active->value ];
+		$sql   = "SELECT COUNT(*) FROM `{$table}` WHERE (parent_location_id = %d OR ancestry_path LIKE %s) AND status = %s";
+		if ( $type instanceof GeographyLocationType ) {
+			$sql   .= ' AND location_type = %s';
+			$args[] = $type->value;
+		}
+		$search = GeographyNameNormalizer::normalize( $search );
+		if ( '' !== $search ) {
+			$sql   .= ' AND (normalized_name LIKE %s OR ascii_name LIKE %s)';
+			$args[] = '%' . $wpdb->esc_like( $search ) . '%';
+			$args[] = '%' . $wpdb->esc_like( $search ) . '%';
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$count = $wpdb->get_var( $wpdb->prepare( $sql, ...$args ) );
+
+		return (int) $count;
+	}
+
 	public function search_localities( string $country_code, ?int $parent_id, string $query, int $limit = 25, int $offset = 0 ): array {
 		$country_code = strtoupper( trim( $country_code ) );
 		$query        = GeographyNameNormalizer::normalize( $query );
@@ -181,10 +207,13 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 			$args[] = $path;
 		}
 		if ( '' !== $query ) {
-			$like   = '%' . $wpdb->esc_like( $query ) . '%';
-			$sql   .= ' AND (normalized_name LIKE %s OR ascii_name LIKE %s)';
-			$args[] = $like;
-			$args[] = $like;
+			$like    = '%' . $wpdb->esc_like( $query ) . '%';
+			$aliases = TableNames::for( GeographySchema::ALIASES_SUFFIX );
+			$sql    .= " AND (normalized_name LIKE %s OR ascii_name LIKE %s OR EXISTS (SELECT 1 FROM `{$aliases}` als WHERE als.location_id = `{$table}`.id AND als.status = %s AND als.normalized_alias LIKE %s))";
+			$args[]  = $like;
+			$args[]  = $like;
+			$args[]  = RecordStatus::Active->value;
+			$args[]  = $like;
 		}
 		$sql   .= ' ORDER BY canonical_name ASC LIMIT %d OFFSET %d';
 		$args[] = $limit;

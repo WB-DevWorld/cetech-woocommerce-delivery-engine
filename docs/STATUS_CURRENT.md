@@ -85,14 +85,15 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 
 ## Active post-RC.11 implementation stream
 - Issue `#23` / draft PR `#24` / branch `feat/canonical-geography-coverage`.
-- Identity: `1.0.0-dev.geo.1`; target schema: `6`.
+- Identity: `1.0.0-dev.geo.2`; target schema: `6`.
+- Rejected technical-review candidate: `1.0.0-dev.geo.1` / `606730e2535896cb18e415b14d62bbb57d050578` — do not send to physical QA.
 - Sole owner: `@wbdevworld`. Ben/Emmanuel are not required reviewers for this stream.
 - RC.11 remains the immutable tagged release candidate. This stream is not RC.12 and must not be packaged as `1.0.0-rc.11`.
 - Architecture: `docs/POST-RC11-CANONICAL-GEOGRAPHY-COVERAGE.md`.
 - Historical qualification PR `#12` / `1.0.0-dev.qual.1` is provenance only.
 
 ## Remaining separate work
-1. Owner physical QA and acceptance of issue #23 (`1.0.0-dev.geo.1` / schema `6`) before any merge.
+1. Owner independent review then physical QA of issue #23 (`1.0.0-dev.geo.2` / schema `6`) before any merge.
 2. Production rollout/pilot only if separately and explicitly owner-authorized.
 3. WPML/WCML overlay decision and licensed-dependency certification if included later.
 4. WP Rocket certification when a legitimate package is available.

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Configuration\Admin\StoreAwareExamples;
+use CetechDeliveryEngine\Application\Coverage\CoverageConfigurationValidator;
 use CetechDeliveryEngine\Application\Coverage\CoverageGroupMatcher;
 use CetechDeliveryEngine\Application\Destination\DestinationZoneMatcher;
 use CetechDeliveryEngine\Application\Destination\OverlappingDeliveryAreaCoverage;
 use CetechDeliveryEngine\Application\Destination\WooCommerceCountryCatalog;
 use CetechDeliveryEngine\Application\Geography\AdminGeographyEndpoint;
 use CetechDeliveryEngine\Application\Geography\CanonicalLocationResolver;
+use CetechDeliveryEngine\Application\Geography\GeographyAdminLabels;
 use CetechDeliveryEngine\Domain\Coverage\CoverageGroupRepositoryInterface;
 use CetechDeliveryEngine\Domain\Enum\CoverageMode;
 use CetechDeliveryEngine\Domain\Enum\DestinationRuleMatchMode;
@@ -49,7 +51,8 @@ final class DestinationZonesPage {
 		private AdminRecordDependencyChecker $dependency_checker,
 		private ?CoverageGroupRepositoryInterface $coverage_groups = null,
 		private ?CanonicalLocationRepositoryInterface $locations = null,
-		private ?CanonicalLocationResolver $resolver = null
+		private ?CanonicalLocationResolver $resolver = null,
+		private ?CoverageConfigurationValidator $coverage_validator = null
 	) {
 	}
 
@@ -378,7 +381,7 @@ final class DestinationZonesPage {
 			__( 'Tell the system which addresses belong in this delivery area.', 'cetech-woocommerce-delivery-engine' )
 		);
 		$this->render_coverage_builder( $is_edit && ! empty( $record['id'] ) ? (int) $record['id'] : 0 );
-		$this->render_rules_section( $rules );
+		$this->render_rules_section( $rules, $is_edit && ! empty( $record['id'] ) ? (int) $record['id'] : 0 );
 		AdminPageLayout::close_section();
 
 		AdminPageLayout::open_advanced( __( 'Advanced details', 'cetech-woocommerce-delivery-engine' ) );
@@ -427,11 +430,11 @@ final class DestinationZonesPage {
 			$groups = $this->coverage_groups->list_by_zone( $zone_id );
 		}
 
-		echo '<div class="cetech-de-coverage-builder" data-cetech-de-coverage-builder>';
+		$countries = WooCommerceCountryCatalog::options();
+		echo '<div class="cetech-de-coverage-builder" data-cetech-de-coverage-builder data-countries="' . esc_attr( (string) wp_json_encode( $countries ) ) . '">';
 		echo '<p>' . esc_html__( 'Coverage groups describe the destinations that share this Delivery Area. Different levels inside a group combine with AND. Multiple places at the same level combine with OR. Additional groups combine with OR.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 		if ( [] === $groups ) {
-			$groups = [];
-			echo '<p class="description">' . esc_html__( 'No coverage groups yet. Add one below, or keep using the legacy location conditions until a location pack is installed.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			echo '<p class="description">' . esc_html__( 'Add a coverage group to use canonical geography. Legacy location conditions stay available only until coverage is active.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 		}
 
 		$index = 0;
@@ -468,72 +471,137 @@ final class DestinationZonesPage {
 			}
 		}
 
-		$summary = $root ? $root->canonical_name : __( 'Unspecified root', 'cetech-woocommerce-delivery-engine' );
-		if ( CoverageMode::SelectedDescendants === $group->mode ) {
-			$summary .= ' — ' . sprintf(
-				/* translators: %d locality count */
-				_n( '%d locality included', '%d localities included', count( $includes ), 'cetech-woocommerce-delivery-engine' ),
-				count( $includes )
-			);
-		} elseif ( CoverageMode::EntireExcept === $group->mode ) {
-			$summary .= ' — ' . esc_html__( 'entire area except selected places', 'cetech-woocommerce-delivery-engine' );
-		} else {
-			$summary .= ' — ' . esc_html__( 'entire selected area', 'cetech-woocommerce-delivery-engine' );
+		$country_code = $root?->country_code ?? '';
+		$admin_label  = GeographyAdminLabels::administrative_area_label( $country_code );
+		$prefix       = 'coverage_groups[' . $index . ']';
+		$mode         = $group->mode->value;
+
+		echo '<fieldset class="cetech-de-coverage-group" data-cetech-de-coverage-group>';
+		echo '<legend>' . esc_html( sprintf( __( 'Coverage group %d', 'cetech-woocommerce-delivery-engine' ), $index + 1 ) ) . '</legend>';
+		if ( $group->id > 0 ) {
+			echo '<input type="hidden" name="' . esc_attr( $prefix ) . '[id]" value="' . esc_attr( (string) $group->id ) . '" />';
+		}
+		if ( $group->review_required ) {
+			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Review required: this group was converted from legacy rules or could not be mapped with full confidence. Saving other fields will not clear this warning.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			echo '<p><label><input type="checkbox" name="' . esc_attr( $prefix ) . '[resolve_review]" value="1" /> ' . esc_html__( 'I have reviewed this coverage group and accept it as the live Delivery Area.', 'cetech-woocommerce-delivery-engine' ) . '</label></p></div>';
+			echo '<input type="hidden" name="' . esc_attr( $prefix ) . '[review_required]" value="1" />';
 		}
 
-		$country_code = $root?->country_code ?? 'GH';
-		echo '<fieldset class="cetech-de-coverage-group">';
-		echo '<legend>' . esc_html( sprintf( __( 'Coverage group %d', 'cetech-woocommerce-delivery-engine' ), $index + 1 ) ) . '</legend>';
-		echo '<p class="cetech-de-coverage-group__summary">' . esc_html( $summary ) . '</p>';
-		if ( $group->review_required ) {
-			echo '<div class="notice notice-warning inline"><p>' . esc_html__( 'Review required: this group was converted from legacy rules or could not be mapped with full confidence.', 'cetech-woocommerce-delivery-engine' ) . '</p></div>';
-		}
 		echo '<p><label for="cetech-de-coverage-country-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Country', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<select id="cetech-de-coverage-country-' . esc_attr( (string) $index ) . '" name="coverage_groups[' . esc_attr( (string) $index ) . '][country]">';
+		echo '<select id="cetech-de-coverage-country-' . esc_attr( (string) $index ) . '" name="' . esc_attr( $prefix ) . '[country]" data-cetech-de-coverage-country>';
+		echo '<option value="">' . esc_html__( 'Select…', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		foreach ( WooCommerceCountryCatalog::options() as $code => $label ) {
 			echo '<option value="' . esc_attr( $code ) . '"' . selected( $country_code, $code, false ) . '>' . esc_html( $label ) . '</option>';
 		}
 		echo '</select></p>';
-		echo '<p><label for="cetech-de-coverage-region-' . esc_attr( (string) $index ) . '">' . esc_html__( 'Region', 'cetech-woocommerce-delivery-engine' ) . '</label><br />';
-		echo '<input type="text" id="cetech-de-coverage-region-' . esc_attr( (string) $index ) . '" class="regular-text" value="' . esc_attr( $root && ! $root->isCountry() ? $root->canonical_name : '' ) . '" data-cetech-de-region-label />';
-		echo '</p>';
+
+		echo '<p><label for="cetech-de-coverage-root-' . esc_attr( (string) $index ) . '">' . esc_html( $admin_label ) . '</label><br />';
+		echo '<select id="cetech-de-coverage-root-' . esc_attr( (string) $index ) . '" data-cetech-de-coverage-root>';
+		if ( $root ) {
+			$root_label = $root->isCountry()
+				? sprintf( __( 'Entire %s', 'cetech-woocommerce-delivery-engine' ), $root->canonical_name )
+				: $root->canonical_name;
+			echo '<option value="' . esc_attr( $root->location_key ) . '" selected>' . esc_html( $root_label ) . '</option>';
+		} else {
+			echo '<option value="">' . esc_html__( 'Select…', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		}
+		echo '</select></p>';
+
 		echo '<p><label>' . esc_html__( 'Coverage', 'cetech-woocommerce-delivery-engine' ) . ' ';
-		echo '<select name="coverage_groups[' . esc_attr( (string) $index ) . '][mode]">';
+		echo '<select name="' . esc_attr( $prefix ) . '[mode]" data-cetech-de-coverage-mode>';
 		foreach ( [
 			CoverageMode::EntireArea->value => __( 'Entire selected area', 'cetech-woocommerce-delivery-engine' ),
 			CoverageMode::SelectedDescendants->value => __( 'Selected locations', 'cetech-woocommerce-delivery-engine' ),
 			CoverageMode::EntireExcept->value => __( 'Entire selected area except…', 'cetech-woocommerce-delivery-engine' ),
 		] as $value => $label ) {
-			echo '<option value="' . esc_attr( $value ) . '"' . selected( $group->mode->value, $value, false ) . '>' . esc_html( $label ) . '</option>';
+			echo '<option value="' . esc_attr( $value ) . '"' . selected( $mode, $value, false ) . '>' . esc_html( $label ) . '</option>';
 		}
 		echo '</select></label></p>';
-		echo '<input type="hidden" name="coverage_groups[' . esc_attr( (string) $index ) . '][root_location_id]" value="' . esc_attr( (string) $group->root_location_id ) . '" />';
-		echo '<input type="hidden" name="coverage_groups[' . esc_attr( (string) $index ) . '][root_key]" value="' . esc_attr( $root?->location_key ?? '' ) . '" />';
-		echo '<p><label>' . esc_html__( 'Localities', 'cetech-woocommerce-delivery-engine' ) . '<br />';
-		echo '<input type="search" class="regular-text" data-cetech-de-locality-search placeholder="' . esc_attr__( 'Search…', 'cetech-woocommerce-delivery-engine' ) . '" aria-label="' . esc_attr__( 'Search localities', 'cetech-woocommerce-delivery-engine' ) . '" /></label></p>';
-		echo '<ul class="cetech-de-coverage-chips">';
+		echo '<input type="hidden" name="' . esc_attr( $prefix ) . '[root_location_id]" value="' . esc_attr( (string) $group->root_location_id ) . '" data-cetech-de-root-id />';
+		echo '<input type="hidden" name="' . esc_attr( $prefix ) . '[root_key]" value="' . esc_attr( $root?->location_key ?? '' ) . '" data-cetech-de-root-key />';
+
+		$include_hidden = CoverageMode::SelectedDescendants === $group->mode ? '' : ' hidden';
+		echo '<div data-cetech-de-include-panel' . $include_hidden . '>';
+		echo '<p><label>' . esc_html__( 'Include locations', 'cetech-woocommerce-delivery-engine' ) . '<br />';
+		echo '<input type="search" class="regular-text" data-cetech-de-locality-search data-cetech-de-search-target="include" placeholder="' . esc_attr__( 'Search…', 'cetech-woocommerce-delivery-engine' ) . '" aria-label="' . esc_attr__( 'Search localities to include', 'cetech-woocommerce-delivery-engine' ) . '" autocomplete="off" /></label></p>';
+		echo '<ul class="cetech-de-coverage-results" data-cetech-de-search-results="include" role="listbox" hidden></ul>';
+		echo '<ul class="cetech-de-coverage-chips" data-cetech-de-chips="include">';
 		foreach ( $includes as $chip ) {
 			echo '<li>' . esc_html( $chip['name'] ) . ' <button type="button" class="button-link" data-remove-member="' . esc_attr( (string) $chip['id'] ) . '">×</button>';
-			echo '<input type="hidden" name="coverage_groups[' . esc_attr( (string) $index ) . '][members][]" value="' . esc_attr( (string) $chip['id'] ) . '" /></li>';
+			echo '<input type="hidden" name="' . esc_attr( $prefix ) . '[members][]" value="' . esc_attr( (string) $chip['id'] ) . '" /></li>';
 		}
 		echo '</ul>';
-		echo '<p class="description">' . esc_html( sprintf( _n( '%d locality included', '%d localities included', count( $includes ), 'cetech-woocommerce-delivery-engine' ), count( $includes ) ) ) . '</p>';
+		echo '<p class="description" data-cetech-de-include-count>' . esc_html( sprintf( _n( '%d location included', '%d locations included', count( $includes ), 'cetech-woocommerce-delivery-engine' ), count( $includes ) ) ) . '</p>';
 		echo '<p><button type="button" class="button" data-cetech-de-select-all>' . esc_html__( 'Select all', 'cetech-woocommerce-delivery-engine' ) . '</button> ';
 		echo '<button type="button" class="button" data-cetech-de-clear-members>' . esc_html__( 'Clear', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
-		if ( [] !== $excludes ) {
-			echo '<p>' . esc_html__( 'Excluded', 'cetech-woocommerce-delivery-engine' ) . '</p><ul>';
-			foreach ( $excludes as $chip ) {
-				echo '<li>' . esc_html( $chip['name'] ) . '<input type="hidden" name="coverage_groups[' . esc_attr( (string) $index ) . '][exclusions][]" value="' . esc_attr( (string) $chip['id'] ) . '" /></li>';
-			}
-			echo '</ul>';
+		echo '</div>';
+
+		$exclude_hidden = CoverageMode::EntireExcept === $group->mode ? '' : ' hidden';
+		echo '<div data-cetech-de-exclude-panel' . $exclude_hidden . '>';
+		echo '<p><label>' . esc_html__( 'Excluded locations', 'cetech-woocommerce-delivery-engine' ) . '<br />';
+		echo '<input type="search" class="regular-text" data-cetech-de-locality-search data-cetech-de-search-target="exclude" placeholder="' . esc_attr__( 'Search locations to exclude…', 'cetech-woocommerce-delivery-engine' ) . '" aria-label="' . esc_attr__( 'Search localities to exclude', 'cetech-woocommerce-delivery-engine' ) . '" autocomplete="off" /></label></p>';
+		echo '<ul class="cetech-de-coverage-results" data-cetech-de-search-results="exclude" role="listbox" hidden></ul>';
+		echo '<ul class="cetech-de-coverage-chips" data-cetech-de-chips="exclude">';
+		foreach ( $excludes as $chip ) {
+			echo '<li>' . esc_html( $chip['name'] ) . ' <button type="button" class="button-link" data-remove-member="' . esc_attr( (string) $chip['id'] ) . '">×</button>';
+			echo '<input type="hidden" name="' . esc_attr( $prefix ) . '[exclusions][]" value="' . esc_attr( (string) $chip['id'] ) . '" /></li>';
 		}
+		echo '</ul>';
+		echo '<p class="description" data-cetech-de-exclude-count>' . esc_html( sprintf( _n( '%d location excluded', '%d locations excluded', count( $excludes ), 'cetech-woocommerce-delivery-engine' ), count( $excludes ) ) ) . '</p>';
+		echo '</div>';
+
+		echo '<div data-cetech-de-postcode-panel>';
+		echo '<p><strong>' . esc_html__( 'Postcode constraints', 'cetech-woocommerce-delivery-engine' ) . '</strong></p>';
+		echo '<p class="description">' . esc_html__( 'Optional. Multiple values are OR. Leave empty for no postcode restriction.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '<table class="widefat striped" data-cetech-de-postcode-table><tbody>';
+		if ( [] === $group->postcodes ) {
+			echo $this->postcode_row_html( $index, 0, '', DestinationRuleMatchMode::Exact->value );
+		} else {
+			foreach ( $group->postcodes as $p_index => $postcode ) {
+				echo $this->postcode_row_html( $index, $p_index, $postcode->postcode_value, $postcode->match_mode->value );
+			}
+		}
+		echo '</tbody></table>';
+		echo '<p><button type="button" class="button" data-cetech-de-add-postcode>' . esc_html__( 'Add postcode', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
+		echo '</div>';
 		echo '</fieldset>';
+	}
+
+	private function postcode_row_html( int $group_index, int $row_index, string $value, string $mode ): string {
+		$html  = '<tr data-cetech-de-postcode-row>';
+		$html .= '<td><input type="text" class="regular-text" name="coverage_groups[' . esc_attr( (string) $group_index ) . '][postcodes][' . esc_attr( (string) $row_index ) . '][postcode_value]" value="' . esc_attr( $value ) . '" placeholder="' . esc_attr__( 'Postcode', 'cetech-woocommerce-delivery-engine' ) . '" /></td>';
+		$html .= '<td><select name="coverage_groups[' . esc_attr( (string) $group_index ) . '][postcodes][' . esc_attr( (string) $row_index ) . '][match_mode]">';
+		$html .= '<option value="' . esc_attr( DestinationRuleMatchMode::Exact->value ) . '"' . selected( $mode, DestinationRuleMatchMode::Exact->value, false ) . '>' . esc_html__( 'Exact', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		$html .= '<option value="' . esc_attr( DestinationRuleMatchMode::Prefix->value ) . '"' . selected( $mode, DestinationRuleMatchMode::Prefix->value, false ) . '>' . esc_html__( 'Prefix', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		$html .= '</select></td>';
+		$html .= '<td><button type="button" class="button-link" data-cetech-de-remove-postcode>×</button></td>';
+		$html .= '</tr>';
+
+		return $html;
 	}
 
 	/**
 	 * @param list<array<string, mixed>> $rules
 	 */
-	private function render_rules_section( array $rules ): void {
+	private function render_rules_section( array $rules, int $zone_id = 0 ): void {
+		$coverage_active = $this->zone_has_active_coverage( $zone_id );
+		if ( $coverage_active ) {
+			echo '<details class="cetech-de-legacy-coverage-evidence"><summary>' . esc_html__( 'Legacy location conditions (compatibility evidence only)', 'cetech-woocommerce-delivery-engine' ) . '</summary>';
+			echo '<p class="description">' . esc_html__( 'Canonical coverage groups above are the live Delivery Area configuration. These legacy conditions are kept as a migration record and are not edited independently while coverage is active.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			echo '<ul>';
+			foreach ( $rules as $rule ) {
+				$type  = (string) ( $rule['rule_type'] ?? '' );
+				$value = (string) ( $rule['rule_value'] ?? '' );
+				if ( '' === $type || '' === $value ) {
+					continue;
+				}
+				echo '<li>' . esc_html( $type . ': ' . $value ) . '</li>';
+			}
+			echo '</ul></details>';
+
+			return;
+		}
+
 		echo '<p>' . esc_html__( 'Where should this delivery area apply?', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 		echo '<p class="description">' . esc_html__( 'Choose a country by name. This is a Delivery Engine Delivery Area, not a WooCommerce shipping zone. Continents and “Everywhere” are not countries.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 
@@ -668,6 +736,16 @@ final class DestinationZonesPage {
 
 		$errors = array_merge( $zone_errors, $rule_result['errors'] );
 
+		$coverage_posted = $this->posted_coverage_groups();
+		$existing_id     = isset( $input['id'] ) ? (int) $input['id'] : 0;
+		$coverage_valid  = [ 'ok' => true, 'errors' => [], 'groups' => [] ];
+		if ( is_array( $coverage_posted ) && $this->coverage_validator instanceof CoverageConfigurationValidator ) {
+			$coverage_valid = $this->coverage_validator->validate( $coverage_posted );
+			if ( ! $coverage_valid['ok'] ) {
+				$errors = array_merge( $errors, $coverage_valid['errors'] );
+			}
+		}
+
 		if ( [] !== $errors ) {
 			$this->action_handler->notices()->stash_form_draft( self::SLUG, $input );
 			$this->action_handler->notices()->flash_error( implode( ' ', $errors ) );
@@ -705,13 +783,23 @@ final class DestinationZonesPage {
 			$this->action_handler->redirect( self::SLUG );
 		}
 
-		if ( ! $this->rule_repository->replaceForZone( $saved_id, $rule_result['rules'] ) ) {
+		$has_active_coverage = $this->zone_has_active_coverage( $saved_id ) || ( is_array( $coverage_posted ) && [] !== ( $coverage_valid['groups'] ?? [] ) );
+		if ( $has_active_coverage && $existing_id > 0 ) {
+			// Schema-6 coverage is authority. Keep legacy destination_rules as immutable evidence.
+		} elseif ( ! $this->rule_repository->replaceForZone( $saved_id, $rule_result['rules'] ) ) {
 			$this->action_handler->notices()->stash_form_draft( self::SLUG, array_merge( $input, [ 'id' => $saved_id ] ) );
 			$this->action_handler->notices()->flash_error( __( 'Destination zone saved, but destination rules could not be updated.', 'cetech-woocommerce-delivery-engine' ) );
 			$this->action_handler->redirect( self::SLUG, [ 'action' => 'edit', 'id' => $saved_id ] );
 		}
 
-		$this->persist_posted_coverage( $saved_id );
+		if ( is_array( $coverage_posted ) ) {
+			$validated_groups = is_array( $coverage_valid['groups'] ?? null ) ? $coverage_valid['groups'] : [];
+			if ( [] === $validated_groups && $this->zone_has_active_coverage( $saved_id ) ) {
+				// A blank or skipped coverage payload must not wipe live schema-6 coverage.
+			} else {
+				$this->persist_posted_coverage( $saved_id, $validated_groups );
+			}
+		}
 
 		$zone_audit = $this->audit_logger->log(
 			$id > 0 ? 'updated' : 'created',
@@ -885,7 +973,7 @@ final class DestinationZonesPage {
 			$primary_rules = $primary_id > 0 ? $this->rule_repository->listByZoneId( $primary_id ) : [];
 			$input['test_result'] = (string) ( $primary['public_label'] ?? $primary['internal_name'] ?? '' );
 
-			if ( DestinationZoneMatcher::is_unrestricted_fallback( $primary, $primary_rules ) ) {
+			if ( DestinationZoneMatcher::is_unrestricted_fallback( $primary, $primary_rules, $this->zone_has_active_coverage( $primary_id ) ) ) {
 				$input['test_global_fallback'] = 1;
 			} elseif ( ! empty( $primary['is_fallback'] ) ) {
 				$input['test_constrained_fallback'] = 1;
@@ -1023,58 +1111,78 @@ final class DestinationZonesPage {
 		return $normalized;
 	}
 
-	private function persist_posted_coverage( int $zone_id ): void {
+	private function persist_posted_coverage( int $zone_id, ?array $validated_groups = null ): void {
 		if ( ! $this->coverage_groups instanceof CoverageGroupRepositoryInterface ) {
 			return;
 		}
 
+		if ( null === $validated_groups ) {
+			$posted = $this->posted_coverage_groups();
+			if ( ! is_array( $posted ) ) {
+				return;
+			}
+			if ( $this->coverage_validator instanceof CoverageConfigurationValidator ) {
+				$result = $this->coverage_validator->validate( $posted );
+				if ( ! $result['ok'] ) {
+					$this->action_handler->notices()->flash_error( implode( ' ', $result['errors'] ) );
+
+					return;
+				}
+				$validated_groups = $result['groups'];
+			} else {
+				return;
+			}
+		}
+
+		$existing = $this->coverage_groups->list_by_zone( $zone_id );
+		$by_id    = [];
+		foreach ( $existing as $group ) {
+			$by_id[ $group->id ] = $group;
+		}
+
+		$payloads = [];
+		foreach ( $validated_groups as $index => $row ) {
+			$existing_id = (int) ( $row['id'] ?? 0 );
+			$previous    = $existing_id > 0 ? ( $by_id[ $existing_id ] ?? null ) : null;
+			$resolve     = ! empty( $row['resolve_review'] );
+			if ( $previous instanceof \CetechDeliveryEngine\Domain\Coverage\CoverageGroup && ! $resolve ) {
+				$row['review_required']  = $previous->review_required;
+				$row['legacy_migration'] = $previous->legacy_migration;
+			} elseif ( $previous instanceof \CetechDeliveryEngine\Domain\Coverage\CoverageGroup && $resolve ) {
+				$row['review_required']  = false;
+				$row['legacy_migration'] = $previous->legacy_migration;
+			}
+			$row['sort_order'] = ( $index + 1 ) * 10;
+			$payloads[]        = $row;
+		}
+
+		$this->coverage_groups->replace_for_zone( $zone_id, $payloads );
+	}
+
+	/**
+	 * @return list<array<string, mixed>>|null
+	 */
+	private function posted_coverage_groups(): ?array {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
-		$posted = isset( $_POST['coverage_groups'] ) && is_array( $_POST['coverage_groups'] )
-			? wp_unslash( $_POST['coverage_groups'] )
-			: null;
-		if ( ! is_array( $posted ) ) {
-			return;
+		if ( ! isset( $_POST['coverage_groups'] ) || ! is_array( $_POST['coverage_groups'] ) ) {
+			return null;
 		}
 
-		$groups = [];
-		foreach ( array_values( $posted ) as $index => $row ) {
-			if ( ! is_array( $row ) ) {
-				continue;
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing
+		return wp_unslash( $_POST['coverage_groups'] );
+	}
+
+	private function zone_has_active_coverage( int $zone_id ): bool {
+		if ( $zone_id <= 0 || ! $this->coverage_groups instanceof CoverageGroupRepositoryInterface ) {
+			return false;
+		}
+		foreach ( $this->coverage_groups->list_by_zone( $zone_id ) as $group ) {
+			if ( $group->isUsable() ) {
+				return true;
 			}
-			$root_id = (int) ( $row['root_location_id'] ?? 0 );
-			$root_key = sanitize_text_field( (string) ( $row['root_key'] ?? '' ) );
-			if ( $root_id <= 0 && '' !== $root_key && $this->resolver instanceof CanonicalLocationResolver ) {
-				$resolved = $this->resolver->require_valid_key( $root_key, '' );
-				$root_id  = $resolved?->id ?? 0;
-			}
-			if ( $root_id <= 0 ) {
-				continue;
-			}
-			$members = [];
-			foreach ( is_array( $row['members'] ?? null ) ? $row['members'] : [] as $member_id ) {
-				$members[] = [
-					'location_id' => (int) $member_id,
-					'membership'  => 'include',
-				];
-			}
-			foreach ( is_array( $row['exclusions'] ?? null ) ? $row['exclusions'] : [] as $member_id ) {
-				$members[] = [
-					'location_id' => (int) $member_id,
-					'membership'  => 'exclude',
-				];
-			}
-			$groups[] = [
-				'root_location_id' => $root_id,
-				'coverage_mode'    => sanitize_key( (string) ( $row['mode'] ?? CoverageMode::EntireArea->value ) ),
-				'sort_order'       => ( $index + 1 ) * 10,
-				'status'           => RecordStatus::Active->value,
-				'review_required'  => ! empty( $row['review_required'] ),
-				'members'          => $members,
-				'postcodes'        => [],
-			];
 		}
 
-		$this->coverage_groups->replace_for_zone( $zone_id, $groups );
+		return false;
 	}
 
 	/**

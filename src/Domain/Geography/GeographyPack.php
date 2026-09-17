@@ -70,12 +70,20 @@ final class GeographyPack {
 	}
 
 	public function publicAdminRow(): array {
+		$source = $this->source_reference;
+		if ( '' !== $source ) {
+			$source = basename( str_replace( '\\', '/', $source ) );
+		}
+
 		return [
 			'id'               => $this->id,
 			'country_code'     => $this->country_code,
 			'provider'         => $this->provider->value,
 			'dataset_name'     => $this->dataset_name,
-			'dataset_version'  => $this->dataset_version,
+			'dataset_version'  => '' !== $this->dataset_version ? $this->dataset_version : '—',
+			'checksum'         => $this->checksum,
+			'source_url'       => $this->source_url,
+			'source_file'      => $source,
 			'status'           => $this->status->value,
 			'license_name'     => $this->license_name,
 			'license_url'      => $this->license_url,
@@ -86,6 +94,7 @@ final class GeographyPack {
 				'imported'  => (int) ( $this->progress['imported'] ?? 0 ),
 				'skipped'   => (int) ( $this->progress['skipped'] ?? 0 ),
 				'total'     => (int) ( $this->progress['total'] ?? 0 ),
+				'phase'     => (string) ( $this->progress['phase'] ?? '' ),
 			],
 			'last_error'       => $this->last_error,
 		];

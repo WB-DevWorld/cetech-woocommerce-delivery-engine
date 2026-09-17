@@ -115,16 +115,17 @@ final class CoverageGroupMatcher {
 
 		$excluded = $this->matches_members( $location, $group->members_of( CoverageMembership::Exclude ) );
 		if ( $excluded instanceof CanonicalLocation ) {
+			$specificity = $this->specificity_from_constraint( $excluded, false );
 			return [
 				'matched'     => false,
-				'specificity' => $this->specificity( $group, $location, true ),
+				'specificity' => $specificity,
 				'diagnostic'  => new CoverageMatchDiagnostic(
 					false,
 					$group->zone_id,
 					$group->id,
 					'',
 					'excluded_descendant',
-					$this->specificity( $group, $location, true ),
+					$specificity,
 					'',
 					[ 'excluded_location_id' => $excluded->id ]
 				),
@@ -133,17 +134,20 @@ final class CoverageGroupMatcher {
 
 		$included = true;
 		$reason   = 'entire_area';
+		$matched_constraint = $root;
 		if ( CoverageMode::SelectedDescendants === $group->mode ) {
 			$member = $this->matches_members( $location, $group->members_of( CoverageMembership::Include ) );
 			if ( ! $member instanceof CanonicalLocation ) {
 				return $this->miss( $group, 'not_selected_descendant' );
 			}
-			$reason = 'selected_descendant';
+			$reason            = 'selected_descendant';
+			$matched_constraint = $member;
 		} elseif ( CoverageMode::EntireExcept === $group->mode ) {
 			$reason = 'entire_area_except';
 		}
 
-		$specificity = $this->specificity( $group, $location, [] !== $group->postcodes );
+		$postcode_hit = [] !== $group->postcodes && $this->postcodes_match( $group, $destination->postcode );
+		$specificity  = $this->specificity_from_constraint( $matched_constraint, $postcode_hit && [] !== $group->postcodes );
 
 		return [
 			'matched'     => $included,
@@ -206,22 +210,15 @@ final class CoverageGroupMatcher {
 		return false;
 	}
 
-	private function specificity( CoverageGroup $group, CanonicalLocation $location, bool $has_postcode ): int {
-		if ( $has_postcode && [] !== $group->postcodes ) {
+	private function specificity_from_constraint( CanonicalLocation $constraint, bool $postcode_matched ): int {
+		if ( $postcode_matched ) {
 			return DestinationZoneMatcher::SPECIFICITY_POSTCODE;
 		}
-		if ( $location->isLocality() || CoverageMode::SelectedDescendants === $group->mode ) {
+		if ( $constraint->isLocality() ) {
 			return DestinationZoneMatcher::SPECIFICITY_CITY;
 		}
-		if ( $location->isAdministrative() ) {
-			$level = $location->administrative_level ?? 1;
-
-			return $level >= 2 ? DestinationZoneMatcher::SPECIFICITY_CITY : DestinationZoneMatcher::SPECIFICITY_REGION;
-		}
-
-		$root = $this->locations->find_by_id( $group->root_location_id );
-		if ( $root instanceof CanonicalLocation && $root->isAdministrative() ) {
-			$level = $root->administrative_level ?? 1;
+		if ( $constraint->isAdministrative() ) {
+			$level = $constraint->administrative_level ?? 1;
 
 			return $level >= 2 ? DestinationZoneMatcher::SPECIFICITY_CITY : DestinationZoneMatcher::SPECIFICITY_REGION;
 		}

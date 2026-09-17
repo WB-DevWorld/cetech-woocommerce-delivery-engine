@@ -83,7 +83,7 @@ final class MatchingLocationFieldRenderer {
 				$names['state'],
 				[
 					'type'          => 'state',
-					'label'         => __( 'Region', 'cetech-woocommerce-delivery-engine' ),
+					'label'       => \CetechDeliveryEngine\Application\Geography\GeographyAdminLabels::administrative_area_label( $country ),
 					'required'      => false,
 					'class'         => [ 'form-row-wide', 'cetech-de-matching-location__control' ],
 					'country_field' => $names['country'],
@@ -129,13 +129,14 @@ final class MatchingLocationFieldRenderer {
 			);
 			echo '</div>';
 			$html .= (string) ob_get_clean();
+			$html .= '<ul class="cetech-de-locality-results" role="listbox" hidden></ul>';
 			$html .= '</fieldset>';
 
 			return $html;
 		}
 
 		$html .= self::select_or_input( $id_prefix . '-country', $names['country'], __( 'Country', 'cetech-woocommerce-delivery-engine' ), $country, self::countries(), 'country', false );
-		$html .= self::select_or_input( $id_prefix . '-state', $names['state'], __( 'Region', 'cetech-woocommerce-delivery-engine' ), $state, self::states( $country ), 'region', ! $has_country );
+		$html .= self::select_or_input( $id_prefix . '-state', $names['state'], \CetechDeliveryEngine\Application\Geography\GeographyAdminLabels::administrative_area_label( $country ), $state, self::states( $country ), 'region', ! $has_country );
 		$html .= self::locality_input( $id_prefix . '-city', $names['city'], $city, ! $has_region );
 		$html .= self::text_input( $id_prefix . '-postcode', $names['postcode'], __( 'Postcode', 'cetech-woocommerce-delivery-engine' ), $postcode, 'postcode', '' === $postcode );
 		$html .= '</fieldset>';

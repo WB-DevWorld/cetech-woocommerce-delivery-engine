@@ -671,10 +671,44 @@
 			var timer = null;
 			city.addEventListener('input', function () {
 				clearField(locationRoot, 'cetech_de_matching_location_key');
+				clearOptions();
+				writePayload(root);
 				window.clearTimeout(timer);
 				timer = window.setTimeout(function () {
 					searchLocalities(city.value);
 				}, 280);
+			});
+			city.addEventListener('keydown', function (event) {
+				var list = locationRoot.querySelector('.cetech-de-locality-results');
+				if (!list || list.hidden) {
+					return;
+				}
+				var options = list.querySelectorAll('[role="option"]');
+				if (!options.length) {
+					return;
+				}
+				var current = parseInt(list.getAttribute('data-active') || '0', 10);
+				if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+					event.preventDefault();
+					current = event.key === 'ArrowDown' ? current + 1 : current - 1;
+					if (current < 0) {
+						current = options.length - 1;
+					}
+					if (current >= options.length) {
+						current = 0;
+					}
+					list.setAttribute('data-active', String(current));
+					Array.prototype.forEach.call(options, function (option, idx) {
+						option.setAttribute('aria-selected', idx === current ? 'true' : 'false');
+					});
+					options[current].focus();
+				} else if (event.key === 'Enter' || event.key === ' ') {
+					var active = options[current] || options[0];
+					if (active) {
+						event.preventDefault();
+						active.click();
+					}
+				}
 			});
 		}
 		if (country && country.value) {

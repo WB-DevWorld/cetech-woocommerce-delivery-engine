@@ -113,14 +113,15 @@ final class DestinationZoneMatcher {
 			}
 
 			$rules = $this->rule_repository->listByZoneId( $zone_id );
+			$coverage = $this->match_coverage( $zone_id, $resolved );
+			$has_coverage_constraint = is_array( $coverage );
 
-			if ( self::is_unrestricted_fallback( $zone, $rules ) ) {
+			if ( ! empty( $zone['is_fallback'] ) && [] === $rules && ! $has_coverage_constraint ) {
 				$unrestricted_fallback = $zone;
 				continue;
 			}
 
-			$coverage = $this->match_coverage( $zone_id, $resolved );
-			if ( is_array( $coverage ) ) {
+			if ( $has_coverage_constraint ) {
 				if ( $coverage['matched'] ) {
 					$candidates[] = [
 						'zone'        => $zone,
@@ -164,8 +165,8 @@ final class DestinationZoneMatcher {
 	 * @param array<string, mixed>       $zone
 	 * @param list<array<string, mixed>> $rules
 	 */
-	public static function is_unrestricted_fallback( array $zone, array $rules ): bool {
-		return ! empty( $zone['is_fallback'] ) && [] === $rules;
+	public static function is_unrestricted_fallback( array $zone, array $rules, bool $has_coverage_constraint = false ): bool {
+		return ! empty( $zone['is_fallback'] ) && [] === $rules && ! $has_coverage_constraint;
 	}
 
 	/**

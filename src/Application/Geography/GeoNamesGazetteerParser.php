@@ -33,7 +33,15 @@ final class GeoNamesGazetteerParser {
 		'ADM2',
 		'ADM3',
 		'ADM4',
+	];
+
+	/** @var list<string> */
+	public const COUNTRY_FEATURE_CODES = [
 		'PCLI',
+		'PCLD',
+		'PCLF',
+		'PCLS',
+		'PCLIX',
 	];
 
 	public function is_relevant_feature( string $feature_class, string $feature_code ): bool {
@@ -42,10 +50,17 @@ final class GeoNamesGazetteerParser {
 		}
 
 		if ( 'A' === $feature_class ) {
-			return in_array( $feature_code, self::ADMIN_FEATURE_CODES, true );
+			return in_array( $feature_code, self::ADMIN_FEATURE_CODES, true )
+				|| in_array( $feature_code, self::COUNTRY_FEATURE_CODES, true )
+				|| str_starts_with( $feature_code, 'PCL' );
 		}
 
 		return false;
+	}
+
+	public function is_country_feature( string $feature_code ): bool {
+		return in_array( $feature_code, self::COUNTRY_FEATURE_CODES, true )
+			|| str_starts_with( $feature_code, 'PCL' );
 	}
 
 	/**
@@ -94,7 +109,8 @@ final class GeoNamesGazetteerParser {
 			'admin4'         => (string) $parts[13],
 			'modified'       => (string) $parts[18],
 			'is_locality'    => 'P' === $feature_class,
-			'is_admin'       => 'A' === $feature_class,
+			'is_admin'       => 'A' === $feature_class && ! $this->is_country_feature( $feature_code ),
+			'is_country'     => 'A' === $feature_class && $this->is_country_feature( $feature_code ),
 			'admin_level'    => match ( $feature_code ) {
 				'ADM1' => 1,
 				'ADM2' => 2,
@@ -106,9 +122,18 @@ final class GeoNamesGazetteerParser {
 	}
 
 	/**
+	 * Stream gazetteer rows with a hard scan bound so one tick cannot scan an
+	 * unlimited number of irrelevant lines while waiting for N relevant features.
+	 *
 	 * @return \Generator<int, array<string, mixed>>
 	 */
-	public function iterate_file( string $path, int $after_offset = 0, int $limit = 100 ): \Generator {
+	public function iterate_file(
+		string $path,
+		int $after_offset = 0,
+		int $max_relevant = 100,
+		int $max_scan = 2500,
+		float $max_seconds = 4.0
+	): \Generator {
 		if ( ! is_readable( $path ) ) {
 			return;
 		}
@@ -122,22 +147,57 @@ final class GeoNamesGazetteerParser {
 			fseek( $handle, $after_offset );
 		}
 
-		$emitted = 0;
-		while ( $emitted < $limit && false !== ( $line = fgets( $handle ) ) ) {
+		$max_relevant = max( 1, min( 250, $max_relevant ) );
+		$max_scan     = max( $max_relevant, min( 20000, $max_scan ) );
+		$started      = microtime( true );
+		$emitted      = 0;
+		$scanned      = 0;
+		$eof          = true;
+
+		while ( $emitted < $max_relevant && $scanned < $max_scan && ( microtime( true ) - $started ) < $max_seconds ) {
+			$line = fgets( $handle );
+			if ( false === $line ) {
+				$eof = true;
+				break;
+			}
+			$eof = false;
+			++$scanned;
 			$parsed = $this->parse_line( $line );
 			$offset = ftell( $handle );
+			$cursor = false === $offset ? $after_offset : $offset;
 			if ( is_array( $parsed ) ) {
-				$parsed['_file_offset'] = false === $offset ? $after_offset : $offset;
+				$parsed['_file_offset'] = $cursor;
+				$parsed['_scanned']     = $scanned;
 				yield $parsed;
 				++$emitted;
-			} elseif ( false !== $offset ) {
+			} else {
 				yield [
-					'_skip'         => true,
-					'_file_offset'  => $offset,
+					'_skip'        => true,
+					'_file_offset' => $cursor,
+					'_scanned'     => $scanned,
 				];
 			}
 		}
 
+		if ( ! $eof ) {
+			$pos  = ftell( $handle );
+			$peek = fgetc( $handle );
+			if ( false === $peek ) {
+				$eof = true;
+			} elseif ( false !== $pos ) {
+				fseek( $handle, $pos );
+			}
+		}
+
+		$end = ftell( $handle );
 		fclose( $handle );
+
+		yield [
+			'_batch_end'   => true,
+			'_eof'         => $eof,
+			'_file_offset' => false === $end ? $after_offset : $end,
+			'_scanned'     => $scanned,
+			'_emitted'     => $emitted,
+		];
 	}
 }

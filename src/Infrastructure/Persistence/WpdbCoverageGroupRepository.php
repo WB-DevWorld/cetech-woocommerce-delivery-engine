@@ -196,13 +196,21 @@ final class WpdbCoverageGroupRepository implements CoverageGroupRepositoryInterf
 	}
 
 	public function replace_for_zone( int $zone_id, array $groups ): array {
+		global $wpdb;
+		$wpdb->query( 'START TRANSACTION' );
 		$this->delete_by_zone( $zone_id );
 		$saved = [];
 		foreach ( $groups as $index => $payload ) {
 			$payload['zone_id']    = $zone_id;
 			$payload['sort_order'] = (int) ( $payload['sort_order'] ?? ( ( $index + 1 ) * 10 ) );
 			$saved[]               = $this->save_group( $payload );
+			if ( '' !== (string) $wpdb->last_error ) {
+				$wpdb->query( 'ROLLBACK' );
+
+				return [];
+			}
 		}
+		$wpdb->query( 'COMMIT' );
 
 		return $saved;
 	}

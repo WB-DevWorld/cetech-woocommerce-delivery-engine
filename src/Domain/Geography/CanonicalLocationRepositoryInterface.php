@@ -33,7 +33,12 @@ interface CanonicalLocationRepositoryInterface {
 	public function count_children( int $parent_id, ?GeographyLocationType $type = null, string $search = '' ): int;
 
 	/**
-	 * Server-side locality search. Bounded. Exact prefix / contains of normalized names.
+	 * Count self-excluded descendants (direct and nested) under a parent.
+	 */
+	public function count_descendants( int $parent_id, ?GeographyLocationType $type = null, string $search = '' ): int;
+
+	/**
+	 * Server-side locality search. Bounded. Exact prefix / contains of normalized names and aliases.
 	 *
 	 * @return list<CanonicalLocation>
 	 */

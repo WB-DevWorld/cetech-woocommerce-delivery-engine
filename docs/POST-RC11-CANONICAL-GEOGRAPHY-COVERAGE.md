@@ -10,7 +10,9 @@ Starting protected master: `72fa354d52b49ffd9cbc32862a6b2e3d7117ea4e`
 
 Immutable release anchor: `v1.0.0-rc.11` -> `384f564f64a2db766ae6907392e95fb366fb8533`
 
-Initial development identity: `1.0.0-dev.geo.1`
+Rejected technical-review candidate: `1.0.0-dev.geo.1` (`606730e2535896cb18e415b14d62bbb57d050578`). Do not reuse that package identity or send it to physical QA.
+
+Current technical-correction candidate identity: `1.0.0-dev.geo.2`
 
 Target schema: `6`
 
@@ -315,3 +317,11 @@ Before owner acceptance, prove:
 - package/privacy/runtime-gate regressions.
 
 See GitHub issue #23 for the complete acceptance list. Issue #23 is the governing scope for this implementation stream.
+
+## Location pack update and provider-row lifecycle
+
+- `install` creates or continues the current dataset.
+- `update` records a new source path, checksum and dataset version, resets the import cursor/phase, and preserves canonical internal IDs where provider mappings already exist.
+- `retry` resumes the current dataset from its persisted cursor. A different file checksum is treated as `update`, never as a resume of the previous EOF.
+- Provider name/parent/coordinate/alias changes update provider-derived canonical metadata without changing the internal location identity. Former names are kept as aliases.
+- If a later dataset omits a previously imported place, the canonical location is **not** deleted or deactivated. Delivery Areas that already reference that internal ID keep working. Removal/deprecation is an explicit merchant review action, not an implicit import side-effect.

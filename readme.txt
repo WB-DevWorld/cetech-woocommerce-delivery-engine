@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.1
-Stable tag: 1.0.0-dev.geo.1
+Stable tag: 1.0.0-dev.geo.2
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9

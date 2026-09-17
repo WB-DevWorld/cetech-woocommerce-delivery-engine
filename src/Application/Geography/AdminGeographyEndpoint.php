@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Geography;
 
+use CetechDeliveryEngine\Application\Coverage\CoverageConfigurationValidator;
 use CetechDeliveryEngine\Domain\Coverage\CoverageGroupRepositoryInterface;
 use CetechDeliveryEngine\Domain\Enum\GeographyLocationType;
 
@@ -31,17 +32,64 @@ final class AdminGeographyEndpoint {
 
 	public function handle_search(): void {
 		$this->verify( self::SEARCH_ACTION, 'manage_delivery_zones' );
+		$op      = sanitize_key( (string) ( $_REQUEST['op'] ?? 'search' ) );
 		$country = strtoupper( sanitize_text_field( wp_unslash( (string) ( $_REQUEST['country'] ?? '' ) ) ) );
 		$parent  = sanitize_text_field( wp_unslash( (string) ( $_REQUEST['parent_key'] ?? '' ) ) );
 		$query   = sanitize_text_field( wp_unslash( (string) ( $_REQUEST['q'] ?? '' ) ) );
-		$select_all = ! empty( $_REQUEST['select_all'] );
 		$page    = max( 1, (int) ( $_REQUEST['page'] ?? 1 ) );
 		$token   = sanitize_text_field( wp_unslash( (string) ( $_REQUEST['request_token'] ?? '' ) ) );
-		$limit   = $select_all ? 100 : 25;
+		$select_all = ! empty( $_REQUEST['select_all'] ) || 'descendants' === $op;
 
-		$parent_location = '' !== $parent ? $this->resolver->require_valid_key( $parent, $country ) : $this->locations->find_country( $country );
-		$parent_id       = $parent_location?->id;
-		$items           = [];
+		if ( 2 !== strlen( $country ) ) {
+			wp_send_json_success(
+				[
+					'items'         => [],
+					'page'          => $page,
+					'request_token' => $token,
+					'total'         => 0,
+					'label'         => GeographyAdminLabels::administrative_area_label( $country ),
+				]
+			);
+		}
+
+		if ( 'children' === $op ) {
+			$this->send_children( $country, $parent, $token );
+		}
+
+		$parent_supplied = '' !== $parent;
+		$parent_location = $parent_supplied ? $this->resolver->require_valid_key( $parent, $country ) : $this->locations->find_country( $country );
+		if ( $parent_supplied && null === $parent_location ) {
+			wp_send_json_success(
+				[
+					'items'         => [],
+					'page'          => $page,
+					'request_token' => $token,
+					'total'         => 0,
+					'error'         => 'invalid_parent',
+				]
+			);
+		}
+
+		$parent_id = $parent_location?->id;
+		$limit     = $select_all ? CoverageConfigurationValidator::SELECT_ALL_LIMIT : 25;
+		$total     = null !== $parent_id
+			? $this->locations->count_descendants( $parent_id, GeographyLocationType::Locality, $query )
+			: 0;
+
+		if ( $select_all && $total > CoverageConfigurationValidator::SELECT_ALL_LIMIT ) {
+			wp_send_json_success(
+				[
+					'items'                  => [],
+					'page'                   => 1,
+					'request_token'          => $token,
+					'total'                  => $total,
+					'recommend_entire_area'  => true,
+					'select_all_limit'       => CoverageConfigurationValidator::SELECT_ALL_LIMIT,
+				]
+			);
+		}
+
+		$items = [];
 		foreach ( $this->locations->search_localities( $country, $parent_id, $query, $limit, ( $page - 1 ) * $limit ) as $location ) {
 			$items[] = [
 				'key'  => $location->location_key,
@@ -55,7 +103,9 @@ final class AdminGeographyEndpoint {
 				'items'         => $items,
 				'page'          => $page,
 				'request_token' => $token,
-				'total'         => null !== $parent_id ? $this->locations->count_children( $parent_id, GeographyLocationType::Locality, $query ) : count( $items ),
+				'total'         => $total > 0 ? $total : count( $items ),
+				'has_more'      => ( $page * $limit ) < $total,
+				'label'         => GeographyAdminLabels::administrative_area_label( $country ),
 			]
 		);
 	}
@@ -68,9 +118,66 @@ final class AdminGeographyEndpoint {
 			$result = $this->packs->tick( $pack_id, '', 100 );
 			wp_send_json_success( $result );
 		}
+		if ( 'retry' === $op && $pack_id > 0 ) {
+			$pack = $this->packs->retry( $pack_id );
+			wp_send_json_success( [ 'pack' => $pack->publicAdminRow() ] );
+		}
 
 		$pack = $this->packs->find( $pack_id );
 		wp_send_json_success( [ 'pack' => $pack?->publicAdminRow() ] );
+	}
+
+	private function send_children( string $country, string $parent, string $token ): void {
+		$parent_location = '' !== $parent
+			? $this->resolver->require_valid_key( $parent, $country )
+			: $this->locations->find_country( $country );
+		if ( null === $parent_location ) {
+			wp_send_json_success(
+				[
+					'items'         => [],
+					'request_token' => $token,
+					'error'         => '' !== $parent ? 'invalid_parent' : 'country_missing',
+					'label'         => GeographyAdminLabels::administrative_area_label( $country ),
+				]
+			);
+		}
+
+		$items = [];
+		foreach ( $this->locations->list_children( $parent_location->id, GeographyLocationType::Administrative, 250, 0 ) as $child ) {
+			$items[] = [
+				'key'  => $child->location_key,
+				'id'   => $child->id,
+				'name' => $child->canonical_name,
+			];
+		}
+		if ( $parent_location->isCountry() ) {
+			array_unshift(
+				$items,
+				[
+					'key'  => $parent_location->location_key,
+					'id'   => $parent_location->id,
+					'name' => sprintf(
+						/* translators: %s country name */
+						__( 'Entire %s', 'cetech-woocommerce-delivery-engine' ),
+						$parent_location->canonical_name
+					),
+					'entire_country' => true,
+				]
+			);
+		}
+
+		wp_send_json_success(
+			[
+				'items'         => $items,
+				'request_token' => $token,
+				'root'          => [
+					'key'  => $parent_location->location_key,
+					'id'   => $parent_location->id,
+					'name' => $parent_location->canonical_name,
+				],
+				'label'         => GeographyAdminLabels::administrative_area_label( $country ),
+			]
+		);
 	}
 
 	private function verify( string $action, string $cap ): void {
