@@ -69,10 +69,12 @@ interface CanonicalLocationRepositoryInterface {
 	 * Bounded, shopper-invisible preparation for one staging token.
 	 * Stages future ancestry/parent metadata and draft aliases/mappings.
 	 * Must not mutate live Active parent_location_id, ancestry_path, names, coordinates, aliases, or mappings.
+	 * Hierarchy-changing roots are prepared independently of ordinary metadata drafts via durable cursors.
 	 *
-	 * @return array{processed: int, last_id: int, done: bool}
+	 * @param array{hierarchy_root_cursor?: int, hierarchy_descendant_cursor?: int, hierarchy_root_id?: int} $hierarchy
+	 * @return array{processed: int, last_id: int, done: bool, hierarchy_root_cursor: int, hierarchy_descendant_cursor: int, hierarchy_root_id: int}
 	 */
-	public function prepare_generation( string $generation_token, int $limit = 200, int $after_id = 0 ): array;
+	public function prepare_generation( string $generation_token, int $limit = 200, int $after_id = 0, array $hierarchy = [] ): array;
 
 	/**
 	 * Small atomic activation: set-based promote of a prepared generation plus pack Ready callback.

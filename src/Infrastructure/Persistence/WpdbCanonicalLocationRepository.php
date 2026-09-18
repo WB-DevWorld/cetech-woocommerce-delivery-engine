@@ -10,6 +10,7 @@ use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Domain\Geography\CanonicalLocation;
 use CetechDeliveryEngine\Domain\Geography\CanonicalLocationRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\GeographyNameNormalizer;
+use CetechDeliveryEngine\Domain\Geography\GeographyPackIncompletePreparationException;
 use CetechDeliveryEngine\Domain\Geography\LocationAncestry;
 
 final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository implements CanonicalLocationRepositoryInterface {
@@ -391,14 +392,17 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		return $total;
 	}
 
-	public function prepare_generation( string $generation_token, int $limit = 200, int $after_id = 0 ): array {
+	public function prepare_generation( string $generation_token, int $limit = 200, int $after_id = 0, array $hierarchy = [] ): array {
 		$generation_token = trim( $generation_token );
 		if ( '' === $generation_token ) {
 			throw new \RuntimeException( 'Promotion requires a generation token.' );
 		}
 
-		$batch = max( 1, $limit );
-		$after = max( 0, $after_id );
+		$batch      = max( 1, $limit );
+		$after      = max( 0, $after_id );
+		$root_cursor = max( 0, (int) ( $hierarchy['hierarchy_root_cursor'] ?? 0 ) );
+		$desc_cursor = max( 0, (int) ( $hierarchy['hierarchy_descendant_cursor'] ?? 0 ) );
+		$root_id     = max( 0, (int) ( $hierarchy['hierarchy_root_id'] ?? 0 ) );
 		global $wpdb;
 		$table = $this->table_name();
 		$sql   = "SELECT * FROM `{$table}` WHERE draft_generation_token = %s AND id > %d ORDER BY id ASC LIMIT %d";
@@ -406,7 +410,8 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		$draft_rows = $wpdb->get_results( $wpdb->prepare( $sql, $generation_token, $after, $batch ), ARRAY_A );
 		$processed  = 0;
 		$last_id    = $after;
-		foreach ( is_array( $draft_rows ) ? $draft_rows : [] as $row ) {
+		$draft_rows = is_array( $draft_rows ) ? $draft_rows : [];
+		foreach ( $draft_rows as $row ) {
 			$location = CanonicalLocation::fromRow( $row );
 			$last_id  = max( $last_id, $location->id );
 			$draft    = '' !== $location->draft_json ? json_decode( $location->draft_json, true ) : null;
@@ -422,15 +427,27 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 			++$processed;
 		}
 
-		$remaining = $batch - $processed;
+		$drafts_exhausted = count( $draft_rows ) < $batch;
+		$hierarchy_done   = false;
+		$remaining        = $batch - $processed;
 		if ( $remaining > 0 ) {
-			$processed += $this->stage_prepared_descendants( $generation_token, $remaining );
+			$staged      = $this->stage_prepared_descendants( $generation_token, $remaining, $root_cursor, $desc_cursor, $root_id );
+			$processed  += $staged['processed'];
+			$root_cursor = $staged['hierarchy_root_cursor'];
+			$desc_cursor = $staged['hierarchy_descendant_cursor'];
+			$root_id     = $staged['hierarchy_root_id'];
+			$hierarchy_done = $staged['done'];
+		} else {
+			$hierarchy_done = ! $this->has_unfinished_hierarchy_preparation( $generation_token );
 		}
 
 		return [
-			'processed' => $processed,
-			'last_id'   => $last_id,
-			'done'      => 0 === $processed,
+			'processed'                    => $processed,
+			'last_id'                      => $last_id,
+			'done'                         => $drafts_exhausted && $hierarchy_done,
+			'hierarchy_root_cursor'        => $root_cursor,
+			'hierarchy_descendant_cursor'  => $desc_cursor,
+			'hierarchy_root_id'            => $root_id,
 		];
 	}
 
@@ -448,6 +465,11 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
 		$wpdb->query( 'START TRANSACTION' );
 		try {
+			if ( $this->has_unfinished_hierarchy_preparation( $generation_token ) ) {
+				throw new GeographyPackIncompletePreparationException(
+					'Hierarchy preparation is incomplete for token ' . $generation_token . '.'
+				);
+			}
 			if ( is_callable( $finalize ) ) {
 				$finalize();
 			}
@@ -486,11 +508,17 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 	}
 
 	public function promote_generation( string $generation_token, ?callable $finalize = null ): int {
-		$after = 0;
-		$guard = 0;
+		$after     = 0;
+		$guard     = 0;
+		$hierarchy = [];
 		do {
-			$prepared = $this->prepare_generation( $generation_token, 200, $after );
-			$after    = (int) $prepared['last_id'];
+			$prepared  = $this->prepare_generation( $generation_token, 200, $after, $hierarchy );
+			$after     = (int) $prepared['last_id'];
+			$hierarchy = [
+				'hierarchy_root_cursor'       => (int) $prepared['hierarchy_root_cursor'],
+				'hierarchy_descendant_cursor' => (int) $prepared['hierarchy_descendant_cursor'],
+				'hierarchy_root_id'           => (int) $prepared['hierarchy_root_id'],
+			];
 			++$guard;
 		} while ( ! $prepared['done'] && $guard < 100000 );
 
@@ -663,50 +691,246 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		}
 	}
 
-	private function stage_prepared_descendants( string $generation_token, int $limit ): int {
+	/**
+	 * @return array{processed: int, done: bool, hierarchy_root_cursor: int, hierarchy_descendant_cursor: int, hierarchy_root_id: int}
+	 */
+	private function stage_prepared_descendants(
+		string $generation_token,
+		int $limit,
+		int $root_cursor,
+		int $desc_cursor,
+		int $current_root_id
+	): array {
 		$remaining = max( 1, $limit );
 		$updated   = 0;
-		global $wpdb;
-		$table = $this->table_name();
-		$sql   = "SELECT * FROM `{$table}` WHERE prepared_generation_token = %s AND draft_generation_token = %s ORDER BY id ASC LIMIT 50";
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$roots = $wpdb->get_results( $wpdb->prepare( $sql, $generation_token, $generation_token ), ARRAY_A );
-		foreach ( is_array( $roots ) ? $roots : [] as $row ) {
+		$pages     = 0;
+		while ( $remaining > 0 && $pages < 40 ) {
+			++$pages;
+			$root = null;
+			if ( $current_root_id > 0 ) {
+				$root = $this->find_by_id( $current_root_id );
+				if ( ! $root instanceof CanonicalLocation || ! $this->requires_descendant_hierarchy_preparation( $root, $generation_token ) ) {
+					$root_cursor      = max( $root_cursor, $current_root_id );
+					$current_root_id  = 0;
+					$desc_cursor      = 0;
+					$root             = null;
+				}
+			}
+			if ( ! $root instanceof CanonicalLocation ) {
+				$found = $this->find_next_hierarchy_root( $generation_token, $root_cursor );
+				if ( $found['exhausted'] ) {
+					return $this->hierarchy_stage_result( $updated, true, $root_cursor, 0, 0 );
+				}
+				if ( ! $found['root'] instanceof CanonicalLocation ) {
+					$root_cursor = max( $root_cursor, $found['scanned_until'] );
+					continue;
+				}
+				$root            = $found['root'];
+				$current_root_id = $root->id;
+				$desc_cursor     = 0;
+			}
+
+			$batch = $this->prepare_root_descendants( $root, $generation_token, $desc_cursor, $remaining );
+			$updated        += $batch['count'];
+			$remaining      -= $batch['count'];
+			if ( 0 === $batch['count'] ) {
+				$root_cursor     = $root->id;
+				$current_root_id = 0;
+				$desc_cursor     = 0;
+				continue;
+			}
+			$desc_cursor = $batch['last_id'];
 			if ( $remaining <= 0 ) {
 				break;
 			}
-			$root = CanonicalLocation::fromRow( $row );
-			if ( '' === $root->prepared_ancestry_path || $root->prepared_ancestry_path === $root->ancestry_path || '' === $root->ancestry_path ) {
-				continue;
-			}
-			$like  = $wpdb->esc_like( $root->ancestry_path ) . '%';
-			$start = strlen( $root->ancestry_path ) + 1;
-			$now   = gmdate( 'Y-m-d H:i:s' );
-			$sql   = "UPDATE `{$table}` SET prepared_ancestry_path = CONCAT(%s, SUBSTRING(ancestry_path, %d)), prepared_generation_token = %s, updated_at = %s WHERE ancestry_path LIKE %s AND id != %d AND (prepared_generation_token = %s OR prepared_generation_token != %s) LIMIT %d";
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$batch = $wpdb->query(
-				$wpdb->prepare(
-					$sql,
-					$root->prepared_ancestry_path,
-					$start,
-					$generation_token,
-					$now,
-					$like,
-					$root->id,
-					'',
-					$generation_token,
-					$remaining
-				)
-			);
-			if ( false === $batch ) {
-				throw new \RuntimeException( 'Failed to stage prepared descendant ancestry for token ' . $generation_token . '.' );
-			}
-			$batch      = (int) $batch;
-			$updated   += $batch;
-			$remaining -= $batch;
 		}
 
-		return $updated;
+		$done = 0 === $current_root_id && ! $this->has_unfinished_hierarchy_preparation( $generation_token );
+
+		return $this->hierarchy_stage_result( $updated, $done, $root_cursor, $desc_cursor, $current_root_id );
+	}
+
+	/**
+	 * @return array{root: ?CanonicalLocation, scanned_until: int, exhausted: bool}
+	 */
+	private function find_next_hierarchy_root( string $generation_token, int $after_id ): array {
+		global $wpdb;
+		$table = $this->table_name();
+		$sql   = "SELECT * FROM `{$table}` WHERE prepared_generation_token = %s AND draft_generation_token = %s AND id > %d ORDER BY id ASC LIMIT 50";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $generation_token, $generation_token, max( 0, $after_id ) ), ARRAY_A );
+		$rows = is_array( $rows ) ? $rows : [];
+		if ( [] === $rows ) {
+			return [
+				'root'          => null,
+				'scanned_until' => $after_id,
+				'exhausted'     => true,
+			];
+		}
+		$scanned = $after_id;
+		foreach ( $rows as $row ) {
+			$candidate = CanonicalLocation::fromRow( $row );
+			$scanned   = max( $scanned, $candidate->id );
+			if ( $this->requires_descendant_hierarchy_preparation( $candidate, $generation_token ) ) {
+				return [
+					'root'          => $candidate,
+					'scanned_until' => $candidate->id,
+					'exhausted'     => false,
+				];
+			}
+		}
+
+		return [
+			'root'          => null,
+			'scanned_until' => $scanned,
+			'exhausted'     => false,
+		];
+	}
+
+	/**
+	 * @return array{count: int, last_id: int}
+	 */
+	private function prepare_root_descendants( CanonicalLocation $root, string $generation_token, int $desc_cursor, int $limit ): array {
+		global $wpdb;
+		$table = $this->table_name();
+		$like  = $wpdb->esc_like( $root->ancestry_path ) . '%';
+		$start = strlen( $root->ancestry_path ) + 1;
+		$now   = gmdate( 'Y-m-d H:i:s' );
+		$sql   = "UPDATE `{$table}` SET prepared_ancestry_path = CONCAT(%s, SUBSTRING(ancestry_path, %d)), prepared_generation_token = %s, updated_at = %s WHERE ancestry_path LIKE %s AND id != %d AND id > %d AND (prepared_generation_token = %s OR prepared_generation_token != %s) ORDER BY id ASC LIMIT %d";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$batch = $wpdb->query(
+			$wpdb->prepare(
+				$sql,
+				$root->prepared_ancestry_path,
+				$start,
+				$generation_token,
+				$now,
+				$like,
+				$root->id,
+				max( 0, $desc_cursor ),
+				'',
+				$generation_token,
+				max( 1, $limit )
+			)
+		);
+		if ( false === $batch ) {
+			throw new \RuntimeException( 'Failed to stage prepared descendant ancestry for token ' . $generation_token . '.' );
+		}
+		$count = (int) $batch;
+		if ( $count <= 0 ) {
+			return [
+				'count'   => 0,
+				'last_id' => $desc_cursor,
+			];
+		}
+
+		$high_sql = "SELECT * FROM `{$table}` WHERE prepared_generation_token = %s AND ancestry_path LIKE %s AND id != %d AND id > %d ORDER BY id DESC LIMIT 1";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$high = $wpdb->get_row(
+			$wpdb->prepare( $high_sql, $generation_token, $like, $root->id, max( 0, $desc_cursor ) ),
+			ARRAY_A
+		);
+
+		return [
+			'count'   => $count,
+			'last_id' => is_array( $high ) ? max( $desc_cursor, (int) ( $high['id'] ?? 0 ) ) : $desc_cursor,
+		];
+	}
+
+	private function requires_descendant_hierarchy_preparation( CanonicalLocation $location, string $generation_token ): bool {
+		if ( $location->prepared_generation_token !== $generation_token ) {
+			return false;
+		}
+		if ( '' === $location->prepared_ancestry_path || '' === $location->ancestry_path ) {
+			return false;
+		}
+
+		return $location->prepared_ancestry_path !== $location->ancestry_path;
+	}
+
+	private function has_unfinished_hierarchy_preparation( string $generation_token ): bool {
+		$after = 0;
+		for ( $page = 0; $page < 1000; ++$page ) {
+			$found = $this->next_hierarchy_changing_draft( $generation_token, $after );
+			if ( null === $found ) {
+				return false;
+			}
+			$after = $found->id;
+			if ( $this->root_has_unprepared_descendants( $found, $generation_token ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private function next_hierarchy_changing_draft( string $generation_token, int $after_id ): ?CanonicalLocation {
+		global $wpdb;
+		$table = $this->table_name();
+		for ( $page = 0; $page < 200; ++$page ) {
+			$sql = "SELECT * FROM `{$table}` WHERE draft_generation_token = %s AND id > %d ORDER BY id ASC LIMIT 50";
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$rows = $wpdb->get_results( $wpdb->prepare( $sql, $generation_token, max( 0, $after_id ) ), ARRAY_A );
+			if ( ! is_array( $rows ) || [] === $rows ) {
+				return null;
+			}
+			foreach ( $rows as $row ) {
+				$location = CanonicalLocation::fromRow( $row );
+				$planned  = $this->planned_ancestry_path( $location, $generation_token );
+				if ( '' !== $location->ancestry_path && '' !== $planned && $planned !== $location->ancestry_path ) {
+					return $location;
+				}
+				$after_id = $location->id;
+			}
+		}
+
+		return null;
+	}
+
+	private function planned_ancestry_path( CanonicalLocation $location, string $generation_token ): string {
+		if ( $location->prepared_generation_token === $generation_token && '' !== $location->prepared_ancestry_path ) {
+			return $location->prepared_ancestry_path;
+		}
+		if ( $location->draft_generation_token !== $generation_token || '' === $location->draft_json ) {
+			return $location->ancestry_path;
+		}
+		$draft = json_decode( $location->draft_json, true );
+		if ( ! is_array( $draft ) ) {
+			return $location->ancestry_path;
+		}
+		$parent_id = isset( $draft['parent_location_id'] ) ? (int) $draft['parent_location_id'] : (int) ( $location->parent_location_id ?? 0 );
+
+		return $this->future_ancestry_path( $location, $parent_id > 0 ? $parent_id : null, $generation_token );
+	}
+
+	private function root_has_unprepared_descendants( CanonicalLocation $root, string $generation_token ): bool {
+		if ( '' === $root->ancestry_path ) {
+			return false;
+		}
+		global $wpdb;
+		$table = $this->table_name();
+		$like  = $wpdb->esc_like( $root->ancestry_path ) . '%';
+		$sql   = "SELECT * FROM `{$table}` WHERE ancestry_path LIKE %s AND id != %d AND (prepared_generation_token = %s OR prepared_generation_token != %s) ORDER BY id ASC LIMIT 1";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$row = $wpdb->get_row(
+			$wpdb->prepare( $sql, $like, $root->id, '', $generation_token ),
+			ARRAY_A
+		);
+
+		return is_array( $row );
+	}
+
+	/**
+	 * @return array{processed: int, done: bool, hierarchy_root_cursor: int, hierarchy_descendant_cursor: int, hierarchy_root_id: int}
+	 */
+	private function hierarchy_stage_result( int $processed, bool $done, int $root_cursor, int $desc_cursor, int $root_id ): array {
+		return [
+			'processed'                   => $processed,
+			'done'                        => $done,
+			'hierarchy_root_cursor'       => $root_cursor,
+			'hierarchy_descendant_cursor' => $desc_cursor,
+			'hierarchy_root_id'           => $root_id,
+		];
 	}
 
 	private function apply_prepared_ancestry_set_based( string $generation_token, string $now ): void {

@@ -420,6 +420,10 @@ final class FakeWpdb {
 			if ( '=' === $clause['op'] && $actual === (string) $clause['value'] ) {
 				return true;
 			}
+
+			if ( '!=' === $clause['op'] && $actual !== (string) $clause['value'] ) {
+				return true;
+			}
 		}
 
 		return false;
@@ -550,6 +554,37 @@ final class FakeWpdb {
 			}
 		}
 
+		$neq = [];
+		if ( preg_match_all(
+			'/(?:`([a-z0-9_]+)`|([a-z0-9_]+))\s*(?:!=|<>)\s*(?:\'((?:\\\\\'|[^\'])*)\'|(\d+))/i',
+			$where_sql,
+			$neq_matches,
+			PREG_SET_ORDER
+		) ) {
+			foreach ( $neq_matches as $neq_match ) {
+				$column = ( $neq_match[1] ?? '' ) !== '' ? $neq_match[1] : (string) ( $neq_match[2] ?? '' );
+				if ( '' === $column ) {
+					continue;
+				}
+				$neq[ $column ] = ( $neq_match[3] ?? '' ) !== '' ? stripcslashes( $neq_match[3] ) : (string) ( $neq_match[4] ?? '' );
+			}
+		}
+
+		$like = [];
+		if ( preg_match_all(
+			'/(?:`([a-z0-9_]+)`|([a-z0-9_]+))\s+LIKE\s+\'((?:\\\\\'|[^\'])*)\'/i',
+			$where_sql,
+			$like_matches,
+			PREG_SET_ORDER
+		) ) {
+			foreach ( $like_matches as $like_match ) {
+				$column = ( $like_match[1] ?? '' ) !== '' ? $like_match[1] : (string) ( $like_match[2] ?? '' );
+				if ( '' !== $column ) {
+					$like[ $column ] = stripcslashes( $like_match[3] );
+				}
+			}
+		}
+
 		$order = [];
 
 		if ( isset( $matches[4] ) && '' !== trim( (string) $matches[4] ) ) {
@@ -571,6 +606,8 @@ final class FakeWpdb {
 			'or_any'  => $or_any,
 			'gt'      => $gt,
 			'lt'      => $lt,
+			'neq'     => $neq,
+			'like'    => $like,
 			'order'   => $order,
 			'limit'   => isset( $matches[5] ) && '' !== $matches[5] ? (int) $matches[5] : null,
 			'offset'  => isset( $matches[6] ) && '' !== $matches[6] ? (int) $matches[6] : 0,
@@ -584,31 +621,58 @@ final class FakeWpdb {
 		$clauses = [];
 
 		if ( preg_match_all(
-			'/`([a-z0-9_]+)`\s+LIKE\s+\'((?:\\\\\'|[^\'])*)\'/i',
+			'/(?:`([a-z0-9_]+)`|([a-z0-9_]+))\s+LIKE\s+\'((?:\\\\\'|[^\'])*)\'/i',
 			$sql,
 			$likes,
 			PREG_SET_ORDER
 		) ) {
 			foreach ( $likes as $like ) {
+				$column = ( $like[1] ?? '' ) !== '' ? $like[1] : (string) ( $like[2] ?? '' );
+				if ( '' === $column ) {
+					continue;
+				}
 				$clauses[] = [
-					'column' => $like[1],
+					'column' => $column,
 					'op'     => 'like',
-					'value'  => stripcslashes( $like[2] ),
+					'value'  => stripcslashes( $like[3] ),
 				];
 			}
 		}
 
 		if ( preg_match_all(
-			'/`([a-z0-9_]+)`\s*=\s*(?:\'((?:\\\\\'|[^\'])*)\'|(\d+))/i',
+			'/(?:`([a-z0-9_]+)`|([a-z0-9_]+))\s*=\s*(?:\'((?:\\\\\'|[^\'])*)\'|(\d+))/i',
 			$sql,
 			$equals,
 			PREG_SET_ORDER
 		) ) {
 			foreach ( $equals as $equal ) {
+				$column = ( $equal[1] ?? '' ) !== '' ? $equal[1] : (string) ( $equal[2] ?? '' );
+				if ( '' === $column ) {
+					continue;
+				}
 				$clauses[] = [
-					'column' => $equal[1],
+					'column' => $column,
 					'op'     => '=',
-					'value'  => ( $equal[2] ?? '' ) !== '' ? stripcslashes( $equal[2] ) : (string) ( $equal[3] ?? '' ),
+					'value'  => ( $equal[3] ?? '' ) !== '' ? stripcslashes( $equal[3] ) : (string) ( $equal[4] ?? '' ),
+				];
+			}
+		}
+
+		if ( preg_match_all(
+			'/(?:`([a-z0-9_]+)`|([a-z0-9_]+))\s*(?:!=|<>)\s*(?:\'((?:\\\\\'|[^\'])*)\'|(\d+))/i',
+			$sql,
+			$neqs,
+			PREG_SET_ORDER
+		) ) {
+			foreach ( $neqs as $neq ) {
+				$column = ( $neq[1] ?? '' ) !== '' ? $neq[1] : (string) ( $neq[2] ?? '' );
+				if ( '' === $column ) {
+					continue;
+				}
+				$clauses[] = [
+					'column' => $column,
+					'op'     => '!=',
+					'value'  => ( $neq[3] ?? '' ) !== '' ? stripcslashes( $neq[3] ) : (string) ( $neq[4] ?? '' ),
 				];
 			}
 		}
@@ -925,7 +989,7 @@ final class FakeWpdb {
 
 	private function execute_concat_substring_update( string $sql ): int|false {
 		if ( ! preg_match(
-			"/^UPDATE `([^`]+)` SET prepared_ancestry_path = CONCAT\\('((?:\\\\'|[^'])*)', SUBSTRING\\(ancestry_path, (\\d+)\\)\\), prepared_generation_token = '((?:\\\\'|[^'])*)', updated_at = '((?:\\\\'|[^'])*)' WHERE (.+?)(?: LIMIT (\\d+))?\\s*$/is",
+			"/^UPDATE `([^`]+)` SET prepared_ancestry_path = CONCAT\\('((?:\\\\'|[^'])*)', SUBSTRING\\(ancestry_path, (\\d+)\\)\\), prepared_generation_token = '((?:\\\\'|[^'])*)', updated_at = '((?:\\\\'|[^'])*)' WHERE (.+?)(?:\\s+ORDER BY\\s+id\\s+ASC)?(?: LIMIT (\\d+))?\\s*$/is",
 			$sql,
 			$matches
 		) ) {
@@ -944,11 +1008,25 @@ final class FakeWpdb {
 		$updated_at = stripcslashes( $matches[5] );
 		$where      = (string) $matches[6];
 		$limit      = isset( $matches[7] ) && '' !== $matches[7] ? (int) $matches[7] : null;
-		$updated    = 0;
+		$order_by_id = (bool) preg_match( '/ORDER BY\s+id\s+ASC/i', $sql );
+		$candidates = [];
 		foreach ( $this->tables[ $table ] ?? [] as $index => $row ) {
 			if ( ! $this->sql_where_matches( $row, $where ) ) {
 				continue;
 			}
+			$candidates[] = $index;
+		}
+		if ( $order_by_id ) {
+			usort(
+				$candidates,
+				function ( int $left, int $right ) use ( $table ): int {
+					return (int) ( $this->tables[ $table ][ $left ]['id'] ?? 0 ) <=> (int) ( $this->tables[ $table ][ $right ]['id'] ?? 0 );
+				}
+			);
+		}
+		$updated = 0;
+		foreach ( $candidates as $index ) {
+			$row    = $this->tables[ $table ][ $index ];
 			$path   = (string) ( $row['ancestry_path'] ?? '' );
 			$suffix = substr( $path, $start - 1 );
 			$this->tables[ $table ][ $index ]['prepared_ancestry_path']     = $prefix . $suffix;
@@ -1178,6 +1256,18 @@ final class FakeWpdb {
 				}
 			}
 
+			foreach ( $parsed['neq'] ?? [] as $column => $value ) {
+				if ( (string) ( $row[ $column ] ?? '' ) === (string) $value ) {
+					continue 2;
+				}
+			}
+
+			foreach ( $parsed['like'] ?? [] as $column => $pattern ) {
+				if ( ! $this->like_matches( (string) ( $row[ $column ] ?? '' ), (string) $pattern ) ) {
+					continue 2;
+				}
+			}
+
 			if ( [] !== $parsed['or_any'] && ! $this->row_matches_any( $row, $parsed['or_any'] ) ) {
 				continue;
 			}
@@ -1192,7 +1282,9 @@ final class FakeWpdb {
 					foreach ( $parsed['order'] as $order ) {
 						$left  = (string) ( $a[ $order['column'] ] ?? '' );
 						$right = (string) ( $b[ $order['column'] ] ?? '' );
-						$cmp   = $left <=> $right;
+						$cmp   = is_numeric( $left ) && is_numeric( $right )
+							? ( (int) $left <=> (int) $right )
+							: ( $left <=> $right );
 
 						if ( 0 !== $cmp ) {
 							return 'DESC' === $order['direction'] ? -$cmp : $cmp;

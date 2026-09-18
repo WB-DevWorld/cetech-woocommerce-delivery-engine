@@ -401,12 +401,20 @@ final class GeoNamesPackImporter {
 			];
 		}
 		$after = (int) ( $progress['promotion_cursor'] ?? 0 );
-		$prepared = $this->locations->prepare_generation( $token, max( 1, $batch_size ), $after );
+		$hierarchy = [
+			'hierarchy_root_cursor'       => (int) ( $progress['hierarchy_root_cursor'] ?? 0 ),
+			'hierarchy_descendant_cursor' => (int) ( $progress['hierarchy_descendant_cursor'] ?? 0 ),
+			'hierarchy_root_id'           => (int) ( $progress['hierarchy_root_id'] ?? 0 ),
+		];
+		$prepared = $this->locations->prepare_generation( $token, max( 1, $batch_size ), $after, $hierarchy );
 		if ( ! $prepared['done'] ) {
-			$progress['phase']             = 'promote';
-			$progress['promotion_cursor']  = (int) $prepared['last_id'];
-			$progress['target_token']      = $token;
-			$progress['target_generation'] = $target;
+			$progress['phase']                        = 'promote';
+			$progress['promotion_cursor']             = (int) $prepared['last_id'];
+			$progress['hierarchy_root_cursor']        = (int) $prepared['hierarchy_root_cursor'];
+			$progress['hierarchy_descendant_cursor']  = (int) $prepared['hierarchy_descendant_cursor'];
+			$progress['hierarchy_root_id']            = (int) $prepared['hierarchy_root_id'];
+			$progress['target_token']                 = $token;
+			$progress['target_generation']            = $target;
 			$this->packs->update_progress(
 				$pack->id,
 				GeographyPackStatus::Importing,
@@ -452,6 +460,9 @@ final class GeoNamesPackImporter {
 							'attempt_seq'       => (int) ( $progress['attempt_seq'] ?? $target ),
 							'staging_identity'  => $token,
 							'promotion_cursor'  => 0,
+							'hierarchy_root_cursor' => 0,
+							'hierarchy_descendant_cursor' => 0,
+							'hierarchy_root_id' => 0,
 							'last_successful'   => [
 								'checksum'          => (string) ( $progress['dataset_checksum'] ?? $pack->checksum ),
 								'dataset_version'   => $pack->dataset_version,

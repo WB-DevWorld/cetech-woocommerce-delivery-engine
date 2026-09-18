@@ -1,6 +1,6 @@
 # Post-RC.11 Canonical Geography & Delivery Area Coverage
 
-Status: ISSUE #23 GEO.9 TECHNICAL CORRECTIONS / NOT MERGED / NOT RC.12
+Status: ISSUE #23 GEO.10 TECHNICAL CORRECTIONS / NOT MERGED / NOT RC.12
 
 Owner: `@wbdevworld`
 
@@ -26,9 +26,11 @@ Rejected technical-review candidate: `1.0.0-dev.geo.7` (`389674173fbf6886cfbf615
 
 Rejected technical-review candidate: `1.0.0-dev.geo.8` (`92cdeae1d1f9916bf38253772ec30240f3e4798b`). Frozen package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.8.zip` SHA-256 `55e3c61297b4b1ab0ad06a3efa3c899c60fdf80f8d0fbd6bec8be5e5342d798f`. Do not physically QA geo.8.
 
-Current technical-correction candidate identity: `1.0.0-dev.geo.9`
+Rejected technical-review candidate: `1.0.0-dev.geo.9` (`09df7d2337e271792f76290b062c7acba598d80a`). Frozen package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.9.zip` SHA-256 `8ac4067ff8a9b5f1eb6bb1b8ad8224a168517160665804b0aa6b577a17029a47`. Do not physically QA geo.9.
 
-geo.9 technical corrections (PR #24 comment `5729019690`): prepare stages future ancestry only and never mutates live Active hierarchy; strict expected target-token fence including empty current.
+Current technical-correction candidate identity: `1.0.0-dev.geo.10`
+
+geo.10 technical corrections (PR #24 comment `5729355535`): durable hierarchy-root/descendant cursors so metadata drafts cannot starve reparent preparation; finalize fails closed if descendant future ancestry is incomplete.
 
 Target schema: `6`
 

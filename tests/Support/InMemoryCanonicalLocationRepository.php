@@ -10,6 +10,7 @@ use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Domain\Geography\CanonicalLocation;
 use CetechDeliveryEngine\Domain\Geography\CanonicalLocationRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\GeographyNameNormalizer;
+use CetechDeliveryEngine\Domain\Geography\GeographyPackIncompletePreparationException;
 use CetechDeliveryEngine\Domain\Geography\LocationAliasRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\LocationAncestry;
 use CetechDeliveryEngine\Domain\Geography\ProviderMappingRepositoryInterface;
@@ -319,17 +320,20 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		return $updated;
 	}
 
-	public function prepare_generation( string $generation_token, int $limit = 200, int $after_id = 0 ): array {
+	public function prepare_generation( string $generation_token, int $limit = 200, int $after_id = 0, array $hierarchy = [] ): array {
 		$generation_token = trim( $generation_token );
 		if ( '' === $generation_token ) {
 			throw new \RuntimeException( 'Promotion requires a generation token.' );
 		}
 
-		$batch     = max( 1, $limit );
-		$after     = max( 0, $after_id );
-		$processed = 0;
-		$last_id   = $after;
-		$candidates = [];
+		$batch       = max( 1, $limit );
+		$after       = max( 0, $after_id );
+		$root_cursor = max( 0, (int) ( $hierarchy['hierarchy_root_cursor'] ?? 0 ) );
+		$desc_cursor = max( 0, (int) ( $hierarchy['hierarchy_descendant_cursor'] ?? 0 ) );
+		$root_id     = max( 0, (int) ( $hierarchy['hierarchy_root_id'] ?? 0 ) );
+		$processed   = 0;
+		$last_id     = $after;
+		$candidates  = [];
 		foreach ( $this->locations as $location ) {
 			if ( $location->draft_generation_token === $generation_token && $location->id > $after ) {
 				$candidates[] = $location;
@@ -339,7 +343,8 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			$candidates,
 			static fn( CanonicalLocation $left, CanonicalLocation $right ): int => $left->id <=> $right->id
 		);
-		foreach ( array_slice( $candidates, 0, $batch ) as $location ) {
+		$draft_slice = array_slice( $candidates, 0, $batch );
+		foreach ( $draft_slice as $location ) {
 			$last_id = max( $last_id, $location->id );
 			if ( '' !== $location->draft_json ) {
 				$draft = json_decode( $location->draft_json, true );
@@ -351,15 +356,27 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			++$processed;
 		}
 
-		$remaining = $batch - $processed;
+		$drafts_exhausted = count( $draft_slice ) < $batch;
+		$hierarchy_done   = false;
+		$remaining        = $batch - $processed;
 		if ( $remaining > 0 ) {
-			$processed += $this->stage_prepared_descendants_in_memory( $generation_token, $remaining );
+			$staged         = $this->stage_prepared_descendants_in_memory( $generation_token, $remaining, $root_cursor, $desc_cursor, $root_id );
+			$processed     += $staged['processed'];
+			$root_cursor    = $staged['hierarchy_root_cursor'];
+			$desc_cursor    = $staged['hierarchy_descendant_cursor'];
+			$root_id        = $staged['hierarchy_root_id'];
+			$hierarchy_done = $staged['done'];
+		} else {
+			$hierarchy_done = ! $this->has_unfinished_hierarchy_preparation_in_memory( $generation_token );
 		}
 
 		return [
-			'processed' => $processed,
-			'last_id'   => $last_id,
-			'done'      => 0 === $processed,
+			'processed'                   => $processed,
+			'last_id'                     => $last_id,
+			'done'                        => $drafts_exhausted && $hierarchy_done,
+			'hierarchy_root_cursor'       => $root_cursor,
+			'hierarchy_descendant_cursor' => $desc_cursor,
+			'hierarchy_root_id'           => $root_id,
 		];
 	}
 
@@ -375,6 +392,11 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		$snapshot_external  = $this->external_by_location;
 
 		try {
+			if ( $this->has_unfinished_hierarchy_preparation_in_memory( $generation_token ) ) {
+				throw new GeographyPackIncompletePreparationException(
+					'Hierarchy preparation is incomplete for token ' . $generation_token . '.'
+				);
+			}
 			if ( is_callable( $finalize ) ) {
 				$finalize();
 			}
@@ -432,11 +454,17 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	}
 
 	public function promote_generation( string $generation_token, ?callable $finalize = null ): int {
-		$after = 0;
-		$guard = 0;
+		$after     = 0;
+		$guard     = 0;
+		$hierarchy = [];
 		do {
-			$prepared = $this->prepare_generation( $generation_token, 200, $after );
-			$after    = (int) $prepared['last_id'];
+			$prepared  = $this->prepare_generation( $generation_token, 200, $after, $hierarchy );
+			$after     = (int) $prepared['last_id'];
+			$hierarchy = [
+				'hierarchy_root_cursor'       => (int) $prepared['hierarchy_root_cursor'],
+				'hierarchy_descendant_cursor' => (int) $prepared['hierarchy_descendant_cursor'],
+				'hierarchy_root_id'           => (int) $prepared['hierarchy_root_id'],
+			];
 			++$guard;
 		} while ( ! $prepared['done'] && $guard < 100000 );
 
@@ -583,57 +611,240 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		return LocationAncestry::append_path( $parent_path, $location->id );
 	}
 
-	private function stage_prepared_descendants_in_memory( string $generation_token, int $limit ): int {
+	/**
+	 * @return array{processed: int, done: bool, hierarchy_root_cursor: int, hierarchy_descendant_cursor: int, hierarchy_root_id: int}
+	 */
+	private function stage_prepared_descendants_in_memory(
+		string $generation_token,
+		int $limit,
+		int $root_cursor,
+		int $desc_cursor,
+		int $current_root_id
+	): array {
 		$remaining = max( 1, $limit );
 		$updated   = 0;
-		foreach ( $this->locations as $root ) {
+		$pages     = 0;
+		while ( $remaining > 0 && $pages < 40 ) {
+			++$pages;
+			$root = null;
+			if ( $current_root_id > 0 ) {
+				$root = $this->locations[ $current_root_id ] ?? null;
+				if ( ! $root instanceof CanonicalLocation || ! $this->requires_descendant_hierarchy_preparation_in_memory( $root, $generation_token ) ) {
+					$root_cursor     = max( $root_cursor, $current_root_id );
+					$current_root_id = 0;
+					$desc_cursor     = 0;
+					$root            = null;
+				}
+			}
+			if ( ! $root instanceof CanonicalLocation ) {
+				$found = $this->find_next_hierarchy_root_in_memory( $generation_token, $root_cursor );
+				if ( $found['exhausted'] ) {
+					return [
+						'processed'                   => $updated,
+						'done'                        => true,
+						'hierarchy_root_cursor'       => $root_cursor,
+						'hierarchy_descendant_cursor' => 0,
+						'hierarchy_root_id'           => 0,
+					];
+				}
+				if ( ! $found['root'] instanceof CanonicalLocation ) {
+					$root_cursor = max( $root_cursor, $found['scanned_until'] );
+					continue;
+				}
+				$root            = $found['root'];
+				$current_root_id = $root->id;
+				$desc_cursor     = 0;
+			}
+
+			$batch = $this->prepare_root_descendants_in_memory( $root, $generation_token, $desc_cursor, $remaining );
+			$updated   += $batch['count'];
+			$remaining -= $batch['count'];
+			if ( 0 === $batch['count'] ) {
+				$root_cursor     = $root->id;
+				$current_root_id = 0;
+				$desc_cursor     = 0;
+				continue;
+			}
+			$desc_cursor = $batch['last_id'];
 			if ( $remaining <= 0 ) {
 				break;
 			}
-			if ( $root->prepared_generation_token !== $generation_token || $root->draft_generation_token !== $generation_token ) {
-				continue;
+		}
+
+		$done = 0 === $current_root_id && ! $this->has_unfinished_hierarchy_preparation_in_memory( $generation_token );
+
+		return [
+			'processed'                   => $updated,
+			'done'                        => $done,
+			'hierarchy_root_cursor'       => $root_cursor,
+			'hierarchy_descendant_cursor' => $desc_cursor,
+			'hierarchy_root_id'           => $current_root_id,
+		];
+	}
+
+	/**
+	 * @return array{root: ?CanonicalLocation, scanned_until: int, exhausted: bool}
+	 */
+	private function find_next_hierarchy_root_in_memory( string $generation_token, int $after_id ): array {
+		$candidates = [];
+		foreach ( $this->locations as $location ) {
+			if ( $location->prepared_generation_token === $generation_token
+				&& $location->draft_generation_token === $generation_token
+				&& $location->id > $after_id ) {
+				$candidates[] = $location;
 			}
-			if ( '' === $root->prepared_ancestry_path || $root->prepared_ancestry_path === $root->ancestry_path || '' === $root->ancestry_path ) {
-				continue;
-			}
-			foreach ( $this->locations as $location ) {
-				if ( $remaining <= 0 ) {
-					break;
-				}
-				if ( $location->id === $root->id || ! str_starts_with( $location->ancestry_path, $root->ancestry_path ) ) {
-					continue;
-				}
-				if ( $location->prepared_generation_token === $generation_token && '' !== $location->prepared_ancestry_path ) {
-					continue;
-				}
-				$suffix = substr( $location->ancestry_path, strlen( $root->ancestry_path ) );
-				$this->locations[ $location->id ] = new CanonicalLocation(
-					$location->id,
-					$location->location_key,
-					$location->country_code,
-					$location->parent_location_id,
-					$location->location_type,
-					$location->administrative_level,
-					$location->canonical_name,
-					$location->normalized_name,
-					$location->ascii_name,
-					$location->latitude,
-					$location->longitude,
-					$location->status,
-					$location->ancestry_path,
-					$location->generation,
-					$location->draft_json,
-					$location->generation_token,
-					$location->draft_generation_token,
-					$root->prepared_ancestry_path . $suffix,
-					$generation_token
-				);
-				++$updated;
-				--$remaining;
+		}
+		usort(
+			$candidates,
+			static fn( CanonicalLocation $left, CanonicalLocation $right ): int => $left->id <=> $right->id
+		);
+		if ( [] === $candidates ) {
+			return [
+				'root'          => null,
+				'scanned_until' => $after_id,
+				'exhausted'     => true,
+			];
+		}
+		$scanned = $after_id;
+		$page    = array_slice( $candidates, 0, 50 );
+		foreach ( $page as $candidate ) {
+			$scanned = max( $scanned, $candidate->id );
+			if ( $this->requires_descendant_hierarchy_preparation_in_memory( $candidate, $generation_token ) ) {
+				return [
+					'root'          => $candidate,
+					'scanned_until' => $candidate->id,
+					'exhausted'     => false,
+				];
 			}
 		}
 
-		return $updated;
+		return [
+			'root'          => null,
+			'scanned_until' => $scanned,
+			'exhausted'     => false,
+		];
+	}
+
+	/**
+	 * @return array{count: int, last_id: int}
+	 */
+	private function prepare_root_descendants_in_memory(
+		CanonicalLocation $root,
+		string $generation_token,
+		int $desc_cursor,
+		int $limit
+	): array {
+		$remaining = max( 1, $limit );
+		$updated   = 0;
+		$last_id   = $desc_cursor;
+		$children  = [];
+		foreach ( $this->locations as $location ) {
+			if ( $location->id === $root->id || $location->id <= $desc_cursor ) {
+				continue;
+			}
+			if ( ! str_starts_with( $location->ancestry_path, $root->ancestry_path ) ) {
+				continue;
+			}
+			if ( $location->prepared_generation_token === $generation_token && '' !== $location->prepared_ancestry_path ) {
+				continue;
+			}
+			$children[] = $location;
+		}
+		usort(
+			$children,
+			static fn( CanonicalLocation $left, CanonicalLocation $right ): int => $left->id <=> $right->id
+		);
+		foreach ( $children as $location ) {
+			if ( $remaining <= 0 ) {
+				break;
+			}
+			$suffix = substr( $location->ancestry_path, strlen( $root->ancestry_path ) );
+			$this->locations[ $location->id ] = new CanonicalLocation(
+				$location->id,
+				$location->location_key,
+				$location->country_code,
+				$location->parent_location_id,
+				$location->location_type,
+				$location->administrative_level,
+				$location->canonical_name,
+				$location->normalized_name,
+				$location->ascii_name,
+				$location->latitude,
+				$location->longitude,
+				$location->status,
+				$location->ancestry_path,
+				$location->generation,
+				$location->draft_json,
+				$location->generation_token,
+				$location->draft_generation_token,
+				$root->prepared_ancestry_path . $suffix,
+				$generation_token
+			);
+			$last_id = $location->id;
+			++$updated;
+			--$remaining;
+		}
+
+		return [
+			'count'   => $updated,
+			'last_id' => $last_id,
+		];
+	}
+
+	private function requires_descendant_hierarchy_preparation_in_memory( CanonicalLocation $location, string $generation_token ): bool {
+		if ( $location->prepared_generation_token !== $generation_token ) {
+			return false;
+		}
+		if ( '' === $location->prepared_ancestry_path || '' === $location->ancestry_path ) {
+			return false;
+		}
+
+		return $location->prepared_ancestry_path !== $location->ancestry_path;
+	}
+
+	private function has_unfinished_hierarchy_preparation_in_memory( string $generation_token ): bool {
+		$drafts = [];
+		foreach ( $this->locations as $location ) {
+			if ( $location->draft_generation_token === $generation_token ) {
+				$drafts[] = $location;
+			}
+		}
+		usort(
+			$drafts,
+			static fn( CanonicalLocation $left, CanonicalLocation $right ): int => $left->id <=> $right->id
+		);
+		foreach ( $drafts as $location ) {
+			$planned = $this->planned_ancestry_path_in_memory( $location, $generation_token );
+			if ( '' === $location->ancestry_path || '' === $planned || $planned === $location->ancestry_path ) {
+				continue;
+			}
+			foreach ( $this->locations as $child ) {
+				if ( $child->id === $location->id || ! str_starts_with( $child->ancestry_path, $location->ancestry_path ) ) {
+					continue;
+				}
+				if ( $child->prepared_generation_token !== $generation_token || '' === $child->prepared_ancestry_path ) {
+					return true;
+				}
+			}
+		}
+
+		return false;
+	}
+
+	private function planned_ancestry_path_in_memory( CanonicalLocation $location, string $generation_token ): string {
+		if ( $location->prepared_generation_token === $generation_token && '' !== $location->prepared_ancestry_path ) {
+			return $location->prepared_ancestry_path;
+		}
+		if ( $location->draft_generation_token !== $generation_token || '' === $location->draft_json ) {
+			return $location->ancestry_path;
+		}
+		$draft = json_decode( $location->draft_json, true );
+		if ( ! is_array( $draft ) ) {
+			return $location->ancestry_path;
+		}
+		$parent_id = isset( $draft['parent_location_id'] ) ? (int) $draft['parent_location_id'] : (int) ( $location->parent_location_id ?? 0 );
+
+		return $this->future_ancestry_path_in_memory( $location, $parent_id > 0 ? $parent_id : null, $generation_token );
 	}
 
 	private function apply_prepared_ancestry_in_memory( CanonicalLocation $location ): void {
