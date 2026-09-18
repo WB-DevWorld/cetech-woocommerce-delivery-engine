@@ -579,6 +579,58 @@ describe('Product delivery fulfilment switcher', () => {
 		expect(document.querySelector('label[for="billing_state"]')).not.toBeNull();
 	});
 
+	it('restores the saved Woo region value after converting INPUT to a canonical SELECT', async () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<fieldset data-cetech-de-selector="1">
+					<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">
+						<p data-cetech-de-field="country"><select name="cetech_de_matching_country"><option value="">Select…</option><option value="XX">No Woo States</option></select></p>
+						<p data-cetech-de-reveal="region" hidden>
+							<label for="billing_state">Region / State</label>
+							<input id="billing_state" class="input-text state_select woodmart-state" name="cetech_de_matching_state" type="text" value="Central District" aria-label="Region / State" aria-required="true" autocomplete="address-level1" data-placeholder="State" data-input-classes="state_select" data-location-key="loc-xx-adm" required="required" />
+						</p>
+						<p data-cetech-de-reveal="locality" hidden>
+							<input name="cetech_de_matching_city" />
+							<ul class="cetech-de-locality-results" hidden></ul>
+						</p>
+						<input type="hidden" name="cetech_de_matching_location_key" data-cetech-de-location-key="1" value="" />
+					</div>
+					<div data-cetech-de-options></div>
+				</fieldset>
+			</form>
+		`;
+		window.cetechDeMatchingLocation = {
+			ajaxUrl: '/wp-admin/admin-ajax.php',
+			geography: { childrenAction: 'cetech_de_geography_children', childrenNonce: 'n' }
+		};
+		window.fetch = async () => ({
+			json: async () => ({
+				success: true,
+				data: {
+					items: [{ key: 'loc-xx-adm', name: 'Central District', code: 'CD' }],
+					skip_admin: false
+				}
+			})
+		});
+		const api = loadSelector();
+		api.bindAll(document);
+		expect(document.querySelector('[name="cetech_de_matching_state"]').tagName).toBe('INPUT');
+		expect(document.querySelector('select[name="cetech_de_matching_state"]')).toBeNull();
+		const country = document.querySelector('[name="cetech_de_matching_country"]');
+		country.value = 'XX';
+		country.dispatchEvent(new Event('change', { bubbles: true }));
+		await expect.poll(() => document.querySelector('[name="cetech_de_matching_state"]')?.tagName || '').toBe('SELECT');
+		const region = document.querySelector('[name="cetech_de_matching_state"]');
+		expect(region.value).toBe('CD');
+		expect(region.options[region.selectedIndex].textContent).toBe('Central District');
+		expect(region.options[region.selectedIndex].getAttribute('data-location-key')).toBe('loc-xx-adm');
+		expect(region.id).toBe('billing_state');
+		expect(region.className).toContain('state_select');
+		expect(region.getAttribute('aria-label')).toBe('Region / State');
+		expect(region.required).toBe(true);
+		expect(document.querySelector('label[for="billing_state"]')).not.toBeNull();
+	});
+
 	it('skips the administrative step when the country has no ADM1 children', async () => {
 		document.body.innerHTML = `
 			<form class="cart">

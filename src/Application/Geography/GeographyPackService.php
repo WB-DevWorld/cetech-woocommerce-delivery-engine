@@ -35,6 +35,8 @@ final class GeographyPackService {
 
 	public const LOCK_TTL_SECONDS = 120;
 
+	public const ABANDONED_ARTIFACT_RETENTION = 4;
+
 	public function __construct(
 		private GeographyPackRepositoryInterface $packs,
 		private GeoNamesPackImporter $importer,
@@ -118,7 +120,11 @@ final class GeographyPackService {
 		}
 		try {
 			$pack   = $this->packs->find_by_id( $pack->id ) ?? $pack;
-			$pack   = $this->importer->begin_dataset( $pack, $file_path, $checksum, $version );
+			$previous = $pack->target_token();
+			$pack     = $this->importer->begin_dataset( $pack, $file_path, $checksum, $version );
+			if ( '' !== $previous && $previous !== $pack->target_token() ) {
+				$this->cleanup_abandoned_generation_files( $pack, $previous );
+			}
 			$stored = $this->store_generation_file( $pack->country_code, $pack->target_token(), $checksum, $file_path );
 			if ( '' === $stored ) {
 				$this->packs->update_progress(
@@ -278,54 +284,85 @@ final class GeographyPackService {
 	 */
 	public function download_tick( int $pack_id, string $country_code, string $generation_token = '' ): array {
 		$country_code = strtoupper( trim( $country_code ) );
-		$owner = $this->acquire_lifecycle_lock( $pack_id, 'download' );
+		$owner        = $this->acquire_lifecycle_lock( $pack_id, 'download' );
 		if ( '' === $owner ) {
 			return [ 'status' => 'noop', 'reason' => 'locked' ];
 		}
+		$zip_path = '';
+		$url      = '';
+		$result   = null;
 		try {
 			$pack = $this->packs->find_by_id( $pack_id );
 			if ( ! $pack instanceof GeographyPack ) {
-				return [ 'status' => 'missing' ];
+				$result = [ 'status' => 'missing' ];
+
+				return $result;
 			}
 			if ( '' === $generation_token ) {
 				$generation_token = $pack->target_token();
 			}
 			if ( $this->is_stale_token( $pack, $generation_token ) ) {
-				return [ 'status' => 'noop', 'reason' => 'stale_generation' ];
+				$result = [ 'status' => 'noop', 'reason' => 'stale_generation' ];
+
+				return $result;
 			}
 
 			$url = self::geonames_url( $country_code );
 			if ( ! $this->is_allowed_geonames_url( $url, $country_code ) ) {
-				$this->packs->update_progress( $pack->id, GeographyPackStatus::Failed, '0', $pack->progress, 'Blocked GeoNames URL.' );
+				$this->packs->update_progress( $pack->id, GeographyPackStatus::Failed, '0', $pack->progress, 'Blocked GeoNames URL.', null, $generation_token );
+				$result = [ 'status' => GeographyPackStatus::Failed->value, 'error' => 'ssrf_blocked' ];
 
-				return [ 'status' => GeographyPackStatus::Failed->value, 'error' => 'ssrf_blocked' ];
+				return $result;
 			}
 
 			$dir = $this->storage_dir();
 			if ( '' === $dir ) {
-				$this->packs->update_progress( $pack->id, GeographyPackStatus::Failed, '0', $pack->progress, 'Uploads directory is not writable.' );
+				$this->packs->update_progress( $pack->id, GeographyPackStatus::Failed, '0', $pack->progress, 'Uploads directory is not writable.', null, $generation_token );
+				$result = [ 'status' => GeographyPackStatus::Failed->value, 'error' => 'storage' ];
 
-				return [ 'status' => GeographyPackStatus::Failed->value, 'error' => 'storage' ];
+				return $result;
 			}
 
 			$zip_path = $dir . '/' . $country_code . '.' . $this->safe_token_segment( $generation_token ) . '.zip';
-			$fetched  = $this->safe_download( $url, $zip_path );
-			if ( ! $fetched ) {
-				$this->packs->update_progress( $pack->id, GeographyPackStatus::Failed, '0', $pack->progress, 'Official GeoNames download failed.' );
+		} finally {
+			$this->release_lifecycle_lock( $pack_id, $owner );
+		}
+		if ( null !== $result ) {
+			return $result;
+		}
 
-				return [ 'status' => GeographyPackStatus::Failed->value, 'error' => 'download_failed' ];
+		$fetched = $this->safe_download( $url, $zip_path );
+		$txt     = '';
+		if ( $fetched ) {
+			$txt = $this->extract_gazetteer_zip( $zip_path, dirname( $zip_path ), $country_code, $generation_token );
+		}
+		$this->safe_unlink( $zip_path );
+
+		$owner = $this->acquire_lifecycle_lock( $pack_id, 'download' );
+		if ( '' === $owner ) {
+			$this->safe_unlink( $txt );
+
+			return [ 'status' => 'noop', 'reason' => 'locked' ];
+		}
+		try {
+			if ( ! $this->renew_lifecycle_lock( $pack_id, $owner ) ) {
+				$this->safe_unlink( $txt );
+
+				return [ 'status' => 'noop', 'reason' => 'lock_lost' ];
 			}
-
-			$txt = $this->extract_gazetteer_zip( $zip_path, $dir, $country_code, $generation_token );
-			$this->safe_unlink( $zip_path );
 			$fresh = $this->packs->find_by_id( $pack_id );
 			if ( ! $fresh instanceof GeographyPack || $this->is_stale_token( $fresh, $generation_token ) ) {
 				$this->safe_unlink( $txt );
 
 				return [ 'status' => 'noop', 'reason' => 'stale_generation' ];
 			}
+			if ( ! $fetched ) {
+				$this->packs->update_progress( $fresh->id, GeographyPackStatus::Failed, '0', $fresh->progress, 'Official GeoNames download failed.', null, $generation_token );
+
+				return [ 'status' => GeographyPackStatus::Failed->value, 'error' => 'download_failed' ];
+			}
 			if ( '' === $txt || ! is_readable( $txt ) ) {
-				$this->packs->update_progress( $pack->id, GeographyPackStatus::Failed, '0', $pack->progress, 'The GeoNames archive did not contain a country gazetteer file.' );
+				$this->packs->update_progress( $fresh->id, GeographyPackStatus::Failed, '0', $fresh->progress, 'The GeoNames archive did not contain a country gazetteer file.', null, $generation_token );
 
 				return [ 'status' => GeographyPackStatus::Failed->value, 'error' => 'extract_failed' ];
 			}
@@ -366,9 +403,13 @@ final class GeographyPackService {
 		}
 		$checksum = $this->checksum_of( $txt_path );
 		$version  = $this->dataset_version( $txt_path, $checksum );
+		$previous = $pack->target_token();
 		$pack     = $this->importer->begin_dataset( $pack, $txt_path, $checksum, $version, $generation_token );
 		if ( $pack->target_token() !== $generation_token ) {
 			return [ 'status' => 'noop', 'reason' => 'stale_generation' ];
+		}
+		if ( '' !== $previous && $previous !== $pack->target_token() ) {
+			$this->cleanup_abandoned_generation_files( $pack, $previous );
 		}
 		$stored = $this->store_generation_file( $pack->country_code, $generation_token, $checksum, $txt_path );
 		if ( '' === $stored ) {
@@ -437,6 +478,9 @@ final class GeographyPackService {
 			return [ 'status' => 'noop', 'reason' => 'locked' ];
 		}
 		try {
+			if ( ! $this->renew_lifecycle_lock( $pack_id, $owner ) ) {
+				return [ 'status' => 'noop', 'reason' => 'lock_lost' ];
+			}
 			$pack = $this->packs->find_by_id( $pack_id );
 			if ( ! $pack instanceof GeographyPack ) {
 				return [ 'status' => 'missing' ];
@@ -448,7 +492,7 @@ final class GeographyPackService {
 				return [ 'status' => 'noop', 'reason' => 'stale_generation' ];
 			}
 
-			return $this->run_tick( $pack, $file_path, $batch_size, $generation_token );
+			return $this->run_tick( $pack, $file_path, $batch_size, $generation_token, $owner );
 		} finally {
 			$this->release_lifecycle_lock( $pack_id, $owner );
 		}
@@ -457,8 +501,11 @@ final class GeographyPackService {
 	/**
 	 * @return array<string, mixed>
 	 */
-	private function run_tick( GeographyPack $pack, string $file_path, int $batch_size, string $generation_token ): array {
+	private function run_tick( GeographyPack $pack, string $file_path, int $batch_size, string $generation_token, string $owner ): array {
 		$pack_id = $pack->id;
+		if ( ! $this->renew_lifecycle_lock( $pack_id, $owner ) ) {
+			return [ 'status' => 'noop', 'reason' => 'lock_lost' ];
+		}
 		$fresh   = $this->packs->find_by_id( $pack_id );
 		if ( ! $fresh instanceof GeographyPack || $this->is_stale_token( $fresh, $generation_token ) ) {
 			return [ 'status' => 'noop', 'reason' => 'stale_generation' ];
@@ -474,7 +521,9 @@ final class GeographyPackService {
 				GeographyPackStatus::Failed,
 				$pack->import_cursor,
 				$pack->progress,
-				'Gazetteer file is not readable. Upload a pack or fetch the official GeoNames country file.'
+				'Gazetteer file is not readable. Upload a pack or fetch the official GeoNames country file.',
+				null,
+				$generation_token
 			);
 
 			return [ 'status' => GeographyPackStatus::Failed->value, 'error' => 'file_unreadable' ];
@@ -483,10 +532,23 @@ final class GeographyPackService {
 		if ( '' !== $pack->checksum ) {
 			$checksum = $this->checksum_of( $file_path );
 			if ( $checksum !== $pack->checksum ) {
-				return [ 'status' => 'noop', 'reason' => 'checksum_mismatch' ];
+				$this->packs->update_progress(
+					$pack->id,
+					GeographyPackStatus::Failed,
+					$pack->import_cursor,
+					$pack->progress,
+					'The gazetteer file checksum does not match the current target. Retry the import or upload the correct file.',
+					null,
+					$generation_token
+				);
+
+				return [ 'status' => GeographyPackStatus::Failed->value, 'error' => 'checksum_mismatch' ];
 			}
 		}
 
+		if ( ! $this->renew_lifecycle_lock( $pack_id, $owner ) || ! $this->owns_lifecycle_lock( $pack_id, $owner ) ) {
+			return [ 'status' => 'noop', 'reason' => 'lock_lost' ];
+		}
 		$result = $this->importer->import_batch( $pack, $file_path, $batch_size );
 		$after  = $this->packs->find_by_id( $pack_id );
 		if ( $after instanceof GeographyPack && $this->is_stale_token( $after, $generation_token ) && 'noop' !== ( $result['status'] ?? '' ) ) {
@@ -590,6 +652,7 @@ final class GeographyPackService {
 			'role'        => $role,
 			'acquired_at' => $now,
 			'expires_at'  => $now + self::LOCK_TTL_SECONDS,
+			'renewed_at'  => $now,
 		];
 		if ( ! function_exists( 'add_option' ) ) {
 			return $owner;
@@ -613,6 +676,38 @@ final class GeographyPackService {
 		}
 
 		return '';
+	}
+
+	private function renew_lifecycle_lock( int $pack_id, string $owner ): bool {
+		if ( '' === $owner ) {
+			return false;
+		}
+		if ( ! function_exists( 'get_option' ) || ! function_exists( 'update_option' ) ) {
+			return true;
+		}
+		$key      = 'cetech_de_geo_pack_cas_' . $pack_id;
+		$existing = get_option( $key, false );
+		if ( ! is_array( $existing ) || (string) ( $existing['owner'] ?? '' ) !== $owner ) {
+			return false;
+		}
+		$now = time();
+		$existing['expires_at'] = $now + self::LOCK_TTL_SECONDS;
+		$existing['renewed_at'] = $now;
+		update_option( $key, $existing, false );
+
+		return true;
+	}
+
+	private function owns_lifecycle_lock( int $pack_id, string $owner ): bool {
+		if ( '' === $owner ) {
+			return false;
+		}
+		if ( ! function_exists( 'get_option' ) ) {
+			return true;
+		}
+		$existing = get_option( 'cetech_de_geo_pack_cas_' . $pack_id, false );
+
+		return is_array( $existing ) && (string) ( $existing['owner'] ?? '' ) === $owner;
 	}
 
 	private function release_lifecycle_lock( int $pack_id, string $owner ): void {
@@ -642,6 +737,94 @@ final class GeographyPackService {
 		}
 
 		return $dest;
+	}
+
+	/**
+	 * Remove superseded/failed token ZIP/TXT artifacts. Never deletes Active dataset source evidence.
+	 */
+	public function cleanup_abandoned_generation_files( GeographyPack $pack, string $abandoned_token = '', string $directory = '' ): int {
+		$dir = '' !== $directory ? $directory : $this->storage_dir();
+		if ( '' === $dir || ! is_dir( $dir ) ) {
+			return 0;
+		}
+		$cc   = strtoupper( $pack->country_code );
+		$keep = [];
+		foreach ( [
+			$pack->source_reference,
+			(string) ( $pack->last_successful()['source_reference'] ?? '' ),
+			(string) ( $pack->last_successful()['source'] ?? '' ),
+		] as $path ) {
+			if ( '' === $path || ! is_file( $path ) ) {
+				continue;
+			}
+			$real = realpath( $path );
+			if ( is_string( $real ) ) {
+				$keep[ $real ] = true;
+			}
+		}
+		$keep_segments = [];
+		foreach ( [
+			$pack->target_token(),
+			(string) ( $pack->last_successful()['generation_token'] ?? '' ),
+			(string) ( $pack->last_successful()['attempt_token'] ?? '' ),
+		] as $token ) {
+			$seg = $this->safe_token_segment( $token );
+			if ( '' !== $seg ) {
+				$keep_segments[ $seg ] = true;
+			}
+		}
+		$keep_checksum = substr(
+			(string) ( $pack->last_successful()['checksum'] ?? $pack->active_checksum() ),
+			0,
+			12
+		);
+		$abandoned_seg = $this->safe_token_segment( $abandoned_token );
+		$deleted       = 0;
+		$extras        = [];
+		$candidates    = glob( $dir . '/' . $cc . '.*' );
+		foreach ( is_array( $candidates ) ? $candidates : [] as $file ) {
+			if ( ! is_file( $file ) ) {
+				continue;
+			}
+			$real = realpath( $file );
+			if ( ! is_string( $real ) || isset( $keep[ $real ] ) ) {
+				continue;
+			}
+			$base = basename( $file );
+			$parts = explode( '.', $base );
+			$seg   = $parts[1] ?? '';
+			if ( isset( $keep_segments[ $seg ] ) ) {
+				continue;
+			}
+			if ( '' !== $keep_checksum && str_contains( $base, $keep_checksum ) ) {
+				continue;
+			}
+			$is_zip_or_txt = str_ends_with( strtolower( $base ), '.zip' ) || str_ends_with( strtolower( $base ), '.txt' );
+			if ( ! $is_zip_or_txt || str_contains( $base, 'incoming' ) ) {
+				continue;
+			}
+			if ( '' !== $abandoned_seg && $seg === $abandoned_seg ) {
+				$this->safe_unlink( $file );
+				++$deleted;
+				continue;
+			}
+			$extras[] = $file;
+		}
+		usort(
+			$extras,
+			static function ( string $left, string $right ): int {
+				return ( (int) @filemtime( $left ) ) <=> ( (int) @filemtime( $right ) );
+			}
+		);
+		$overflow = count( $extras ) - self::ABANDONED_ARTIFACT_RETENTION;
+		if ( $overflow > 0 ) {
+			foreach ( array_slice( $extras, 0, $overflow ) as $file ) {
+				$this->safe_unlink( $file );
+				++$deleted;
+			}
+		}
+
+		return $deleted;
 	}
 
 	private function safe_token_segment( string $token ): string {

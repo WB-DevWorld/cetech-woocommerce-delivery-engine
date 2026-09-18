@@ -312,9 +312,10 @@ final class Geo6TechnicalCorrectionTest extends TestCase {
 				string $cursor,
 				array $progress,
 				string $last_error = '',
-				?string $installed_at = null
+				?string $installed_at = null,
+				string $expected_target_token = ''
 			): void {
-				$this->inner->update_progress( $id, $status, $cursor, $progress, $last_error, $installed_at );
+				$this->inner->update_progress( $id, $status, $cursor, $progress, $last_error, $installed_at, $expected_target_token );
 			}
 		};
 		$importer = $this->importer( $geo, $packs );

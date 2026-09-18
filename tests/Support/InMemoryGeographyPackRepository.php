@@ -58,7 +58,8 @@ final class InMemoryGeographyPackRepository implements GeographyPackRepositoryIn
 		string $cursor,
 		array $progress,
 		string $last_error = '',
-		?string $installed_at = null
+		?string $installed_at = null,
+		string $expected_target_token = ''
 	): void {
 		if ( $this->fail_next_progress || ( $this->fail_next_ready_progress && GeographyPackStatus::Ready === $status ) ) {
 			$this->fail_next_progress       = false;
@@ -67,19 +68,15 @@ final class InMemoryGeographyPackRepository implements GeographyPackRepositoryIn
 		}
 		$existing = $this->packs[ $id ] ?? null;
 		if ( ! $existing instanceof GeographyPack ) {
+			if ( '' !== trim( $expected_target_token ) ) {
+				throw new \CetechDeliveryEngine\Domain\Geography\GeographyPackTokenFenceException(
+					'Pack target token fence rejected expected ' . trim( $expected_target_token ) . ' against a missing pack.'
+				);
+			}
+
 			return;
 		}
-		if ( ! array_key_exists( 'last_successful', $progress ) && isset( $existing->progress['last_successful'] ) ) {
-			$progress['last_successful'] = $existing->progress['last_successful'];
-		}
-		if ( GeographyPackStatus::Ready === $status ) {
-			$progress['last_successful'] = [
-				'checksum'         => '' !== (string) ( $progress['dataset_checksum'] ?? '' ) ? (string) $progress['dataset_checksum'] : $existing->checksum,
-				'dataset_version'  => $existing->dataset_version,
-				'source_reference' => $existing->source_reference,
-				'installed_at'     => $installed_at ?? $existing->installed_at,
-			];
-		}
+		$progress = $existing->apply_progress_update( $progress, $status, $installed_at, $expected_target_token );
 		$this->packs[ $id ] = new GeographyPack(
 			$existing->id,
 			$existing->country_code,

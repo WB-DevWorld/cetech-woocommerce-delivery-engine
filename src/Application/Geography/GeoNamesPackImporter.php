@@ -13,6 +13,7 @@ use CetechDeliveryEngine\Domain\Geography\CanonicalLocationRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\GeographyNameNormalizer;
 use CetechDeliveryEngine\Domain\Geography\GeographyPack;
 use CetechDeliveryEngine\Domain\Geography\GeographyPackRepositoryInterface;
+use CetechDeliveryEngine\Domain\Geography\GeographyPackTokenFenceException;
 use CetechDeliveryEngine\Domain\Geography\LocationAliasRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\LocationAncestry;
 use CetechDeliveryEngine\Domain\Geography\ProviderMappingRepositoryInterface;
@@ -158,13 +159,7 @@ final class GeoNamesPackImporter {
 		$this->woo_bootstrap->bootstrap_country( $pack->country_code );
 		$country = $this->locations->find_country( $pack->country_code );
 		if ( ! $country instanceof CanonicalLocation ) {
-			$this->packs->update_progress(
-				$pack->id,
-				GeographyPackStatus::Failed,
-				$pack->import_cursor,
-				$pack->progress,
-				'Country node could not be bootstrapped.'
-			);
+			$this->mark_target_failed( $pack, 'Country node could not be bootstrapped.', $pack->target_token() );
 
 			return [
 				'status' => GeographyPackStatus::Failed->value,
@@ -185,6 +180,41 @@ final class GeoNamesPackImporter {
 			$progress['target_generation'] = $target;
 			$progress['target_token']      = $token;
 		}
+
+		try {
+			return $this->import_batch_body( $pack, $file_path, $batch_size, $country, $cursor, $progress, $processed, $imported, $skipped, $target, $token );
+		} catch ( GeographyPackTokenFenceException $e ) {
+			return [
+				'status' => 'noop',
+				'reason' => 'stale_generation',
+			];
+		} catch ( \Throwable $e ) {
+			$this->mark_target_failed( $pack, $e->getMessage(), $token );
+
+			return [
+				'status' => GeographyPackStatus::Failed->value,
+				'error'  => 'import_write_failed',
+			];
+		}
+	}
+
+	/**
+	 * @param array<string, mixed> $progress
+	 * @return array<string, mixed>
+	 */
+	private function import_batch_body(
+		GeographyPack $pack,
+		string $file_path,
+		int $batch_size,
+		CanonicalLocation $country,
+		int $cursor,
+		array $progress,
+		int $processed,
+		int $imported,
+		int $skipped,
+		int $target,
+		string $token
+	): array {
 		$last      = $cursor;
 		$phase     = (string) ( $progress['phase'] ?? 'admin1' );
 		if ( ! in_array( $phase, self::PHASES, true ) ) {
@@ -255,6 +285,7 @@ final class GeoNamesPackImporter {
 					$this->locations->promote_generation(
 						$token,
 						function () use ( $pack, $last, $processed, $imported, $skipped, $progress, $phase, $target, $token ): void {
+							$installed_at = gmdate( 'Y-m-d H:i:s' );
 							$this->packs->update_progress(
 								$pack->id,
 								GeographyPackStatus::Ready,
@@ -274,37 +305,29 @@ final class GeoNamesPackImporter {
 									'attempt_seq'       => (int) ( $progress['attempt_seq'] ?? $target ),
 									'staging_identity'  => $token,
 									'last_successful'   => [
-										'checksum'         => (string) ( $progress['dataset_checksum'] ?? $pack->checksum ),
-										'dataset_version'  => $pack->dataset_version,
-										'source_reference' => $pack->source_reference,
-										'generation_token' => $token,
+										'checksum'          => (string) ( $progress['dataset_checksum'] ?? $pack->checksum ),
+										'dataset_version'   => $pack->dataset_version,
+										'source_reference'  => $pack->source_reference,
+										'source'            => $pack->source_reference,
+										'installed_at'      => $installed_at,
+										'generation_token'  => $token,
+										'attempt_token'     => $token,
+										'active_generation' => $target,
 									],
 								],
 								'',
-								gmdate( 'Y-m-d H:i:s' )
+								$installed_at,
+								$token
 							);
 						}
 					);
+				} catch ( GeographyPackTokenFenceException $e ) {
+					return [
+						'status' => 'noop',
+						'reason' => 'stale_generation',
+					];
 				} catch ( \Throwable $e ) {
-					$this->packs->update_progress(
-						$pack->id,
-						GeographyPackStatus::Failed,
-						(string) $last,
-						[
-							'processed'         => $processed,
-							'imported'          => $imported,
-							'skipped'           => $skipped,
-							'total'             => (int) ( $progress['total'] ?? 0 ),
-							'phase'             => $phase,
-							'target_generation' => $target,
-							'target_token'      => $token,
-							'target_checksum'   => (string) ( $progress['target_checksum'] ?? $pack->checksum ),
-							'dataset_checksum'  => (string) ( $progress['dataset_checksum'] ?? $pack->checksum ),
-							'active_generation' => (int) ( $progress['active_generation'] ?? 0 ),
-							'last_successful'   => $pack->last_successful(),
-						],
-						$e->getMessage()
-					);
+					$this->mark_target_failed( $pack, $e->getMessage(), $token, (string) $last, $progress, $processed, $imported, $skipped, $phase, $target );
 
 					return [
 						'status' => GeographyPackStatus::Failed->value,
@@ -334,10 +357,13 @@ final class GeoNamesPackImporter {
 			'staging_identity'   => $token,
 			'last_successful'    => $complete
 				? [
-					'checksum'         => (string) ( $progress['dataset_checksum'] ?? $pack->checksum ),
-					'dataset_version'  => $pack->dataset_version,
-					'source_reference' => $pack->source_reference,
-					'generation_token' => $token,
+					'checksum'          => (string) ( $progress['dataset_checksum'] ?? $pack->checksum ),
+					'dataset_version'   => $pack->dataset_version,
+					'source_reference'  => $pack->source_reference,
+					'source'            => $pack->source_reference,
+					'generation_token'  => $token,
+					'attempt_token'     => $token,
+					'active_generation' => $target,
 				]
 				: $pack->last_successful(),
 		];
@@ -348,7 +374,8 @@ final class GeoNamesPackImporter {
 				(string) $last,
 				$progress,
 				'',
-				null
+				null,
+				$token
 			);
 		}
 
@@ -887,6 +914,50 @@ final class GeoNamesPackImporter {
 
 	private function new_attempt_token( GeographyPack $pack ): string {
 		return strtolower( $pack->provider->value ) . ':' . $pack->country_code . ':' . $pack->id . ':' . bin2hex( random_bytes( 8 ) );
+	}
+
+	/**
+	 * @param array<string, mixed> $progress
+	 */
+	private function mark_target_failed(
+		GeographyPack $pack,
+		string $message,
+		string $token,
+		string $cursor = '',
+		array $progress = [],
+		int $processed = 0,
+		int $imported = 0,
+		int $skipped = 0,
+		string $phase = '',
+		int $target = 0
+	): void {
+		$payload = $pack->progress;
+		if ( [] !== $progress ) {
+			$payload['processed']         = $processed;
+			$payload['imported']          = $imported;
+			$payload['skipped']           = $skipped;
+			$payload['total']             = (int) ( $progress['total'] ?? 0 );
+			$payload['phase']             = $phase;
+			$payload['target_generation'] = $target;
+			$payload['target_token']      = $token;
+			$payload['target_checksum']   = (string) ( $progress['target_checksum'] ?? $pack->checksum );
+			$payload['dataset_checksum']  = (string) ( $progress['dataset_checksum'] ?? $pack->checksum );
+			$payload['active_generation'] = (int) ( $progress['active_generation'] ?? 0 );
+		}
+		$payload['last_successful'] = $pack->last_successful();
+		try {
+			$this->packs->update_progress(
+				$pack->id,
+				GeographyPackStatus::Failed,
+				'' !== $cursor ? $cursor : $pack->import_cursor,
+				$payload,
+				$message,
+				null,
+				$token
+			);
+		} catch ( GeographyPackTokenFenceException $e ) {
+			unset( $e );
+		}
 	}
 
 	/**

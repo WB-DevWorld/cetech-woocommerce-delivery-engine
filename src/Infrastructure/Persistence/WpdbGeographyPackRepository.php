@@ -114,20 +114,21 @@ final class WpdbGeographyPackRepository implements GeographyPackRepositoryInterf
 		string $cursor,
 		array $progress,
 		string $last_error = '',
-		?string $installed_at = null
+		?string $installed_at = null,
+		string $expected_target_token = ''
 	): void {
 		global $wpdb;
 		$existing = $this->find_by_id( $id );
-		if ( $existing instanceof GeographyPack && ! array_key_exists( 'last_successful', $progress ) && isset( $existing->progress['last_successful'] ) ) {
-			$progress['last_successful'] = $existing->progress['last_successful'];
-		}
-		if ( GeographyPackStatus::Ready === $status ) {
-			$progress['last_successful'] = [
-				'checksum'          => $existing instanceof GeographyPack ? ( '' !== (string) ( $progress['dataset_checksum'] ?? '' ) ? (string) $progress['dataset_checksum'] : $existing->checksum ) : (string) ( $progress['dataset_checksum'] ?? '' ),
-				'dataset_version'   => $existing instanceof GeographyPack ? $existing->dataset_version : '',
-				'source_reference'  => $existing instanceof GeographyPack ? $existing->source_reference : '',
-				'installed_at'      => $installed_at ?? ( $existing?->installed_at ),
-			];
+		if ( $existing instanceof GeographyPack ) {
+			$progress = $existing->apply_progress_update( $progress, $status, $installed_at, $expected_target_token );
+			$existing = $this->find_by_id( $id );
+			if ( $existing instanceof GeographyPack ) {
+				$existing->assert_expected_target_token( $expected_target_token );
+			}
+		} elseif ( '' !== trim( $expected_target_token ) ) {
+			throw new \CetechDeliveryEngine\Domain\Geography\GeographyPackTokenFenceException(
+				'Pack target token fence rejected expected ' . trim( $expected_target_token ) . ' against a missing pack.'
+			);
 		}
 		$table   = TableNames::for( GeographySchema::PACKS_SUFFIX );
 		$encoded = wp_json_encode( $progress );

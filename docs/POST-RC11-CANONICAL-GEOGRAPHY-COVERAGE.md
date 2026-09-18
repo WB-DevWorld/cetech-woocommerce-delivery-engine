@@ -1,6 +1,6 @@
 # Post-RC.11 Canonical Geography & Delivery Area Coverage
 
-Status: ISSUE #23 GEO.6 TECHNICAL CORRECTIONS / NOT MERGED / NOT RC.12
+Status: ISSUE #23 GEO.7 TECHNICAL CORRECTIONS / NOT MERGED / NOT RC.12
 
 Owner: `@wbdevworld`
 
@@ -20,7 +20,11 @@ Rejected technical-review candidate: `1.0.0-dev.geo.4` (`48f6a39436bc2464d4e2cfd
 
 Rejected technical-review candidate: `1.0.0-dev.geo.5` (`f5da0b6b528e19ae57eedd9bc9bfee5ce05cc57b`). Frozen package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.5.zip` SHA-256 `720a663800b57205637d02b9669eb9930b28b9dc6d1e2b180de6aea10edfa4ee`. Do not physically QA geo.5.
 
-Current technical-correction candidate identity: `1.0.0-dev.geo.6`
+Rejected technical-review candidate: `1.0.0-dev.geo.6` (`730bcc2fa73fadd0da121487b7439edff5b3dfdc`). Frozen package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.6.zip` SHA-256 `39437fb8a950e88968474eaf71e013b1b9e8a872b9e4b4710e7108d29d9a92c6`. Do not physically QA geo.6.
+
+Current technical-correction candidate identity: `1.0.0-dev.geo.7`
+
+geo.7 technical corrections (PR #24 comment `5720192318`): renewable owner lease/heartbeat plus remote download I/O outside the mutation lease; pack Ready/import writes fenced to the expected target token so an expired old worker cannot finalize after a newer target starts; provider-mapping upsert throws on DB failure and fails the current target; checksum mismatch marks the current target Failed/retryable; last_successful preserves checksum, dataset version, source, installed time, generation/attempt token and active generation; abandoned token ZIP/TXT artifacts are cleaned without deleting Active source evidence; converting a Woo free-text region INPUT to a canonical SELECT restores the saved region value.
 
 Target schema: `6`
 

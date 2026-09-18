@@ -119,6 +119,102 @@ final class GeographyPack {
 		return GeographyPackStatus::Ready === $this->status ? $this->checksum : '';
 	}
 
+	public function assert_expected_target_token( string $expected_target_token ): void {
+		$expected = trim( $expected_target_token );
+		$current  = $this->target_token();
+		if ( '' === $expected || '' === $current || $current === $expected ) {
+			return;
+		}
+
+		throw new GeographyPackTokenFenceException(
+			'Pack target token fence rejected expected ' . $expected . ' against current ' . $current . '.'
+		);
+	}
+
+	/**
+	 * @param array<string, mixed> $progress
+	 * @return array<string, mixed>
+	 */
+	public function apply_progress_update( array $progress, GeographyPackStatus $status, ?string $installed_at, string $expected_target_token = '' ): array {
+		$this->assert_expected_target_token( $expected_target_token );
+		if ( ! array_key_exists( 'last_successful', $progress ) && [] !== $this->last_successful() ) {
+			$progress['last_successful'] = $this->last_successful();
+		}
+		if ( GeographyPackStatus::Ready === $status ) {
+			$progress['last_successful'] = $this->ready_last_successful( $progress, $installed_at );
+		}
+
+		return $progress;
+	}
+
+	/**
+	 * @param array<string, mixed> $progress
+	 * @return array<string, mixed>
+	 */
+	public function ready_last_successful( array $progress, ?string $installed_at ): array {
+		$supplied = isset( $progress['last_successful'] ) && is_array( $progress['last_successful'] )
+			? $progress['last_successful']
+			: [];
+		$prior = $this->last_successful();
+		$token = self::first_non_empty_string(
+			(string) ( $supplied['generation_token'] ?? '' ),
+			(string) ( $supplied['attempt_token'] ?? '' ),
+			(string) ( $progress['staging_identity'] ?? '' ),
+			(string) ( $progress['target_token'] ?? '' ),
+			$this->target_token()
+		);
+
+		return [
+			'checksum'          => self::first_non_empty_string(
+				(string) ( $supplied['checksum'] ?? '' ),
+				(string) ( $progress['dataset_checksum'] ?? '' ),
+				$this->checksum,
+				(string) ( $prior['checksum'] ?? '' )
+			),
+			'dataset_version'   => self::first_non_empty_string(
+				(string) ( $supplied['dataset_version'] ?? '' ),
+				$this->dataset_version,
+				(string) ( $prior['dataset_version'] ?? '' )
+			),
+			'source_reference'  => self::first_non_empty_string(
+				(string) ( $supplied['source_reference'] ?? '' ),
+				(string) ( $supplied['source'] ?? '' ),
+				$this->source_reference,
+				(string) ( $prior['source_reference'] ?? '' ),
+				(string) ( $prior['source'] ?? '' )
+			),
+			'source'            => self::first_non_empty_string(
+				(string) ( $supplied['source'] ?? '' ),
+				(string) ( $supplied['source_reference'] ?? '' ),
+				$this->source_reference,
+				(string) ( $prior['source'] ?? '' ),
+				(string) ( $prior['source_reference'] ?? '' )
+			),
+			'installed_at'      => self::first_non_empty_string(
+				(string) ( $supplied['installed_at'] ?? '' ),
+				(string) ( $installed_at ?? '' ),
+				(string) ( $this->installed_at ?? '' ),
+				(string) ( $prior['installed_at'] ?? '' )
+			),
+			'generation_token'  => $token,
+			'attempt_token'     => self::first_non_empty_string(
+				(string) ( $supplied['attempt_token'] ?? '' ),
+				$token
+			),
+			'active_generation' => (int) ( $supplied['active_generation'] ?? $progress['active_generation'] ?? $this->active_generation() ),
+		];
+	}
+
+	private static function first_non_empty_string( string ...$values ): string {
+		foreach ( $values as $value ) {
+			if ( '' !== $value ) {
+				return $value;
+			}
+		}
+
+		return '';
+	}
+
 	public function publicAdminRow(): array {
 		$source = $this->source_reference;
 		if ( '' !== $source ) {

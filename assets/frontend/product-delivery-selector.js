@@ -588,6 +588,18 @@
 			});
 		}
 
+		function captureSavedRegion(current) {
+			if (!current) {
+				return { value: '', key: '', code: '' };
+			}
+			var selected = current.tagName === 'SELECT' && current.selectedIndex >= 0 ? current.options[current.selectedIndex] : null;
+			return {
+				value: String(current.value || ''),
+				key: (selected && selected.getAttribute('data-location-key')) || current.getAttribute('data-location-key') || current.getAttribute('data-cetech-de-location-key') || '',
+				code: current.getAttribute('data-state') || current.getAttribute('data-code') || ''
+			};
+		}
+
 		function ensureRegionSelect() {
 			var current = regionField();
 			if (current && current.tagName === 'SELECT') {
@@ -597,11 +609,21 @@
 			if (!wrap) {
 				return current;
 			}
+			var saved = captureSavedRegion(current);
 			var select = document.createElement('select');
 			select.name = current && current.name ? current.name : 'cetech_de_matching_state';
 			copyFieldIdentity(current, select);
 			if (!select.getAttribute('autocomplete')) {
 				select.setAttribute('autocomplete', 'address-level1');
+			}
+			if (saved.value) {
+				select.setAttribute('data-cetech-de-saved-region', saved.value);
+			}
+			if (saved.key) {
+				select.setAttribute('data-cetech-de-saved-region-key', saved.key);
+			}
+			if (saved.code) {
+				select.setAttribute('data-cetech-de-saved-region-code', saved.code);
 			}
 			if (current && current.parentNode) {
 				current.parentNode.replaceChild(select, current);
@@ -610,6 +632,23 @@
 			}
 			select.addEventListener('change', onRegionChange);
 			return select;
+		}
+
+		function regionMatchesSaved(saved, item, option) {
+			if (!saved) {
+				return false;
+			}
+			var current = saved.value || '';
+			if (current && (current === option.value || current === item.name || current === item.key || current === item.code)) {
+				return true;
+			}
+			if (saved.key && saved.key === item.key) {
+				return true;
+			}
+			if (saved.code && (saved.code === item.code || saved.code === option.value)) {
+				return true;
+			}
+			return false;
 		}
 
 		function loadChildren(type, parentKey) {
@@ -650,14 +689,18 @@
 				}
 				setReveal(locationRoot, 'region', true);
 				setReveal(locationRoot, 'locality', false);
-				var current = region.value;
+				var saved = {
+					value: region.value || region.getAttribute('data-cetech-de-saved-region') || '',
+					key: region.getAttribute('data-cetech-de-saved-region-key') || '',
+					code: region.getAttribute('data-cetech-de-saved-region-code') || ''
+				};
 				region.innerHTML = '<option value="">' + escapeHtml('Select…') + '</option>';
 				items.forEach(function (item) {
 					var option = document.createElement('option');
 					option.value = item.code || item.key || item.name || '';
 					option.setAttribute('data-location-key', item.key || '');
 					option.textContent = item.name || '';
-					if (current && (current === option.value || current === item.name || current === item.key || current === item.code)) {
+					if (regionMatchesSaved(saved, item, option)) {
 						option.selected = true;
 					}
 					region.appendChild(option);

@@ -29,6 +29,7 @@ interface GeographyPackRepositoryInterface {
 		string $cursor,
 		array $progress,
 		string $last_error = '',
-		?string $installed_at = null
+		?string $installed_at = null,
+		string $expected_target_token = ''
 	): void;
 }

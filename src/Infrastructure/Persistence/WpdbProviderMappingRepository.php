@@ -62,26 +62,33 @@ final class WpdbProviderMappingRepository implements ProviderMappingRepositoryIn
 			$encoded = '{}';
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-		$wpdb->query(
-			$wpdb->prepare(
-				"INSERT INTO `{$table}` (location_id, provider, external_id, pack_id, dataset_version, provider_parent_reference, feature_class, feature_code, provider_metadata_json, generation_token, created_at, updated_at)
-				VALUES (%d, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-				ON DUPLICATE KEY UPDATE location_id = VALUES(location_id), pack_id = VALUES(pack_id), dataset_version = VALUES(dataset_version), provider_parent_reference = VALUES(provider_parent_reference), feature_class = VALUES(feature_class), feature_code = VALUES(feature_code), provider_metadata_json = VALUES(provider_metadata_json), updated_at = VALUES(updated_at)",
-				$location_id,
-				$provider->value,
-				$external_id,
-				null === $pack_id ? null : $pack_id,
-				$dataset_version,
-				$provider_parent_reference,
-				$feature_class,
-				$feature_code,
-				$encoded,
-				$generation_token,
-				$now,
-				$now
-			)
-		);
+		$sql = "SELECT * FROM `{$table}` WHERE provider = %s AND external_id = %s AND generation_token = %s LIMIT 1";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$existing = $wpdb->get_row( $wpdb->prepare( $sql, $provider->value, $external_id, $generation_token ), ARRAY_A );
+		$row      = [
+			'location_id'               => $location_id,
+			'provider'                  => $provider->value,
+			'external_id'               => $external_id,
+			'pack_id'                   => $pack_id,
+			'dataset_version'           => $dataset_version,
+			'provider_parent_reference' => $provider_parent_reference,
+			'feature_class'             => $feature_class,
+			'feature_code'              => $feature_code,
+			'provider_metadata_json'    => $encoded,
+			'generation_token'          => $generation_token,
+			'updated_at'                => $now,
+		];
+		if ( is_array( $existing ) ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+			$result = $wpdb->update( $table, $row, [ 'id' => (int) ( $existing['id'] ?? 0 ) ] );
+		} else {
+			$row['created_at'] = $now;
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+			$result = $wpdb->insert( $table, $row );
+		}
+		if ( false === $result ) {
+			throw new \RuntimeException( 'Failed to write provider mapping for ' . $external_id . '.' );
+		}
 	}
 
 	public function find_mapping( GeographyProvider $provider, string $external_id, string $generation_token = '' ): ?array {

@@ -32,6 +32,8 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 
 	public bool $fail_next_staged_mapping_delete = false;
 
+	public bool $fail_next_upsert = false;
+
 	private int $next_id = 1;
 
 	public function seed(
@@ -722,6 +724,10 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		array $metadata = [],
 		string $generation_token = ''
 	): void {
+		if ( $this->fail_next_upsert ) {
+			$this->fail_next_upsert = false;
+			throw new \RuntimeException( 'Simulated provider mapping write failure.' );
+		}
 		unset( $provider_parent_reference, $feature_class, $feature_code, $metadata );
 		$key = $this->mapping_key( $provider->value, $external_id, $generation_token );
 		$this->mapping_rows[ $key ] = [
