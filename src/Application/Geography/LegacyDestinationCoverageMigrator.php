@@ -44,7 +44,7 @@ final class LegacyDestinationCoverageMigrator {
 	 *     warnings:list<array<string, mixed>>
 	 * }
 	 */
-	public function migrate( bool $force = false ): array {
+	public function migrate( bool $force = false, int $after_id = 0, int $max_pages = 0 ): array {
 		$report = [
 			'zones'                 => 0,
 			'scanned'               => 0,
@@ -56,13 +56,25 @@ final class LegacyDestinationCoverageMigrator {
 			'activated'             => 0,
 			'review_required'       => 0,
 			'warnings'              => [],
+			'last_zone_id'          => max( 0, $after_id ),
+			'complete'              => false,
 		];
 
-		foreach ( $this->zones->list( [ 'limit' => 5000 ] ) as $zone ) {
-			$zone_id = (int) ( $zone['id'] ?? 0 );
-			if ( $zone_id <= 0 ) {
-				continue;
+		$after = max( 0, $after_id );
+		$pages = 0;
+		do {
+			$page = $this->zones->page_after( $after, 100 );
+			if ( [] === $page ) {
+				break;
 			}
+			++$pages;
+			foreach ( $page as $zone ) {
+				$zone_id = (int) ( $zone['id'] ?? 0 );
+				$after   = max( $after, $zone_id );
+				$report['last_zone_id'] = $after;
+				if ( $zone_id <= 0 ) {
+					continue;
+				}
 			++$report['zones'];
 			++$report['scanned'];
 
@@ -124,13 +136,37 @@ final class LegacyDestinationCoverageMigrator {
 					'error'   => $e->getMessage(),
 				];
 			}
-		}
+			}
+			$this->persist_progress( $report );
+		} while ( $max_pages <= 0 || $pages < $max_pages );
+
+		$report['last_zone_id'] = $after;
+		$report['complete']     = [] === $this->zones->page_after( $after, 1 );
+		$this->persist_progress( $report );
 
 		if ( function_exists( 'update_option' ) ) {
 			update_option( self::OPTION_KEY, $report, false );
 		}
 
 		return $report;
+	}
+
+	/**
+	 * @param array<string, mixed> $report
+	 */
+	private function persist_progress( array $report ): void {
+		if ( ! function_exists( 'get_option' ) || ! function_exists( 'update_option' ) ) {
+			return;
+		}
+
+		$upgrade = get_option( Schema6CoverageUpgradeService::OPTION_KEY, [] );
+		if ( is_array( $upgrade ) && [] !== $upgrade ) {
+			$upgrade['last_zone_id'] = (int) ( $report['last_zone_id'] ?? 0 );
+			if ( empty( $report['complete'] ) && Schema6CoverageUpgradeService::STATUS_COMPLETED === (string) ( $upgrade['status'] ?? '' ) ) {
+				$upgrade['status'] = Schema6CoverageUpgradeService::STATUS_RUNNING;
+			}
+			update_option( Schema6CoverageUpgradeService::OPTION_KEY, $upgrade, false );
+		}
 	}
 
 	/**

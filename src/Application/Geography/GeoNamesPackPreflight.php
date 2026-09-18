@@ -98,6 +98,12 @@ final class GeoNamesPackPreflight {
 				++$locality;
 			}
 		}
+		if ( $scanned >= self::MAX_SCAN ) {
+			$more       = fgets( $handle );
+			$hit_budget = false !== $more || ! feof( $handle );
+		} else {
+			$hit_budget = false;
+		}
 		fclose( $handle );
 
 		$out = [
@@ -131,22 +137,34 @@ final class GeoNamesPackPreflight {
 			return $out;
 		}
 		if ( $country_rows <= 0 ) {
-			$out['error'] = 'wrong_country';
+			$out['error'] = $hit_budget ? 'indeterminate' : 'wrong_country';
+			if ( $hit_budget ) {
+				$out['status'] = 'indeterminate';
+			}
 
 			return $out;
 		}
 		if ( $relevant <= 0 ) {
-			$out['error'] = 'zero_relevant_geography';
+			$out['error'] = $hit_budget ? 'indeterminate' : 'zero_relevant_geography';
+			if ( $hit_budget ) {
+				$out['status'] = 'indeterminate';
+			}
 
 			return $out;
 		}
 		if ( ! $has_country && ! $has_adm1 && $admin <= 0 && $locality <= 0 ) {
-			$out['error'] = 'minimum_hierarchy_missing';
+			$out['error'] = $hit_budget ? 'indeterminate' : 'minimum_hierarchy_missing';
+			if ( $hit_budget ) {
+				$out['status'] = 'indeterminate';
+			}
 
 			return $out;
 		}
 		if ( ! $has_adm1 && $admin <= 0 && $locality <= 0 ) {
-			$out['error'] = 'minimum_hierarchy_missing';
+			$out['error'] = $hit_budget ? 'indeterminate' : 'minimum_hierarchy_missing';
+			if ( $hit_budget ) {
+				$out['status'] = 'indeterminate';
+			}
 
 			return $out;
 		}

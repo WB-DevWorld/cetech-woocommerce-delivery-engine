@@ -101,6 +101,10 @@ final class CoverageGroupMatcher {
 			return $this->miss( $group, 'destination_not_canonical' );
 		}
 
+		if ( ! $location->isActive() ) {
+			return $this->miss( $group, 'destination_inactive' );
+		}
+
 		if ( $location->country_code !== $root->country_code ) {
 			return $this->miss( $group, 'country_mismatch' );
 		}
@@ -184,6 +188,9 @@ final class CoverageGroupMatcher {
 		$best   = null;
 		$best_rank = -1;
 		foreach ( $loaded as $member_location ) {
+			if ( ! $member_location->isActive() ) {
+				continue;
+			}
 			if ( ! LocationAncestry::is_self_or_descendant( $location, $member_location ) ) {
 				continue;
 			}

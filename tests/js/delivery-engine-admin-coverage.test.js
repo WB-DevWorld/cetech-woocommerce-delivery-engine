@@ -352,4 +352,88 @@ describe('Admin coverage builder', () => {
 		expect(remaining[1].querySelector('[name="coverage_groups[1][country]"]').value).toBe('CA');
 		expect(remaining[1].querySelector('legend').textContent).toBe('Coverage group 2');
 	});
+
+	it('ignores a stale admin root response after a newer country is selected', async () => {
+		const deferred = {};
+		window.fetch = vi.fn((url, init) => {
+			const body = String(init && init.body ? init.body : '');
+			if (body.includes('op=children') && body.includes('country=GH') && !body.includes('parent_key=')) {
+				return new Promise((resolve) => {
+					deferred.resolveGhana = resolve;
+				});
+			}
+			if (body.includes('op=children') && body.includes('country=GB')) {
+				return jsonResponse({
+					items: [
+						{ id: 20, key: 'loc-gb', name: 'Entire United Kingdom', entire_country: true },
+						{ id: 21, key: 'loc-eng', name: 'England' }
+					],
+					root: { id: 20, key: 'loc-gb', name: 'United Kingdom' },
+					request_token: '2'
+				});
+			}
+			return jsonResponse({ items: [], request_token: '0' });
+		});
+		document.body.innerHTML = `
+			<div data-cetech-de-coverage-builder data-countries='{"GH":"Ghana","GB":"United Kingdom"}'>
+				<fieldset class="cetech-de-coverage-group">
+					<select data-cetech-de-coverage-country>
+						<option value="">Select…</option>
+						<option value="GH">Ghana</option>
+						<option value="GB">United Kingdom</option>
+					</select>
+					<select data-cetech-de-coverage-root><option value="">Select…</option></select>
+					<input type="hidden" data-cetech-de-root-key value="" />
+				</fieldset>
+			</div>
+		`;
+		loadAdmin();
+		const country = document.querySelector('[data-cetech-de-coverage-country]');
+		country.value = 'GH';
+		country.dispatchEvent(new Event('change', { bubbles: true }));
+		country.value = 'GB';
+		country.dispatchEvent(new Event('change', { bubbles: true }));
+		await vi.waitFor(() => {
+			expect(document.querySelector('[data-cetech-de-coverage-root] option[value="loc-eng"]')).not.toBeNull();
+		});
+		deferred.resolveGhana({
+			json: () => Promise.resolve({
+				success: true,
+				data: {
+					items: [
+						{ id: 1, key: 'loc-gh', name: 'Entire Ghana', entire_country: true },
+						{ id: 2, key: 'loc-ga', name: 'Greater Accra' }
+					],
+					root: { id: 1, key: 'loc-gh', name: 'Ghana' },
+					request_token: '1'
+				}
+			})
+		});
+		await new Promise((resolve) => setTimeout(resolve, 40));
+		expect(document.querySelector('[data-cetech-de-coverage-root] option[value="loc-ga"]')).toBeNull();
+		expect(document.querySelector('[data-cetech-de-coverage-root] option[value="loc-eng"]')).not.toBeNull();
+	});
+
+	it('submits confirm_drop_canonical when the last coverage group is removed', () => {
+		window.confirm = vi.fn(() => true);
+		document.body.innerHTML = `
+			<form>
+				<div data-cetech-de-coverage-builder data-countries='{"GH":"Ghana"}'>
+					<div data-cetech-de-coverage-groups>
+						<fieldset class="cetech-de-coverage-group">
+							<input type="hidden" name="coverage_groups[0][country]" value="GH" />
+							<button type="button" data-cetech-de-remove-coverage-group>Remove</button>
+						</fieldset>
+					</div>
+				</div>
+			</form>
+		`;
+		loadAdmin();
+		document.querySelector('[data-cetech-de-remove-coverage-group]').click();
+		expect(document.querySelectorAll('.cetech-de-coverage-group').length).toBe(0);
+		const flag = document.querySelector('input[name="confirm_drop_canonical"]');
+		expect(flag).not.toBeNull();
+		expect(flag.value).toBe('1');
+		expect(flag.checked === true || flag.type === 'hidden').toBe(true);
+	});
 });

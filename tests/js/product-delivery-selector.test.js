@@ -665,4 +665,186 @@ describe('Product delivery fulfilment switcher', () => {
 		await expect.poll(() => document.querySelector('[data-cetech-de-reveal="locality"]')?.hidden === false).toBe(true);
 		expect(document.querySelector('[data-cetech-de-reveal="region"]').hidden).toBe(true);
 	});
+
+	it('ignores a stale country children response after a newer country is selected', async () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<fieldset data-cetech-de-selector="1">
+					<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">
+						<p data-cetech-de-field="country">
+							<select name="cetech_de_matching_country">
+								<option value="">Select…</option>
+								<option value="GH">Ghana</option>
+								<option value="GB">United Kingdom</option>
+							</select>
+						</p>
+						<p data-cetech-de-reveal="region" hidden>
+							<select name="cetech_de_matching_state"><option value="">Select…</option></select>
+						</p>
+						<p data-cetech-de-reveal="locality" hidden>
+							<input name="cetech_de_matching_city" />
+							<ul class="cetech-de-locality-results" hidden></ul>
+						</p>
+						<input type="hidden" name="cetech_de_matching_location_key" data-cetech-de-location-key="1" value="" />
+					</div>
+					<div data-cetech-de-options></div>
+				</fieldset>
+			</form>
+		`;
+		window.cetechDeMatchingLocation = {
+			ajaxUrl: '/wp-admin/admin-ajax.php',
+			geography: { childrenAction: 'cetech_de_geography_children', childrenNonce: 'n' }
+		};
+		const deferred = {};
+		window.fetch = (url, init) => {
+			const body = String(init && init.body ? init.body : '');
+			if (body.includes('country=GH')) {
+				return new Promise((resolve) => {
+					deferred.resolveGhana = resolve;
+				});
+			}
+			return Promise.resolve({
+				json: async () => ({
+					success: true,
+					data: {
+						items: [{ key: 'loc-eng', name: 'England', code: 'ENG' }],
+						skip_admin: false,
+						request_token: '2'
+					}
+				})
+			});
+		};
+		const api = loadSelector();
+		api.bindAll(document);
+		const country = document.querySelector('[name="cetech_de_matching_country"]');
+		country.value = 'GH';
+		country.dispatchEvent(new Event('change', { bubbles: true }));
+		country.value = 'GB';
+		country.dispatchEvent(new Event('change', { bubbles: true }));
+		await expect.poll(() => document.querySelector('[name="cetech_de_matching_state"] option[value="ENG"]')).not.toBeNull();
+		deferred.resolveGhana({
+			json: async () => ({
+				success: true,
+				data: {
+					items: [{ key: 'loc-ga', name: 'Greater Accra', code: 'AA' }],
+					skip_admin: false,
+					request_token: '1'
+				}
+			})
+		});
+		await new Promise((resolve) => setTimeout(resolve, 40));
+		expect(document.querySelector('[name="cetech_de_matching_state"] option[value="AA"]')).toBeNull();
+		expect(document.querySelector('[name="cetech_de_matching_state"] option[value="ENG"]')).not.toBeNull();
+	});
+
+	it('ignores a stale postcode relevance response after geography changes', async () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<fieldset data-cetech-de-selector="1">
+					<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">
+						<p data-cetech-de-field="country">
+							<select name="cetech_de_matching_country">
+								<option value="GH" selected>Ghana</option>
+							</select>
+						</p>
+						<p data-cetech-de-reveal="region">
+							<select name="cetech_de_matching_state">
+								<option value="">Select…</option>
+								<option value="AA" selected data-location-key="loc-ga">Greater Accra</option>
+								<option value="AH" data-location-key="loc-ash">Ashanti</option>
+							</select>
+						</p>
+						<p data-cetech-de-reveal="locality">
+							<input name="cetech_de_matching_city" />
+							<ul class="cetech-de-locality-results" hidden></ul>
+						</p>
+						<p data-cetech-de-reveal="postcode" hidden>
+							<input name="cetech_de_matching_postcode" />
+						</p>
+						<input type="hidden" name="cetech_de_matching_location_key" data-cetech-de-location-key="1" value="" />
+					</div>
+					<div data-cetech-de-options></div>
+				</fieldset>
+			</form>
+		`;
+		window.cetechDeMatchingLocation = {
+			ajaxUrl: '/wp-admin/admin-ajax.php',
+			geography: { postcodeAction: 'cetech_de_geography_postcode_relevance', postcodeNonce: 'n' }
+		};
+		const deferred = {};
+		window.fetch = (url, init) => {
+			const body = String(init && init.body ? init.body : '');
+			if (body.includes('parent_key=loc-ga')) {
+				return new Promise((resolve) => {
+					deferred.resolveAccra = resolve;
+				});
+			}
+			return Promise.resolve({
+				json: async () => ({ success: true, data: { visible: false, request_token: '2' } })
+			});
+		};
+		const api = loadSelector();
+		api.bindAll(document);
+		const region = document.querySelector('[name="cetech_de_matching_state"]');
+		region.dispatchEvent(new Event('change', { bubbles: true }));
+		region.value = 'AH';
+		region.dispatchEvent(new Event('change', { bubbles: true }));
+		await expect.poll(() => document.querySelector('[data-cetech-de-reveal="postcode"]')?.hidden === true).toBe(true);
+		deferred.resolveAccra({
+			json: async () => ({ success: true, data: { visible: true, request_token: '1' } })
+		});
+		await new Promise((resolve) => setTimeout(resolve, 40));
+		expect(document.querySelector('[data-cetech-de-reveal="postcode"]').hidden).toBe(true);
+	});
+
+	it('canonicalizes a saved free-text state on initial bind without changing country', async () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<fieldset data-cetech-de-selector="1">
+					<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">
+						<p data-cetech-de-field="country">
+							<select name="cetech_de_matching_country">
+								<option value="">Select…</option>
+								<option value="XX" selected>No Woo States</option>
+							</select>
+						</p>
+						<p data-cetech-de-reveal="region" hidden>
+							<label for="billing_state">Region / State</label>
+							<input id="billing_state" class="input-text state_select woodmart-state" name="cetech_de_matching_state" type="text" value="Central District" aria-label="Region / State" aria-required="true" autocomplete="address-level1" data-placeholder="State" data-input-classes="state_select" data-location-key="loc-xx-adm" required="required" />
+						</p>
+						<p data-cetech-de-reveal="locality" hidden>
+							<input name="cetech_de_matching_city" />
+							<ul class="cetech-de-locality-results" hidden></ul>
+						</p>
+						<input type="hidden" name="cetech_de_matching_location_key" data-cetech-de-location-key="1" value="" />
+					</div>
+					<div data-cetech-de-options></div>
+				</fieldset>
+			</form>
+		`;
+		window.cetechDeMatchingLocation = {
+			ajaxUrl: '/wp-admin/admin-ajax.php',
+			geography: { childrenAction: 'cetech_de_geography_children', childrenNonce: 'n' }
+		};
+		window.fetch = async () => ({
+			json: async () => ({
+				success: true,
+				data: {
+					items: [{ key: 'loc-xx-adm', name: 'Central District', code: 'CD' }],
+					skip_admin: false
+				}
+			})
+		});
+		const api = loadSelector();
+		api.bindAll(document);
+		await expect.poll(() => document.querySelector('[name="cetech_de_matching_state"]')?.tagName || '').toBe('SELECT');
+		const region = document.querySelector('[name="cetech_de_matching_state"]');
+		expect(region.value).toBe('CD');
+		expect(region.options[region.selectedIndex].textContent).toBe('Central District');
+		expect(region.id).toBe('billing_state');
+		expect(region.className).toContain('state_select');
+		expect(region.getAttribute('aria-label')).toBe('Region / State');
+		expect(region.required).toBe(true);
+		expect(document.querySelector('label[for="billing_state"]')).not.toBeNull();
+	});
 });

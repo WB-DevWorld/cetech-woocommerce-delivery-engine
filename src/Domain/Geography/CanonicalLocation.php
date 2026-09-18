@@ -33,7 +33,8 @@ final class CanonicalLocation {
 		public readonly string $generation_token = '',
 		public readonly string $draft_generation_token = '',
 		public readonly string $prepared_ancestry_path = '',
-		public readonly string $prepared_generation_token = ''
+		public readonly string $prepared_generation_token = '',
+		public readonly int $prepared_hierarchy_root_id = 0
 	) {
 	}
 
@@ -113,7 +114,8 @@ final class CanonicalLocation {
 			(string) ( $row['generation_token'] ?? '' ),
 			(string) ( $row['draft_generation_token'] ?? '' ),
 			(string) ( $row['prepared_ancestry_path'] ?? '' ),
-			(string) ( $row['prepared_generation_token'] ?? '' )
+			(string) ( $row['prepared_generation_token'] ?? '' ),
+			(int) ( $row['prepared_hierarchy_root_id'] ?? 0 )
 		);
 	}
 }

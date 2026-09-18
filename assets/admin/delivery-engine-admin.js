@@ -530,6 +530,18 @@
 			return parseInt(group.getAttribute('data-search-token-' + target) || '0', 10) || 0;
 		}
 
+		function nextGroupToken(group, kind) {
+			var attr = 'data-' + kind + '-token';
+			var current = parseInt(group.getAttribute(attr) || '0', 10) || 0;
+			current += 1;
+			group.setAttribute(attr, String(current));
+			return current;
+		}
+
+		function currentGroupToken(group, kind) {
+			return parseInt(group.getAttribute('data-' + kind + '-token') || '0', 10) || 0;
+		}
+
 		function groupIndex(group) {
 			return Array.prototype.indexOf.call(root.querySelectorAll('.cetech-de-coverage-group'), group);
 		}
@@ -746,13 +758,18 @@
 			if (!parentKey) {
 				return;
 			}
+			var token = nextGroupToken(group, 'child-root');
 			var body = new window.URLSearchParams();
 			body.set('action', geo.searchAction);
 			body.set('nonce', geo.searchNonce || '');
 			body.set('op', 'children');
 			body.set('country', countryOf(group));
 			body.set('parent_key', parentKey);
+			body.set('request_token', String(token));
 			fetchJson(body).then(function (payload) {
+				if (token !== currentGroupToken(group, 'child-root')) {
+					return;
+				}
 				var data = payload && payload.data ? payload.data : payload;
 				var items = (data && data.items ? data.items : []).filter(function (item) {
 					return !item.entire_country;
@@ -785,12 +802,17 @@
 			Array.prototype.forEach.call(group.querySelectorAll('[data-cetech-de-nested-root]'), function (node) {
 				node.remove();
 			});
+			var token = nextGroupToken(group, 'root');
 			var body = new window.URLSearchParams();
 			body.set('action', geo.searchAction);
 			body.set('nonce', geo.searchNonce || '');
 			body.set('op', 'children');
 			body.set('country', country);
+			body.set('request_token', String(token));
 			fetchJson(body).then(function (payload) {
+				if (token !== currentGroupToken(group, 'root')) {
+					return;
+				}
 				var data = payload && payload.data ? payload.data : payload;
 				if (data && data.label) {
 					applyAdminLabel(group, data.label);
@@ -872,6 +894,15 @@
 					if (!window.confirm('This is the last canonical coverage group. Removing it stops canonical coverage. Hidden legacy conditions will not be used automatically.')) {
 						return;
 					}
+					var form = root.closest('form') || document;
+					var flag = form.querySelector('input[name="confirm_drop_canonical"]');
+					if (!flag) {
+						flag = document.createElement('input');
+						flag.type = 'hidden';
+						flag.name = 'confirm_drop_canonical';
+						form.appendChild(flag);
+					}
+					flag.value = '1';
 				}
 				groupToRemove.remove();
 				reindexCoverageGroups();

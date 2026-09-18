@@ -138,6 +138,7 @@ final class AdminGeographyEndpoint {
 	}
 
 	private function send_children( string $country, string $parent, string $token ): void {
+		$page = max( 1, (int) ( $_REQUEST['page'] ?? 1 ) );
 		$parent_location = '' !== $parent
 			? $this->resolver->require_valid_key( $parent, $country )
 			: $this->locations->find_country( $country );
@@ -145,6 +146,7 @@ final class AdminGeographyEndpoint {
 			wp_send_json_success(
 				[
 					'items'         => [],
+					'page'          => $page,
 					'request_token' => $token,
 					'error'         => '' !== $parent ? 'invalid_parent' : 'country_missing',
 					'label'         => GeographyAdminLabels::administrative_area_label( $country ),
@@ -152,8 +154,10 @@ final class AdminGeographyEndpoint {
 			);
 		}
 
-		$items = [];
-		foreach ( $this->locations->list_children( $parent_location->id, GeographyLocationType::Administrative, 250, 0 ) as $child ) {
+		$limit  = 50;
+		$offset = ( $page - 1 ) * $limit;
+		$items  = [];
+		foreach ( $this->locations->list_children( $parent_location->id, GeographyLocationType::Administrative, $limit, $offset ) as $child ) {
 			$items[] = [
 				'key'          => $child->location_key,
 				'id'           => $child->id,
@@ -162,7 +166,8 @@ final class AdminGeographyEndpoint {
 				'level'        => $child->administrative_level,
 			];
 		}
-		if ( $parent_location->isCountry() ) {
+		$total = $this->locations->count_children( $parent_location->id, GeographyLocationType::Administrative );
+		if ( $parent_location->isCountry() && 1 === $page ) {
 			array_unshift(
 				$items,
 				[
@@ -182,8 +187,10 @@ final class AdminGeographyEndpoint {
 		wp_send_json_success(
 			[
 				'items'         => $items,
+				'page'          => $page,
 				'request_token' => $token,
-				'has_more'      => false,
+				'total'         => $total,
+				'has_more'      => ( $page * $limit ) < $total,
 				'root'          => [
 					'key'  => $parent_location->location_key,
 					'id'   => $parent_location->id,

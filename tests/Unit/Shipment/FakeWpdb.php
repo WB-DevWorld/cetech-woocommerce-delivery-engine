@@ -349,6 +349,20 @@ final class FakeWpdb {
 		$this->record_sql( $sql );
 		$trimmed = trim( $sql );
 
+		if ( preg_match( '/^SHOW COLUMNS FROM `([^`]+)` LIKE \'((?:\\\\\'|[^\'])*)\'\s*$/i', $trimmed, $column ) ) {
+			$table = $column[1];
+			$name  = stripcslashes( $column[2] );
+
+			if ( isset( $this->tables[ $table ] ) ) {
+				return [
+					'Field' => $name,
+					'Type'  => 'varchar(191)',
+				];
+			}
+
+			return null;
+		}
+
 		if ( preg_match( '/^SHOW INDEX FROM `([^`]+)` WHERE Key_name = \'((?:\\\\\'|[^\'])*)\'\s*$/i', $trimmed, $index ) ) {
 			$table = $index[1];
 			$name  = stripcslashes( $index[2] );
@@ -989,7 +1003,7 @@ final class FakeWpdb {
 
 	private function execute_concat_substring_update( string $sql ): int|false {
 		if ( ! preg_match(
-			"/^UPDATE `([^`]+)` SET prepared_ancestry_path = CONCAT\\('((?:\\\\'|[^'])*)', SUBSTRING\\(ancestry_path, (\\d+)\\)\\), prepared_generation_token = '((?:\\\\'|[^'])*)', updated_at = '((?:\\\\'|[^'])*)' WHERE (.+?)(?:\\s+ORDER BY\\s+id\\s+ASC)?(?: LIMIT (\\d+))?\\s*$/is",
+			"/^UPDATE `([^`]+)` SET prepared_ancestry_path = CONCAT\\('((?:\\\\'|[^'])*)', SUBSTRING\\(ancestry_path, (\\d+)\\)\\), prepared_generation_token = '((?:\\\\'|[^'])*)'(?:, prepared_hierarchy_root_id = (\\d+))?, updated_at = '((?:\\\\'|[^'])*)' WHERE (.+?)(?:\\s+ORDER BY\\s+id\\s+ASC)?(?: LIMIT (\\d+))?\\s*$/is",
 			$sql,
 			$matches
 		) ) {
@@ -1005,9 +1019,10 @@ final class FakeWpdb {
 		$prefix     = stripcslashes( $matches[2] );
 		$start      = max( 1, (int) $matches[3] );
 		$token      = stripcslashes( $matches[4] );
-		$updated_at = stripcslashes( $matches[5] );
-		$where      = (string) $matches[6];
-		$limit      = isset( $matches[7] ) && '' !== $matches[7] ? (int) $matches[7] : null;
+		$root_id    = isset( $matches[5] ) && '' !== (string) $matches[5] ? (int) $matches[5] : null;
+		$updated_at = stripcslashes( $matches[6] );
+		$where      = (string) $matches[7];
+		$limit      = isset( $matches[8] ) && '' !== $matches[8] ? (int) $matches[8] : null;
 		$order_by_id = (bool) preg_match( '/ORDER BY\s+id\s+ASC/i', $sql );
 		$candidates = [];
 		foreach ( $this->tables[ $table ] ?? [] as $index => $row ) {
@@ -1031,6 +1046,9 @@ final class FakeWpdb {
 			$suffix = substr( $path, $start - 1 );
 			$this->tables[ $table ][ $index ]['prepared_ancestry_path']     = $prefix . $suffix;
 			$this->tables[ $table ][ $index ]['prepared_generation_token']  = $token;
+			if ( null !== $root_id ) {
+				$this->tables[ $table ][ $index ]['prepared_hierarchy_root_id'] = $root_id;
+			}
 			$this->tables[ $table ][ $index ]['updated_at']                 = $updated_at;
 			++$updated;
 			if ( null !== $limit && $updated >= $limit ) {
@@ -1059,9 +1077,10 @@ final class FakeWpdb {
 				continue;
 			}
 			$path = (string) ( $row['prepared_ancestry_path'] ?? '' );
-			$this->tables[ $table ][ $index ]['ancestry_path']             = $path;
-			$this->tables[ $table ][ $index ]['prepared_ancestry_path']    = '';
-			$this->tables[ $table ][ $index ]['prepared_generation_token'] = '';
+			$this->tables[ $table ][ $index ]['ancestry_path']              = $path;
+			$this->tables[ $table ][ $index ]['prepared_ancestry_path']     = '';
+			$this->tables[ $table ][ $index ]['prepared_generation_token']  = '';
+			$this->tables[ $table ][ $index ]['prepared_hierarchy_root_id'] = 0;
 			if ( preg_match( "/updated_at = '((?:\\\\'|[^'])*)'/i", $sql, $at ) ) {
 				$this->tables[ $table ][ $index ]['updated_at'] = stripcslashes( $at[1] );
 			}

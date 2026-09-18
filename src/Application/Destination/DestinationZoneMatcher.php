@@ -46,6 +46,9 @@ final class DestinationZoneMatcher {
 	/** @var list<CoverageMatchDiagnostic> */
 	private array $last_diagnostics = [];
 
+	/** @var array<string, list<array<string, mixed>>> */
+	private array $match_cache = [];
+
 	public function __construct(
 		private DestinationZoneRepositoryInterface $zone_repository,
 		private DestinationRuleRepositoryInterface $rule_repository,
@@ -105,54 +108,68 @@ final class DestinationZoneMatcher {
 		$this->last_diagnostics = [];
 
 		$resolved = $this->resolve_destination( $country_code, $region, $city, $postcode, $context );
-
-		$zones = $this->zone_repository->list(
+		$cache_key = implode(
+			'|',
 			[
-				'status' => RecordStatus::Active->value,
-				'limit'  => 500,
+				$country_code,
+				$region,
+				$city,
+				$postcode,
+				(string) ( $context['canonical_location_key'] ?? '' ),
+				(string) ( $resolved?->location_id() ?? 0 ),
 			]
 		);
+		if ( isset( $this->match_cache[ $cache_key ] ) ) {
+			return $this->match_cache[ $cache_key ];
+		}
 
 		$candidates            = [];
 		$unrestricted_fallback = null;
+		$after                 = 0;
+		do {
+			$page = $this->zone_repository->page_after(
+				$after,
+				100,
+				[ 'status' => RecordStatus::Active->value ]
+			);
+			foreach ( $page as $zone ) {
+				$zone_id = (int) ( $zone['id'] ?? 0 );
+				$after   = max( $after, $zone_id );
+				if ( $zone_id <= 0 ) {
+					continue;
+				}
 
-		foreach ( $zones as $zone ) {
-			$zone_id = (int) ( $zone['id'] ?? 0 );
+				$rules = $this->rule_repository->listByZoneId( $zone_id );
+				$coverage = $this->match_coverage( $zone_id, $resolved );
+				$has_coverage_constraint = is_array( $coverage );
 
-			if ( $zone_id <= 0 ) {
-				continue;
-			}
+				if ( ! empty( $zone['is_fallback'] ) && [] === $rules && ! $has_coverage_constraint ) {
+					$unrestricted_fallback = $zone;
+					continue;
+				}
 
-			$rules = $this->rule_repository->listByZoneId( $zone_id );
-			$coverage = $this->match_coverage( $zone_id, $resolved );
-			$has_coverage_constraint = is_array( $coverage );
+				if ( $has_coverage_constraint ) {
+					if ( $coverage['matched'] ) {
+						$candidates[] = [
+							'zone'        => $zone,
+							'specificity' => (int) $coverage['specificity'],
+						];
+					}
+					continue;
+				}
 
-			if ( ! empty( $zone['is_fallback'] ) && [] === $rules && ! $has_coverage_constraint ) {
-				$unrestricted_fallback = $zone;
-				continue;
-			}
+				if ( [] === $rules ) {
+					continue;
+				}
 
-			if ( $has_coverage_constraint ) {
-				if ( $coverage['matched'] ) {
+				if ( $this->zone_matches_address( $rules, $country_code, $region, $city, $postcode ) ) {
 					$candidates[] = [
 						'zone'        => $zone,
-						'specificity' => (int) $coverage['specificity'],
+						'specificity' => self::geographic_specificity_rank( $rules, false ),
 					];
 				}
-				continue;
 			}
-
-			if ( [] === $rules ) {
-				continue;
-			}
-
-			if ( $this->zone_matches_address( $rules, $country_code, $region, $city, $postcode ) ) {
-				$candidates[] = [
-					'zone'        => $zone,
-					'specificity' => self::geographic_specificity_rank( $rules, false ),
-				];
-			}
-		}
+		} while ( [] !== $page );
 
 		if ( [] !== $candidates ) {
 			usort( $candidates, [ $this, 'compare_candidates' ] );
@@ -163,10 +180,15 @@ final class DestinationZoneMatcher {
 				$ordered[] = $candidate['zone'];
 			}
 
+			$this->match_cache[ $cache_key ] = $ordered;
+
 			return $ordered;
 		}
 
-		return null !== $unrestricted_fallback ? [ $unrestricted_fallback ] : [];
+		$result = null !== $unrestricted_fallback ? [ $unrestricted_fallback ] : [];
+		$this->match_cache[ $cache_key ] = $result;
+
+		return $result;
 	}
 
 	/**

@@ -776,18 +776,26 @@ final class GeoNamesPackImporter {
 			return false;
 		}
 		$matches = 0;
-		foreach ( $this->locations->list_children( $parent->id, GeographyLocationType::Administrative, 250, 0 ) as $child ) {
-			if ( null !== $level && $level > 0 && $child->administrative_level !== $level ) {
-				continue;
+		$offset  = 0;
+		do {
+			$page = $this->locations->list_children( $parent->id, GeographyLocationType::Administrative, 250, $offset );
+			foreach ( $page as $child ) {
+				if ( null !== $level && $level > 0 && $child->administrative_level !== $level ) {
+					continue;
+				}
+				if ( GeographyNameNormalizer::administrative_core( $child->canonical_name ) === $core
+					|| GeographyNameNormalizer::administrative_core( $child->ascii_name ) === $core
+					|| GeographyNameNormalizer::administrative_core( $child->normalized_name ) === $core ) {
+					++$matches;
+					if ( $matches > 1 ) {
+						return true;
+					}
+				}
 			}
-			if ( GeographyNameNormalizer::administrative_core( $child->canonical_name ) === $core
-				|| GeographyNameNormalizer::administrative_core( $child->ascii_name ) === $core
-				|| GeographyNameNormalizer::administrative_core( $child->normalized_name ) === $core ) {
-				++$matches;
-			}
-		}
+			$offset += count( $page );
+		} while ( 250 === count( $page ) );
 
-		return $matches > 1;
+		return false;
 	}
 
 	/**
@@ -873,10 +881,14 @@ final class GeoNamesPackImporter {
 
 		$admin1 = trim( (string) ( $row['admin1'] ?? '' ) );
 		if ( '' !== $admin1 ) {
-			foreach ( $this->locations->list_children( $country->id, GeographyLocationType::Administrative, 250, 0 ) as $admin ) {
-				if ( $admin->normalized_name === GeographyNameNormalizer::normalize( $admin1 ) ) {
-					return $admin;
-				}
+			$by_name = $this->locations->find_exact_child(
+				$country->country_code,
+				$country->id,
+				GeographyNameNormalizer::normalize( $admin1 ),
+				GeographyLocationType::Administrative
+			);
+			if ( $by_name instanceof CanonicalLocation ) {
+				return $by_name;
 			}
 		}
 

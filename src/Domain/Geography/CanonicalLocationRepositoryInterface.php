@@ -18,7 +18,7 @@ interface CanonicalLocationRepositoryInterface {
 	 */
 	public function find_by_ids( array $ids ): array;
 
-	public function find_country( string $country_code ): ?CanonicalLocation;
+	public function find_country( string $country_code, bool $include_inactive = false ): ?CanonicalLocation;
 
 	/**
 	 * Exact normalized name under an optional parent. Never fuzzy.

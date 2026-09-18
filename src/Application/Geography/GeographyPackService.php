@@ -815,8 +815,12 @@ final class GeographyPackService {
 	}
 
 	private function bump_revision(): void {
-		$current = (int) get_option( self::REVISION_OPTION, 0 );
-		update_option( self::REVISION_OPTION, $current + 1, false );
+		try {
+			$revision = bin2hex( random_bytes( 8 ) ) . '-' . str_replace( '.', '', (string) microtime( true ) );
+		} catch ( \Throwable ) {
+			$revision = uniqid( 'geo-', true );
+		}
+		update_option( self::REVISION_OPTION, $revision, false );
 	}
 
 	private function storage_dir(): string {

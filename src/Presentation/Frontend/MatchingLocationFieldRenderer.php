@@ -109,6 +109,7 @@ final class MatchingLocationFieldRenderer {
 						'role'                          => 'combobox',
 						'aria-autocomplete'             => 'list',
 						'aria-expanded'                 => 'false',
+						'aria-controls'                 => $id_prefix . '-city-list',
 					],
 				],
 				$city
@@ -129,7 +130,7 @@ final class MatchingLocationFieldRenderer {
 			);
 			echo '</div>';
 			$html .= (string) ob_get_clean();
-			$html .= '<ul class="cetech-de-locality-results" role="listbox" hidden></ul>';
+			$html .= '<ul id="' . esc_attr( $id_prefix . '-city-list' ) . '" class="cetech-de-locality-results" role="listbox" hidden></ul>';
 			$html .= '</fieldset>';
 
 			return $html;

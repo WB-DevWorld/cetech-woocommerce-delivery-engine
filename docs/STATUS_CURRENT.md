@@ -1,6 +1,6 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-18 (issue #23 geo.10 technical-correction candidate on `feat/canonical-geography-coverage`).
+Last reconciled: 2026-09-18 (issue #23 geo.11 technical-correction candidate on `feat/canonical-geography-coverage`).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
@@ -85,7 +85,7 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 
 ## Active post-RC.11 implementation stream
 - Issue `#23` / draft PR `#24` / branch `feat/canonical-geography-coverage`.
-- Identity: `1.0.0-dev.geo.10`; target schema: `6`.
+- Identity: `1.0.0-dev.geo.11`; target schema: `6`.
 - Rejected technical-review candidate: `1.0.0-dev.geo.1` / `606730e2535896cb18e415b14d62bbb57d050578` — do not send to physical QA.
 - Rejected technical-review candidate: `1.0.0-dev.geo.2` / `a52e2aafc97274b74ec14f8b451395b73c9541af` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.2.zip`, SHA-256 `6bde464b249ee6f17831e00d39110c8b10f89f441db3e1b453622a5d95f6b4a5`. Do not physically QA geo.2.
 - Rejected technical-review candidate: `1.0.0-dev.geo.3` / `fdff226cbe6837a3ac508bc6677c8e56771ec229` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.3.zip`, SHA-256 `1c1af4dcfbc6767402b6e7dfacde9a87270ac5ccb8a950788e130c9d130b49b8`. Do not physically QA geo.3.
@@ -95,12 +95,13 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - Rejected technical-review candidate: `1.0.0-dev.geo.7` / `389674173fbf6886cfbf615c4baa163e13cc12c8` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.7.zip`, SHA-256 `d167a0da7841c20bc141a7b3b294acba13291aa6e3e0f0e46cb0f98f36bf616a`. Do not physically QA geo.7.
 - Rejected technical-review candidate: `1.0.0-dev.geo.8` / `92cdeae1d1f9916bf38253772ec30240f3e4798b` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.8.zip`, SHA-256 `55e3c61297b4b1ab0ad06a3efa3c899c60fdf80f8d0fbd6bec8be5e5342d798f`. Do not physically QA geo.8.
 - Rejected technical-review candidate: `1.0.0-dev.geo.9` / `09df7d2337e271792f76290b062c7acba598d80a` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.9.zip`, SHA-256 `8ac4067ff8a9b5f1eb6bb1b8ad8224a168517160665804b0aa6b577a17029a47`. Do not physically QA geo.9.
+- Rejected technical-review candidate: `1.0.0-dev.geo.10` / `66be34b684c11c165617359b828ccf852fba2635` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.10.zip`, SHA-256 `494546cf021909b30a8f0519c816069af72c41b064cbe28b05a31409355f7f47`. Do not physically QA geo.10.
 - RC.11 remains the immutable tagged release candidate. This stream is not RC.12 and must not be packaged as `1.0.0-rc.11`.
 - Architecture: `docs/POST-RC11-CANONICAL-GEOGRAPHY-COVERAGE.md`.
 - Historical qualification PR `#12` / `1.0.0-dev.qual.1` is provenance only.
 
 ## Remaining separate work
-1. Owner independent review then physical QA of issue #23 (`1.0.0-dev.geo.10` / schema `6`) before any merge.
+1. Owner independent review then physical QA of issue #23 (`1.0.0-dev.geo.11` / schema `6`) before any merge.
 2. Production rollout/pilot only if separately and explicitly owner-authorized.
 3. WPML/WCML overlay decision and licensed-dependency certification if included later.
 4. WP Rocket certification when a legitimate package is available.

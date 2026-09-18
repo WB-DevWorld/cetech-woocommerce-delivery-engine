@@ -295,6 +295,27 @@ final class InMemoryDestinationZoneRepository implements DestinationZoneReposito
 		return $out;
 	}
 
+	public function page_after( int $after_id, int $limit = 100, array $criteria = [] ): array {
+		$status = isset( $criteria['status'] ) ? (string) $criteria['status'] : '';
+		$out    = [];
+		foreach ( $this->zones as $zone ) {
+			$id = (int) ( $zone['id'] ?? 0 );
+			if ( $id <= $after_id ) {
+				continue;
+			}
+			if ( '' !== $status && (string) ( $zone['status'] ?? '' ) !== $status ) {
+				continue;
+			}
+			$out[] = $zone;
+		}
+		usort(
+			$out,
+			static fn ( array $left, array $right ): int => ( (int) ( $left['id'] ?? 0 ) ) <=> ( (int) ( $right['id'] ?? 0 ) )
+		);
+
+		return array_slice( $out, 0, max( 1, $limit ) );
+	}
+
 	public function softDelete( int $id ): bool {
 		return false;
 	}

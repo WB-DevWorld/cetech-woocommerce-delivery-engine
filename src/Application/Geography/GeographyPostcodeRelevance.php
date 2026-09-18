@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Geography;
 
+use CetechDeliveryEngine\Domain\Coverage\CoverageGroup;
 use CetechDeliveryEngine\Domain\Coverage\CoverageGroupRepositoryInterface;
+use CetechDeliveryEngine\Domain\Enum\CoverageMembership;
+use CetechDeliveryEngine\Domain\Enum\CoverageMode;
+use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Domain\Geography\CanonicalLocation;
 use CetechDeliveryEngine\Domain\Geography\CanonicalLocationRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\LocationAncestry;
@@ -74,30 +78,79 @@ final class GeographyPostcodeRelevance {
 			$scope = $this->locations->find_country( $country_code );
 		}
 
-		foreach ( $this->zones->list( [ 'status' => 'active', 'limit' => 500 ] ) as $zone ) {
-			$zone_id = (int) ( $zone['id'] ?? 0 );
-			if ( $zone_id <= 0 ) {
-				continue;
+		$after = 0;
+		do {
+			$page = $this->zones->page_after( $after, 100, [ 'status' => RecordStatus::Active->value ] );
+			foreach ( $page as $zone ) {
+				$zone_id = (int) ( $zone['id'] ?? 0 );
+				$after   = max( $after, $zone_id );
+				if ( $zone_id <= 0 ) {
+					continue;
+				}
+				foreach ( $this->groups->list_by_zone( $zone_id ) as $group ) {
+					if ( ! $group->isUsable() || ! $this->has_active_postcode( $group ) ) {
+						continue;
+					}
+					$root = $this->locations->find_by_id( $group->root_location_id );
+					if ( ! $root instanceof CanonicalLocation || ! $root->isActive() || $root->country_code !== $country_code ) {
+						continue;
+					}
+					if ( $scope instanceof CanonicalLocation && $this->group_covers_scope( $group, $root, $scope ) ) {
+						return true;
+					}
+					if ( ! $scope instanceof CanonicalLocation && $root->isCountry() ) {
+						return true;
+					}
+				}
 			}
-			foreach ( $this->groups->list_by_zone( $zone_id ) as $group ) {
-				if ( ! $group->isUsable() || [] === $group->postcodes ) {
-					continue;
-				}
-				$root = $this->locations->find_by_id( $group->root_location_id );
-				if ( ! $root instanceof CanonicalLocation || $root->country_code !== $country_code ) {
-					continue;
-				}
-				if ( $scope instanceof CanonicalLocation
-					&& ! LocationAncestry::is_self_or_descendant( $scope, $root )
-					&& ! LocationAncestry::is_self_or_descendant( $root, $scope )
-				) {
-					continue;
-				}
+		} while ( [] !== $page );
 
+		return false;
+	}
+
+	private function has_active_postcode( CoverageGroup $group ): bool {
+		foreach ( $group->postcodes as $postcode ) {
+			if ( RecordStatus::Active === $postcode->status && '' !== $postcode->postcode_value ) {
 				return true;
 			}
 		}
 
 		return false;
+	}
+
+	private function group_covers_scope( CoverageGroup $group, CanonicalLocation $root, CanonicalLocation $scope ): bool {
+		if ( CoverageMode::SelectedDescendants === $group->mode ) {
+			foreach ( $group->members_of( CoverageMembership::Include ) as $member ) {
+				$location = $this->locations->find_by_id( $member->location_id );
+				if ( ! $location instanceof CanonicalLocation || ! $location->isActive() ) {
+					continue;
+				}
+				if ( LocationAncestry::is_self_or_descendant( $scope, $location )
+					|| LocationAncestry::is_self_or_descendant( $location, $scope ) ) {
+					return true;
+				}
+			}
+
+			return false;
+		}
+
+		$related = LocationAncestry::is_self_or_descendant( $scope, $root )
+			|| LocationAncestry::is_self_or_descendant( $root, $scope );
+		if ( ! $related ) {
+			return false;
+		}
+
+		if ( CoverageMode::EntireExcept === $group->mode ) {
+			foreach ( $group->members_of( CoverageMembership::Exclude ) as $member ) {
+				$excluded = $this->locations->find_by_id( $member->location_id );
+				if ( $excluded instanceof CanonicalLocation
+					&& $excluded->isActive()
+					&& LocationAncestry::is_self_or_descendant( $scope, $excluded ) ) {
+					return false;
+				}
+			}
+		}
+
+		return true;
 	}
 }

@@ -49,6 +49,7 @@ final class StorefrontGeographyEndpoint {
 		$country = strtoupper( sanitize_text_field( wp_unslash( (string) ( $_REQUEST['country'] ?? '' ) ) ) );
 		$parent  = sanitize_text_field( wp_unslash( (string) ( $_REQUEST['parent_key'] ?? '' ) ) );
 		$type    = sanitize_key( (string) ( $_REQUEST['type'] ?? GeographyLocationType::Administrative->value ) );
+		$page    = max( 1, (int) ( $_REQUEST['page'] ?? 1 ) );
 		$location_type = GeographyLocationType::tryFrom( $type ) ?? GeographyLocationType::Administrative;
 
 		$parent_supplied = '' !== $parent;
@@ -64,13 +65,13 @@ final class StorefrontGeographyEndpoint {
 			wp_send_json_success( [ 'items' => [] ] );
 		}
 
-		$cache_key = $this->cache_key( 'children', $country, $parent, $location_type->value, '', 1 );
+		$cache_key = $this->cache_key( 'children', $country, $parent, $location_type->value, (string) $page, $page );
 		$cached    = $this->cache_get( $cache_key );
 		if ( is_array( $cached ) ) {
 			wp_send_json_success( $cached );
 		}
 
-		$payload = $this->children_result_for( $parent_location, $country, $location_type );
+		$payload = $this->children_result_for( $parent_location, $country, $location_type, $page );
 		$this->cache_set( $cache_key, $payload );
 
 		wp_send_json_success( $payload );
@@ -131,12 +132,22 @@ final class StorefrontGeographyEndpoint {
 
 	public function handle_postcode(): void {
 		$this->verify( self::POSTCODE_ACTION );
-		$country = strtoupper( sanitize_text_field( wp_unslash( (string) ( $_REQUEST['country'] ?? '' ) ) ) );
-		$parent  = sanitize_text_field( wp_unslash( (string) ( $_REQUEST['parent_key'] ?? '' ) ) );
+		if ( ! $this->allow_request() ) {
+			wp_send_json_error( [ 'message' => __( 'Please wait and try again.', 'cetech-woocommerce-delivery-engine' ) ], 429 );
+		}
+		$country   = strtoupper( sanitize_text_field( wp_unslash( (string) ( $_REQUEST['country'] ?? '' ) ) ) );
+		$parent    = sanitize_text_field( wp_unslash( (string) ( $_REQUEST['parent_key'] ?? '' ) ) );
+		$cache_key = $this->cache_key( 'postcode', $country, $parent, '', '', 1 );
+		$cached    = $this->cache_get( $cache_key );
+		if ( is_array( $cached ) ) {
+			wp_send_json_success( $cached );
+		}
 		$visible = $this->postcodes instanceof GeographyPostcodeRelevance
 			? $this->postcodes->is_visible( $country, $parent )
 			: $this->country_requires_postcode( $country );
-		wp_send_json_success( [ 'required' => $visible, 'visible' => $visible ] );
+		$payload = [ 'required' => $visible, 'visible' => $visible ];
+		$this->cache_set( $cache_key, $payload );
+		wp_send_json_success( $payload );
 	}
 
 	/**
@@ -185,7 +196,7 @@ final class StorefrontGeographyEndpoint {
 	 *
 	 * @return array<string, mixed>
 	 */
-	public function children_result( string $country, string $parent = '', string $type = '' ): array {
+	public function children_result( string $country, string $parent = '', string $type = '', int $page = 1 ): array {
 		$country       = strtoupper( trim( $country ) );
 		$location_type = GeographyLocationType::tryFrom( $type ) ?? GeographyLocationType::Administrative;
 		$parent        = trim( $parent );
@@ -195,27 +206,36 @@ final class StorefrontGeographyEndpoint {
 		if ( null === $parent_location ) {
 			return [
 				'items'      => [],
+				'page'       => max( 1, $page ),
+				'has_more'   => false,
 				'label'      => GeographyAdminLabels::administrative_area_label( $country ),
 				'skip_admin' => GeographyLocationType::Administrative === $location_type,
 			];
 		}
 
-		return $this->children_result_for( $parent_location, $country, $location_type );
+		return $this->children_result_for( $parent_location, $country, $location_type, $page );
 	}
 
 	/**
 	 * @return array<string, mixed>
 	 */
-	private function children_result_for( \CetechDeliveryEngine\Domain\Geography\CanonicalLocation $parent_location, string $country, GeographyLocationType $location_type ): array {
-		$items = [];
-		foreach ( $this->locations->list_children( $parent_location->id, $location_type, 200, 0 ) as $child ) {
+	private function children_result_for( \CetechDeliveryEngine\Domain\Geography\CanonicalLocation $parent_location, string $country, GeographyLocationType $location_type, int $page = 1 ): array {
+		$page   = max( 1, $page );
+		$limit  = 50;
+		$offset = ( $page - 1 ) * $limit;
+		$items  = [];
+		foreach ( $this->locations->list_children( $parent_location->id, $location_type, $limit, $offset ) as $child ) {
 			$items[] = $this->customer_item( $child );
 		}
+		$total = $this->locations->count_children( $parent_location->id, $location_type );
 
 		return [
 			'items'      => $items,
+			'page'       => $page,
+			'total'      => $total,
+			'has_more'   => ( $page * $limit ) < $total,
 			'label'      => GeographyAdminLabels::administrative_area_label( $country ),
-			'skip_admin' => GeographyLocationType::Administrative === $location_type && [] === $items,
+			'skip_admin' => GeographyLocationType::Administrative === $location_type && 0 === $total,
 		];
 	}
 

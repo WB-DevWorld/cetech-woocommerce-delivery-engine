@@ -480,6 +480,8 @@
 		locationRoot.setAttribute('data-cetech-de-cascade', '1');
 		var geo = config.geography || {};
 		var searchToken = 0;
+		var childrenToken = 0;
+		var postcodeToken = 0;
 
 		function applyRegionLabel(rootEl, label) {
 			if (!rootEl || !label) {
@@ -655,6 +657,7 @@
 			if (!config.ajaxUrl || !geo.childrenAction) {
 				return;
 			}
+			var token = ++childrenToken;
 			var country = countryField();
 			var body = new window.URLSearchParams();
 			body.set('action', geo.childrenAction);
@@ -662,12 +665,16 @@
 			body.set('country', country ? country.value : '');
 			body.set('parent_key', parentKey || '');
 			body.set('type', type);
+			body.set('request_token', String(token));
 			window.fetch(config.ajaxUrl, {
 				method: 'POST',
 				credentials: 'same-origin',
 				headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
 				body: body.toString()
 			}).then(function (response) { return response.json(); }).then(function (payload) {
+				if (token !== childrenToken) {
+					return;
+				}
 				var data = payload && payload.data ? payload.data : payload;
 				var items = data && data.items ? data.items : [];
 				if (data && data.label) {
@@ -843,18 +850,23 @@
 			if (!config.ajaxUrl || !geo.postcodeAction) {
 				return;
 			}
+			var token = ++postcodeToken;
 			var country = countryField();
 			var body = new window.URLSearchParams();
 			body.set('action', geo.postcodeAction);
 			body.set('nonce', geo.postcodeNonce || '');
 			body.set('country', country ? country.value : '');
 			body.set('parent_key', currentParentKey());
+			body.set('request_token', String(token));
 			window.fetch(config.ajaxUrl, {
 				method: 'POST',
 				credentials: 'same-origin',
 				headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
 				body: body.toString()
 			}).then(function (response) { return response.json(); }).then(function (payload) {
+				if (token !== postcodeToken) {
+					return;
+				}
 				var data = payload && payload.data ? payload.data : payload;
 				setReveal(locationRoot, 'postcode', !!(data && data.visible));
 			}).catch(function () { /* keep */ });
@@ -863,6 +875,18 @@
 		var country = countryField();
 		var region = regionField();
 		var city = cityField();
+		if (city) {
+			var listbox = locationRoot.querySelector('.cetech-de-locality-results');
+			if (listbox) {
+				if (!listbox.id) {
+					listbox.id = (city.id || 'cetech-de-city') + '-list';
+				}
+				city.setAttribute('aria-controls', listbox.id);
+				if (!city.getAttribute('role')) {
+					city.setAttribute('role', 'combobox');
+				}
+			}
+		}
 		if (country) {
 			country.addEventListener('change', onCountryChange);
 		}
@@ -918,6 +942,7 @@
 			if (region && region.value) {
 				setReveal(locationRoot, 'locality', true);
 			}
+			loadChildren('administrative', '');
 		}
 	}
 

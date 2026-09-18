@@ -32,7 +32,7 @@ final class WooCommerceGeographyBootstrap {
 	public function bootstrap_country( string $country_code ): array {
 		$country_code = strtoupper( trim( $country_code ) );
 		$created      = 0;
-		$country      = $this->locations->find_country( $country_code );
+		$country      = $this->locations->find_country( $country_code, true );
 		if ( ! $country instanceof CanonicalLocation ) {
 			$label   = $this->country_label( $country_code ) ?: $country_code;
 			$country = $this->locations->save(

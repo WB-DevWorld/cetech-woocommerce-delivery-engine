@@ -21,8 +21,9 @@ final class SchemaV6InspectionTest extends TestCase {
 		$plugin_root = dirname( __DIR__, 3 );
 		$header      = (string) file_get_contents( $plugin_root . '/cetech-woocommerce-delivery-engine.php' );
 
-		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.geo\\.10'\s*\)/", $header );
-		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.geo\\.10\s*$/m', $header );
+		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.geo\\.11'\s*\)/", $header );
+		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.geo\\.11\s*$/m', $header );
+		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo.10' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo.9' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo.8' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo.7' )", $header );
@@ -82,9 +83,9 @@ final class SchemaV6InspectionTest extends TestCase {
 		$upgrade = (string) file_get_contents( dirname( __DIR__, 3 ) . '/src/Application/Geography/Schema6CoverageUpgradeService.php' );
 		self::assertStringContainsString( 'referenced_country_codes', $upgrade );
 		self::assertStringContainsString( 'bootstrap_country', $upgrade );
-		self::assertStringContainsString( '$this->migrator->migrate( $force )', $upgrade );
+		self::assertStringContainsString( '$this->migrator->migrate( $force, $after )', $upgrade );
 		$boot = strpos( $upgrade, 'bootstrap_country' );
-		$migrate = strpos( $upgrade, '$this->migrator->migrate( $force )' );
+		$migrate = strpos( $upgrade, '$this->migrator->migrate( $force, $after )' );
 		self::assertNotFalse( $boot );
 		self::assertNotFalse( $migrate );
 		self::assertGreaterThan( $boot, $migrate );

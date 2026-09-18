@@ -185,26 +185,31 @@ final class OverlappingDeliveryAreaCoverage {
 	private function active_zones_with_rules(): array {
 		$out = [];
 
-		foreach ( $this->zone_repository->list( [ 'status' => RecordStatus::Active->value, 'limit' => 500 ] ) as $zone ) {
-			$zone_id = (int) ( $zone['id'] ?? 0 );
+		$after = 0;
+		do {
+			$page = $this->zone_repository->page_after( $after, 100, [ 'status' => RecordStatus::Active->value ] );
+			foreach ( $page as $zone ) {
+				$zone_id = (int) ( $zone['id'] ?? 0 );
+				$after   = max( $after, $zone_id );
 
-			if ( $zone_id <= 0 ) {
-				continue;
+				if ( $zone_id <= 0 ) {
+					continue;
+				}
+
+				$rules = $this->rule_repository->listByZoneId( $zone_id );
+				$has_canonical = $this->zone_has_canonical_coverage( $zone_id );
+
+				if ( ( [] === $rules || DestinationZoneMatcher::is_unrestricted_fallback( $zone, $rules ) ) && ! $has_canonical ) {
+					continue;
+				}
+
+				$out[] = [
+					'zone'       => $zone,
+					'rules'      => $rules,
+					'canonical'  => $has_canonical,
+				];
 			}
-
-			$rules = $this->rule_repository->listByZoneId( $zone_id );
-			$has_canonical = $this->zone_has_canonical_coverage( $zone_id );
-
-			if ( ( [] === $rules || DestinationZoneMatcher::is_unrestricted_fallback( $zone, $rules ) ) && ! $has_canonical ) {
-				continue;
-			}
-
-			$out[] = [
-				'zone'       => $zone,
-				'rules'      => $rules,
-				'canonical'  => $has_canonical,
-			];
-		}
+		} while ( [] !== $page );
 
 		return $out;
 	}
