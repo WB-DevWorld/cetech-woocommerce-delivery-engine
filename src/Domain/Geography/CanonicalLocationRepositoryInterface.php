@@ -66,8 +66,27 @@ interface CanonicalLocationRepositoryInterface {
 	public function rebuild_descendant_ancestry( int $root_id, string $old_path, string $new_path, int $limit = 2000 ): int;
 
 	/**
+	 * Bounded, shopper-invisible preparation for one staging token.
+	 * Rebuilds missing Inactive ancestry and stages draft aliases/mappings.
+	 * Does not activate geography or mutate Active live names.
+	 *
+	 * @return array{processed: int, last_id: int, done: bool}
+	 */
+	public function prepare_generation( string $generation_token, int $limit = 200, int $after_id = 0 ): array;
+
+	/**
+	 * Small atomic activation: set-based promote of a prepared generation plus pack Ready callback.
+	 * Must not load a complete national generation into PHP or UPDATE one row at a time.
+	 *
+	 * @param callable|null $finalize Invoked inside the same transaction after geography writes.
+	 *
+	 * @return int Number of rows activated from Inactive to Active.
+	 */
+	public function finalize_generation( string $generation_token, ?callable $finalize = null ): int;
+
+	/**
 	 * Activate Inactive rows and apply drafts for one immutable staging token.
-	 * Must be transactional and include any pack Ready/provenance callback.
+	 * Prepare is bounded/resumable; final activation is a small atomic transaction.
 	 * Throws on any persistence failure.
 	 *
 	 * @param callable|null $finalize Invoked inside the same transaction after geography writes.

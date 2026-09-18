@@ -46,6 +46,10 @@ final class GeographyPack {
 
 		$provider = GeographyProvider::tryFrom( (string) ( $row['provider'] ?? '' ) ) ?? GeographyProvider::GeoNames;
 		$status   = GeographyPackStatus::tryFrom( (string) ( $row['status'] ?? '' ) ) ?? GeographyPackStatus::Pending;
+		$column_token = trim( (string) ( $row['target_token'] ?? '' ) );
+		if ( '' !== $column_token ) {
+			$progress['target_token'] = $column_token;
+		}
 
 		return new self(
 			(int) ( $row['id'] ?? 0 ),
@@ -136,7 +140,7 @@ final class GeographyPack {
 	 * @return array<string, mixed>
 	 */
 	public function apply_progress_update( array $progress, GeographyPackStatus $status, ?string $installed_at, string $expected_target_token = '' ): array {
-		$this->assert_expected_target_token( $expected_target_token );
+		unset( $expected_target_token );
 		if ( ! array_key_exists( 'last_successful', $progress ) && [] !== $this->last_successful() ) {
 			$progress['last_successful'] = $this->last_successful();
 		}

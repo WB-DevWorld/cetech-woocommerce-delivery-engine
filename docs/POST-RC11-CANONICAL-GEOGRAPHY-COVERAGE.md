@@ -1,6 +1,6 @@
 # Post-RC.11 Canonical Geography & Delivery Area Coverage
 
-Status: ISSUE #23 GEO.7 TECHNICAL CORRECTIONS / NOT MERGED / NOT RC.12
+Status: ISSUE #23 GEO.8 TECHNICAL CORRECTIONS / NOT MERGED / NOT RC.12
 
 Owner: `@wbdevworld`
 
@@ -22,9 +22,11 @@ Rejected technical-review candidate: `1.0.0-dev.geo.5` (`f5da0b6b528e19ae57eedd9
 
 Rejected technical-review candidate: `1.0.0-dev.geo.6` (`730bcc2fa73fadd0da121487b7439edff5b3dfdc`). Frozen package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.6.zip` SHA-256 `39437fb8a950e88968474eaf71e013b1b9e8a872b9e4b4710e7108d29d9a92c6`. Do not physically QA geo.6.
 
-Current technical-correction candidate identity: `1.0.0-dev.geo.7`
+Rejected technical-review candidate: `1.0.0-dev.geo.7` (`389674173fbf6886cfbf615c4baa163e13cc12c8`). Frozen package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.7.zip` SHA-256 `d167a0da7841c20bc141a7b3b294acba13291aa6e3e0f0e46cb0f98f36bf616a`. Do not physically QA geo.7.
 
-geo.7 technical corrections (PR #24 comment `5720192318`): renewable owner lease/heartbeat plus remote download I/O outside the mutation lease; pack Ready/import writes fenced to the expected target token so an expired old worker cannot finalize after a newer target starts; provider-mapping upsert throws on DB failure and fails the current target; checksum mismatch marks the current target Failed/retryable; last_successful preserves checksum, dataset version, source, installed time, generation/attempt token and active generation; abandoned token ZIP/TXT artifacts are cleaned without deleting Active source evidence; converting a Woo free-text region INPUT to a canonical SELECT restores the saved region value.
+Current technical-correction candidate identity: `1.0.0-dev.geo.8`
+
+geo.8 technical corrections (PR #24 comment `5728435779`): bounded prepare plus small atomic finalize for generation promotion; pack-row lease CAS; conditional target-token Ready writes; official-download supersession of unfinished targets; incoming-file cleanup.
 
 Target schema: `6`
 

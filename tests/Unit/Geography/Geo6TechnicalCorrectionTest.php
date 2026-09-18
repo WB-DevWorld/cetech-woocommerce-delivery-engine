@@ -195,22 +195,12 @@ final class Geo6TechnicalCorrectionTest extends TestCase {
 
 	public function test_stale_abandoned_lock_is_recovered(): void {
 		$service = $this->service();
-		$key     = 'cetech_de_geo_pack_cas_42';
-		add_option(
-			$key,
-			[
-				'owner'       => 'dead:worker',
-				'role'        => 'tick',
-				'acquired_at' => 1,
-				'expires_at'  => time() - 10,
-			],
-			'',
-			false
-		);
+		$packs   = $this->packs_of( $service );
+		$packs->acquire_lease( 42, 'dead', 1, 1 );
+		$packs->expire_lease( 42, time() - 10 );
 		$owner = $this->invoke_lock( $service, 'acquire_lifecycle_lock', 42, 'tick' );
 		self::assertNotSame( '', $owner );
-		$lease = get_option( $key );
-		self::assertIsArray( $lease );
+		$lease = $packs->current_lease( 42 );
 		self::assertSame( $owner, $lease['owner'] ?? null );
 	}
 
@@ -224,14 +214,14 @@ final class Geo6TechnicalCorrectionTest extends TestCase {
 
 	public function test_wrong_owner_cannot_release_another_workers_lock(): void {
 		$service = $this->service();
+		$packs   = $this->packs_of( $service );
 		$owner   = $this->invoke_lock( $service, 'acquire_lifecycle_lock', 9, 'tick' );
 		self::assertNotSame( '', $owner );
 		$this->invoke_lock( $service, 'release_lifecycle_lock', 9, 'other-owner' );
-		$lease = get_option( 'cetech_de_geo_pack_cas_9' );
-		self::assertIsArray( $lease );
+		$lease = $packs->current_lease( 9 );
 		self::assertSame( $owner, $lease['owner'] ?? null );
 		$this->invoke_lock( $service, 'release_lifecycle_lock', 9, $owner );
-		self::assertFalse( get_option( 'cetech_de_geo_pack_cas_9', false ) );
+		self::assertSame( '', $packs->current_lease( 9 )['owner'] ?? null );
 	}
 
 	public function test_update_rereads_latest_pack_after_lock(): void {
@@ -316,6 +306,22 @@ final class Geo6TechnicalCorrectionTest extends TestCase {
 				string $expected_target_token = ''
 			): void {
 				$this->inner->update_progress( $id, $status, $cursor, $progress, $last_error, $installed_at, $expected_target_token );
+			}
+
+			public function acquire_lease( int $id, string $role, int $now, int $ttl_seconds ): string {
+				return $this->inner->acquire_lease( $id, $role, $now, $ttl_seconds );
+			}
+
+			public function renew_lease( int $id, string $owner, int $now, int $ttl_seconds ): bool {
+				return $this->inner->renew_lease( $id, $owner, $now, $ttl_seconds );
+			}
+
+			public function release_lease( int $id, string $owner ): bool {
+				return $this->inner->release_lease( $id, $owner );
+			}
+
+			public function current_lease( int $id ): array {
+				return $this->inner->current_lease( $id );
 			}
 		};
 		$importer = $this->importer( $geo, $packs );
@@ -519,6 +525,15 @@ final class Geo6TechnicalCorrectionTest extends TestCase {
 			$this->importer( $geo, $packs ),
 			new WooCommerceGeographyBootstrap( $geo->locations, $geo->locations, $geo->locations )
 		);
+	}
+
+	private function packs_of( GeographyPackService $service ): InMemoryGeographyPackRepository {
+		$ref = new \ReflectionProperty( $service, 'packs' );
+		$ref->setAccessible( true );
+		$packs = $ref->getValue( $service );
+		self::assertInstanceOf( InMemoryGeographyPackRepository::class, $packs );
+
+		return $packs;
 	}
 
 	private function invoke_lock( GeographyPackService $service, string $method, int $pack_id, string $owner_or_role ): string {

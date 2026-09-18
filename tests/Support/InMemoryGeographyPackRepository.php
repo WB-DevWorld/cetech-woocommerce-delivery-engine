@@ -20,6 +20,12 @@ final class InMemoryGeographyPackRepository implements GeographyPackRepositoryIn
 
 	public bool $fail_next_ready_progress = false;
 
+	/** @var array<int, array{owner: string, role: string, acquired_at: int, expires_at: int}> */
+	private array $leases = [];
+
+	/** @var array<string, bool> */
+	private array $finalize_blocked = [];
+
 	public function find_by_id( int $id ): ?GeographyPack {
 		return $this->packs[ $id ] ?? null;
 	}
@@ -76,6 +82,33 @@ final class InMemoryGeographyPackRepository implements GeographyPackRepositoryIn
 
 			return;
 		}
+		$fence_token = trim( $expected_target_token );
+		if ( '' === $fence_token ) {
+			$fence_token = trim( (string) ( $progress['target_token'] ?? '' ) );
+		}
+		if ( '' !== $fence_token && '' !== $existing->target_token() && $existing->target_token() !== $fence_token ) {
+			throw new \CetechDeliveryEngine\Domain\Geography\GeographyPackTokenFenceException(
+				'Pack target token fence rejected expected ' . $fence_token . ' against current ' . $existing->target_token() . '.'
+			);
+		}
+		if ( GeographyPackStatus::Ready === $status && '' !== $fence_token ) {
+			if ( GeographyPackStatus::Ready === $existing->status ) {
+				throw new \CetechDeliveryEngine\Domain\Geography\GeographyPackConcurrentPromotionException(
+					'Pack Ready update affected zero rows for token ' . $fence_token . '.'
+				);
+			}
+			if ( GeographyPackStatus::Importing !== $existing->status && GeographyPackStatus::Pending !== $existing->status ) {
+				throw new \CetechDeliveryEngine\Domain\Geography\GeographyPackConcurrentPromotionException(
+					'Pack Ready update affected zero rows for token ' . $fence_token . '.'
+				);
+			}
+			if ( isset( $this->finalize_blocked[ $id . ':' . $fence_token ] ) ) {
+				throw new \CetechDeliveryEngine\Domain\Geography\GeographyPackConcurrentPromotionException(
+					'Pack Ready update affected zero rows for token ' . $fence_token . '.'
+				);
+			}
+			$this->finalize_blocked[ $id . ':' . $fence_token ] = true;
+		}
 		$progress = $existing->apply_progress_update( $progress, $status, $installed_at, $expected_target_token );
 		$this->packs[ $id ] = new GeographyPack(
 			$existing->id,
@@ -95,6 +128,70 @@ final class InMemoryGeographyPackRepository implements GeographyPackRepositoryIn
 			$last_error,
 			$installed_at ?? $existing->installed_at
 		);
+	}
+
+	public function acquire_lease( int $id, string $role, int $now, int $ttl_seconds ): string {
+		$existing = $this->leases[ $id ] ?? [
+			'owner'       => '',
+			'role'        => '',
+			'acquired_at' => 0,
+			'expires_at'  => 0,
+		];
+		if ( '' !== $existing['owner'] && $existing['expires_at'] >= $now ) {
+			return '';
+		}
+		$owner = $role . ':' . bin2hex( random_bytes( 8 ) );
+		$this->leases[ $id ] = [
+			'owner'       => $owner,
+			'role'        => $role,
+			'acquired_at' => $now,
+			'expires_at'  => $now + max( 1, $ttl_seconds ),
+		];
+
+		return $owner;
+	}
+
+	public function renew_lease( int $id, string $owner, int $now, int $ttl_seconds ): bool {
+		if ( '' === $owner ) {
+			return false;
+		}
+		$existing = $this->leases[ $id ] ?? null;
+		if ( ! is_array( $existing ) || $existing['owner'] !== $owner ) {
+			return false;
+		}
+		$existing['expires_at'] = $now + max( 1, $ttl_seconds );
+		$this->leases[ $id ]    = $existing;
+
+		return true;
+	}
+
+	public function release_lease( int $id, string $owner ): bool {
+		if ( '' === $owner ) {
+			return false;
+		}
+		$existing = $this->leases[ $id ] ?? null;
+		if ( ! is_array( $existing ) || $existing['owner'] !== $owner ) {
+			return false;
+		}
+		unset( $this->leases[ $id ] );
+
+		return true;
+	}
+
+	public function current_lease( int $id ): array {
+		return $this->leases[ $id ] ?? [
+			'owner'       => '',
+			'role'        => '',
+			'acquired_at' => 0,
+			'expires_at'  => 0,
+		];
+	}
+
+	public function expire_lease( int $id, int $expired_at ): void {
+		if ( ! isset( $this->leases[ $id ] ) ) {
+			return;
+		}
+		$this->leases[ $id ]['expires_at'] = $expired_at;
 	}
 
 	/**

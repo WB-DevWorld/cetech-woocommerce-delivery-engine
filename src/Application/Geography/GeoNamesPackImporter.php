@@ -13,6 +13,7 @@ use CetechDeliveryEngine\Domain\Geography\CanonicalLocationRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\GeographyNameNormalizer;
 use CetechDeliveryEngine\Domain\Geography\GeographyPack;
 use CetechDeliveryEngine\Domain\Geography\GeographyPackRepositoryInterface;
+use CetechDeliveryEngine\Domain\Geography\GeographyPackConcurrentPromotionException;
 use CetechDeliveryEngine\Domain\Geography\GeographyPackTokenFenceException;
 use CetechDeliveryEngine\Domain\Geography\LocationAliasRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\LocationAncestry;
@@ -49,7 +50,7 @@ final class GeoNamesPackImporter {
 	public const MAX_SECONDS_PER_TICK = 4.0;
 
 	/** @var list<string> */
-	public const PHASES = [ 'admin1', 'admin2', 'admin3', 'admin4', 'locality' ];
+	public const PHASES = [ 'admin1', 'admin2', 'admin3', 'admin4', 'locality', 'promote' ];
 
 	public function __construct(
 		private CanonicalLocationRepositoryInterface $locations,
@@ -183,10 +184,17 @@ final class GeoNamesPackImporter {
 
 		try {
 			return $this->import_batch_body( $pack, $file_path, $batch_size, $country, $cursor, $progress, $processed, $imported, $skipped, $target, $token );
-		} catch ( GeographyPackTokenFenceException $e ) {
+		} catch ( GeographyPackTokenFenceException | GeographyPackConcurrentPromotionException $e ) {
+			$current = $this->packs->find_by_id( $pack->id );
+			if ( $current instanceof GeographyPack && GeographyPackStatus::Ready === $current->status && ( '' === $token || $current->target_token() === $token ) ) {
+				return [
+					'status' => GeographyPackStatus::Ready->value,
+					'reason' => 'already_ready',
+				];
+			}
 			return [
 				'status' => 'noop',
-				'reason' => 'stale_generation',
+				'reason' => $e instanceof GeographyPackConcurrentPromotionException ? 'concurrent_promotion' : 'stale_generation',
 			];
 		} catch ( \Throwable $e ) {
 			$this->mark_target_failed( $pack, $e->getMessage(), $token );
@@ -219,6 +227,10 @@ final class GeoNamesPackImporter {
 		$phase     = (string) ( $progress['phase'] ?? 'admin1' );
 		if ( ! in_array( $phase, self::PHASES, true ) ) {
 			$phase = 'admin' === $phase ? 'admin1' : ( 'locality' === $phase ? 'locality' : 'admin1' );
+		}
+
+		if ( 'promote' === $phase ) {
+			return $this->promote_batch( $pack, $file_path, $batch_size, $progress, $processed, $imported, $skipped, $target, $token );
 		}
 
 		$eof     = false;
@@ -273,74 +285,20 @@ final class GeoNamesPackImporter {
 				$phase = self::PHASES[ $idx + 1 ];
 				$last  = 0;
 				$status = GeographyPackStatus::Importing;
+				if ( 'promote' === $phase ) {
+					$progress['promotion_cursor'] = 0;
+				}
 			} else {
-				$fresh = $this->packs->find_by_id( $pack->id );
-				if ( ! $fresh instanceof GeographyPack || $fresh->target_token() !== $token ) {
-					return [
-						'status' => 'noop',
-						'reason' => 'stale_generation',
-					];
-				}
-				try {
-					$this->locations->promote_generation(
-						$token,
-						function () use ( $pack, $last, $processed, $imported, $skipped, $progress, $phase, $target, $token ): void {
-							$installed_at = gmdate( 'Y-m-d H:i:s' );
-							$this->packs->update_progress(
-								$pack->id,
-								GeographyPackStatus::Ready,
-								(string) $last,
-								[
-									'processed'         => $processed,
-									'imported'          => $imported,
-									'skipped'           => $skipped,
-									'total'             => (int) ( $progress['total'] ?? 0 ),
-									'phase'             => $phase,
-									'scanned'           => 0,
-									'target_generation' => $target,
-									'target_token'      => $token,
-									'target_checksum'   => (string) ( $progress['target_checksum'] ?? $pack->checksum ),
-									'dataset_checksum'  => (string) ( $progress['dataset_checksum'] ?? $pack->checksum ),
-									'active_generation' => $target,
-									'attempt_seq'       => (int) ( $progress['attempt_seq'] ?? $target ),
-									'staging_identity'  => $token,
-									'last_successful'   => [
-										'checksum'          => (string) ( $progress['dataset_checksum'] ?? $pack->checksum ),
-										'dataset_version'   => $pack->dataset_version,
-										'source_reference'  => $pack->source_reference,
-										'source'            => $pack->source_reference,
-										'installed_at'      => $installed_at,
-										'generation_token'  => $token,
-										'attempt_token'     => $token,
-										'active_generation' => $target,
-									],
-								],
-								'',
-								$installed_at,
-								$token
-							);
-						}
-					);
-				} catch ( GeographyPackTokenFenceException $e ) {
-					return [
-						'status' => 'noop',
-						'reason' => 'stale_generation',
-					];
-				} catch ( \Throwable $e ) {
-					$this->mark_target_failed( $pack, $e->getMessage(), $token, (string) $last, $progress, $processed, $imported, $skipped, $phase, $target );
-
-					return [
-						'status' => GeographyPackStatus::Failed->value,
-						'error'  => 'promotion_failed',
-					];
-				}
-				$status   = GeographyPackStatus::Ready;
-				$complete = true;
+				$phase  = 'promote';
+				$last   = 0;
+				$status = GeographyPackStatus::Importing;
+				$progress['promotion_cursor'] = 0;
 			}
 		} else {
 			$status = GeographyPackStatus::Importing;
 		}
 
+		$promotion_cursor = (int) ( $progress['promotion_cursor'] ?? 0 );
 		$progress = [
 			'processed'          => $processed,
 			'imported'           => $imported,
@@ -355,6 +313,7 @@ final class GeoNamesPackImporter {
 			'active_generation'  => $complete ? $target : (int) ( $progress['active_generation'] ?? 0 ),
 			'attempt_seq'        => (int) ( $progress['attempt_seq'] ?? $target ),
 			'staging_identity'   => $token,
+			'promotion_cursor'   => $promotion_cursor,
 			'last_successful'    => $complete
 				? [
 					'checksum'          => (string) ( $progress['dataset_checksum'] ?? $pack->checksum ),
@@ -387,6 +346,150 @@ final class GeoNamesPackImporter {
 			'cursor'    => $last,
 			'phase'     => $phase,
 			'complete'  => $complete,
+		];
+	}
+
+	public function abandon_unsuccessful_target( string $generation_token ): void {
+		$this->locations->abandon_generation( $generation_token );
+	}
+
+	/**
+	 * @param array<string, mixed> $progress
+	 * @return array<string, mixed>
+	 */
+	private function promote_batch(
+		GeographyPack $pack,
+		string $file_path,
+		int $batch_size,
+		array $progress,
+		int $processed,
+		int $imported,
+		int $skipped,
+		int $target,
+		string $token
+	): array {
+		unset( $file_path );
+		$fresh = $this->packs->find_by_id( $pack->id );
+		if ( ! $fresh instanceof GeographyPack || $fresh->target_token() !== $token ) {
+			return [
+				'status' => 'noop',
+				'reason' => 'stale_generation',
+			];
+		}
+		if ( GeographyPackStatus::Ready === $fresh->status ) {
+			return [
+				'status'    => GeographyPackStatus::Ready->value,
+				'processed' => $processed,
+				'imported'  => $imported,
+				'skipped'   => $skipped,
+				'cursor'    => 0,
+				'phase'     => 'promote',
+				'complete'  => true,
+			];
+		}
+		$after = (int) ( $progress['promotion_cursor'] ?? 0 );
+		$prepared = $this->locations->prepare_generation( $token, max( 1, $batch_size ), $after );
+		if ( ! $prepared['done'] ) {
+			$progress['phase']             = 'promote';
+			$progress['promotion_cursor']  = (int) $prepared['last_id'];
+			$progress['target_token']      = $token;
+			$progress['target_generation'] = $target;
+			$this->packs->update_progress(
+				$pack->id,
+				GeographyPackStatus::Importing,
+				(string) $prepared['last_id'],
+				$progress,
+				'',
+				null,
+				$token
+			);
+
+			return [
+				'status'    => GeographyPackStatus::Importing->value,
+				'processed' => $processed,
+				'imported'  => $imported,
+				'skipped'   => $skipped,
+				'cursor'    => (int) $prepared['last_id'],
+				'phase'     => 'promote',
+				'complete'  => false,
+			];
+		}
+
+		try {
+			$this->locations->finalize_generation(
+				$token,
+				function () use ( $pack, $processed, $imported, $skipped, $progress, $target, $token ): void {
+					$installed_at = gmdate( 'Y-m-d H:i:s' );
+					$this->packs->update_progress(
+						$pack->id,
+						GeographyPackStatus::Ready,
+						'0',
+						[
+							'processed'         => $processed,
+							'imported'          => $imported,
+							'skipped'           => $skipped,
+							'total'             => (int) ( $progress['total'] ?? 0 ),
+							'phase'             => 'promote',
+							'scanned'           => 0,
+							'target_generation' => $target,
+							'target_token'      => $token,
+							'target_checksum'   => (string) ( $progress['target_checksum'] ?? $pack->checksum ),
+							'dataset_checksum'  => (string) ( $progress['dataset_checksum'] ?? $pack->checksum ),
+							'active_generation' => $target,
+							'attempt_seq'       => (int) ( $progress['attempt_seq'] ?? $target ),
+							'staging_identity'  => $token,
+							'promotion_cursor'  => 0,
+							'last_successful'   => [
+								'checksum'          => (string) ( $progress['dataset_checksum'] ?? $pack->checksum ),
+								'dataset_version'   => $pack->dataset_version,
+								'source_reference'  => $pack->source_reference,
+								'source'            => $pack->source_reference,
+								'installed_at'      => $installed_at,
+								'generation_token'  => $token,
+								'attempt_token'     => $token,
+								'active_generation' => $target,
+							],
+						],
+						'',
+						$installed_at,
+						$token
+					);
+				}
+			);
+		} catch ( GeographyPackTokenFenceException | GeographyPackConcurrentPromotionException $e ) {
+			$current = $this->packs->find_by_id( $pack->id );
+			if ( $current instanceof GeographyPack && GeographyPackStatus::Ready === $current->status && $current->target_token() === $token ) {
+				return [
+					'status'    => GeographyPackStatus::Ready->value,
+					'processed' => $processed,
+					'imported'  => $imported,
+					'skipped'   => $skipped,
+					'cursor'    => 0,
+					'phase'     => 'promote',
+					'complete'  => true,
+				];
+			}
+			return [
+				'status' => 'noop',
+				'reason' => $e instanceof GeographyPackConcurrentPromotionException ? 'concurrent_promotion' : 'stale_generation',
+			];
+		} catch ( \Throwable $e ) {
+			$this->mark_target_failed( $pack, $e->getMessage(), $token, (string) $after, $progress, $processed, $imported, $skipped, 'promote', $target );
+
+			return [
+				'status' => GeographyPackStatus::Failed->value,
+				'error'  => 'promotion_failed',
+			];
+		}
+
+		return [
+			'status'    => GeographyPackStatus::Ready->value,
+			'processed' => $processed,
+			'imported'  => $imported,
+			'skipped'   => $skipped,
+			'cursor'    => 0,
+			'phase'     => 'promote',
+			'complete'  => true,
 		];
 	}
 

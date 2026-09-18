@@ -239,6 +239,13 @@ final class GeographyPackService {
 				return $this->packs->find_by_id( $pack->id ) ?? $pack;
 			}
 
+			$old_token     = $pack->target_token();
+			$last_success  = (string) ( $pack->last_successful()['generation_token'] ?? $pack->last_successful()['attempt_token'] ?? '' );
+			if ( '' !== $old_token && $old_token !== $last_success ) {
+				$this->importer->abandon_unsuccessful_target( $old_token );
+				$this->cleanup_abandoned_generation_files( $pack, $old_token );
+			}
+
 			$pack = $this->packs->save(
 				[
 					'id'               => $pack->id,
@@ -644,82 +651,23 @@ final class GeographyPackService {
 	}
 
 	private function acquire_lifecycle_lock( int $pack_id, string $role ): string {
-		$key   = 'cetech_de_geo_pack_cas_' . $pack_id;
-		$now   = time();
-		$owner = $role . ':' . bin2hex( random_bytes( 8 ) );
-		$lease = [
-			'owner'       => $owner,
-			'role'        => $role,
-			'acquired_at' => $now,
-			'expires_at'  => $now + self::LOCK_TTL_SECONDS,
-			'renewed_at'  => $now,
-		];
-		if ( ! function_exists( 'add_option' ) ) {
-			return $owner;
-		}
-		if ( add_option( $key, $lease, '', false ) ) {
-			return $owner;
-		}
-		$existing = function_exists( 'get_option' ) ? get_option( $key, false ) : false;
-		if ( ! is_array( $existing ) ) {
-			return '';
-		}
-		$expires = (int) ( $existing['expires_at'] ?? 0 );
-		if ( $expires >= $now ) {
-			return '';
-		}
-		if ( function_exists( 'delete_option' ) ) {
-			delete_option( $key );
-		}
-		if ( add_option( $key, $lease, '', false ) ) {
-			return $owner;
-		}
-
-		return '';
+		return $this->packs->acquire_lease( $pack_id, $role, time(), self::LOCK_TTL_SECONDS );
 	}
 
 	private function renew_lifecycle_lock( int $pack_id, string $owner ): bool {
-		if ( '' === $owner ) {
-			return false;
-		}
-		if ( ! function_exists( 'get_option' ) || ! function_exists( 'update_option' ) ) {
-			return true;
-		}
-		$key      = 'cetech_de_geo_pack_cas_' . $pack_id;
-		$existing = get_option( $key, false );
-		if ( ! is_array( $existing ) || (string) ( $existing['owner'] ?? '' ) !== $owner ) {
-			return false;
-		}
-		$now = time();
-		$existing['expires_at'] = $now + self::LOCK_TTL_SECONDS;
-		$existing['renewed_at'] = $now;
-		update_option( $key, $existing, false );
-
-		return true;
+		return $this->packs->renew_lease( $pack_id, $owner, time(), self::LOCK_TTL_SECONDS );
 	}
 
 	private function owns_lifecycle_lock( int $pack_id, string $owner ): bool {
 		if ( '' === $owner ) {
 			return false;
 		}
-		if ( ! function_exists( 'get_option' ) ) {
-			return true;
-		}
-		$existing = get_option( 'cetech_de_geo_pack_cas_' . $pack_id, false );
 
-		return is_array( $existing ) && (string) ( $existing['owner'] ?? '' ) === $owner;
+		return $this->packs->current_lease( $pack_id )['owner'] === $owner;
 	}
 
 	private function release_lifecycle_lock( int $pack_id, string $owner ): void {
-		if ( '' === $owner || ! function_exists( 'get_option' ) || ! function_exists( 'delete_option' ) ) {
-			return;
-		}
-		$key      = 'cetech_de_geo_pack_cas_' . $pack_id;
-		$existing = get_option( $key, false );
-		if ( ! is_array( $existing ) || (string) ( $existing['owner'] ?? '' ) !== $owner ) {
-			return;
-		}
-		delete_option( $key );
+		$this->packs->release_lease( $pack_id, $owner );
 	}
 
 	private function store_generation_file( string $country_code, string $generation_token, string $checksum, string $source_path ): string {
@@ -735,6 +683,7 @@ final class GeographyPackService {
 		if ( ! @copy( $source_path, $dest ) ) {
 			return '';
 		}
+		$this->cleanup_incoming_source( $source_path, $dir, $dest );
 
 		return $dest;
 	}
@@ -800,7 +749,7 @@ final class GeographyPackService {
 				continue;
 			}
 			$is_zip_or_txt = str_ends_with( strtolower( $base ), '.zip' ) || str_ends_with( strtolower( $base ), '.txt' );
-			if ( ! $is_zip_or_txt || str_contains( $base, 'incoming' ) ) {
+			if ( ! $is_zip_or_txt ) {
 				continue;
 			}
 			if ( '' !== $abandoned_seg && $seg === $abandoned_seg ) {
@@ -825,6 +774,26 @@ final class GeographyPackService {
 		}
 
 		return $deleted;
+	}
+
+	private function cleanup_incoming_source( string $source_path, string $storage_dir, string $immutable_path ): void {
+		if ( $source_path === $immutable_path || ! is_file( $source_path ) ) {
+			return;
+		}
+		$base = basename( $source_path );
+		if ( ! str_contains( strtolower( $base ), 'incoming' ) || ! str_ends_with( strtolower( $base ), '.txt' ) ) {
+			return;
+		}
+		$real_source  = realpath( $source_path );
+		$real_storage = realpath( $storage_dir );
+		if ( ! is_string( $real_source ) || ! is_string( $real_storage ) ) {
+			return;
+		}
+		$prefix = $real_storage . DIRECTORY_SEPARATOR;
+		if ( ! str_starts_with( $real_source, $prefix ) && $real_source !== $real_storage ) {
+			return;
+		}
+		$this->safe_unlink( $source_path );
 	}
 
 	private function safe_token_segment( string $token ): string {

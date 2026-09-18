@@ -315,7 +315,45 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		return $updated;
 	}
 
-	public function promote_generation( string $generation_token, ?callable $finalize = null ): int {
+	public function prepare_generation( string $generation_token, int $limit = 200, int $after_id = 0 ): array {
+		$generation_token = trim( $generation_token );
+		if ( '' === $generation_token ) {
+			throw new \RuntimeException( 'Promotion requires a generation token.' );
+		}
+
+		$batch     = max( 1, $limit );
+		$after     = max( 0, $after_id );
+		$processed = 0;
+		$last_id   = $after;
+		$candidates = [];
+		foreach ( $this->locations as $location ) {
+			if ( $location->draft_generation_token === $generation_token && $location->id > $after ) {
+				$candidates[] = $location;
+			}
+		}
+		usort(
+			$candidates,
+			static fn( CanonicalLocation $left, CanonicalLocation $right ): int => $left->id <=> $right->id
+		);
+		foreach ( array_slice( $candidates, 0, $batch ) as $location ) {
+			$last_id = max( $last_id, $location->id );
+			if ( '' !== $location->draft_json ) {
+				$draft = json_decode( $location->draft_json, true );
+				if ( is_array( $draft ) ) {
+					$this->stage_draft_side_effects_in_memory( $location, $draft, $generation_token );
+				}
+			}
+			++$processed;
+		}
+
+		return [
+			'processed' => $processed,
+			'last_id'   => $last_id,
+			'done'      => 0 === $processed,
+		];
+	}
+
+	public function finalize_generation( string $generation_token, ?callable $finalize = null ): int {
 		$generation_token = trim( $generation_token );
 		if ( '' === $generation_token ) {
 			throw new \RuntimeException( 'Promotion requires a generation token.' );
@@ -327,6 +365,9 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		$snapshot_external  = $this->external_by_location;
 
 		try {
+			if ( is_callable( $finalize ) ) {
+				$finalize();
+			}
 			$activated = 0;
 			foreach ( $this->locations as $location ) {
 				if ( $location->draft_generation_token === $generation_token && '' !== $location->draft_json ) {
@@ -361,9 +402,6 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			}
 			$this->activate_staged_mappings( $generation_token );
 			$this->activate_staged_aliases( $generation_token );
-			if ( is_callable( $finalize ) ) {
-				$finalize();
-			}
 
 			return $activated;
 		} catch ( \Throwable $e ) {
@@ -373,6 +411,18 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			$this->external_by_location = $snapshot_external;
 			throw $e;
 		}
+	}
+
+	public function promote_generation( string $generation_token, ?callable $finalize = null ): int {
+		$after = 0;
+		$guard = 0;
+		do {
+			$prepared = $this->prepare_generation( $generation_token, 200, $after );
+			$after    = (int) $prepared['last_id'];
+			++$guard;
+		} while ( ! $prepared['done'] && $guard < 100000 );
+
+		return $this->finalize_generation( $generation_token, $finalize );
 	}
 
 	public function abandon_generation( string $generation_token ): void {
@@ -422,6 +472,49 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 				$kept[] = $alias;
 			}
 			$this->aliases[ $location_id ] = $kept;
+		}
+	}
+
+	/**
+	 * @param array<string, mixed> $draft
+	 */
+	private function stage_draft_side_effects_in_memory( CanonicalLocation $location, array $draft, string $generation_token ): void {
+		$former = trim( (string) ( $draft['former_name'] ?? '' ) );
+		if ( '' !== $former ) {
+			$this->add_alias( $location->id, $former, GeographyNameNormalizer::normalize( $former ), '', 'former_name', false, $generation_token );
+		}
+		foreach ( $draft['aliases'] ?? [] as $alias_row ) {
+			if ( ! is_array( $alias_row ) ) {
+				continue;
+			}
+			$alias = trim( (string) ( $alias_row['alias'] ?? '' ) );
+			$norm  = trim( (string) ( $alias_row['normalized'] ?? GeographyNameNormalizer::normalize( $alias ) ) );
+			if ( '' === $alias || '' === $norm ) {
+				continue;
+			}
+			$this->add_alias( $location->id, $alias, $norm, '', (string) ( $alias_row['type'] ?? 'alternate' ), false, $generation_token );
+		}
+		foreach ( $draft['mappings'] ?? [] as $mapping ) {
+			if ( ! is_array( $mapping ) ) {
+				continue;
+			}
+			$external = trim( (string) ( $mapping['external_id'] ?? '' ) );
+			if ( '' === $external ) {
+				continue;
+			}
+			$provider = GeographyProvider::tryFrom( (string) ( $mapping['provider'] ?? '' ) ) ?? GeographyProvider::GeoNames;
+			$this->upsert(
+				$location->id,
+				$provider,
+				$external,
+				isset( $mapping['pack_id'] ) ? (int) $mapping['pack_id'] : null,
+				(string) ( $mapping['dataset_version'] ?? '' ),
+				(string) ( $mapping['provider_parent_reference'] ?? '' ),
+				(string) ( $mapping['feature_class'] ?? '' ),
+				(string) ( $mapping['feature_code'] ?? '' ),
+				is_array( $mapping['metadata'] ?? null ) ? $mapping['metadata'] : [],
+				$generation_token
+			);
 		}
 	}
 

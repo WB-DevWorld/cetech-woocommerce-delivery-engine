@@ -71,13 +71,10 @@ final class Geo7TechnicalCorrectionTest extends TestCase {
 			]
 		);
 		$service = $this->service();
+		$mem     = $this->packs_of( $service );
 		$old     = $this->invoke( $service, 'acquire_lifecycle_lock', $pack->id, 'tick' );
 		self::assertNotSame( '', $old );
-		$key   = 'cetech_de_geo_pack_cas_' . $pack->id;
-		$lease = get_option( $key );
-		self::assertIsArray( $lease );
-		$lease['expires_at'] = time() - 10;
-		update_option( $key, $lease, false );
+		$mem->expire_lease( $pack->id, time() - 10 );
 		$new = $this->invoke( $service, 'acquire_lifecycle_lock', $pack->id, 'tick' );
 		self::assertNotSame( '', $new );
 		self::assertNotSame( $old, $new );
@@ -307,18 +304,23 @@ final class Geo7TechnicalCorrectionTest extends TestCase {
 
 	public function test_owner_can_renew_unstolen_lease(): void {
 		$service = $this->service();
+		$packs   = $this->packs_of( $service );
 		$owner   = $this->invoke( $service, 'acquire_lifecycle_lock', 11, 'tick' );
 		self::assertNotSame( '', $owner );
-		$key   = 'cetech_de_geo_pack_cas_11';
-		$lease = get_option( $key );
-		self::assertIsArray( $lease );
-		$lease['expires_at'] = time() - 5;
-		update_option( $key, $lease, false );
+		$packs->expire_lease( 11, time() - 5 );
 		self::assertTrue( $this->invoke( $service, 'renew_lifecycle_lock', 11, $owner ) );
-		$renewed = get_option( $key );
-		self::assertIsArray( $renewed );
+		$renewed = $packs->current_lease( 11 );
 		self::assertGreaterThan( time(), (int) ( $renewed['expires_at'] ?? 0 ) );
 		self::assertSame( $owner, $renewed['owner'] ?? null );
+	}
+
+	private function packs_of( GeographyPackService $service ): InMemoryGeographyPackRepository {
+		$ref = new \ReflectionProperty( $service, 'packs' );
+		$ref->setAccessible( true );
+		$packs = $ref->getValue( $service );
+		self::assertInstanceOf( InMemoryGeographyPackRepository::class, $packs );
+
+		return $packs;
 	}
 
 	private function service(): GeographyPackService {
