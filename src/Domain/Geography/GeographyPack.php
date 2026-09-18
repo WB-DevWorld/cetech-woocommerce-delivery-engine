@@ -46,9 +46,8 @@ final class GeographyPack {
 
 		$provider = GeographyProvider::tryFrom( (string) ( $row['provider'] ?? '' ) ) ?? GeographyProvider::GeoNames;
 		$status   = GeographyPackStatus::tryFrom( (string) ( $row['status'] ?? '' ) ) ?? GeographyPackStatus::Pending;
-		$column_token = trim( (string) ( $row['target_token'] ?? '' ) );
-		if ( '' !== $column_token ) {
-			$progress['target_token'] = $column_token;
+		if ( array_key_exists( 'target_token', $row ) ) {
+			$progress['target_token'] = trim( (string) $row['target_token'] );
 		}
 
 		return new self(
@@ -125,8 +124,11 @@ final class GeographyPack {
 
 	public function assert_expected_target_token( string $expected_target_token ): void {
 		$expected = trim( $expected_target_token );
-		$current  = $this->target_token();
-		if ( '' === $expected || '' === $current || $current === $expected ) {
+		if ( '' === $expected ) {
+			return;
+		}
+		$current = $this->target_token();
+		if ( $current === $expected ) {
 			return;
 		}
 

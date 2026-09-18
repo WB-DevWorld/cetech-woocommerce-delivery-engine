@@ -124,12 +124,14 @@ final class WpdbGeographyPackRepository implements GeographyPackRepositoryInterf
 		string $expected_target_token = ''
 	): void {
 		global $wpdb;
+		$expected = trim( $expected_target_token );
 		$existing = $this->find_by_id( $id );
 		if ( $existing instanceof GeographyPack ) {
-			$progress = $existing->apply_progress_update( $progress, $status, $installed_at, $expected_target_token );
-		} elseif ( '' !== trim( $expected_target_token ) ) {
+			$progress = $existing->apply_progress_update( $progress, $status, $installed_at, $expected );
+			$existing->assert_expected_target_token( $expected );
+		} elseif ( '' !== $expected ) {
 			throw new \CetechDeliveryEngine\Domain\Geography\GeographyPackTokenFenceException(
-				'Pack target token fence rejected expected ' . trim( $expected_target_token ) . ' against a missing pack.'
+				'Pack target token fence rejected expected ' . $expected . ' against a missing pack.'
 			);
 		}
 		$table   = TableNames::for( GeographySchema::PACKS_SUFFIX );
@@ -148,20 +150,18 @@ final class WpdbGeographyPackRepository implements GeographyPackRepositoryInterf
 		if ( null !== $installed_at ) {
 			$data['installed_at'] = $installed_at;
 		}
-		$fence_token = trim( $expected_target_token );
-		if ( '' === $fence_token ) {
-			$fence_token = trim( (string) ( $progress['target_token'] ?? '' ) );
-		}
-		if ( '' !== $fence_token ) {
-			$data['target_token'] = $fence_token;
-		}
 
 		$where = [ 'id' => $id ];
-		$current_token = $existing instanceof GeographyPack ? $existing->target_token() : '';
-		if ( '' !== $fence_token && '' !== $current_token ) {
-			$where['target_token'] = $fence_token;
+		if ( '' !== $expected ) {
+			$data['target_token']  = $expected;
+			$where['target_token'] = $expected;
+		} else {
+			$progress_token = trim( (string) ( $progress['target_token'] ?? '' ) );
+			if ( '' !== $progress_token ) {
+				$data['target_token'] = $progress_token;
+			}
 		}
-		if ( GeographyPackStatus::Ready === $status && '' !== $fence_token ) {
+		if ( GeographyPackStatus::Ready === $status && '' !== $expected ) {
 			$where['status'] = GeographyPackStatus::Importing->value;
 			if ( $existing instanceof GeographyPack && GeographyPackStatus::Pending === $existing->status ) {
 				$where['status'] = GeographyPackStatus::Pending->value;
@@ -173,8 +173,8 @@ final class WpdbGeographyPackRepository implements GeographyPackRepositoryInterf
 		if ( false === $result ) {
 			throw new \RuntimeException( 'Failed to update geography pack progress for pack ' . $id . '.' );
 		}
-		if ( 0 === (int) $result && '' !== $fence_token ) {
-			$this->throw_fenced_update_failure( $id, $status, $fence_token );
+		if ( 0 === (int) $result && '' !== $expected ) {
+			$this->throw_fenced_update_failure( $id, $status, $expected );
 		}
 	}
 

@@ -67,8 +67,8 @@ interface CanonicalLocationRepositoryInterface {
 
 	/**
 	 * Bounded, shopper-invisible preparation for one staging token.
-	 * Rebuilds missing Inactive ancestry and stages draft aliases/mappings.
-	 * Does not activate geography or mutate Active live names.
+	 * Stages future ancestry/parent metadata and draft aliases/mappings.
+	 * Must not mutate live Active parent_location_id, ancestry_path, names, coordinates, aliases, or mappings.
 	 *
 	 * @return array{processed: int, last_id: int, done: bool}
 	 */

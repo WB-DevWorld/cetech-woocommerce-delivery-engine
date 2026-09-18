@@ -412,26 +412,19 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 			$draft    = '' !== $location->draft_json ? json_decode( $location->draft_json, true ) : null;
 			if ( is_array( $draft ) ) {
 				$this->stage_draft_side_effects( $location, $draft, $generation_token );
-				$parent_id = isset( $draft['parent_location_id'] ) ? (int) $draft['parent_location_id'] : (int) ( $location->parent_location_id ?? 0 );
-				if ( $parent_id > 0 && $parent_id !== (int) ( $location->parent_location_id ?? 0 ) ) {
-					$parent = $this->find_by_id( $parent_id );
-					if ( $parent instanceof CanonicalLocation ) {
-						$old_path = $location->ancestry_path;
-						$new_path = LocationAncestry::append_path( $parent->ancestry_path, $location->id );
-						$this->update_ancestry_path( $location->id, $new_path );
-						if ( '' !== $old_path && $old_path !== $new_path ) {
-							$this->rebuild_descendant_ancestry( $location->id, $old_path, $new_path );
-						}
-					}
-				}
-			}
-			if ( RecordStatus::Inactive === $location->status && '' === $location->ancestry_path ) {
+				$this->stage_prepared_hierarchy( $location, $draft, $generation_token );
+			} elseif ( RecordStatus::Inactive === $location->status && '' === $location->ancestry_path ) {
 				$path = $this->compute_path( $location );
 				if ( '' !== $path ) {
-					$this->update_ancestry_path( $location->id, $path );
+					$this->write_prepared_ancestry( $location->id, $path, $generation_token );
 				}
 			}
 			++$processed;
+		}
+
+		$remaining = $batch - $processed;
+		if ( $remaining > 0 ) {
+			$processed += $this->stage_prepared_descendants( $generation_token, $remaining );
 		}
 
 		return [
@@ -463,6 +456,12 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 			$draft_count = (int) $wpdb->get_var( $wpdb->prepare( $count_sql, $generation_token ) );
 			if ( $draft_count > 0 ) {
 				$this->apply_drafts_set_based( $generation_token, $now );
+			}
+			$count_sql = "SELECT COUNT(*) FROM `{$table}` WHERE prepared_generation_token = %s AND prepared_ancestry_path != ''";
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$prepared_count = (int) $wpdb->get_var( $wpdb->prepare( $count_sql, $generation_token ) );
+			if ( $prepared_count > 0 ) {
+				$this->apply_prepared_ancestry_set_based( $generation_token, $now );
 			}
 			$sql = "UPDATE `{$table}` SET status = %s, updated_at = %s WHERE generation_token = %s AND status = %s";
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
@@ -519,10 +518,10 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 				throw new \RuntimeException( 'Failed to abandon staged locations for token ' . $generation_token . '.' );
 			}
 
-			$sql = "UPDATE `{$locations}` SET `draft_json` = NULL, `draft_generation_token` = %s, `updated_at` = %s WHERE `draft_generation_token` = %s AND `status` = %s";
+			$sql = "UPDATE `{$locations}` SET `draft_json` = NULL, `draft_generation_token` = %s, `prepared_ancestry_path` = %s, `prepared_generation_token` = %s, `updated_at` = %s WHERE (`draft_generation_token` = %s OR `prepared_generation_token` = %s)";
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 			$cleared = $wpdb->query(
-				$wpdb->prepare( $sql, '', $now, $generation_token, RecordStatus::Active->value )
+				$wpdb->prepare( $sql, '', '', '', $now, $generation_token, $generation_token )
 			);
 			if ( false === $cleared ) {
 				throw new \RuntimeException( 'Failed to clear staged drafts for token ' . $generation_token . '.' );
@@ -616,6 +615,108 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 			if ( is_array( $mapping ) ) {
 				$this->write_staged_mapping( $existing->id, $mapping, $generation_token );
 			}
+		}
+	}
+
+	/**
+	 * @param array<string, mixed> $draft
+	 */
+	private function stage_prepared_hierarchy( CanonicalLocation $location, array $draft, string $generation_token ): void {
+		$parent_id = isset( $draft['parent_location_id'] ) ? (int) $draft['parent_location_id'] : (int) ( $location->parent_location_id ?? 0 );
+		$path      = $this->future_ancestry_path( $location, $parent_id > 0 ? $parent_id : null, $generation_token );
+		if ( '' !== $path ) {
+			$this->write_prepared_ancestry( $location->id, $path, $generation_token );
+		}
+	}
+
+	private function future_ancestry_path( CanonicalLocation $location, ?int $parent_id, string $generation_token ): string {
+		if ( null === $parent_id || $parent_id <= 0 ) {
+			return LocationAncestry::append_path( '', $location->id );
+		}
+
+		$parent = $this->find_by_id( $parent_id );
+		$parent_path = '';
+		if ( $parent instanceof CanonicalLocation ) {
+			$parent_path = ( $parent->prepared_generation_token === $generation_token && '' !== $parent->prepared_ancestry_path )
+				? $parent->prepared_ancestry_path
+				: $parent->ancestry_path;
+		}
+
+		return LocationAncestry::append_path( $parent_path, $location->id );
+	}
+
+	private function write_prepared_ancestry( int $id, string $path, string $generation_token ): void {
+		global $wpdb;
+		$table = $this->table_name();
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$result = $wpdb->update(
+			$table,
+			[
+				'prepared_ancestry_path'     => $path,
+				'prepared_generation_token'  => $generation_token,
+				'updated_at'                 => gmdate( 'Y-m-d H:i:s' ),
+			],
+			[ 'id' => $id ]
+		);
+		if ( false === $result ) {
+			throw new \RuntimeException( 'Failed to stage prepared ancestry for location ' . $id . '.' );
+		}
+	}
+
+	private function stage_prepared_descendants( string $generation_token, int $limit ): int {
+		$remaining = max( 1, $limit );
+		$updated   = 0;
+		global $wpdb;
+		$table = $this->table_name();
+		$sql   = "SELECT * FROM `{$table}` WHERE prepared_generation_token = %s AND draft_generation_token = %s ORDER BY id ASC LIMIT 50";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$roots = $wpdb->get_results( $wpdb->prepare( $sql, $generation_token, $generation_token ), ARRAY_A );
+		foreach ( is_array( $roots ) ? $roots : [] as $row ) {
+			if ( $remaining <= 0 ) {
+				break;
+			}
+			$root = CanonicalLocation::fromRow( $row );
+			if ( '' === $root->prepared_ancestry_path || $root->prepared_ancestry_path === $root->ancestry_path || '' === $root->ancestry_path ) {
+				continue;
+			}
+			$like  = $wpdb->esc_like( $root->ancestry_path ) . '%';
+			$start = strlen( $root->ancestry_path ) + 1;
+			$now   = gmdate( 'Y-m-d H:i:s' );
+			$sql   = "UPDATE `{$table}` SET prepared_ancestry_path = CONCAT(%s, SUBSTRING(ancestry_path, %d)), prepared_generation_token = %s, updated_at = %s WHERE ancestry_path LIKE %s AND id != %d AND (prepared_generation_token = %s OR prepared_generation_token != %s) LIMIT %d";
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$batch = $wpdb->query(
+				$wpdb->prepare(
+					$sql,
+					$root->prepared_ancestry_path,
+					$start,
+					$generation_token,
+					$now,
+					$like,
+					$root->id,
+					'',
+					$generation_token,
+					$remaining
+				)
+			);
+			if ( false === $batch ) {
+				throw new \RuntimeException( 'Failed to stage prepared descendant ancestry for token ' . $generation_token . '.' );
+			}
+			$batch      = (int) $batch;
+			$updated   += $batch;
+			$remaining -= $batch;
+		}
+
+		return $updated;
+	}
+
+	private function apply_prepared_ancestry_set_based( string $generation_token, string $now ): void {
+		global $wpdb;
+		$table = $this->table_name();
+		$sql   = "UPDATE `{$table}` SET ancestry_path = prepared_ancestry_path, prepared_ancestry_path = '', prepared_generation_token = '', updated_at = %s WHERE prepared_generation_token = %s AND prepared_ancestry_path != ''";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$result = $wpdb->query( $wpdb->prepare( $sql, $now, $generation_token ) );
+		if ( false === $result ) {
+			throw new \RuntimeException( 'Failed to apply prepared ancestry paths for token ' . $generation_token . '.' );
 		}
 	}
 

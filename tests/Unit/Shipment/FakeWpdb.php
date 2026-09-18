@@ -23,6 +23,8 @@ final class FakeWpdb {
 
 	public int $rows_affected = 0;
 
+	public int $max_select_row_count = 0;
+
 	/** @var list<string> */
 	public array $sql_log = [];
 
@@ -381,8 +383,13 @@ final class FakeWpdb {
 		}
 
 		$parsed = $this->parse_select( $sql );
+		$rows   = $this->filter_rows( $parsed );
+		$count  = count( $rows );
+		if ( $count > $this->max_select_row_count ) {
+			$this->max_select_row_count = $count;
+		}
 
-		return $this->filter_rows( $parsed );
+		return $rows;
 	}
 
 	/**
@@ -703,12 +710,29 @@ final class FakeWpdb {
 		if ( preg_match( '/INNER JOIN/i', $sql ) ) {
 			return $this->execute_join_update( $sql );
 		}
+		if ( preg_match( '/CONCAT\s*\(/i', $sql ) && preg_match( '/SUBSTRING\s*\(/i', $sql ) ) {
+			return $this->execute_concat_substring_update( $sql );
+		}
+		if ( preg_match( '/ancestry_path\s*=\s*`?prepared_ancestry_path`?/i', $sql ) ) {
+			return $this->execute_apply_prepared_ancestry_update( $sql );
+		}
 		if ( ! preg_match( '/^UPDATE `([^`]+)` SET (.+) WHERE (.+)$/is', $sql, $matches ) ) {
 			throw new \RuntimeException( 'Unsupported SQL: ' . $sql );
+		}
+		if ( null !== $this->fail_next_update_column && str_contains( (string) $matches[2], $this->fail_next_update_column ) ) {
+			$this->fail_next_update_column = null;
+			$this->last_error              = 'Simulated column update failure';
+
+			return false;
 		}
 		$table   = $matches[1];
 		$set     = $this->parse_set_clause( (string) $matches[2] );
 		$where   = (string) $matches[3];
+		$limit   = null;
+		if ( preg_match( '/^(.*)\s+LIMIT\s+(\d+)\s*$/is', $where, $limit_match ) ) {
+			$where = (string) $limit_match[1];
+			$limit = (int) $limit_match[2];
+		}
 		$updated = 0;
 		foreach ( $this->tables[ $table ] ?? [] as $index => $row ) {
 			if ( ! $this->sql_where_matches( $row, $where ) ) {
@@ -716,6 +740,9 @@ final class FakeWpdb {
 			}
 			$this->tables[ $table ][ $index ] = array_merge( $row, $set );
 			++$updated;
+			if ( null !== $limit && $updated >= $limit ) {
+				break;
+			}
 		}
 
 		return $updated;
@@ -896,6 +923,76 @@ final class FakeWpdb {
 		return $inserted;
 	}
 
+	private function execute_concat_substring_update( string $sql ): int|false {
+		if ( ! preg_match(
+			"/^UPDATE `([^`]+)` SET prepared_ancestry_path = CONCAT\\('((?:\\\\'|[^'])*)', SUBSTRING\\(ancestry_path, (\\d+)\\)\\), prepared_generation_token = '((?:\\\\'|[^'])*)', updated_at = '((?:\\\\'|[^'])*)' WHERE (.+?)(?: LIMIT (\\d+))?\\s*$/is",
+			$sql,
+			$matches
+		) ) {
+			throw new \RuntimeException( 'Unsupported SQL: ' . $sql );
+		}
+		if ( null !== $this->fail_next_update_column && str_contains( $sql, $this->fail_next_update_column ) ) {
+			$this->fail_next_update_column = null;
+			$this->last_error              = 'Simulated column update failure';
+
+			return false;
+		}
+		$table      = $matches[1];
+		$prefix     = stripcslashes( $matches[2] );
+		$start      = max( 1, (int) $matches[3] );
+		$token      = stripcslashes( $matches[4] );
+		$updated_at = stripcslashes( $matches[5] );
+		$where      = (string) $matches[6];
+		$limit      = isset( $matches[7] ) && '' !== $matches[7] ? (int) $matches[7] : null;
+		$updated    = 0;
+		foreach ( $this->tables[ $table ] ?? [] as $index => $row ) {
+			if ( ! $this->sql_where_matches( $row, $where ) ) {
+				continue;
+			}
+			$path   = (string) ( $row['ancestry_path'] ?? '' );
+			$suffix = substr( $path, $start - 1 );
+			$this->tables[ $table ][ $index ]['prepared_ancestry_path']     = $prefix . $suffix;
+			$this->tables[ $table ][ $index ]['prepared_generation_token']  = $token;
+			$this->tables[ $table ][ $index ]['updated_at']                 = $updated_at;
+			++$updated;
+			if ( null !== $limit && $updated >= $limit ) {
+				break;
+			}
+		}
+
+		return $updated;
+	}
+
+	private function execute_apply_prepared_ancestry_update( string $sql ): int|false {
+		if ( null !== $this->fail_next_update_column && str_contains( $sql, $this->fail_next_update_column ) ) {
+			$this->fail_next_update_column = null;
+			$this->last_error              = 'Simulated column update failure';
+
+			return false;
+		}
+		if ( ! preg_match( '/^UPDATE `([^`]+)` SET .+ WHERE (.+)$/is', $sql, $matches ) ) {
+			throw new \RuntimeException( 'Unsupported SQL: ' . $sql );
+		}
+		$table   = $matches[1];
+		$where   = (string) $matches[2];
+		$updated = 0;
+		foreach ( $this->tables[ $table ] ?? [] as $index => $row ) {
+			if ( ! $this->sql_where_matches( $row, $where ) ) {
+				continue;
+			}
+			$path = (string) ( $row['prepared_ancestry_path'] ?? '' );
+			$this->tables[ $table ][ $index ]['ancestry_path']             = $path;
+			$this->tables[ $table ][ $index ]['prepared_ancestry_path']    = '';
+			$this->tables[ $table ][ $index ]['prepared_generation_token'] = '';
+			if ( preg_match( "/updated_at = '((?:\\\\'|[^'])*)'/i", $sql, $at ) ) {
+				$this->tables[ $table ][ $index ]['updated_at'] = stripcslashes( $at[1] );
+			}
+			++$updated;
+		}
+
+		return $updated;
+	}
+
 	/**
 	 * @param array<string, mixed> $row
 	 */
@@ -1025,6 +1122,15 @@ final class FakeWpdb {
 		}
 		if ( preg_match( '/^`?([a-z0-9_]+)`?\s*>\s*(\d+)$/i', $clause, $matches ) ) {
 			return (int) ( $row[ $matches[1] ] ?? 0 ) > (int) $matches[2];
+		}
+		if ( preg_match( '/^`?([a-z0-9_]+)`?\s*(?:!=|<>)\s*\'((?:\\\\\'|[^\'])*)\'$/i', $clause, $matches ) ) {
+			return (string) ( $row[ $matches[1] ] ?? '' ) !== stripcslashes( $matches[2] );
+		}
+		if ( preg_match( '/^`?([a-z0-9_]+)`?\s*(?:!=|<>)\s*(\d+)$/i', $clause, $matches ) ) {
+			return (int) ( $row[ $matches[1] ] ?? 0 ) !== (int) $matches[2];
+		}
+		if ( preg_match( '/^`?([a-z0-9_]+)`?\s+LIKE\s+\'((?:\\\\\'|[^\'])*)\'$/i', $clause, $matches ) ) {
+			return $this->like_matches( (string) ( $row[ $matches[1] ] ?? '' ), stripcslashes( $matches[2] ) );
 		}
 
 		return false;

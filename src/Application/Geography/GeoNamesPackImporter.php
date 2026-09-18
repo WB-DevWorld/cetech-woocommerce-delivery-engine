@@ -181,6 +181,19 @@ final class GeoNamesPackImporter {
 			$progress['target_generation'] = $target;
 			$progress['target_token']      = $token;
 		}
+		if ( '' === $pack->target_token() && '' !== $token ) {
+			$this->packs->update_progress(
+				$pack->id,
+				$pack->status,
+				$pack->import_cursor,
+				$progress,
+				$pack->last_error
+			);
+			$reloaded = $this->packs->find_by_id( $pack->id );
+			if ( $reloaded instanceof GeographyPack ) {
+				$pack = $reloaded;
+			}
+		}
 
 		try {
 			return $this->import_batch_body( $pack, $file_path, $batch_size, $country, $cursor, $progress, $processed, $imported, $skipped, $target, $token );

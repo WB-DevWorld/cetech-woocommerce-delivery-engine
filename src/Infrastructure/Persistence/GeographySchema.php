@@ -84,6 +84,8 @@ final class GeographySchema {
 				generation int unsigned NOT NULL DEFAULT 0,
 				generation_token varchar(64) NOT NULL DEFAULT '',
 				draft_generation_token varchar(64) NOT NULL DEFAULT '',
+				prepared_generation_token varchar(64) NOT NULL DEFAULT '',
+				prepared_ancestry_path varchar(191) NOT NULL DEFAULT '',
 				draft_json longtext NULL,
 				created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
 				updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -97,6 +99,7 @@ final class GeographySchema {
 				KEY generation_status (generation, status),
 				KEY generation_token (generation_token),
 				KEY draft_generation_token (draft_generation_token),
+				KEY prepared_generation_token (prepared_generation_token),
 				KEY status (status)
 			) ENGINE=InnoDB {$charset_collate};",
 			self::ALIASES_SUFFIX => "CREATE TABLE {$aliases} (
@@ -182,10 +185,13 @@ final class GeographySchema {
 				'generation',
 				'generation_token',
 				'draft_generation_token',
+				'prepared_generation_token',
+				'prepared_ancestry_path',
 				'draft_json',
 				'KEY generation_status (generation, status)',
 				'KEY generation_token (generation_token)',
 				'KEY draft_generation_token (draft_generation_token)',
+				'KEY prepared_generation_token (prepared_generation_token)',
 				'ENGINE=InnoDB',
 			],
 			self::ALIASES_SUFFIX => [

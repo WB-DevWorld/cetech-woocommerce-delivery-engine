@@ -31,7 +31,9 @@ final class CanonicalLocation {
 		public readonly int $generation = 0,
 		public readonly string $draft_json = '',
 		public readonly string $generation_token = '',
-		public readonly string $draft_generation_token = ''
+		public readonly string $draft_generation_token = '',
+		public readonly string $prepared_ancestry_path = '',
+		public readonly string $prepared_generation_token = ''
 	) {
 	}
 
@@ -109,7 +111,9 @@ final class CanonicalLocation {
 			(int) ( $row['generation'] ?? 0 ),
 			(string) ( $row['draft_json'] ?? '' ),
 			(string) ( $row['generation_token'] ?? '' ),
-			(string) ( $row['draft_generation_token'] ?? '' )
+			(string) ( $row['draft_generation_token'] ?? '' ),
+			(string) ( $row['prepared_ancestry_path'] ?? '' ),
+			(string) ( $row['prepared_generation_token'] ?? '' )
 		);
 	}
 }

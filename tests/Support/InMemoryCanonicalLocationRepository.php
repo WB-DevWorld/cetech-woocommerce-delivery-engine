@@ -261,7 +261,9 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			$location->generation,
 			$location->draft_json,
 			$location->generation_token,
-			$location->draft_generation_token
+			$location->draft_generation_token,
+			$location->prepared_ancestry_path,
+			$location->prepared_generation_token
 		);
 		$this->locations[ $id ] = $saved;
 
@@ -292,7 +294,9 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 				$existing->generation,
 				$existing->draft_json,
 				$existing->generation_token,
-				$existing->draft_generation_token
+				$existing->draft_generation_token,
+				$existing->prepared_ancestry_path,
+				$existing->prepared_generation_token
 			);
 		}
 	}
@@ -341,9 +345,15 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 				$draft = json_decode( $location->draft_json, true );
 				if ( is_array( $draft ) ) {
 					$this->stage_draft_side_effects_in_memory( $location, $draft, $generation_token );
+					$this->stage_prepared_hierarchy_in_memory( $location, $draft, $generation_token );
 				}
 			}
 			++$processed;
+		}
+
+		$remaining = $batch - $processed;
+		if ( $remaining > 0 ) {
+			$processed += $this->stage_prepared_descendants_in_memory( $generation_token, $remaining );
 		}
 
 		return [
@@ -374,28 +384,36 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 					$draft = json_decode( $location->draft_json, true );
 					if ( is_array( $draft ) ) {
 						$this->apply_draft_in_memory( $location, $draft );
-						$location = $this->locations[ $location->id ] ?? $location;
 					}
 				}
+			}
+			foreach ( $this->locations as $location ) {
+				if ( $location->prepared_generation_token === $generation_token && '' !== $location->prepared_ancestry_path ) {
+					$this->apply_prepared_ancestry_in_memory( $location );
+					$location = $this->locations[ $location->id ] ?? $location;
+				}
 				if ( $location->generation_token === $generation_token && RecordStatus::Inactive === $location->status ) {
+					$fresh = $this->locations[ $location->id ] ?? $location;
 					$this->locations[ $location->id ] = new CanonicalLocation(
-						$location->id,
-						$location->location_key,
-						$location->country_code,
-						$location->parent_location_id,
-						$location->location_type,
-						$location->administrative_level,
-						$location->canonical_name,
-						$location->normalized_name,
-						$location->ascii_name,
-						$location->latitude,
-						$location->longitude,
+						$fresh->id,
+						$fresh->location_key,
+						$fresh->country_code,
+						$fresh->parent_location_id,
+						$fresh->location_type,
+						$fresh->administrative_level,
+						$fresh->canonical_name,
+						$fresh->normalized_name,
+						$fresh->ascii_name,
+						$fresh->latitude,
+						$fresh->longitude,
 						RecordStatus::Active,
-						$location->ancestry_path,
-						$location->generation,
+						$fresh->ancestry_path,
+						$fresh->generation,
 						'',
 						$generation_token,
-						''
+						'',
+						$fresh->prepared_ancestry_path,
+						$fresh->prepared_generation_token
 					);
 					++$activated;
 				}
@@ -436,7 +454,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 				unset( $this->locations[ $id ], $this->aliases[ $id ] );
 				continue;
 			}
-			if ( $location->draft_generation_token === $generation_token && RecordStatus::Active === $location->status ) {
+			if ( $location->draft_generation_token === $generation_token || $location->prepared_generation_token === $generation_token ) {
 				$this->locations[ $id ] = new CanonicalLocation(
 					$location->id,
 					$location->location_key,
@@ -454,6 +472,8 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 					$location->generation,
 					'',
 					$location->generation_token,
+					'',
+					'',
 					''
 				);
 			}
@@ -521,29 +541,155 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	/**
 	 * @param array<string, mixed> $draft
 	 */
+	private function stage_prepared_hierarchy_in_memory( CanonicalLocation $location, array $draft, string $generation_token ): void {
+		$parent_id = isset( $draft['parent_location_id'] ) ? (int) $draft['parent_location_id'] : (int) ( $location->parent_location_id ?? 0 );
+		$path      = $this->future_ancestry_path_in_memory( $location, $parent_id > 0 ? $parent_id : null, $generation_token );
+		$fresh     = $this->locations[ $location->id ] ?? $location;
+		$this->locations[ $location->id ] = new CanonicalLocation(
+			$fresh->id,
+			$fresh->location_key,
+			$fresh->country_code,
+			$fresh->parent_location_id,
+			$fresh->location_type,
+			$fresh->administrative_level,
+			$fresh->canonical_name,
+			$fresh->normalized_name,
+			$fresh->ascii_name,
+			$fresh->latitude,
+			$fresh->longitude,
+			$fresh->status,
+			$fresh->ancestry_path,
+			$fresh->generation,
+			$fresh->draft_json,
+			$fresh->generation_token,
+			$fresh->draft_generation_token,
+			$path,
+			$generation_token
+		);
+	}
+
+	private function future_ancestry_path_in_memory( CanonicalLocation $location, ?int $parent_id, string $generation_token ): string {
+		if ( null === $parent_id || $parent_id <= 0 ) {
+			return LocationAncestry::append_path( '', $location->id );
+		}
+		$parent = $this->locations[ $parent_id ] ?? null;
+		$parent_path = '';
+		if ( $parent instanceof CanonicalLocation ) {
+			$parent_path = ( $parent->prepared_generation_token === $generation_token && '' !== $parent->prepared_ancestry_path )
+				? $parent->prepared_ancestry_path
+				: $parent->ancestry_path;
+		}
+
+		return LocationAncestry::append_path( $parent_path, $location->id );
+	}
+
+	private function stage_prepared_descendants_in_memory( string $generation_token, int $limit ): int {
+		$remaining = max( 1, $limit );
+		$updated   = 0;
+		foreach ( $this->locations as $root ) {
+			if ( $remaining <= 0 ) {
+				break;
+			}
+			if ( $root->prepared_generation_token !== $generation_token || $root->draft_generation_token !== $generation_token ) {
+				continue;
+			}
+			if ( '' === $root->prepared_ancestry_path || $root->prepared_ancestry_path === $root->ancestry_path || '' === $root->ancestry_path ) {
+				continue;
+			}
+			foreach ( $this->locations as $location ) {
+				if ( $remaining <= 0 ) {
+					break;
+				}
+				if ( $location->id === $root->id || ! str_starts_with( $location->ancestry_path, $root->ancestry_path ) ) {
+					continue;
+				}
+				if ( $location->prepared_generation_token === $generation_token && '' !== $location->prepared_ancestry_path ) {
+					continue;
+				}
+				$suffix = substr( $location->ancestry_path, strlen( $root->ancestry_path ) );
+				$this->locations[ $location->id ] = new CanonicalLocation(
+					$location->id,
+					$location->location_key,
+					$location->country_code,
+					$location->parent_location_id,
+					$location->location_type,
+					$location->administrative_level,
+					$location->canonical_name,
+					$location->normalized_name,
+					$location->ascii_name,
+					$location->latitude,
+					$location->longitude,
+					$location->status,
+					$location->ancestry_path,
+					$location->generation,
+					$location->draft_json,
+					$location->generation_token,
+					$location->draft_generation_token,
+					$root->prepared_ancestry_path . $suffix,
+					$generation_token
+				);
+				++$updated;
+				--$remaining;
+			}
+		}
+
+		return $updated;
+	}
+
+	private function apply_prepared_ancestry_in_memory( CanonicalLocation $location ): void {
+		$this->update_ancestry_path( $location->id, $location->prepared_ancestry_path );
+		$fresh = $this->locations[ $location->id ] ?? $location;
+		$this->locations[ $location->id ] = new CanonicalLocation(
+			$fresh->id,
+			$fresh->location_key,
+			$fresh->country_code,
+			$fresh->parent_location_id,
+			$fresh->location_type,
+			$fresh->administrative_level,
+			$fresh->canonical_name,
+			$fresh->normalized_name,
+			$fresh->ascii_name,
+			$fresh->latitude,
+			$fresh->longitude,
+			$fresh->status,
+			$fresh->ancestry_path,
+			$fresh->generation,
+			$fresh->draft_json,
+			$fresh->generation_token,
+			$fresh->draft_generation_token,
+			'',
+			''
+		);
+	}
+
+	/**
+	 * @param array<string, mixed> $draft
+	 */
 	private function apply_draft_in_memory( CanonicalLocation $location, array $draft ): void {
-		$name   = trim( (string) ( $draft['canonical_name'] ?? $location->canonical_name ) );
-		$parent = isset( $draft['parent_location_id'] ) ? (int) $draft['parent_location_id'] : $location->parent_location_id;
-		$old    = $location->ancestry_path;
+		$fresh  = $this->locations[ $location->id ] ?? $location;
+		$name   = trim( (string) ( $draft['canonical_name'] ?? $fresh->canonical_name ) );
+		$parent = isset( $draft['parent_location_id'] ) ? (int) $draft['parent_location_id'] : $fresh->parent_location_id;
 		$this->save(
 			new CanonicalLocation(
-				$location->id,
-				$location->location_key,
-				$location->country_code,
+				$fresh->id,
+				$fresh->location_key,
+				$fresh->country_code,
 				( $parent ?? 0 ) > 0 ? $parent : null,
-				$location->location_type,
-				$location->administrative_level,
-				'' !== $name ? $name : $location->canonical_name,
-				GeographyNameNormalizer::normalize( '' !== $name ? $name : $location->canonical_name ),
-				(string) ( $draft['ascii_name'] ?? $location->ascii_name ),
-				isset( $draft['latitude'] ) ? (float) $draft['latitude'] : $location->latitude,
-				isset( $draft['longitude'] ) ? (float) $draft['longitude'] : $location->longitude,
-				$location->status,
-				$location->ancestry_path,
-				$location->generation,
+				$fresh->location_type,
+				$fresh->administrative_level,
+				'' !== $name ? $name : $fresh->canonical_name,
+				GeographyNameNormalizer::normalize( '' !== $name ? $name : $fresh->canonical_name ),
+				(string) ( $draft['ascii_name'] ?? $fresh->ascii_name ),
+				isset( $draft['latitude'] ) ? (float) $draft['latitude'] : $fresh->latitude,
+				isset( $draft['longitude'] ) ? (float) $draft['longitude'] : $fresh->longitude,
+				$fresh->status,
+				$fresh->ancestry_path,
+				$fresh->generation,
 				'',
-				$location->generation_token,
-				''
+				$fresh->generation_token,
+				'',
+				$fresh->prepared_ancestry_path,
+				$fresh->prepared_generation_token
 			)
 		);
 		$former = trim( (string) ( $draft['former_name'] ?? '' ) );
@@ -582,16 +728,6 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 				is_array( $mapping['metadata'] ?? null ) ? $mapping['metadata'] : [],
 				''
 			);
-		}
-		if ( ( $parent ?? 0 ) > 0 && $parent !== $location->parent_location_id ) {
-			$parent_loc = $this->locations[ (int) $parent ] ?? null;
-			if ( $parent_loc instanceof CanonicalLocation ) {
-				$new_path = LocationAncestry::append_path( $parent_loc->ancestry_path, $location->id );
-				$this->update_ancestry_path( $location->id, $new_path );
-				if ( '' !== $old && $old !== $new_path ) {
-					$this->rebuild_descendant_ancestry( $location->id, $old, $new_path );
-				}
-			}
 		}
 	}
 

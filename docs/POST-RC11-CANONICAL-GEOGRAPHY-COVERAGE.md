@@ -1,6 +1,6 @@
 # Post-RC.11 Canonical Geography & Delivery Area Coverage
 
-Status: ISSUE #23 GEO.8 TECHNICAL CORRECTIONS / NOT MERGED / NOT RC.12
+Status: ISSUE #23 GEO.9 TECHNICAL CORRECTIONS / NOT MERGED / NOT RC.12
 
 Owner: `@wbdevworld`
 
@@ -24,9 +24,11 @@ Rejected technical-review candidate: `1.0.0-dev.geo.6` (`730bcc2fa73fadd0da12148
 
 Rejected technical-review candidate: `1.0.0-dev.geo.7` (`389674173fbf6886cfbf615c4baa163e13cc12c8`). Frozen package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.7.zip` SHA-256 `d167a0da7841c20bc141a7b3b294acba13291aa6e3e0f0e46cb0f98f36bf616a`. Do not physically QA geo.7.
 
-Current technical-correction candidate identity: `1.0.0-dev.geo.8`
+Rejected technical-review candidate: `1.0.0-dev.geo.8` (`92cdeae1d1f9916bf38253772ec30240f3e4798b`). Frozen package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.8.zip` SHA-256 `55e3c61297b4b1ab0ad06a3efa3c899c60fdf80f8d0fbd6bec8be5e5342d798f`. Do not physically QA geo.8.
 
-geo.8 technical corrections (PR #24 comment `5728435779`): bounded prepare plus small atomic finalize for generation promotion; pack-row lease CAS; conditional target-token Ready writes; official-download supersession of unfinished targets; incoming-file cleanup.
+Current technical-correction candidate identity: `1.0.0-dev.geo.9`
+
+geo.9 technical corrections (PR #24 comment `5729019690`): prepare stages future ancestry only and never mutates live Active hierarchy; strict expected target-token fence including empty current.
 
 Target schema: `6`
 

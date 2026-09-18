@@ -83,13 +83,8 @@ final class InMemoryGeographyPackRepository implements GeographyPackRepositoryIn
 			return;
 		}
 		$fence_token = trim( $expected_target_token );
-		if ( '' === $fence_token ) {
-			$fence_token = trim( (string) ( $progress['target_token'] ?? '' ) );
-		}
-		if ( '' !== $fence_token && '' !== $existing->target_token() && $existing->target_token() !== $fence_token ) {
-			throw new \CetechDeliveryEngine\Domain\Geography\GeographyPackTokenFenceException(
-				'Pack target token fence rejected expected ' . $fence_token . ' against current ' . $existing->target_token() . '.'
-			);
+		if ( '' !== $fence_token ) {
+			$existing->assert_expected_target_token( $fence_token );
 		}
 		if ( GeographyPackStatus::Ready === $status && '' !== $fence_token ) {
 			if ( GeographyPackStatus::Ready === $existing->status ) {
