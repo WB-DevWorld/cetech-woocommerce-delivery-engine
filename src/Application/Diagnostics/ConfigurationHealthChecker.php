@@ -67,7 +67,8 @@ final class ConfigurationHealthChecker {
 		private RateCardRepositoryInterface $rate_card_repository,
 		private ProductDeliveryRuleRepositoryInterface $product_rule_repository,
 		private ProductTargetResolver $target_resolver,
-		private FeatureFlags $feature_flags
+		private FeatureFlags $feature_flags,
+		private ?\CetechDeliveryEngine\Domain\Coverage\CoverageGroupRepositoryInterface $coverage_groups = null
 	) {
 	}
 
@@ -272,7 +273,7 @@ final class ConfigurationHealthChecker {
 				++$unrestricted_fallback_count;
 			}
 
-			if ( [] === $zone_rules && empty( $zone['is_fallback'] ) ) {
+			if ( [] === $zone_rules && empty( $zone['is_fallback'] ) && ! $this->zone_has_canonical_coverage( $zone_id ) ) {
 				$this->add(
 					$diagnostics,
 					DiagnosticSeverity::Warning,
@@ -352,7 +353,9 @@ final class ConfigurationHealthChecker {
 		$overlap = new OverlappingDeliveryAreaCoverage(
 			$this->destination_zone_repository,
 			$this->destination_rule_repository,
-			$this->rate_card_repository
+			$this->rate_card_repository,
+			null,
+			$this->coverage_groups
 		);
 
 		foreach ( $overlap->warnings() as $warning ) {
@@ -2156,6 +2159,19 @@ final class ConfigurationHealthChecker {
 			$contents = file_get_contents( $file->getPathname() );
 
 			if ( false !== $contents && str_contains( $contents, 'register_rest_route' ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private function zone_has_canonical_coverage( int $zone_id ): bool {
+		if ( $zone_id <= 0 || ! $this->coverage_groups instanceof \CetechDeliveryEngine\Domain\Coverage\CoverageGroupRepositoryInterface ) {
+			return false;
+		}
+		foreach ( $this->coverage_groups->list_by_zone( $zone_id ) as $group ) {
+			if ( $group->isUsable() ) {
 				return true;
 			}
 		}

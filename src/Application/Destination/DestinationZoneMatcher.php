@@ -4,9 +4,14 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Destination;
 
+use CetechDeliveryEngine\Application\Coverage\CoverageGroupMatcher;
+use CetechDeliveryEngine\Application\Geography\CanonicalLocationResolver;
+use CetechDeliveryEngine\Domain\Coverage\CoverageMatchDiagnostic;
+use CetechDeliveryEngine\Domain\Enum\CanonicalResolutionContext;
 use CetechDeliveryEngine\Domain\Enum\DestinationRuleMatchMode;
 use CetechDeliveryEngine\Domain\Enum\DestinationRuleType;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
+use CetechDeliveryEngine\Domain\Geography\ResolvedDestination;
 use CetechDeliveryEngine\Domain\Zone\DestinationRuleRepositoryInterface;
 use CetechDeliveryEngine\Domain\Zone\DestinationZoneRepositoryInterface;
 
@@ -20,20 +25,47 @@ final class DestinationZoneMatcher {
 
 	public const SPECIFICITY_FALLBACK = 0;
 
-	public const SPECIFICITY_COUNTRY = 1;
+	public const SPECIFICITY_COUNTRY = 10;
 
-	public const SPECIFICITY_REGION = 2;
+	public const SPECIFICITY_ADM1 = 20;
 
-	public const SPECIFICITY_CITY = 3;
+	public const SPECIFICITY_REGION = 20;
 
-	public const SPECIFICITY_POSTCODE = 4;
+	public const SPECIFICITY_ADM2 = 30;
+
+	public const SPECIFICITY_ADM3 = 40;
+
+	public const SPECIFICITY_ADM4 = 50;
+
+	public const SPECIFICITY_LOCALITY = 60;
+
+	public const SPECIFICITY_CITY = 60;
+
+	public const SPECIFICITY_POSTCODE = 70;
+
+	/** @var list<CoverageMatchDiagnostic> */
+	private array $last_diagnostics = [];
+
+	/** @var array<string, list<array<string, mixed>>> */
+	private array $match_cache = [];
 
 	public function __construct(
 		private DestinationZoneRepositoryInterface $zone_repository,
 		private DestinationRuleRepositoryInterface $rule_repository,
-		private ?RegionCodeLabelMatcher $region_matcher = null
+		private ?RegionCodeLabelMatcher $region_matcher = null,
+		private ?CoverageGroupMatcher $coverage_matcher = null,
+		private ?CanonicalLocationResolver $canonical_resolver = null
 	) {
 		$this->region_matcher = $region_matcher ?? new RegionCodeLabelMatcher();
+	}
+
+	/**
+	 * Admin/test diagnostics from the most recent match_all() call. Never customer-facing.
+	 *
+	 * @return list<CoverageMatchDiagnostic>
+	 */
+	public function last_diagnostics(): array {
+		return $this->last_diagnostics;
 	}
 
 	/**
@@ -52,7 +84,7 @@ final class DestinationZoneMatcher {
 
 	/**
 	 * Every matching active Delivery Area, ordered by configured priority, then
-	 * geographic specificity (postcode > city > region > country > fallback),
+		 * geographic specificity (postcode > locality > ADM4 > ADM3 > ADM2 > ADM1 > country > fallback),
 	 * then a deterministic name/code tie-break. Database creation order is not
 	 * a business ranking.
 	 *
@@ -66,48 +98,78 @@ final class DestinationZoneMatcher {
 		string $country_code,
 		string $region,
 		string $city,
-		string $postcode
+		string $postcode,
+		array $context = []
 	): array {
 		$country_code = strtoupper( trim( $country_code ) );
 		$region       = strtolower( trim( $region ) );
 		$city         = strtolower( trim( $city ) );
 		$postcode     = strtoupper( trim( $postcode ) );
+		$this->last_diagnostics = [];
 
-		$zones = $this->zone_repository->list(
+		$resolved = $this->resolve_destination( $country_code, $region, $city, $postcode, $context );
+		$cache_key = implode(
+			'|',
 			[
-				'status' => RecordStatus::Active->value,
-				'limit'  => 500,
+				$country_code,
+				$region,
+				$city,
+				$postcode,
+				(string) ( $context['canonical_location_key'] ?? '' ),
+				(string) ( $resolved?->location_id() ?? 0 ),
 			]
 		);
+		if ( isset( $this->match_cache[ $cache_key ] ) ) {
+			return $this->match_cache[ $cache_key ];
+		}
 
 		$candidates            = [];
 		$unrestricted_fallback = null;
+		$after                 = 0;
+		do {
+			$page = $this->zone_repository->page_after(
+				$after,
+				100,
+				[ 'status' => RecordStatus::Active->value ]
+			);
+			foreach ( $page as $zone ) {
+				$zone_id = (int) ( $zone['id'] ?? 0 );
+				$after   = max( $after, $zone_id );
+				if ( $zone_id <= 0 ) {
+					continue;
+				}
 
-		foreach ( $zones as $zone ) {
-			$zone_id = (int) ( $zone['id'] ?? 0 );
+				$rules = $this->rule_repository->listByZoneId( $zone_id );
+				$coverage = $this->match_coverage( $zone_id, $resolved );
+				$has_coverage_constraint = is_array( $coverage );
 
-			if ( $zone_id <= 0 ) {
-				continue;
+				if ( ! empty( $zone['is_fallback'] ) && [] === $rules && ! $has_coverage_constraint ) {
+					$unrestricted_fallback = $zone;
+					continue;
+				}
+
+				if ( $has_coverage_constraint ) {
+					if ( $coverage['matched'] ) {
+						$candidates[] = [
+							'zone'        => $zone,
+							'specificity' => (int) $coverage['specificity'],
+						];
+					}
+					continue;
+				}
+
+				if ( [] === $rules ) {
+					continue;
+				}
+
+				if ( $this->zone_matches_address( $rules, $country_code, $region, $city, $postcode ) ) {
+					$candidates[] = [
+						'zone'        => $zone,
+						'specificity' => self::geographic_specificity_rank( $rules, false ),
+					];
+				}
 			}
-
-			$rules = $this->rule_repository->listByZoneId( $zone_id );
-
-			if ( self::is_unrestricted_fallback( $zone, $rules ) ) {
-				$unrestricted_fallback = $zone;
-				continue;
-			}
-
-			if ( [] === $rules ) {
-				continue;
-			}
-
-			if ( $this->zone_matches_address( $rules, $country_code, $region, $city, $postcode ) ) {
-				$candidates[] = [
-					'zone'        => $zone,
-					'specificity' => self::geographic_specificity_rank( $rules, false ),
-				];
-			}
-		}
+		} while ( [] !== $page );
 
 		if ( [] !== $candidates ) {
 			usort( $candidates, [ $this, 'compare_candidates' ] );
@@ -118,10 +180,15 @@ final class DestinationZoneMatcher {
 				$ordered[] = $candidate['zone'];
 			}
 
+			$this->match_cache[ $cache_key ] = $ordered;
+
 			return $ordered;
 		}
 
-		return null !== $unrestricted_fallback ? [ $unrestricted_fallback ] : [];
+		$result = null !== $unrestricted_fallback ? [ $unrestricted_fallback ] : [];
+		$this->match_cache[ $cache_key ] = $result;
+
+		return $result;
 	}
 
 	/**
@@ -131,8 +198,8 @@ final class DestinationZoneMatcher {
 	 * @param array<string, mixed>       $zone
 	 * @param list<array<string, mixed>> $rules
 	 */
-	public static function is_unrestricted_fallback( array $zone, array $rules ): bool {
-		return ! empty( $zone['is_fallback'] ) && [] === $rules;
+	public static function is_unrestricted_fallback( array $zone, array $rules, bool $has_coverage_constraint = false ): bool {
+		return ! empty( $zone['is_fallback'] ) && [] === $rules && ! $has_coverage_constraint;
 	}
 
 	/**
@@ -267,5 +334,57 @@ final class DestinationZoneMatcher {
 		}
 
 		return $postcode === $rule_value;
+	}
+
+	/**
+	 * @param array<string, mixed> $context
+	 */
+	private function resolve_destination(
+		string $country_code,
+		string $region,
+		string $city,
+		string $postcode,
+		array $context
+	): ?ResolvedDestination {
+		if ( ! $this->canonical_resolver instanceof CanonicalLocationResolver ) {
+			return null;
+		}
+
+		$key = (string) ( $context['canonical_location_key'] ?? '' );
+		$policy = CanonicalResolutionContext::tryFrom( (string) ( $context['resolution_context'] ?? '' ) )
+			?? CanonicalResolutionContext::WooCommerceDestination;
+
+		return $this->canonical_resolver->resolve(
+			$country_code,
+			(string) ( $context['state'] ?? $region ),
+			(string) ( $context['state_label'] ?? $region ),
+			$city,
+			$postcode,
+			$key,
+			$policy
+		);
+	}
+
+	/**
+	 * @return array{matched:bool,specificity:int}|null Null when the zone has no usable coverage groups.
+	 */
+	private function match_coverage( int $zone_id, ?ResolvedDestination $resolved ): ?array {
+		if ( ! $this->coverage_matcher instanceof CoverageGroupMatcher || ! $resolved instanceof ResolvedDestination ) {
+			return null;
+		}
+
+		$result = $this->coverage_matcher->match_zone( $zone_id, $resolved );
+		if ( isset( $result['diagnostic'] ) && $result['diagnostic'] instanceof CoverageMatchDiagnostic ) {
+			$this->last_diagnostics[] = $result['diagnostic'];
+		}
+
+		if ( 'no_usable_coverage_group' === ( $result['diagnostic']->fallback_reason ?? '' ) ) {
+			return null;
+		}
+
+		return [
+			'matched'     => (bool) $result['matched'],
+			'specificity' => (int) $result['specificity'],
+		];
 	}
 }

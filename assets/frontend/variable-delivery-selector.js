@@ -138,7 +138,8 @@
 				country: value('cetech_de_matching_country'),
 				state: value('cetech_de_matching_state'),
 				city: value('cetech_de_matching_city'),
-				postcode: value('cetech_de_matching_postcode')
+				postcode: value('cetech_de_matching_postcode'),
+				location_key: value('cetech_de_matching_location_key')
 			};
 		},
 
@@ -161,7 +162,7 @@
 
 			this.showLoading();
 
-			var cacheKey = productId + ':' + variationId + ':' + location.country + ':' + location.state + ':' + location.city + ':' + location.postcode + ':' + quantity;
+			var cacheKey = productId + ':' + variationId + ':' + location.country + ':' + location.state + ':' + location.city + ':' + location.postcode + ':' + (location.location_key || '') + ':' + quantity;
 			if (this.cache[cacheKey]) {
 				if (token === this.requestToken && variationId === this.currentVariationId) {
 					this.renderResponse(this.cache[cacheKey], variationId);
@@ -188,6 +189,7 @@
 					state: location.state,
 					city: location.city,
 					postcode: location.postcode,
+					location_key: location.location_key,
 					quantity: quantity
 				}
 			});
@@ -431,20 +433,7 @@
 			var labelText = document.createElement('span');
 			labelText.className = 'cetech-de-delivery-option__label';
 			labelText.textContent = String(option.delivery_offer_public_label || '');
-
-			var headline = document.createElement('span');
-			headline.className = 'cetech-de-delivery-option__headline';
-			headline.appendChild(labelText);
-			var priceText = window.CetechDeProductDeliverySelector && window.CetechDeProductDeliverySelector.formatPriceText
-				? window.CetechDeProductDeliverySelector.formatPriceText(option, { i18n: i18n })
-				: String(option.price_text || '');
-			if (priceText) {
-				var price = document.createElement('span');
-				price.className = 'cetech-de-delivery-option__price';
-				price.textContent = priceText;
-				headline.appendChild(price);
-			}
-			body.appendChild(headline);
+			body.appendChild(labelText);
 
 			if (option.estimate_text && String(option.fulfilment_choice || '') !== 'store_pickup') {
 				var estimateLine = option.estimate_line
@@ -458,6 +447,16 @@
 					eta.textContent = estimateLine;
 					body.appendChild(eta);
 				}
+			}
+
+			var priceText = window.CetechDeProductDeliverySelector && window.CetechDeProductDeliverySelector.formatPriceText
+				? window.CetechDeProductDeliverySelector.formatPriceText(option, { i18n: i18n })
+				: String(option.price_text || '');
+			if (priceText) {
+				var price = document.createElement('span');
+				price.className = 'cetech-de-delivery-option__price';
+				price.textContent = priceText;
+				body.appendChild(price);
 			}
 
 			label.appendChild(input);

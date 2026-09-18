@@ -85,6 +85,26 @@ final class AdminUxAssets {
 				]
 			);
 		}
+
+		if ( DestinationZonesPage::SLUG === $page || LocationPacksPage::SLUG === $page ) {
+			wp_localize_script(
+				self::HANDLE,
+				'cetechDeGeography',
+				[
+					'ajaxUrl'      => admin_url( 'admin-ajax.php' ),
+					'searchAction' => \CetechDeliveryEngine\Application\Geography\AdminGeographyEndpoint::SEARCH_ACTION,
+					'packAction'   => \CetechDeliveryEngine\Application\Geography\AdminGeographyEndpoint::PACK_ACTION,
+					'searchNonce'  => wp_create_nonce( \CetechDeliveryEngine\Application\Geography\AdminGeographyEndpoint::SEARCH_ACTION ),
+					'packNonce'    => wp_create_nonce( \CetechDeliveryEngine\Application\Geography\AdminGeographyEndpoint::PACK_ACTION ),
+					'i18n'         => [
+						'search'     => __( 'Search…', 'cetech-woocommerce-delivery-engine' ),
+						'included'   => __( 'localities included', 'cetech-woocommerce-delivery-engine' ),
+						'selectAll'  => __( 'Select all', 'cetech-woocommerce-delivery-engine' ),
+						'clear'      => __( 'Clear', 'cetech-woocommerce-delivery-engine' ),
+					],
+				]
+			);
+		}
 	}
 
 	private function is_relevant_screen( string $hook_suffix ): bool {

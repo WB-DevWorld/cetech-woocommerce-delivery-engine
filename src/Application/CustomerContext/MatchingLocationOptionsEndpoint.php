@@ -7,6 +7,7 @@ namespace CetechDeliveryEngine\Application\CustomerContext;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryFulfilmentCapabilities;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
+use CetechDeliveryEngine\Application\Geography\CanonicalLocationResolver;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
@@ -26,7 +27,8 @@ final class MatchingLocationOptionsEndpoint {
 		private Requirements $requirements,
 		private CartDeliverySelectionCapture $cart_capture,
 		private LocationAwareDeliveryOptions $location_options,
-		private CustomerBrowsingLocationStore $browsing_store
+		private CustomerBrowsingLocationStore $browsing_store,
+		private ?CanonicalLocationResolver $resolver = null
 	) {
 	}
 
@@ -47,14 +49,15 @@ final class MatchingLocationOptionsEndpoint {
 		$quantity     = isset( $_REQUEST['quantity'] ) ? (int) wp_unslash( (string) $_REQUEST['quantity'] ) : 1;
 		$location     = MatchingLocation::fromInput(
 			[
-				'country'  => isset( $_REQUEST['country'] ) ? wp_unslash( (string) $_REQUEST['country'] ) : '',
-				'state'    => isset( $_REQUEST['state'] ) ? wp_unslash( (string) $_REQUEST['state'] ) : '',
-				'city'     => isset( $_REQUEST['city'] ) ? wp_unslash( (string) $_REQUEST['city'] ) : '',
-				'postcode' => isset( $_REQUEST['postcode'] ) ? wp_unslash( (string) $_REQUEST['postcode'] ) : '',
+				'country'                 => isset( $_REQUEST['country'] ) ? wp_unslash( (string) $_REQUEST['country'] ) : '',
+				'state'                   => isset( $_REQUEST['state'] ) ? wp_unslash( (string) $_REQUEST['state'] ) : '',
+				'city'                    => isset( $_REQUEST['city'] ) ? wp_unslash( (string) $_REQUEST['city'] ) : '',
+				'postcode'                => isset( $_REQUEST['postcode'] ) ? wp_unslash( (string) $_REQUEST['postcode'] ) : '',
+				'canonical_location_key'  => isset( $_REQUEST['location_key'] ) ? wp_unslash( (string) $_REQUEST['location_key'] ) : '',
 			]
 		);
 
-		if ( $location->isPresent() ) {
+		if ( $location->isPresent() && $this->may_persist_browsing( $location ) ) {
 			$this->browsing_store->save( $location );
 		}
 
@@ -170,5 +173,24 @@ final class MatchingLocationOptionsEndpoint {
 		$payload['available_choices'] = $caps['available_choices'];
 
 		return $payload;
+	}
+
+	private function may_persist_browsing( MatchingLocation $location ): bool {
+		if ( ! $this->resolver instanceof CanonicalLocationResolver ) {
+			return true;
+		}
+		$country = $location->country_identity;
+		if ( ! $this->resolver->country_has_usable_pack( $country ) ) {
+			return true;
+		}
+		if ( '' === trim( $location->city ) ) {
+			return true;
+		}
+		$key = $location->canonical_location_key;
+		if ( '' === $key ) {
+			return false;
+		}
+
+		return null !== $this->resolver->require_valid_key( $key, $country );
 	}
 }

@@ -13,4 +13,10 @@
             <directory>tests/Unit</directory>
         </testsuite>
     </testsuites>
+    <groups>
+        <exclude>
+            <group>geo11-scale</group>
+            <group>geo11-real-db</group>
+        </exclude>
+    </groups>
 </phpunit>

@@ -142,6 +142,17 @@ $required_classes = [
 	'CetechDeliveryEngine\\Application\\Bulk\\Queue\\ActionSchedulerQueue',
 	'CetechDeliveryEngine\\Application\\Bulk\\Queue\\WpActionSchedulerGateway',
 	'CetechDeliveryEngine\\Infrastructure\\Persistence\\BulkJobSchema',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\GeographySchema',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\CoverageSchema',
+	'CetechDeliveryEngine\\Application\\Geography\\CanonicalLocationResolver',
+	'CetechDeliveryEngine\\Application\\Geography\\StorefrontGeographyEndpoint',
+	'CetechDeliveryEngine\\Application\\Geography\\AdminGeographyEndpoint',
+	'CetechDeliveryEngine\\Application\\Geography\\GeographyPackService',
+	'CetechDeliveryEngine\\Application\\Geography\\GeoNamesPackImporter',
+	'CetechDeliveryEngine\\Application\\Geography\\WooCommerceGeographyBootstrap',
+	'CetechDeliveryEngine\\Application\\Geography\\LegacyDestinationCoverageMigrator',
+	'CetechDeliveryEngine\\Application\\Coverage\\CoverageGroupMatcher',
+	'CetechDeliveryEngine\\Presentation\\Admin\\LocationPacksPage',
 ];
 
 $required_interfaces = [
@@ -232,6 +243,11 @@ if ( ! is_readable( $variable_css ) ) {
 $product_css = $package_root . '/assets/frontend/product-delivery-selector.css';
 if ( ! is_readable( $product_css ) ) {
 	$failures[] = 'Missing assets/frontend/product-delivery-selector.css';
+} else {
+	$product_css_source = (string) file_get_contents( $product_css );
+	if ( ! str_contains( $product_css_source, '--cetech-de-delivery-fee-accent' ) ) {
+		$failures[] = 'Product delivery CSS missing --cetech-de-delivery-fee-accent token.';
+	}
 }
 
 $admin_css = $package_root . '/assets/admin/delivery-engine-admin.css';
@@ -275,11 +291,19 @@ $is_schema5_release = str_contains( $header_source, '1.0.0-dev.bulk' )
 	|| str_contains( $header_source, '1.0.0-rc.8' )
 	|| str_contains( $header_source, '1.0.0-rc.9' )
 	|| str_contains( $header_source, '1.0.0-rc.10' )
-	|| str_contains( $header_source, '1.0.0-dev.pdp-price' );
+	|| str_contains( $header_source, '1.0.0-dev.pdp-price' )
+	|| str_contains( $header_source, '1.0.0-rc.11' );
 
+$is_schema6_release = str_contains( $header_source, '1.0.0-dev.geo' );
+
+$target = 'unknown';
 if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 	$target = ( new ReflectionClass( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) )->getConstant( 'TARGET' );
-	if ( $is_schema5_release ) {
+	if ( $is_schema6_release ) {
+		if ( '6' !== $target ) {
+			$failures[] = 'SchemaVersion::TARGET must be 6 for this schema-6 package.';
+		}
+	} elseif ( $is_schema5_release ) {
 		if ( '5' !== $target ) {
 			$failures[] = 'SchemaVersion::TARGET must be 5 for this schema-5 package.';
 		}
@@ -289,9 +313,9 @@ if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 }
 
 $bulk_js = $package_root . '/assets/admin/bulk-tools.js';
-if ( $is_schema5_release && ! is_readable( $bulk_js ) ) {
+if ( ( $is_schema5_release || $is_schema6_release ) && ! is_readable( $bulk_js ) ) {
 	$failures[] = 'Missing assets/admin/bulk-tools.js';
-} elseif ( is_readable( $bulk_js ) && ( str_contains( $header_source, '1.0.0-dev.bulk.9' ) || str_contains( $header_source, '1.0.0-dev.fulfilment' ) || str_contains( $header_source, '1.0.0-dev.blocks' ) || str_contains( $header_source, '1.0.0-dev.cartstate' ) || str_contains( $header_source, '1.0.0-dev.peritem' ) || str_contains( $header_source, '1.0.0-dev.wcfm' ) || str_contains( $header_source, '1.0.0-dev.integrated' ) || str_contains( $header_source, '1.0.0-dev.qual' ) || str_contains( $header_source, '1.0.0-rc.7' ) || str_contains( $header_source, '1.0.0-rc.8' ) || str_contains( $header_source, '1.0.0-rc.9' ) || str_contains( $header_source, '1.0.0-rc.10' ) || str_contains( $header_source, '1.0.0-dev.pdp-price' ) ) ) {
+} elseif ( is_readable( $bulk_js ) && ( $is_schema5_release || $is_schema6_release ) ) {
 	$bulk_js_source = (string) file_get_contents( $bulk_js );
 	if ( ! str_contains( $bulk_js_source, "body.set('advance', '1')" ) ) {
 		$failures[] = 'bulk-tools.js missing bounded AJAX continue (advance=1).';
@@ -710,7 +734,7 @@ fwrite( STDOUT, "Package verification OK\n" );
 fwrite( STDOUT, "- ConfigurationHealthChecker autoloads from Application\\Diagnostics\n" );
 fwrite( STDOUT, "- Plugin.php import present\n" );
 fwrite( STDOUT, "- Boot factory class references resolve\n" );
-fwrite( STDOUT, "- Schema target 4; main ECR + variable ECR flags default OFF\n" );
+fwrite( STDOUT, "- Schema target " . (string) $target . "; main ECR + variable ECR flags default OFF\n" );
 fwrite( STDOUT, "- Stage 6 variation endpoint/router/inspector/assets present\n" );
 fwrite( STDOUT, "- Variable frontend JS/CSS present with found_variation/reset_data/requestToken\n" );
 fwrite( STDOUT, "- Stage 8 grouping/shipping/order snapshot classes autoload\n" );

@@ -107,6 +107,9 @@ delete_option( 'cetech_de_global_configuration_version' );
 delete_option( 'cetech_de_v3_config_migration_report' );
 delete_option( 'cetech_de_capabilities_version' );
 delete_option( 'cetech_de_shipment_creation_failure_order_ids' );
+delete_option( 'cetech_de_schema6_coverage_upgrade' );
+delete_option( 'cetech_de_coverage_migration_report' );
+delete_option( 'cetech_de_geography_revision' );
 
 global $wpdb;
 
@@ -134,6 +137,13 @@ $table_suffixes = [
 	'bulk_jobs',
 	'bulk_job_items',
 	'bulk_recipes',
+	'geography_packs',
+	'geography_locations',
+	'geography_location_aliases',
+	'geography_provider_mappings',
+	'destination_coverage_groups',
+	'destination_coverage_members',
+	'destination_coverage_postcodes',
 ];
 
 foreach ( $table_suffixes as $suffix ) {

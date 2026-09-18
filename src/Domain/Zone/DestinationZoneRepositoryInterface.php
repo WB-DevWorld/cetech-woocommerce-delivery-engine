@@ -28,6 +28,17 @@ interface DestinationZoneRepositoryInterface {
 	 */
 	public function list( array $criteria = [] ): array;
 
+	/**
+	 * Complete keyset page. $limit is page size only and must not be treated as a
+	 * ceiling on the total matching set. Callers that need every applicable zone
+	 * must iterate until a page is empty.
+	 *
+	 * @param array<string, mixed> $criteria
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	public function page_after( int $after_id, int $limit = 100, array $criteria = [] ): array;
+
 	public function softDelete( int $id ): bool;
 
 	public function hardDelete( int $id ): bool;

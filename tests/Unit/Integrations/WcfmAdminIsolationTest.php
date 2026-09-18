@@ -312,7 +312,7 @@ final class WcfmAdminIsolationTest extends TestCase {
 	}
 
 	public function test_schema_remains_five(): void {
-		self::assertSame( '5', SchemaVersion::TARGET );
+		self::assertSame( '6', SchemaVersion::TARGET );
 	}
 
 	/**

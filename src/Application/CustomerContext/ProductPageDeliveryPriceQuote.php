@@ -8,6 +8,7 @@ use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidatorInterface;
 use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingRateCalculator;
 use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
+use CetechDeliveryEngine\Domain\Enum\CanonicalResolutionContext;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 
 /**
@@ -49,6 +50,9 @@ final class ProductPageDeliveryPriceQuote {
 			return null;
 		}
 
+		$destination = $location->toWcPackageDestination();
+		$destination['resolution_context'] = CanonicalResolutionContext::ShopperSelector->value;
+
 		return $this->price_for_intent(
 			$validation->intent,
 			[
@@ -56,7 +60,7 @@ final class ProductPageDeliveryPriceQuote {
 				'variation_id' => $context->variation_id,
 				'quantity'     => $context->quantity,
 			],
-			$location->toWcPackageDestination(),
+			$destination,
 			$currency_code
 		);
 	}

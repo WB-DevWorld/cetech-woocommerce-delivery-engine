@@ -11,6 +11,7 @@ on:
       - 'ws2/**'
       - 'ws3/**'
       - 'fix/**'
+      - 'feat/**'
       - 'batch/**'
 
 permissions:

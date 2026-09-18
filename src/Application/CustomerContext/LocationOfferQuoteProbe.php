@@ -8,6 +8,7 @@ use CetechDeliveryEngine\Application\Destination\PackageDestinationZoneResolverI
 use CetechDeliveryEngine\Application\RateQuote\RateQuoteEngine;
 use CetechDeliveryEngine\Application\RateQuote\RateQuoteRequest;
 use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
+use CetechDeliveryEngine\Domain\Enum\CanonicalResolutionContext;
 use CetechDeliveryEngine\Domain\ValueObject\CurrencyCode;
 
 /**
@@ -35,7 +36,10 @@ final class LocationOfferQuoteProbe {
 			return false;
 		}
 
-		return $this->offer_quotes_for_destination( $offer_id, $location->toWcPackageDestination(), $currency_code );
+		$destination = $location->toWcPackageDestination();
+		$destination['resolution_context'] = CanonicalResolutionContext::ShopperSelector->value;
+
+		return $this->offer_quotes_for_destination( $offer_id, $destination, $currency_code );
 	}
 
 	/**
