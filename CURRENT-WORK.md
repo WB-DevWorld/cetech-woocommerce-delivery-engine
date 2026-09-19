@@ -76,8 +76,15 @@ Ben (`@Ben-001-sys`) and Emmanuel (`@Emmanuel-coder-prog`) have **no** implement
 - WP Rocket certification: do not expand; remains separate/unqualified.
 - Stage 15: not started.
 
-## Geo.12 technical-closure evidence (pending package SHA after commit)
+## Geo.12 technical-closure evidence
 - Identity: `1.0.0-dev.geo.12`; schema `6`.
+- Source SHA: `41861d261fe9c6ca4dead778464de19e5c03ac40`.
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.12.zip`.
+- ZIP bytes: `1,757,860`.
+- ZIP SHA-256: `e66ab64a4869dd6262fe2cea16f2a7b35949e487e34fbafc5c029bd3cb1203c2`.
+- Production package verifier: PASS (schema target 6).
+- Extracted root: `cetech-woocommerce-delivery-engine/`.
+- Packaged PHP lint: `497 files / 0 failures`.
 - Requirement IDs referenced in this pass: DE-GEO-011, DE-GEO-012, DE-GEO-013.
 - Local gates: Composer validate OK; PHP lint 653 files / 0 failures; Docker PHP 8.1 runtime lint 482 files / 0 failures; default PHPUnit 1202 tests / 7234 assertions; Vitest 76 tests; team control plane OK; product control plane OK (10 files, 372 Requirement IDs).
 - Real MariaDB `@group geo12-real-db`: 3 tests / 35 assertions in 20:49; metadata-only drafts 116.91s; >1,000 hierarchy-changing roots 1131.71s; real SQL CAS mismatch stays 0.

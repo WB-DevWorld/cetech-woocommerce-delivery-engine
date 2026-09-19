@@ -96,7 +96,7 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 ## Active post-RC.11 implementation stream
 - Issue `#23` / draft PR `#24` / branch `feat/canonical-geography-coverage`.
 - Frozen technical-stabilization candidate: `1.0.0-dev.geo.11` / `daef41a85662e1c1dc0aa6f5673ca9749f163a26`; schema `6`.
-- Current technical-closure candidate: `1.0.0-dev.geo.12`; target schema remains `6`. Package SHA/bytes recorded after the geo.12 commit.
+- Current technical-closure candidate: `1.0.0-dev.geo.12` / `41861d261fe9c6ca4dead778464de19e5c03ac40`; schema `6`. ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.12.zip`, `1,757,860` bytes, SHA-256 `e66ab64a4869dd6262fe2cea16f2a7b35949e487e34fbafc5c029bd3cb1203c2`. Not merged. Not physically QA'd.
 - Rejected technical-review candidate: `1.0.0-dev.geo.1` / `606730e2535896cb18e415b14d62bbb57d050578` — do not send to physical QA.
 - Rejected technical-review candidate: `1.0.0-dev.geo.2` / `a52e2aafc97274b74ec14f8b451395b73c9541af` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.2.zip`, SHA-256 `6bde464b249ee6f17831e00d39110c8b10f89f441db3e1b453622a5d95f6b4a5`. Do not physically QA geo.2.
 - Rejected technical-review candidate: `1.0.0-dev.geo.3` / `fdff226cbe6837a3ac508bc6677c8e56771ec229` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.3.zip`, SHA-256 `1c1af4dcfbc6767402b6e7dfacde9a87270ac5ccb8a950788e130c9d130b49b8`. Do not physically QA geo.3.
