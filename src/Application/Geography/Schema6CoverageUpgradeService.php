@@ -451,16 +451,7 @@ final class Schema6CoverageUpgradeService {
 	 */
 	private function owner_store( string $owner, string $pass_id, array $state ): bool {
 		$current = $this->current_state();
-		$current_owner = (string) ( $current['owner'] ?? $current['lease_owner'] ?? '' );
-		$current_pass  = (string) ( $current['pass_id'] ?? '' );
-		$current_worker = (string) ( $current['worker'] ?? '' );
-		if ( '' !== $pass_id && '' !== $current_pass && $current_pass !== $pass_id ) {
-			return false;
-		}
-		if ( '' !== $current_owner && $current_owner !== $owner && $current_worker !== $owner ) {
-			return false;
-		}
-		if ( $this->lock_expired( $current ) && $current_owner !== $owner && $current_worker !== $owner ) {
+		if ( ! $this->worker_may_commit( $owner, $pass_id, $current ) ) {
 			return false;
 		}
 
@@ -469,13 +460,7 @@ final class Schema6CoverageUpgradeService {
 
 	private function renew_owner_lease( string $owner, string $pass_id ): bool {
 		$current = $this->current_state();
-		$current_owner  = (string) ( $current['owner'] ?? $current['lease_owner'] ?? '' );
-		$current_worker = (string) ( $current['worker'] ?? '' );
-		$current_pass   = (string) ( $current['pass_id'] ?? '' );
-		if ( '' !== $pass_id && '' !== $current_pass && $current_pass !== $pass_id ) {
-			return false;
-		}
-		if ( $current_owner !== $owner && $current_worker !== $owner ) {
+		if ( ! $this->worker_may_commit( $owner, $pass_id, $current ) ) {
 			return false;
 		}
 		$now  = time();
@@ -489,6 +474,26 @@ final class Schema6CoverageUpgradeService {
 		);
 
 		return $this->compare_and_swap_state( $current, $next );
+	}
+
+	/**
+	 * Tick mutation is fenced to the exact current worker token plus pass identity.
+	 * Historical pass-owner identity is not sufficient after another worker is installed.
+	 *
+	 * @param array<string, mixed> $current
+	 */
+	private function worker_may_commit( string $worker, string $pass_id, array $current ): bool {
+		$worker = trim( $worker );
+		if ( '' === $worker ) {
+			return false;
+		}
+		$current_pass   = (string) ( $current['pass_id'] ?? '' );
+		$current_worker = (string) ( $current['worker'] ?? '' );
+		if ( '' !== $pass_id && '' !== $current_pass && $current_pass !== $pass_id ) {
+			return false;
+		}
+
+		return $current_worker === $worker;
 	}
 
 	private function owns_pass( string $owner ): bool {

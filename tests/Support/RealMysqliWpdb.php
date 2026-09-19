@@ -21,6 +21,9 @@ final class RealMysqliWpdb {
 
 	public int $rows_affected = 0;
 
+	/** @var list<string> */
+	public array $sql_log = [];
+
 	private \PDO $pdo;
 
 	public function __construct( \PDO $pdo, string $prefix = 'wp_' ) {
@@ -56,6 +59,14 @@ final class RealMysqliWpdb {
 		}
 
 		return new self( $pdo );
+	}
+
+	public function clear_sql_log(): void {
+		$this->sql_log = [];
+	}
+
+	private function log_sql( string $sql ): void {
+		$this->sql_log[] = $sql;
 	}
 
 	public function pdo(): \PDO {
@@ -95,7 +106,8 @@ final class RealMysqliWpdb {
 	}
 
 	public function query( mixed $sql ): int|bool {
-		$sql    = (string) $sql;
+		$sql = (string) $sql;
+		$this->log_sql( $sql );
 		$result = $this->pdo->exec( $sql );
 		if ( false === $result ) {
 			$this->last_error    = $this->error_message();
@@ -190,6 +202,7 @@ final class RealMysqliWpdb {
 	 * @return list<string>
 	 */
 	public function get_col( string $sql ): array {
+		$this->log_sql( $sql );
 		$statement = $this->pdo->query( $sql );
 		if ( false === $statement ) {
 			$this->last_error = $this->error_message();
@@ -203,6 +216,7 @@ final class RealMysqliWpdb {
 	}
 
 	public function get_var( string $sql ) {
+		$this->log_sql( $sql );
 		$statement = $this->pdo->query( $sql );
 		if ( false === $statement ) {
 			$this->last_error = $this->error_message();
@@ -220,6 +234,7 @@ final class RealMysqliWpdb {
 	 */
 	public function get_row( string $sql, $output = 'ARRAY_A' ): ?array {
 		unset( $output );
+		$this->log_sql( $sql );
 		$statement = $this->pdo->query( $sql );
 		if ( false === $statement ) {
 			$this->last_error = $this->error_message();
@@ -237,6 +252,7 @@ final class RealMysqliWpdb {
 	 */
 	public function get_results( string $sql, $output = 'ARRAY_A' ): array {
 		unset( $output );
+		$this->log_sql( $sql );
 		$statement = $this->pdo->query( $sql );
 		if ( false === $statement ) {
 			$this->last_error = $this->error_message();

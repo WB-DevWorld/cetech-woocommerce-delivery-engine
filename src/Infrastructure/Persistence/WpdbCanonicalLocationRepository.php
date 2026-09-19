@@ -15,11 +15,6 @@ use CetechDeliveryEngine\Domain\Geography\LocationAncestry;
 
 final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository implements CanonicalLocationRepositoryInterface {
 
-	/**
-	 * @var array<string, list<CanonicalLocation>>
-	 */
-	private array $hierarchy_changing_roots_cache = [];
-
 	protected function table_suffix(): string {
 		return GeographySchema::LOCATIONS_SUFFIX;
 	}
@@ -445,7 +440,6 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		if ( '' === $generation_token ) {
 			throw new \RuntimeException( 'Promotion requires a generation token.' );
 		}
-		$this->hierarchy_changing_roots_cache = [];
 
 		$batch      = max( 1, $limit );
 		$after      = max( 0, $after_id );
@@ -486,8 +480,6 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 			$desc_cursor = $staged['hierarchy_descendant_cursor'];
 			$root_id     = $staged['hierarchy_root_id'];
 			$hierarchy_done = $staged['done'];
-		} else {
-			$hierarchy_done = ! $this->has_unfinished_hierarchy_preparation( $generation_token );
 		}
 
 		return [
@@ -800,12 +792,12 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 				}
 			}
 			if ( ! $root instanceof CanonicalLocation ) {
-				$found = $this->find_next_hierarchy_root( $generation_token );
+				$found = $this->find_next_hierarchy_root( $generation_token, $root_cursor );
 				if ( $found['exhausted'] ) {
 					return $this->hierarchy_stage_result( $updated, true, $root_cursor, 0, 0 );
 				}
 				if ( ! $found['root'] instanceof CanonicalLocation ) {
-					return $this->hierarchy_stage_result( $updated, false, $root_cursor, $desc_cursor, 0 );
+					return $this->hierarchy_stage_result( $updated, false, max( $root_cursor, $found['scanned_until'] ), $desc_cursor, 0 );
 				}
 				$root            = $found['root'];
 				$current_root_id = $root->id;
@@ -832,19 +824,31 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		return $this->hierarchy_stage_result( $updated, $done, $root_cursor, $desc_cursor, $current_root_id );
 	}
 
+	private function has_unprocessed_generation_drafts( string $generation_token ): bool {
+		global $wpdb;
+		$table = $this->table_name();
+		$sql   = "SELECT id FROM `{$table}` WHERE draft_generation_token = %s AND prepared_generation_token != %s LIMIT 1";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$id = $wpdb->get_var( $wpdb->prepare( $sql, $generation_token, $generation_token ) );
+
+		return null !== $id && false !== $id && '' !== (string) $id && 0 !== (int) $id;
+	}
+
 	/**
 	 * @return array{root: ?CanonicalLocation, scanned_until: int, exhausted: bool}
 	 */
-	private function find_next_hierarchy_root( string $generation_token ): array {
-		$roots = $this->list_hierarchy_changing_roots( $generation_token );
-		if ( [] === $roots ) {
-			return [
-				'root'          => null,
-				'scanned_until' => 0,
-				'exhausted'     => true,
-			];
-		}
-		foreach ( $roots as $candidate ) {
+	private function find_next_hierarchy_root( string $generation_token, int $after_id ): array {
+		$scanned = max( 0, $after_id );
+		for ( $i = 0; $i < 50; $i++ ) {
+			$candidate = $this->next_prepared_moving_root( $generation_token, $scanned );
+			if ( ! $candidate instanceof CanonicalLocation ) {
+				return [
+					'root'          => null,
+					'scanned_until' => $scanned,
+					'exhausted'     => true,
+				];
+			}
+			$scanned = $candidate->id;
 			if ( $this->root_has_unprepared_descendants( $candidate, $generation_token ) ) {
 				return [
 					'root'          => $candidate,
@@ -856,9 +860,36 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 
 		return [
 			'root'          => null,
-			'scanned_until' => 0,
-			'exhausted'     => true,
+			'scanned_until' => $scanned,
+			'exhausted'     => false,
 		];
+	}
+
+	private function next_prepared_moving_root( string $generation_token, int $after_id ): ?CanonicalLocation {
+		$page = $this->list_prepared_moving_roots_page( $generation_token, $after_id, 1 );
+
+		return $page[0] ?? null;
+	}
+
+	/**
+	 * @return list<CanonicalLocation>
+	 */
+	private function list_prepared_moving_roots_page( string $generation_token, int $after_id, int $limit ): array {
+		global $wpdb;
+		$table = $this->table_name();
+		$limit = max( 1, min( 100, $limit ) );
+		$sql   = "SELECT * FROM `{$table}` WHERE prepared_generation_token = %s AND prepared_hierarchy_root_id = id AND id > %d ORDER BY id ASC LIMIT %d";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results(
+			$wpdb->prepare( $sql, $generation_token, max( 0, $after_id ), $limit ),
+			ARRAY_A
+		);
+		$out = [];
+		foreach ( is_array( $rows ) ? $rows : [] as $row ) {
+			$out[] = CanonicalLocation::fromRow( $row );
+		}
+
+		return $out;
 	}
 
 	/**
@@ -928,47 +959,40 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 	}
 
 	private function has_unfinished_hierarchy_preparation( string $generation_token ): bool {
-		foreach ( $this->list_hierarchy_changing_roots( $generation_token ) as $root ) {
-			if ( $this->root_has_unprepared_descendants( $root, $generation_token ) ) {
-				return true;
+		if ( $this->has_unprocessed_generation_drafts( $generation_token ) ) {
+			return true;
+		}
+		$after = 0;
+		while ( true ) {
+			$page = $this->list_prepared_moving_roots_page( $generation_token, $after, 50 );
+			if ( [] === $page ) {
+				return false;
+			}
+			foreach ( $page as $root ) {
+				$after = $root->id;
+				if ( $this->root_has_unprepared_descendants( $root, $generation_token ) ) {
+					return true;
+				}
 			}
 		}
-
-		return false;
 	}
 
 	/**
 	 * @return list<CanonicalLocation>
 	 */
 	private function list_hierarchy_changing_roots( string $generation_token ): array {
-		if ( isset( $this->hierarchy_changing_roots_cache[ $generation_token ] ) ) {
-			return $this->hierarchy_changing_roots_cache[ $generation_token ];
-		}
-
-		global $wpdb;
-		$table = $this->table_name();
-		$sql   = "SELECT * FROM `{$table}` WHERE draft_generation_token = %s ORDER BY id ASC";
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$rows  = $wpdb->get_results( $wpdb->prepare( $sql, $generation_token ), ARRAY_A );
 		$roots = [];
-		foreach ( is_array( $rows ) ? $rows : [] as $row ) {
-			$location = CanonicalLocation::fromRow( $row );
-			if ( $this->draft_changes_parent( $location ) ) {
-				$roots[] = $location;
+		$after = 0;
+		while ( true ) {
+			$page = $this->list_prepared_moving_roots_page( $generation_token, $after, 100 );
+			if ( [] === $page ) {
+				break;
+			}
+			foreach ( $page as $root ) {
+				$roots[] = $root;
+				$after   = $root->id;
 			}
 		}
-		usort(
-			$roots,
-			static function ( CanonicalLocation $left, CanonicalLocation $right ): int {
-				$depth = strlen( $right->ancestry_path ) <=> strlen( $left->ancestry_path );
-				if ( 0 !== $depth ) {
-					return $depth;
-				}
-
-				return $left->id <=> $right->id;
-			}
-		);
-		$this->hierarchy_changing_roots_cache[ $generation_token ] = $roots;
 
 		return $roots;
 	}
@@ -1101,12 +1125,31 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 	 * @return list<CanonicalLocation>
 	 */
 	private function nested_moving_roots( CanonicalLocation $root, string $generation_token ): array {
+		if ( '' === $root->ancestry_path ) {
+			return [];
+		}
+
+		global $wpdb;
+		$table  = $this->table_name();
+		$like   = $wpdb->esc_like( $root->ancestry_path ) . '%';
 		$nested = [];
-		foreach ( $this->list_hierarchy_changing_roots( $generation_token ) as $candidate ) {
-			if ( $candidate->id === $root->id || '' === $candidate->ancestry_path ) {
-				continue;
+		$after  = 0;
+		while ( true ) {
+			$sql = "SELECT * FROM `{$table}` WHERE prepared_generation_token = %s AND prepared_hierarchy_root_id = id AND id != %d AND ancestry_path LIKE %s AND id > %d ORDER BY id ASC LIMIT 100";
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$rows = $wpdb->get_results(
+				$wpdb->prepare( $sql, $generation_token, $root->id, $like, $after ),
+				ARRAY_A
+			);
+			if ( ! is_array( $rows ) || [] === $rows ) {
+				break;
 			}
-			if ( str_starts_with( $candidate->ancestry_path, $root->ancestry_path ) ) {
+			foreach ( $rows as $row ) {
+				$candidate = CanonicalLocation::fromRow( $row );
+				$after     = $candidate->id;
+				if ( '' === $candidate->ancestry_path ) {
+					continue;
+				}
 				$nested[] = $candidate;
 			}
 		}

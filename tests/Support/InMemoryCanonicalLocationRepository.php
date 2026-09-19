@@ -35,6 +35,13 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 
 	public bool $fail_next_upsert = false;
 
+	public int $generation_drafts_examined = 0;
+
+	public int $prepared_moving_root_pages = 0;
+
+	/** @var list<int> */
+	public array $prepared_moving_root_after_ids = [];
+
 	private int $next_id = 1;
 
 	public function seed(
@@ -388,6 +395,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		);
 		$draft_slice = array_slice( $candidates, 0, $batch );
 		foreach ( $draft_slice as $location ) {
+			++$this->generation_drafts_examined;
 			$last_id = max( $last_id, $location->id );
 			if ( '' !== $location->draft_json ) {
 				$draft = json_decode( $location->draft_json, true );
@@ -409,8 +417,6 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			$desc_cursor    = $staged['hierarchy_descendant_cursor'];
 			$root_id        = $staged['hierarchy_root_id'];
 			$hierarchy_done = $staged['done'];
-		} else {
-			$hierarchy_done = ! $this->has_unfinished_hierarchy_preparation_in_memory( $generation_token );
 		}
 
 		return [
@@ -707,7 +713,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 				}
 			}
 			if ( ! $root instanceof CanonicalLocation ) {
-				$found = $this->find_next_hierarchy_root_in_memory( $generation_token );
+				$found = $this->find_next_hierarchy_root_in_memory( $generation_token, $root_cursor );
 				if ( $found['exhausted'] ) {
 					return [
 						'processed'                   => $updated,
@@ -721,7 +727,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 					return [
 						'processed'                   => $updated,
 						'done'                        => false,
-						'hierarchy_root_cursor'       => $root_cursor,
+						'hierarchy_root_cursor'       => max( $root_cursor, $found['scanned_until'] ),
 						'hierarchy_descendant_cursor' => $desc_cursor,
 						'hierarchy_root_id'           => 0,
 					];
@@ -760,16 +766,19 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	/**
 	 * @return array{root: ?CanonicalLocation, scanned_until: int, exhausted: bool}
 	 */
-	private function find_next_hierarchy_root_in_memory( string $generation_token ): array {
-		$roots = $this->list_hierarchy_changing_roots_in_memory( $generation_token );
-		if ( [] === $roots ) {
-			return [
-				'root'          => null,
-				'scanned_until' => 0,
-				'exhausted'     => true,
-			];
-		}
-		foreach ( $roots as $candidate ) {
+	private function find_next_hierarchy_root_in_memory( string $generation_token, int $after_id ): array {
+		$scanned = max( 0, $after_id );
+		for ( $i = 0; $i < 50; $i++ ) {
+			$page = $this->list_prepared_moving_roots_page_in_memory( $generation_token, $scanned, 1 );
+			$candidate = $page[0] ?? null;
+			if ( ! $candidate instanceof CanonicalLocation ) {
+				return [
+					'root'          => null,
+					'scanned_until' => $scanned,
+					'exhausted'     => true,
+				];
+			}
+			$scanned = $candidate->id;
 			if ( $this->root_has_unprepared_descendants_in_memory( $candidate, $generation_token ) ) {
 				return [
 					'root'          => $candidate,
@@ -781,9 +790,36 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 
 		return [
 			'root'          => null,
-			'scanned_until' => 0,
-			'exhausted'     => true,
+			'scanned_until' => $scanned,
+			'exhausted'     => false,
 		];
+	}
+
+	/**
+	 * @return list<CanonicalLocation>
+	 */
+	private function list_prepared_moving_roots_page_in_memory( string $generation_token, int $after_id, int $limit ): array {
+		++$this->prepared_moving_root_pages;
+		$this->prepared_moving_root_after_ids[] = max( 0, $after_id );
+		$out = [];
+		foreach ( $this->locations as $location ) {
+			if ( $location->prepared_generation_token !== $generation_token ) {
+				continue;
+			}
+			if ( $location->prepared_hierarchy_root_id !== $location->id ) {
+				continue;
+			}
+			if ( $location->id <= $after_id ) {
+				continue;
+			}
+			$out[] = $location;
+		}
+		usort(
+			$out,
+			static fn ( CanonicalLocation $left, CanonicalLocation $right ): int => $left->id <=> $right->id
+		);
+
+		return array_slice( $out, 0, max( 1, $limit ) );
 	}
 
 	/**
@@ -872,8 +908,27 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	}
 
 	private function has_unfinished_hierarchy_preparation_in_memory( string $generation_token ): bool {
-		foreach ( $this->list_hierarchy_changing_roots_in_memory( $generation_token ) as $root ) {
-			if ( $this->root_has_unprepared_descendants_in_memory( $root, $generation_token ) ) {
+		if ( $this->has_unprocessed_generation_drafts_in_memory( $generation_token ) ) {
+			return true;
+		}
+		$after = 0;
+		while ( true ) {
+			$page = $this->list_prepared_moving_roots_page_in_memory( $generation_token, $after, 50 );
+			if ( [] === $page ) {
+				return false;
+			}
+			foreach ( $page as $root ) {
+				$after = $root->id;
+				if ( $this->root_has_unprepared_descendants_in_memory( $root, $generation_token ) ) {
+					return true;
+				}
+			}
+		}
+	}
+
+	private function has_unprocessed_generation_drafts_in_memory( string $generation_token ): bool {
+		foreach ( $this->locations as $location ) {
+			if ( $location->draft_generation_token === $generation_token && $location->prepared_generation_token !== $generation_token ) {
 				return true;
 			}
 		}
@@ -886,26 +941,17 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	 */
 	private function list_hierarchy_changing_roots_in_memory( string $generation_token ): array {
 		$roots = [];
-		foreach ( $this->locations as $location ) {
-			if ( $location->draft_generation_token !== $generation_token ) {
-				continue;
+		$after = 0;
+		while ( true ) {
+			$page = $this->list_prepared_moving_roots_page_in_memory( $generation_token, $after, 100 );
+			if ( [] === $page ) {
+				break;
 			}
-			if ( ! $this->draft_changes_parent_in_memory( $location ) ) {
-				continue;
+			foreach ( $page as $root ) {
+				$roots[] = $root;
+				$after   = $root->id;
 			}
-			$roots[] = $location;
 		}
-		usort(
-			$roots,
-			static function ( CanonicalLocation $left, CanonicalLocation $right ): int {
-				$depth = strlen( $right->ancestry_path ) <=> strlen( $left->ancestry_path );
-				if ( 0 !== $depth ) {
-					return $depth;
-				}
-
-				return $left->id <=> $right->id;
-			}
-		);
 
 		return $roots;
 	}

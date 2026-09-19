@@ -476,7 +476,7 @@ final class FakeWpdb {
 	 */
 	private function parse_select( string $sql ): array {
 		if ( ! preg_match(
-			'/SELECT\s+(COUNT\(\*\)|\*)\s+FROM\s+`([^`]+)`\s+WHERE\s+(.+?)(?:\s+ORDER BY\s+(.+?))?(?:\s+LIMIT\s+(\d+)(?:\s+OFFSET\s+(\d+))?)?\s*$/is',
+			'/SELECT\s+(COUNT\(\*\)|\*|id|`id`)\s+FROM\s+`([^`]+)`\s+WHERE\s+(.+?)(?:\s+ORDER BY\s+(.+?))?(?:\s+LIMIT\s+(\d+)(?:\s+OFFSET\s+(\d+))?)?\s*$/is',
 			trim( $sql ),
 			$matches
 		) ) {
@@ -599,6 +599,23 @@ final class FakeWpdb {
 			}
 		}
 
+		$eq_column = [];
+		if ( preg_match_all(
+			'/(?:`([a-z0-9_]+)`|([a-z][a-z0-9_]*))\s*=\s*(?:`([a-z0-9_]+)`|([a-z][a-z0-9_]*))/i',
+			$where_sql,
+			$eq_col_matches,
+			PREG_SET_ORDER
+		) ) {
+			foreach ( $eq_col_matches as $eq_col ) {
+				$left  = ( $eq_col[1] ?? '' ) !== '' ? $eq_col[1] : (string) ( $eq_col[2] ?? '' );
+				$right = ( $eq_col[3] ?? '' ) !== '' ? $eq_col[3] : (string) ( $eq_col[4] ?? '' );
+				if ( '' === $left || '' === $right ) {
+					continue;
+				}
+				$eq_column[ $left ] = $right;
+			}
+		}
+
 		$order = [];
 
 		if ( isset( $matches[4] ) && '' !== trim( (string) $matches[4] ) ) {
@@ -621,8 +638,9 @@ final class FakeWpdb {
 			'gt'      => $gt,
 			'lt'      => $lt,
 			'neq'     => $neq,
-			'like'    => $like,
-			'order'   => $order,
+			'like'      => $like,
+			'eq_column' => $eq_column,
+			'order'     => $order,
 			'limit'   => isset( $matches[5] ) && '' !== $matches[5] ? (int) $matches[5] : null,
 			'offset'  => isset( $matches[6] ) && '' !== $matches[6] ? (int) $matches[6] : 0,
 		];
@@ -1283,6 +1301,12 @@ final class FakeWpdb {
 
 			foreach ( $parsed['like'] ?? [] as $column => $pattern ) {
 				if ( ! $this->like_matches( (string) ( $row[ $column ] ?? '' ), (string) $pattern ) ) {
+					continue 2;
+				}
+			}
+
+			foreach ( $parsed['eq_column'] ?? [] as $left => $right ) {
+				if ( (string) ( $row[ $left ] ?? '' ) !== (string) ( $row[ $right ] ?? '' ) ) {
 					continue 2;
 				}
 			}
