@@ -1,6 +1,6 @@
-# Current Work — Post-RC.11 Baseline
+# Current Work — Post-RC.11 Baseline and Authorized Streams
 
-Status: RC.11 TAGGED / TEAM BASELINE ACTIVE / NOT DEPLOYED
+Status: RC.11 TAGGED / PRODUCT TRUTH OWNER-ACCEPTED / GEO.12 IS THE ONLY ACTIVE RUNTIME STREAM / NOT DEPLOYED
 
 ## Canonical repository truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
@@ -35,14 +35,24 @@ The accepted issue #18 correction adds authoritative customer-facing delivery pr
 - New development work should branch from the **latest protected `master`**, which may advance beyond the immutable release source through docs-only or later owner-authorized work.
 - Never move/reuse the RC.11 tag or overwrite the qualified ZIP identity.
 
+## Owner-approved product control plane
+- On 2026-09-19 the owner accepted `PRODUCT-TRUTH-BASELINE-1`, resolved all six recorded product decisions, and approved the realignment plan.
+- The authoritative product-control-plane package is proposed under `docs/product/` on `docs/product-control-plane` for independent review into protected `master`.
+- `docs/AUTHORITY.md` assigns governing responsibility by artifact. The 372 Requirement IDs are frozen and must not be renumbered.
+- Stable 1.0 scope checkpoint: `STABLE-1.0-SCOPE-1`.
+
 ## Environment authorization
 - FLAIROC: no RC.11 deployment authorized.
 - Training site: no RC.11 deployment authorized.
 - Production: no RC.11 deployment authorized.
 - POS repository: outside scope / must not be touched.
-- WPML/WCML certification remains separate.
+- CETECH is the first production Pilot customer, but no Pilot creation or deployment is authorized until geo.12 has technical closure and physical owner QA.
+- WPML/WCML remains separate and must be certified before Stable 1.0 only if it will be advertised as supported at launch.
 - WP Rocket certification remains separate/unqualified.
 - Stage 15 remains not started.
 
 ## Current next work
-No automatic next feature/release stage is authorized by RC.11 finalization. Production rollout/pilot, WPML/WCML certification, WP Rocket certification, Stage 15, or further feature work each require a separate explicit owner decision.
+1. Publish the accepted product-control-plane package through the dedicated reviewed documentation PR; no product/runtime code belongs in that PR.
+2. In parallel, continue only the finite geo.12 closure work on issue #23 / Draft PR #24 / `feat/canonical-geography-coverage`.
+3. After geo.12 technical closure and physical owner QA, create a controlled CETECH production Pilot/release candidate. This does not pre-authorize deployment and does not assume the name RC.12.
+4. Do not begin any other runtime implementation stream concurrently. Later realignment waves follow the approved dependency gates and bounded requirement-ID work.

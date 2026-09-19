@@ -1,0 +1,2999 @@
+# YAML 1.2
+registry_version: "PRODUCT-TRUTH-BASELINE-1"
+baseline_status: OWNER_ACCEPTED_FROZEN
+owner_accepted_on: "2026-09-19"
+audit_date: "2026-09-19"
+product: "CETECH Delivery Standalone"
+implementation_baseline: "RC.11/master plus separately identified unmerged geo.11 evidence"
+requirement_count: 372
+conformance_counts:
+  ALIGNED_EXACT: 30
+  ALIGNED_SEMANTICALLY_EQUIVALENT: 52
+  CERTIFICATION_GAP: 7
+  CONNECTED_ONLY: 7
+  DEFERRED: 7
+  DESIGN_SUPERIOR_REALIGN_CODE: 3
+  IMPLEMENTATION_SUPERIOR_ADOPT: 6
+  INTENTIONALLY_NON_CODE: 6
+  MISSING_IMPLEMENTATION: 90
+  PARTIAL_IMPLEMENTATION: 164
+requirements:
+  - id: DE-FAM-001
+    domain: FAM
+    requirement: "Standalone is an independent WooCommerce product, repository, build, release, and commercial identity."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: INTENTIONALLY_NON_CODE
+    source_ref: "Standalone handover; product-family decision"
+    evidence_ref: "PRODUCT-CONSTITUTION.md"
+  - id: DE-FAM-002
+    domain: FAM
+    requirement: "Connected is a separate public product, repository, build, release, and engine."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: INTENTIONALLY_NON_CODE
+    source_ref: "Standalone handover; product-family decision"
+    evidence_ref: "PRODUCT-CONSTITUTION.md"
+  - id: DE-FAM-003
+    domain: FAM
+    requirement: "Standalone and Connected may share behavioral specifications and versioned contracts but not runtime identity or storage authority."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: INTENTIONALLY_NON_CODE
+    source_ref: "Standalone handover; product-family decision"
+    evidence_ref: "PRODUCT-CONSTITUTION.md"
+  - id: DE-FAM-004
+    domain: FAM
+    requirement: "CETECH V4 may consume Standalone but must never be a Standalone dependency."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: INTENTIONALLY_NON_CODE
+    source_ref: "Standalone handover; product-family decision"
+    evidence_ref: "PRODUCT-CONSTITUTION.md"
+  - id: DE-FAM-005
+    domain: FAM
+    requirement: "Standalone core must operate with WooCommerce as its only hard application dependency."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: INTENTIONALLY_NON_CODE
+    source_ref: "Standalone handover; product-family decision"
+    evidence_ref: "PRODUCT-CONSTITUTION.md"
+  - id: DE-FAM-006
+    domain: FAM
+    requirement: "Standalone must remain commercially and operationally useful outside the CETECH ecosystem."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: INTENTIONALLY_NON_CODE
+    source_ref: "Standalone handover; product-family decision"
+    evidence_ref: "PRODUCT-CONSTITUTION.md"
+  - id: DE-OWN-001
+    domain: OWN
+    requirement: "WooCommerce owns products, variations, carts, checkout, orders, customers, payments, refunds, taxes, and accounts."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Standalone handover; transfer-kit ownership decisions"
+    evidence_ref: "src/Application; src/Domain; Woo integration adapters"
+  - id: DE-OWN-002
+    domain: OWN
+    requirement: "The Delivery Engine owns fulfillment choices, delivery offers, delivery areas, delivery-specific prices and promises."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Standalone handover; transfer-kit ownership decisions"
+    evidence_ref: "src/Application; src/Domain; Woo integration adapters"
+  - id: DE-OWN-003
+    domain: OWN
+    requirement: "The Delivery Engine must not duplicate merchandise pricing, stock, payment, tax, identity, or product-master authority."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Standalone handover; transfer-kit ownership decisions"
+    evidence_ref: "src/Application; src/Domain; Woo integration adapters"
+  - id: DE-OWN-004
+    domain: OWN
+    requirement: "One canonical owner must exist for each business truth."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Standalone handover; transfer-kit ownership decisions"
+    evidence_ref: "src/Application; src/Domain; Woo integration adapters"
+  - id: DE-OWN-005
+    domain: OWN
+    requirement: "External products and plugins must be normalized through boundary adapters."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Standalone handover; transfer-kit ownership decisions"
+    evidence_ref: "src/Application; src/Domain; Woo integration adapters"
+  - id: DE-OWN-006
+    domain: OWN
+    requirement: "Customer-facing labels must never become operational or transactional truth."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Standalone handover; transfer-kit ownership decisions"
+    evidence_ref: "src/Application; src/Domain; Woo integration adapters"
+  - id: DE-CONFIG-001
+    domain: CONFIG
+    requirement: "Configuration must resolve field by field through global, product, then variation scope."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Standalone handover — scoped configuration"
+    evidence_ref: "src/Domain/Configuration; src/Application/Configuration; schema 3 tables"
+  - id: DE-CONFIG-002
+    domain: CONFIG
+    requirement: "Each field must support inherit, explicit override, and clear/reset semantics."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Standalone handover — scoped configuration"
+    evidence_ref: "src/Domain/Configuration; src/Application/Configuration; schema 3 tables"
+  - id: DE-CONFIG-003
+    domain: CONFIG
+    requirement: "Effective configuration must expose both the value and its source scope."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Standalone handover — scoped configuration"
+    evidence_ref: "src/Domain/Configuration; src/Application/Configuration; schema 3 tables"
+  - id: DE-CONFIG-004
+    domain: CONFIG
+    requirement: "Scalar and collection fields must preserve tri-state semantics."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Standalone handover — scoped configuration"
+    evidence_ref: "src/Domain/Configuration; src/Application/Configuration; schema 3 tables"
+  - id: DE-CONFIG-005
+    domain: CONFIG
+    requirement: "Disabling a module must preserve its configuration and history."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Standalone handover — scoped configuration"
+    evidence_ref: "src/Domain/Configuration; src/Application/Configuration; schema 3 tables"
+  - id: DE-CONFIG-006
+    domain: CONFIG
+    requirement: "Product and variation administration must show inherited versus customized values."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Standalone handover — scoped configuration"
+    evidence_ref: "src/Domain/Configuration; src/Application/Configuration; schema 3 tables"
+  - id: DE-CONFIG-007
+    domain: CONFIG
+    requirement: "Configuration writes must be audited and versioned."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Standalone handover — scoped configuration"
+    evidence_ref: "src/Domain/Configuration; src/Application/Configuration; schema 3 tables"
+  - id: DE-CONFIG-008
+    domain: CONFIG
+    requirement: "Legacy configuration must migrate non-destructively into scoped configuration."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Standalone handover — scoped configuration"
+    evidence_ref: "src/Domain/Configuration; src/Application/Configuration; schema 3 tables"
+  - id: DE-ECR-001
+    domain: ECR
+    requirement: "All storefront and operational consumers must use the same Effective Configuration Resolver."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Effective Configuration Resolver decisions"
+    evidence_ref: "EffectiveConfigurationResolver; runtime router; resolver parity tests"
+  - id: DE-ECR-002
+    domain: ECR
+    requirement: "Simple and variable products must use semantically identical resolution rules."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Effective Configuration Resolver decisions"
+    evidence_ref: "EffectiveConfigurationResolver; runtime router; resolver parity tests"
+  - id: DE-ECR-003
+    domain: ECR
+    requirement: "Variation overrides must take precedence only for explicitly overridden fields."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Effective Configuration Resolver decisions"
+    evidence_ref: "EffectiveConfigurationResolver; runtime router; resolver parity tests"
+  - id: DE-ECR-004
+    domain: ECR
+    requirement: "Runtime fingerprints must change when effective business configuration changes."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Effective Configuration Resolver decisions"
+    evidence_ref: "EffectiveConfigurationResolver; runtime router; resolver parity tests"
+  - id: DE-ECR-005
+    domain: ECR
+    requirement: "Resolver failure or incomplete required configuration must fail closed."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Effective Configuration Resolver decisions"
+    evidence_ref: "EffectiveConfigurationResolver; runtime router; resolver parity tests"
+  - id: DE-ECR-006
+    domain: ECR
+    requirement: "Preview and diagnostics must use the production resolver rather than a separate interpretation."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Effective Configuration Resolver decisions"
+    evidence_ref: "EffectiveConfigurationResolver; runtime router; resolver parity tests"
+  - id: DE-CTX-001
+    domain: CTX
+    requirement: "A normalized commerce context must carry only delivery-relevant customer, channel, role, group, quantity, and currency facts."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Commerce-context and B2B decisions"
+    evidence_ref: "CustomerCartContext; MatchingLocation; per-item context tests"
+  - id: DE-CTX-002
+    domain: CTX
+    requirement: "Wholesale or marketplace plugins retain ownership of groups, roles, visibility, MOQ, and product price."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Commerce-context and B2B decisions"
+    evidence_ref: "CustomerCartContext; MatchingLocation; per-item context tests"
+  - id: DE-CTX-003
+    domain: CTX
+    requirement: "Quantity may affect delivery logistics independently of merchandise-price rules."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Commerce-context and B2B decisions"
+    evidence_ref: "CustomerCartContext; MatchingLocation; per-item context tests"
+  - id: DE-CTX-004
+    domain: CTX
+    requirement: "Per-item destinations and pickup endpoints must be preserved without leaking between cart lines."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Commerce-context and B2B decisions"
+    evidence_ref: "CustomerCartContext; MatchingLocation; per-item context tests"
+  - id: DE-CTX-005
+    domain: CTX
+    requirement: "Cart/session identity must isolate customer and destination context."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Commerce-context and B2B decisions"
+    evidence_ref: "CustomerCartContext; MatchingLocation; per-item context tests"
+  - id: DE-CTX-006
+    domain: CTX
+    requirement: "Adapters must not make a supported commerce model a hard dependency."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Commerce-context and B2B decisions"
+    evidence_ref: "CustomerCartContext; MatchingLocation; per-item context tests"
+  - id: DE-LOG-001
+    domain: LOG
+    requirement: "A Logistics Profile must represent weight, dimensions, handling, packaging, class, and transport constraints."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Logistics Profile decisions"
+    evidence_ref: "LogisticsProfile domain/repository/admin page; limited runtime dimensions"
+  - id: DE-LOG-002
+    domain: LOG
+    requirement: "Native WooCommerce weight and dimension fields are the default product measurements."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Logistics Profile decisions"
+    evidence_ref: "LogisticsProfile domain/repository/admin page; limited runtime dimensions"
+  - id: DE-LOG-003
+    domain: LOG
+    requirement: "Volumetric weight must be provider-neutral and policy driven."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Logistics Profile decisions"
+    evidence_ref: "LogisticsProfile domain/repository/admin page; limited runtime dimensions"
+  - id: DE-LOG-004
+    domain: LOG
+    requirement: "Product and variation scopes may inherit or override Logistics Profile assignment."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Logistics Profile decisions"
+    evidence_ref: "LogisticsProfile domain/repository/admin page; limited runtime dimensions"
+  - id: DE-LOG-005
+    domain: LOG
+    requirement: "Quote and journey planning must consume the effective Logistics Profile."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Logistics Profile decisions"
+    evidence_ref: "LogisticsProfile domain/repository/admin page; limited runtime dimensions"
+  - id: DE-LOG-006
+    domain: LOG
+    requirement: "Logistics Profiles must not become product taxonomy or inventory truth."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Logistics Profile decisions"
+    evidence_ref: "LogisticsProfile domain/repository/admin page; limited runtime dimensions"
+  - id: DE-ORIGIN-001
+    domain: ORIGIN
+    requirement: "Suppliers and origins are separate domain concepts."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Supplier/origin architecture"
+    evidence_ref: "Supplier and Origin repositories/admin; quote dimensions"
+  - id: DE-ORIGIN-002
+    domain: ORIGIN
+    requirement: "Origins must carry operational location and dispatch facts without exposing private details publicly."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Supplier/origin architecture"
+    evidence_ref: "Supplier and Origin repositories/admin; quote dimensions"
+  - id: DE-ORIGIN-003
+    domain: ORIGIN
+    requirement: "Products and variations may inherit or override an origin."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Supplier/origin architecture"
+    evidence_ref: "Supplier and Origin repositories/admin; quote dimensions"
+  - id: DE-ORIGIN-004
+    domain: ORIGIN
+    requirement: "Supplier identity must not replace product or inventory ownership."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Supplier/origin architecture"
+    evidence_ref: "Supplier and Origin repositories/admin; quote dimensions"
+  - id: DE-ORIGIN-005
+    domain: ORIGIN
+    requirement: "Multi-origin grouping must be deterministic and visible to operations."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Supplier/origin architecture"
+    evidence_ref: "Supplier and Origin repositories/admin; quote dimensions"
+  - id: DE-ORIGIN-006
+    domain: ORIGIN
+    requirement: "Public payloads and shared caches must not reveal private supplier or origin data."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Supplier/origin architecture"
+    evidence_ref: "Supplier and Origin repositories/admin; quote dimensions"
+  - id: DE-GEO-001
+    domain: GEO
+    requirement: "Canonical locations must use immutable plugin-owned internal IDs."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 A–O; canonical geography addendum"
+    evidence_ref: "geo.11 branch Domain/Geography, repositories, endpoints, migration; PR #24 closure blockers"
+  - id: DE-GEO-002
+    domain: GEO
+    requirement: "Canonical locations must retain country, parent, type or administrative level, display name, status, and timestamps."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 A–O; canonical geography addendum"
+    evidence_ref: "geo.11 branch Domain/Geography, repositories, endpoints, migration; PR #24 closure blockers"
+  - id: DE-GEO-003
+    domain: GEO
+    requirement: "Aliases and provider mappings must be replaceable without changing canonical business identity."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 A–O; canonical geography addendum"
+    evidence_ref: "geo.11 branch Domain/Geography, repositories, endpoints, migration; PR #24 closure blockers"
+  - id: DE-GEO-004
+    domain: GEO
+    requirement: "Provider IDs must never be permanent business identity."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 A–O; canonical geography addendum"
+    evidence_ref: "geo.11 branch Domain/Geography, repositories, endpoints, migration; PR #24 closure blockers"
+  - id: DE-GEO-005
+    domain: GEO
+    requirement: "Locations may retain coordinates and data-pack provenance."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 A–O; canonical geography addendum"
+    evidence_ref: "geo.11 branch Domain/Geography, repositories, endpoints, migration; PR #24 closure blockers"
+  - id: DE-GEO-006
+    domain: GEO
+    requirement: "Frontend and administration must reference the same canonical records."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 A–O; canonical geography addendum"
+    evidence_ref: "geo.11 branch Domain/Geography, repositories, endpoints, migration; PR #24 closure blockers"
+  - id: DE-GEO-007
+    domain: GEO
+    requirement: "Matching must use canonical identity and ancestry, not spelling."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 A–O; canonical geography addendum"
+    evidence_ref: "geo.11 branch Domain/Geography, repositories, endpoints, migration; PR #24 closure blockers"
+  - id: DE-GEO-008
+    domain: GEO
+    requirement: "Country/location packs must install and update independently of the core ZIP."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 A–O; canonical geography addendum"
+    evidence_ref: "geo.11 branch Domain/Geography, repositories, endpoints, migration; PR #24 closure blockers"
+  - id: DE-GEO-009
+    domain: GEO
+    requirement: "Only merchant-needed packs should be stored locally."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 A–O; canonical geography addendum"
+    evidence_ref: "geo.11 branch Domain/Geography, repositories, endpoints, migration; PR #24 closure blockers"
+  - id: DE-GEO-010
+    domain: GEO
+    requirement: "Runtime selection must use local or cached data rather than a public geocoder on every request."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 A–O; canonical geography addendum"
+    evidence_ref: "geo.11 branch Domain/Geography, repositories, endpoints, migration; PR #24 closure blockers"
+  - id: DE-GEO-011
+    domain: GEO
+    requirement: "Pack imports must be idempotent, resumable, bounded, and safe on retry."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 A–O; canonical geography addendum"
+    evidence_ref: "geo.11 branch Domain/Geography, repositories, endpoints, migration; PR #24 closure blockers"
+  - id: DE-GEO-012
+    domain: GEO
+    requirement: "Pack promotion must be atomic, fenced, and invisible until complete."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: DESIGN_SUPERIOR_REALIGN_CODE
+    source_ref: "Issue #23 A–O; canonical geography addendum"
+    evidence_ref: "geo.11 branch Domain/Geography, repositories, endpoints, migration; PR #24 closure blockers"
+  - id: DE-GEO-013
+    domain: GEO
+    requirement: "Woo country/state data should seed authoritative country/subdivision facts where appropriate."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 A–O; canonical geography addendum"
+    evidence_ref: "geo.11 branch Domain/Geography, repositories, endpoints, migration; PR #24 closure blockers"
+  - id: DE-GEO-014
+    domain: GEO
+    requirement: "Locality import must be provider-neutral; GeoNames is the initial supported source."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 A–O; canonical geography addendum"
+    evidence_ref: "geo.11 branch Domain/Geography, repositories, endpoints, migration; PR #24 closure blockers"
+  - id: DE-GEO-015
+    domain: GEO
+    requirement: "Public geography payloads must expose only customer-safe IDs and names."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 A–O; canonical geography addendum"
+    evidence_ref: "geo.11 branch Domain/Geography, repositories, endpoints, migration; PR #24 closure blockers"
+  - id: DE-AREA-001
+    domain: AREA
+    requirement: "A Delivery Area represents destinations sharing delivery treatment."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 coverage-group decisions"
+    evidence_ref: "geo.11 Coverage domain/repository/matcher; geo.12 defect list"
+  - id: DE-AREA-002
+    domain: AREA
+    requirement: "Different hierarchy levels within a coverage group combine with AND."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 coverage-group decisions"
+    evidence_ref: "geo.11 Coverage domain/repository/matcher; geo.12 defect list"
+  - id: DE-AREA-003
+    domain: AREA
+    requirement: "Multiple selected members at the same hierarchy level combine with OR."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 coverage-group decisions"
+    evidence_ref: "geo.11 Coverage domain/repository/matcher; geo.12 defect list"
+  - id: DE-AREA-004
+    domain: AREA
+    requirement: "Separate coverage groups combine with OR."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 coverage-group decisions"
+    evidence_ref: "geo.11 Coverage domain/repository/matcher; geo.12 defect list"
+  - id: DE-AREA-005
+    domain: AREA
+    requirement: "Coverage must preserve parent-child relationships and reject nonsense combinations."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 coverage-group decisions"
+    evidence_ref: "geo.11 Coverage domain/repository/matcher; geo.12 defect list"
+  - id: DE-AREA-006
+    domain: AREA
+    requirement: "Coverage modes must include whole area, selected descendants, and whole area except exclusions."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 coverage-group decisions"
+    evidence_ref: "geo.11 Coverage domain/repository/matcher; geo.12 defect list"
+  - id: DE-AREA-007
+    domain: AREA
+    requirement: "Exclusions override inherited inclusion within the same group."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 coverage-group decisions"
+    evidence_ref: "geo.11 Coverage domain/repository/matcher; geo.12 defect list"
+  - id: DE-AREA-008
+    domain: AREA
+    requirement: "Postcode exact and prefix constraints must remain available where relevant."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 coverage-group decisions"
+    evidence_ref: "geo.11 Coverage domain/repository/matcher; geo.12 defect list"
+  - id: DE-AREA-009
+    domain: AREA
+    requirement: "Area priority, matched-constraint specificity, overlap order, and fallback must be deterministic."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 coverage-group decisions"
+    evidence_ref: "geo.11 Coverage domain/repository/matcher; geo.12 defect list"
+  - id: DE-AREA-010
+    domain: AREA
+    requirement: "Only a truly unconstrained fallback may act as everywhere else."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 coverage-group decisions"
+    evidence_ref: "geo.11 Coverage domain/repository/matcher; geo.12 defect list"
+  - id: DE-AREA-011
+    domain: AREA
+    requirement: "No valid matching coverage must fail closed."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 coverage-group decisions"
+    evidence_ref: "geo.11 Coverage domain/repository/matcher; geo.12 defect list"
+  - id: DE-AREA-012
+    domain: AREA
+    requirement: "Legacy schema-5 rules must remain authoritative until each zone is safely converted."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_CURRENT_ACTIVE_STREAM_CLOSES
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Issue #23 coverage-group decisions"
+    evidence_ref: "geo.11 Coverage domain/repository/matcher; geo.12 defect list"
+  - id: DE-OFFER-001
+    domain: OFFER
+    requirement: "A Delivery Offer is the selectable customer-facing fulfillment service contract."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Delivery Offer/service model"
+    evidence_ref: "DeliveryOffer domain/repository/admin; ProductDeliveryOptionsBuilder"
+  - id: DE-OFFER-002
+    domain: OFFER
+    requirement: "Offers must have stable internal identity distinct from mutable public labels."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Delivery Offer/service model"
+    evidence_ref: "DeliveryOffer domain/repository/admin; ProductDeliveryOptionsBuilder"
+  - id: DE-OFFER-003
+    domain: OFFER
+    requirement: "Offers must separate route, service level, carrier visibility, description, tax class, and priority."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Delivery Offer/service model"
+    evidence_ref: "DeliveryOffer domain/repository/admin; ProductDeliveryOptionsBuilder"
+  - id: DE-OFFER-004
+    domain: OFFER
+    requirement: "Air and Sea are route or service facts, never product variations."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Delivery Offer/service model"
+    evidence_ref: "DeliveryOffer domain/repository/admin; ProductDeliveryOptionsBuilder"
+  - id: DE-OFFER-005
+    domain: OFFER
+    requirement: "Customer-visible offers must be filtered by effective product, fulfillment, destination, and price validity."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Delivery Offer/service model"
+    evidence_ref: "DeliveryOffer domain/repository/admin; ProductDeliveryOptionsBuilder"
+  - id: DE-OFFER-006
+    domain: OFFER
+    requirement: "An offer may be automatic when only one valid choice exists."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Delivery Offer/service model"
+    evidence_ref: "DeliveryOffer domain/repository/admin; ProductDeliveryOptionsBuilder"
+  - id: DE-OFFER-007
+    domain: OFFER
+    requirement: "Multiple offers must remain selectable when business policy permits."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Delivery Offer/service model"
+    evidence_ref: "DeliveryOffer domain/repository/admin; ProductDeliveryOptionsBuilder"
+  - id: DE-OFFER-008
+    domain: OFFER
+    requirement: "Offer labels and descriptions must be snapshot-safe and translatable."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Delivery Offer/service model"
+    evidence_ref: "DeliveryOffer domain/repository/admin; ProductDeliveryOptionsBuilder"
+  - id: DE-PROMISE-001
+    domain: PROMISE
+    requirement: "Promise calculation must separate processing, transit, and final-mile components."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Delivery Service & Promise Policy Engine"
+    evidence_ref: "DeliveryOffer duration fields and formatter only; no full calendar/cutoff/capacity engine"
+  - id: DE-PROMISE-002
+    domain: PROMISE
+    requirement: "Promise policy must support Express, Same Day, Next Day, Standard, Relaxed, and merchant-defined service levels."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Delivery Service & Promise Policy Engine"
+    evidence_ref: "DeliveryOffer duration fields and formatter only; no full calendar/cutoff/capacity engine"
+  - id: DE-PROMISE-003
+    domain: PROMISE
+    requirement: "Promise calculation must use business calendars and closure dates."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Delivery Service & Promise Policy Engine"
+    evidence_ref: "DeliveryOffer duration fields and formatter only; no full calendar/cutoff/capacity engine"
+  - id: DE-PROMISE-004
+    domain: PROMISE
+    requirement: "Promise calculation must enforce service cutoffs."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Delivery Service & Promise Policy Engine"
+    evidence_ref: "DeliveryOffer duration fields and formatter only; no full calendar/cutoff/capacity engine"
+  - id: DE-PROMISE-005
+    domain: PROMISE
+    requirement: "Promise calculation must consider capacity where configured."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Delivery Service & Promise Policy Engine"
+    evidence_ref: "DeliveryOffer duration fields and formatter only; no full calendar/cutoff/capacity engine"
+  - id: DE-PROMISE-006
+    domain: PROMISE
+    requirement: "Sequential and parallel legs must aggregate promises correctly."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Delivery Service & Promise Policy Engine"
+    evidence_ref: "DeliveryOffer duration fields and formatter only; no full calendar/cutoff/capacity engine"
+  - id: DE-PROMISE-007
+    domain: PROMISE
+    requirement: "Promise results must identify the governing policy version."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Delivery Service & Promise Policy Engine"
+    evidence_ref: "DeliveryOffer duration fields and formatter only; no full calendar/cutoff/capacity engine"
+  - id: DE-PROMISE-008
+    domain: PROMISE
+    requirement: "Customer-facing ETA must be explainable and localized."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Delivery Service & Promise Policy Engine"
+    evidence_ref: "DeliveryOffer duration fields and formatter only; no full calendar/cutoff/capacity engine"
+  - id: DE-PROMISE-009
+    domain: PROMISE
+    requirement: "Promise failure must not silently display an invented date."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Delivery Service & Promise Policy Engine"
+    evidence_ref: "DeliveryOffer duration fields and formatter only; no full calendar/cutoff/capacity engine"
+  - id: DE-PROMISE-010
+    domain: PROMISE
+    requirement: "Accepted promise facts must be frozen into the order snapshot."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Delivery Service & Promise Policy Engine"
+    evidence_ref: "DeliveryOffer duration fields and formatter only; no full calendar/cutoff/capacity engine"
+  - id: DE-QUOTE-001
+    domain: QUOTE
+    requirement: "A first-class DeliveryQuote must have a stable quote ID."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "DeliveryQuote lifecycle addendum"
+    evidence_ref: "RateQuoteEngine/Request/Result compute amounts but lack first-class quote identity, persistence and TTL"
+  - id: DE-QUOTE-002
+    domain: QUOTE
+    requirement: "A quote must bind cart or delivery-group fingerprint, origin, destination, service, and quantity."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "DeliveryQuote lifecycle addendum"
+    evidence_ref: "RateQuoteEngine/Request/Result compute amounts but lack first-class quote identity, persistence and TTL"
+  - id: DE-QUOTE-003
+    domain: QUOTE
+    requirement: "A quote must record list price, promotion, final customer price, currency, and tax context."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "DeliveryQuote lifecycle addendum"
+    evidence_ref: "RateQuoteEngine/Request/Result compute amounts but lack first-class quote identity, persistence and TTL"
+  - id: DE-QUOTE-004
+    domain: QUOTE
+    requirement: "A quote must record estimated cost and pricing-policy version."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "DeliveryQuote lifecycle addendum"
+    evidence_ref: "RateQuoteEngine/Request/Result compute amounts but lack first-class quote identity, persistence and TTL"
+  - id: DE-QUOTE-005
+    domain: QUOTE
+    requirement: "A quote may record route distance, duration, traffic, vehicle requirement, provider, and provider version."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "DeliveryQuote lifecycle addendum"
+    evidence_ref: "RateQuoteEngine/Request/Result compute amounts but lack first-class quote identity, persistence and TTL"
+  - id: DE-QUOTE-006
+    domain: QUOTE
+    requirement: "A quote must have created, expiry, and status fields."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "DeliveryQuote lifecycle addendum"
+    evidence_ref: "RateQuoteEngine/Request/Result compute amounts but lack first-class quote identity, persistence and TTL"
+  - id: DE-QUOTE-007
+    domain: QUOTE
+    requirement: "A valid quote price must remain frozen until expiry."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "DeliveryQuote lifecycle addendum"
+    evidence_ref: "RateQuoteEngine/Request/Result compute amounts but lack first-class quote identity, persistence and TTL"
+  - id: DE-QUOTE-008
+    domain: QUOTE
+    requirement: "Quote TTL must be distinct from capacity-reservation TTL."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "DeliveryQuote lifecycle addendum"
+    evidence_ref: "RateQuoteEngine/Request/Result compute amounts but lack first-class quote identity, persistence and TTL"
+  - id: DE-QUOTE-009
+    domain: QUOTE
+    requirement: "Material cart, destination, service, currency, inventory, or policy changes must trigger revalidation."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "DeliveryQuote lifecycle addendum"
+    evidence_ref: "RateQuoteEngine/Request/Result compute amounts but lack first-class quote identity, persistence and TTL"
+  - id: DE-QUOTE-010
+    domain: QUOTE
+    requirement: "Expired or invalid quotes must fail closed with recoverable customer UX."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "DeliveryQuote lifecycle addendum"
+    evidence_ref: "RateQuoteEngine/Request/Result compute amounts but lack first-class quote identity, persistence and TTL"
+  - id: DE-QUOTE-011
+    domain: QUOTE
+    requirement: "Accepted quote facts must be snapshotted and never reconstructed from current rules."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "DeliveryQuote lifecycle addendum"
+    evidence_ref: "RateQuoteEngine/Request/Result compute amounts but lack first-class quote identity, persistence and TTL"
+  - id: DE-QUOTE-012
+    domain: QUOTE
+    requirement: "Quote creation and acceptance must be idempotent where requests can repeat."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "DeliveryQuote lifecycle addendum"
+    evidence_ref: "RateQuoteEngine/Request/Result compute amounts but lack first-class quote identity, persistence and TTL"
+  - id: DE-PICKUP-001
+    domain: PICKUP
+    requirement: "Pickup locations must have stable identity, type, internal name, and customer name."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Pickup intelligence addendum"
+    evidence_ref: "PickupLocation persistence/admin/basic selector and snapshots; missing full schedules/capacity/disclosure"
+  - id: DE-PICKUP-002
+    domain: PICKUP
+    requirement: "Pickup locations must support store, warehouse, partner, agent, supplier, locker, third-party, and custom types."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Pickup intelligence addendum"
+    evidence_ref: "PickupLocation persistence/admin/basic selector and snapshots; missing full schedules/capacity/disclosure"
+  - id: DE-PICKUP-003
+    domain: PICKUP
+    requirement: "Pickup locations must retain address, coordinates, map link, contact, instructions, and landmarks."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Pickup intelligence addendum"
+    evidence_ref: "PickupLocation persistence/admin/basic selector and snapshots; missing full schedules/capacity/disclosure"
+  - id: DE-PICKUP-004
+    domain: PICKUP
+    requirement: "Pickup locations must model hours, time zone, closures, readiness, capacity, and status."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Pickup intelligence addendum"
+    evidence_ref: "PickupLocation persistence/admin/basic selector and snapshots; missing full schedules/capacity/disclosure"
+  - id: DE-PICKUP-005
+    domain: PICKUP
+    requirement: "Eligibility may vary by product, service, and scope."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Pickup intelligence addendum"
+    evidence_ref: "PickupLocation persistence/admin/basic selector and snapshots; missing full schedules/capacity/disclosure"
+  - id: DE-PICKUP-006
+    domain: PICKUP
+    requirement: "A default location and customer selection among allowed locations must both be supported."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Pickup intelligence addendum"
+    evidence_ref: "PickupLocation persistence/admin/basic selector and snapshots; missing full schedules/capacity/disclosure"
+  - id: DE-PICKUP-007
+    domain: PICKUP
+    requirement: "Pre-checkout disclosure may be general while post-checkout details are complete and configurable."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Pickup intelligence addendum"
+    evidence_ref: "PickupLocation persistence/admin/basic selector and snapshots; missing full schedules/capacity/disclosure"
+  - id: DE-PICKUP-008
+    domain: PICKUP
+    requirement: "Pickup may carry a customer fee and must not be implemented as an accidental zero-cost shipping hack."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Pickup intelligence addendum"
+    evidence_ref: "PickupLocation persistence/admin/basic selector and snapshots; missing full schedules/capacity/disclosure"
+  - id: DE-PICKUP-009
+    domain: PICKUP
+    requirement: "The selected pickup endpoint must be snapshotted immutably."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Pickup intelligence addendum"
+    evidence_ref: "PickupLocation persistence/admin/basic selector and snapshots; missing full schedules/capacity/disclosure"
+  - id: DE-PICKUP-010
+    domain: PICKUP
+    requirement: "Pickup customer copy must never present pickup as shipping to the customer's address."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Pickup intelligence addendum"
+    evidence_ref: "PickupLocation persistence/admin/basic selector and snapshots; missing full schedules/capacity/disclosure"
+  - id: DE-JOURNEY-001
+    domain: JOURNEY
+    requirement: "A fulfillment journey may contain zero, one, or many legs."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Multi-leg/composite logistics decisions"
+    evidence_ref: "No journey/leg aggregate in RC.11 or geo.11"
+  - id: DE-JOURNEY-002
+    domain: JOURNEY
+    requirement: "Journey legs may execute sequentially or in parallel."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Multi-leg/composite logistics decisions"
+    evidence_ref: "No journey/leg aggregate in RC.11 or geo.11"
+  - id: DE-JOURNEY-003
+    domain: JOURNEY
+    requirement: "Each leg must retain origin, destination, mode, service, responsible provider, cost, and promise facts."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Multi-leg/composite logistics decisions"
+    evidence_ref: "No journey/leg aggregate in RC.11 or geo.11"
+  - id: DE-JOURNEY-004
+    domain: JOURNEY
+    requirement: "Customer presentation should normally consolidate a multi-leg journey into one coherent offer."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Multi-leg/composite logistics decisions"
+    evidence_ref: "No journey/leg aggregate in RC.11 or geo.11"
+  - id: DE-JOURNEY-005
+    domain: JOURNEY
+    requirement: "Internal operations must preserve per-leg status and economics."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Multi-leg/composite logistics decisions"
+    evidence_ref: "No journey/leg aggregate in RC.11 or geo.11"
+  - id: DE-JOURNEY-006
+    domain: JOURNEY
+    requirement: "Composite names such as Air Shipping and Delivery must be presentation derived from journey facts."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Multi-leg/composite logistics decisions"
+    evidence_ref: "No journey/leg aggregate in RC.11 or geo.11"
+  - id: DE-JOURNEY-007
+    domain: JOURNEY
+    requirement: "Public presentation may be hidden, summary, or explicit without changing operational truth."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Multi-leg/composite logistics decisions"
+    evidence_ref: "No journey/leg aggregate in RC.11 or geo.11"
+  - id: DE-JOURNEY-008
+    domain: JOURNEY
+    requirement: "Journey grouping must support supplier, warehouse, and customer or pickup endpoints."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Multi-leg/composite logistics decisions"
+    evidence_ref: "No journey/leg aggregate in RC.11 or geo.11"
+  - id: DE-JOURNEY-009
+    domain: JOURNEY
+    requirement: "Shared-leg costs must be allocated deterministically."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Multi-leg/composite logistics decisions"
+    evidence_ref: "No journey/leg aggregate in RC.11 or geo.11"
+  - id: DE-JOURNEY-010
+    domain: JOURNEY
+    requirement: "Journey history must remain stable after configuration changes."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Multi-leg/composite logistics decisions"
+    evidence_ref: "No journey/leg aggregate in RC.11 or geo.11"
+  - id: DE-ECON-001
+    domain: ECON
+    requirement: "Customer delivery charge must be stored separately from estimated internal cost."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Internal delivery economics decision"
+    evidence_ref: "Only customer rate amount/rate card are modeled"
+  - id: DE-ECON-002
+    domain: ECON
+    requirement: "Actual internal cost must be stored separately from estimate and customer charge."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Internal delivery economics decision"
+    evidence_ref: "Only customer rate amount/rate card are modeled"
+  - id: DE-ECON-003
+    domain: ECON
+    requirement: "Provider payable must be a distinct amount."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Internal delivery economics decision"
+    evidence_ref: "Only customer rate amount/rate card are modeled"
+  - id: DE-ECON-004
+    domain: ECON
+    requirement: "Delivery subsidy must be explicit rather than hidden in a modified base rate."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Internal delivery economics decision"
+    evidence_ref: "Only customer rate amount/rate card are modeled"
+  - id: DE-ECON-005
+    domain: ECON
+    requirement: "Delivery margin must be derived from authoritative economic components."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Internal delivery economics decision"
+    evidence_ref: "Only customer rate amount/rate card are modeled"
+  - id: DE-ECON-006
+    domain: ECON
+    requirement: "Shared-leg cost allocation must be deterministic and auditable."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Internal delivery economics decision"
+    evidence_ref: "Only customer rate amount/rate card are modeled"
+  - id: DE-ECON-007
+    domain: ECON
+    requirement: "Economic fields must carry currency and source or policy version."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Internal delivery economics decision"
+    evidence_ref: "Only customer rate amount/rate card are modeled"
+  - id: DE-ECON-008
+    domain: ECON
+    requirement: "Private economics must never appear in customer payloads."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Internal delivery economics decision"
+    evidence_ref: "Only customer rate amount/rate card are modeled"
+  - id: DE-RATE-001
+    domain: RATE
+    requirement: "Rate Cards must use stable identity and explicit status."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Rate Card decisions"
+    evidence_ref: "RateCard repositories/admin; RateQuoteEngine; selected Woo shipping rate"
+  - id: DE-RATE-002
+    domain: RATE
+    requirement: "Rate Cards must bind offer, destination area, currency, charge type, and priority."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Rate Card decisions"
+    evidence_ref: "RateCard repositories/admin; RateQuoteEngine; selected Woo shipping rate"
+  - id: DE-RATE-003
+    domain: RATE
+    requirement: "Rate Cards may narrow by logistics profile, supplier, and origin."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Rate Card decisions"
+    evidence_ref: "RateCard repositories/admin; RateQuoteEngine; selected Woo shipping rate"
+  - id: DE-RATE-004
+    domain: RATE
+    requirement: "Rates must support effective-from and effective-to dates."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Rate Card decisions"
+    evidence_ref: "RateCard repositories/admin; RateQuoteEngine; selected Woo shipping rate"
+  - id: DE-RATE-005
+    domain: RATE
+    requirement: "Fixed per shipment and fixed per item calculation must be server-authoritative."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Rate Card decisions"
+    evidence_ref: "RateCard repositories/admin; RateQuoteEngine; selected Woo shipping rate"
+  - id: DE-RATE-006
+    domain: RATE
+    requirement: "Invalid, negative, unsupported, or absent rate configuration must fail closed."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Rate Card decisions"
+    evidence_ref: "RateCard repositories/admin; RateQuoteEngine; selected Woo shipping rate"
+  - id: DE-RATE-007
+    domain: RATE
+    requirement: "Matched-card selection must be deterministic and explainable."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Rate Card decisions"
+    evidence_ref: "RateCard repositories/admin; RateQuoteEngine; selected Woo shipping rate"
+  - id: DE-RATE-008
+    domain: RATE
+    requirement: "One authoritative WooCommerce rate must represent the selected offer per managed package."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Rate Card decisions"
+    evidence_ref: "RateCard repositories/admin; RateQuoteEngine; selected Woo shipping rate"
+  - id: DE-PROMO-001
+    domain: PROMO
+    requirement: "Delivery promotions must be separate from base Rate Cards."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Delivery promotion/subsidy architecture"
+    evidence_ref: "No delivery-promotion domain or persistence"
+  - id: DE-PROMO-002
+    domain: PROMO
+    requirement: "Promotion eligibility must be rule driven and versioned."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Delivery promotion/subsidy architecture"
+    evidence_ref: "No delivery-promotion domain or persistence"
+  - id: DE-PROMO-003
+    domain: PROMO
+    requirement: "Promotion application must record list price, discount, subsidy source, and final price."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Delivery promotion/subsidy architecture"
+    evidence_ref: "No delivery-promotion domain or persistence"
+  - id: DE-PROMO-004
+    domain: PROMO
+    requirement: "Budgets and limits must fail closed when exhausted or indeterminate."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Delivery promotion/subsidy architecture"
+    evidence_ref: "No delivery-promotion domain or persistence"
+  - id: DE-PROMO-005
+    domain: PROMO
+    requirement: "Promotion stacking and precedence must be deterministic."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Delivery promotion/subsidy architecture"
+    evidence_ref: "No delivery-promotion domain or persistence"
+  - id: DE-PROMO-006
+    domain: PROMO
+    requirement: "Promotion changes must revalidate active quotes."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Delivery promotion/subsidy architecture"
+    evidence_ref: "No delivery-promotion domain or persistence"
+  - id: DE-PROMO-007
+    domain: PROMO
+    requirement: "Order snapshots must preserve applied delivery promotion facts."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Delivery promotion/subsidy architecture"
+    evidence_ref: "No delivery-promotion domain or persistence"
+  - id: DE-FX-001
+    domain: FX
+    requirement: "The plugin must not become an FX engine."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Multi-currency provider architecture"
+    evidence_ref: "Currency code filters rates; no adapter/conversion provenance"
+  - id: DE-FX-002
+    domain: FX
+    requirement: "A provider-neutral currency adapter must determine presentment and conversion facts."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Multi-currency provider architecture"
+    evidence_ref: "Currency code filters rates; no adapter/conversion provenance"
+  - id: DE-FX-003
+    domain: FX
+    requirement: "Currency conversion must occur exactly once."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Multi-currency provider architecture"
+    evidence_ref: "Currency code filters rates; no adapter/conversion provenance"
+  - id: DE-FX-004
+    domain: FX
+    requirement: "Quote cache keys must include currency and provider context."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Multi-currency provider architecture"
+    evidence_ref: "Currency code filters rates; no adapter/conversion provenance"
+  - id: DE-FX-005
+    domain: FX
+    requirement: "Snapshots must preserve base, presentment, and charged currency plus applied rate and timestamp."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Multi-currency provider architecture"
+    evidence_ref: "Currency code filters rates; no adapter/conversion provenance"
+  - id: DE-FX-006
+    domain: FX
+    requirement: "WCML, WooPayments Multi-Currency, FOX/WOOCS, CURCY, Aelia, and TIV are priority adapter targets without becoming hard dependencies."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Multi-currency provider architecture"
+    evidence_ref: "Currency code filters rates; no adapter/conversion provenance"
+  - id: DE-TAX-001
+    domain: TAX
+    requirement: "WooCommerce remains tax authority for the checkout transaction."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Tax/duty/landed-cost boundary"
+    evidence_ref: "Offer tax_class and Woo shipping rate integration exist; broader boundary undocumented"
+  - id: DE-TAX-002
+    domain: TAX
+    requirement: "Delivery offers and charges must expose the correct Woo tax class and taxability."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Tax/duty/landed-cost boundary"
+    evidence_ref: "Offer tax_class and Woo shipping rate integration exist; broader boundary undocumented"
+  - id: DE-TAX-003
+    domain: TAX
+    requirement: "International duty or landed-cost estimates must be separately identified from authoritative tax."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Tax/duty/landed-cost boundary"
+    evidence_ref: "Offer tax_class and Woo shipping rate integration exist; broader boundary undocumented"
+  - id: DE-TAX-004
+    domain: TAX
+    requirement: "Historical snapshots must retain charged delivery tax context without recalculating from current tax rules."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Tax/duty/landed-cost boundary"
+    evidence_ref: "Offer tax_class and Woo shipping rate integration exist; broader boundary undocumented"
+  - id: DE-PDP-001
+    domain: PDP
+    requirement: "Product pages must show only valid delivery or pickup choices."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "PDP selector and issue #18 decisions"
+    evidence_ref: "ProductDeliverySelectorRenderer; ProductPageDeliveryPriceQuote; JS tests; RC.11 qualification"
+  - id: DE-PDP-002
+    domain: PDP
+    requirement: "Product-page prices must be server-authoritative and quantity aware."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: IMPLEMENTATION_SUPERIOR_ADOPT
+    source_ref: "PDP selector and issue #18 decisions"
+    evidence_ref: "ProductDeliverySelectorRenderer; ProductPageDeliveryPriceQuote; JS tests; RC.11 qualification"
+  - id: DE-PDP-003
+    domain: PDP
+    requirement: "A delivery option must display service name, ETA, then prominent fee."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "PDP selector and issue #18 decisions"
+    evidence_ref: "ProductDeliverySelectorRenderer; ProductPageDeliveryPriceQuote; JS tests; RC.11 qualification"
+  - id: DE-PDP-004
+    domain: PDP
+    requirement: "Zero-price pickup must display Free clearly."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "PDP selector and issue #18 decisions"
+    evidence_ref: "ProductDeliverySelectorRenderer; ProductPageDeliveryPriceQuote; JS tests; RC.11 qualification"
+  - id: DE-PDP-005
+    domain: PDP
+    requirement: "No implicit store-country quote may masquerade as a shopper location."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "PDP selector and issue #18 decisions"
+    evidence_ref: "ProductDeliverySelectorRenderer; ProductPageDeliveryPriceQuote; JS tests; RC.11 qualification"
+  - id: DE-PDP-006
+    domain: PDP
+    requirement: "Unquoted managed delivery must fail closed."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "PDP selector and issue #18 decisions"
+    evidence_ref: "ProductDeliverySelectorRenderer; ProductPageDeliveryPriceQuote; JS tests; RC.11 qualification"
+  - id: DE-PDP-007
+    domain: PDP
+    requirement: "Simple and variable products must both be supported."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "PDP selector and issue #18 decisions"
+    evidence_ref: "ProductDeliverySelectorRenderer; ProductPageDeliveryPriceQuote; JS tests; RC.11 qualification"
+  - id: DE-PDP-008
+    domain: PDP
+    requirement: "Radio controls, full-card click targets, focus, labels, and responsive tap targets must be preserved."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "PDP selector and issue #18 decisions"
+    evidence_ref: "ProductDeliverySelectorRenderer; ProductPageDeliveryPriceQuote; JS tests; RC.11 qualification"
+  - id: DE-CART-001
+    domain: CART
+    requirement: "Delivery selections must persist in cart item data and session state."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Cart/checkout lifecycle decisions"
+    evidence_ref: "Cart selection capture/reconciler/revalidator/reselection; Classic and Blocks adapters"
+  - id: DE-CART-002
+    domain: CART
+    requirement: "Stale configuration must reconcile existing cart lines against live rules."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Cart/checkout lifecycle decisions"
+    evidence_ref: "Cart selection capture/reconciler/revalidator/reselection; Classic and Blocks adapters"
+  - id: DE-CART-003
+    domain: CART
+    requirement: "Invalidated selections must request reselection rather than silently substitute."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Cart/checkout lifecycle decisions"
+    evidence_ref: "Cart selection capture/reconciler/revalidator/reselection; Classic and Blocks adapters"
+  - id: DE-CART-004
+    domain: CART
+    requirement: "Cart identity must distinguish materially different delivery contexts."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Cart/checkout lifecycle decisions"
+    evidence_ref: "Cart selection capture/reconciler/revalidator/reselection; Classic and Blocks adapters"
+  - id: DE-CART-005
+    domain: CART
+    requirement: "Checkout must revalidate the selected delivery choice and authoritative quote."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Cart/checkout lifecycle decisions"
+    evidence_ref: "Cart selection capture/reconciler/revalidator/reselection; Classic and Blocks adapters"
+  - id: DE-CART-006
+    domain: CART
+    requirement: "Classic checkout and Blocks checkout must produce equivalent business results."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Cart/checkout lifecycle decisions"
+    evidence_ref: "Cart selection capture/reconciler/revalidator/reselection; Classic and Blocks adapters"
+  - id: DE-CART-007
+    domain: CART
+    requirement: "Checkout address remains final authority over preliminary product-page location."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Cart/checkout lifecycle decisions"
+    evidence_ref: "Cart selection capture/reconciler/revalidator/reselection; Classic and Blocks adapters"
+  - id: DE-CART-008
+    domain: CART
+    requirement: "Managed packages with no valid Delivery Engine rate must not fall back to unrelated native rates."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: IMPLEMENTATION_SUPERIOR_ADOPT
+    source_ref: "Cart/checkout lifecycle decisions"
+    evidence_ref: "Cart selection capture/reconciler/revalidator/reselection; Classic and Blocks adapters"
+  - id: DE-GROUP-001
+    domain: GROUP
+    requirement: "Cart lines must group only when fulfillment choice, endpoint, origin, service, and destination policy allow."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: IMPLEMENTATION_SUPERIOR_ADOPT
+    source_ref: "Grouping/consolidation and per-item decisions"
+    evidence_ref: "ShippingPackageBuilder; DeliveryGroupIdentity; per-item context tests"
+  - id: DE-GROUP-002
+    domain: GROUP
+    requirement: "Per-item destinations must produce distinct delivery groups when required."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Grouping/consolidation and per-item decisions"
+    evidence_ref: "ShippingPackageBuilder; DeliveryGroupIdentity; per-item context tests"
+  - id: DE-GROUP-003
+    domain: GROUP
+    requirement: "Pickup and delivery groups must never be conflated."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Grouping/consolidation and per-item decisions"
+    evidence_ref: "ShippingPackageBuilder; DeliveryGroupIdentity; per-item context tests"
+  - id: DE-GROUP-004
+    domain: GROUP
+    requirement: "Grouping fingerprints must exclude stale administrative configuration noise."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Grouping/consolidation and per-item decisions"
+    evidence_ref: "ShippingPackageBuilder; DeliveryGroupIdentity; per-item context tests"
+  - id: DE-GROUP-005
+    domain: GROUP
+    requirement: "One customer rate per managed package must correspond to the group truth."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Grouping/consolidation and per-item decisions"
+    evidence_ref: "ShippingPackageBuilder; DeliveryGroupIdentity; per-item context tests"
+  - id: DE-GROUP-006
+    domain: GROUP
+    requirement: "Split and merge operations must be deterministic and revalidated."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Grouping/consolidation and per-item decisions"
+    evidence_ref: "ShippingPackageBuilder; DeliveryGroupIdentity; per-item context tests"
+  - id: DE-GROUP-007
+    domain: GROUP
+    requirement: "Customer presentation must use clear Delivery or Pickup group language."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Grouping/consolidation and per-item decisions"
+    evidence_ref: "ShippingPackageBuilder; DeliveryGroupIdentity; per-item context tests"
+  - id: DE-SNAP-001
+    domain: SNAP
+    requirement: "Each order line must retain immutable product, variation, quantity, fulfillment, and selected-offer facts."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: IMPLEMENTATION_SUPERIOR_ADOPT
+    source_ref: "Immutable order snapshot addendum"
+    evidence_ref: "OrderDeliverySnapshot V1/V2 and persister; lacks policy/label/quote-complete fields"
+  - id: DE-SNAP-002
+    domain: SNAP
+    requirement: "Snapshots must retain destination or pickup endpoint and delivery-group identity."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Immutable order snapshot addendum"
+    evidence_ref: "OrderDeliverySnapshot V1/V2 and persister; lacks policy/label/quote-complete fields"
+  - id: DE-SNAP-003
+    domain: SNAP
+    requirement: "Snapshots must retain quoted amount, currency, rate-card identity, and quote status."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Immutable order snapshot addendum"
+    evidence_ref: "OrderDeliverySnapshot V1/V2 and persister; lacks policy/label/quote-complete fields"
+  - id: DE-SNAP-004
+    domain: SNAP
+    requirement: "Snapshots must retain customer-facing offer label, description, and estimate."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Immutable order snapshot addendum"
+    evidence_ref: "OrderDeliverySnapshot V1/V2 and persister; lacks policy/label/quote-complete fields"
+  - id: DE-SNAP-005
+    domain: SNAP
+    requirement: "Snapshots must retain applied DeliveryQuote identity and pricing-policy version."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Immutable order snapshot addendum"
+    evidence_ref: "OrderDeliverySnapshot V1/V2 and persister; lacks policy/label/quote-complete fields"
+  - id: DE-SNAP-006
+    domain: SNAP
+    requirement: "Snapshots must retain fulfillment labels and promise-policy version."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Immutable order snapshot addendum"
+    evidence_ref: "OrderDeliverySnapshot V1/V2 and persister; lacks policy/label/quote-complete fields"
+  - id: DE-SNAP-007
+    domain: SNAP
+    requirement: "Snapshots must retain Return Policy and Refund Policy versions, summaries, full text, and exceptions."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Immutable order snapshot addendum"
+    evidence_ref: "OrderDeliverySnapshot V1/V2 and persister; lacks policy/label/quote-complete fields"
+  - id: DE-SNAP-008
+    domain: SNAP
+    requirement: "Historical snapshots must never be rewritten from current configuration."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Immutable order snapshot addendum"
+    evidence_ref: "OrderDeliverySnapshot V1/V2 and persister; lacks policy/label/quote-complete fields"
+  - id: DE-SHIP-001
+    domain: SHIP
+    requirement: "The plugin must own provider-neutral shipment aggregates separate from Woo order status."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Shipment/status/tracking architecture"
+    evidence_ref: "Shipment aggregate/repository/services/admin/customer renderers; schema 4"
+  - id: DE-SHIP-002
+    domain: SHIP
+    requirement: "Shipment creation must be idempotent."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: IMPLEMENTATION_SUPERIOR_ADOPT
+    source_ref: "Shipment/status/tracking architecture"
+    evidence_ref: "Shipment aggregate/repository/services/admin/customer renderers; schema 4"
+  - id: DE-SHIP-003
+    domain: SHIP
+    requirement: "Shipment items must retain order-item and quantity relationships."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Shipment/status/tracking architecture"
+    evidence_ref: "Shipment aggregate/repository/services/admin/customer renderers; schema 4"
+  - id: DE-SHIP-004
+    domain: SHIP
+    requirement: "Shipment events must be append-oriented and historically attributable."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Shipment/status/tracking architecture"
+    evidence_ref: "Shipment aggregate/repository/services/admin/customer renderers; schema 4"
+  - id: DE-SHIP-005
+    domain: SHIP
+    requirement: "Status transitions must be validated and timestamped."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Shipment/status/tracking architecture"
+    evidence_ref: "Shipment aggregate/repository/services/admin/customer renderers; schema 4"
+  - id: DE-SHIP-006
+    domain: SHIP
+    requirement: "Paid-order and COD creation paths must remain distinct and safe."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Shipment/status/tracking architecture"
+    evidence_ref: "Shipment aggregate/repository/services/admin/customer renderers; schema 4"
+  - id: DE-SHIP-007
+    domain: SHIP
+    requirement: "Cancellation and item-quantity refund handling must preserve shipment truth."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Shipment/status/tracking architecture"
+    evidence_ref: "Shipment aggregate/repository/services/admin/customer renderers; schema 4"
+  - id: DE-SHIP-008
+    domain: SHIP
+    requirement: "Staff must have an operational shipments workspace and needs-attention path."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Shipment/status/tracking architecture"
+    evidence_ref: "Shipment aggregate/repository/services/admin/customer renderers; schema 4"
+  - id: DE-SHIP-009
+    domain: SHIP
+    requirement: "Customers may see shipment status and tracking without private operational data."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Shipment/status/tracking architecture"
+    evidence_ref: "Shipment aggregate/repository/services/admin/customer renderers; schema 4"
+  - id: DE-SHIP-010
+    domain: SHIP
+    requirement: "Carrier adapters must not own the core shipment model."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Shipment/status/tracking architecture"
+    evidence_ref: "Shipment aggregate/repository/services/admin/customer renderers; schema 4"
+  - id: DE-EXC-001
+    domain: EXC
+    requirement: "Failed delivery must have explicit exception reasons and status."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Exception and reattempt decisions"
+    evidence_ref: "Shipment operation issues/failure stores exist; no full failed-delivery policy"
+  - id: DE-EXC-002
+    domain: EXC
+    requirement: "Reattempt eligibility, fee, and promise must be policy driven."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Exception and reattempt decisions"
+    evidence_ref: "Shipment operation issues/failure stores exist; no full failed-delivery policy"
+  - id: DE-EXC-003
+    domain: EXC
+    requirement: "Return-to-origin must be distinct from refund and order cancellation."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Exception and reattempt decisions"
+    evidence_ref: "Shipment operation issues/failure stores exist; no full failed-delivery policy"
+  - id: DE-EXC-004
+    domain: EXC
+    requirement: "Operational exceptions must surface in Needs Attention with recovery actions."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Exception and reattempt decisions"
+    evidence_ref: "Shipment operation issues/failure stores exist; no full failed-delivery policy"
+  - id: DE-EXC-005
+    domain: EXC
+    requirement: "Exception history must be auditable and customer disclosure configurable."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Exception and reattempt decisions"
+    evidence_ref: "Shipment operation issues/failure stores exist; no full failed-delivery policy"
+  - id: DE-NOTIFY-001
+    domain: NOTIFY
+    requirement: "Delivery and shipment notifications must be policy driven rather than hard-coded side effects."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Notification requirements"
+    evidence_ref: "Customer email summary exists; no governed notification policy/event delivery"
+  - id: DE-NOTIFY-002
+    domain: NOTIFY
+    requirement: "Notifications must use immutable order or shipment facts."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Notification requirements"
+    evidence_ref: "Customer email summary exists; no governed notification policy/event delivery"
+  - id: DE-NOTIFY-003
+    domain: NOTIFY
+    requirement: "Delivery channels, retries, suppression, and failure status must be auditable."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Notification requirements"
+    evidence_ref: "Customer email summary exists; no governed notification policy/event delivery"
+  - id: DE-NOTIFY-004
+    domain: NOTIFY
+    requirement: "Customer messages must not disclose private provider or internal economic data."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Notification requirements"
+    evidence_ref: "Customer email summary exists; no governed notification policy/event delivery"
+  - id: DE-RETURN-001
+    domain: RETURN
+    requirement: "Return Policy must be an independent policy system, not a Refund Policy field."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Return Policy addendum"
+    evidence_ref: "No Return Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-RETURN-002
+    domain: RETURN
+    requirement: "Return Policy records need name, customer title, summary, full text, exceptions, and status."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Return Policy addendum"
+    evidence_ref: "No Return Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-RETURN-003
+    domain: RETURN
+    requirement: "Return Policy records need version, effective dates, author, and audit history."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Return Policy addendum"
+    evidence_ref: "No Return Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-RETURN-004
+    domain: RETURN
+    requirement: "A separate global Return Policy default must exist."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Return Policy addendum"
+    evidence_ref: "No Return Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-RETURN-005
+    domain: RETURN
+    requirement: "Fulfillment-specific Return Policy overrides must be supported."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Return Policy addendum"
+    evidence_ref: "No Return Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-RETURN-006
+    domain: RETURN
+    requirement: "Product and variation Return Policy overrides must resolve independently."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Return Policy addendum"
+    evidence_ref: "No Return Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-RETURN-007
+    domain: RETURN
+    requirement: "Cart and checkout must show the applicable summary with details on demand."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Return Policy addendum"
+    evidence_ref: "No Return Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-RETURN-008
+    domain: RETURN
+    requirement: "Order and post-purchase surfaces must show the frozen policy."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Return Policy addendum"
+    evidence_ref: "No Return Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-RETURN-009
+    domain: RETURN
+    requirement: "Optional customer acknowledgement must be recorded when enabled."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Return Policy addendum"
+    evidence_ref: "No Return Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-RETURN-010
+    domain: RETURN
+    requirement: "Order snapshots must preserve the complete applied Return Policy version and content."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Return Policy addendum"
+    evidence_ref: "No Return Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-REFUND-001
+    domain: REFUND
+    requirement: "Refund Policy must be an independent policy system, not a Return Policy field."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Refund Policy addendum"
+    evidence_ref: "No Refund Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-REFUND-002
+    domain: REFUND
+    requirement: "Refund Policy records need name, customer title, summary, full text, exceptions, and status."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Refund Policy addendum"
+    evidence_ref: "No Refund Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-REFUND-003
+    domain: REFUND
+    requirement: "Refund Policy records need version, effective dates, author, and audit history."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Refund Policy addendum"
+    evidence_ref: "No Refund Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-REFUND-004
+    domain: REFUND
+    requirement: "A separate global Refund Policy default must exist."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Refund Policy addendum"
+    evidence_ref: "No Refund Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-REFUND-005
+    domain: REFUND
+    requirement: "Fulfillment-specific Refund Policy overrides must be supported."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Refund Policy addendum"
+    evidence_ref: "No Refund Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-REFUND-006
+    domain: REFUND
+    requirement: "Product and variation Refund Policy overrides must resolve independently."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Refund Policy addendum"
+    evidence_ref: "No Refund Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-REFUND-007
+    domain: REFUND
+    requirement: "Cart and checkout must show the applicable summary with details on demand."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Refund Policy addendum"
+    evidence_ref: "No Refund Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-REFUND-008
+    domain: REFUND
+    requirement: "Order and post-purchase surfaces must show the frozen policy."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Refund Policy addendum"
+    evidence_ref: "No Refund Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-REFUND-009
+    domain: REFUND
+    requirement: "Optional customer acknowledgement must be recorded when enabled."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Refund Policy addendum"
+    evidence_ref: "No Refund Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-REFUND-010
+    domain: REFUND
+    requirement: "Order snapshots must preserve the complete applied Refund Policy version and content."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Refund Policy addendum"
+    evidence_ref: "No Refund Policy domain, persistence, UI, snapshot, API or tests"
+  - id: DE-LABEL-001
+    domain: LABEL
+    requirement: "The product must support multiple fulfillment labels per product or variation."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Fulfillment Labels & Product Promise module"
+    evidence_ref: "No label taxonomy/rules/persistence/UI in RC.11 or geo.11"
+  - id: DE-LABEL-002
+    domain: LABEL
+    requirement: "Labels require stable internal identity, public text, status, and schedule."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Fulfillment Labels & Product Promise module"
+    evidence_ref: "No label taxonomy/rules/persistence/UI in RC.11 or geo.11"
+  - id: DE-LABEL-003
+    domain: LABEL
+    requirement: "Global enablement and product or variation inheritance must be supported."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Fulfillment Labels & Product Promise module"
+    evidence_ref: "No label taxonomy/rules/persistence/UI in RC.11 or geo.11"
+  - id: DE-LABEL-004
+    domain: LABEL
+    requirement: "Rule-driven labels must consume authoritative delivery facts."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Fulfillment Labels & Product Promise module"
+    evidence_ref: "No label taxonomy/rules/persistence/UI in RC.11 or geo.11"
+  - id: DE-LABEL-005
+    domain: LABEL
+    requirement: "Display positions must be configurable across product, cart, checkout, and order surfaces."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Fulfillment Labels & Product Promise module"
+    evidence_ref: "No label taxonomy/rules/persistence/UI in RC.11 or geo.11"
+  - id: DE-LABEL-006
+    domain: LABEL
+    requirement: "Structured wait or availability data must accompany relevant labels."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Fulfillment Labels & Product Promise module"
+    evidence_ref: "No label taxonomy/rules/persistence/UI in RC.11 or geo.11"
+  - id: DE-LABEL-007
+    domain: LABEL
+    requirement: "Labels must be accessible, localized, and efficiently evaluated."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Fulfillment Labels & Product Promise module"
+    evidence_ref: "No label taxonomy/rules/persistence/UI in RC.11 or geo.11"
+  - id: DE-LABEL-008
+    domain: LABEL
+    requirement: "Labels communicate product promise but never determine price, inventory, fulfillment, or shipment truth."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Fulfillment Labels & Product Promise module"
+    evidence_ref: "No label taxonomy/rules/persistence/UI in RC.11 or geo.11"
+  - id: DE-LABEL-009
+    domain: LABEL
+    requirement: "Applied labels and rule versions must be frozen in the order snapshot."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Fulfillment Labels & Product Promise module"
+    evidence_ref: "No label taxonomy/rules/persistence/UI in RC.11 or geo.11"
+  - id: DE-BULK-001
+    domain: BULK
+    requirement: "Bulk operations must preview and validate before applying changes."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Bulk Tools decisions"
+    evidence_ref: "Bulk job schema/services/admin/CLI/Action Scheduler; bulk tests"
+  - id: DE-BULK-002
+    domain: BULK
+    requirement: "Bulk jobs must use the same application services and validation as interactive writes."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Bulk Tools decisions"
+    evidence_ref: "Bulk job schema/services/admin/CLI/Action Scheduler; bulk tests"
+  - id: DE-BULK-003
+    domain: BULK
+    requirement: "Large jobs must be resumable and bounded through Action Scheduler or safe continuation."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: IMPLEMENTATION_SUPERIOR_ADOPT
+    source_ref: "Bulk Tools decisions"
+    evidence_ref: "Bulk job schema/services/admin/CLI/Action Scheduler; bulk tests"
+  - id: DE-BULK-004
+    domain: BULK
+    requirement: "Each target result and error must be durably recorded."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Bulk Tools decisions"
+    evidence_ref: "Bulk job schema/services/admin/CLI/Action Scheduler; bulk tests"
+  - id: DE-BULK-005
+    domain: BULK
+    requirement: "CSV and configuration import/export must be versioned and validated."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Bulk Tools decisions"
+    evidence_ref: "Bulk job schema/services/admin/CLI/Action Scheduler; bulk tests"
+  - id: DE-BULK-006
+    domain: BULK
+    requirement: "Rollback must be bounded by fingerprints and must not overwrite newer conflicting edits."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Bulk Tools decisions"
+    evidence_ref: "Bulk job schema/services/admin/CLI/Action Scheduler; bulk tests"
+  - id: DE-BULK-007
+    domain: BULK
+    requirement: "Dry-run and read-only validation must perform genuine scans."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Bulk Tools decisions"
+    evidence_ref: "Bulk job schema/services/admin/CLI/Action Scheduler; bulk tests"
+  - id: DE-BULK-008
+    domain: BULK
+    requirement: "Machine-readable job status and recovery for waiting or stale jobs must exist."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Bulk Tools decisions"
+    evidence_ref: "Bulk job schema/services/admin/CLI/Action Scheduler; bulk tests"
+  - id: DE-RULE-001
+    domain: RULE
+    requirement: "Business rules must have draft, published, retired, and scheduled lifecycle states."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Business-rule versioning decisions"
+    evidence_ref: "Some status/effective dates/audit exist; no general versioned rule lifecycle"
+  - id: DE-RULE-002
+    domain: RULE
+    requirement: "Rules must retain version, effective-from, effective-until, author, and change reason."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Business-rule versioning decisions"
+    evidence_ref: "Some status/effective dates/audit exist; no general versioned rule lifecycle"
+  - id: DE-RULE-003
+    domain: RULE
+    requirement: "Only published and currently effective rules may drive customer results."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Business-rule versioning decisions"
+    evidence_ref: "Some status/effective dates/audit exist; no general versioned rule lifecycle"
+  - id: DE-RULE-004
+    domain: RULE
+    requirement: "Rule precedence and conflicts must be deterministic and diagnosable."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Business-rule versioning decisions"
+    evidence_ref: "Some status/effective dates/audit exist; no general versioned rule lifecycle"
+  - id: DE-RULE-005
+    domain: RULE
+    requirement: "Historical orders must retain the applied rule or policy version."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Business-rule versioning decisions"
+    evidence_ref: "Some status/effective dates/audit exist; no general versioned rule lifecycle"
+  - id: DE-RULE-006
+    domain: RULE
+    requirement: "Rule changes must support impact preview or dry-run."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Business-rule versioning decisions"
+    evidence_ref: "Some status/effective dates/audit exist; no general versioned rule lifecycle"
+  - id: DE-RULE-007
+    domain: RULE
+    requirement: "Emergency disable must not destroy rule history."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Business-rule versioning decisions"
+    evidence_ref: "Some status/effective dates/audit exist; no general versioned rule lifecycle"
+  - id: DE-OVR-001
+    domain: OVR
+    requirement: "Manual overrides may target service availability, origin, fee, waiver, tier, vehicle, grouping, or consolidation."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Governed manual override decisions"
+    evidence_ref: "No general override aggregate or approval workflow"
+  - id: DE-OVR-002
+    domain: OVR
+    requirement: "Every override must record actor, time, old value, new value, and reason."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Governed manual override decisions"
+    evidence_ref: "No general override aggregate or approval workflow"
+  - id: DE-OVR-003
+    domain: OVR
+    requirement: "Sensitive overrides may require role separation or approval."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Governed manual override decisions"
+    evidence_ref: "No general override aggregate or approval workflow"
+  - id: DE-OVR-004
+    domain: OVR
+    requirement: "Overrides must be scope and time bounded."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Governed manual override decisions"
+    evidence_ref: "No general override aggregate or approval workflow"
+  - id: DE-OVR-005
+    domain: OVR
+    requirement: "Override effects must be visible in diagnostics and snapshots."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Governed manual override decisions"
+    evidence_ref: "No general override aggregate or approval workflow"
+  - id: DE-OVR-006
+    domain: OVR
+    requirement: "Expired or revoked overrides must preserve history."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Governed manual override decisions"
+    evidence_ref: "No general override aggregate or approval workflow"
+  - id: DE-ANALYTICS-001
+    domain: ANALYTICS
+    requirement: "Operational analytics must distinguish quotes, selections, orders, shipments, failures, and completions."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Analytics/profitability requirements"
+    evidence_ref: "No analytics/profitability module"
+  - id: DE-ANALYTICS-002
+    domain: ANALYTICS
+    requirement: "Profitability must derive from customer charge, subsidy, actual cost, provider payable, and allocation."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Analytics/profitability requirements"
+    evidence_ref: "No analytics/profitability module"
+  - id: DE-ANALYTICS-003
+    domain: ANALYTICS
+    requirement: "Analytics must not become an alternative transactional authority."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Analytics/profitability requirements"
+    evidence_ref: "No analytics/profitability module"
+  - id: DE-ANALYTICS-004
+    domain: ANALYTICS
+    requirement: "Exports must protect personal and precise-location data."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Analytics/profitability requirements"
+    evidence_ref: "No analytics/profitability module"
+  - id: DE-ANALYTICS-005
+    domain: ANALYTICS
+    requirement: "Connected DataPlane integration may consume events but must not become a Standalone dependency."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: ACCEPTED_POST_1_0_PRODUCT_COMPLETION
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Analytics/profitability requirements"
+    evidence_ref: "No analytics/profitability module"
+  - id: DE-API-001
+    domain: API
+    requirement: "Standalone must expose versioned shopper, admin, integration, webhook, and diagnostic API surfaces as appropriate."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "First-class interface and OpenAPI decisions"
+    evidence_ref: "Store API extension/AJAX exist; no public/admin REST namespace or OpenAPI"
+  - id: DE-API-002
+    domain: API
+    requirement: "REST and Store API handlers must call the same application services as internal flows."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "First-class interface and OpenAPI decisions"
+    evidence_ref: "Store API extension/AJAX exist; no public/admin REST namespace or OpenAPI"
+  - id: DE-API-003
+    domain: API
+    requirement: "OpenAPI must describe routes, schemas, authentication, errors, examples, pagination, and versioning."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "First-class interface and OpenAPI decisions"
+    evidence_ref: "Store API extension/AJAX exist; no public/admin REST namespace or OpenAPI"
+  - id: DE-API-004
+    domain: API
+    requirement: "JSON Schema must define public request and response contracts."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "First-class interface and OpenAPI decisions"
+    evidence_ref: "Store API extension/AJAX exist; no public/admin REST namespace or OpenAPI"
+  - id: DE-API-005
+    domain: API
+    requirement: "Mutating endpoints must support idempotency keys where repetition is possible."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "First-class interface and OpenAPI decisions"
+    evidence_ref: "Store API extension/AJAX exist; no public/admin REST namespace or OpenAPI"
+  - id: DE-API-006
+    domain: API
+    requirement: "Responses and logs must carry correlation or request IDs."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "First-class interface and OpenAPI decisions"
+    evidence_ref: "Store API extension/AJAX exist; no public/admin REST namespace or OpenAPI"
+  - id: DE-API-007
+    domain: API
+    requirement: "Concurrent resource changes should support ETag or equivalent optimistic concurrency where appropriate."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "First-class interface and OpenAPI decisions"
+    evidence_ref: "Store API extension/AJAX exist; no public/admin REST namespace or OpenAPI"
+  - id: DE-API-008
+    domain: API
+    requirement: "Authorization must be capability and object scoped."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "First-class interface and OpenAPI decisions"
+    evidence_ref: "Store API extension/AJAX exist; no public/admin REST namespace or OpenAPI"
+  - id: DE-API-009
+    domain: API
+    requirement: "Public responses must expose only customer-safe fields."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "First-class interface and OpenAPI decisions"
+    evidence_ref: "Store API extension/AJAX exist; no public/admin REST namespace or OpenAPI"
+  - id: DE-API-010
+    domain: API
+    requirement: "Errors must be structured, stable, localized at presentation boundaries, and fail closed."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "First-class interface and OpenAPI decisions"
+    evidence_ref: "Store API extension/AJAX exist; no public/admin REST namespace or OpenAPI"
+  - id: DE-API-011
+    domain: API
+    requirement: "Public contracts must be classified stable, experimental, or internal with deprecation policy."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "First-class interface and OpenAPI decisions"
+    evidence_ref: "Store API extension/AJAX exist; no public/admin REST namespace or OpenAPI"
+  - id: DE-API-012
+    domain: API
+    requirement: "API rate and abuse protection must be appropriate to quote and geography cost."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "First-class interface and OpenAPI decisions"
+    evidence_ref: "Store API extension/AJAX exist; no public/admin REST namespace or OpenAPI"
+  - id: DE-CLI-001
+    domain: CLI
+    requirement: "A first-class WP-CLI namespace must cover administration, operations, diagnostics, maintenance, import/export, simulation, configuration, and development support."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "CETECH-CLI-001 through 003"
+    evidence_ref: "BulkJobCliCommand only"
+  - id: DE-CLI-002
+    domain: CLI
+    requirement: "CLI commands must reuse application services and never fork business logic."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "CETECH-CLI-001 through 003"
+    evidence_ref: "BulkJobCliCommand only"
+  - id: DE-CLI-003
+    domain: CLI
+    requirement: "CLI must support status and doctor diagnostics."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "CETECH-CLI-001 through 003"
+    evidence_ref: "BulkJobCliCommand only"
+  - id: DE-CLI-004
+    domain: CLI
+    requirement: "CLI must support location and geography-pack operations."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "CETECH-CLI-001 through 003"
+    evidence_ref: "BulkJobCliCommand only"
+  - id: DE-CLI-005
+    domain: CLI
+    requirement: "CLI must support fulfillment, quote, order, shipment, and policy operations."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "CETECH-CLI-001 through 003"
+    evidence_ref: "BulkJobCliCommand only"
+  - id: DE-CLI-006
+    domain: CLI
+    requirement: "CLI must support jobs, cache, database, and OpenAPI maintenance."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "CETECH-CLI-001 through 003"
+    evidence_ref: "BulkJobCliCommand only"
+  - id: DE-CLI-007
+    domain: CLI
+    requirement: "Commands must support non-interactive and machine-readable output."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "CETECH-CLI-001 through 003"
+    evidence_ref: "BulkJobCliCommand only"
+  - id: DE-CLI-008
+    domain: CLI
+    requirement: "Destructive commands must require confirmation and offer dry-run where practical."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "CETECH-CLI-001 through 003"
+    evidence_ref: "BulkJobCliCommand only"
+  - id: DE-CLI-009
+    domain: CLI
+    requirement: "Exit codes, errors, authorization assumptions, and secrets handling must be automation safe."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "CETECH-CLI-001 through 003"
+    evidence_ref: "BulkJobCliCommand only"
+  - id: DE-EVENT-001
+    domain: EVENT
+    requirement: "Material quote, selection, order-snapshot, shipment, policy, and pack lifecycle changes must emit governed domain events."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Events/webhooks/AsyncAPI decisions"
+    evidence_ref: "Only internal Woo hooks/filters; no governed domain events/webhooks"
+  - id: DE-EVENT-002
+    domain: EVENT
+    requirement: "Event schemas must be versioned and documented."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Events/webhooks/AsyncAPI decisions"
+    evidence_ref: "Only internal Woo hooks/filters; no governed domain events/webhooks"
+  - id: DE-EVENT-003
+    domain: EVENT
+    requirement: "Webhook subscriptions and delivery status must be persisted."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Events/webhooks/AsyncAPI decisions"
+    evidence_ref: "Only internal Woo hooks/filters; no governed domain events/webhooks"
+  - id: DE-EVENT-004
+    domain: EVENT
+    requirement: "Webhooks must be signed and protected against replay."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Events/webhooks/AsyncAPI decisions"
+    evidence_ref: "Only internal Woo hooks/filters; no governed domain events/webhooks"
+  - id: DE-EVENT-005
+    domain: EVENT
+    requirement: "Webhook delivery must be idempotent, retried with backoff, and dead-lettered or surfaced when exhausted."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Events/webhooks/AsyncAPI decisions"
+    evidence_ref: "Only internal Woo hooks/filters; no governed domain events/webhooks"
+  - id: DE-EVENT-006
+    domain: EVENT
+    requirement: "AsyncAPI or equivalent event documentation must describe public event contracts."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Events/webhooks/AsyncAPI decisions"
+    evidence_ref: "Only internal Woo hooks/filters; no governed domain events/webhooks"
+  - id: DE-EVENT-007
+    domain: EVENT
+    requirement: "Internal WordPress hooks must be stable, minimal, documented, and must not expose private data."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: MISSING_IMPLEMENTATION
+    source_ref: "Events/webhooks/AsyncAPI decisions"
+    evidence_ref: "Only internal Woo hooks/filters; no governed domain events/webhooks"
+  - id: DE-DIAG-001
+    domain: DIAG
+    requirement: "System status must report plugin, schema, WooCommerce, HPOS, checkout, theme, language, currency, cache, and scheduler state."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Monitoring/diagnostics requirements"
+    evidence_ref: "ConfigurationHealthChecker and SystemStatusPage extensive; no external telemetry/Site Health full surface"
+  - id: DE-DIAG-002
+    domain: DIAG
+    requirement: "Diagnostics must cover configuration completeness, failed quotes, jobs, cleanup, API, and database health."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Monitoring/diagnostics requirements"
+    evidence_ref: "ConfigurationHealthChecker and SystemStatusPage extensive; no external telemetry/Site Health full surface"
+  - id: DE-DIAG-003
+    domain: DIAG
+    requirement: "Site Health integration should expose actionable non-secret checks."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Monitoring/diagnostics requirements"
+    evidence_ref: "ConfigurationHealthChecker and SystemStatusPage extensive; no external telemetry/Site Health full surface"
+  - id: DE-DIAG-004
+    domain: DIAG
+    requirement: "Logs must use WooCommerce logging, correlation IDs, severity, and redaction."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Monitoring/diagnostics requirements"
+    evidence_ref: "ConfigurationHealthChecker and SystemStatusPage extensive; no external telemetry/Site Health full surface"
+  - id: DE-DIAG-005
+    domain: DIAG
+    requirement: "Diagnostics must remain truthful when an analysis is bounded or incomplete."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Monitoring/diagnostics requirements"
+    evidence_ref: "ConfigurationHealthChecker and SystemStatusPage extensive; no external telemetry/Site Health full surface"
+  - id: DE-DIAG-006
+    domain: DIAG
+    requirement: "Cached and uncached matching must preserve equivalent explainability."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Monitoring/diagnostics requirements"
+    evidence_ref: "ConfigurationHealthChecker and SystemStatusPage extensive; no external telemetry/Site Health full surface"
+  - id: DE-DIAG-007
+    domain: DIAG
+    requirement: "Monitoring must not expose private commercial or customer data."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Monitoring/diagnostics requirements"
+    evidence_ref: "ConfigurationHealthChecker and SystemStatusPage extensive; no external telemetry/Site Health full surface"
+  - id: DE-FLAG-001
+    domain: FLAG
+    requirement: "Major runtime modules and adapters must support controlled enablement."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Feature flag/emergency-disable decisions"
+    evidence_ref: "FeatureFlags option set; module gates; no single documented global checkout kill switch"
+  - id: DE-FLAG-002
+    domain: FLAG
+    requirement: "Feature flags must preserve configuration and history when disabled."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Feature flag/emergency-disable decisions"
+    evidence_ref: "FeatureFlags option set; module gates; no single documented global checkout kill switch"
+  - id: DE-FLAG-003
+    domain: FLAG
+    requirement: "A global emergency disable must stop Delivery Engine checkout effects safely."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Feature flag/emergency-disable decisions"
+    evidence_ref: "FeatureFlags option set; module gates; no single documented global checkout kill switch"
+  - id: DE-FLAG-004
+    domain: FLAG
+    requirement: "Flags must support gradual rollout or bounded activation where appropriate."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Feature flag/emergency-disable decisions"
+    evidence_ref: "FeatureFlags option set; module gates; no single documented global checkout kill switch"
+  - id: DE-FLAG-005
+    domain: FLAG
+    requirement: "Flag state and operational impact must be visible in diagnostics."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Feature flag/emergency-disable decisions"
+    evidence_ref: "FeatureFlags option set; module gates; no single documented global checkout kill switch"
+  - id: DE-DATA-001
+    domain: DATA
+    requirement: "Every data class must have an explicit retention and cleanup policy."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Data lifecycle and uninstall decisions"
+    evidence_ref: "Verified forward migrations and explicit uninstall exist; no comprehensive retention/GC"
+  - id: DE-DATA-002
+    domain: DATA
+    requirement: "Quotes and transient traces must expire without deleting contractual snapshots."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Data lifecycle and uninstall decisions"
+    evidence_ref: "Verified forward migrations and explicit uninstall exist; no comprehensive retention/GC"
+  - id: DE-DATA-003
+    domain: DATA
+    requirement: "Logs must be configurable and redacted."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Data lifecycle and uninstall decisions"
+    evidence_ref: "Verified forward migrations and explicit uninstall exist; no comprehensive retention/GC"
+  - id: DE-DATA-004
+    domain: DATA
+    requirement: "Order snapshots and policy history must not be garbage collected."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Data lifecycle and uninstall decisions"
+    evidence_ref: "Verified forward migrations and explicit uninstall exist; no comprehensive retention/GC"
+  - id: DE-DATA-005
+    domain: DATA
+    requirement: "Deactivation must not delete data."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Data lifecycle and uninstall decisions"
+    evidence_ref: "Verified forward migrations and explicit uninstall exist; no comprehensive retention/GC"
+  - id: DE-DATA-006
+    domain: DATA
+    requirement: "Uninstall deletion must require explicit merchant intent and remain bounded to plugin-owned data."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Data lifecycle and uninstall decisions"
+    evidence_ref: "Verified forward migrations and explicit uninstall exist; no comprehensive retention/GC"
+  - id: DE-DATA-007
+    domain: DATA
+    requirement: "Background cleanup must use bounded scheduled work and must not delete shared Action Scheduler tables."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Data lifecycle and uninstall decisions"
+    evidence_ref: "Verified forward migrations and explicit uninstall exist; no comprehensive retention/GC"
+  - id: DE-REL-001
+    domain: REL
+    requirement: "Release artifacts must be built from a clean committed SHA."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Productization/release decisions"
+    evidence_ref: "Immutable tags/package scripts/CI/checksums exist; distribution/updater/SBOM unresolved"
+  - id: DE-REL-002
+    domain: REL
+    requirement: "Tags and qualified artifacts are immutable and version identities are never reused."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Productization/release decisions"
+    evidence_ref: "Immutable tags/package scripts/CI/checksums exist; distribution/updater/SBOM unresolved"
+  - id: DE-REL-003
+    domain: REL
+    requirement: "Clean install and prior-version upgrade with data retention must be qualified."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Productization/release decisions"
+    evidence_ref: "Immutable tags/package scripts/CI/checksums exist; distribution/updater/SBOM unresolved"
+  - id: DE-REL-004
+    domain: REL
+    requirement: "Release packages must exclude tests, development evidence, secrets, and unrelated binaries."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Productization/release decisions"
+    evidence_ref: "Immutable tags/package scripts/CI/checksums exist; distribution/updater/SBOM unresolved"
+  - id: DE-REL-005
+    domain: REL
+    requirement: "Dependencies and licenses must be locked and scanned."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Productization/release decisions"
+    evidence_ref: "Immutable tags/package scripts/CI/checksums exist; distribution/updater/SBOM unresolved"
+  - id: DE-REL-006
+    domain: REL
+    requirement: "Checksums and preferably an SBOM must accompany commercial artifacts."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Productization/release decisions"
+    evidence_ref: "Immutable tags/package scripts/CI/checksums exist; distribution/updater/SBOM unresolved"
+  - id: DE-REL-007
+    domain: REL
+    requirement: "Release channels and rollback procedure must be explicit."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Productization/release decisions"
+    evidence_ref: "Immutable tags/package scripts/CI/checksums exist; distribution/updater/SBOM unresolved"
+  - id: DE-REL-008
+    domain: REL
+    requirement: "Compatibility claims must be centrally registered and evidence linked."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Productization/release decisions"
+    evidence_ref: "Immutable tags/package scripts/CI/checksums exist; distribution/updater/SBOM unresolved"
+  - id: DE-REL-009
+    domain: REL
+    requirement: "Commercial distribution, licensing, signing, and updates must use an independent direct mechanism; WordPress.org is not required."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Productization/release decisions"
+    evidence_ref: "Owner decision recorded; direct commercial mechanism remains to be implemented and qualified"
+  - id: DE-COMPAT-001
+    domain: COMPAT
+    requirement: "HPOS compatibility is mandatory and must be declared and qualified."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Compatibility targets and boundaries"
+    evidence_ref: "See COMPATIBILITY-CERTIFICATION.md"
+  - id: DE-COMPAT-002
+    domain: COMPAT
+    requirement: "Classic checkout is a mandatory supported path."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Compatibility targets and boundaries"
+    evidence_ref: "See COMPATIBILITY-CERTIFICATION.md"
+  - id: DE-COMPAT-003
+    domain: COMPAT
+    requirement: "Cart and Checkout Blocks are a mandatory supported path."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: ALIGNED_EXACT
+    source_ref: "Compatibility targets and boundaries"
+    evidence_ref: "See COMPATIBILITY-CERTIFICATION.md"
+  - id: DE-COMPAT-004
+    domain: COMPAT
+    requirement: "Storefront and a current supported WoodMart version are mandatory Stable 1.0 reference-theme certifications; neither is a hard dependency."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: CERTIFICATION_GAP
+    source_ref: "Compatibility targets and boundaries"
+    evidence_ref: "See COMPATIBILITY-CERTIFICATION.md"
+  - id: DE-COMPAT-005
+    domain: COMPAT
+    requirement: "WPML and WCML certification is required before Stable 1.0 only if advertised as supported at launch; otherwise it remains optional."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: OPTIONAL_CERTIFICATION
+    conformance: CERTIFICATION_GAP
+    source_ref: "Compatibility targets and boundaries"
+    evidence_ref: "See COMPATIBILITY-CERTIFICATION.md"
+  - id: DE-COMPAT-006
+    domain: COMPAT
+    requirement: "WCFM support is limited to explicit delivery-context and administrative-isolation contracts."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: OPTIONAL_CERTIFICATION
+    conformance: ALIGNED_SEMANTICALLY_EQUIVALENT
+    source_ref: "Compatibility targets and boundaries"
+    evidence_ref: "See COMPATIBILITY-CERTIFICATION.md"
+  - id: DE-COMPAT-007
+    domain: COMPAT
+    requirement: "B2BKing is the Stable 1.0 wholesale reference target; other wholesale adapters remain optional certification targets."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: CERTIFICATION_GAP
+    source_ref: "Compatibility targets and boundaries"
+    evidence_ref: "See COMPATIBILITY-CERTIFICATION.md"
+  - id: DE-COMPAT-008
+    domain: COMPAT
+    requirement: "FOX/WOOCS is the Stable 1.0 multi-currency reference target; other currency providers remain optional adapter-specific certifications."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: CERTIFICATION_GAP
+    source_ref: "Compatibility targets and boundaries"
+    evidence_ref: "See COMPATIBILITY-CERTIFICATION.md"
+  - id: DE-COMPAT-009
+    domain: COMPAT
+    requirement: "VitePOS or any POS is outside the core dependency boundary and requires separate end-to-end certification."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: OPTIONAL_CERTIFICATION
+    conformance: CERTIFICATION_GAP
+    source_ref: "Compatibility targets and boundaries"
+    evidence_ref: "See COMPATIBILITY-CERTIFICATION.md"
+  - id: DE-COMPAT-010
+    domain: COMPAT
+    requirement: "Redis and page-cache plugins must not leak cart, address, currency, locale, or quote state."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: OPTIONAL_CERTIFICATION
+    conformance: CERTIFICATION_GAP
+    source_ref: "Compatibility targets and boundaries"
+    evidence_ref: "See COMPATIBILITY-CERTIFICATION.md"
+  - id: DE-COMPAT-011
+    domain: COMPAT
+    requirement: "External PSPs are owned by WooCommerce/payment plugins and require only compatibility qualification."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: OPTIONAL_CERTIFICATION
+    conformance: CERTIFICATION_GAP
+    source_ref: "Compatibility targets and boundaries"
+    evidence_ref: "See COMPATIBILITY-CERTIFICATION.md"
+  - id: DE-COMPAT-012
+    domain: COMPAT
+    requirement: "Carrier APIs are optional future adapters and must not define the core model."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: FUTURE_ADVANCED_INTEGRATION
+    conformance: DEFERRED
+    source_ref: "Compatibility targets and boundaries"
+    evidence_ref: "See COMPATIBILITY-CERTIFICATION.md"
+  - id: DE-SEC-001
+    domain: SEC
+    requirement: "Every administrative write must enforce capability, nonce, validation, and object scope."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Security/privacy/abuse decisions"
+    evidence_ref: "Capabilities, nonces, sanitization, private payload tests exist; no complete public API abuse layer"
+  - id: DE-SEC-002
+    domain: SEC
+    requirement: "Public canonical IDs and selection payloads must be treated as untrusted input."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Security/privacy/abuse decisions"
+    evidence_ref: "Capabilities, nonces, sanitization, private payload tests exist; no complete public API abuse layer"
+  - id: DE-SEC-003
+    domain: SEC
+    requirement: "Money, eligibility, promise, and shipment transitions must be server-authoritative."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Security/privacy/abuse decisions"
+    evidence_ref: "Capabilities, nonces, sanitization, private payload tests exist; no complete public API abuse layer"
+  - id: DE-SEC-004
+    domain: SEC
+    requirement: "Public payloads must exclude supplier, origin, rate-card, internal-cost, margin, and secret data."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Security/privacy/abuse decisions"
+    evidence_ref: "Capabilities, nonces, sanitization, private payload tests exist; no complete public API abuse layer"
+  - id: DE-SEC-005
+    domain: SEC
+    requirement: "Logs and diagnostics must redact personal, address, coordinate, credential, and token data."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Security/privacy/abuse decisions"
+    evidence_ref: "Capabilities, nonces, sanitization, private payload tests exist; no complete public API abuse layer"
+  - id: DE-SEC-006
+    domain: SEC
+    requirement: "Precise addresses and coordinates must have purpose-limited storage and disclosure."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Security/privacy/abuse decisions"
+    evidence_ref: "Capabilities, nonces, sanitization, private payload tests exist; no complete public API abuse layer"
+  - id: DE-SEC-007
+    domain: SEC
+    requirement: "Quote, geography, webhook, and diagnostic interfaces must be rate and abuse protected."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Security/privacy/abuse decisions"
+    evidence_ref: "Capabilities, nonces, sanitization, private payload tests exist; no complete public API abuse layer"
+  - id: DE-SEC-008
+    domain: SEC
+    requirement: "Secrets must never be committed, exported, logged, or shipped in packages."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Security/privacy/abuse decisions"
+    evidence_ref: "Capabilities, nonces, sanitization, private payload tests exist; no complete public API abuse layer"
+  - id: DE-SEC-009
+    domain: SEC
+    requirement: "Imports and uploads must resist path traversal, SSRF, archive abuse, and malicious content."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Security/privacy/abuse decisions"
+    evidence_ref: "Capabilities, nonces, sanitization, private payload tests exist; no complete public API abuse layer"
+  - id: DE-SEC-010
+    domain: SEC
+    requirement: "Security qualification must include runtime behavior, not only static tool output."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Security/privacy/abuse decisions"
+    evidence_ref: "Capabilities, nonces, sanitization, private payload tests exist; no complete public API abuse layer"
+  - id: DE-PERF-001
+    domain: PERF
+    requirement: "Customer request paths must avoid unbounded scans and N+1 queries."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Performance/cache/scalability decisions"
+    evidence_ref: "Bounded bulk jobs and many query indexes exist; geo.11 has known >500/UI/migration gaps"
+  - id: DE-PERF-002
+    domain: PERF
+    requirement: "National-scale pack import must be bounded, resumable, and background-capable."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Performance/cache/scalability decisions"
+    evidence_ref: "Bounded bulk jobs and many query indexes exist; geo.11 has known >500/UI/migration gaps"
+  - id: DE-PERF-003
+    domain: PERF
+    requirement: "Large catalogs and more than 500 delivery areas must remain truthfully operable."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Performance/cache/scalability decisions"
+    evidence_ref: "Bounded bulk jobs and many query indexes exist; geo.11 has known >500/UI/migration gaps"
+  - id: DE-PERF-004
+    domain: PERF
+    requirement: "Cache keys must include every material product, variation, quantity, destination, offer, group, currency, locale, rule, and inventory dimension."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Performance/cache/scalability decisions"
+    evidence_ref: "Bounded bulk jobs and many query indexes exist; geo.11 has known >500/UI/migration gaps"
+  - id: DE-PERF-005
+    domain: PERF
+    requirement: "Shared cache keys must never contain raw private addresses."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Performance/cache/scalability decisions"
+    evidence_ref: "Bounded bulk jobs and many query indexes exist; geo.11 has known >500/UI/migration gaps"
+  - id: DE-PERF-006
+    domain: PERF
+    requirement: "Cache invalidation must be versioned and concurrency safe."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Performance/cache/scalability decisions"
+    evidence_ref: "Bounded bulk jobs and many query indexes exist; geo.11 has known >500/UI/migration gaps"
+  - id: DE-PERF-007
+    domain: PERF
+    requirement: "Cart, session, user, locale, and currency state must never leak across customers."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Performance/cache/scalability decisions"
+    evidence_ref: "Bounded bulk jobs and many query indexes exist; geo.11 has known >500/UI/migration gaps"
+  - id: DE-PERF-008
+    domain: PERF
+    requirement: "Assets must load only on relevant admin or storefront surfaces."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Performance/cache/scalability decisions"
+    evidence_ref: "Bounded bulk jobs and many query indexes exist; geo.11 has known >500/UI/migration gaps"
+  - id: DE-PERF-009
+    domain: PERF
+    requirement: "Emergency cache cleanup must never issue broad destructive commands such as Redis FLUSHALL."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Performance/cache/scalability decisions"
+    evidence_ref: "Bounded bulk jobs and many query indexes exist; geo.11 has known >500/UI/migration gaps"
+  - id: DE-UX-001
+    domain: UX
+    requirement: "Staff administration must be WordPress-native, task-oriented, and progressively disclose advanced controls."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Admin/customer UX decisions"
+    evidence_ref: "Strong WordPress-native admin/PDP/cart/order surfaces; active geo pagination and policy/label gaps"
+  - id: DE-UX-002
+    domain: UX
+    requirement: "Customer language must hide internal machinery while preserving truthful choices and prices."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Admin/customer UX decisions"
+    evidence_ref: "Strong WordPress-native admin/PDP/cart/order surfaces; active geo pagination and policy/label gaps"
+  - id: DE-UX-003
+    domain: UX
+    requirement: "Desktop and mobile layouts must remain usable without excessive nesting or density."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Admin/customer UX decisions"
+    evidence_ref: "Strong WordPress-native admin/PDP/cart/order surfaces; active geo pagination and policy/label gaps"
+  - id: DE-UX-004
+    domain: UX
+    requirement: "Keyboard, focus, labels, contrast, status semantics, and screen-reader behavior are release requirements."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Admin/customer UX decisions"
+    evidence_ref: "Strong WordPress-native admin/PDP/cart/order surfaces; active geo pagination and policy/label gaps"
+  - id: DE-UX-005
+    domain: UX
+    requirement: "Color must not be the sole differentiator."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Admin/customer UX decisions"
+    evidence_ref: "Strong WordPress-native admin/PDP/cart/order surfaces; active geo pagination and policy/label gaps"
+  - id: DE-UX-006
+    domain: UX
+    requirement: "Theme adaptation must use tokens and scoped CSS rather than editing parent themes."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Admin/customer UX decisions"
+    evidence_ref: "Strong WordPress-native admin/PDP/cart/order surfaces; active geo pagination and policy/label gaps"
+  - id: DE-UX-007
+    domain: UX
+    requirement: "SEO-sensitive product content must remain crawl-safe and not depend on private dynamic state."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Admin/customer UX decisions"
+    evidence_ref: "Strong WordPress-native admin/PDP/cart/order surfaces; active geo pagination and policy/label gaps"
+  - id: DE-UX-008
+    domain: UX
+    requirement: "Errors must explain recovery without exposing internals or implying false availability."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Admin/customer UX decisions"
+    evidence_ref: "Strong WordPress-native admin/PDP/cart/order surfaces; active geo pagination and policy/label gaps"
+  - id: DE-GLOBAL-001
+    domain: GLOBAL
+    requirement: "Core behavior must not hard-code Ghana, GHS, or one country's address hierarchy."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: DESIGN_SUPERIOR_REALIGN_CODE
+    source_ref: "Global/country-neutrality decisions"
+    evidence_ref: "Core mostly country-neutral; geo.11 retains two GH UI defaults"
+  - id: DE-GLOBAL-002
+    domain: GLOBAL
+    requirement: "Country-specific labels, postcode relevance, and administrative levels must come from data or adapters."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Global/country-neutrality decisions"
+    evidence_ref: "Core mostly country-neutral; geo.11 retains two GH UI defaults"
+  - id: DE-GLOBAL-003
+    domain: GLOBAL
+    requirement: "Ghana may be a qualification/reference pack but not the commercial default."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: DESIGN_SUPERIOR_REALIGN_CODE
+    source_ref: "Global/country-neutrality decisions"
+    evidence_ref: "Core mostly country-neutral; geo.11 retains two GH UI defaults"
+  - id: DE-GLOBAL-004
+    domain: GLOBAL
+    requirement: "Units, time zones, currencies, locales, names, and calendars must be explicit and internationalized."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Global/country-neutrality decisions"
+    evidence_ref: "Core mostly country-neutral; geo.11 retains two GH UI defaults"
+  - id: DE-GLOBAL-005
+    domain: GLOBAL
+    requirement: "Country-specific data packs must be replaceable without changing business configuration identity."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: REQUIRED_BEFORE_STABLE_1_0
+    conformance: PARTIAL_IMPLEMENTATION
+    source_ref: "Global/country-neutrality decisions"
+    evidence_ref: "Core mostly country-neutral; geo.11 retains two GH UI defaults"
+  - id: DE-CONNECT-001
+    domain: CONNECT
+    requirement: "Connected inventory and fulfillment orchestration belongs to Invordex."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: CONNECTED_ONLY
+    conformance: CONNECTED_ONLY
+    source_ref: "Standalone/Connected product-family decisions"
+    evidence_ref: "No Connected runtime in Standalone, as required"
+  - id: DE-CONNECT-002
+    domain: CONNECT
+    requirement: "Connected transport execution belongs to Alcide."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: CONNECTED_ONLY
+    conformance: CONNECTED_ONLY
+    source_ref: "Standalone/Connected product-family decisions"
+    evidence_ref: "No Connected runtime in Standalone, as required"
+  - id: DE-CONNECT-003
+    domain: CONNECT
+    requirement: "Connected warehouse execution belongs to HubLoft."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: CONNECTED_ONLY
+    conformance: CONNECTED_ONLY
+    source_ref: "Standalone/Connected product-family decisions"
+    evidence_ref: "No Connected runtime in Standalone, as required"
+  - id: DE-CONNECT-004
+    domain: CONNECT
+    requirement: "Connected product master belongs to AIM PIM and supplier/procurement belongs to Suproma."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: CONNECTED_ONLY
+    conformance: CONNECTED_ONLY
+    source_ref: "Standalone/Connected product-family decisions"
+    evidence_ref: "No Connected runtime in Standalone, as required"
+  - id: DE-CONNECT-005
+    domain: CONNECT
+    requirement: "Connected geography belongs to GeoMesh where adopted; Standalone retains local canonical geography."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: CONNECTED_ONLY
+    conformance: CONNECTED_ONLY
+    source_ref: "Standalone/Connected product-family decisions"
+    evidence_ref: "No Connected runtime in Standalone, as required"
+  - id: DE-CONNECT-006
+    domain: CONNECT
+    requirement: "Connected return execution belongs to ReLoop while policy presentation may remain in the delivery contract."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: CONNECTED_ONLY
+    conformance: CONNECTED_ONLY
+    source_ref: "Standalone/Connected product-family decisions"
+    evidence_ref: "No Connected runtime in Standalone, as required"
+  - id: DE-CONNECT-007
+    domain: CONNECT
+    requirement: "AccessLobby, MoneyMove, DonLoft, DataPlane, and other peers remain optional Connected owners, never Standalone hard dependencies."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: CONNECTED_ONLY
+    conformance: CONNECTED_ONLY
+    source_ref: "Standalone/Connected product-family decisions"
+    evidence_ref: "No Connected runtime in Standalone, as required"
+  - id: DE-DEFER-001
+    domain: DEFER
+    requirement: "Proof-of-delivery execution is deferred."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: EXPLICITLY_DEFERRED
+    conformance: DEFERRED
+    source_ref: "Explicit advanced deferrals"
+    evidence_ref: "No implementation required for Stable 1.0"
+  - id: DE-DEFER-002
+    domain: DEFER
+    requirement: "OTP, QR, GPS, photo capture, and buyer-confirmation workflows are deferred."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: EXPLICITLY_DEFERRED
+    conformance: DEFERRED
+    source_ref: "Explicit advanced deferrals"
+    evidence_ref: "No implementation required for Stable 1.0"
+  - id: DE-DEFER-003
+    domain: DEFER
+    requirement: "Driver accounts and driver applications are deferred."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: EXPLICITLY_DEFERRED
+    conformance: DEFERRED
+    source_ref: "Explicit advanced deferrals"
+    evidence_ref: "No implementation required for Stable 1.0"
+  - id: DE-DEFER-004
+    domain: DEFER
+    requirement: "Live carrier quoting, dispatch, label purchase, and automatic tracking synchronization are deferred advanced adapters."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: EXPLICITLY_DEFERRED
+    conformance: DEFERRED
+    source_ref: "Explicit advanced deferrals"
+    evidence_ref: "No implementation required for Stable 1.0"
+  - id: DE-DEFER-005
+    domain: DEFER
+    requirement: "Automatic order completion from delivery events is deferred."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: EXPLICITLY_DEFERRED
+    conformance: DEFERRED
+    source_ref: "Explicit advanced deferrals"
+    evidence_ref: "No implementation required for Stable 1.0"
+  - id: DE-DEFER-006
+    domain: DEFER
+    requirement: "Courier marketplace, supplier portal, and warehouse scanning are outside the current Standalone Stable 1.0 scope."
+    authority_status: CURRENT_AUTHORITATIVE
+    release_intent: EXPLICITLY_DEFERRED
+    conformance: DEFERRED
+    source_ref: "Explicit advanced deferrals"
+    evidence_ref: "No implementation required for Stable 1.0"
+supersession_policy:
+  ids_frozen: true
+  rule: "Do not renumber after PRODUCT-TRUTH-BASELINE-1; split, merge, or supersede through explicit decision records."

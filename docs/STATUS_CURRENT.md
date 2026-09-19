@@ -1,6 +1,6 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-16 (RC.11 tagged release-candidate closeout).
+Last reconciled: 2026-09-19 (owner-accepted product truth and authorized control-plane publication).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
@@ -75,6 +75,13 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - New work should branch from the latest protected `master`, which may advance beyond the release source through later docs-only or owner-authorized work.
 - Release source and current development head are deliberately allowed to differ after release closeout; never move the release tag to follow later master commits.
 
+## Owner-accepted product truth
+- `PRODUCT-TRUTH-BASELINE-1` was accepted by the owner on 2026-09-19 with all six decisions resolved in `docs/product/DECISION-CONFLICT-REGISTER.md`.
+- The approved 372-Requirement registry and companion artifacts live under `docs/product/`; `docs/AUTHORITY.md` defines which artifact governs each class of truth.
+- Stable 1.0 scope is frozen as `STABLE-1.0-SCOPE-1`. This product baseline is not a claim that missing capabilities are implemented or that Stable 1.0 has shipped.
+- The realignment plan is approved, but geo.12 on issue #23 / Draft PR #24 remains the only currently authorized runtime implementation stream.
+- After geo.12 technical closure and physical owner QA, the next release action is a controlled CETECH production Pilot/release candidate. No RC.12 name, package, tag, or deployment is created or authorized by this documentation publication.
+
 ## Completed forensic / release-control work
 - 2026-09-15 local Git/source recovery (issue #2 / PR #9).
 - 2026-09-16 Desktop artifact reconciliation (PR #14): all relevant desktop artifacts accounted for.
@@ -84,10 +91,11 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - 2026-09-16 RC.11 promotion, final package qualification, annotated tag and closeout completed.
 
 ## Remaining separate work
-1. Production rollout/pilot only if separately and explicitly owner-authorized.
-2. WPML/WCML overlay decision and licensed-dependency certification if included later.
-3. WP Rocket certification when a legitimate package is available.
-4. Any further product/runtime work only under a new explicitly authorized task.
+1. Finish the finite geo.12 closure instructions and physical owner QA on PR #24 without mixing in broader realignment work.
+2. Create the controlled CETECH production Pilot/release candidate after that gate; deployment remains a separate action.
+3. Certify the Stable 1.0 launch floor: WooCommerce/HPOS, Classic, Blocks, Storefront, current supported WoodMart, B2BKing, and FOX/WOOCS.
+4. Certify WPML/WCML before Stable 1.0 only if it will be advertised as supported at launch; keep other optional targets explicitly uncertified until evidence exists.
+5. Execute later approved realignment waves only after their predecessor gates and without a second concurrent runtime stream.
 
 ## Deferred / not started
 - Stage 15 is NOT STARTED.
