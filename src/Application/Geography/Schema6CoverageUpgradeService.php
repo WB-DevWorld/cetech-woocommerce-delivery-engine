@@ -541,13 +541,14 @@ final class Schema6CoverageUpgradeService {
 					'option_value' => serialize( $expected ),
 				]
 			);
+			if ( false === $updated ) {
+				return false;
+			}
 			if ( is_int( $updated ) && $updated > 0 ) {
-				if ( function_exists( 'wp_cache_delete' ) ) {
-					wp_cache_delete( self::OPTION_KEY, 'options' );
-				}
-				$GLOBALS['cetech_de_test_options'][ self::OPTION_KEY ] = $replacement;
-
-				return true;
+				return $this->accept_cas_replacement( $replacement );
+			}
+			if ( 0 === (int) $updated && $this->persisted_option_equals( $replacement ) ) {
+				return $this->accept_cas_replacement( $replacement );
 			}
 
 			return false;
@@ -560,6 +561,42 @@ final class Schema6CoverageUpgradeService {
 		$this->store_state( $replacement );
 
 		return true;
+	}
+
+	/**
+	 * @param array<string, mixed> $replacement
+	 */
+	private function accept_cas_replacement( array $replacement ): bool {
+		if ( function_exists( 'wp_cache_delete' ) ) {
+			wp_cache_delete( self::OPTION_KEY, 'options' );
+		}
+		$GLOBALS['cetech_de_test_options'][ self::OPTION_KEY ] = $replacement;
+
+		return true;
+	}
+
+	/**
+	 * Direct options-table read. Zero-row CAS may succeed only when this equals replacement.
+	 *
+	 * @param array<string, mixed> $replacement
+	 */
+	private function persisted_option_equals( array $replacement ): bool {
+		global $wpdb;
+		$table = preg_replace( '/[^A-Za-z0-9_]/', '', (string) $wpdb->options );
+		if ( ! is_string( $table ) || '' === $table ) {
+			return false;
+		}
+		// phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared -- table name is a sanitized wpdb->options identifier.
+		$sql = $wpdb->prepare(
+			"SELECT option_value FROM `{$table}` WHERE option_name = %s LIMIT 1",
+			self::OPTION_KEY
+		);
+		if ( ! is_string( $sql ) ) {
+			return false;
+		}
+		$stored = $wpdb->get_var( $sql );
+
+		return is_string( $stored ) && $stored === serialize( $replacement );
 	}
 
 	private function real_wpdb_cas_available(): bool {

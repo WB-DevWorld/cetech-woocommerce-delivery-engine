@@ -244,7 +244,6 @@ final class Geo13RealDatabaseProofTest extends TestCase {
 			)
 		);
 		self::assertSame( 44, (int) ( $upgrade->current_state()['last_zone_id'] ?? 0 ) );
-		sleep( 1 );
 		self::assertTrue( $this->invoke( $upgrade, 'renew_owner_lease', [ $worker_b, $pass_id ] ) );
 		self::assertFalse(
 			$this->invoke(
