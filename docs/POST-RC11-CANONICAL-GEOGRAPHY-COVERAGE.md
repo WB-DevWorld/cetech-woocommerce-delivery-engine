@@ -1,6 +1,6 @@
 # Post-RC.11 Canonical Geography & Delivery Area Coverage
 
-Status: ISSUE #23 GEO.11 TECHNICAL STABILIZATION / NOT MERGED / NOT RC.12
+Status: ISSUE #23 GEO.12 TECHNICAL CLOSURE / NOT MERGED / NOT RC.12
 
 Owner: `@wbdevworld`
 
@@ -30,7 +30,9 @@ Rejected technical-review candidate: `1.0.0-dev.geo.9` (`09df7d2337e271792f76290
 
 Rejected technical-review candidate: `1.0.0-dev.geo.10` (`66be34b684c11c165617359b828ccf852fba2635`). Frozen package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.10.zip` SHA-256 `494546cf021909b30a8f0519c816069af72c41b064cbe28b05a31409355f7f47`. Do not physically QA geo.10.
 
-Current technical-correction candidate identity: `1.0.0-dev.geo.11`
+Rejected whole-branch closure-review candidate: `1.0.0-dev.geo.11` (`daef41a85662e1c1dc0aa6f5673ca9749f163a26`). Frozen package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.11.zip` SHA-256 `5ba3eb3a6b10eba60e36735085071b628d1dc030e85f4e79f67e5753c9331400`. Do not physically QA geo.11.
+
+Current technical-correction candidate identity: `1.0.0-dev.geo.12`
 
 geo.11 technical corrections (PR #24 comment `5730679997` / issue #23 A–O): nested hierarchy ownership via `prepared_hierarchy_root_id`; complete keyset iteration for zones/matcher/admin children; atomic schema-6 lease; inactive canonical members excluded from live authority; stale-response request tokens; truthful postcode relevance; unique geography cache revision; schema-6 verify of current columns; preflight MAX_SCAN is indeterminate rather than false invalidity.
 

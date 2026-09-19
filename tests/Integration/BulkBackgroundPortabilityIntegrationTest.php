@@ -109,8 +109,14 @@ final class BulkBackgroundPortabilityIntegrationTest extends TestCase {
 		self::assertSame( 0, $job->processed_count );
 		self::assertSame( 0, $job->enumerated_count );
 		self::assertNotEmpty( $GLOBALS['cetech_de_test_as_calls']['async'] ?? [] );
-		self::assertSame( ActionSchedulerQueue::HOOK, $GLOBALS['cetech_de_test_as_calls']['async'][0]['hook'] );
-		self::assertSame( [ 'job_id' => (int) $job->id ], $GLOBALS['cetech_de_test_as_calls']['async'][0]['args'] );
+		$bulk_calls = array_values(
+			array_filter(
+				$GLOBALS['cetech_de_test_as_calls']['async'],
+				static fn ( array $call ): bool => ActionSchedulerQueue::HOOK === (string) ( $call['hook'] ?? '' )
+			)
+		);
+		self::assertNotSame( [], $bulk_calls, 'Bulk preview must enqueue the catalog tick even when schema-6 continuation is also queued.' );
+		self::assertSame( [ 'job_id' => (int) $job->id ], $bulk_calls[0]['args'] );
 		self::assertSame( [ 'maybe_dispatch' ], $GLOBALS['cetech_de_test_as_calls']['kick'] ?? [] );
 		self::assertArrayNotHasKey( 'schedule', $GLOBALS['cetech_de_test_as_calls'] );
 	}

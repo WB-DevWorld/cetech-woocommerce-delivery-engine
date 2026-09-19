@@ -21,6 +21,8 @@ final class InMemoryCoverageGroupRepository implements CoverageGroupRepositoryIn
 	private int $next_member = 1;
 	private int $next_postcode = 1;
 
+	public int $fail_replace_zone_id = 0;
+
 	public function list_by_zone( int $zone_id ): array {
 		$out = [];
 		foreach ( $this->groups as $group ) {
@@ -115,6 +117,9 @@ final class InMemoryCoverageGroupRepository implements CoverageGroupRepositoryIn
 	}
 
 	public function replace_for_zone( int $zone_id, array $groups ): array {
+		if ( $this->fail_replace_zone_id > 0 && $zone_id === $this->fail_replace_zone_id ) {
+			throw new \RuntimeException( 'Simulated coverage persistence failure.' );
+		}
 		$existing = $this->list_by_zone( $zone_id );
 		$owned    = [];
 		foreach ( $existing as $group ) {

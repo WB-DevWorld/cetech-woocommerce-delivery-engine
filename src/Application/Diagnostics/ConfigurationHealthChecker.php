@@ -247,45 +247,69 @@ final class ConfigurationHealthChecker {
 	 * @param list<ConfigurationDiagnostic> $diagnostics
 	 */
 	private function check_destinations( array &$diagnostics ): void {
-		$zones     = $this->destination_zone_repository->list( [ 'limit' => self::LIST_LIMIT ] );
-		$zones_by_id = $this->index_by_id( $zones );
-		$rules     = $this->destination_rule_repository->list( self::LIST_LIMIT );
-		$rules_by_zone = [];
-
-		foreach ( $rules as $rule ) {
-			$zone_id = (int) ( $rule['zone_id'] ?? 0 );
-			$rules_by_zone[ $zone_id ][] = $rule;
-		}
-
+		$zones_by_id = [];
 		$unrestricted_fallback_count = 0;
-
-		foreach ( $zones as $zone ) {
-			$zone_id = (int) ( $zone['id'] ?? 0 );
-			$status  = (string) ( $zone['status'] ?? '' );
-
-			if ( RecordStatus::Active->value !== $status ) {
-				continue;
+		$after = 0;
+		do {
+			$page = $this->destination_zone_repository->page_after( $after, 100 );
+			foreach ( $page as $zone ) {
+				$zone_id = (int) ( $zone['id'] ?? 0 );
+				$after   = max( $after, $zone_id );
+				if ( $zone_id <= 0 ) {
+					continue;
+				}
+				$zones_by_id[ $zone_id ] = $zone;
+				$status = (string) ( $zone['status'] ?? '' );
+				if ( RecordStatus::Active->value !== $status ) {
+					continue;
+				}
+				$zone_rules = $this->destination_rule_repository->listByZoneId( $zone_id );
+				if ( DestinationZoneMatcher::is_unrestricted_fallback( $zone, $zone_rules ) ) {
+					++$unrestricted_fallback_count;
+				}
+				if ( [] === $zone_rules && empty( $zone['is_fallback'] ) && ! $this->zone_has_canonical_coverage( $zone_id ) ) {
+					$this->add(
+						$diagnostics,
+						DiagnosticSeverity::Warning,
+						'active_zone_without_rules',
+						__( 'Active zone without rules', 'cetech-woocommerce-delivery-engine' ),
+						__( 'An active destination zone has no rules and is not marked as fallback.', 'cetech-woocommerce-delivery-engine' ),
+						'destination_zone',
+						$zone_id,
+						$this->entity_code_detail( $zone, 'internal_code' )
+					);
+				}
+				foreach ( $zone_rules as $rule ) {
+					$rule_id = (int) ( $rule['id'] ?? 0 );
+					$rule_type = (string) ( $rule['rule_type'] ?? '' );
+					if ( ! $this->is_valid_rule_type( $rule_type ) ) {
+						$this->add(
+							$diagnostics,
+							DiagnosticSeverity::Warning,
+							'destination_rule_invalid_type',
+							__( 'Invalid destination rule type', 'cetech-woocommerce-delivery-engine' ),
+							__( 'A destination rule uses an unknown rule type.', 'cetech-woocommerce-delivery-engine' ),
+							'destination_rule',
+							$rule_id,
+							sprintf( 'rule_type=%s', $rule_type )
+						);
+					}
+					$match_mode = (string) ( $rule['match_mode'] ?? '' );
+					if ( ! $this->is_valid_match_mode( $match_mode ) ) {
+						$this->add(
+							$diagnostics,
+							DiagnosticSeverity::Warning,
+							'destination_rule_invalid_match_mode',
+							__( 'Invalid destination rule match mode', 'cetech-woocommerce-delivery-engine' ),
+							__( 'A destination rule uses an unknown match mode.', 'cetech-woocommerce-delivery-engine' ),
+							'destination_rule',
+							$rule_id,
+							sprintf( 'match_mode=%s', $match_mode )
+						);
+					}
+				}
 			}
-
-			$zone_rules = $rules_by_zone[ $zone_id ] ?? [];
-
-			if ( DestinationZoneMatcher::is_unrestricted_fallback( $zone, $zone_rules ) ) {
-				++$unrestricted_fallback_count;
-			}
-
-			if ( [] === $zone_rules && empty( $zone['is_fallback'] ) && ! $this->zone_has_canonical_coverage( $zone_id ) ) {
-				$this->add(
-					$diagnostics,
-					DiagnosticSeverity::Warning,
-					'active_zone_without_rules',
-					__( 'Active zone without rules', 'cetech-woocommerce-delivery-engine' ),
-					__( 'An active destination zone has no rules and is not marked as fallback.', 'cetech-woocommerce-delivery-engine' ),
-					'destination_zone',
-					$zone_id,
-					$this->entity_code_detail( $zone, 'internal_code' )
-				);
-			}
-		}
+		} while ( [] !== $page );
 
 		if ( $unrestricted_fallback_count > 1 ) {
 			$this->add(
@@ -300,54 +324,6 @@ final class ConfigurationHealthChecker {
 				),
 				'destination_zone'
 			);
-		}
-
-		foreach ( $rules as $rule ) {
-			$rule_id = (int) ( $rule['id'] ?? 0 );
-			$zone_id = (int) ( $rule['zone_id'] ?? 0 );
-
-			if ( $zone_id <= 0 || ! isset( $zones_by_id[ $zone_id ] ) ) {
-				$this->add(
-					$diagnostics,
-					DiagnosticSeverity::Error,
-					'destination_rule_orphan_zone',
-					__( 'Orphan destination rule', 'cetech-woocommerce-delivery-engine' ),
-					__( 'A destination rule references a zone that does not exist.', 'cetech-woocommerce-delivery-engine' ),
-					'destination_rule',
-					$rule_id,
-					sprintf( 'zone_id=%d', $zone_id )
-				);
-			}
-
-			$rule_type = (string) ( $rule['rule_type'] ?? '' );
-
-			if ( ! $this->is_valid_rule_type( $rule_type ) ) {
-				$this->add(
-					$diagnostics,
-					DiagnosticSeverity::Warning,
-					'destination_rule_invalid_type',
-					__( 'Invalid destination rule type', 'cetech-woocommerce-delivery-engine' ),
-					__( 'A destination rule uses an unknown rule type.', 'cetech-woocommerce-delivery-engine' ),
-					'destination_rule',
-					$rule_id,
-					sprintf( 'rule_type=%s', $rule_type )
-				);
-			}
-
-			$match_mode = (string) ( $rule['match_mode'] ?? '' );
-
-			if ( ! $this->is_valid_match_mode( $match_mode ) ) {
-				$this->add(
-					$diagnostics,
-					DiagnosticSeverity::Warning,
-					'destination_rule_invalid_match_mode',
-					__( 'Invalid destination rule match mode', 'cetech-woocommerce-delivery-engine' ),
-					__( 'A destination rule uses an unknown match mode.', 'cetech-woocommerce-delivery-engine' ),
-					'destination_rule',
-					$rule_id,
-					sprintf( 'match_mode=%s', $match_mode )
-				);
-			}
 		}
 
 		$overlap = new OverlappingDeliveryAreaCoverage(
@@ -368,6 +344,18 @@ final class ConfigurationHealthChecker {
 				'destination_zone',
 				(int) $warning['zone_id'],
 				(string) $warning['details']
+			);
+		}
+		foreach ( $overlap->unproven_zone_ids() as $unproven_id ) {
+			$this->add(
+				$diagnostics,
+				DiagnosticSeverity::Info,
+				'destination_coverage_unproven',
+				__( 'Delivery area coverage not fully proven', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Canonical overlap/fallback could not be proven cheaply for this area. Test a specific address instead of treating it as uncovered.', 'cetech-woocommerce-delivery-engine' ),
+				'destination_zone',
+				$unproven_id,
+				'needs_test'
 			);
 		}
 
@@ -481,19 +469,36 @@ final class ConfigurationHealthChecker {
 	 */
 	private function check_rate_cards( array &$diagnostics ): void {
 		$offers    = $this->index_by_id( $this->delivery_offer_repository->list( [ 'limit' => self::LIST_LIMIT ] ) );
-		$zones     = $this->index_by_id( $this->destination_zone_repository->list( [ 'limit' => self::LIST_LIMIT ] ) );
+		$zones     = [];
+		$zone_after = 0;
+		do {
+			$zone_page = $this->destination_zone_repository->page_after( $zone_after, 100 );
+			foreach ( $zone_page as $zone ) {
+				$zone_id    = (int) ( $zone['id'] ?? 0 );
+				$zone_after = max( $zone_after, $zone_id );
+				if ( $zone_id > 0 ) {
+					$zones[ $zone_id ] = $zone;
+				}
+			}
+		} while ( [] !== $zone_page );
 		$profiles  = $this->index_by_id( $this->logistics_profile_repository->list( [ 'limit' => self::LIST_LIMIT ] ) );
 		$suppliers = $this->index_by_id( $this->supplier_repository->list( [ 'limit' => self::LIST_LIMIT ] ) );
 		$origins   = $this->index_by_id( $this->origin_repository->list( [ 'limit' => self::LIST_LIMIT ] ) );
 		$now       = gmdate( 'Y-m-d H:i:s' );
 		$signatures = [];
 
-		foreach ( $this->rate_card_repository->list( [ 'limit' => self::LIST_LIMIT ] ) as $card ) {
-			$card_id = (int) ( $card['id'] ?? 0 );
-			$status  = (string) ( $card['status'] ?? '' );
+		$card_after = 0;
+		do {
+			$cards = method_exists( $this->rate_card_repository, 'page_after' )
+				? $this->rate_card_repository->page_after( $card_after, 100 )
+				: ( 0 === $card_after ? $this->rate_card_repository->list( [ 'limit' => self::LIST_LIMIT ] ) : [] );
+			foreach ( $cards as $card ) {
+				$card_id    = (int) ( $card['id'] ?? 0 );
+				$card_after = max( $card_after, $card_id );
+				$status     = (string) ( $card['status'] ?? '' );
 
-			$this->check_rate_card_delivery_offer( $diagnostics, $card, $offers );
-			$this->check_rate_card_destination_zone( $diagnostics, $card, $zones );
+				$this->check_rate_card_delivery_offer( $diagnostics, $card, $offers );
+				$this->check_rate_card_destination_zone( $diagnostics, $card, $zones );
 			$this->check_rate_card_optional_fk(
 				$diagnostics,
 				$card,
@@ -530,6 +535,7 @@ final class ConfigurationHealthChecker {
 				$signatures[ $signature ][] = $card_id;
 			}
 		}
+		} while ( [] !== $cards && method_exists( $this->rate_card_repository, 'page_after' ) );
 
 		foreach ( $signatures as $signature => $card_ids ) {
 			if ( count( $card_ids ) < 2 ) {
@@ -1502,10 +1508,9 @@ final class ConfigurationHealthChecker {
 
 		$offer_ids_with_active_cards = [];
 
-		foreach ( $this->rate_card_repository->list( [ 'status' => RecordStatus::Active->value, 'limit' => self::LIST_LIMIT ] ) as $card ) {
-			$offer_id = (int) ( $card['delivery_offer_id'] ?? 0 );
-
-			if ( $offer_id > 0 ) {
+		foreach ( $this->delivery_offer_repository->list( [ 'limit' => self::LIST_LIMIT ] ) as $offer ) {
+			$offer_id = (int) ( $offer['id'] ?? 0 );
+			if ( $offer_id > 0 && $this->rate_card_repository->countActiveByDeliveryOfferId( $offer_id ) > 0 ) {
 				$offer_ids_with_active_cards[ $offer_id ] = true;
 			}
 		}

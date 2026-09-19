@@ -28,7 +28,7 @@ final class LocationPacksPage {
 
 	public function handle_actions(): void {
 		if ( $this->action_handler->verify_post( self::ACTION_INSTALL, self::ACTION_INSTALL, 'manage_delivery_zones', self::SLUG ) ) {
-			$country = strtoupper( sanitize_text_field( wp_unslash( (string) ( $_POST['country_code'] ?? 'GH' ) ) ) );
+			$country = strtoupper( sanitize_text_field( wp_unslash( (string) ( $_POST['country_code'] ?? '' ) ) ) );
 			if ( 2 !== strlen( $country ) || ! ctype_alpha( $country ) ) {
 				$this->action_handler->notices()->add_error( __( 'Enter a two-letter country code.', 'cetech-woocommerce-delivery-engine' ) );
 				return;
@@ -65,6 +65,34 @@ final class LocationPacksPage {
 				'retry' => $this->packs->retry( (int) ( $_POST['pack_id'] ?? 0 ), $path ),
 				default => $this->packs->install( $country, $path ),
 			};
+			if ( GeographyPackStatus::Failed === $pack->status ) {
+				$message = '' !== $pack->last_error
+					? $pack->last_error
+					: sprintf(
+						/* translators: %s country code */
+						__( 'Location pack for %s failed validation and was not queued.', 'cetech-woocommerce-delivery-engine' ),
+						$country
+					);
+				$this->action_handler->notices()->add_error( $message );
+
+				return;
+			}
+			if ( '' !== $path && is_readable( $path ) ) {
+				$this->packs->tick( $pack->id, $path, 100 );
+				$pack = $this->packs->find( $pack->id ) ?? $pack;
+				if ( GeographyPackStatus::Failed === $pack->status ) {
+					$message = '' !== $pack->last_error
+						? $pack->last_error
+						: sprintf(
+							/* translators: %s country code */
+							__( 'Location pack for %s failed.', 'cetech-woocommerce-delivery-engine' ),
+							$country
+						);
+					$this->action_handler->notices()->add_error( $message );
+
+					return;
+				}
+			}
 			$this->action_handler->notices()->add_success(
 				sprintf(
 					/* translators: %s country code */
@@ -72,9 +100,6 @@ final class LocationPacksPage {
 					$country
 				)
 			);
-			if ( '' !== $path && is_readable( $path ) ) {
-				$this->packs->tick( $pack->id, $path, 100 );
-			}
 		}
 
 		if ( $this->action_handler->verify_post( self::ACTION_TICK, self::ACTION_TICK, 'manage_delivery_zones', self::SLUG ) ) {
@@ -130,7 +155,7 @@ final class LocationPacksPage {
 		echo '<form method="post" enctype="multipart/form-data">';
 		wp_nonce_field( self::ACTION_INSTALL, self::ACTION_INSTALL );
 		echo '<table class="form-table"><tr><th><label for="cetech-de-pack-country">' . esc_html__( 'Country', 'cetech-woocommerce-delivery-engine' ) . '</label></th><td>';
-		echo '<input type="text" id="cetech-de-pack-country" name="country_code" value="GH" maxlength="2" class="regular-text" />';
+		echo '<input type="text" id="cetech-de-pack-country" name="country_code" value="' . esc_attr( $this->default_country_code() ) . '" maxlength="2" class="regular-text" />';
 		echo '</td></tr><tr><th><label for="cetech-de-pack-file">' . esc_html__( 'Upload gazetteer file', 'cetech-woocommerce-delivery-engine' ) . '</label></th><td>';
 		echo '<input type="file" id="cetech-de-pack-file" name="pack_file" accept=".txt,.zip,text/plain,application/zip" />';
 		echo '<p class="description">' . esc_html__( 'Upload the extracted GeoNames country .txt file, or the official country .zip. Files are stored under wp-content/uploads/cetech-delivery-engine/geography/.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
@@ -197,5 +222,17 @@ final class LocationPacksPage {
 		submit_button( __( 'Run safe legacy reconciliation', 'cetech-woocommerce-delivery-engine' ), 'secondary' );
 		echo '</form>';
 		echo '</div>';
+	}
+
+	private function default_country_code(): string {
+		if ( function_exists( 'wc_get_base_location' ) ) {
+			$location = wc_get_base_location();
+			$country  = strtoupper( (string) ( $location['country'] ?? '' ) );
+			if ( preg_match( '/^[A-Z]{2}$/', $country ) ) {
+				return $country;
+			}
+		}
+
+		return '';
 	}
 }

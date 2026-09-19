@@ -1,6 +1,6 @@
 # Current Work — Post-RC.11 Canonical Geography Stream
 
-Status: ISSUE #23 ACTIVE / GEO.12 IS THE ONLY ACTIVE RUNTIME STREAM / PRODUCT TRUTH OWNER-ACCEPTED / NOT MERGED / NOT RC.12
+Status: ISSUE #23 GEO.12 TECHNICAL CLOSURE IMPLEMENTED / DRAFT PR #24 OPEN / NOT MERGED / NOT RC.12 / AWAITING WHOLE-BRANCH REVIEW
 
 ## Canonical repository truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
@@ -32,7 +32,8 @@ Status: ISSUE #23 ACTIVE / GEO.12 IS THE ONLY ACTIVE RUNTIME STREAM / PRODUCT TR
 - Architecture baseline commit: `657e1f9481e1cfe974d2d70fe52a8da28b4176f0`.
 - Architecture document: `docs/POST-RC11-CANONICAL-GEOGRAPHY-COVERAGE.md`.
 - Frozen technical-stabilization candidate: `1.0.0-dev.geo.11` / `daef41a85662e1c1dc0aa6f5673ca9749f163a26`.
-- Authorized next identity: `1.0.0-dev.geo.12`.
+- Authorized current identity: `1.0.0-dev.geo.12` (schema `6`).
+- Product-control-plane sync: merged `origin/master` `6ee4cef088f0bda2633d4b8e37abf3e37634426b` into `feat/canonical-geography-coverage` at pre-sync `daef41a85662e1c1dc0aa6f5673ca9749f163a26`; post-sync merge commit `a7b3592d2d862a7b7a279087a66813104d04642c`. Conflicts resolved only in `CURRENT-WORK.md` and `docs/STATUS_CURRENT.md`. `ci.yml` auto-merged and preserves feat/** CI plus product-control-plane validation. No rebase/squash/history rewrite.
 - Target schema: `6`.
 - `1.0.0-dev.geo.1` (`606730e2535896cb18e415b14d62bbb57d050578`) is a rejected technical-review candidate. Do not send it to physical QA or reuse its package identity.
 - `1.0.0-dev.geo.2` (`a52e2aafc97274b74ec14f8b451395b73c9541af`) is a rejected technical-review candidate. Frozen package: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.2.zip` (SHA-256 `6bde464b249ee6f17831e00d39110c8b10f89f441db3e1b453622a5d95f6b4a5`). Do not physically QA geo.2 or reuse its package identity.
@@ -45,7 +46,7 @@ Status: ISSUE #23 ACTIVE / GEO.12 IS THE ONLY ACTIVE RUNTIME STREAM / PRODUCT TR
 - `1.0.0-dev.geo.9` (`09df7d2337e271792f76290b062c7acba598d80a`) is a rejected technical-review candidate. Frozen package: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.9.zip` (SHA-256 `8ac4067ff8a9b5f1eb6bb1b8ad8224a168517160665804b0aa6b577a17029a47`, `1,661,773` bytes). Do not physically QA geo.9 or reuse its package identity.
 - `1.0.0-dev.geo.10` (`66be34b684c11c165617359b828ccf852fba2635`) is a rejected technical-review candidate. Frozen package: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.10.zip` (SHA-256 `494546cf021909b30a8f0519c816069af72c41b064cbe28b05a31409355f7f47`). Do not physically QA geo.10 or reuse its package identity.
 - `1.0.0-dev.geo.11` (`daef41a85662e1c1dc0aa6f5673ca9749f163a26`) is a rejected whole-branch closure-review candidate. Frozen package: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.11.zip` (SHA-256 `5ba3eb3a6b10eba60e36735085071b628d1dc030e85f4e79f67e5753c9331400`). Do not physically QA geo.11 or reuse its package identity.
-- Implementation: bounded geo.12 closure-correction pass for PR #24 comment `5732836980` / issue #23 A–O; not physically QA'd; not packaged as RC.11; not merged; not self-accepted.
+- Implementation: geo.12 closure-correction pass for PR #24 comment `5732836980` / issue #23 A–O is implemented on this branch and is ready for independent whole-branch review. Not physically QA'd; not packaged as RC.11; not merged; not self-accepted.
 - Do not package this work as `1.0.0-rc.11`.
 - Keep PR #24 Draft. Do not merge. Do not self-accept.
 
@@ -75,9 +76,17 @@ Ben (`@Ben-001-sys`) and Emmanuel (`@Emmanuel-coder-prog`) have **no** implement
 - WP Rocket certification: do not expand; remains separate/unqualified.
 - Stage 15: not started.
 
+## Geo.12 technical-closure evidence (pending package SHA after commit)
+- Identity: `1.0.0-dev.geo.12`; schema `6`.
+- Requirement IDs referenced in this pass: DE-GEO-011, DE-GEO-012, DE-GEO-013.
+- Local gates: Composer validate OK; PHP lint 653 files / 0 failures; Docker PHP 8.1 runtime lint 482 files / 0 failures; default PHPUnit 1202 tests / 7234 assertions; Vitest 76 tests; team control plane OK; product control plane OK (10 files, 372 Requirement IDs).
+- Real MariaDB `@group geo12-real-db`: 3 tests / 35 assertions in 20:49; metadata-only drafts 116.91s; >1,000 hierarchy-changing roots 1131.71s; real SQL CAS mismatch stays 0.
+- GH pack was not re-run in this pass.
+- PR #24 remains Draft / OPEN / unmerged.
+
 ## Current next work
-1. Finish the finite geo.12 closure work on issue #23 / Draft PR #24 / `feat/canonical-geography-coverage`.
-2. After geo.12 technical closure and physical owner QA, create a controlled CETECH production Pilot/release candidate. This does not pre-authorize deployment and does not assume the name RC.12.
+1. Independent whole-branch review of geo.12 / Draft PR #24. Do not merge. Do not physically QA until that review accepts.
+2. After accepted technical closure and physical owner QA, create a controlled CETECH production Pilot/release candidate. This does not pre-authorize deployment and does not assume the name RC.12.
 3. Do not begin any other runtime implementation stream concurrently. Later realignment waves follow the approved dependency gates and bounded requirement-ID work.
 
 ## Explicit non-actions

@@ -15,6 +15,11 @@ use CetechDeliveryEngine\Domain\Geography\LocationAncestry;
 
 final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository implements CanonicalLocationRepositoryInterface {
 
+	/**
+	 * @var array<string, list<CanonicalLocation>>
+	 */
+	private array $hierarchy_changing_roots_cache = [];
+
 	protected function table_suffix(): string {
 		return GeographySchema::LOCATIONS_SUFFIX;
 	}
@@ -125,6 +130,43 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		$row = $wpdb->get_row( $wpdb->prepare( $sql, ...$args ), ARRAY_A );
 
 		return is_array( $row ) ? CanonicalLocation::fromRow( $row ) : null;
+	}
+
+	public function find_unique_exact_descendant( string $country_code, int $ancestor_id, string $normalized_name, ?GeographyLocationType $type = null ): ?CanonicalLocation {
+		$country_code    = strtoupper( trim( $country_code ) );
+		$normalized_name = GeographyNameNormalizer::normalize( $normalized_name );
+		if ( '' === $country_code || '' === $normalized_name || $ancestor_id <= 0 ) {
+			return null;
+		}
+		$ancestor = $this->find_by_id( $ancestor_id );
+		if ( ! $ancestor instanceof CanonicalLocation || '' === $ancestor->ancestry_path ) {
+			return null;
+		}
+
+		global $wpdb;
+		$table = $this->table_name();
+		$args  = [
+			$country_code,
+			RecordStatus::Active->value,
+			$normalized_name,
+			$normalized_name,
+			$normalized_name,
+			$wpdb->esc_like( $ancestor->ancestry_path ) . '%',
+			$ancestor_id,
+		];
+		$sql = "SELECT * FROM `{$table}` WHERE country_code = %s AND status = %s AND (normalized_name = %s OR ascii_name = %s OR LOWER(ascii_name) = %s) AND ancestry_path LIKE %s AND id != %d";
+		if ( $type instanceof GeographyLocationType ) {
+			$sql   .= ' AND location_type = %s';
+			$args[] = $type->value;
+		}
+		$sql .= ' LIMIT 2';
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$args ), ARRAY_A );
+		if ( ! is_array( $rows ) || 1 !== count( $rows ) ) {
+			return null;
+		}
+
+		return CanonicalLocation::fromRow( $rows[0] );
 	}
 
 	public function list_children( int $parent_id, ?GeographyLocationType $type = null, int $limit = 50, int $offset = 0 ): array {
@@ -403,6 +445,7 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		if ( '' === $generation_token ) {
 			throw new \RuntimeException( 'Promotion requires a generation token.' );
 		}
+		$this->hierarchy_changing_roots_cache = [];
 
 		$batch      = max( 1, $limit );
 		$after      = max( 0, $after_id );
@@ -672,19 +715,46 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 	}
 
 	private function future_ancestry_path( CanonicalLocation $location, ?int $parent_id, string $generation_token ): string {
-		if ( null === $parent_id || $parent_id <= 0 ) {
+		return $this->future_graph_path( $location, $generation_token );
+	}
+
+	/**
+	 * Resolve the complete future-parent graph for this generation.
+	 * Independent of row order and of whether a moving parent has already been prepared.
+	 *
+	 * @param array<int, true> $stack
+	 */
+	private function future_graph_path( CanonicalLocation $location, string $generation_token, array $stack = [] ): string {
+		if ( isset( $stack[ $location->id ] ) ) {
+			throw new \RuntimeException( 'Cyclic or invalid future-parent graph.' );
+		}
+		$stack[ $location->id ] = true;
+		$parent_id              = $this->future_parent_id( $location, $generation_token );
+		if ( $parent_id <= 0 ) {
 			return LocationAncestry::append_path( '', $location->id );
 		}
-
 		$parent = $this->find_by_id( $parent_id );
-		$parent_path = '';
-		if ( $parent instanceof CanonicalLocation ) {
-			$parent_path = ( $parent->prepared_generation_token === $generation_token && '' !== $parent->prepared_ancestry_path )
-				? $parent->prepared_ancestry_path
-				: $parent->ancestry_path;
+		if ( ! $parent instanceof CanonicalLocation ) {
+			throw new \RuntimeException( 'Cyclic or invalid future-parent graph.' );
+		}
+		if ( $this->draft_changes_parent( $parent ) && $parent->draft_generation_token === $generation_token ) {
+			$parent_path = $this->future_graph_path( $parent, $generation_token, $stack );
+		} else {
+			$parent_path = $parent->ancestry_path;
 		}
 
 		return LocationAncestry::append_path( $parent_path, $location->id );
+	}
+
+	private function future_parent_id( CanonicalLocation $location, string $generation_token ): int {
+		if ( $location->draft_generation_token === $generation_token && '' !== $location->draft_json ) {
+			$draft = json_decode( $location->draft_json, true );
+			if ( is_array( $draft ) && array_key_exists( 'parent_location_id', $draft ) ) {
+				return (int) $draft['parent_location_id'];
+			}
+		}
+
+		return (int) ( $location->parent_location_id ?? 0 );
 	}
 
 	private function write_prepared_ancestry( int $id, string $path, string $generation_token, int $hierarchy_root_id = 0 ): void {
@@ -871,15 +941,21 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 	 * @return list<CanonicalLocation>
 	 */
 	private function list_hierarchy_changing_roots( string $generation_token ): array {
+		if ( isset( $this->hierarchy_changing_roots_cache[ $generation_token ] ) ) {
+			return $this->hierarchy_changing_roots_cache[ $generation_token ];
+		}
+
+		global $wpdb;
+		$table = $this->table_name();
+		$sql   = "SELECT * FROM `{$table}` WHERE draft_generation_token = %s ORDER BY id ASC";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows  = $wpdb->get_results( $wpdb->prepare( $sql, $generation_token ), ARRAY_A );
 		$roots = [];
-		$after = 0;
-		while ( true ) {
-			$found = $this->next_hierarchy_changing_draft( $generation_token, $after );
-			if ( null === $found ) {
-				break;
+		foreach ( is_array( $rows ) ? $rows : [] as $row ) {
+			$location = CanonicalLocation::fromRow( $row );
+			if ( $this->draft_changes_parent( $location ) ) {
+				$roots[] = $location;
 			}
-			$roots[] = $found;
-			$after   = $found->id;
 		}
 		usort(
 			$roots,
@@ -892,6 +968,7 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 				return $left->id <=> $right->id;
 			}
 		);
+		$this->hierarchy_changing_roots_cache[ $generation_token ] = $roots;
 
 		return $roots;
 	}
@@ -929,19 +1006,7 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 	}
 
 	private function planned_ancestry_path( CanonicalLocation $location, string $generation_token ): string {
-		if ( $location->prepared_generation_token === $generation_token && '' !== $location->prepared_ancestry_path ) {
-			return $location->prepared_ancestry_path;
-		}
-		if ( $location->draft_generation_token !== $generation_token || '' === $location->draft_json ) {
-			return $location->ancestry_path;
-		}
-		$draft = json_decode( $location->draft_json, true );
-		if ( ! is_array( $draft ) ) {
-			return $location->ancestry_path;
-		}
-		$parent_id = isset( $draft['parent_location_id'] ) ? (int) $draft['parent_location_id'] : (int) ( $location->parent_location_id ?? 0 );
-
-		return $this->future_ancestry_path( $location, $parent_id > 0 ? $parent_id : null, $generation_token );
+		return $this->future_graph_path( $location, $generation_token );
 	}
 
 	private function root_has_unprepared_descendants( CanonicalLocation $root, string $generation_token ): bool {
@@ -1023,8 +1088,10 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		if ( $owner instanceof CanonicalLocation && $owner->id === $location->id ) {
 			return $this->planned_ancestry_path( $location, $generation_token );
 		}
-		if ( $owner instanceof CanonicalLocation && '' !== $owner->prepared_ancestry_path && '' !== $owner->ancestry_path ) {
-			return $owner->prepared_ancestry_path . substr( $location->ancestry_path, strlen( $owner->ancestry_path ) );
+		if ( $owner instanceof CanonicalLocation && '' !== $owner->ancestry_path ) {
+			$owner_future = $this->planned_ancestry_path( $owner, $generation_token );
+
+			return $owner_future . substr( $location->ancestry_path, strlen( $owner->ancestry_path ) );
 		}
 
 		return $this->planned_ancestry_path( $location, $generation_token );

@@ -57,6 +57,7 @@ final class LegacyDestinationCoverageMigrator {
 			'review_required'       => 0,
 			'warnings'              => [],
 			'last_zone_id'          => max( 0, $after_id ),
+			'failed_zone_id'        => 0,
 			'complete'              => false,
 		];
 
@@ -70,8 +71,6 @@ final class LegacyDestinationCoverageMigrator {
 			++$pages;
 			foreach ( $page as $zone ) {
 				$zone_id = (int) ( $zone['id'] ?? 0 );
-				$after   = max( $after, $zone_id );
-				$report['last_zone_id'] = $after;
 				if ( $zone_id <= 0 ) {
 					continue;
 				}
@@ -85,10 +84,14 @@ final class LegacyDestinationCoverageMigrator {
 						++$report['skipped_manual'];
 					}
 					++$report['skipped'];
+					$after = max( $after, $zone_id );
+					$report['last_zone_id'] = $after;
 					continue;
 				}
 				if ( ! $force || ! $this->is_revisit_candidate( $existing ) ) {
 					++$report['skipped'];
+					$after = max( $after, $zone_id );
+					$report['last_zone_id'] = $after;
 					continue;
 				}
 			}
@@ -96,12 +99,16 @@ final class LegacyDestinationCoverageMigrator {
 			$rules = $this->rules->listByZoneId( $zone_id );
 			if ( [] === $rules ) {
 				++$report['skipped'];
+				$after = max( $after, $zone_id );
+				$report['last_zone_id'] = $after;
 				continue;
 			}
 
 			$payloads = $this->convert_zone( $zone_id, $rules );
 			if ( [] === $payloads ) {
 				++$report['skipped'];
+				$after = max( $after, $zone_id );
+				$report['last_zone_id'] = $after;
 				continue;
 			}
 
@@ -112,7 +119,12 @@ final class LegacyDestinationCoverageMigrator {
 						'zone_id' => $zone_id,
 						'reason'  => 'coverage_replace_failed',
 					];
-					continue;
+					$report['failed_zone_id'] = $zone_id;
+					$report['last_zone_id']   = $after;
+					$report['complete']       = false;
+					$this->persist_progress( $report );
+
+					return $report;
 				}
 				foreach ( $saved_groups as $saved ) {
 					++$report['converted'];
@@ -135,13 +147,21 @@ final class LegacyDestinationCoverageMigrator {
 					'reason'  => 'coverage_replace_failed',
 					'error'   => $e->getMessage(),
 				];
+				$report['failed_zone_id'] = $zone_id;
+				$report['last_zone_id']   = $after;
+				$report['complete']       = false;
+				$this->persist_progress( $report );
+
+				return $report;
 			}
+			$after = max( $after, $zone_id );
+			$report['last_zone_id'] = $after;
 			}
 			$this->persist_progress( $report );
 		} while ( $max_pages <= 0 || $pages < $max_pages );
 
 		$report['last_zone_id'] = $after;
-		$report['complete']     = [] === $this->zones->page_after( $after, 1 );
+		$report['complete']     = [] === $this->zones->page_after( $after, 1 ) && empty( $report['failed_zone_id'] );
 		$this->persist_progress( $report );
 
 		if ( function_exists( 'update_option' ) ) {
@@ -155,17 +175,8 @@ final class LegacyDestinationCoverageMigrator {
 	 * @param array<string, mixed> $report
 	 */
 	private function persist_progress( array $report ): void {
-		if ( ! function_exists( 'get_option' ) || ! function_exists( 'update_option' ) ) {
-			return;
-		}
-
-		$upgrade = get_option( Schema6CoverageUpgradeService::OPTION_KEY, [] );
-		if ( is_array( $upgrade ) && [] !== $upgrade ) {
-			$upgrade['last_zone_id'] = (int) ( $report['last_zone_id'] ?? 0 );
-			if ( empty( $report['complete'] ) && Schema6CoverageUpgradeService::STATUS_COMPLETED === (string) ( $upgrade['status'] ?? '' ) ) {
-				$upgrade['status'] = Schema6CoverageUpgradeService::STATUS_RUNNING;
-			}
-			update_option( Schema6CoverageUpgradeService::OPTION_KEY, $upgrade, false );
+		if ( function_exists( 'update_option' ) ) {
+			update_option( self::OPTION_KEY, $report, false );
 		}
 	}
 

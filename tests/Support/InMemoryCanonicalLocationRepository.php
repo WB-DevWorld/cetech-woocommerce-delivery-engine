@@ -141,6 +141,42 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		return null;
 	}
 
+	public function find_unique_exact_descendant( string $country_code, int $ancestor_id, string $normalized_name, ?GeographyLocationType $type = null ): ?CanonicalLocation {
+		$country_code    = strtoupper( trim( $country_code ) );
+		$normalized_name = GeographyNameNormalizer::normalize( $normalized_name );
+		if ( '' === $country_code || '' === $normalized_name || $ancestor_id <= 0 ) {
+			return null;
+		}
+		$ancestor = $this->locations[ $ancestor_id ] ?? null;
+		if ( ! $ancestor instanceof CanonicalLocation ) {
+			return null;
+		}
+		$matches = [];
+		foreach ( $this->locations as $location ) {
+			if ( ! $location->isActive() || $location->country_code !== $country_code || $location->id === $ancestor_id ) {
+				continue;
+			}
+			if ( $type instanceof GeographyLocationType && $location->location_type !== $type ) {
+				continue;
+			}
+			$name_hit = $location->normalized_name === $normalized_name
+				|| GeographyNameNormalizer::normalize( $location->ascii_name ) === $normalized_name
+				|| strtolower( $location->ascii_name ) === $normalized_name;
+			if ( ! $name_hit ) {
+				continue;
+			}
+			if ( ! LocationAncestry::is_self_or_descendant( $location, $ancestor ) ) {
+				continue;
+			}
+			$matches[] = $location;
+			if ( count( $matches ) > 1 ) {
+				return null;
+			}
+		}
+
+		return 1 === count( $matches ) ? $matches[0] : null;
+	}
+
 	public function list_children( int $parent_id, ?GeographyLocationType $type = null, int $limit = 50, int $offset = 0 ): array {
 		$out = [];
 		foreach ( $this->locations as $location ) {
@@ -608,18 +644,43 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	}
 
 	private function future_ancestry_path_in_memory( CanonicalLocation $location, ?int $parent_id, string $generation_token ): string {
-		if ( null === $parent_id || $parent_id <= 0 ) {
+		return $this->future_graph_path_in_memory( $location, $generation_token );
+	}
+
+	/**
+	 * @param array<int, true> $stack
+	 */
+	private function future_graph_path_in_memory( CanonicalLocation $location, string $generation_token, array $stack = [] ): string {
+		if ( isset( $stack[ $location->id ] ) ) {
+			throw new \RuntimeException( 'Cyclic or invalid future-parent graph.' );
+		}
+		$stack[ $location->id ] = true;
+		$parent_id              = $this->future_parent_id_in_memory( $location, $generation_token );
+		if ( $parent_id <= 0 ) {
 			return LocationAncestry::append_path( '', $location->id );
 		}
 		$parent = $this->locations[ $parent_id ] ?? null;
-		$parent_path = '';
-		if ( $parent instanceof CanonicalLocation ) {
-			$parent_path = ( $parent->prepared_generation_token === $generation_token && '' !== $parent->prepared_ancestry_path )
-				? $parent->prepared_ancestry_path
-				: $parent->ancestry_path;
+		if ( ! $parent instanceof CanonicalLocation ) {
+			throw new \RuntimeException( 'Cyclic or invalid future-parent graph.' );
+		}
+		if ( $this->draft_changes_parent_in_memory( $parent ) && $parent->draft_generation_token === $generation_token ) {
+			$parent_path = $this->future_graph_path_in_memory( $parent, $generation_token, $stack );
+		} else {
+			$parent_path = $parent->ancestry_path;
 		}
 
 		return LocationAncestry::append_path( $parent_path, $location->id );
+	}
+
+	private function future_parent_id_in_memory( CanonicalLocation $location, string $generation_token ): int {
+		if ( $location->draft_generation_token === $generation_token && '' !== $location->draft_json ) {
+			$draft = json_decode( $location->draft_json, true );
+			if ( is_array( $draft ) && array_key_exists( 'parent_location_id', $draft ) ) {
+				return (int) $draft['parent_location_id'];
+			}
+		}
+
+		return (int) ( $location->parent_location_id ?? 0 );
 	}
 
 	/**
@@ -929,8 +990,10 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		if ( $owner instanceof CanonicalLocation && $owner->id === $location->id ) {
 			return $this->planned_ancestry_path_in_memory( $location, $generation_token );
 		}
-		if ( $owner instanceof CanonicalLocation && '' !== $owner->prepared_ancestry_path && '' !== $owner->ancestry_path ) {
-			return $owner->prepared_ancestry_path . substr( $location->ancestry_path, strlen( $owner->ancestry_path ) );
+		if ( $owner instanceof CanonicalLocation && '' !== $owner->ancestry_path ) {
+			$owner_future = $this->planned_ancestry_path_in_memory( $owner, $generation_token );
+
+			return $owner_future . substr( $location->ancestry_path, strlen( $owner->ancestry_path ) );
 		}
 
 		return $this->planned_ancestry_path_in_memory( $location, $generation_token );
@@ -970,19 +1033,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	}
 
 	private function planned_ancestry_path_in_memory( CanonicalLocation $location, string $generation_token ): string {
-		if ( $location->prepared_generation_token === $generation_token && '' !== $location->prepared_ancestry_path ) {
-			return $location->prepared_ancestry_path;
-		}
-		if ( $location->draft_generation_token !== $generation_token || '' === $location->draft_json ) {
-			return $location->ancestry_path;
-		}
-		$draft = json_decode( $location->draft_json, true );
-		if ( ! is_array( $draft ) ) {
-			return $location->ancestry_path;
-		}
-		$parent_id = isset( $draft['parent_location_id'] ) ? (int) $draft['parent_location_id'] : (int) ( $location->parent_location_id ?? 0 );
-
-		return $this->future_ancestry_path_in_memory( $location, $parent_id > 0 ? $parent_id : null, $generation_token );
+		return $this->future_graph_path_in_memory( $location, $generation_token );
 	}
 
 	private function apply_prepared_ancestry_in_memory( CanonicalLocation $location ): void {
@@ -1214,6 +1265,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	}
 
 	public function find_exact( string $country_code, string $normalized_alias, ?int $parent_id = null ): ?CanonicalLocation {
+		$matches = [];
 		foreach ( $this->aliases as $location_id => $list ) {
 			foreach ( $list as $alias ) {
 				if ( $alias['normalized'] !== $normalized_alias ) {
@@ -1232,12 +1284,14 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 				if ( null !== $parent_id && $parent_id > 0 && $location->parent_location_id !== $parent_id && ! LocationAncestry::path_contains( $location->ancestry_path, $parent_id ) ) {
 					continue;
 				}
-
-				return $location;
+				$matches[ $location->id ] = $location;
+				if ( count( $matches ) > 1 ) {
+					return null;
+				}
 			}
 		}
 
-		return null;
+		return 1 === count( $matches ) ? array_values( $matches )[0] : null;
 	}
 
 	public function list_for_location( int $location_id ): array {

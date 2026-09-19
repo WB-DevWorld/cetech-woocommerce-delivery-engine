@@ -414,10 +414,11 @@ describe('Admin coverage builder', () => {
 		expect(document.querySelector('[data-cetech-de-coverage-root] option[value="loc-eng"]')).not.toBeNull();
 	});
 
-	it('submits confirm_drop_canonical when the last coverage group is removed', () => {
+	it('submits confirm_drop_canonical using the actual unchecked checkbox', () => {
 		window.confirm = vi.fn(() => true);
 		document.body.innerHTML = `
 			<form>
+				<input type="checkbox" name="confirm_drop_canonical" value="1" />
 				<div data-cetech-de-coverage-builder data-countries='{"GH":"Ghana"}'>
 					<div data-cetech-de-coverage-groups>
 						<fieldset class="cetech-de-coverage-group">
@@ -429,11 +430,124 @@ describe('Admin coverage builder', () => {
 			</form>
 		`;
 		loadAdmin();
+		const checkbox = document.querySelector('input[name="confirm_drop_canonical"]');
+		expect(checkbox.checked).toBe(false);
 		document.querySelector('[data-cetech-de-remove-coverage-group]').click();
 		expect(document.querySelectorAll('.cetech-de-coverage-group').length).toBe(0);
-		const flag = document.querySelector('input[name="confirm_drop_canonical"]');
-		expect(flag).not.toBeNull();
-		expect(flag.value).toBe('1');
-		expect(flag.checked === true || flag.type === 'hidden').toBe(true);
+		expect(checkbox.checked).toBe(true);
+		expect(checkbox.value).toBe('1');
+	});
+
+	it('loads administrative child 51 and 251 through bounded pages and restores a saved later-page root', async () => {
+		const pages = {
+			1: Array.from({ length: 50 }, (_, i) => ({ id: i + 1, key: `adm-${i + 1}`, name: `Admin ${i + 1}` })),
+			2: Array.from({ length: 50 }, (_, i) => ({ id: i + 51, key: `adm-${i + 51}`, name: `Admin ${i + 51}` })),
+			3: Array.from({ length: 50 }, (_, i) => ({ id: i + 101, key: `adm-${i + 101}`, name: `Admin ${i + 101}` })),
+			4: Array.from({ length: 50 }, (_, i) => ({ id: i + 151, key: `adm-${i + 151}`, name: `Admin ${i + 151}` })),
+			5: Array.from({ length: 50 }, (_, i) => ({ id: i + 201, key: `adm-${i + 201}`, name: `Admin ${i + 201}` })),
+			6: [{ id: 251, key: 'adm-251', name: 'Admin 251' }]
+		};
+		window.fetch = vi.fn((url, init) => {
+			const body = String(init && init.body ? init.body : '');
+			const pageMatch = body.match(/page=(\d+)/);
+			const page = pageMatch ? Number(pageMatch[1]) : 1;
+			if (body.includes('op=children')) {
+				const items = pages[page] || [];
+				return jsonResponse({
+					items,
+					page,
+					total: 251,
+					has_more: page < 6,
+					request_token: String(body.match(/request_token=(\d+)/)?.[1] || '1')
+				});
+			}
+			return jsonResponse({ items: [] });
+		});
+		document.body.innerHTML = `
+			<form>
+				<div data-cetech-de-coverage-builder data-countries='{"GH":"Ghana"}'>
+					<div data-cetech-de-coverage-groups>
+						<fieldset class="cetech-de-coverage-group">
+							<select data-cetech-de-coverage-country><option value="GH" selected>Ghana</option></select>
+							<select data-cetech-de-coverage-root data-cetech-de-saved-root="adm-51"><option value="">Select…</option></select>
+						</fieldset>
+					</div>
+				</div>
+			</form>
+		`;
+		loadAdmin();
+		const country = document.querySelector('[data-cetech-de-coverage-country]');
+		country.dispatchEvent(new Event('change', { bubbles: true }));
+		await expect.poll(() => document.querySelector('option[value="adm-51"]')).not.toBeNull();
+		for (let i = 0; i < 5; i += 1) {
+			document.querySelector('[data-cetech-de-load-more-roots]')?.click();
+			await new Promise((resolve) => setTimeout(resolve, 20));
+		}
+		await expect.poll(() => document.querySelector('option[value="adm-251"]')).not.toBeNull();
+	});
+
+	it('ignores a stale page response after Country change', async () => {
+		let resolveStale;
+		window.fetch = vi.fn((url, init) => {
+			const body = String(init && init.body ? init.body : '');
+			if (body.includes('country=GH') && body.includes('page=2')) {
+				return new Promise((resolve) => {
+					resolveStale = resolve;
+				});
+			}
+			if (body.includes('country=GB')) {
+				return jsonResponse({
+					items: [{ id: 9, key: 'loc-eng', name: 'England' }],
+					page: 1,
+					has_more: false,
+					request_token: String(body.match(/request_token=(\d+)/)?.[1] || '2')
+				});
+			}
+			return jsonResponse({
+				items: [{ id: 1, key: 'loc-ga', name: 'Greater Accra' }],
+				page: 1,
+				has_more: true,
+				request_token: String(body.match(/request_token=(\d+)/)?.[1] || '1')
+			});
+		});
+		document.body.innerHTML = `
+			<form>
+				<div data-cetech-de-coverage-builder data-countries='{"GH":"Ghana","GB":"United Kingdom"}'>
+					<div data-cetech-de-coverage-groups>
+						<fieldset class="cetech-de-coverage-group">
+							<select data-cetech-de-coverage-country>
+								<option value="GH" selected>Ghana</option>
+								<option value="GB">United Kingdom</option>
+							</select>
+							<select data-cetech-de-coverage-root><option value="">Select…</option></select>
+						</fieldset>
+					</div>
+				</div>
+			</form>
+		`;
+		loadAdmin();
+		const country = document.querySelector('[data-cetech-de-coverage-country]');
+		country.dispatchEvent(new Event('change', { bubbles: true }));
+		await expect.poll(() => document.querySelector('option[value="loc-ga"]')).not.toBeNull();
+		document.querySelector('[data-cetech-de-load-more-roots]').click();
+		country.value = 'GB';
+		country.dispatchEvent(new Event('change', { bubbles: true }));
+		await expect.poll(() => document.querySelector('option[value="loc-eng"]')).not.toBeNull();
+		if (resolveStale) {
+			resolveStale({
+				json: () => Promise.resolve({
+					success: true,
+					data: {
+						items: [{ id: 51, key: 'adm-51', name: 'Stale Admin 51' }],
+						page: 2,
+						has_more: false,
+						request_token: '1'
+					}
+				})
+			});
+		}
+		await new Promise((resolve) => setTimeout(resolve, 40));
+		expect(document.querySelector('option[value="adm-51"]')).toBeNull();
+		expect(document.querySelector('option[value="loc-eng"]')).not.toBeNull();
 	});
 });

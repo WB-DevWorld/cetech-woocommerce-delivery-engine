@@ -346,6 +346,12 @@ final class Plugin {
 			10,
 			3
 		);
+		add_action(
+			Schema6CoverageUpgradeService::HOOK,
+			function (): void {
+				$this->container->get( Schema6CoverageUpgradeService::class )->continue_pass();
+			}
+		);
 
 		if ( ! $requirements->is_woocommerce_active() ) {
 			$this->container->get( AdminNoticeManager::class )->register(

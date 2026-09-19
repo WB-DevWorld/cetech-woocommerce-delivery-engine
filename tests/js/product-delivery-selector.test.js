@@ -847,4 +847,125 @@ describe('Product delivery fulfilment switcher', () => {
 		expect(region.required).toBe(true);
 		expect(document.querySelector('label[for="billing_state"]')).not.toBeNull();
 	});
+
+	it('loads administrative child 51 and 251 and restores a saved later-page region', async () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<fieldset data-cetech-de-selector="1">
+					<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">
+						<p data-cetech-de-field="country">
+							<select name="cetech_de_matching_country"><option value="GH" selected>Ghana</option></select>
+						</p>
+						<p data-cetech-de-reveal="region" hidden>
+							<select name="cetech_de_matching_state" data-cetech-de-saved-region="adm-51"><option value="">Select…</option></select>
+						</p>
+						<p data-cetech-de-reveal="locality" hidden>
+							<input name="cetech_de_matching_city" />
+						</p>
+						<input type="hidden" name="cetech_de_matching_location_key" data-cetech-de-location-key="1" value="" />
+					</div>
+					<div data-cetech-de-options></div>
+				</fieldset>
+			</form>
+		`;
+		window.cetechDeMatchingLocation = {
+			ajaxUrl: '/wp-admin/admin-ajax.php',
+			geography: { childrenAction: 'cetech_de_geography_children', childrenNonce: 'n' }
+		};
+		window.fetch = async (url, init) => {
+			const body = String(init && init.body ? init.body : '');
+			const pageMatch = body.match(/page=(\d+)/);
+			const page = pageMatch ? Number(pageMatch[1]) : 1;
+			const start = (page - 1) * 50 + 1;
+			const items = page < 6
+				? Array.from({ length: 50 }, (_, i) => ({ key: `adm-${start + i}`, name: `Admin ${start + i}`, code: `adm-${start + i}` }))
+				: [{ key: 'adm-251', name: 'Admin 251', code: 'adm-251' }];
+			return {
+				json: async () => ({
+					success: true,
+					data: { items, page, total: 251, has_more: page < 6, skip_admin: false }
+				})
+			};
+		};
+		const api = loadSelector();
+		api.bindAll(document);
+		await expect.poll(() => document.querySelector('option[value="adm-51"]')).not.toBeNull();
+		const more = document.querySelector('[data-cetech-de-load-more-admin]');
+		expect(more).not.toBeNull();
+		for (let i = 0; i < 5; i += 1) {
+			document.querySelector('[data-cetech-de-load-more-admin]')?.click();
+			await new Promise((resolve) => setTimeout(resolve, 20));
+		}
+		await expect.poll(() => document.querySelector('option[value="adm-251"]')).not.toBeNull();
+	});
+
+	it('ignores a stale administrative page response after Country change', async () => {
+		document.body.innerHTML = `
+			<form class="cart">
+				<fieldset data-cetech-de-selector="1">
+					<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">
+						<p data-cetech-de-field="country">
+							<select name="cetech_de_matching_country">
+								<option value="">Select…</option>
+								<option value="GH">Ghana</option>
+								<option value="GB">United Kingdom</option>
+							</select>
+						</p>
+						<p data-cetech-de-reveal="region" hidden>
+							<select name="cetech_de_matching_state"><option value="">Select…</option></select>
+						</p>
+						<input type="hidden" name="cetech_de_matching_location_key" data-cetech-de-location-key="1" value="" />
+					</div>
+					<div data-cetech-de-options></div>
+				</fieldset>
+			</form>
+		`;
+		window.cetechDeMatchingLocation = {
+			ajaxUrl: '/wp-admin/admin-ajax.php',
+			geography: { childrenAction: 'cetech_de_geography_children', childrenNonce: 'n' }
+		};
+		let resolveStale;
+		window.fetch = (url, init) => {
+			const body = String(init && init.body ? init.body : '');
+			if (body.includes('country=GH') && body.includes('page=2')) {
+				return new Promise((resolve) => {
+					resolveStale = resolve;
+				});
+			}
+			if (body.includes('country=GB')) {
+				return Promise.resolve({
+					json: async () => ({
+						success: true,
+						data: { items: [{ key: 'loc-eng', name: 'England', code: 'ENG' }], skip_admin: false, has_more: false }
+					})
+				});
+			}
+			return Promise.resolve({
+				json: async () => ({
+					success: true,
+					data: { items: [{ key: 'loc-ga', name: 'Greater Accra', code: 'GA' }], skip_admin: false, has_more: true }
+				})
+			});
+		};
+		const api = loadSelector();
+		api.bindAll(document);
+		const country = document.querySelector('[name="cetech_de_matching_country"]');
+		country.value = 'GH';
+		country.dispatchEvent(new Event('change', { bubbles: true }));
+		await expect.poll(() => document.querySelector('option[value="GA"], option[value="loc-ga"]')).not.toBeNull();
+		document.querySelector('[data-cetech-de-load-more-admin]')?.click();
+		country.value = 'GB';
+		country.dispatchEvent(new Event('change', { bubbles: true }));
+		await expect.poll(() => document.querySelector('option[value="ENG"], option[value="loc-eng"]')).not.toBeNull();
+		if (resolveStale) {
+			resolveStale({
+				json: async () => ({
+					success: true,
+					data: { items: [{ key: 'adm-51', name: 'Stale 51', code: 'adm-51' }], page: 2, has_more: false }
+				})
+			});
+		}
+		await new Promise((resolve) => setTimeout(resolve, 40));
+		expect(document.querySelector('option[value="adm-51"]')).toBeNull();
+	});
 });

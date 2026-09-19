@@ -309,7 +309,8 @@ final class Geo4TechnicalCorrectionTest extends TestCase {
 			null,
 			$groups
 		);
-		self::assertContains( 22, $coverage->uncovered_zone_ids() );
+		self::assertNotContains( 22, $coverage->uncovered_zone_ids() );
+		self::assertContains( 22, $coverage->unproven_zone_ids() );
 		$warnings = $coverage->warnings();
 		self::assertNotSame( [], $warnings );
 		self::assertSame( 'canonical_coverage_overlap_unproven', $warnings[0]['code'] );

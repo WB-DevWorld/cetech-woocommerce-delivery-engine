@@ -5,11 +5,14 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Tests\Unit\Runtime;
 
 use CetechDeliveryEngine\Domain\RateCard\RateCardRepositoryInterface;
+use CetechDeliveryEngine\Tests\Support\RateCardActiveListingTrait;
 
 /**
  * In-memory rate cards for quote and overlap tests.
  */
 final class InMemoryQuoteRateCardRepository implements RateCardRepositoryInterface {
+
+	use RateCardActiveListingTrait;
 
 	/**
 	 * @param list<array<string, mixed>> $rows

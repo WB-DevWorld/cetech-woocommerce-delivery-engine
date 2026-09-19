@@ -94,7 +94,9 @@ final class CanonicalLocationResolver {
 			$allow_text_locality = false;
 		}
 		if ( $parent_for_locality instanceof CanonicalLocation && '' !== $locality_label && $allow_text_locality ) {
-			$locality = $this->exact_under_parent( $country_code, $parent_for_locality->id, $locality_label, GeographyLocationType::Locality );
+			$locality = CanonicalResolutionContext::WooCommerceDestination === $context
+				? $this->unique_exact_under( $country_code, $parent_for_locality->id, $locality_label, GeographyLocationType::Locality )
+				: $this->exact_under_parent( $country_code, $parent_for_locality->id, $locality_label, GeographyLocationType::Locality );
 		}
 
 		$chosen = $locality ?? $admin ?? $country;
@@ -108,7 +110,7 @@ final class CanonicalLocationResolver {
 	}
 
 	public function exact_named_child( string $country_code, int $parent_id, string $name, GeographyLocationType $type ): ?CanonicalLocation {
-		return $this->exact_under_parent( $country_code, $parent_id, $name, $type );
+		return $this->unique_exact_under( $country_code, $parent_id, $name, $type );
 	}
 
 	public function require_valid_key( string $canonical_key, string $country_code, ?int $expected_parent_id = null ): ?CanonicalLocation {
@@ -156,6 +158,30 @@ final class CanonicalLocationResolver {
 		$by_code = $this->locations->find_exact_child( $country_code, $parent_id, strtolower( $name ), $type );
 		if ( $by_code instanceof CanonicalLocation ) {
 			return $by_code;
+		}
+
+		return $this->aliases->find_exact( $country_code, $normalized, $parent_id );
+	}
+
+	private function unique_exact_under( string $country_code, int $parent_id, string $name, GeographyLocationType $type ): ?CanonicalLocation {
+		$by_key = $this->locations->find_by_key( $name );
+		if ( $by_key instanceof CanonicalLocation && $by_key->isActive() && $by_key->country_code === $country_code ) {
+			$parent = $this->locations->find_by_id( $parent_id );
+			if ( $parent instanceof CanonicalLocation && LocationAncestry::is_self_or_descendant( $by_key, $parent ) ) {
+				if ( $by_key->location_type === $type || ( GeographyLocationType::Administrative === $type && $by_key->isAdministrative() ) ) {
+					return $by_key;
+				}
+			}
+		}
+
+		$normalized = GeographyNameNormalizer::normalize( $name );
+		if ( '' === $normalized ) {
+			return null;
+		}
+
+		$exact = $this->locations->find_unique_exact_descendant( $country_code, $parent_id, $normalized, $type );
+		if ( $exact instanceof CanonicalLocation ) {
+			return $exact;
 		}
 
 		return $this->aliases->find_exact( $country_code, $normalized, $parent_id );

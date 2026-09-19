@@ -101,16 +101,9 @@ final class GeographyPackService {
 
 		$checksum = $this->checksum_of( $file_path );
 		$preflight = $this->preflight->validate( $file_path, $country_code );
-		if ( ! $preflight['ok'] ) {
-			$this->packs->update_progress(
-				$pack->id,
-				GeographyPackStatus::Failed,
-				'0',
-				$pack->progress,
-				$this->preflight_error_message( (string) $preflight['error'] )
-			);
-
-			return $this->packs->find_by_id( $pack->id ) ?? $pack;
+		$continued = $this->apply_preflight_result( $pack, $file_path, $preflight );
+		if ( null !== $continued ) {
+			return $continued;
 		}
 
 		$version = $this->dataset_version( $file_path, $checksum );
@@ -397,16 +390,13 @@ final class GeographyPackService {
 			return [ 'status' => GeographyPackStatus::Failed->value, 'error' => 'file_unreadable' ];
 		}
 		$preflight = $this->preflight->validate( $txt_path, $pack->country_code );
-		if ( ! $preflight['ok'] ) {
-			$this->packs->update_progress(
-				$pack->id,
-				GeographyPackStatus::Failed,
-				'0',
-				$pack->progress,
-				$this->preflight_error_message( (string) $preflight['error'] )
-			);
-
-			return [ 'status' => GeographyPackStatus::Failed->value, 'error' => (string) $preflight['error'] ];
+		$continued = $this->apply_preflight_result( $pack, $txt_path, $preflight );
+		if ( null !== $continued ) {
+			return [
+				'status' => $continued->status->value,
+				'error'  => $continued->last_error,
+				'pack_id'=> $continued->id,
+			];
 		}
 		$checksum = $this->checksum_of( $txt_path );
 		$version  = $this->dataset_version( $txt_path, $checksum );
@@ -534,6 +524,27 @@ final class GeographyPackService {
 			);
 
 			return [ 'status' => GeographyPackStatus::Failed->value, 'error' => 'file_unreadable' ];
+		}
+
+		if ( (string) ( $pack->progress['phase'] ?? '' ) === 'preflight_validation' ) {
+			$offset = (int) ( $pack->progress['preflight_offset'] ?? 0 );
+			$carry  = is_array( $pack->progress['preflight_carry'] ?? null ) ? $pack->progress['preflight_carry'] : [];
+			$preflight = $this->preflight->validate( $file_path, $pack->country_code, $offset, $carry );
+			$continued = $this->apply_preflight_result( $pack, $file_path, $preflight, $generation_token );
+			if ( null !== $continued ) {
+				return [
+					'status' => $continued->status->value,
+					'error'  => $continued->last_error,
+					'phase'  => (string) ( $continued->progress['phase'] ?? '' ),
+				];
+			}
+			$pack = $this->packs->find_by_id( $pack_id ) ?? $pack;
+			if ( '' === $pack->checksum ) {
+				$checksum = $this->checksum_of( $file_path );
+				$version  = $this->dataset_version( $file_path, $checksum );
+				$pack     = $this->importer->begin_dataset( $pack, $file_path, $checksum, $version, $generation_token );
+				$generation_token = $pack->target_token();
+			}
 		}
 
 		if ( '' !== $pack->checksum ) {
@@ -812,6 +823,53 @@ final class GeographyPackService {
 			'unreadable' => 'The geography pack file is not readable.',
 			default => 'The geography pack failed preflight validation.',
 		};
+	}
+
+	/**
+	 * @param array<string, mixed> $preflight
+	 */
+	private function apply_preflight_result( GeographyPack $pack, string $file_path, array $preflight, string $generation_token = '' ): ?GeographyPack {
+		if ( ! empty( $preflight['ok'] ) ) {
+			return null;
+		}
+		if ( GeoNamesPackPreflight::is_indeterminate( $preflight ) ) {
+			if ( '' !== $file_path ) {
+				$pack = $this->packs->save(
+					[
+						'id'               => $pack->id,
+						'source_reference' => $file_path,
+					]
+				);
+			}
+			$progress                      = $pack->progress;
+			$progress['phase']             = 'preflight_validation';
+			$progress['preflight_offset']  = (int) ( $preflight['offset'] ?? 0 );
+			$progress['preflight_carry']   = is_array( $preflight['carry'] ?? null ) ? $preflight['carry'] : [];
+			$this->packs->update_progress(
+				$pack->id,
+				GeographyPackStatus::Importing,
+				(string) $progress['preflight_offset'],
+				$progress,
+				'',
+				null,
+				$generation_token
+			);
+			$this->enqueue_tick( $pack->id, $file_path, '' !== $generation_token ? $generation_token : $pack->target_token() );
+
+			return $this->packs->find_by_id( $pack->id ) ?? $pack;
+		}
+
+		$this->packs->update_progress(
+			$pack->id,
+			GeographyPackStatus::Failed,
+			'0',
+			$pack->progress,
+			$this->preflight_error_message( (string) $preflight['error'] ),
+			null,
+			$generation_token
+		);
+
+		return $this->packs->find_by_id( $pack->id ) ?? $pack;
 	}
 
 	private function bump_revision(): void {

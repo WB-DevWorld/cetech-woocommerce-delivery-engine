@@ -37,6 +37,7 @@ use CetechDeliveryEngine\Domain\ProductRule\ProductDeliveryRuleRepositoryInterfa
 use CetechDeliveryEngine\Domain\RateCard\RateCardBulkAmountMath;
 use CetechDeliveryEngine\Domain\RateCard\RateCardBulkMutator;
 use CetechDeliveryEngine\Domain\RateCard\RateCardRepositoryInterface;
+use CetechDeliveryEngine\Tests\Support\RateCardActiveListingTrait;
 use CetechDeliveryEngine\Infrastructure\Persistence\InMemoryBulkJobRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\InMemoryScopedConfigurationRepository;
 use CetechDeliveryEngine\Presentation\Admin\BulkJobAdminCopy;
@@ -633,6 +634,8 @@ final class ArrayDeliveryOfferStore implements DeliveryOfferRepositoryInterface 
 }
 
 final class ArrayRateCardStore implements RateCardRepositoryInterface {
+
+	use RateCardActiveListingTrait;
 
 	/** @var array<int, array<string, mixed>> */
 	private array $rows = [];

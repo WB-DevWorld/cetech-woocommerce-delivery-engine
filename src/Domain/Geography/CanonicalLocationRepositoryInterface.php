@@ -26,6 +26,12 @@ interface CanonicalLocationRepositoryInterface {
 	public function find_exact_child( string $country_code, ?int $parent_id, string $normalized_name, ?GeographyLocationType $type = null, ?int $include_generation = null, string $include_token = '' ): ?CanonicalLocation;
 
 	/**
+	 * Unique exact name/ascii match of $type anywhere beneath $ancestor_id.
+	 * Null when zero or more than one Active candidate. Never fuzzy. Never first-row-wins.
+	 */
+	public function find_unique_exact_descendant( string $country_code, int $ancestor_id, string $normalized_name, ?GeographyLocationType $type = null ): ?CanonicalLocation;
+
+	/**
 	 * @return list<CanonicalLocation>
 	 */
 	public function list_children( int $parent_id, ?GeographyLocationType $type = null, int $limit = 50, int $offset = 0 ): array;

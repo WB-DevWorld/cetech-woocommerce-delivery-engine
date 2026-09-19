@@ -748,23 +748,27 @@
 			}).then(function (response) { return response.json(); });
 		}
 
-		function loadChildRoots(group, parentKey, level) {
+		function loadChildRoots(group, parentKey, level, page) {
 			var browser = group.querySelector('[data-cetech-de-admin-browser]') || group;
-			Array.prototype.forEach.call(group.querySelectorAll('[data-cetech-de-nested-root]'), function (node) {
-				if (parseInt(node.getAttribute('data-cetech-de-nested-root') || '0', 10) >= level) {
-					node.remove();
-				}
-			});
+			page = page || 1;
+			if (page <= 1) {
+				Array.prototype.forEach.call(group.querySelectorAll('[data-cetech-de-nested-root]'), function (node) {
+					if (parseInt(node.getAttribute('data-cetech-de-nested-root') || '0', 10) >= level) {
+						node.remove();
+					}
+				});
+			}
 			if (!parentKey) {
 				return;
 			}
-			var token = nextGroupToken(group, 'child-root');
+			var token = page > 1 ? currentGroupToken(group, 'child-root') : nextGroupToken(group, 'child-root');
 			var body = new window.URLSearchParams();
 			body.set('action', geo.searchAction);
 			body.set('nonce', geo.searchNonce || '');
 			body.set('op', 'children');
 			body.set('country', countryOf(group));
 			body.set('parent_key', parentKey);
+			body.set('page', String(page));
 			body.set('request_token', String(token));
 			fetchJson(body).then(function (payload) {
 				if (token !== currentGroupToken(group, 'child-root')) {
@@ -774,13 +778,20 @@
 				var items = (data && data.items ? data.items : []).filter(function (item) {
 					return !item.entire_country;
 				});
-				if (!items.length) {
+				if (!items.length && page <= 1) {
 					return;
 				}
-				var wrap = document.createElement('p');
-				wrap.setAttribute('data-cetech-de-nested-root', String(level));
-				wrap.innerHTML = '<label>Narrower area<br /><select data-cetech-de-coverage-root data-cetech-de-nested-level="' + level + '"><option value="">Entire selected area</option></select></label>';
-				var select = wrap.querySelector('select');
+				var wrap = page > 1 ? group.querySelector('[data-cetech-de-nested-root="' + level + '"]') : null;
+				var select;
+				if (!wrap) {
+					wrap = document.createElement('p');
+					wrap.setAttribute('data-cetech-de-nested-root', String(level));
+					wrap.innerHTML = '<label>Narrower area<br /><select data-cetech-de-coverage-root data-cetech-de-nested-level="' + level + '"><option value="">Entire selected area</option></select></label>';
+					select = wrap.querySelector('select');
+					browser.appendChild(wrap);
+				} else {
+					select = wrap.querySelector('select');
+				}
 				items.forEach(function (item) {
 					var option = document.createElement('option');
 					option.value = item.key || '';
@@ -789,25 +800,46 @@
 					option.setAttribute('data-has-children', item.has_children ? '1' : '0');
 					select.appendChild(option);
 				});
-				browser.appendChild(wrap);
+				var more = wrap.querySelector('[data-cetech-de-load-more-children]');
+				if (data && data.has_more) {
+					if (!more) {
+						more = document.createElement('button');
+						more.type = 'button';
+						more.className = 'button-link';
+						more.setAttribute('data-cetech-de-load-more-children', '1');
+						more.textContent = 'Load more';
+						wrap.appendChild(more);
+					}
+					more.setAttribute('data-page', String(page + 1));
+					more.setAttribute('data-parent', parentKey);
+					more.setAttribute('data-level', String(level));
+					more.hidden = false;
+				} else if (more) {
+					more.hidden = true;
+				}
 			}).catch(function () { /* keep */ });
 		}
 
-		function loadRoots(group) {
+		function loadRoots(group, page, append) {
 			var country = countryOf(group);
 			var select = group.querySelector('[data-cetech-de-coverage-root]:not([data-cetech-de-nested-level])');
 			if (!select || !geo.ajaxUrl || !country) {
 				return;
 			}
-			Array.prototype.forEach.call(group.querySelectorAll('[data-cetech-de-nested-root]'), function (node) {
-				node.remove();
-			});
-			var token = nextGroupToken(group, 'root');
+			page = page || 1;
+			if (!append) {
+				Array.prototype.forEach.call(group.querySelectorAll('[data-cetech-de-nested-root]'), function (node) {
+					node.remove();
+				});
+			}
+			var token = append ? currentGroupToken(group, 'root') : nextGroupToken(group, 'root');
+			var saved = select.getAttribute('data-cetech-de-saved-root') || select.value || '';
 			var body = new window.URLSearchParams();
 			body.set('action', geo.searchAction);
 			body.set('nonce', geo.searchNonce || '');
 			body.set('op', 'children');
 			body.set('country', country);
+			body.set('page', String(page));
 			body.set('request_token', String(token));
 			fetchJson(body).then(function (payload) {
 				if (token !== currentGroupToken(group, 'root')) {
@@ -818,9 +850,14 @@
 					applyAdminLabel(group, data.label);
 				}
 				var items = data && data.items ? data.items : [];
-				var current = select.value;
-				select.innerHTML = '<option value="">Select…</option>';
+				var current = saved || select.value;
+				if (!append) {
+					select.innerHTML = '<option value="">Select…</option>';
+				}
 				items.forEach(function (item) {
+					if (select.querySelector('option[value="' + String(item.key || '').replace(/"/g, '') + '"]')) {
+						return;
+					}
 					var option = document.createElement('option');
 					option.value = item.key || '';
 					option.textContent = item.name || '';
@@ -834,6 +871,25 @@
 				if (data && data.root && !select.value) {
 					select.value = data.root.key || '';
 					setRoot(group, data.root.id, data.root.key);
+				}
+				if (saved && !select.value && data && data.has_more) {
+					loadRoots(group, page + 1, true);
+					return;
+				}
+				var more = group.querySelector('[data-cetech-de-load-more-roots]');
+				if (data && data.has_more) {
+					if (!more) {
+						more = document.createElement('button');
+						more.type = 'button';
+						more.className = 'button-link';
+						more.setAttribute('data-cetech-de-load-more-roots', '1');
+						more.textContent = 'Load more';
+						select.parentNode.appendChild(more);
+					}
+					more.setAttribute('data-page', String(page + 1));
+					more.hidden = false;
+				} else if (more) {
+					more.hidden = true;
 				}
 				if (select.selectedOptions[0]) {
 					var chosen = select.selectedOptions[0];
@@ -903,9 +959,35 @@
 						form.appendChild(flag);
 					}
 					flag.value = '1';
+					if ('checkbox' === flag.type) {
+						flag.checked = true;
+					}
 				}
 				groupToRemove.remove();
 				reindexCoverageGroups();
+				return;
+			}
+			var moreRoots = event.target.closest('[data-cetech-de-load-more-roots]');
+			if (moreRoots) {
+				event.preventDefault();
+				var group = moreRoots.closest('.cetech-de-coverage-group');
+				if (group) {
+					loadRoots(group, parseInt(moreRoots.getAttribute('data-page') || '2', 10), true);
+				}
+				return;
+			}
+			var moreChildren = event.target.closest('[data-cetech-de-load-more-children]');
+			if (moreChildren) {
+				event.preventDefault();
+				var group = moreChildren.closest('.cetech-de-coverage-group');
+				if (group) {
+					loadChildRoots(
+						group,
+						moreChildren.getAttribute('data-parent') || '',
+						parseInt(moreChildren.getAttribute('data-level') || '2', 10),
+						parseInt(moreChildren.getAttribute('data-page') || '2', 10)
+					);
+				}
 				return;
 			}
 			var add = event.target.closest('[data-cetech-de-add-coverage-group]');

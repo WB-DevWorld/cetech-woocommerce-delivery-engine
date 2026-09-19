@@ -92,6 +92,41 @@ final class WpdbRateCardRepository extends AbstractWpdbRepository implements Rat
 		return $this->count_where( 'destination_zone_id', $destination_zone_id );
 	}
 
+	public function countActiveByDestinationZoneId( int $destination_zone_id ): int {
+		if ( $destination_zone_id <= 0 ) {
+			return 0;
+		}
+		global $wpdb;
+		$table = $this->table_name();
+		$sql   = "SELECT COUNT(*) FROM `{$table}` WHERE destination_zone_id = %d AND status = %s";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return (int) $wpdb->get_var( $wpdb->prepare( $sql, $destination_zone_id, RecordStatus::Active->value ) );
+	}
+
+	public function listActiveByDestinationZoneId( int $destination_zone_id ): array {
+		if ( $destination_zone_id <= 0 ) {
+			return [];
+		}
+		global $wpdb;
+		$table = $this->table_name();
+		$sql   = "SELECT * FROM `{$table}` WHERE destination_zone_id = %d AND status = %s ORDER BY id ASC";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $destination_zone_id, RecordStatus::Active->value ), ARRAY_A );
+
+		return is_array( $rows ) ? $rows : [];
+	}
+
+	public function countActiveByDeliveryOfferId( int $delivery_offer_id ): int {
+		if ( $delivery_offer_id <= 0 ) {
+			return 0;
+		}
+		global $wpdb;
+		$table = $this->table_name();
+		$sql   = "SELECT COUNT(*) FROM `{$table}` WHERE delivery_offer_id = %d AND status = %s";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		return (int) $wpdb->get_var( $wpdb->prepare( $sql, $delivery_offer_id, RecordStatus::Active->value ) );
+	}
+
 	public function countOrderSnapshotReferences( int $rate_card_id ): int {
 		global $wpdb;
 

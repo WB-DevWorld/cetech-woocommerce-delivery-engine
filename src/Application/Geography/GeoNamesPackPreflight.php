@@ -6,6 +6,9 @@ namespace CetechDeliveryEngine\Application\Geography;
 
 /**
  * Validates a GeoNames gazetteer file before a pack can become Ready.
+ *
+ * MAX_SCAN is a bounded inspection window, not a verdict. An indeterminate
+ * window must be continued until the file is proven VALID or INVALID.
  */
 final class GeoNamesPackPreflight {
 
@@ -19,9 +22,10 @@ final class GeoNamesPackPreflight {
 	}
 
 	/**
-	 * @return array{ok:bool,error:string,country_rows:int,relevant:int,admin:int,locality:int,scanned:int}
+	 * @param array<string, mixed> $carry
+	 * @return array{ok:bool,error:string,country_rows:int,relevant:int,admin:int,locality:int,scanned:int,status?:string,offset?:int,carry?:array<string,mixed>}
 	 */
-	public function validate( string $file_path, string $country_code ): array {
+	public function validate( string $file_path, string $country_code, int $offset = 0, array $carry = [] ): array {
 		$country_code = strtoupper( trim( $country_code ) );
 		$empty        = [
 			'ok'           => false,
@@ -31,6 +35,7 @@ final class GeoNamesPackPreflight {
 			'admin'        => 0,
 			'locality'     => 0,
 			'scanned'      => 0,
+			'offset'       => 0,
 		];
 		if ( 2 !== strlen( $country_code ) || ! is_readable( $file_path ) ) {
 			$empty['error'] = is_readable( $file_path ) ? 'country_invalid' : 'unreadable';
@@ -49,21 +54,37 @@ final class GeoNamesPackPreflight {
 			return $empty;
 		}
 
-		$scanned      = 0;
-		$tabular      = 0;
-		$corrupt      = 0;
-		$country_rows = 0;
-		$relevant     = 0;
-		$admin        = 0;
-		$locality     = 0;
-		$has_country  = false;
-		$has_adm1     = false;
-		while ( $scanned < self::MAX_SCAN ) {
+		$skipped = 0;
+		while ( $skipped < max( 0, $offset ) ) {
+			$skip_line = fgets( $handle );
+			if ( false === $skip_line ) {
+				fclose( $handle );
+				$empty['error'] = (int) ( $carry['tabular'] ?? 0 ) > 0 ? 'zero_relevant_geography' : 'empty';
+				$empty['scanned'] = $skipped;
+				$empty['offset']  = $skipped;
+
+				return $empty;
+			}
+			++$skipped;
+		}
+
+		$scanned      = $skipped;
+		$window       = 0;
+		$tabular      = (int) ( $carry['tabular'] ?? 0 );
+		$corrupt      = (int) ( $carry['corrupt'] ?? 0 );
+		$country_rows = (int) ( $carry['country_rows'] ?? 0 );
+		$relevant     = (int) ( $carry['relevant'] ?? 0 );
+		$admin        = (int) ( $carry['admin'] ?? 0 );
+		$locality     = (int) ( $carry['locality'] ?? 0 );
+		$has_country  = ! empty( $carry['has_country'] );
+		$has_adm1     = ! empty( $carry['has_adm1'] );
+		while ( $window < self::MAX_SCAN ) {
 			$line = fgets( $handle );
 			if ( false === $line ) {
 				break;
 			}
 			++$scanned;
+			++$window;
 			$trimmed = trim( $line, "\r\n" );
 			if ( '' === $trimmed || str_starts_with( $trimmed, '#' ) ) {
 				continue;
@@ -98,7 +119,7 @@ final class GeoNamesPackPreflight {
 				++$locality;
 			}
 		}
-		if ( $scanned >= self::MAX_SCAN ) {
+		if ( $window >= self::MAX_SCAN ) {
 			$more       = fgets( $handle );
 			$hit_budget = false !== $more || ! feof( $handle );
 		} else {
@@ -106,6 +127,16 @@ final class GeoNamesPackPreflight {
 		}
 		fclose( $handle );
 
+		$next_carry = [
+			'tabular'      => $tabular,
+			'corrupt'      => $corrupt,
+			'country_rows' => $country_rows,
+			'relevant'     => $relevant,
+			'admin'        => $admin,
+			'locality'     => $locality,
+			'has_country'  => $has_country,
+			'has_adm1'     => $has_adm1,
+		];
 		$out = [
 			'ok'           => false,
 			'error'        => '',
@@ -114,6 +145,8 @@ final class GeoNamesPackPreflight {
 			'admin'        => $admin,
 			'locality'     => $locality,
 			'scanned'      => $scanned,
+			'offset'       => $scanned,
+			'carry'        => $next_carry,
 		];
 
 		if ( 0 === $scanned || ( 0 === $tabular && $corrupt > 0 ) ) {
@@ -122,11 +155,6 @@ final class GeoNamesPackPreflight {
 			return $out;
 		}
 		if ( 0 === $tabular ) {
-			$out['error'] = 'corrupt';
-
-			return $out;
-		}
-		if ( $corrupt > 0 && 0 === $tabular ) {
 			$out['error'] = 'corrupt';
 
 			return $out;
@@ -172,5 +200,12 @@ final class GeoNamesPackPreflight {
 		$out['ok'] = true;
 
 		return $out;
+	}
+
+	/**
+	 * @param array<string, mixed> $result
+	 */
+	public static function is_indeterminate( array $result ): bool {
+		return ! empty( $result['ok'] ) ? false : ( 'indeterminate' === (string) ( $result['status'] ?? $result['error'] ?? '' ) );
 	}
 }

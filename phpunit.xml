@@ -17,6 +17,7 @@
         <exclude>
             <group>geo11-scale</group>
             <group>geo11-real-db</group>
+            <group>geo12-real-db</group>
         </exclude>
     </groups>
 </phpunit>

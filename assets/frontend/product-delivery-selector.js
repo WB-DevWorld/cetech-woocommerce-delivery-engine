@@ -653,11 +653,15 @@
 			return false;
 		}
 
-		function loadChildren(type, parentKey) {
+		function loadChildren(type, parentKey, page, append) {
 			if (!config.ajaxUrl || !geo.childrenAction) {
 				return;
 			}
-			var token = ++childrenToken;
+			page = page || 1;
+			var token = append ? childrenToken : ++childrenToken;
+			if (append) {
+				token = childrenToken;
+			}
 			var country = countryField();
 			var body = new window.URLSearchParams();
 			body.set('action', geo.childrenAction);
@@ -665,6 +669,7 @@
 			body.set('country', country ? country.value : '');
 			body.set('parent_key', parentKey || '');
 			body.set('type', type);
+			body.set('page', String(page));
 			body.set('request_token', String(token));
 			window.fetch(config.ajaxUrl, {
 				method: 'POST',
@@ -683,7 +688,7 @@
 				if (type !== 'administrative') {
 					return;
 				}
-				if (!items.length || data.skip_admin) {
+				if ((!items.length && !append) || data.skip_admin) {
 					setReveal(locationRoot, 'region', false);
 					setReveal(locationRoot, 'locality', true);
 					return;
@@ -701,7 +706,9 @@
 					key: region.getAttribute('data-cetech-de-saved-region-key') || '',
 					code: region.getAttribute('data-cetech-de-saved-region-code') || ''
 				};
-				region.innerHTML = '<option value="">' + escapeHtml('Select…') + '</option>';
+				if (!append) {
+					region.innerHTML = '<option value="">' + escapeHtml('Select…') + '</option>';
+				}
 				items.forEach(function (item) {
 					var option = document.createElement('option');
 					option.value = item.code || item.key || item.name || '';
@@ -712,6 +719,32 @@
 					}
 					region.appendChild(option);
 				});
+				var foundSaved = !!(saved.value || saved.key || saved.code) && !!region.selectedOptions[0] && region.selectedOptions[0].value;
+				if (!foundSaved && saved.value) {
+					foundSaved = Array.prototype.some.call(region.options, function (opt) {
+						return opt.value === saved.value || opt.getAttribute('data-location-key') === saved.key;
+					});
+				}
+				if (!foundSaved && data && data.has_more) {
+					loadChildren(type, parentKey, page + 1, true);
+					return;
+				}
+				var more = locationRoot.querySelector('[data-cetech-de-load-more-admin]');
+				if (data && data.has_more) {
+					if (!more) {
+						more = document.createElement('button');
+						more.type = 'button';
+						more.className = 'button-link';
+						more.setAttribute('data-cetech-de-load-more-admin', '1');
+						more.textContent = 'Load more';
+						region.parentNode.appendChild(more);
+					}
+					more.setAttribute('data-page', String(page + 1));
+					more.setAttribute('data-parent', parentKey || '');
+					more.hidden = false;
+				} else if (more) {
+					more.hidden = true;
+				}
 			}).catch(function () { /* keep existing options */ });
 		}
 
@@ -893,6 +926,14 @@
 		if (region) {
 			region.addEventListener('change', onRegionChange);
 		}
+		locationRoot.addEventListener('click', function (event) {
+			var more = event.target.closest('[data-cetech-de-load-more-admin]');
+			if (!more) {
+				return;
+			}
+			event.preventDefault();
+			loadChildren('administrative', more.getAttribute('data-parent') || '', parseInt(more.getAttribute('data-page') || '2', 10), true);
+		});
 		if (city) {
 			var timer = null;
 			city.addEventListener('input', function () {

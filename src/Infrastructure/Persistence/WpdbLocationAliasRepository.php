@@ -38,11 +38,14 @@ final class WpdbLocationAliasRepository implements LocationAliasRepositoryInterf
 				: '/' . $parent_id . '/';
 			$args[] = $wpdb->esc_like( $path ) . '%';
 		}
-		$sql .= ' LIMIT 1';
+		$sql .= ' LIMIT 2';
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-		$row = $wpdb->get_row( $wpdb->prepare( $sql, ...$args ), ARRAY_A );
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$args ), ARRAY_A );
+		if ( ! is_array( $rows ) || 1 !== count( $rows ) ) {
+			return null;
+		}
 
-		return is_array( $row ) ? CanonicalLocation::fromRow( $row ) : null;
+		return CanonicalLocation::fromRow( $rows[0] );
 	}
 
 	public function list_for_location( int $location_id ): array {

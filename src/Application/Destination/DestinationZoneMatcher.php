@@ -120,8 +120,16 @@ final class DestinationZoneMatcher {
 			]
 		);
 		if ( isset( $this->match_cache[ $cache_key ] ) ) {
-			return $this->match_cache[ $cache_key ];
+			$cached = $this->match_cache[ $cache_key ];
+			if ( is_array( $cached ) && array_key_exists( 'matches', $cached ) ) {
+				$this->last_diagnostics = is_array( $cached['diagnostics'] ?? null ) ? $cached['diagnostics'] : [];
+
+				return $cached['matches'];
+			}
+
+			return $cached;
 		}
+		$this->last_diagnostics = [];
 
 		$candidates            = [];
 		$unrestricted_fallback = null;
@@ -180,13 +188,19 @@ final class DestinationZoneMatcher {
 				$ordered[] = $candidate['zone'];
 			}
 
-			$this->match_cache[ $cache_key ] = $ordered;
+			$this->match_cache[ $cache_key ] = [
+				'matches'      => $ordered,
+				'diagnostics'  => $this->last_diagnostics,
+			];
 
 			return $ordered;
 		}
 
 		$result = null !== $unrestricted_fallback ? [ $unrestricted_fallback ] : [];
-		$this->match_cache[ $cache_key ] = $result;
+		$this->match_cache[ $cache_key ] = [
+			'matches'      => $result,
+			'diagnostics'  => $this->last_diagnostics,
+		];
 
 		return $result;
 	}

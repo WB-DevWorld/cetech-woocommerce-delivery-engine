@@ -268,8 +268,14 @@ final class Geo11TechnicalCorrectionTest extends TestCase {
 		$bootstrap = new WooCommerceGeographyBootstrap( $locations, $locations, $locations );
 		$migrator  = new LegacyDestinationCoverageMigrator( $zones, $rules, $groups, $locations, new CanonicalLocationResolver( $locations, $locations ) );
 		$upgrade   = new Schema6CoverageUpgradeService( $zones, $rules, $bootstrap, $migrator );
-		$result    = $upgrade->maybe_run();
-		$state     = $result['state'] ?? $upgrade->current_state();
+		$state     = [];
+		for ( $i = 0; $i < 20; ++$i ) {
+			$result = $upgrade->maybe_run();
+			$state  = is_array( $result['state'] ?? null ) ? $result['state'] : $upgrade->current_state();
+			if ( Schema6CoverageUpgradeService::STATUS_COMPLETED === (string) ( $state['status'] ?? '' ) ) {
+				break;
+			}
+		}
 		self::assertNotEmpty( $groups->list_by_zone( 501 ) );
 		self::assertSame( Schema6CoverageUpgradeService::STATUS_COMPLETED, (string) ( $state['status'] ?? '' ) );
 		unset( $ghana );

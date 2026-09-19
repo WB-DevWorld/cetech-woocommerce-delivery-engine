@@ -21,6 +21,7 @@ use CetechDeliveryEngine\Domain\LogisticsProfile\LogisticsProfileRepositoryInter
 use CetechDeliveryEngine\Domain\Pickup\PickupLocationRepositoryInterface;
 use CetechDeliveryEngine\Domain\ProductRule\ProductDeliveryRuleRepositoryInterface;
 use CetechDeliveryEngine\Domain\RateCard\RateCardRepositoryInterface;
+use CetechDeliveryEngine\Tests\Support\RateCardActiveListingTrait;
 use CetechDeliveryEngine\Domain\Supplier\OriginRepositoryInterface;
 use CetechDeliveryEngine\Domain\Supplier\SupplierRepositoryInterface;
 use CetechDeliveryEngine\Domain\Zone\DestinationRuleRepositoryInterface;
@@ -240,6 +241,7 @@ final class CompatibilityMatrixQualificationTest extends TestCase {
 	 */
 	private function cards( array $rows ): RateCardRepositoryInterface {
 		return new class( $rows ) implements RateCardRepositoryInterface {
+			use RateCardActiveListingTrait;
 			/** @param list<array<string, mixed>> $rows */
 			public function __construct( private array $rows ) {
 			}

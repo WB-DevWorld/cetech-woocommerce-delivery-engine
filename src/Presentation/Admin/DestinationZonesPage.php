@@ -111,17 +111,51 @@ final class DestinationZonesPage {
 			StoreAwareExamples::area_list_example()
 		);
 
-		$zones              = $this->zone_repository->list( [ 'limit' => 500 ] );
-		$rate_cards_by_zone = $this->active_rate_cards_by_zone();
-		$zones_without_rates = 0;
-
+		$per_page           = 50;
+		$page               = isset( $_GET['paged'] ) ? max( 1, absint( wp_unslash( (string) $_GET['paged'] ) ) ) : 1;
+		$total_zones        = $this->zone_repository->count_all();
+		$after              = 0;
+		if ( $page > 1 ) {
+			$skip = ( $page - 1 ) * $per_page;
+			$seen = 0;
+			do {
+				$walk = $this->zone_repository->page_after( $after, min( 100, $skip - $seen ) );
+				if ( [] === $walk ) {
+					break;
+				}
+				foreach ( $walk as $row ) {
+					$after = max( $after, (int) ( $row['id'] ?? 0 ) );
+					++$seen;
+					if ( $seen >= $skip ) {
+						break 2;
+					}
+				}
+			} while ( [] !== $walk );
+		}
+		$zones              = $this->zone_repository->page_after( $after, $per_page );
+		$rate_cards_by_zone = [];
 		foreach ( $zones as $zone ) {
 			$zone_id = (int) ( $zone['id'] ?? 0 );
-
-			if ( $zone_id > 0 && RecordStatus::Active->value === (string) ( $zone['status'] ?? '' ) && ! isset( $rate_cards_by_zone[ $zone_id ] ) ) {
-				++$zones_without_rates;
+			if ( $zone_id <= 0 ) {
+				continue;
+			}
+			$count = $this->rate_card_repository->countActiveByDestinationZoneId( $zone_id );
+			if ( $count > 0 ) {
+				$rate_cards_by_zone[ $zone_id ] = $count;
 			}
 		}
+		$zones_without_rates = 0;
+		$scan_after          = 0;
+		do {
+			$scan = $this->zone_repository->page_after( $scan_after, 100, [ 'status' => RecordStatus::Active->value ] );
+			foreach ( $scan as $zone ) {
+				$scan_id    = (int) ( $zone['id'] ?? 0 );
+				$scan_after = max( $scan_after, $scan_id );
+				if ( $scan_id > 0 && $this->rate_card_repository->countActiveByDestinationZoneId( $scan_id ) <= 0 ) {
+					++$zones_without_rates;
+				}
+			}
+		} while ( [] !== $scan );
 
 		$coverage   = new OverlappingDeliveryAreaCoverage(
 			$this->zone_repository,
@@ -131,14 +165,15 @@ final class DestinationZonesPage {
 			$this->coverage_groups
 		);
 		$uncovered  = $coverage->uncovered_zone_ids();
+		$unproven   = $coverage->unproven_zone_ids();
 		$overlap_warnings = $coverage->warnings();
 
 		AdminPageLayout::render_summary_stats(
 			[
 				[
 					'label' => __( 'Total delivery areas', 'cetech-woocommerce-delivery-engine' ),
-					'value' => count( $zones ),
-					'empty' => [] === $zones,
+					'value' => $total_zones,
+					'empty' => 0 === $total_zones,
 				],
 				[
 					'label' => __( 'Areas without delivery charges', 'cetech-woocommerce-delivery-engine' ),
@@ -158,6 +193,15 @@ final class DestinationZonesPage {
 			AdminPageLayout::render_warning(
 				(string) $warning['title'],
 				(string) $warning['message'],
+				__( 'Manage delivery charges', 'cetech-woocommerce-delivery-engine' ),
+				AdminPageRenderer::list_url( RateCardsPage::SLUG )
+			);
+		}
+
+		if ( [] !== $unproven || $coverage->analysis_incomplete() ) {
+			AdminPageLayout::render_warning(
+				__( 'Some delivery-area overlap could not be fully proven', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Canonical coverage fallback was not exhaustively proven for every area. Test specific addresses instead of treating those areas as uncovered.', 'cetech-woocommerce-delivery-engine' ),
 				__( 'Manage delivery charges', 'cetech-woocommerce-delivery-engine' ),
 				AdminPageRenderer::list_url( RateCardsPage::SLUG )
 			);
@@ -227,6 +271,25 @@ final class DestinationZonesPage {
 				$rows,
 				true
 			);
+
+			$total_pages = (int) max( 1, (int) ceil( $total_zones / $per_page ) );
+			if ( $total_pages > 1 && function_exists( 'paginate_links' ) ) {
+				echo '<nav class="tablenav bottom" aria-label="' . esc_attr__( 'Delivery Area list pagination', 'cetech-woocommerce-delivery-engine' ) . '">';
+				echo wp_kses_post(
+					(string) paginate_links(
+						[
+							'base'      => esc_url( add_query_arg( 'paged', '%#%', admin_url( 'admin.php?page=' . self::SLUG ) ) ),
+							'format'    => '',
+							'current'   => $page,
+							'total'     => $total_pages,
+							'type'      => 'plain',
+							'prev_text' => '&laquo;',
+							'next_text' => '&raquo;',
+						]
+					)
+				);
+				echo '</nav>';
+			}
 
 			AdminPageLayout::close_section();
 		}
@@ -501,7 +564,7 @@ final class DestinationZonesPage {
 					sprintf(
 						/* translators: 1: country, 2: region, 3: city */
 						__( 'Previous legacy scope: %1$s > %2$s > %3$s. Mapping this to the entire selected area is broader coverage.', 'cetech-woocommerce-delivery-engine' ),
-						(string) ( $group->legacy_migration['countries'][0] ?? 'GH' ),
+						(string) ( $group->legacy_migration['countries'][0] ?? ( $root?->country_code ?: __( 'unknown country', 'cetech-woocommerce-delivery-engine' ) ) ),
 						$region,
 						$legacy_city
 					)

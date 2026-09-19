@@ -38,6 +38,23 @@ interface RateCardRepositoryInterface {
 
 	public function countByDestinationZoneId( int $destination_zone_id ): int;
 
+	/**
+	 * Complete Active rate-card count for one Delivery Area. Not clamped by list().
+	 */
+	public function countActiveByDestinationZoneId( int $destination_zone_id ): int;
+
+	/**
+	 * Complete Active rate cards for one Delivery Area. Not clamped by list().
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	public function listActiveByDestinationZoneId( int $destination_zone_id ): array;
+
+	/**
+	 * Complete Active rate-card count for one Delivery Option. Not clamped by list().
+	 */
+	public function countActiveByDeliveryOfferId( int $delivery_offer_id ): int;
+
 	public function countByLogisticsProfileId( int $logistics_profile_id ): int;
 
 	public function countOrderSnapshotReferences( int $rate_card_id ): int;
