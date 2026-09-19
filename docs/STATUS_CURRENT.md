@@ -1,10 +1,11 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-18 (issue #23 geo.11 technical-correction candidate on `feat/canonical-geography-coverage`).
+Last reconciled: 2026-09-19 (PR #25 product-control-plane published on protected master; geography branch synchronized; geo.12 is the only active runtime stream).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
 - Default/canonical development branch: protected `master`
+- Current protected `master`: `6ee4cef088f0bda2633d4b8e37abf3e37634426b`
 - Repository visibility: public during GitHub Free branch/ruleset protection use.
 - Composer license declaration remains `proprietary`; public visibility is not an open-source license grant.
 
@@ -75,6 +76,14 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - New work should branch from the latest protected `master`, which may advance beyond the release source through later docs-only or owner-authorized work.
 - Release source and current development head are deliberately allowed to differ after release closeout; never move the release tag to follow later master commits.
 
+## Owner-accepted product truth
+- `PRODUCT-TRUTH-BASELINE-1` was accepted by the owner on 2026-09-19 with all six decisions resolved in `docs/product/DECISION-CONFLICT-REGISTER.md`.
+- The approved 372-Requirement registry and companion artifacts live under `docs/product/`; `docs/AUTHORITY.md` defines which artifact governs each class of truth.
+- Stable 1.0 scope is frozen as `STABLE-1.0-SCOPE-1`. This product baseline is not a claim that missing capabilities are implemented or that Stable 1.0 has shipped.
+- Product-control-plane publication PR #25 is merged to protected master `6ee4cef088f0bda2633d4b8e37abf3e37634426b`.
+- The realignment plan is approved, but geo.12 on issue #23 / Draft PR #24 remains the only currently authorized runtime implementation stream.
+- After geo.12 technical closure and physical owner QA, the next release action is a controlled CETECH production Pilot/release candidate. No RC.12 name, package, tag, or deployment is created or authorized by this documentation publication.
+
 ## Completed forensic / release-control work
 - 2026-09-15 local Git/source recovery (issue #2 / PR #9).
 - 2026-09-16 Desktop artifact reconciliation (PR #14): all relevant desktop artifacts accounted for.
@@ -82,10 +91,12 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - 2026-09-16 RC.10 promotion completed and tagged.
 - 2026-09-16 issue #18 owner acceptance, integration and post-merge CI completed.
 - 2026-09-16 RC.11 promotion, final package qualification, annotated tag and closeout completed.
+- 2026-09-19 product-control-plane publication PR #25 merged to protected master.
 
 ## Active post-RC.11 implementation stream
 - Issue `#23` / draft PR `#24` / branch `feat/canonical-geography-coverage`.
-- Identity: `1.0.0-dev.geo.11`; target schema: `6`.
+- Frozen technical-stabilization candidate: `1.0.0-dev.geo.11` / `daef41a85662e1c1dc0aa6f5673ca9749f163a26`; schema `6`.
+- Authorized next identity: `1.0.0-dev.geo.12`; target schema remains `6`.
 - Rejected technical-review candidate: `1.0.0-dev.geo.1` / `606730e2535896cb18e415b14d62bbb57d050578` — do not send to physical QA.
 - Rejected technical-review candidate: `1.0.0-dev.geo.2` / `a52e2aafc97274b74ec14f8b451395b73c9541af` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.2.zip`, SHA-256 `6bde464b249ee6f17831e00d39110c8b10f89f441db3e1b453622a5d95f6b4a5`. Do not physically QA geo.2.
 - Rejected technical-review candidate: `1.0.0-dev.geo.3` / `fdff226cbe6837a3ac508bc6677c8e56771ec229` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.3.zip`, SHA-256 `1c1af4dcfbc6767402b6e7dfacde9a87270ac5ccb8a950788e130c9d130b49b8`. Do not physically QA geo.3.
@@ -96,16 +107,18 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - Rejected technical-review candidate: `1.0.0-dev.geo.8` / `92cdeae1d1f9916bf38253772ec30240f3e4798b` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.8.zip`, SHA-256 `55e3c61297b4b1ab0ad06a3efa3c899c60fdf80f8d0fbd6bec8be5e5342d798f`. Do not physically QA geo.8.
 - Rejected technical-review candidate: `1.0.0-dev.geo.9` / `09df7d2337e271792f76290b062c7acba598d80a` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.9.zip`, SHA-256 `8ac4067ff8a9b5f1eb6bb1b8ad8224a168517160665804b0aa6b577a17029a47`. Do not physically QA geo.9.
 - Rejected technical-review candidate: `1.0.0-dev.geo.10` / `66be34b684c11c165617359b828ccf852fba2635` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.10.zip`, SHA-256 `494546cf021909b30a8f0519c816069af72c41b064cbe28b05a31409355f7f47`. Do not physically QA geo.10.
+- Rejected whole-branch closure-review candidate: `1.0.0-dev.geo.11` / `daef41a85662e1c1dc0aa6f5673ca9749f163a26` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.11.zip`, SHA-256 `5ba3eb3a6b10eba60e36735085071b628d1dc030e85f4e79f67e5753c9331400`. Do not physically QA geo.11.
 - RC.11 remains the immutable tagged release candidate. This stream is not RC.12 and must not be packaged as `1.0.0-rc.11`.
 - Architecture: `docs/POST-RC11-CANONICAL-GEOGRAPHY-COVERAGE.md`.
 - Historical qualification PR `#12` / `1.0.0-dev.qual.1` is provenance only.
 
 ## Remaining separate work
-1. Owner independent review then physical QA of issue #23 (`1.0.0-dev.geo.11` / schema `6`) before any merge.
-2. Production rollout/pilot only if separately and explicitly owner-authorized.
-3. WPML/WCML overlay decision and licensed-dependency certification if included later.
-4. WP Rocket certification when a legitimate package is available.
-5. Any further product/runtime work only under a new explicitly authorized task. Do not infer RC.12 or Stage 15.
+1. Finish the finite geo.12 closure instructions and physical owner QA on PR #24 without mixing in broader realignment work.
+2. Create the controlled CETECH production Pilot/release candidate after that gate; deployment remains a separate action.
+3. Certify the Stable 1.0 launch floor: WooCommerce/HPOS, Classic, Blocks, Storefront, current supported WoodMart, B2BKing, and FOX/WOOCS.
+4. Certify WPML/WCML before Stable 1.0 only if it will be advertised as supported at launch; keep other optional targets explicitly uncertified until evidence exists.
+5. Execute later approved realignment waves only after their predecessor gates and without a second concurrent runtime stream.
+6. Do not infer RC.12 or Stage 15.
 
 ## Deferred / not started
 - Stage 15 is NOT STARTED.
