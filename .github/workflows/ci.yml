@@ -96,5 +96,10 @@ jobs:
         with:
           php-version: '8.1'
           coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Verify team control plane
         run: php scripts/verify-control-plane.php
+      - name: Verify product control plane
+        run: node scripts/verify-product-control-plane.mjs --self-test
