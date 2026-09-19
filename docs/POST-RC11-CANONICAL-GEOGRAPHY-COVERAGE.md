@@ -36,7 +36,7 @@ Rejected technical-review candidate: `1.0.0-dev.geo.12` (`41861d261fe9c6ca4dead7
 
 Rejected technical-review candidate: `1.0.0-dev.geo.13` (`31147df82a819416f15a2729ed87647c6ef80f9e`). Frozen package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.13.zip` SHA-256 `c15c44c31ffee4c1baeb1ea6fdeac4fd1255a3ba86cca223ad793fe5c445797a`. Do not physically QA geo.13 or reuse its package identity.
 
-Current technical-correction candidate identity: `1.0.0-dev.geo.14`
+Current technical-correction candidate identity: `1.0.0-dev.geo.14` (`ea53d0486593199898269479be624de262127692`). Package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.14.zip` SHA-256 `cc3f320e8f9856c08d0e5c50ee05f41363db8a8ba79135bde23befdeaa212cc7`. Do not physically QA until independent geo.13→geo.14 CAS differential review.
 
 geo.11 technical corrections (PR #24 comment `5730679997` / issue #23 A–O): nested hierarchy ownership via `prepared_hierarchy_root_id`; complete keyset iteration for zones/matcher/admin children; atomic schema-6 lease; inactive canonical members excluded from live authority; stale-response request tokens; truthful postcode relevance; unique geography cache revision; schema-6 verify of current columns; preflight MAX_SCAN is indeterminate rather than false invalidity.
 
