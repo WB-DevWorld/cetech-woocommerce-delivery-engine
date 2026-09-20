@@ -346,6 +346,7 @@ final class Plugin {
 			10,
 			3
 		);
+		$this->container->get( GeographyPackService::class )->register_liveness();
 		add_action(
 			Schema6CoverageUpgradeService::HOOK,
 			function (): void {

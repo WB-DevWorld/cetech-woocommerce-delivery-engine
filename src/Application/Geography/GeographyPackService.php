@@ -24,7 +24,11 @@ final class GeographyPackService {
 
 	public const DOWNLOAD_HOOK = 'cetech_de_geography_pack_download';
 
+	public const LIVENESS_HOOK = 'cetech_de_geography_pack_liveness';
+
 	public const GROUP = 'cetech-delivery-engine-geography';
+
+	public const LIVENESS_GROUP = 'cetech-delivery-engine-geography-liveness';
 
 	public const REVISION_OPTION = 'cetech_de_geography_revision';
 
@@ -483,6 +487,9 @@ final class GeographyPackService {
 			if ( ! $pack instanceof GeographyPack ) {
 				return [ 'status' => 'missing' ];
 			}
+			if ( GeographyPackStatus::Ready === $pack->status || GeographyPackStatus::Failed === $pack->status ) {
+				return [ 'status' => $pack->status->value, 'reason' => 'terminal' ];
+			}
 			if ( '' === $generation_token ) {
 				$generation_token = $pack->target_token();
 			}
@@ -641,6 +648,164 @@ final class GeographyPackService {
 		return self::GROUP . '-' . $pack_id;
 	}
 
+	/**
+	 * Register bounded import liveness: recover an importing pack that has
+	 * no pending and no in-progress continuation without resetting cursor,
+	 * checksum, source, or generation token.
+	 */
+	public function register_liveness(): void {
+		add_action( self::LIVENESS_HOOK, [ $this, 'ensure_import_liveness' ] );
+		add_action( 'action_scheduler_init', [ $this, 'kick_liveness_if_needed' ] );
+		add_action( 'action_scheduler_after_execute', [ $this, 'on_scheduler_after_execute' ], 20, 3 );
+		add_action( 'action_scheduler_failed_execution', [ $this, 'on_scheduler_failed_execution' ], 20, 3 );
+	}
+
+	public function kick_liveness_if_needed(): void {
+		if ( ! $this->has_unfinished_pack() ) {
+			return;
+		}
+		$this->schedule_liveness_check();
+	}
+
+	/**
+	 * @param mixed $action_id
+	 * @param mixed $action
+	 * @param mixed $context
+	 */
+	public function on_scheduler_after_execute( $action_id, $action = null, $context = null ): void {
+		unset( $action_id, $context );
+		$this->ensure_if_geography_action( $action );
+	}
+
+	/**
+	 * @param mixed $action_id
+	 * @param mixed $error
+	 * @param mixed $context
+	 */
+	public function on_scheduler_failed_execution( $action_id, $error = null, $context = null ): void {
+		unset( $error, $context );
+		$action = null;
+		if ( is_int( $action_id ) || is_numeric( $action_id ) ) {
+			$action = $this->fetch_scheduler_action( (int) $action_id );
+		}
+		$this->ensure_if_geography_action( $action );
+	}
+
+	/**
+	 * Re-arm at most one continuation for each importing/pending pack that
+	 * has no live worker and no pending successor. Never resets cursor,
+	 * checksum, source file, or generation token.
+	 */
+	public function ensure_import_liveness(): void {
+		$unfinished = false;
+		foreach ( $this->packs->list_all() as $pack ) {
+			if ( GeographyPackStatus::Importing !== $pack->status && GeographyPackStatus::Pending !== $pack->status ) {
+				continue;
+			}
+			$unfinished = true;
+			$this->rearm_pack_if_orphaned( $pack );
+		}
+		if ( $unfinished ) {
+			$this->schedule_liveness_check();
+		}
+	}
+
+	private function rearm_pack_if_orphaned( GeographyPack $pack ): void {
+		if ( $this->lease_is_held( $pack->id ) ) {
+			return;
+		}
+		$group = $this->pack_action_group( $pack->id );
+		if ( ActionSchedulerReadiness::has_active_continuation( self::HOOK, $group ) ) {
+			return;
+		}
+		if ( ActionSchedulerReadiness::has_active_continuation( self::DOWNLOAD_HOOK, $group ) ) {
+			return;
+		}
+		$source = (string) $pack->source_reference;
+		if ( GeographyPackStatus::Importing === $pack->status ) {
+			if ( '' === $source || ! is_readable( $source ) ) {
+				return;
+			}
+			$this->enqueue_tick( $pack->id, $source, $pack->target_token() );
+
+			return;
+		}
+		if ( '' !== $source && is_readable( $source ) ) {
+			$this->enqueue_tick( $pack->id, $source, $pack->target_token() );
+
+			return;
+		}
+		$country = strtoupper( $pack->country_code );
+		$token   = $pack->target_token();
+		if ( 2 === strlen( $country ) && '' !== $token ) {
+			$this->enqueue_download( $pack->id, $country, $token );
+		}
+	}
+
+	private function schedule_liveness_check(): void {
+		ActionSchedulerReadiness::enqueue_unique_async( self::LIVENESS_HOOK, [], self::LIVENESS_GROUP );
+	}
+
+	private function has_unfinished_pack(): bool {
+		foreach ( $this->packs->list_all() as $pack ) {
+			if ( GeographyPackStatus::Importing === $pack->status || GeographyPackStatus::Pending === $pack->status ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	private function lease_is_held( int $pack_id ): bool {
+		$lease = $this->packs->current_lease( $pack_id );
+		if ( '' === (string) ( $lease['owner'] ?? '' ) ) {
+			return false;
+		}
+
+		return (int) ( $lease['expires_at'] ?? 0 ) > time();
+	}
+
+	/**
+	 * @param mixed $action
+	 */
+	private function ensure_if_geography_action( $action ): void {
+		$hook = '';
+		if ( is_object( $action ) && method_exists( $action, 'get_hook' ) ) {
+			$hook = (string) $action->get_hook();
+		}
+		if ( '' !== $hook && ! in_array( $hook, [ self::HOOK, self::DOWNLOAD_HOOK, self::LIVENESS_HOOK ], true ) ) {
+			return;
+		}
+		if ( '' === $hook ) {
+			return;
+		}
+		$this->ensure_import_liveness();
+	}
+
+	/**
+	 * @return object|null
+	 */
+	private function fetch_scheduler_action( int $action_id ) {
+		if ( $action_id <= 0 || ! class_exists( \ActionScheduler::class, false ) || ! is_callable( [ \ActionScheduler::class, 'store' ] ) ) {
+			return null;
+		}
+		try {
+			$store = \ActionScheduler::store();
+		} catch ( \Throwable ) {
+			return null;
+		}
+		if ( ! is_object( $store ) || ! method_exists( $store, 'fetch_action' ) ) {
+			return null;
+		}
+		try {
+			$fetched = $store->fetch_action( $action_id );
+		} catch ( \Throwable ) {
+			return null;
+		}
+
+		return is_object( $fetched ) ? $fetched : null;
+	}
+
 	private function is_stale_token( GeographyPack $pack, string $generation_token ): bool {
 		$expected = $pack->target_token();
 		if ( '' === $expected ) {
@@ -671,10 +836,16 @@ final class GeographyPackService {
 	}
 
 	private function store_generation_file( string $country_code, string $generation_token, string $checksum, string $source_path ): string {
-		$dir = $this->storage_dir();
 		$seg = $this->safe_token_segment( $generation_token );
-		if ( '' === $dir || ! is_readable( $source_path ) || '' === $seg ) {
+		if ( ! is_readable( $source_path ) || '' === $seg ) {
 			return '';
+		}
+		$dir = $this->storage_dir();
+		if ( '' === $dir ) {
+			// Unit tests and other non-WordPress runtimes have no uploads
+			// directory. Keep the provided readable file as the generation
+			// source. Failed packs must not auto-resume via tick().
+			return $source_path;
 		}
 		$dest = $dir . '/' . strtoupper( $country_code ) . '.' . $seg . '.' . substr( $checksum, 0, 12 ) . '.txt';
 		if ( $dest === $source_path ) {

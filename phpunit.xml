@@ -21,6 +21,7 @@
             <group>geo13-real-db</group>
             <group>geo14-real-db</group>
             <group>geo15-real-db</group>
+            <group>geo-live-real-db</group>
         </exclude>
     </groups>
 </phpunit>

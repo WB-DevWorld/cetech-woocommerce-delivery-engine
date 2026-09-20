@@ -170,11 +170,15 @@ final class GeoNamesPackImporterTest extends TestCase {
 		$pack = $service->install( 'GH', $file1 );
 		$pack = $packs->find_by_id( $pack->id );
 		self::assertNotNull( $pack );
-		while ( GeographyPackStatus::Ready !== $pack->status ) {
-			$service->tick( $pack->id, $file1, 20 );
+		$guard = 0;
+		while ( GeographyPackStatus::Ready !== $pack->status && $guard < 40 ) {
+			$result = $service->tick( $pack->id, $file1, 20 );
+			self::assertNotSame( GeographyPackStatus::Failed->value, (string) ( $result['status'] ?? '' ) );
 			$pack = $packs->find_by_id( $pack->id );
 			self::assertNotNull( $pack );
+			++$guard;
 		}
+		self::assertSame( GeographyPackStatus::Ready, $pack->status );
 		$old_cursor = $pack->import_cursor;
 		self::assertNotSame( '', $pack->checksum );
 		self::assertNotSame( '', $pack->dataset_version );
