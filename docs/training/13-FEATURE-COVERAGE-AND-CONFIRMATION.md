@@ -1,7 +1,7 @@
 # Feature coverage and confirmation
 
 **Audience:** Trainers and administrators  
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.9** (schema **5**). Includes Cart/Checkout Blocks, overlapping Delivery Area pricing, and constrained fallback. Tagged **1.0.0-rc.8** remains unchanged.  
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.12** (schema **6**). Canonical geography, Coverage Groups, Location Packs, Cart/Checkout Blocks, overlapping Delivery Area pricing, constrained fallback. Tagged **1.0.0-rc.11** remains unchanged.  
 **Everyday home:** WordPress admin → **Delivery Engine → Overview**
 
 Every implemented staff-facing feature is either **trained** (staff can do the work from a written guide) or **confirmed** (a trainer or administrator ticks a live pass/fail check). Reading this page is not training. Use the linked guides, then tick the checks on the live site.
@@ -9,6 +9,20 @@ Every implemented staff-facing feature is either **trained** (staff can do the w
 Do **not** train or confirm visionary features listed under [Not this release](#not-this-release). Do not invent free shipping. Do not complete paid orders unless an administrator authorised a test purchase.
 
 QA products: simple **#39705**; variable **#39717** / A **#39718** / B **#39719**. Read-only orders: **#39721**, **#39724**.
+
+---
+
+## Certification buckets (do not overclaim)
+
+| Bucket | Meaning | RC.12 examples |
+|--------|---------|----------------|
+| **IMPLEMENTED / QUALIFIED** | In this plugin version and trained/qualified on the evidence named | Canonical geography runtime; schema 6; training-site RC.12 qualification PASS; Classic checkout path used in training |
+| **IMPLEMENTED / NOT YET BROADLY CERTIFIED** | Code exists; do not claim store-wide Stable-1.0 certification | WoodMart + B2BKing coexistence on training (useful evidence, not broader certification) |
+| **NOT INSTALLED IN TRAINING ENVIRONMENT** | Do not teach as proven on training.cetechbpa.com | FOX/WOOCS |
+| **SEPARATE CERTIFICATION STREAM** | Out of this training realignment | WPML/WCML |
+| **DEFERRED** | Not this release / not started | Stage 15; RC.13; Pilot; production; carrier APIs; customer timeline |
+
+WP Rocket remains **not formally certified** despite being present on training. Core delivery does not depend on WoodMart.
 
 ---
 
@@ -34,12 +48,15 @@ Tick on the live training site. Keep one copy per trainee (or per site smoke).
 | # | Feature | Train in | Confirm on live | Pass |
 |---|---------|----------|-----------------|------|
 | A1 | Overview is the everyday home | [00](00-START-HERE.md), [05](05-STAFF-TRAINING-MANUAL.md) M1 | Open **Delivery Engine → Overview**. Name readiness, defaults, Needs Attention. | ☐ |
-| A2 | Everyday menu (no hunting old names) | [00](00-START-HERE.md), [05](05-STAFF-TRAINING-MANUAL.md) M2 | Point to Overview, Site-wide Defaults, Options, Areas, Charges, Pickup Locations, Product Exceptions, Needs Attention, Settings. | ☐ |
+| A2 | Everyday menu (no hunting old names) | [00](00-START-HERE.md), [05](05-STAFF-TRAINING-MANUAL.md) M2 | Point to Overview, Site-wide Defaults, Options, Areas, **Location Packs**, Charges, Pickup Locations, Product Exceptions, Needs Attention, Settings. | ☐ |
+| A2b | Location Pack is not a price | [14](14-LOCATION-PACKS-AND-GEOGRAPHY.md), [01](01-QUICK-START.md) | Open **Location Packs**. Explain **ready**. State that GH₵30 lives on Delivery Charges. | ☐ |
+| A2c | Coverage Group modes | [15](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md) | Name **Entire selected area**, **Selected locations**, **Entire selected area except…**. Teaching example: Accra, Tema, Madina, Adenta. | ☐ |
+| A2d | Review required + reconciliation | [15](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md#review-required) | Explain data was not destroyed. Point to **Run safe legacy reconciliation**. Do not propose delete/recreate. | ☐ |
 | A3 | Site-wide Defaults per fulfilment type | [02](02-COMPLETE-ADMIN-GUIDE.md), [05](05-STAFF-TRAINING-MANUAL.md) M6 | Open Site-wide Defaults. Name In Warehouse, In Store, International, and the primary default. | ☐ |
 | A4 | Field-by-field inheritance | [01](01-QUICK-START.md), [05](05-STAFF-TRAINING-MANUAL.md) M3 | On **#39705**, show **Currently using** Site-wide Default. Explain that changing Estimated delivery does not freeze Delivery Options. | ☐ |
 | A5 | Delivery Options (public names) | [12](12-SETUP-CONFIGURE-AND-TEST.md) §2 | Open Delivery Options. Name one public option customers would see. | ☐ |
-| A6 | Delivery Areas + region name and short code | [12](12-SETUP-CONFIGURE-AND-TEST.md) §4 | **Test an address** with `Greater Accra` **and** `AA` (or the store’s equivalent). Both name the same area. | ☐ |
-| A7 | Test an address Primary match / Also matches | [12](12-SETUP-CONFIGURE-AND-TEST.md) §4, playbook 31 | For Accra city (or the store’s city-in-region pair): **Primary match** is the more-specific area; **Also matches** lists the broader area. Country is chosen by name (Ghana), not typed as `GH`. | ☐ |
+| A6 | Delivery Areas + Coverage + Test an address | [12](12-SETUP-CONFIGURE-AND-TEST.md) §4, [15](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md) | **Test an address** for Accra. Read Primary match / Also matches. Explain priority (lower number first). | ☐ |
+| A7 | Test an address Primary match / Also matches | [12](12-SETUP-CONFIGURE-AND-TEST.md) §4, playbook 31, 46 | For Accra: **Primary match** follows **priority** (lower number first) then specificity; **Also matches** lists other covering areas. Country is chosen by name (Ghana), not typed as `GH`. | ☐ |
 | A7b | Constrained vs global fallback | [12](12-SETUP-CONFIGURE-AND-TEST.md) §4 | Greater Accra Fallback with Ghana + Greater Accra rules does **not** match United States / New York. A ruleless Fallback can catch leftover addresses. No match stays unmatched. | ☐ |
 | A8 | Delivery Charges + Check a delivery price | [12](12-SETUP-CONFIGURE-AND-TEST.md) §5 | **Check a delivery price** for a known option + area shows the configured fee, not a silent 0. | ☐ |
 | A9 | Pickup Locations (if pickup is offered) | [12](12-SETUP-CONFIGURE-AND-TEST.md) §6 | At least one active Pickup Location exists when Store pickup is offered. | ☐ |
@@ -138,7 +155,7 @@ Train staff that these are **not** available. Do not demonstrate them as working
 | WPML / WCML / WCFM / VitePOS adapters | Optional integrations show detection only. Core delivery does not depend on them. |
 | WoodMart as a required integration | Core must work without WoodMart. Do not edit the WoodMart parent theme. |
 | Stage 15 / per-item locations / Return-Refund as a Delivery Engine money workflow | Not this release. WooCommerce remains the owner of payments and refunds. |
-| Stage 15 / later RC identities | Not this release. Protected published baseline is **1.0.0-rc.9**. Do not retag RC.8 or earlier. |
+| Stage 15 / later RC identities | Not this release. Protected published baseline is **1.0.0-rc.12**. Do not retag RC.12 or earlier. No Pilot, no production, no RC.13. |
 
 ---
 
@@ -146,10 +163,10 @@ Train staff that these are **not** available. Do not demonstrate them as working
 
 | Role | Must pass |
 |------|-----------|
-| Everyday catalog / order staff | A1–A15, C1–C3, C16–C17. C4 or C5 for the checkout type this store uses. |
+| Everyday catalog / order staff | A1–A15, C1–C3, C16–C17. C4 or C5 for the checkout type this store uses. Geography: packs are not prices; escalate Review required. |
 | Checkout / storefront staff | Everyday set plus C4–C15 for every path the store actually uses (Classic, Blocks, pickup, International, overlapping areas). Mark unused paths N/A. |
 | Shipment staff | Everyday set plus D1–D11 (or N/A if Shipments is off). |
-| Administrator | All of the above that the store uses, plus B1–B11. Bulk Tools E1–E7 if that person will run bulk jobs. |
+| Administrator | All of the above that the store uses, plus B1–B11, A2b–A2d. Bulk Tools E1–E7 if that person will run bulk jobs. |
 
 A trainee **fails** the course if they invent $0 shipping, change Settings without authorisation, rewrite a paid order’s delivery details, or propose PHP/SQL/SSH as a first check.
 
@@ -160,5 +177,7 @@ A trainee **fails** the course if they invent $0 shipping, change Settings witho
 - [00 — Start here](00-START-HERE.md)  
 - [06 — Trainer Guide](06-TRAINER-GUIDE.md)  
 - [03 — Use-Case Playbook](03-USE-CASE-PLAYBOOK.md)  
-- [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md)  
+- [12 — Setup, configure, and test](12-SETUP-CONFIGURE-AND-TEST.md)  
 - [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md)  
+- [14 — Location Packs](14-LOCATION-PACKS-AND-GEOGRAPHY.md)  
+- [15 — Delivery Areas and Coverage Groups](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md)

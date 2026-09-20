@@ -1,19 +1,22 @@
 # Use-Case Playbook
 
 **Audience:** Experienced staff and administrators  
-**Version:** 1.0.0-rc.9 (schema 5)  
+**Version:** 1.0.0-rc.12 (schema 6)  
 **QA fixtures:** #39705 (simple), #39717 (parent), #39718 (A), #39719 (B)  
-**Everyday system:** Site-wide Defaults + Product Exceptions. When shipment records are on, also **Delivery Engine → Shipments**.
+**Everyday system:** Location Packs + Delivery Areas/Coverage Groups + Delivery Charges + Site-wide Defaults + Product Exceptions. When shipment records are on, also **Delivery Engine → Shipments**.
 
 Each use case includes: Goal, When, Starting point, Steps, What you should see, Customer impact, Order impact, Common mistake, Verify success.
 
 Screenshots are deferred. Follow the live screens.
 
+**Geography (RC.12):** Use cases **43–54**. Full how-to: [14](14-LOCATION-PACKS-AND-GEOGRAPHY.md), [15](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md), [12](12-SETUP-CONFIGURE-AND-TEST.md).  
 **Shipments:** Use cases 20–30. Full how-to: [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md).  
 **Checkout, overlapping areas, mixed carts:** Use cases 31–40.  
 **Bulk Tools (administrators):** Use cases 41–42.  
 **Tick every feature:** [13 — Feature coverage and confirmation](13-FEATURE-COVERAGE-AND-CONFIRMATION.md).  
 Old menu names from older guides: [Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md).
+
+Teaching example: Ghana pack → Greater Accra Selected Cities → Selected locations Accra, Tema, Madina, Adenta → Standard Delivery → GH₵30.
 
 ---
 
@@ -530,4 +533,131 @@ Old menu names from older guides: [Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.m
 **What you should see:** A report, then (if authorised) a reversible charge job.  
 **Common mistake:** Importing a configuration package onto production without a window.  
 **Verify:** After rollback, the QA charge is the previous amount.
+
+---
+
+## USE CASE 43 — One price for 20 cities (or four in the teaching example)
+
+**Goal:** Charge Standard Delivery **GH₵30** in Accra, Tema, Madina, and Adenta without four Delivery Areas.  
+**When:** Several cities share one treatment.  
+**Starting point:** Ghana Location Pack **ready**. **Delivery Areas**.  
+**Steps:** One area **Greater Accra Selected Cities** → Coverage **Selected locations** → include those cities → one Delivery Charge GH₵30.  
+**What you should see:** **Test an address** for Accra, Tema, Madina, Adenta all Primary-match this area.  
+**Customer impact:** Same option and fee in those cities.  
+**Common mistake:** Creating one Delivery Area per city.  
+**Verify:** Product page locality Accra shows GH₵30.
+
+---
+
+## USE CASE 44 — Whole region
+
+**Goal:** Serve all of Greater Accra.  
+**Steps:** Coverage **Entire selected area** with root Greater Accra.  
+**What you should see:** Towns inside Greater Accra match. Kumasi (Ashanti) does not.  
+**Common mistake:** Using Selected locations and then forgetting towns.  
+**Verify:** Test an address for a Greater Accra town you did not list by name.
+
+---
+
+## USE CASE 45 — Whole region except remote places
+
+**Goal:** All Greater Accra except Ada Foah and Prampram.  
+**Steps:** Coverage **Entire selected area except…** → **Excluded locations** Ada Foah, Prampram.  
+**What you should see:** Accra matches this group; excluded towns do not match **this** group.  
+**Common mistake:** Thinking exclusion bans the town from every other Delivery Area.  
+**Verify:** **Also matches** / a remote-area service may still cover the excluded town.
+
+---
+
+## USE CASE 46 — Special Accra area overriding broader Greater Accra
+
+**Goal:** Accra special service is considered before Greater Accra general.  
+**Steps:** Accra area **Priority 8**; Greater Accra general **Priority 25**. Both can match Accra.  
+**What you should see:** **Test an address** Accra → Primary match is the special service. Greater Accra may appear under **Also matches**.  
+**Common mistake:** Assuming smallest area always wins without setting priority.  
+**Verify:** Lower number is checked first.
+
+---
+
+## USE CASE 47 — Country-wide fallback
+
+**Goal:** Catch leftover Ghana addresses only after specific areas fail.  
+**Steps:** A Delivery Area with Ghana **Entire selected area** (or true empty-geography fallback if leftover **everywhere** is intended). Higher priority number than city/region areas.  
+**What you should see:** Accra still Primary-matches the specific area. An unmatched town in Ghana can use the fallback if configured. United States does not match a Ghana-constrained fallback.  
+**Common mistake:** Empty-geography global fallback accidentally matching every country.  
+**Verify:** Test Ghana leftover vs United States / New York.
+
+---
+
+## USE CASE 48 — Postcode-specific delivery
+
+**Goal:** Restrict a Coverage Group with postcodes.  
+**Steps:** In the group, **Postcode constraints** → value + **Exact** or **Prefix**. Multiple values are OR. Leave empty for no restriction.  
+**What you should see:** Matching postcode qualifies; others in the same city may not. Customer postcode field appears only when relevant.  
+**Common mistake:** Treating a hidden postcode field as a defect.  
+**Verify:** Test an address with and without the postcode.
+
+---
+
+## USE CASE 49 — No Location Pack yet
+
+**Goal:** Understand Country/Region without locality search.  
+**When:** New store or training immediately after RC.12 upgrade.  
+**Starting point:** Location Packs list empty.  
+**Steps:** Open a QA product. Select Ghana. Regions still appear from WooCommerce. Search a locality.  
+**What you should see:** No pack-backed locality results. Country-wide delivery can still work. This is **not** a plugin crash.  
+**Common mistake:** Deleting Delivery Areas or escalating as a fatal error.  
+**Verify:** After installing Ghana pack to **ready**, locality search returns places.
+
+---
+
+## USE CASE 50 — Migrated legacy city marked review-required
+
+**Goal:** Finish Accra/Kumasi after schema 5 → 6.  
+**When:** Upgrade converted areas but could not prove `"Accra"` / `"Kumasi"`.  
+**Steps:** Install Ghana pack → **Run safe legacy reconciliation** → open the area → confirm canonical geography → tick **I reviewed this migrated coverage**. Do not tick **Confirm replacement with entire selected area** unless wider coverage is intended.  
+**What you should see:** Warning remains until review. Data is still there.  
+**Common mistake:** Deleting/recreating the area.  
+**Verify:** Test Accra after the group is usable (active, not review-required).
+
+---
+
+## USE CASE 51 — Adding a new country later
+
+**Goal:** Serve a second country with locality-level delivery.  
+**Steps:** Install that country’s Location Pack only → wait **ready** → new Delivery Area/Coverage → option/charge → test.  
+**What you should see:** Ghana pack stays. New country localities appear only after **ready**.  
+**Common mistake:** Installing every GeoNames country “just in case.”  
+**Verify:** The new country row is **ready**; Ghana still works.
+
+---
+
+## USE CASE 52 — Failed or interrupted pack import
+
+**Goal:** Recover without database edits.  
+**Steps:** Read **failed** / stuck **importing** error and Progress. Wait. Click **Continue / retry** once. Or **Operation:** **Retry / resume current dataset**.  
+**What you should see:** Status moves toward **ready**, or a clear error.  
+**Common mistake:** Rapid repeated clicks; editing pack status in SQL.  
+**Verify:** Status **ready**; checksum/provider/license visible.
+
+---
+
+## USE CASE 53 — Pickup plus delivery
+
+**Goal:** Same catalogue can offer delivery in the teaching cities and store pickup.  
+**Steps:** Pickup Location exists. In Store defaults include Store pickup **and** Standard Delivery. Geography still uses Coverage Groups for delivery. Pickup is not “shipping to” the customer address.  
+**What you should see:** Delivery GH₵30 where coverage matches; pickup 0.00/FREE allowed. No false missing-price warning in a mixed cart.  
+**Common mistake:** Treating pickup as a Location Pack.  
+**Verify:** Playbook 34–35 still hold.
+
+---
+
+## USE CASE 54 — B2B customer with merchandise pricing controlled elsewhere
+
+**Goal:** Delivery Engine prices delivery only.  
+**When:** B2BKing / WoodMart / WooCommerce own product prices. Training-site coexistence is evidence, not broader Stable-1.0 certification. FOX/WOOCS was **not** installed on training.  
+**Steps:** Confirm merchandise price comes from the other plugin. Confirm delivery fee still comes from Delivery Charges for the selected option/area.  
+**What you should see:** Delivery GH₵30 (or configured fee) is unchanged by B2B merchandise rules unless a documented integration says otherwise.  
+**Common mistake:** Editing Location Packs to change product prices.  
+**Verify:** PDP shows merchandise price from its authority and delivery fee from Delivery Engine.
 

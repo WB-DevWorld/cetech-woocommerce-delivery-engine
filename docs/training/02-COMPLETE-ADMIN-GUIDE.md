@@ -1,13 +1,19 @@
 # Complete Administrator Guide
 
 **Audience:** Administrators and authorised configuration staff  
-**Version:** CETECH Delivery Engine **1.0.0-rc.9** (schema **5**)  
+**Version:** CETECH Delivery Engine **1.0.0-rc.12** (schema **6**)  
 **Everyday home:** Delivery Engine → **Overview**  
 **Not everyday:** Technical Diagnostics, private supply screens, Advanced Settings
 
 For each page: purpose, who, when, fields, recommended settings, steps, example, customer impact, mistakes, do-not-touch, related workflows, expected result.
 
 Screenshots are deferred. Practice on QA products **#39705**, **#39717** / **#39718** / **#39719**.
+
+**How the pieces fit** (connected, not the same thing): Location Pack = directory of places (not a price) → Delivery Area / Coverage Group = where you serve → Delivery Option = the service → Delivery Charge = the money → product rules (Site-wide → product → variation) → product page → cart → checkout → order snapshot.
+
+Teaching example: Ghana pack → **Greater Accra Selected Cities** → Selected locations Accra, Tema, Madina, Adenta → Standard Delivery → **GH₵30**.
+
+Dedicated guides: [14 — Location Packs](14-LOCATION-PACKS-AND-GEOGRAPHY.md) · [15 — Coverage Groups](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md). Recommended order: [12](12-SETUP-CONFIGURE-AND-TEST.md).
 
 ---
 
@@ -191,37 +197,127 @@ The option appears where assigned and is the label customers see.
 
 ---
 
+## PAGE: Delivery Engine → Location Packs
+
+**What this page is for**  
+Install country locality data used by Delivery Areas and the product-page city selector. Shopper requests never call GeoNames. Packs are stored in WordPress uploads, not inside the plugin.
+
+**Who should use it**  
+Administrators / authorised configuration staff (same access as Delivery Areas). Salespeople do not need this page daily.
+
+**When to use it**  
+When the business needs city/town directory data WooCommerce does not already provide; after an RC.11→RC.12 upgrade that shows **Review required** for old locality text; when adding a new country’s deeper localities later. Country/region coverage can proceed without a locality pack when WooCommerce already provides those administrative locations.
+
+**What it is not**  
+Not a delivery price, Delivery Area, Delivery Option, carrier, or customer address book. Installing Ghana geography does not create GH₵30.
+
+**What you will see**  
+Heading **Location Packs**. Attribution: GeoNames gazetteer data licensed under CC BY 4.0.
+
+**Install or update a pack**
+
+- **Country** — two-letter code (`GH`). Often pre-filled from the WooCommerce store country.
+- **Upload gazetteer file** — GeoNames country `.txt` or `.zip`.
+- **Official download** — tick **Fetch the official GeoNames country ZIP in the background (download.geonames.org only).**
+- **Operation** — **Install or continue** / **Update with a new dataset** / **Retry / resume current dataset**.
+- Button: **Install / update pack**.
+
+**Installed packs** columns: Country, Provider, Version, Checksum, Status, Installed, License, Progress, Actions.
+
+Statuses: **pending**, **importing**, **ready**, **failed**. **Ready** = usable live geography dataset.
+
+**Continue / retry** appears for pending, importing, or failed rows. Use it to resume. Do not click rapidly because import is batched in the background.
+
+**Safe post-pack reconciliation**
+
+Button: **Run safe legacy reconciliation**.
+
+Revisits Delivery Areas with no coverage, migration-generated review-required groups, or unresolved migration records. Active manually created canonical coverage is never replaced. It is not “reset all Delivery Areas.” Ambiguous cases may still need a person.
+
+Notice after run: scanned, skipped manual, reconciled, still review required, activated.
+
+**Recommended**  
+Install packs only where you need city/town directory data WooCommerce does not already provide. Ghana is the training/reference market, not a hard-coded limit. Wait for **ready** before relying on pack-backed locality search. Do not treat **Selected locations** or **Entire selected area except…** as automatic pack requirements.
+
+**Customer experience**  
+Without a usable pack, WooCommerce can still show Country → Region, but locality search has no pack-backed results. That is expected, not a plugin failure. Changing a parent location clears child selections. Postcode appears only when relevant. Country-wide delivery does not force a locality.
+
+**Common mistakes**  
+Treating the pack as a price; deleting Delivery Areas because locality search is empty; editing pack status in the database; installing every country.
+
+**Do not change casually**  
+Do not run migration classes by hand. Do not downgrade schema.
+
+**Related**  
+[14](14-LOCATION-PACKS-AND-GEOGRAPHY.md); Delivery Areas; review-required workflow in [15](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md#review-required).
+
+**Expected result**  
+The country row shows **ready**. Coverage builder locality search can find Accra, Tema, Madina, Adenta once those exist in the pack. Delivery Charges still have to be created separately.
+
+**Training-site observation**  
+After RC.11 → RC.12 the training site had **0** installed Location Packs, a small geography location count from migration/bootstrap, and WooCommerce still supplied Ghana’s regions. Locality search had no pack-backed data. Expected architecture.
+
+---
+
 ## PAGE: Delivery Areas
 
 **What this page is for**  
-Where the business delivers.
+Business groupings of destinations that share intended delivery treatment, plus Coverage Groups that name the canonical places inside each area.
 
 **Who**  
 Administrators / authorised staff.
 
 **When**  
-Expanding coverage or fixing address matching.
+After any Location Packs the business needs for city/town directory data are **ready**, and before Delivery Charges. Country/region Delivery Areas can be created using WooCommerce administrative geography without a locality pack.
 
 **Key fields**  
-Area name, geography (countries / states / postcodes via the condition builder). For **State / Region**, the WooCommerce checkout name and that country’s short code both match (for example Ghana `Greater Accra` and `AA`). Match mode and priority stay under **Advanced matching**. **Test an address** shows **Primary match** and, when more than one area covers the address, **Also matches**.
+- **Delivery area name**, **Reference code**, **Customer-facing label**, **Status**  
+- **Coverage groups** (live RC.12 geography)  
+- **Priority** — “Lower numbers are checked first when more than one delivery area could match.”  
+- **Use as fallback for unmatched addresses**  
+- **Remote area**  
+- List tool: **Test an address** → **Primary match** / **Also matches**
+
+Exact Coverage dropdown labels:
+
+- **Entire selected area** — all of Greater Accra (or the selected country).
+- **Selected locations** — only Accra, Tema, Madina, Adenta (teaching example).
+- **Entire selected area except…** — all Greater Accra except Ada Foah and Prampram.
+
+Help text on the builder: different levels = **AND**; several places at the same level = **OR**; extra groups = **OR**.
+
+Exclusions override inclusion **inside that group**. The excluded town may still match another Delivery Area.
+
+**Priority and overlaps**  
+Preferred business rule gets the lower number (example: Accra special service **8**, Greater Accra general **25**). The engine then uses geographic specificity when priority is equal. Do **not** invent “smallest area automatically wins.” Overlap on the list is normal. If overlap could not be fully proven, test specific addresses rather than treating areas as uncovered.
+
+**Review required**  
+Does **not** mean data was destroyed. The upgrade refused to guess which canonical locality old text (`"Accra"`) meant. Saving other fields will not clear the warning. Tick **I reviewed this migrated coverage** only after you confirm. If the screen warns that **Confirm replacement with entire selected area** would widen coverage, do not tick it unless that is intended. Do not delete/recreate the area. After a pack is **ready**, use **Run safe legacy reconciliation** on Location Packs.
+
+Legacy conditions, once coverage is active, appear under **Legacy location conditions (compatibility evidence only)**.
+
+Removing every coverage group requires the confirmation checkbox that you will **not** silently fall back to hidden legacy conditions.
+
+**Fallback**  
+Empty geography + fallback = true Everywhere else. Geography + fallback stays constrained (Greater Accra fallback never matches the United States). Native WooCommerce shipping is never the fallback. No match stays unmatched — fail closed, not free shipping.
 
 **Recommended**  
-Areas that match how you sell. A city inside a region is normal. Do **not** copy the same Delivery Charge onto every city so a missing city rate “works.” The selected Delivery Option can use a broader matching area’s charge when the city has none for that option. Test tricky addresses with both the region name and the checkout short code.
+One Delivery Area with a **Selected locations** group for the teaching example — not four city areas. Every sellable area + option still needs a Delivery Charge. Broader matching areas can supply a missing charge for the **same** selected option; a different option is never substituted. Invalid more-specific charges fail closed.
 
 **Steps**  
-Add/edit area → define conditions → **Test an address** → read Primary match / Also matches → ensure a Delivery Charge exists for each sellable option on the area that should price it (region-level is enough when cities inherit that option).
+Add/edit area → add Coverage Group → choose mode → save → **Test an address** → add Delivery Charge → test product page → cart → checkout.
 
 **Customer experience**  
-Correct fee for their destination (together with Delivery Charges).
+Correct fee for their destination together with Delivery Charges. Cascading location: Country → Region → Locality → postcode when relevant.
 
 **Mistakes**  
-Treating nested city-in-region overlap as an error; duplicating Air onto every city; leaving an invalid city charge for an option that should fail closed.
+One area per city for one shared price; treating Location Packs as prices; assuming smallest area wins; deleting review-required data; confusing Coverage Groups with product inheritance.
 
 **Related**  
-Delivery Charges; WooCommerce shipping zones (method availability). Add **Delivery** only to the zones where this plugin should operate; Rest of the World is optional: [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md#how-to-add-the-delivery-shipping-method-in-woocommerce). Playbook 31–33.
+[15](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md); Delivery Charges; WooCommerce **Delivery** shipping method: [12](12-SETUP-CONFIGURE-AND-TEST.md#how-to-add-the-delivery-shipping-method-in-woocommerce). Playbook geography cases.
 
 **Expected result**  
-Address tests match the intended Primary area; Also matches lists broader coverage when it exists.
+Address tests match the intended Primary area; Also matches lists other legitimate coverage; Accra in the teaching example quotes **GH₵30** for Standard Delivery.
 
 ---
 
@@ -247,6 +343,10 @@ Add/edit charge → Save → verify checkout with a QA product (stop before paym
 
 **Customer experience**  
 Checkout shipping amount. WooCommerce already shows this total — do not expect a second custom “Shipping summary” on thank-you.
+
+Teaching example: Standard Delivery in **Greater Accra Selected Cities** = **GH₵30**. The Location Pack does not create this amount.
+
+The Delivery Engine owns delivery charges inside its boundary. It does **not** become merchandise pricing authority. B2BKing / WoodMart / WooCommerce can remain merchandise pricing authorities. FOX/WOOCS can remain currency authority where installed. Training-site coexistence is evidence, not broader Stable-1.0 certification.
 
 **Mistakes**  
 Missing charges; assuming free shipping; confusing one shared delivery fee with a per-item fee.
@@ -490,6 +590,10 @@ Fulfilment labels, generic “Delivery method: Delivery”, compact-selector pub
 **Staff role**  
 Configure in admin; verify on QA storefront; do not complete unnecessary paid orders.
 
+Cascading location on the product page: **Country → Region/State → Locality → Postcode when relevant**. Changing a parent clears children. Locality uses canonical identity. Without a Location Pack, Country/Region can still appear while locality search is empty — expected.
+
+Delivery card order: service name → ETA/timeframe → prominent fee.
+
 ---
 
 ## PAGE: WooCommerce order → Delivery information
@@ -511,3 +615,13 @@ Rewriting historical delivery facts after Site-wide Defaults change.
 
 **Expected result**  
 Staff can fulfil from the panel. Customers on thank-you still see only the compact public contract.
+
+---
+
+## Upgrading from RC.11 (schema 5) to RC.12 (schema 6)
+
+Normal plugin upgrade creates canonical geography/coverage structures. Existing Delivery Areas, Delivery Charges, rules, and business references are retained.
+
+Some migrated city rules can become **Review required** when a Location Pack was not installed (training: Accra and Kumasi / unmapped city). Follow Location Packs → **Run safe legacy reconciliation** → inspect the area → confirm geography. Do not invoke migration classes. Do not downgrade schema by hand. Backup before major upgrades.
+
+Details: [14](14-LOCATION-PACKS-AND-GEOGRAPHY.md), [15](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md#review-required), [12](12-SETUP-CONFIGURE-AND-TEST.md).

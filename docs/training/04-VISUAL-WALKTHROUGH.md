@@ -1,12 +1,14 @@
 # Visual Walkthrough (written screen tour)
 
 **Audience:** New staff and trainers  
-**Version:** 1.0.0-rc.9 (schema 5)  
-**Screenshots:** Deferred. This tour is written against the live screens. Do not use leftover older images as teaching truth.
+**Version:** 1.0.0-rc.12 (schema 6)  
+**Screenshots:** Not captured for RC.12 in this package. Do **not** use leftover RC.2 images as teaching truth. Follow the live screens. Screenshot TODOs below are capture instructions, not fabricated pictures.
 
-Walk this path on the live site (read-only unless a trainer authorises a QA edit):
+Walk this path (read-only unless a trainer authorises a QA edit):
 
-WordPress admin → Overview → Site-wide Defaults → Delivery Options / Areas / Charges → Pickup Locations → Product Exceptions → Needs Attention → Settings → Bulk Tools (administrators only) → WooCommerce product Delivery tab → Preview Delivery → product page → cart → Classic checkout **and** Cart/Checkout Blocks (whichever the store uses) → WooCommerce order Delivery information → Shipments (only if an Administrator has turned shipment records on).
+WordPress admin → Overview → **Location Packs** → Site-wide Defaults → Delivery Options → Delivery Areas / Coverage Groups → Delivery Charges → Pickup Locations → Product Exceptions → Needs Attention → Settings → Bulk Tools (administrators only) → WooCommerce product Delivery tab → Preview Delivery → product page (Country → Region → Locality) → cart → Classic checkout **and** Cart/Checkout Blocks (whichever the store uses) → WooCommerce order Delivery information → Shipments (only if enabled).
+
+Teaching example: Ghana pack **ready** → Greater Accra Selected Cities → Selected locations Accra, Tema, Madina, Adenta → Standard Delivery → GH₵30.
 
 For each screen: what you are looking at, what matters, what you can safely change, what to leave alone, what happens after Save.
 
@@ -88,22 +90,59 @@ Assigned products/defaults can show the new label.
 
 ---
 
+## 4A. Location Packs
+
+**What you are looking at**  
+**Delivery Engine → Location Packs**. Heading **Location Packs**. Sections **Install or update a pack**, **Installed packs**, **Safe post-pack reconciliation**.
+
+**What matters**  
+This is a directory of places, not a price. Status **ready** means usable live geography. **Continue / retry** resumes pending/importing/failed work. Button **Run safe legacy reconciliation** revisits migration leftovers only.
+
+**Safely change**  
+Install/update packs for countries you serve. Wait for background import.
+
+**Leave alone**  
+Database status, rapid clicking, treating GeoNames license as a shipping contract.
+
+**After Save**  
+Import continues in the background. Locality search works after **ready**.
+
+**Screenshot TODO (capture on training or a demo site; redact PII; do not change live business config for prettier shots without owner permission):**
+
+- TODO-SCREENSHOT: Location Packs page (empty state “No location packs installed yet.” and/or install form). Capture: WP admin → Delivery Engine → Location Packs. Crop to the wrap. No emails, keys, or server IPs.
+- TODO-SCREENSHOT: pack **ready** row (Country GH, Status ready, Provider, Version, Checksum fragment, License, Progress).
+- TODO-SCREENSHOT: pack **importing** row with Progress and **Continue / retry** — only if a safe non-production import is already running; do not start a destructive import just for a picture.
+- TODO-SCREENSHOT: **Run safe legacy reconciliation** heading and button.
+
+---
+
 ## 5. Delivery Areas
 
 **What you are looking at**  
-Where the store delivers (condition builder).
+List of Delivery Areas, overlap/charge warnings, **Test an address**, then the editor with **Coverage groups**.
 
 **What matters**  
-Address matching. For **State / Region**, the checkout name and that country’s short code both match (for example Ghana `Greater Accra` and `AA`). **Test an address** shows **Primary match** and **Also matches** when a city sits inside a region. That nested overlap is normal. Advanced matching (mode/priority) stays collapsed until needed.
+Live configuration is Coverage Groups, not the old text condition table. Modes: **Entire selected area**, **Selected locations**, **Entire selected area except…**. Priority: lower numbers checked first. **Review required** warning if migration could not prove old city text. **I reviewed this migrated coverage**. **Confirm replacement with entire selected area** only if widening is intended.
 
 **Safely change**  
-Authorised geography updates; **Test an address**.
+Authorised geography; **Test an address**; review-required confirmation after a pack is ready.
 
 **Leave alone**  
-Copying the same Delivery Charge onto every city so Air “works.” Invalid city charges for an option that should fail closed.
+Deleting review-required areas; inventing smallest-area-wins; copying the same charge onto every city.
 
 **After Save**  
-Charges that use this area continue to apply to matching addresses. A selected option with no city charge can use a broader matching area’s charge for **that same option**.
+Matcher uses canonical coverage. Charges that use this area apply to matching addresses. A selected option with no more-specific charge can use a broader matching area’s charge for **that same option**.
+
+**Screenshot TODO:**
+
+- TODO-SCREENSHOT: Delivery Area editor — name **Greater Accra Selected Cities**, Coverage group 1.
+- TODO-SCREENSHOT: Coverage dropdown showing the three modes.
+- TODO-SCREENSHOT: **Selected locations** with chips Accra, Tema, Madina, Adenta (demo data).
+- TODO-SCREENSHOT: **Entire selected area**.
+- TODO-SCREENSHOT: **Entire selected area except…** with excluded chips (demo towns).
+- TODO-SCREENSHOT: **Priority** field and help “Lower numbers are checked first…”.
+- TODO-SCREENSHOT: **Review required** inline warning plus the two checkboxes.
+- TODO-SCREENSHOT: **Test an address** Primary match / Also matches.
 
 ---
 
@@ -262,20 +301,26 @@ Not applicable; refresh after you save elsewhere.
 ## 14. Customer product page
 
 **What you are looking at**  
-Compact delivery selector.
+Cascading location + compact delivery selector.
 
 **What matters**  
-Radio + **bold public option name**. Second line: **Estimated delivery:** …  
-Variable products: choose the variation first.
+Country → Region/State → Locality (pack-backed) → Postcode when relevant. Changing a parent clears children. Delivery card: **service name → ETA/timeframe → prominent fee**. Radio + **bold public option name**. Variable products: choose the variation first. Without a pack, Country/Region can still appear while locality results are empty — expected.
 
 **Safely change**  
 Nothing in admin from this screen; this is the shop.
 
 **Leave alone**  
-Expecting fulfilment group headings or a long description here.
+Expecting fulfilment group headings or a long description here. Treating empty locality search as a crash when no pack is installed.
 
 **After Save**  
 Admin saves appear here after reload (and variation re-selection if variable).
+
+**Screenshot TODO:**
+
+- TODO-SCREENSHOT: PDP country selector (Ghana).
+- TODO-SCREENSHOT: PDP region (Greater Accra).
+- TODO-SCREENSHOT: PDP locality search (Accra) with pack **ready**.
+- TODO-SCREENSHOT: delivery card showing Standard Delivery, estimate, GH₵30 (or the demo fee). Use QA product **#39705**. Redact customer account email if visible.
 
 ---
 
@@ -296,6 +341,8 @@ Placing paid orders for practice.
 **After Save**  
 Not a Delivery Engine save.
 
+**Screenshot TODO:** Cart line with Standard Delivery and GH₵30 (QA cart, no customer PII).
+
 ---
 
 ## 16. Checkout (Classic and Blocks)
@@ -314,6 +361,8 @@ Forcing a $0 workaround if the charge is missing; looking for a Delivery Engine 
 
 **After Save**  
 Not applicable.
+
+**Screenshot TODO:** Checkout shipping line with public option name and GH₵30. Stop before payment. Redact emails and payment fields.
 
 ---
 
