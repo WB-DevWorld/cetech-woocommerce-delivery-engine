@@ -4,6 +4,7 @@
 **Schema:** `6` (unchanged; no schema 7)  
 **Branch:** `fix/geography-pack-liveness`  
 **Base:** protected `master` `83effbf081e54b47ef088673c8ac18217ab9dfda`  
+**Runtime / package-source SHA:** `cd5cdfbbebfa243feb5f0bf66121edee55b16e87`  
 **PR:** https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/34  
 **Not RC.13. Not deployed. Not merged.**
 
@@ -20,11 +21,14 @@ Do not rebuild or mutate this ZIP or its checksum record.
 
 ## geo-live.2 package (dev qualification, after CI)
 
-Recorded after GitHub CI SUCCESS on the runtime/package-source commit. Do not treat this ZIP as RC.13 or as a replacement for RC.12 or geo-live.1.
+Built from a clean committed tree after GitHub CI SUCCESS on runtime/package-source `cd5cdfbbebfa243feb5f0bf66121edee55b16e87`. Do not treat this ZIP as RC.13 or as a replacement for RC.12 or geo-live.1.
 
-- Identity: `1.0.0-dev.geo-live.2`
-- Schema: `6`
-- Filename / bytes / SHA-256: recorded in the closeout commit after the ZIP is built
+- Source SHA: `cd5cdfbbebfa243feb5f0bf66121edee55b16e87`
+- Filename: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-live.2.zip`
+- Bytes: `1,786,463`
+- SHA-256: `c5ea75fd407aa32a9e443a3f883e3036785cc776dcf715a040026087fdf8c149`
+- Production-package verifier: PASS (staged and extracted)
+- Packaged PHP lint: `499 files / 0 failures`
 - Not deployed to training
 
 ## Training forensics (read-only; captured before any further mutation)

@@ -41,7 +41,11 @@ Last reconciled: 2026-09-20 (RC.12 tagged and published as a prerelease from pro
 - Base: protected `master` `83effbf081e54b47ef088673c8ac18217ab9dfda`
 - Development identity: `1.0.0-dev.geo-live.2`
 - Schema: `6` (unchanged)
+- Runtime / package-source SHA: `cd5cdfbbebfa243feb5f0bf66121edee55b16e87`
 - Frozen geo-live.1 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-live.1.zip` (`1,783,293` bytes, SHA-256 `6281f1b3f7d080ac9bb528fc1a117be909ac1ae05c052d6fe704cc053192ccbf`)
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-live.2.zip`
+- Bytes: `1,786,463`
+- SHA-256: `c5ea75fd407aa32a9e443a3f883e3036785cc776dcf715a040026087fdf8c149`
 - PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/34
 - Not merged. Not deployed. Not RC.13.
 - Evidence: `docs/POST-RC12-GEO-LIVENESS.md`
