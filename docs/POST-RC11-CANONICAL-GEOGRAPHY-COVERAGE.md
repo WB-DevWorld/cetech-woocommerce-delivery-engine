@@ -1,6 +1,6 @@
 # Post-RC.11 Canonical Geography & Delivery Area Coverage
 
-Status: ISSUE #23 GEO.16 LOCATION PACKS ADMIN-FORM P2 CLOSURE / NOT MERGED / NOT RC.12
+Status: ISSUE #23 CLOSED/COMPLETED / PR #24 MERGED / GEO.16 IMMUTABLE QUALIFICATION PROVENANCE / RC.12 IDENTITY PROMOTION ACTIVE
 
 Owner: `@wbdevworld`
 
@@ -8,7 +8,11 @@ Branch: `feat/canonical-geography-coverage`
 
 Starting protected master: `72fa354d52b49ffd9cbc32862a6b2e3d7117ea4e`
 
+Merged to protected master: `3d786ba6440a5f6f850d736bda0da5a5f5236c1f` (PR #24)
+
 Immutable release anchor: `v1.0.0-rc.11` -> `384f564f64a2db766ae6907392e95fb366fb8533`
+
+RC.12 promotion: issue `#26` / `release/rc12` / identity `1.0.0-rc.12` / schema `6`. Not tagged. Pilot not authorized.
 
 Rejected technical-review candidate: `1.0.0-dev.geo.1` (`606730e2535896cb18e415b14d62bbb57d050578`). Do not reuse that package identity or send it to physical QA.
 
@@ -40,7 +44,7 @@ Rejected technical-review candidate: `1.0.0-dev.geo.14` (`ea53d04865931998982694
 
 Frozen physically qualified geography/runtime candidate: `1.0.0-dev.geo.15` (`eb9f4e4893b32ec8e59d47fb90e13adfed85e78e`). Package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.15.zip` SHA-256 `95340eed81a3e7d7b5a7bddb3635a825870a6916d5716d27e6ea12f1fcd68690`. Schema `6`. Isolated physical QA passed migration/import/coverage/storefront qualification and confirmed one P2: Location Packs admin forms omitted `cetech_de_action` / `cetech_de_nonce`. Do not rebuild or reuse this package identity.
 
-Owner-accepted geography candidate identity: `1.0.0-dev.geo.16` (`7aeb4c573d04d12d8101c0e05bc8858ff332d63f`). Package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.16.zip` SHA-256 `500b09878ba08b879e5bdfdb0ea6e58726a71fe90a6994a83bb96b1e314a3925`. Schema `6`. `@wbdevworld` accepted this exact identity on 2026-09-20. Location Packs install, continue/retry and reconciliation forms use `AdminFormHelper::nonce_field(ACTION)` plus hidden `cetech_de_action`. `AdminActionHandler` security contract is unchanged. Matching precedence is unchanged. Evidence: `docs/ISSUE-23-GEO16-PHYSICAL-QA.md`. This acceptance does not create RC.12 or authorize a CETECH Pilot.
+Owner-accepted geography candidate identity: `1.0.0-dev.geo.16` (`7aeb4c573d04d12d8101c0e05bc8858ff332d63f`). Package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.16.zip` SHA-256 `500b09878ba08b879e5bdfdb0ea6e58726a71fe90a6994a83bb96b1e314a3925`. Schema `6`. `@wbdevworld` accepted this exact identity on 2026-09-20. Location Packs install, continue/retry and reconciliation forms use `AdminFormHelper::nonce_field(ACTION)` plus hidden `cetech_de_action`. `AdminActionHandler` security contract is unchanged. Matching precedence is unchanged. Evidence: `docs/ISSUE-23-GEO16-PHYSICAL-QA.md`. Issue #23 is CLOSED/COMPLETED. PR #24 is MERGED at `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`. Geo.16 remains immutable qualification provenance. Owner-authorized RC.12 is an identity-only promotion of this accepted protected-master runtime and does not authorize a CETECH Pilot.
 
 geo.11 technical corrections (PR #24 comment `5730679997` / issue #23 A–O): nested hierarchy ownership via `prepared_hierarchy_root_id`; complete keyset iteration for zones/matcher/admin children; atomic schema-6 lease; inactive canonical members excluded from live authority; stale-response request tokens; truthful postcode relevance; unique geography cache revision; schema-6 verify of current columns; preflight MAX_SCAN is indeterminate rather than false invalidity.
 
@@ -61,7 +65,7 @@ Target schema: `6`
 8. Coverage groups support entire area, selected descendants, and entire area except selected descendants.
 9. Canonical geography is provider-neutral. Provider IDs are mappings, never permanent business identity.
 10. Location datasets are installed per country/market; the global gazetteer is not shipped in the core plugin ZIP.
-11. RC.11 remains immutable. This work is post-RC.11 and does not imply RC.12 promotion.
+11. RC.11 remains immutable. Issue #23 is closed completed. RC.12 is a separately authorized identity-only promotion of the merged baseline and is not a new geography runtime feature.
 
 ## Why schema 6 is required
 
