@@ -102,13 +102,20 @@ Ben (`@Ben-001-sys`) and Emmanuel (`@Emmanuel-coder-prog`) have **no** implement
 
 ## Geo.15 P1-closure candidate
 - Identity: `1.0.0-dev.geo.15`; schema `6`.
-- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.15.zip` (bytes/SHA-256 recorded after the clean package-source SHA is built).
+- Package-source SHA: `eb9f4e4893b32ec8e59d47fb90e13adfed85e78e`.
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.15.zip`.
+- ZIP bytes: `1,763,366`.
+- ZIP SHA-256: `95340eed81a3e7d7b5a7bddb3635a825870a6916d5716d27e6ea12f1fcd68690`.
+- Production package verifier: PASS (schema target 6).
+- Extracted root: `cetech-woocommerce-delivery-engine/`.
+- Packaged PHP lint: `499 files / 0 failures`.
 - Production files: `Plugin.php` deferred kickoff; `Schema6CoverageUpgradeKickoff`; `ActionSchedulerReadiness`; `Schema6CoverageUpgradeService::enqueue_continuation()`; `GeographyPackService` enqueue; `WpdbGeographyPackRepository::renew_lease()`.
 - Lifecycle: `MigrationRunner::run()` remains on `plugins_loaded`. Coverage conversion kickoff is `init` priority 20. Worker callbacks for schema-6 and geography-pack hooks remain registered at boot.
 - Action Scheduler: enqueue/unschedule require `ActionScheduler::is_initialized()` / `did_action('action_scheduler_init')`. `function_exists('as_enqueue_async_action')` is not sufficient. Unsafe scheduler APIs are not invoked; later requests retry the kickoff.
 - Pack renew: database false = failure; affected rows > 0 = success; affected rows === 0 = direct lease read; true only when pack ID, `lease_owner` and `lease_expires_at` already equal the intended renewal. No fallback write.
 - Matching: unchanged. Same-level overlap still ranks by configured Delivery Area priority. Equal-specificity equal-priority overlap diagnostics retained.
 - Requirement IDs referenced in this pass: DE-GEO-011, DE-GEO-012, DE-GEO-013, DE-PERF-002.
+- Local gates: Composer validate OK; PHP lint 2807 files / 0 failures; Docker PHP 8.1 runtime lint 484 files OK; default PHPUnit 1226 tests / 7429 assertions; Geo15 unit 14 tests / 111 assertions; Geo15 real-MariaDB `@group geo15-real-db` 6 tests / 82 assertions; Geo14 unit 4 tests / 18 assertions; Geo14 real-MariaDB `@group geo14-real-db` 5 tests / 54 assertions; Geo13 unit 4 tests / 50 assertions; Geo13 real-MariaDB `@group geo13-real-db` 3 tests / 54 assertions; Vitest 76 tests; team control plane OK; product control plane OK (10 files, 372 Requirement IDs).
 - PR #24 remains Draft / OPEN / unmerged.
 - Do not run physical QA until narrow technical review accepts the exact geo.15 package.
 
