@@ -40,6 +40,10 @@ Last reconciled: 2026-09-20 (RC.12 tagged and published as a prerelease from pro
 - Branch: `fix/checkout-multi-destination-preservation`
 - Base: protected `master` `c4cee3c37360789d47f3238207aaa4e74ba86109`
 - Development identity: `1.0.0-dev.checkout-mdest.1`
+- Package-source SHA: `b07c3eb1ee3556e5b184ce072c1833ba04459cf9`
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.checkout-mdest.1.zip`
+- Bytes: `1,778,523`
+- SHA-256: `8ceb27dfa3381db23917fbcae45f31453e8588598241f0c4e9af4fd7855c5df1`
 - Schema: `6` (unchanged)
 - Not RC.13. Not deployed. Awaiting ChatGPT/owner review.
 - Evidence: `docs/POST-RC12-CHECKOUT-MULTIDEST.md`

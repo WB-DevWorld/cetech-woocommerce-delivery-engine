@@ -26,6 +26,7 @@ Issue `#29` — `[P1] Checkout Use my checkout address flattens multi-destinatio
 - Owner: `@wbdevworld` (explicit owner instruction; checkout runtime + customer copy).
 - Branch: `fix/checkout-multi-destination-preservation` from protected `master` `c4cee3c`.
 - Development identity: `1.0.0-dev.checkout-mdest.1` (schema remains `6`).
+- Dev ZIP (after CI): `cetech-woocommerce-delivery-engine-1.0.0-dev.checkout-mdest.1.zip` / `1,778,523` bytes / SHA-256 `8ceb27dfa3381db23917fbcae45f31453e8588598241f0c4e9af4fd7855c5df1` / source `b07c3eb1ee3556e5b184ce072c1833ba04459cf9`.
 - Not RC.13. Not a release promotion.
 
 Owner-reproduced on `training.cetechbpa.com` (RC.12 runtime):

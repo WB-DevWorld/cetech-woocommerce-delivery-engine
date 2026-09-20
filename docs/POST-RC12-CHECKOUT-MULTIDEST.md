@@ -8,6 +8,14 @@
 **Immutable RC.12 source:** `78594ad8962868683726373f58f4a8b1b48e4d0e` / tag `v1.0.0-rc.12`  
 **Status:** AWAITING REVIEW — not RC.13 — not deployed
 
+## Package (dev qualification, after CI)
+
+- Source SHA: `b07c3eb1ee3556e5b184ce072c1833ba04459cf9`
+- Filename: `cetech-woocommerce-delivery-engine-1.0.0-dev.checkout-mdest.1.zip`
+- Bytes: `1,778,523`
+- SHA-256: `8ceb27dfa3381db23917fbcae45f31453e8588598241f0c4e9af4fd7855c5df1`
+- Built from a clean committed tree after GitHub CI SUCCESS. Do not treat this ZIP as RC.13 or as a replacement for RC.12.
+
 ## Owner reproduction (training.cetechbpa.com, RC.12 runtime)
 
 Cart: two identical products with distinct Delivery Engine customer contexts.
