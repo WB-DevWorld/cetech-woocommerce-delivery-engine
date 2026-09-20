@@ -48,15 +48,17 @@ final class LocationIdentity {
 		string $country,
 		string $state,
 		string $city,
-		string $postcode
+		string $postcode,
+		string $canonical_location_key = ''
 	): string {
 		return self::hash(
 			self::KIND_MATCHING,
 			[
-				'city'     => $city,
-				'country'  => $country,
-				'postcode' => $postcode,
-				'state'    => $state,
+				'canonical_location_key' => $canonical_location_key,
+				'city'                   => $city,
+				'country'                => $country,
+				'postcode'               => $postcode,
+				'state'                  => $state,
 			]
 		);
 	}

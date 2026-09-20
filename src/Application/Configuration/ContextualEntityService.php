@@ -355,7 +355,7 @@ final class ContextualEntityService {
 			}
 		}
 
-		return 'GH';
+		return '';
 	}
 
 	public function store_currency(): string {

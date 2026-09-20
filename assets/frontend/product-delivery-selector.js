@@ -35,13 +35,21 @@
 		if (!option) {
 			return '';
 		}
-		if (option.price_text) {
-			return String(option.price_text);
-		}
-		if (option.fulfilment_choice === 'store_pickup') {
+		var raw = option.price_text ? String(option.price_text) : '';
+		if (!raw && option.fulfilment_choice === 'store_pickup') {
 			return (config && config.i18n && config.i18n.free) || 'Free';
 		}
-		return '';
+		if (!raw) {
+			return '';
+		}
+		if (option.fulfilment_choice === 'store_pickup') {
+			return raw;
+		}
+		var label = (config && config.i18n && config.i18n.deliveryFee) || 'Delivery fee';
+		if (raw.toLowerCase().indexOf(label.toLowerCase()) === 0) {
+			return raw;
+		}
+		return label + ': ' + raw;
 	}
 
 	function productQuantity(root) {
@@ -89,7 +97,8 @@
 				country: fieldValue(loc, 'cetech_de_matching_country'),
 				state: fieldValue(loc, 'cetech_de_matching_state'),
 				city: fieldValue(loc, 'cetech_de_matching_city'),
-				postcode: fieldValue(loc, 'cetech_de_matching_postcode')
+				postcode: fieldValue(loc, 'cetech_de_matching_postcode'),
+				canonical_location_key: fieldValue(loc, 'cetech_de_matching_location_key')
 			},
 			display_key: checked ? String(checked.value || '') : '',
 			fulfilment_choice: choiceSwitch
@@ -210,6 +219,7 @@
 		}
 
 		bindLocation(root);
+		bindCascade(root);
 		bindFormSubmit(root);
 		writePayload(root);
 		dismissStaleSelectionNotices(root);
@@ -287,6 +297,7 @@
 			body.set('state', fieldValue(locationRoot, 'cetech_de_matching_state'));
 			body.set('city', fieldValue(locationRoot, 'cetech_de_matching_city'));
 			body.set('postcode', fieldValue(locationRoot, 'cetech_de_matching_postcode'));
+			body.set('location_key', fieldValue(locationRoot, 'cetech_de_matching_location_key'));
 			body.set('quantity', String(productQuantity(root)));
 
 			window.fetch(config.ajaxUrl, {
@@ -420,32 +431,560 @@
 		var isPickup = option.fulfilment_choice === 'store_pickup';
 		var title = option.delivery_offer_public_label || option.pickup_location_label || '';
 		var price = formatPriceText(option, config);
-		var headline = '<span class="cetech-de-delivery-option__headline"><span class="cetech-de-delivery-option__label">' + escapeHtml(title) + '</span>';
-		if (price) {
-			headline += '<span class="cetech-de-delivery-option__price">' + escapeHtml(price) + '</span>';
-		}
-		headline += '</span>';
-		var meta = '';
+		var bodyHtml = '<span class="cetech-de-delivery-option__label">' + escapeHtml(title) + '</span>';
 		if (isPickup) {
 			if (option.pickup_location_label && option.pickup_location_label !== title) {
-				meta += '<span class="cetech-de-delivery-option__meta">' + escapeHtml(option.pickup_location_label) + '</span>';
+				bodyHtml += '<span class="cetech-de-delivery-option__meta">' + escapeHtml(option.pickup_location_label) + '</span>';
 			}
 			if (option.pickup_address) {
-				meta += '<span class="cetech-de-delivery-option__meta">' + escapeHtml(option.pickup_address) + '</span>';
+				bodyHtml += '<span class="cetech-de-delivery-option__meta">' + escapeHtml(option.pickup_address) + '</span>';
 			}
 			var ready = String(option.estimate_text || '').replace(/^Estimated(?:\s+delivery)?\s*:?\s+/i, '').trim();
 			if (ready) {
-				meta += '<span class="cetech-de-delivery-option__estimate">' + escapeHtml(ready) + '</span>';
+				bodyHtml += '<span class="cetech-de-delivery-option__estimate">' + escapeHtml(ready) + '</span>';
 			}
 		} else {
 			var estimateLine = formatEstimateLine(option, config);
 			if (estimateLine) {
-				meta += '<span class="cetech-de-delivery-option__estimate">' + escapeHtml(estimateLine) + '</span>';
+				bodyHtml += '<span class="cetech-de-delivery-option__estimate">' + escapeHtml(estimateLine) + '</span>';
 			}
+		}
+		if (price) {
+			bodyHtml += '<span class="cetech-de-delivery-option__price">' + escapeHtml(price) + '</span>';
 		}
 		return '<p class="cetech-de-delivery-option cetech-de-delivery-option--radio cetech-de-delivery-option--card" data-cetech-de-choice="' + escapeHtml(option.fulfilment_choice || '') + '"><label>' +
 			'<input type="radio" name="' + escapeHtml((config && config.postField) || 'cetech_de_delivery_option_key') + '" value="' + escapeHtml(option.display_key) + '"' + (checked ? ' checked="checked"' : '') + ' required="required" />' +
-			'<span class="cetech-de-delivery-option__body">' + headline + meta + '</span></label></p>';
+			'<span class="cetech-de-delivery-option__body">' + bodyHtml + '</span></label></p>';
+	}
+
+	function setReveal(locationRoot, field, visible) {
+		var nodes = locationRoot.querySelectorAll('[data-cetech-de-reveal="' + field + '"]');
+		Array.prototype.forEach.call(nodes, function (node) {
+			node.hidden = !visible;
+		});
+	}
+
+	function clearField(locationRoot, name) {
+		var field = locationRoot.querySelector('[name="' + name + '"]');
+		if (field) {
+			field.value = '';
+		}
+	}
+
+	function bindCascade(root) {
+		var locationRoot = root.querySelector('[data-cetech-de-matching-location]');
+		var config = window.cetechDeMatchingLocation || {};
+		if (!locationRoot || locationRoot.getAttribute('data-cetech-de-cascade') === '1') {
+			return;
+		}
+		locationRoot.setAttribute('data-cetech-de-cascade', '1');
+		var geo = config.geography || {};
+		var searchToken = 0;
+		var childrenToken = 0;
+		var postcodeToken = 0;
+
+		function applyRegionLabel(rootEl, label) {
+			if (!rootEl || !label) {
+				return;
+			}
+			var wrap = rootEl.querySelector('[data-cetech-de-field="region"], [data-cetech-de-reveal="region"]');
+			if (!wrap) {
+				return;
+			}
+			var select = wrap.querySelector('select');
+			if (select) {
+				select.setAttribute('aria-label', label);
+			}
+			var lab = wrap.querySelector('label');
+			if (lab) {
+				var text = lab.childNodes[0];
+				if (text && text.nodeType === 3) {
+					text.textContent = label;
+					return;
+				}
+			}
+			var span = wrap.querySelector('.cetech-de-admin-label');
+			if (!span) {
+				span = document.createElement('span');
+				span.className = 'cetech-de-admin-label';
+				wrap.insertBefore(span, wrap.firstChild);
+			}
+			span.textContent = label;
+		}
+
+		function countryField() {
+			return locationRoot.querySelector('[name="cetech_de_matching_country"]');
+		}
+		function regionField() {
+			return locationRoot.querySelector('[name="cetech_de_matching_state"]');
+		}
+		function cityField() {
+			return locationRoot.querySelector('[name="cetech_de_matching_city"]');
+		}
+		function keyField() {
+			return locationRoot.querySelector('[data-cetech-de-location-key]');
+		}
+
+		function clearOptions() {
+			var optionsEl = root.querySelector('[data-cetech-de-options]');
+			if (optionsEl) {
+				optionsEl.innerHTML = '';
+			}
+			writePayload(root);
+		}
+
+		function onCountryChange() {
+			clearField(locationRoot, 'cetech_de_matching_state');
+			clearField(locationRoot, 'cetech_de_matching_city');
+			clearField(locationRoot, 'cetech_de_matching_postcode');
+			clearField(locationRoot, 'cetech_de_matching_location_key');
+			var country = countryField();
+			if (config.ajaxUrl && geo.childrenAction && country && country.value) {
+				setReveal(locationRoot, 'region', false);
+				setReveal(locationRoot, 'locality', false);
+			} else {
+				setReveal(locationRoot, 'region', !!(country && country.value));
+				setReveal(locationRoot, 'locality', false);
+			}
+			setReveal(locationRoot, 'postcode', false);
+			clearOptions();
+			loadChildren('administrative', '');
+		}
+
+		function onRegionChange() {
+			clearField(locationRoot, 'cetech_de_matching_city');
+			clearField(locationRoot, 'cetech_de_matching_postcode');
+			clearField(locationRoot, 'cetech_de_matching_location_key');
+			var region = regionField();
+			setReveal(locationRoot, 'locality', !!(region && region.value));
+			setReveal(locationRoot, 'postcode', false);
+			clearOptions();
+			refreshPostcode();
+		}
+
+		function copyFieldIdentity(from, to) {
+			if (!from || !to) {
+				return;
+			}
+			if (from.id) {
+				to.id = from.id;
+			}
+			if (from.className) {
+				to.className = from.className;
+			}
+			['aria-label', 'aria-labelledby', 'aria-describedby', 'aria-required', 'aria-invalid', 'aria-controls', 'aria-expanded', 'role', 'title', 'required'].forEach(function (name) {
+				var value = from.getAttribute(name);
+				if (value !== null) {
+					to.setAttribute(name, value);
+				}
+			});
+			if (from.required) {
+				to.required = true;
+			}
+			var autocomplete = from.getAttribute('autocomplete');
+			to.setAttribute('autocomplete', autocomplete || 'address-level1');
+			Array.prototype.forEach.call(from.attributes || [], function (attr) {
+				if (attr && attr.name && attr.name.indexOf('data-') === 0) {
+					to.setAttribute(attr.name, attr.value);
+				}
+			});
+		}
+
+		function captureSavedRegion(current) {
+			if (!current) {
+				return { value: '', key: '', code: '' };
+			}
+			var selected = current.tagName === 'SELECT' && current.selectedIndex >= 0 ? current.options[current.selectedIndex] : null;
+			return {
+				value: String(current.value || ''),
+				key: (selected && selected.getAttribute('data-location-key')) || current.getAttribute('data-location-key') || current.getAttribute('data-cetech-de-location-key') || '',
+				code: current.getAttribute('data-state') || current.getAttribute('data-code') || ''
+			};
+		}
+
+		function ensureRegionSelect() {
+			var current = regionField();
+			if (current && current.tagName === 'SELECT') {
+				return current;
+			}
+			var wrap = locationRoot.querySelector('[data-cetech-de-field="region"], [data-cetech-de-reveal="region"]');
+			if (!wrap) {
+				return current;
+			}
+			var saved = captureSavedRegion(current);
+			var select = document.createElement('select');
+			select.name = current && current.name ? current.name : 'cetech_de_matching_state';
+			copyFieldIdentity(current, select);
+			if (!select.getAttribute('autocomplete')) {
+				select.setAttribute('autocomplete', 'address-level1');
+			}
+			if (saved.value) {
+				select.setAttribute('data-cetech-de-saved-region', saved.value);
+			}
+			if (saved.key) {
+				select.setAttribute('data-cetech-de-saved-region-key', saved.key);
+			}
+			if (saved.code) {
+				select.setAttribute('data-cetech-de-saved-region-code', saved.code);
+			}
+			if (current && current.parentNode) {
+				current.parentNode.replaceChild(select, current);
+			} else {
+				wrap.appendChild(select);
+			}
+			select.addEventListener('change', onRegionChange);
+			return select;
+		}
+
+		function regionMatchesSaved(saved, item, option) {
+			if (!saved) {
+				return false;
+			}
+			var current = saved.value || '';
+			if (current && (current === option.value || current === item.name || current === item.key || current === item.code)) {
+				return true;
+			}
+			if (saved.key && saved.key === item.key) {
+				return true;
+			}
+			if (saved.code && (saved.code === item.code || saved.code === option.value)) {
+				return true;
+			}
+			return false;
+		}
+
+		function loadChildren(type, parentKey, page, append) {
+			if (!config.ajaxUrl || !geo.childrenAction) {
+				return;
+			}
+			page = page || 1;
+			var token = append ? childrenToken : ++childrenToken;
+			if (append) {
+				token = childrenToken;
+			}
+			var country = countryField();
+			var body = new window.URLSearchParams();
+			body.set('action', geo.childrenAction);
+			body.set('nonce', geo.childrenNonce || '');
+			body.set('country', country ? country.value : '');
+			body.set('parent_key', parentKey || '');
+			body.set('type', type);
+			body.set('page', String(page));
+			body.set('request_token', String(token));
+			window.fetch(config.ajaxUrl, {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+				body: body.toString()
+			}).then(function (response) { return response.json(); }).then(function (payload) {
+				if (token !== childrenToken) {
+					return;
+				}
+				var data = payload && payload.data ? payload.data : payload;
+				var items = data && data.items ? data.items : [];
+				if (data && data.label) {
+					applyRegionLabel(locationRoot, data.label);
+				}
+				if (type !== 'administrative') {
+					return;
+				}
+				if ((!items.length && !append) || data.skip_admin) {
+					setReveal(locationRoot, 'region', false);
+					setReveal(locationRoot, 'locality', true);
+					return;
+				}
+				var region = ensureRegionSelect();
+				if (!region || region.tagName !== 'SELECT') {
+					setReveal(locationRoot, 'region', false);
+					setReveal(locationRoot, 'locality', true);
+					return;
+				}
+				setReveal(locationRoot, 'region', true);
+				setReveal(locationRoot, 'locality', false);
+				var saved = {
+					value: region.value || region.getAttribute('data-cetech-de-saved-region') || '',
+					key: region.getAttribute('data-cetech-de-saved-region-key') || '',
+					code: region.getAttribute('data-cetech-de-saved-region-code') || ''
+				};
+				if (!append) {
+					region.innerHTML = '<option value="">' + escapeHtml('Select…') + '</option>';
+				}
+				items.forEach(function (item) {
+					var option = document.createElement('option');
+					option.value = item.code || item.key || item.name || '';
+					option.setAttribute('data-location-key', item.key || '');
+					option.textContent = item.name || '';
+					if (regionMatchesSaved(saved, item, option)) {
+						option.selected = true;
+					}
+					region.appendChild(option);
+				});
+				var foundSaved = !!(saved.value || saved.key || saved.code) && !!region.selectedOptions[0] && region.selectedOptions[0].value;
+				if (!foundSaved && saved.value) {
+					foundSaved = Array.prototype.some.call(region.options, function (opt) {
+						return opt.value === saved.value || opt.getAttribute('data-location-key') === saved.key;
+					});
+				}
+				if (!foundSaved && data && data.has_more) {
+					loadChildren(type, parentKey, page + 1, true);
+					return;
+				}
+				var more = locationRoot.querySelector('[data-cetech-de-load-more-admin]');
+				if (data && data.has_more) {
+					if (!more) {
+						more = document.createElement('button');
+						more.type = 'button';
+						more.className = 'button-link';
+						more.setAttribute('data-cetech-de-load-more-admin', '1');
+						more.textContent = 'Load more';
+						region.parentNode.appendChild(more);
+					}
+					more.setAttribute('data-page', String(page + 1));
+					more.setAttribute('data-parent', parentKey || '');
+					more.hidden = false;
+				} else if (more) {
+					more.hidden = true;
+				}
+			}).catch(function () { /* keep existing options */ });
+		}
+
+		function currentParentKey() {
+			var key = keyField();
+			if (key && key.value) {
+				return key.value;
+			}
+			var region = regionField();
+			if (region && region.options && region.selectedIndex >= 0) {
+				var selected = region.options[region.selectedIndex];
+				return (selected && selected.getAttribute('data-location-key')) || '';
+			}
+			return '';
+		}
+
+		function searchLocalities(query, page, append) {
+			if (!config.ajaxUrl || !geo.searchAction) {
+				return;
+			}
+			page = page || 1;
+			var list = locationRoot.querySelector('.cetech-de-locality-results');
+			var token = append ? parseInt(list && list.getAttribute('data-token') ? list.getAttribute('data-token') : '0', 10) : ++searchToken;
+			var country = countryField();
+			var parentKey = currentParentKey();
+			if (!parentKey) {
+				var region = regionField();
+				var selectedRegion = region && region.options && region.selectedIndex >= 0 ? region.options[region.selectedIndex] : null;
+				parentKey = selectedRegion ? (selectedRegion.getAttribute('data-location-key') || '') : '';
+				if (!parentKey && region && region.value && region.value.indexOf('-') !== -1 && region.value.length > 8) {
+					parentKey = region.value;
+				}
+			}
+			var body = new window.URLSearchParams();
+			body.set('action', geo.searchAction);
+			body.set('nonce', geo.searchNonce || '');
+			body.set('country', country ? country.value : '');
+			body.set('parent_key', parentKey);
+			body.set('q', query || '');
+			body.set('page', String(page));
+			body.set('request_token', String(token));
+			if (list) {
+				list.setAttribute('data-token', String(token));
+			}
+			window.fetch(config.ajaxUrl, {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+				body: body.toString()
+			}).then(function (response) { return response.json(); }).then(function (payload) {
+				if (token !== searchToken && !append) {
+					return;
+				}
+				if (list && String(list.getAttribute('data-token') || '') !== String(token)) {
+					return;
+				}
+				var data = payload && payload.data ? payload.data : payload;
+				if (!list) {
+					return;
+				}
+				if (!append) {
+					list.innerHTML = '';
+				}
+				var seen = {};
+				Array.prototype.forEach.call(list.querySelectorAll('[role="option"]'), function (option) {
+					seen[option.getAttribute('data-key') || ''] = true;
+				});
+				var items = data && data.items ? data.items : [];
+				items.forEach(function (item) {
+					if (seen[item.key || '']) {
+						return;
+					}
+					seen[item.key || ''] = true;
+					var li = document.createElement('li');
+					li.setAttribute('role', 'option');
+					li.tabIndex = 0;
+					var resultLabel = item.label || item.name || '';
+					li.textContent = resultLabel;
+					li.setAttribute('aria-label', resultLabel);
+					li.setAttribute('data-key', item.key || '');
+					li.addEventListener('click', function () { selectLocality(item); });
+					li.addEventListener('keydown', function (event) {
+						if (event.key === 'Enter' || event.key === ' ') {
+							event.preventDefault();
+							selectLocality(item);
+						}
+					});
+					list.appendChild(li);
+				});
+				var more = list.querySelector('[data-cetech-de-locality-more]');
+				if (more) {
+					more.remove();
+				}
+				if (data && data.has_more) {
+					var button = document.createElement('button');
+					button.type = 'button';
+					button.className = 'button-link';
+					button.setAttribute('data-cetech-de-locality-more', '1');
+					button.setAttribute('data-page', String(page + 1));
+					button.textContent = 'Load more';
+					button.addEventListener('click', function (event) {
+						event.preventDefault();
+						var city = cityField();
+						searchLocalities(city ? city.value : query, page + 1, true);
+					});
+					list.appendChild(button);
+				}
+				list.hidden = list.querySelectorAll('[role="option"]').length === 0;
+				var city = cityField();
+				if (city) {
+					city.setAttribute('aria-expanded', list.hidden ? 'false' : 'true');
+				}
+			}).catch(function () { /* keep */ });
+		}
+
+		function selectLocality(item) {
+			var city = cityField();
+			var key = keyField();
+			if (city) {
+				city.value = item.name || '';
+			}
+			if (key) {
+				key.value = item.key || '';
+			}
+			var list = locationRoot.querySelector('.cetech-de-locality-results');
+			if (list) {
+				list.hidden = true;
+				list.innerHTML = '';
+			}
+			clearOptions();
+			refreshPostcode();
+			locationRoot.dispatchEvent(new Event('change', { bubbles: true }));
+		}
+
+		function refreshPostcode() {
+			if (!config.ajaxUrl || !geo.postcodeAction) {
+				return;
+			}
+			var token = ++postcodeToken;
+			var country = countryField();
+			var body = new window.URLSearchParams();
+			body.set('action', geo.postcodeAction);
+			body.set('nonce', geo.postcodeNonce || '');
+			body.set('country', country ? country.value : '');
+			body.set('parent_key', currentParentKey());
+			body.set('request_token', String(token));
+			window.fetch(config.ajaxUrl, {
+				method: 'POST',
+				credentials: 'same-origin',
+				headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+				body: body.toString()
+			}).then(function (response) { return response.json(); }).then(function (payload) {
+				if (token !== postcodeToken) {
+					return;
+				}
+				var data = payload && payload.data ? payload.data : payload;
+				setReveal(locationRoot, 'postcode', !!(data && data.visible));
+			}).catch(function () { /* keep */ });
+		}
+
+		var country = countryField();
+		var region = regionField();
+		var city = cityField();
+		if (city) {
+			var listbox = locationRoot.querySelector('.cetech-de-locality-results');
+			if (listbox) {
+				if (!listbox.id) {
+					listbox.id = (city.id || 'cetech-de-city') + '-list';
+				}
+				city.setAttribute('aria-controls', listbox.id);
+				if (!city.getAttribute('role')) {
+					city.setAttribute('role', 'combobox');
+				}
+			}
+		}
+		if (country) {
+			country.addEventListener('change', onCountryChange);
+		}
+		if (region) {
+			region.addEventListener('change', onRegionChange);
+		}
+		locationRoot.addEventListener('click', function (event) {
+			var more = event.target.closest('[data-cetech-de-load-more-admin]');
+			if (!more) {
+				return;
+			}
+			event.preventDefault();
+			loadChildren('administrative', more.getAttribute('data-parent') || '', parseInt(more.getAttribute('data-page') || '2', 10), true);
+		});
+		if (city) {
+			var timer = null;
+			city.addEventListener('input', function () {
+				clearField(locationRoot, 'cetech_de_matching_location_key');
+				clearOptions();
+				writePayload(root);
+				window.clearTimeout(timer);
+				timer = window.setTimeout(function () {
+					searchLocalities(city.value);
+				}, 280);
+			});
+			city.addEventListener('keydown', function (event) {
+				var list = locationRoot.querySelector('.cetech-de-locality-results');
+				if (!list || list.hidden) {
+					return;
+				}
+				var options = list.querySelectorAll('[role="option"]');
+				if (!options.length) {
+					return;
+				}
+				var current = parseInt(list.getAttribute('data-active') || '0', 10);
+				if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+					event.preventDefault();
+					current = event.key === 'ArrowDown' ? current + 1 : current - 1;
+					if (current < 0) {
+						current = options.length - 1;
+					}
+					if (current >= options.length) {
+						current = 0;
+					}
+					list.setAttribute('data-active', String(current));
+					Array.prototype.forEach.call(options, function (option, idx) {
+						option.setAttribute('aria-selected', idx === current ? 'true' : 'false');
+					});
+					options[current].focus();
+				} else if (event.key === 'Enter' || event.key === ' ') {
+					var active = options[current] || options[0];
+					if (active) {
+						event.preventDefault();
+						active.click();
+					}
+				}
+			});
+		}
+		if (country && country.value) {
+			setReveal(locationRoot, 'region', true);
+			if (region && region.value) {
+				setReveal(locationRoot, 'locality', true);
+			}
+			loadChildren('administrative', '');
+		}
 	}
 
 	window.CetechDeProductDeliverySelector = {

@@ -24,6 +24,7 @@ use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\Enum\RateCardChargeType;
 use CetechDeliveryEngine\Domain\ProductRule\ProductDeliveryRuleRepositoryInterface;
 use CetechDeliveryEngine\Domain\RateCard\RateCardRepositoryInterface;
+use CetechDeliveryEngine\Tests\Support\RateCardActiveListingTrait;
 use CetechDeliveryEngine\Support\Logger;
 use PHPUnit\Framework\TestCase;
 
@@ -395,6 +396,7 @@ final class ProductPageDeliveryPriceQuoteTest extends TestCase {
 		$currency = $this->store_currency();
 
 		return new class( $rows, $currency ) implements RateCardRepositoryInterface {
+			use RateCardActiveListingTrait;
 			/**
 			 * @param list<array<string, mixed>> $rows
 			 */

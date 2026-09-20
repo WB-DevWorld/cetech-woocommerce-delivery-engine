@@ -8,6 +8,7 @@ use CetechDeliveryEngine\Application\RateQuote\RateQuoteEngine;
 use CetechDeliveryEngine\Application\RateQuote\RateQuoteRequest;
 use CetechDeliveryEngine\Domain\Enum\RateCardChargeType;
 use CetechDeliveryEngine\Domain\RateCard\RateCardRepositoryInterface;
+use CetechDeliveryEngine\Tests\Support\RateCardActiveListingTrait;
 use PHPUnit\Framework\TestCase;
 
 final class RateQuoteSafetyTest extends TestCase {
@@ -216,6 +217,8 @@ final class RateQuoteSafetyTest extends TestCase {
 }
 
 final class FixedRateCardRepository implements RateCardRepositoryInterface {
+
+	use RateCardActiveListingTrait;
 
 	/**
 	 * @param list<array<string, mixed>> $rows

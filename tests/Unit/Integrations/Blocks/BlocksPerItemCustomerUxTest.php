@@ -36,10 +36,11 @@ final class BlocksPerItemCustomerUxTest extends TestCase {
 					BlocksCheckoutAdapter::NAMESPACE => [
 						'delivery_option_key' => 'in_warehouse:delivery:1',
 						'matching_location'    => [
-							'country'  => 'GH',
-							'state'    => 'AA',
-							'city'     => 'Accra',
-							'postcode' => 'GA-123',
+							'country'                 => 'GH',
+							'state'                   => 'AA',
+							'city'                    => 'Accra',
+							'postcode'                => 'GA-123',
+							'canonical_location_key'  => 'loc-accra',
 						],
 					],
 				],
@@ -49,6 +50,7 @@ final class BlocksPerItemCustomerUxTest extends TestCase {
 		$matching = $bridge->filter_submitted_matching_location( null );
 		self::assertInstanceOf( \CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation::class, $matching );
 		self::assertSame( 'Accra', $matching->city );
+		self::assertSame( 'loc-accra', $matching->canonical_location_key );
 		self::assertSame( 'in_warehouse:delivery:1', $bridge->filter_submitted_option_key( '' ) );
 	}
 
@@ -289,7 +291,7 @@ final class BlocksPerItemCustomerUxTest extends TestCase {
 	}
 
 	public function test_schema_target_remains_five(): void {
-		self::assertSame( '5', \CetechDeliveryEngine\Core\Versioning\SchemaVersion::TARGET );
+		self::assertSame( '6', \CetechDeliveryEngine\Core\Versioning\SchemaVersion::TARGET );
 	}
 
 	/**

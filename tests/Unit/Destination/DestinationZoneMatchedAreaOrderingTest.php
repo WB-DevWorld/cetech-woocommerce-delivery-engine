@@ -52,6 +52,32 @@ final class DestinationZoneMatchedAreaOrderingTest extends TestCase {
 		self::assertSame( self::ACCRA_ID, (int) $matched[1]['id'] );
 	}
 
+	public function test_same_level_overlap_explicit_priority_wins(): void {
+		$zones = new InMemoryDestinationZoneRepository();
+		$zones->save( $this->zone( 80, 'Accra West', 40 ) );
+		$zones->save( $this->zone( 81, 'Accra East', 10 ) );
+		$rules = new InMemoryDestinationRuleRepository();
+		$rules->replaceForZone(
+			80,
+			[
+				$this->rule( DestinationRuleType::Country, 'GH' ),
+				$this->rule( DestinationRuleType::City, 'Accra' ),
+			]
+		);
+		$rules->replaceForZone(
+			81,
+			[
+				$this->rule( DestinationRuleType::Country, 'GH' ),
+				$this->rule( DestinationRuleType::City, 'Accra' ),
+			]
+		);
+		$matcher = new DestinationZoneMatcher( $zones, $rules, $this->ghana_catalog() );
+		$matched = $matcher->match_all( 'GH', 'AA', 'Accra', '' );
+
+		self::assertSame( 81, (int) $matched[0]['id'] );
+		self::assertSame( 80, (int) $matched[1]['id'] );
+	}
+
 	public function test_admin_tester_and_package_resolver_expose_the_same_ordered_ids(): void {
 		$admin    = new DestinationZoneTestMatcher( $this->matcher );
 		$resolver = new PackageDestinationZoneResolver( $this->matcher );

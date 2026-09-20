@@ -92,6 +92,20 @@ final class Rc3ZoneRepository implements DestinationZoneRepositoryInterface {
 	public function findByCode( string $code ): ?array { return $this->store->findByCode( 'zones', $code ); }
 	public function save( array $data ): int { return $this->store->save( 'zones', $data ); }
 	public function list( array $criteria = [] ): array { return $this->store->list( 'zones' ); }
+	public function page_after( int $after_id, int $limit = 100, array $criteria = [] ): array {
+		$out = [];
+		foreach ( $this->store->list( 'zones' ) as $zone ) {
+			$id = (int) ( $zone['id'] ?? 0 );
+			if ( $id <= $after_id ) {
+				continue;
+			}
+			$out[] = $zone;
+			if ( count( $out ) >= max( 1, $limit ) ) {
+				break;
+			}
+		}
+		return $out;
+	}
 	public function softDelete( int $id ): bool { return $this->store->delete( 'zones', $id ); }
 	public function hardDelete( int $id ): bool { return $this->softDelete( $id ); }
 	public function count_all(): int { return $this->store->count( 'zones' ); }

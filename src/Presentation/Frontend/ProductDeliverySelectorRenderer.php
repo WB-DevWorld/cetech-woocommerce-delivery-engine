@@ -113,10 +113,19 @@ final class ProductDeliverySelectorRenderer {
 					'selectOption' => __( 'Please select a delivery option for this product.', 'cetech-woocommerce-delivery-engine' ),
 					'enterLocation' => __( 'Please enter a delivery location for this product.', 'cetech-woocommerce-delivery-engine' ),
 					'free'          => __( 'Free', 'cetech-woocommerce-delivery-engine' ),
+					'deliveryFee'   => CustomerStorefrontCopy::delivery_fee(),
 				],
 				'postField' => CartDeliverySelectionCapture::POST_FIELD,
 				'contextField' => ClassicPdpContextPayload::POST_FIELD,
 				'storeNamespace' => \CetechDeliveryEngine\Integrations\Blocks\BlocksCheckoutAdapter::NAMESPACE,
+				'geography' => [
+					'childrenAction' => \CetechDeliveryEngine\Application\Geography\StorefrontGeographyEndpoint::CHILDREN_ACTION,
+					'searchAction'   => \CetechDeliveryEngine\Application\Geography\StorefrontGeographyEndpoint::SEARCH_ACTION,
+					'postcodeAction' => \CetechDeliveryEngine\Application\Geography\StorefrontGeographyEndpoint::POSTCODE_ACTION,
+					'childrenNonce'  => function_exists( 'wp_create_nonce' ) ? wp_create_nonce( \CetechDeliveryEngine\Application\Geography\StorefrontGeographyEndpoint::CHILDREN_ACTION ) : '',
+					'searchNonce'    => function_exists( 'wp_create_nonce' ) ? wp_create_nonce( \CetechDeliveryEngine\Application\Geography\StorefrontGeographyEndpoint::SEARCH_ACTION ) : '',
+					'postcodeNonce'  => function_exists( 'wp_create_nonce' ) ? wp_create_nonce( \CetechDeliveryEngine\Application\Geography\StorefrontGeographyEndpoint::POSTCODE_ACTION ) : '',
+				],
 			]
 		);
 	}
@@ -427,11 +436,9 @@ final class ProductDeliverySelectorRenderer {
 
 		echo '<li class="' . esc_attr( $class ) . '">';
 		echo '<div class="cetech-de-delivery-option__body">';
-		echo '<span class="cetech-de-delivery-option__headline">';
 		echo '<span class="cetech-de-delivery-option__label">' . esc_html( $label ) . '</span>';
-		$this->render_price( $option );
-		echo '</span>';
 		$this->render_estimate_line( $option );
+		$this->render_price( $option );
 		echo '</div>';
 
 		if ( ! $option->is_available && null !== $option->unavailable_reason && '' !== $option->unavailable_reason ) {
@@ -461,15 +468,13 @@ final class ProductDeliverySelectorRenderer {
 		echo '<label for="' . esc_attr( $input_id ) . '" class="cetech-de-delivery-option__label-wrap">';
 		echo '<input type="radio" name="' . esc_attr( CartDeliverySelectionCapture::POST_FIELD ) . '" id="' . esc_attr( $input_id ) . '" value="' . esc_attr( $option->display_key ) . '"' . ( $checked ? ' checked="checked"' : '' ) . ( $disabled ? ' disabled="disabled"' : '' ) . ' required="required" />';
 		echo '<span class="cetech-de-delivery-option__body">';
-		echo '<span class="cetech-de-delivery-option__headline">';
 		echo '<span class="cetech-de-delivery-option__label">' . esc_html( $label ) . '</span>';
-		$this->render_price( $option );
-		echo '</span>';
 		if ( $is_pickup ) {
 			$this->render_pickup_card_meta( $option );
 		} else {
 			$this->render_estimate_line( $option );
 		}
+		$this->render_price( $option );
 		echo '</span>';
 		echo '</label>';
 		echo '</p>';
@@ -533,8 +538,11 @@ final class ProductDeliverySelectorRenderer {
 		}
 
 		$basis = sanitize_key( (string) ( $option->price_basis ?? '' ) );
+		$line  = FulfilmentChoice::StorePickup->value === $option->fulfilment_choice
+			? $text
+			: CustomerStorefrontCopy::delivery_fee_line( $text );
 		echo '<span class="cetech-de-delivery-option__price"' . ( '' !== $basis ? ' data-cetech-de-price-basis="' . esc_attr( $basis ) . '"' : '' ) . '>';
-		echo esc_html( $text );
+		echo esc_html( $line );
 		echo '</span>';
 	}
 

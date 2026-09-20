@@ -19,7 +19,8 @@ final class MatchingLocation {
 		public readonly string $country_identity,
 		public readonly string $state_identity,
 		public readonly string $city_identity,
-		public readonly string $postcode_identity
+		public readonly string $postcode_identity,
+		public readonly string $canonical_location_key = ''
 	) {
 	}
 
@@ -31,6 +32,8 @@ final class MatchingLocation {
 		$state_raw   = (string) ( $raw['state'] ?? '' );
 		$city_raw    = (string) ( $raw['city'] ?? '' );
 		$postcode    = (string) ( $raw['postcode'] ?? $raw['zip'] ?? '' );
+		$canonical   = trim( (string) ( $raw['canonical_location_key'] ?? $raw['location_key'] ?? '' ) );
+		$canonical   = preg_replace( '/[^a-zA-Z0-9\-]/', '', $canonical ) ?? '';
 
 		$country = LocationNormalizer::countryDisplay( $country_raw );
 		$state   = LocationNormalizer::stateDisplay( $country, $state_raw );
@@ -43,7 +46,8 @@ final class MatchingLocation {
 			LocationNormalizer::country( $country_raw ),
 			LocationNormalizer::state( $country, $state_raw ),
 			LocationNormalizer::cityIdentity( $city_raw ),
-			LocationNormalizer::postcode( $postcode )
+			LocationNormalizer::postcode( $postcode ),
+			$canonical
 		);
 	}
 
@@ -56,7 +60,8 @@ final class MatchingLocation {
 			$this->country_identity,
 			$this->state_identity,
 			$this->city_identity,
-			$this->postcode_identity
+			$this->postcode_identity,
+			$this->canonical_location_key
 		);
 	}
 
@@ -67,10 +72,11 @@ final class MatchingLocation {
 	 */
 	public function toDestinationArray(): array {
 		return [
-			'country'  => $this->country_identity,
-			'state'    => $this->state_identity,
-			'city'     => $this->city,
-			'postcode' => $this->postcode,
+			'country'                 => $this->country_identity,
+			'state'                   => $this->state_identity,
+			'city'                    => $this->city,
+			'postcode'                => $this->postcode,
+			'canonical_location_key'  => $this->canonical_location_key,
 		];
 	}
 
@@ -81,12 +87,13 @@ final class MatchingLocation {
 	 */
 	public function toWcPackageDestination( string $address = '', string $address_2 = '' ): array {
 		return [
-			'country'   => $this->country_identity,
-			'state'     => $this->state_identity,
-			'city'      => $this->city,
-			'postcode'  => $this->postcode,
-			'address'   => $address,
-			'address_2' => $address_2,
+			'country'                => $this->country_identity,
+			'state'                  => $this->state_identity,
+			'city'                   => $this->city,
+			'postcode'               => $this->postcode,
+			'address'                => $address,
+			'address_2'              => $address_2,
+			'canonical_location_key' => $this->canonical_location_key,
 		];
 	}
 
@@ -101,14 +108,15 @@ final class MatchingLocation {
 	 */
 	public function toArray(): array {
 		return [
-			'country'           => $this->country,
-			'state'             => $this->state,
-			'city'              => $this->city,
-			'postcode'          => $this->postcode,
-			'country_identity'  => $this->country_identity,
-			'state_identity'    => $this->state_identity,
-			'city_identity'     => $this->city_identity,
-			'postcode_identity' => $this->postcode_identity,
+			'country'                 => $this->country,
+			'state'                   => $this->state,
+			'city'                    => $this->city,
+			'postcode'                => $this->postcode,
+			'country_identity'        => $this->country_identity,
+			'state_identity'          => $this->state_identity,
+			'city_identity'           => $this->city_identity,
+			'postcode_identity'       => $this->postcode_identity,
+			'canonical_location_key'  => $this->canonical_location_key,
 		];
 	}
 

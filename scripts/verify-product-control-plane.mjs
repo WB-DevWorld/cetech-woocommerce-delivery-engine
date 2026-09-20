@@ -4,6 +4,10 @@ import { existsSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+function readText(path) {
+  return readFileSync(path, 'utf8').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+}
+
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const productDirectory = join(repositoryRoot, 'docs', 'product');
 const expectedRequirementCount = 372;
@@ -189,7 +193,7 @@ function validateArtifactSet() {
     invariant(existsSync(artifactPath) && statSync(artifactPath).isFile(), `Missing product-control-plane file: docs/product/${artifact}`);
   }
 
-  const manifest = readFileSync(join(productDirectory, 'AUDIT-MANIFEST.yaml'), 'utf8');
+  const manifest = readText(join(productDirectory, 'AUDIT-MANIFEST.yaml'));
   const artifactBlock = manifest.match(/^artifacts:\n((?:  - .+\n)+)/m);
   invariant(artifactBlock !== null, 'AUDIT-MANIFEST.yaml has no valid artifacts list');
   const referencedArtifacts = artifactBlock[1]
@@ -198,7 +202,7 @@ function validateArtifactSet() {
     .map((line) => line.replace(/^  - /, ''));
   invariant(JSON.stringify(referencedArtifacts) === JSON.stringify(expectedArtifacts), 'AUDIT-MANIFEST.yaml artifact list does not match the required control-plane files');
 
-  const authority = readFileSync(join(repositoryRoot, 'docs', 'AUTHORITY.md'), 'utf8');
+  const authority = readText(join(repositoryRoot, 'docs', 'AUTHORITY.md'));
   for (const artifact of expectedArtifacts) {
     invariant(authority.includes(`docs/product/${artifact}`), `docs/AUTHORITY.md does not reference docs/product/${artifact}`);
   }
@@ -234,7 +238,7 @@ function runNegativeFixtures(validSource) {
 
 try {
   validateArtifactSet();
-  const registrySource = readFileSync(join(productDirectory, 'CAPABILITY-REGISTRY.yaml'), 'utf8');
+  const registrySource = readText(join(productDirectory, 'CAPABILITY-REGISTRY.yaml'));
   const requirements = validateRegistry(registrySource);
 
   if (process.argv.includes('--self-test')) {

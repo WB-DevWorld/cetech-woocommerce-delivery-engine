@@ -37,6 +37,12 @@ final class ConfigurationTables {
 	/** @var list<string> Post-RC.6 bulk job engine table suffixes. */
 	public const BULK_JOB_SUFFIXES = BulkJobSchema::SUFFIXES;
 
+	/** @var list<string> Schema 6 geography table suffixes. */
+	public const GEOGRAPHY_SUFFIXES = GeographySchema::SUFFIXES;
+
+	/** @var list<string> Schema 6 coverage table suffixes. */
+	public const COVERAGE_SUFFIXES = CoverageSchema::SUFFIXES;
+
 	/**
 	 * @return list<string>
 	 */
@@ -46,7 +52,9 @@ final class ConfigurationTables {
 			self::PRODUCT_RULE_SUFFIXES,
 			self::SCOPED_CONFIGURATION_SUFFIXES,
 			self::SHIPMENT_SUFFIXES,
-			self::BULK_JOB_SUFFIXES
+			self::BULK_JOB_SUFFIXES,
+			self::GEOGRAPHY_SUFFIXES,
+			self::COVERAGE_SUFFIXES
 		);
 	}
 

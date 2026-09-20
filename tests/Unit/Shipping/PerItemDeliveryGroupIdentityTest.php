@@ -131,6 +131,6 @@ final class PerItemDeliveryGroupIdentityTest extends TestCase {
 
 	public function test_worst_case_length_fits_schema_five_column(): void {
 		self::assertLessThanOrEqual( DeliveryGroupIdentity::COLUMN_LENGTH, DeliveryGroupIdentity::worstCaseLength( true ) );
-		self::assertSame( 5, (int) \CetechDeliveryEngine\Core\Versioning\SchemaVersion::TARGET );
+		self::assertSame( 6, (int) \CetechDeliveryEngine\Core\Versioning\SchemaVersion::TARGET );
 	}
 }

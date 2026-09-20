@@ -275,6 +275,12 @@ if ( ! function_exists( 'add_action' ) ) {
 	}
 }
 
+if ( ! function_exists( 'did_action' ) ) {
+	function did_action( string $hook_name ): int {
+		return (int) ( $GLOBALS['wp_actions'][ $hook_name ] ?? 0 );
+	}
+}
+
 if ( ! function_exists( 'add_option' ) ) {
 	function add_option( string $option, mixed $value = '', mixed $deprecated = '', bool|string $autoload = 'yes' ): bool {
 		unset( $deprecated, $autoload );

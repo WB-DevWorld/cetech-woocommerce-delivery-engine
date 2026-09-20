@@ -36,6 +36,25 @@ final class CustomerStorefrontCopy {
 		return __( 'Store Pickup', 'cetech-woocommerce-delivery-engine' );
 	}
 
+	public static function delivery_fee(): string {
+		return __( 'Delivery fee', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function delivery_fee_line( string $price_text ): string {
+		$price_text = trim( $price_text );
+		if ( '' === $price_text ) {
+			return '';
+		}
+		if ( 0 === strcasecmp( $price_text, __( 'Free', 'cetech-woocommerce-delivery-engine' ) ) ) {
+			return $price_text;
+		}
+		if ( str_starts_with( strtolower( $price_text ), strtolower( self::delivery_fee() ) ) ) {
+			return $price_text;
+		}
+
+		return self::delivery_fee() . ': ' . $price_text;
+	}
+
 	public static function change(): string {
 		return __( 'Change', 'cetech-woocommerce-delivery-engine' );
 	}

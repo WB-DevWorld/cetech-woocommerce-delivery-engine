@@ -27,6 +27,29 @@ use CetechDeliveryEngine\Application\Destination\DestinationZoneMatcher;
 use CetechDeliveryEngine\Application\Destination\PackageDestinationZoneResolver;
 use CetechDeliveryEngine\Application\Destination\RegionCodeLabelMatcher;
 use CetechDeliveryEngine\Application\Destination\WooCommerceStateCatalogInterface;
+use CetechDeliveryEngine\Application\Coverage\CoverageConfigurationValidator;
+use CetechDeliveryEngine\Application\Coverage\CoverageGroupMatcher;
+use CetechDeliveryEngine\Application\Geography\AdminGeographyEndpoint;
+use CetechDeliveryEngine\Application\Geography\CanonicalLocationResolver;
+use CetechDeliveryEngine\Application\Geography\GeoNamesGazetteerParser;
+use CetechDeliveryEngine\Application\Geography\GeoNamesPackImporter;
+use CetechDeliveryEngine\Application\Geography\GeographyPackService;
+use CetechDeliveryEngine\Application\Geography\GeographyPostcodeRelevance;
+use CetechDeliveryEngine\Application\Geography\LegacyDestinationCoverageMigrator;
+use CetechDeliveryEngine\Application\Geography\Schema6CoverageUpgradeKickoff;
+use CetechDeliveryEngine\Application\Geography\Schema6CoverageUpgradeService;
+use CetechDeliveryEngine\Application\Geography\StorefrontGeographyEndpoint;
+use CetechDeliveryEngine\Application\Geography\WooCommerceGeographyBootstrap;
+use CetechDeliveryEngine\Domain\Coverage\CoverageGroupRepositoryInterface;
+use CetechDeliveryEngine\Domain\Geography\CanonicalLocationRepositoryInterface;
+use CetechDeliveryEngine\Domain\Geography\GeographyPackRepositoryInterface;
+use CetechDeliveryEngine\Domain\Geography\LocationAliasRepositoryInterface;
+use CetechDeliveryEngine\Domain\Geography\ProviderMappingRepositoryInterface;
+use CetechDeliveryEngine\Infrastructure\Persistence\WpdbCanonicalLocationRepository;
+use CetechDeliveryEngine\Infrastructure\Persistence\WpdbCoverageGroupRepository;
+use CetechDeliveryEngine\Infrastructure\Persistence\WpdbGeographyPackRepository;
+use CetechDeliveryEngine\Infrastructure\Persistence\WpdbLocationAliasRepository;
+use CetechDeliveryEngine\Infrastructure\Persistence\WpdbProviderMappingRepository;
 use CetechDeliveryEngine\Infrastructure\WooCommerce\Destination\WooCommerceStateCatalog;
 use CetechDeliveryEngine\Application\RateQuote\RateQuoteEngine;
 use CetechDeliveryEngine\Application\Order\CustomerOrderDeliverySummaryBuilder;
@@ -160,6 +183,7 @@ use CetechDeliveryEngine\Presentation\Admin\ProductExceptionsPage;
 use CetechDeliveryEngine\Presentation\Admin\ShipmentsPage;
 use CetechDeliveryEngine\Presentation\Admin\DestinationZoneTestMatcher;
 use CetechDeliveryEngine\Presentation\Admin\DestinationZonesPage;
+use CetechDeliveryEngine\Presentation\Admin\LocationPacksPage;
 use CetechDeliveryEngine\Presentation\Admin\EffectiveConfigurationPreviewPage;
 use CetechDeliveryEngine\Presentation\Admin\PreviewVariationsEndpoint;
 use CetechDeliveryEngine\Presentation\Admin\LogisticsProfilesPage;
@@ -274,6 +298,8 @@ final class Plugin {
 		/** @var MigrationRunner $migration_runner */
 		$migration_runner = $this->container->get( MigrationRunner::class );
 		$migration_runner->run();
+		// Woo-dependent coverage conversion waits for init after Action Scheduler (priority 1).
+		$this->container->get( Schema6CoverageUpgradeKickoff::class )->register();
 
 		// Capability matrix must self-heal when an active plugin folder is replaced
 		// without reactivation (activation hooks do not run in that path).
@@ -288,6 +314,7 @@ final class Plugin {
 			$this->container->get( ProductDeliveryPanel::class )->register();
 			$this->container->get( PreviewVariationsEndpoint::class )->register();
 			$this->container->get( BulkJobProgressEndpoint::class )->register();
+			$this->container->get( AdminGeographyEndpoint::class )->register();
 		}
 
 		$this->container->get( BulkJobCliCommand::class )->register();
@@ -295,6 +322,34 @@ final class Plugin {
 			ActionSchedulerQueue::HOOK,
 			function ( $job_id ): void {
 				$this->container->get( BulkJobWorker::class )->tick( (int) $job_id );
+			}
+		);
+		add_action(
+			GeographyPackService::HOOK,
+			function ( $pack_id = 0, $source_path = '', $generation_token = '' ): void {
+				$path  = is_array( $pack_id ) ? (string) ( $pack_id['source_path'] ?? '' ) : (string) $source_path;
+				$id    = is_array( $pack_id ) ? (int) ( $pack_id['pack_id'] ?? 0 ) : (int) $pack_id;
+				$token = is_array( $pack_id ) ? (string) ( $pack_id['generation_token'] ?? '' ) : (string) $generation_token;
+				$this->container->get( GeographyPackService::class )->tick( $id, $path, 200, $token );
+			},
+			10,
+			3
+		);
+		add_action(
+			GeographyPackService::DOWNLOAD_HOOK,
+			function ( $pack_id = 0, $country_code = '', $generation_token = '' ): void {
+				$id      = is_array( $pack_id ) ? (int) ( $pack_id['pack_id'] ?? 0 ) : (int) $pack_id;
+				$country = is_array( $pack_id ) ? (string) ( $pack_id['country_code'] ?? '' ) : (string) $country_code;
+				$token   = is_array( $pack_id ) ? (string) ( $pack_id['generation_token'] ?? '' ) : (string) $generation_token;
+				$this->container->get( GeographyPackService::class )->download_tick( $id, $country, $token );
+			},
+			10,
+			3
+		);
+		add_action(
+			Schema6CoverageUpgradeService::HOOK,
+			function (): void {
+				$this->container->get( Schema6CoverageUpgradeService::class )->continue_pass();
 			}
 		);
 
@@ -330,6 +385,7 @@ final class Plugin {
 		$this->container->get( CartCustomerContextEditorService::class )->register();
 		$this->container->get( CartCustomerContextEditorRenderer::class )->register();
 		$this->container->get( MatchingLocationOptionsEndpoint::class )->register();
+		$this->container->get( StorefrontGeographyEndpoint::class )->register();
 		$this->container->get( CheckoutDeliverySelectionValidator::class )->register();
 		$this->container->get( CheckoutAddressPolicy::class )->register();
 		$this->container->get( CheckoutDeliveryPlanRenderer::class )->register();
@@ -584,7 +640,9 @@ final class Plugin {
 			static fn ( ServiceContainer $container ): DestinationZoneMatcher => new DestinationZoneMatcher(
 				$container->get( DestinationZoneRepositoryInterface::class ),
 				$container->get( DestinationRuleRepositoryInterface::class ),
-				$container->get( RegionCodeLabelMatcher::class )
+				$container->get( RegionCodeLabelMatcher::class ),
+				$container->get( CoverageGroupMatcher::class ),
+				$container->get( CanonicalLocationResolver::class )
 			)
 		);
 
@@ -656,7 +714,8 @@ final class Plugin {
 				$container->get( RateCardRepositoryInterface::class ),
 				$container->get( ProductDeliveryRuleRepositoryInterface::class ),
 				$container->get( ProductTargetResolver::class ),
-				$container->get( FeatureFlags::class )
+				$container->get( FeatureFlags::class ),
+				$container->get( CoverageGroupRepositoryInterface::class )
 			)
 		);
 
@@ -680,7 +739,9 @@ final class Plugin {
 
 		$this->container->singleton(
 			CustomerBrowsingLocationStore::class,
-			static fn (): CustomerBrowsingLocationStore => new CustomerBrowsingLocationStore()
+			static fn ( ServiceContainer $container ): CustomerBrowsingLocationStore => new CustomerBrowsingLocationStore(
+				$container->get( CanonicalLocationResolver::class )
+			)
 		);
 
 		$this->container->singleton(
@@ -773,7 +834,8 @@ final class Plugin {
 				$container->get( Requirements::class ),
 				$container->get( CartDeliverySelectionCapture::class ),
 				$container->get( LocationAwareDeliveryOptions::class ),
-				$container->get( CustomerBrowsingLocationStore::class )
+				$container->get( CustomerBrowsingLocationStore::class ),
+				$container->get( CanonicalLocationResolver::class )
 			)
 		);
 
@@ -1200,7 +1262,20 @@ final class Plugin {
 				$container->get( DestinationZoneTestMatcher::class ),
 				$container->get( AdminActionHandler::class ),
 				$container->get( ConfigurationAuditLogger::class ),
-				$container->get( AdminRecordDependencyChecker::class )
+				$container->get( AdminRecordDependencyChecker::class ),
+				$container->get( CoverageGroupRepositoryInterface::class ),
+				$container->get( CanonicalLocationRepositoryInterface::class ),
+				$container->get( CanonicalLocationResolver::class ),
+				$container->get( CoverageConfigurationValidator::class )
+			)
+		);
+
+		$this->container->singleton(
+			LocationPacksPage::class,
+			static fn ( ServiceContainer $container ): LocationPacksPage => new LocationPacksPage(
+				$container->get( GeographyPackService::class ),
+				$container->get( AdminActionHandler::class ),
+				$container->get( Schema6CoverageUpgradeService::class )
 			)
 		);
 
@@ -1716,7 +1791,8 @@ final class Plugin {
 				$container->get( ShipmentsPage::class ),
 				$container->get( BulkToolsPage::class ),
 				$container->get( NeedsAttentionCountQuery::class ),
-				$container->get( ShipmentActivityCursor::class )
+				$container->get( ShipmentActivityCursor::class ),
+				$container->get( LocationPacksPage::class )
 			)
 		);
 	}
@@ -1785,6 +1861,151 @@ final class Plugin {
 		$this->container->singleton(
 			BulkJobRepositoryInterface::class,
 			static fn (): BulkJobRepositoryInterface => new WpdbBulkJobRepository()
+		);
+
+		$this->container->singleton(
+			CanonicalLocationRepositoryInterface::class,
+			static fn (): CanonicalLocationRepositoryInterface => new WpdbCanonicalLocationRepository()
+		);
+
+		$this->container->singleton(
+			LocationAliasRepositoryInterface::class,
+			static fn ( ServiceContainer $container ): LocationAliasRepositoryInterface => new WpdbLocationAliasRepository(
+				$container->get( CanonicalLocationRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			ProviderMappingRepositoryInterface::class,
+			static fn (): ProviderMappingRepositoryInterface => new WpdbProviderMappingRepository()
+		);
+
+		$this->container->singleton(
+			GeographyPackRepositoryInterface::class,
+			static fn (): GeographyPackRepositoryInterface => new WpdbGeographyPackRepository()
+		);
+
+		$this->container->singleton(
+			CoverageGroupRepositoryInterface::class,
+			static fn (): CoverageGroupRepositoryInterface => new WpdbCoverageGroupRepository()
+		);
+
+		$this->container->singleton(
+			CanonicalLocationResolver::class,
+			static fn ( ServiceContainer $container ): CanonicalLocationResolver => new CanonicalLocationResolver(
+				$container->get( CanonicalLocationRepositoryInterface::class ),
+				$container->get( LocationAliasRepositoryInterface::class ),
+				$container->get( GeographyPackRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			CoverageConfigurationValidator::class,
+			static fn ( ServiceContainer $container ): CoverageConfigurationValidator => new CoverageConfigurationValidator(
+				$container->get( CanonicalLocationRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			GeographyPostcodeRelevance::class,
+			static fn ( ServiceContainer $container ): GeographyPostcodeRelevance => new GeographyPostcodeRelevance(
+				$container->get( CoverageGroupRepositoryInterface::class ),
+				$container->get( CanonicalLocationRepositoryInterface::class ),
+				$container->get( DestinationZoneRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			CoverageGroupMatcher::class,
+			static fn ( ServiceContainer $container ): CoverageGroupMatcher => new CoverageGroupMatcher(
+				$container->get( CoverageGroupRepositoryInterface::class ),
+				$container->get( CanonicalLocationRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			WooCommerceGeographyBootstrap::class,
+			static fn ( ServiceContainer $container ): WooCommerceGeographyBootstrap => new WooCommerceGeographyBootstrap(
+				$container->get( CanonicalLocationRepositoryInterface::class ),
+				$container->get( LocationAliasRepositoryInterface::class ),
+				$container->get( ProviderMappingRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			GeoNamesGazetteerParser::class,
+			static fn (): GeoNamesGazetteerParser => new GeoNamesGazetteerParser()
+		);
+
+		$this->container->singleton(
+			GeoNamesPackImporter::class,
+			static fn ( ServiceContainer $container ): GeoNamesPackImporter => new GeoNamesPackImporter(
+				$container->get( CanonicalLocationRepositoryInterface::class ),
+				$container->get( LocationAliasRepositoryInterface::class ),
+				$container->get( ProviderMappingRepositoryInterface::class ),
+				$container->get( GeographyPackRepositoryInterface::class ),
+				$container->get( WooCommerceGeographyBootstrap::class ),
+				$container->get( GeoNamesGazetteerParser::class )
+			)
+		);
+
+		$this->container->singleton(
+			GeographyPackService::class,
+			static fn ( ServiceContainer $container ): GeographyPackService => new GeographyPackService(
+				$container->get( GeographyPackRepositoryInterface::class ),
+				$container->get( GeoNamesPackImporter::class ),
+				$container->get( WooCommerceGeographyBootstrap::class )
+			)
+		);
+
+		$this->container->singleton(
+			StorefrontGeographyEndpoint::class,
+			static fn ( ServiceContainer $container ): StorefrontGeographyEndpoint => new StorefrontGeographyEndpoint(
+				$container->get( CanonicalLocationRepositoryInterface::class ),
+				$container->get( CanonicalLocationResolver::class ),
+				$container->get( GeographyPackRepositoryInterface::class ),
+				$container->get( ProviderMappingRepositoryInterface::class ),
+				$container->get( GeographyPostcodeRelevance::class )
+			)
+		);
+
+		$this->container->singleton(
+			AdminGeographyEndpoint::class,
+			static fn ( ServiceContainer $container ): AdminGeographyEndpoint => new AdminGeographyEndpoint(
+				$container->get( CanonicalLocationResolver::class ),
+				$container->get( CanonicalLocationRepositoryInterface::class ),
+				$container->get( GeographyPackService::class ),
+				$container->get( CoverageGroupRepositoryInterface::class ),
+				$container->get( Schema6CoverageUpgradeService::class )
+			)
+		);
+
+		$this->container->singleton(
+			LegacyDestinationCoverageMigrator::class,
+			static fn ( ServiceContainer $container ): LegacyDestinationCoverageMigrator => new LegacyDestinationCoverageMigrator(
+				$container->get( DestinationZoneRepositoryInterface::class ),
+				$container->get( DestinationRuleRepositoryInterface::class ),
+				$container->get( CoverageGroupRepositoryInterface::class ),
+				$container->get( CanonicalLocationRepositoryInterface::class ),
+				$container->get( CanonicalLocationResolver::class )
+			)
+		);
+
+		$this->container->singleton(
+			Schema6CoverageUpgradeService::class,
+			static fn ( ServiceContainer $container ): Schema6CoverageUpgradeService => new Schema6CoverageUpgradeService(
+				$container->get( DestinationZoneRepositoryInterface::class ),
+				$container->get( DestinationRuleRepositoryInterface::class ),
+				$container->get( WooCommerceGeographyBootstrap::class ),
+				$container->get( LegacyDestinationCoverageMigrator::class )
+			)
+		);
+
+		$this->container->singleton(
+			Schema6CoverageUpgradeKickoff::class,
+			static fn ( ServiceContainer $container ): Schema6CoverageUpgradeKickoff => new Schema6CoverageUpgradeKickoff(
+				$container->get( Schema6CoverageUpgradeService::class )
+			)
 		);
 
 		$this->container->singleton(

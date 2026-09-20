@@ -23,6 +23,7 @@ use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\Enum\RateCardChargeType;
 use CetechDeliveryEngine\Domain\ProductRule\ProductDeliveryRuleRepositoryInterface;
 use CetechDeliveryEngine\Domain\RateCard\RateCardRepositoryInterface;
+use CetechDeliveryEngine\Tests\Support\RateCardActiveListingTrait;
 use CetechDeliveryEngine\Support\Logger;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -447,6 +448,8 @@ final class ShippingPackageGroupingTest extends TestCase {
  * Minimal rate-card repository for Stage 8A shipping grouping tests.
  */
 final class Stage8aFixedRateCardRepository implements RateCardRepositoryInterface {
+
+	use RateCardActiveListingTrait;
 
 	/**
 	 * @param list<array<string, mixed>> $rows

@@ -24,11 +24,21 @@ use CetechDeliveryEngine\Domain\Zone\DestinationZoneRepositoryInterface;
  */
 final class OverlappingDeliveryAreaCoverage {
 
+	private const MAX_PAIRWISE_ZONES = 80;
+
+	private bool $analysis_incomplete = false;
+
+	/**
+	 * @var list<int>
+	 */
+	private array $unproven_zone_ids = [];
+
 	public function __construct(
 		private DestinationZoneRepositoryInterface $zone_repository,
 		private DestinationRuleRepositoryInterface $rule_repository,
 		private RateCardRepositoryInterface $rate_card_repository,
-		private ?RegionCodeLabelMatcher $region_matcher = null
+		private ?RegionCodeLabelMatcher $region_matcher = null,
+		private ?\CetechDeliveryEngine\Domain\Coverage\CoverageGroupRepositoryInterface $coverage_groups = null
 	) {
 		$this->region_matcher = $region_matcher ?? new RegionCodeLabelMatcher();
 	}
@@ -45,10 +55,37 @@ final class OverlappingDeliveryAreaCoverage {
 	public function warnings(): array {
 		$active = $this->active_zones_with_rules();
 		$warnings = [];
+		$canonical_overlap_noted = [];
+
+		if ( count( $active ) > self::MAX_PAIRWISE_ZONES ) {
+			$this->analysis_incomplete = true;
+			$warnings[] = [
+				'code'    => 'overlap_analysis_incomplete',
+				'title'   => __( 'Overlap analysis not fully proven', 'cetech-woocommerce-delivery-engine' ),
+				'message' => __( 'This store has too many active Delivery Areas for exhaustive overlap analysis in one request. Test specific addresses before relying on uncovered warnings.', 'cetech-woocommerce-delivery-engine' ),
+				'zone_id' => 0,
+				'details' => 'needs_test',
+			];
+
+			return $warnings;
+		}
 
 		foreach ( $this->pairs( $active ) as $pair ) {
 			$left  = $pair[0];
 			$right = $pair[1];
+
+			$left_canonical_only  = ! empty( $left['canonical'] ) && [] === $left['rules'];
+			$right_canonical_only = ! empty( $right['canonical'] ) && [] === $right['rules'];
+			if ( $left_canonical_only || $right_canonical_only ) {
+				$canonical_zone = $left_canonical_only ? $left['zone'] : $right['zone'];
+				$other_zone     = $left_canonical_only ? $right['zone'] : $left['zone'];
+				$cid            = (int) ( $canonical_zone['id'] ?? 0 );
+				if ( $cid > 0 && ! isset( $canonical_overlap_noted[ $cid ] ) ) {
+					$canonical_overlap_noted[ $cid ] = true;
+					$warnings[] = $this->canonical_overlap_warning( $canonical_zone, $other_zone );
+				}
+				continue;
+			}
 
 			if ( ! $this->rules_are_compatible( $left['rules'], $right['rules'] ) ) {
 				continue;
@@ -73,10 +110,33 @@ final class OverlappingDeliveryAreaCoverage {
 		return $warnings;
 	}
 
+	public function analysis_incomplete(): bool {
+		return $this->analysis_incomplete;
+	}
+
+	/**
+	 * @return list<int>
+	 */
+	public function unproven_zone_ids(): array {
+		$this->uncovered_zone_ids();
+
+		return $this->unproven_zone_ids;
+	}
+
 	public function has_nested_overlaps(): bool {
 		$active = $this->active_zones_with_rules();
+		if ( count( $active ) > self::MAX_PAIRWISE_ZONES ) {
+			$this->analysis_incomplete = true;
+
+			return false;
+		}
 
 		foreach ( $this->pairs( $active ) as $pair ) {
+			$left_canonical_only  = ! empty( $pair[0]['canonical'] ) && [] === $pair[0]['rules'];
+			$right_canonical_only = ! empty( $pair[1]['canonical'] ) && [] === $pair[1]['rules'];
+			if ( $left_canonical_only || $right_canonical_only ) {
+				return true;
+			}
 			if ( ! $this->rules_are_compatible( $pair[0]['rules'], $pair[1]['rules'] ) ) {
 				continue;
 			}
@@ -99,20 +159,28 @@ final class OverlappingDeliveryAreaCoverage {
 	 * @return list<int>
 	 */
 	public function uncovered_zone_ids(): array {
-		$active     = $this->active_zones_with_rules();
-		$cards      = $this->rate_card_repository->list( [ 'limit' => 2000 ] );
-		$card_zones = [];
+		$this->unproven_zone_ids = [];
+		$active                  = $this->active_zones_with_rules();
+		$card_zones              = [];
 
-		foreach ( $cards as $card ) {
-			if ( RecordStatus::Active->value !== (string) ( $card['status'] ?? '' ) ) {
-				continue;
-			}
-
-			$zone_id = (int) ( $card['destination_zone_id'] ?? 0 );
-
-			if ( $zone_id > 0 ) {
+		foreach ( $active as $item ) {
+			$zone_id = (int) ( $item['zone']['id'] ?? 0 );
+			if ( $zone_id > 0 && $this->rate_card_repository->countActiveByDestinationZoneId( $zone_id ) > 0 ) {
 				$card_zones[ $zone_id ] = true;
 			}
+		}
+
+		if ( count( $active ) > self::MAX_PAIRWISE_ZONES ) {
+			$this->analysis_incomplete = true;
+			foreach ( $active as $item ) {
+				$zone_id = (int) ( $item['zone']['id'] ?? 0 );
+				if ( $zone_id <= 0 || isset( $card_zones[ $zone_id ] ) ) {
+					continue;
+				}
+				$this->unproven_zone_ids[] = $zone_id;
+			}
+
+			return [];
 		}
 
 		$uncovered = [];
@@ -121,6 +189,11 @@ final class OverlappingDeliveryAreaCoverage {
 			$zone_id = (int) ( $item['zone']['id'] ?? 0 );
 
 			if ( $zone_id <= 0 || isset( $card_zones[ $zone_id ] ) ) {
+				continue;
+			}
+
+			if ( ! empty( $item['canonical'] ) && [] === $item['rules'] ) {
+				$this->unproven_zone_ids[] = $zone_id;
 				continue;
 			}
 
@@ -160,26 +233,46 @@ final class OverlappingDeliveryAreaCoverage {
 	private function active_zones_with_rules(): array {
 		$out = [];
 
-		foreach ( $this->zone_repository->list( [ 'status' => RecordStatus::Active->value, 'limit' => 500 ] ) as $zone ) {
-			$zone_id = (int) ( $zone['id'] ?? 0 );
+		$after = 0;
+		do {
+			$page = $this->zone_repository->page_after( $after, 100, [ 'status' => RecordStatus::Active->value ] );
+			foreach ( $page as $zone ) {
+				$zone_id = (int) ( $zone['id'] ?? 0 );
+				$after   = max( $after, $zone_id );
 
-			if ( $zone_id <= 0 ) {
-				continue;
+				if ( $zone_id <= 0 ) {
+					continue;
+				}
+
+				$rules = $this->rule_repository->listByZoneId( $zone_id );
+				$has_canonical = $this->zone_has_canonical_coverage( $zone_id );
+
+				if ( ( [] === $rules || DestinationZoneMatcher::is_unrestricted_fallback( $zone, $rules ) ) && ! $has_canonical ) {
+					continue;
+				}
+
+				$out[] = [
+					'zone'       => $zone,
+					'rules'      => $rules,
+					'canonical'  => $has_canonical,
+				];
 			}
-
-			$rules = $this->rule_repository->listByZoneId( $zone_id );
-
-			if ( [] === $rules || DestinationZoneMatcher::is_unrestricted_fallback( $zone, $rules ) ) {
-				continue;
-			}
-
-			$out[] = [
-				'zone'  => $zone,
-				'rules' => $rules,
-			];
-		}
+		} while ( [] !== $page );
 
 		return $out;
+	}
+
+	private function zone_has_canonical_coverage( int $zone_id ): bool {
+		if ( ! $this->coverage_groups instanceof \CetechDeliveryEngine\Domain\Coverage\CoverageGroupRepositoryInterface ) {
+			return false;
+		}
+		foreach ( $this->coverage_groups->list_by_zone( $zone_id ) as $group ) {
+			if ( $group->isUsable() ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -322,6 +415,30 @@ final class OverlappingDeliveryAreaCoverage {
 	 *
 	 * @return array{code: string, title: string, message: string, zone_id: int, details: string}
 	 */
+	/**
+	 * @param array<string, mixed> $canonical
+	 * @param array<string, mixed> $other
+	 *
+	 * @return array{code: string, title: string, message: string, zone_id: int, details: string}
+	 */
+	private function canonical_overlap_warning( array $canonical, array $other ): array {
+		$canonical_label = $this->zone_label( $canonical );
+		$other_label     = $this->zone_label( $other );
+
+		return [
+			'code'    => 'canonical_coverage_overlap_unproven',
+			'title'   => __( 'Canonical coverage overlap cannot be proven from legacy rules', 'cetech-woocommerce-delivery-engine' ),
+			'message' => sprintf(
+				/* translators: 1: canonical area name, 2: other area name */
+				__( 'Delivery Area "%1$s" uses canonical coverage. Overlap with other Delivery Areas (including "%2$s") cannot be proven from legacy destination rules.', 'cetech-woocommerce-delivery-engine' ),
+				$canonical_label,
+				$other_label
+			),
+			'zone_id' => (int) ( $canonical['id'] ?? 0 ),
+			'details' => $canonical_label . ' / ' . $other_label,
+		];
+	}
+
 	private function ambiguous_warning( array $left, array $right ): array {
 		$left_label  = $this->zone_label( $left );
 		$right_label = $this->zone_label( $right );
@@ -392,15 +509,7 @@ final class OverlappingDeliveryAreaCoverage {
 	private function cards_by_offer( int $zone_id ): array {
 		$by_offer = [];
 
-		foreach ( $this->rate_card_repository->list( [ 'limit' => 2000 ] ) as $card ) {
-			if ( (int) ( $card['destination_zone_id'] ?? 0 ) !== $zone_id ) {
-				continue;
-			}
-
-			if ( RecordStatus::Active->value !== (string) ( $card['status'] ?? '' ) ) {
-				continue;
-			}
-
+		foreach ( $this->rate_card_repository->listActiveByDestinationZoneId( $zone_id ) as $card ) {
 			$offer_id = (int) ( $card['delivery_offer_id'] ?? 0 );
 
 			if ( $offer_id <= 0 ) {
