@@ -1,6 +1,6 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-20 (geo.15 P1 closure candidate prepared for narrow technical review; frozen geo.14 ZIP unchanged; Draft PR #24 unmerged; not RC.12).
+Last reconciled: 2026-09-20 (geo.16 Location Packs admin-form P2 closure prepared for differential review; frozen geo.15 ZIP unchanged; Draft PR #24 unmerged; not RC.12).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
@@ -81,8 +81,8 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - The approved 372-Requirement registry and companion artifacts live under `docs/product/`; `docs/AUTHORITY.md` defines which artifact governs each class of truth.
 - Stable 1.0 scope is frozen as `STABLE-1.0-SCOPE-1`. This product baseline is not a claim that missing capabilities are implemented or that Stable 1.0 has shipped.
 - Product-control-plane publication PR #25 is merged to protected master `6ee4cef088f0bda2633d4b8e37abf3e37634426b`.
-- The realignment plan is approved, but geo.15 on issue #23 / Draft PR #24 is the only currently authorized runtime implementation stream. Frozen geo.14 remains an immutable rejected physical-QA candidate.
-- After geo.15 technical closure and physical owner QA, the next release action is a controlled CETECH production Pilot/release candidate. No RC.12 name, package, tag, or deployment is created or authorized by this documentation publication.
+- The realignment plan is approved, but geo.16 on issue #23 / Draft PR #24 is the only currently authorized runtime implementation stream. Frozen geo.15 remains the immutable physically qualified geography/runtime baseline except for the confirmed Location Packs admin-form P2. Frozen geo.14 remains an immutable rejected physical-QA candidate.
+- After geo.16 confined differential review and narrow physical QA of the form correction, the next release action is a controlled CETECH production Pilot/release candidate. No RC.12 name, package, tag, or deployment is created or authorized by this documentation publication.
 
 ## Completed forensic / release-control work
 - 2026-09-15 local Git/source recovery (issue #2 / PR #9).
@@ -99,7 +99,8 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - Frozen rejected candidate: `1.0.0-dev.geo.12` / `41861d261fe9c6ca4dead778464de19e5c03ac40`; schema `6`. ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.12.zip`, `1,757,860` bytes, SHA-256 `e66ab64a4869dd6262fe2cea16f2a7b35949e487e34fbafc5c029bd3cb1203c2`. Do not reuse this package identity.
 - Frozen rejected candidate: `1.0.0-dev.geo.13` / `31147df82a819416f15a2729ed87647c6ef80f9e`; schema `6`. ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.13.zip`, `1,758,541` bytes, SHA-256 `c15c44c31ffee4c1baeb1ea6fdeac4fd1255a3ba86cca223ad793fe5c445797a`. Independent geo.12→geo.13 review accepted the intended worker-fencing and hierarchy-boundedness corrections. Do not physically QA geo.13 or reuse its package identity.
 - Frozen rejected candidate: `1.0.0-dev.geo.14` / `ea53d0486593199898269479be624de262127692`; schema `6`. ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.14.zip`, `1,759,583` bytes, SHA-256 `cc3f320e8f9856c08d0e5c50ee05f41363db8a8ba79135bde23befdeaa212cc7`. Isolated physical QA confirmed two P1 production-path defects. Do not rebuild or reuse this package identity.
-- Current technical-correction candidate: `1.0.0-dev.geo.15` / `eb9f4e4893b32ec8e59d47fb90e13adfed85e78e`; schema `6`. ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.15.zip`, `1,763,366` bytes, SHA-256 `95340eed81a3e7d7b5a7bddb3635a825870a6916d5716d27e6ea12f1fcd68690`. Closed P1 pass: deferred schema-6 coverage kickoff until Woo/Action Scheduler readiness; verified pack-lease zero-row renew. Matching unchanged. Draft PR #24 unmerged. Do not run physical QA until narrow technical review accepts the exact geo.15 package.
+- Frozen physically qualified geography/runtime candidate: `1.0.0-dev.geo.15` / `eb9f4e4893b32ec8e59d47fb90e13adfed85e78e`; schema `6`. ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.15.zip`, `1,763,366` bytes, SHA-256 `95340eed81a3e7d7b5a7bddb3635a825870a6916d5716d27e6ea12f1fcd68690`. Isolated physical QA passed migration/import/coverage/storefront qualification. Confirmed P2: Location Packs forms omitted the shared admin POST contract. Do not rebuild or overwrite this package.
+- Current technical-correction candidate: `1.0.0-dev.geo.16`; schema `6`. Closed P2 pass: Location Packs install, continue/retry and reconciliation forms emit `cetech_de_action` plus `cetech_de_nonce` via `AdminFormHelper`. `AdminActionHandler` unchanged. Matching unchanged. Draft PR #24 unmerged. Do not run physical QA until ChatGPT confirms the geo.15→geo.16 differential is confined.
 - Rejected technical-review candidate: `1.0.0-dev.geo.1` / `606730e2535896cb18e415b14d62bbb57d050578` — do not send to physical QA.
 - Rejected technical-review candidate: `1.0.0-dev.geo.2` / `a52e2aafc97274b74ec14f8b451395b73c9541af` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.2.zip`, SHA-256 `6bde464b249ee6f17831e00d39110c8b10f89f441db3e1b453622a5d95f6b4a5`. Do not physically QA geo.2.
 - Rejected technical-review candidate: `1.0.0-dev.geo.3` / `fdff226cbe6837a3ac508bc6677c8e56771ec229` — frozen ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.3.zip`, SHA-256 `1c1af4dcfbc6767402b6e7dfacde9a87270ac5ccb8a950788e130c9d130b49b8`. Do not physically QA geo.3.
@@ -116,8 +117,8 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - Historical qualification PR `#12` / `1.0.0-dev.qual.1` is provenance only.
 
 ## Remaining separate work
-1. Narrow ChatGPT technical review of the exact geo.15 package. Do not merge. Do not mark PR #24 ready. Do not run physical QA until that review accepts the package.
-2. After acceptance, physical requalification of the exact geo.15 ZIP (Track A clean; Track B RC.11 → geo.15 via normal HTTP plugin replacement; no manual `maybe_run()`).
+1. ChatGPT differential review of the exact geo.15→geo.16 Location Packs form-contract correction. Do not merge. Do not mark PR #24 ready. Do not run physical QA until that review accepts the differential as confined.
+2. After acceptance, narrow physical QA of the exact geo.16 ZIP (natural Location Packs POST, negative security, pack-lifecycle smoke, activation/PDP smoke). Inherit geo.15 evidence for byte-identical production files.
 3. Create the controlled CETECH production Pilot/release candidate only after an owner-accepted physically qualified package; deployment remains a separate action.
 4. Certify the Stable 1.0 launch floor: WooCommerce/HPOS, Classic, Blocks, Storefront, current supported WoodMart, B2BKing, and FOX/WOOCS.
 5. Certify WPML/WCML before Stable 1.0 only if it will be advertised as supported at launch; keep other optional targets explicitly uncertified until evidence exists.

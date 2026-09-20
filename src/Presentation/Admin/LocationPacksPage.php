@@ -30,14 +30,14 @@ final class LocationPacksPage {
 		if ( $this->action_handler->verify_post( self::ACTION_INSTALL, self::ACTION_INSTALL, 'manage_delivery_zones', self::SLUG ) ) {
 			$country = strtoupper( sanitize_text_field( wp_unslash( (string) ( $_POST['country_code'] ?? '' ) ) ) );
 			if ( 2 !== strlen( $country ) || ! ctype_alpha( $country ) ) {
-				$this->action_handler->notices()->add_error( __( 'Enter a two-letter country code.', 'cetech-woocommerce-delivery-engine' ) );
+				$this->action_handler->notices()->flash_error( __( 'Enter a two-letter country code.', 'cetech-woocommerce-delivery-engine' ) );
 				return;
 			}
 			$download = ! empty( $_POST['download_official'] );
 			$path     = '';
 			if ( $download ) {
 				$this->packs->queue_official_download( $country );
-				$this->action_handler->notices()->add_success(
+				$this->action_handler->notices()->flash_success(
 					sprintf(
 						/* translators: %s country code */
 						__( 'Official GeoNames pack for %s queued for background download.', 'cetech-woocommerce-delivery-engine' ),
@@ -52,7 +52,7 @@ final class LocationPacksPage {
 				$name = sanitize_file_name( (string) ( $_FILES['pack_file']['name'] ?? '' ) );
 				$path = $this->packs->store_upload( $country, $tmp, $name );
 				if ( '' === $path ) {
-					$this->action_handler->notices()->add_error( __( 'The uploaded pack could not be stored. Use a country .txt or .zip file.', 'cetech-woocommerce-delivery-engine' ) );
+					$this->action_handler->notices()->flash_error( __( 'The uploaded pack could not be stored. Use a country .txt or .zip file.', 'cetech-woocommerce-delivery-engine' ) );
 					return;
 				}
 			} else {
@@ -73,7 +73,7 @@ final class LocationPacksPage {
 						__( 'Location pack for %s failed validation and was not queued.', 'cetech-woocommerce-delivery-engine' ),
 						$country
 					);
-				$this->action_handler->notices()->add_error( $message );
+				$this->action_handler->notices()->flash_error( $message );
 
 				return;
 			}
@@ -88,12 +88,12 @@ final class LocationPacksPage {
 							__( 'Location pack for %s failed.', 'cetech-woocommerce-delivery-engine' ),
 							$country
 						);
-					$this->action_handler->notices()->add_error( $message );
+					$this->action_handler->notices()->flash_error( $message );
 
 					return;
 				}
 			}
-			$this->action_handler->notices()->add_success(
+			$this->action_handler->notices()->flash_success(
 				sprintf(
 					/* translators: %s country code */
 					__( 'Location pack for %s queued. Import continues in the background.', 'cetech-woocommerce-delivery-engine' ),
@@ -113,12 +113,12 @@ final class LocationPacksPage {
 
 		if ( $this->action_handler->verify_post( self::ACTION_RECONCILE, self::ACTION_RECONCILE, 'manage_delivery_zones', self::SLUG ) ) {
 			if ( ! $this->upgrade instanceof Schema6CoverageUpgradeService ) {
-				$this->action_handler->notices()->add_error( __( 'Legacy coverage reconciliation is not available.', 'cetech-woocommerce-delivery-engine' ) );
+				$this->action_handler->notices()->flash_error( __( 'Legacy coverage reconciliation is not available.', 'cetech-woocommerce-delivery-engine' ) );
 				return;
 			}
 			$result = $this->upgrade->reconcile( true );
 			$migration = is_array( $result['migration'] ?? null ) ? $result['migration'] : [];
-			$this->action_handler->notices()->add_success(
+			$this->action_handler->notices()->flash_success(
 				sprintf(
 					/* translators: 1: scanned, 2: skipped manual, 3: reconciled, 4: still review, 5: activated */
 					__( 'Safe reconciliation finished. Scanned %1$d, skipped manual %2$d, reconciled %3$d, still review required %4$d, activated %5$d.', 'cetech-woocommerce-delivery-engine' ),
@@ -131,7 +131,7 @@ final class LocationPacksPage {
 			);
 			$warnings = is_array( $migration['warnings'] ?? null ) ? $migration['warnings'] : [];
 			if ( [] !== $warnings ) {
-				$this->action_handler->notices()->add_warning(
+				$this->action_handler->notices()->flash_warning(
 					sprintf(
 						/* translators: %d warning count */
 						_n( '%d reconciliation warning was recorded.', '%d reconciliation warnings were recorded.', count( $warnings ), 'cetech-woocommerce-delivery-engine' ),
@@ -153,7 +153,8 @@ final class LocationPacksPage {
 
 		echo '<h2>' . esc_html__( 'Install or update a pack', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
 		echo '<form method="post" enctype="multipart/form-data">';
-		wp_nonce_field( self::ACTION_INSTALL, self::ACTION_INSTALL );
+		AdminFormHelper::nonce_field( self::ACTION_INSTALL );
+		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_INSTALL ) . '" />';
 		echo '<table class="form-table"><tr><th><label for="cetech-de-pack-country">' . esc_html__( 'Country', 'cetech-woocommerce-delivery-engine' ) . '</label></th><td>';
 		echo '<input type="text" id="cetech-de-pack-country" name="country_code" value="' . esc_attr( $this->default_country_code() ) . '" maxlength="2" class="regular-text" />';
 		echo '</td></tr><tr><th><label for="cetech-de-pack-file">' . esc_html__( 'Upload gazetteer file', 'cetech-woocommerce-delivery-engine' ) . '</label></th><td>';
@@ -202,7 +203,8 @@ final class LocationPacksPage {
 			echo '</td><td>';
 			if ( GeographyPackStatus::Failed->value === $status || GeographyPackStatus::Importing->value === $status || GeographyPackStatus::Pending->value === $status ) {
 				echo '<form method="post" style="display:inline">';
-				wp_nonce_field( self::ACTION_TICK, self::ACTION_TICK );
+				AdminFormHelper::nonce_field( self::ACTION_TICK );
+				echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_TICK ) . '" />';
 				echo '<input type="hidden" name="pack_id" value="' . esc_attr( (string) $row['id'] ) . '" />';
 				echo '<input type="hidden" name="pack_op" value="retry" />';
 				submit_button( __( 'Continue / retry', 'cetech-woocommerce-delivery-engine' ), 'secondary', 'submit', false );
@@ -218,7 +220,8 @@ final class LocationPacksPage {
 		echo '<h2>' . esc_html__( 'Safe post-pack reconciliation', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
 		echo '<p>' . esc_html__( 'Revisit only Delivery Areas with no coverage, migration-generated review-required groups, or unresolved migration records. Active manually created canonical coverage is never replaced.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 		echo '<form method="post">';
-		wp_nonce_field( self::ACTION_RECONCILE, self::ACTION_RECONCILE );
+		AdminFormHelper::nonce_field( self::ACTION_RECONCILE );
+		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_RECONCILE ) . '" />';
 		submit_button( __( 'Run safe legacy reconciliation', 'cetech-woocommerce-delivery-engine' ), 'secondary' );
 		echo '</form>';
 		echo '</div>';

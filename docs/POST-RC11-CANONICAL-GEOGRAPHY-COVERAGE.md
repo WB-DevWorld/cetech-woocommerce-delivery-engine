@@ -1,6 +1,6 @@
 # Post-RC.11 Canonical Geography & Delivery Area Coverage
 
-Status: ISSUE #23 GEO.15 P1 CLOSURE / NOT MERGED / NOT RC.12
+Status: ISSUE #23 GEO.16 LOCATION PACKS ADMIN-FORM P2 CLOSURE / NOT MERGED / NOT RC.12
 
 Owner: `@wbdevworld`
 
@@ -38,7 +38,9 @@ Rejected technical-review candidate: `1.0.0-dev.geo.13` (`31147df82a819416f15a27
 
 Rejected technical-review candidate: `1.0.0-dev.geo.14` (`ea53d0486593199898269479be624de262127692`). Frozen package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.14.zip` SHA-256 `cc3f320e8f9856c08d0e5c50ee05f41363db8a8ba79135bde23befdeaa212cc7`. Isolated physical QA confirmed two P1 defects. Do not rebuild or reuse this package identity.
 
-Current technical-correction candidate identity: `1.0.0-dev.geo.15` (`eb9f4e4893b32ec8e59d47fb90e13adfed85e78e`). Package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.15.zip` SHA-256 `95340eed81a3e7d7b5a7bddb3635a825870a6916d5716d27e6ea12f1fcd68690`. Schema `6`. Woo-dependent schema-6 coverage conversion kickoff is deferred to `init` priority 20; table migrations remain on `plugins_loaded`. Pack lease zero-row renewals are verified without unfenced writes. Matching precedence is unchanged. Do not physically QA until independent technical review accepts the exact geo.15 package.
+Frozen physically qualified geography/runtime candidate: `1.0.0-dev.geo.15` (`eb9f4e4893b32ec8e59d47fb90e13adfed85e78e`). Package `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.15.zip` SHA-256 `95340eed81a3e7d7b5a7bddb3635a825870a6916d5716d27e6ea12f1fcd68690`. Schema `6`. Isolated physical QA passed migration/import/coverage/storefront qualification and confirmed one P2: Location Packs admin forms omitted `cetech_de_action` / `cetech_de_nonce`. Do not rebuild or reuse this package identity.
+
+Current technical-correction candidate identity: `1.0.0-dev.geo.16`. Schema `6`. Location Packs install, continue/retry and reconciliation forms now use `AdminFormHelper::nonce_field(ACTION)` plus hidden `cetech_de_action`. `AdminActionHandler` security contract is unchanged. Matching precedence is unchanged. Do not physically QA until independent review accepts the geo.15→geo.16 differential as confined to this UI contract correction.
 
 geo.11 technical corrections (PR #24 comment `5730679997` / issue #23 A–O): nested hierarchy ownership via `prepared_hierarchy_root_id`; complete keyset iteration for zones/matcher/admin children; atomic schema-6 lease; inactive canonical members excluded from live authority; stale-response request tokens; truthful postcode relevance; unique geography cache revision; schema-6 verify of current columns; preflight MAX_SCAN is indeterminate rather than false invalidity.
 
