@@ -1,6 +1,6 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-20 (RC.12 tagged and published as a prerelease from protected-master `78594ad`; Issue #26 CLOSED/COMPLETED; training-site qualification PASS; staff-training realignment merged on `c4cee3c` and is **not** the RC.12 tag source; Issue #29 MERGED to protected `master` `83effbf081e54b47ef088673c8ac18217ab9dfda`; Issue #33 post-RC.12 Ghana Location Pack liveness candidate `1.0.0-dev.geo-live.1` is in review and is **not** RC.13; Pilot not authorized).
+Last reconciled: 2026-09-20 (RC.12 tagged and published as a prerelease from protected-master `78594ad`; Issue #26 CLOSED/COMPLETED; training-site qualification PASS; staff-training realignment merged on `c4cee3c` and is **not** the RC.12 tag source; Issue #29 MERGED to protected `master` `83effbf081e54b47ef088673c8ac18217ab9dfda`; Issue #33 post-RC.12 Ghana Location Pack liveness candidate `1.0.0-dev.geo-live.2` is awaiting differential review and is **not** RC.13; geo-live.1 ZIP is frozen historical evidence; Pilot not authorized).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
@@ -39,13 +39,11 @@ Last reconciled: 2026-09-20 (RC.12 tagged and published as a prerelease from pro
 - Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/33
 - Branch: `fix/geography-pack-liveness`
 - Base: protected `master` `83effbf081e54b47ef088673c8ac18217ab9dfda`
-- Development identity: `1.0.0-dev.geo-live.1`
+- Development identity: `1.0.0-dev.geo-live.2`
 - Schema: `6` (unchanged)
-- Runtime / package-source SHA: `afb3b4bee9a09b235b639a227564a0b0b3166cd5`
+- Frozen geo-live.1 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-live.1.zip` (`1,783,293` bytes, SHA-256 `6281f1b3f7d080ac9bb528fc1a117be909ac1ae05c052d6fe704cc053192ccbf`)
 - PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/34
-- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-live.1.zip`
-- Bytes: `1,783,293`
-- SHA-256: `6281f1b3f7d080ac9bb528fc1a117be909ac1ae05c052d6fe704cc053192ccbf`
+- Not merged. Not deployed. Not RC.13.
 - Evidence: `docs/POST-RC12-GEO-LIVENESS.md`
 
 ## Post-RC.12 merged — Issue #29 (not a release)

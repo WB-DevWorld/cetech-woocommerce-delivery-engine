@@ -47,8 +47,21 @@ final class ActionSchedulerReadiness {
 		return self::is_initialized() && function_exists( 'as_enqueue_async_action' );
 	}
 
+	public static function can_schedule_single(): bool {
+		return self::is_initialized() && function_exists( 'as_schedule_single_action' );
+	}
+
 	public static function can_unschedule(): bool {
 		return self::is_initialized() && function_exists( 'as_unschedule_all_actions' );
+	}
+
+	public static function current_time(): int {
+		$store = $GLOBALS['cetech_de_as_store'] ?? null;
+		if ( is_object( $store ) && method_exists( $store, 'now' ) ) {
+			return (int) $store->now();
+		}
+
+		return time();
 	}
 
 	public static function unschedule_all( string $hook, string $group ): void {
@@ -104,6 +117,45 @@ final class ActionSchedulerReadiness {
 
 		if ( array_key_exists( 'cetech_de_test_as_enqueue_invoked', $GLOBALS ) ) {
 			++$GLOBALS['cetech_de_test_as_enqueue_invoked'];
+		}
+
+		if ( is_numeric( $id ) ) {
+			return (int) $id > 0;
+		}
+
+		return false !== $id && null !== $id;
+	}
+
+	/**
+	 * Schedule at most one pending delayed action for hook/group.
+	 * Uses unique=false so an in-progress action cannot suppress the future check.
+	 *
+	 * @param array<string, mixed> $args
+	 */
+	public static function schedule_unique_delayed( string $hook, array $args, string $group, int $timestamp ): bool {
+		if ( array_key_exists( 'cetech_de_test_as_schedule_attempts', $GLOBALS ) ) {
+			++$GLOBALS['cetech_de_test_as_schedule_attempts'];
+		}
+
+		if ( ! self::can_schedule_single() ) {
+			return false;
+		}
+
+		$timestamp = max( $timestamp, self::current_time() );
+		if ( self::pending_count( $hook, $group ) > 0 ) {
+			self::cap_pending( $hook, $group, 1 );
+			if ( array_key_exists( 'cetech_de_test_as_schedule_invoked', $GLOBALS ) ) {
+				++$GLOBALS['cetech_de_test_as_schedule_invoked'];
+			}
+
+			return true;
+		}
+
+		$id = as_schedule_single_action( $timestamp, $hook, $args, $group, false );
+		self::cap_pending( $hook, $group, 1 );
+
+		if ( array_key_exists( 'cetech_de_test_as_schedule_invoked', $GLOBALS ) ) {
+			++$GLOBALS['cetech_de_test_as_schedule_invoked'];
 		}
 
 		if ( is_numeric( $id ) ) {

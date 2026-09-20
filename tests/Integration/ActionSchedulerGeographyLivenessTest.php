@@ -19,12 +19,15 @@ use PHPUnit\Framework\Attributes\RunInSeparateProcess;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Real Action Scheduler uniqueness contract + unattended geography tick lifecycle.
+ * Source-faithful Action Scheduler 3.9.2 uniqueness-contract reproduction
+ * plus unattended geography tick lifecycle.
  *
  * Unique matching is the Action Scheduler 3.9.2 DBStore rule:
  * hook + group against pending and in-progress; arguments are ignored.
- * SQLite reproduces the unique INSERT ... WHERE NOT EXISTS query.
- * The UniqueStore then runs worker A → successor B → C until Ready.
+ * SQLite reproduces the unique INSERT ... WHERE NOT EXISTS query where
+ * PDO sqlite is available. UniqueStore then runs worker A → successor B → C
+ * until Ready. This is not a full production Action Scheduler package
+ * end-to-end test.
  *
  * Requirement IDs: DE-GEO-011, DE-GEO-012, DE-GEO-013, DE-PERF-002.
  */

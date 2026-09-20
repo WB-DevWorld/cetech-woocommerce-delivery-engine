@@ -119,6 +119,10 @@ if ( ! function_exists( 'as_schedule_single_action' ) ) {
 	 * @return int
 	 */
 	function as_schedule_single_action( $timestamp, $hook, $args = [], $group = '', $unique = false ) {
+		$store = $GLOBALS['cetech_de_as_store'] ?? null;
+		if ( is_object( $store ) && method_exists( $store, 'schedule_single' ) ) {
+			return (int) $store->schedule_single( (int) $timestamp, (string) $hook, is_array( $args ) ? $args : [], (string) $group, (bool) $unique );
+		}
 		$GLOBALS['cetech_de_test_as_calls']['schedule'][] = [
 			'timestamp' => (int) $timestamp,
 			'hook'      => (string) $hook,

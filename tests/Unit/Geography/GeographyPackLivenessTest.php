@@ -57,11 +57,18 @@ final class GeographyPackLivenessTest extends TestCase {
 		$enqueue = $this->method_source( $source, 'enqueue_unique_async' );
 		self::assertStringNotContainsString( 'as_unschedule_all_actions', $enqueue );
 		self::assertStringContainsString( 'pending_count', $enqueue );
+		$delayed = $this->method_source( $source, 'schedule_unique_delayed' );
+		self::assertStringContainsString( 'as_schedule_single_action( $timestamp, $hook, $args, $group, false )', $delayed );
+		self::assertStringNotContainsString( 'as_enqueue_async_action', $delayed );
 		$plugin = (string) file_get_contents( dirname( __DIR__, 2 ) . '/../src/Bootstrap/Plugin.php' );
 		self::assertStringContainsString( 'register_liveness()', $plugin );
 		$packs = (string) file_get_contents( dirname( __DIR__, 2 ) . '/../src/Application/Geography/GeographyPackService.php' );
 		self::assertStringContainsString( 'ensure_import_liveness', $packs );
+		self::assertStringContainsString( 'schedule_unique_delayed', $packs );
 		self::assertSame( 'cetech_de_geography_pack_liveness', GeographyPackService::LIVENESS_HOOK );
+		self::assertSame( 60, GeographyPackService::LIVENESS_INTERVAL_SECONDS );
+		self::assertMatchesRegularExpression( '/function schedule_liveness_check\(\): void \{[^}]*schedule_unique_delayed/s', $packs );
+		self::assertDoesNotMatchRegularExpression( '/function schedule_liveness_check\(\): void \{[^}]*enqueue_unique_async/s', $packs );
 	}
 
 	public function test_running_action_does_not_suppress_its_own_successor(): void {
@@ -207,6 +214,7 @@ final class GeographyPackLivenessTest extends TestCase {
 		self::assertSame( 0, $this->store->count_by_status( GeographyPackService::HOOK, $group, ActionSchedulerUniqueStore::STATUS_PENDING ) );
 		$service->ensure_import_liveness();
 		self::assertSame( 0, $this->store->count_by_status( GeographyPackService::HOOK, $group, ActionSchedulerUniqueStore::STATUS_PENDING ) );
+		self::assertSame( 0, $this->store->count_by_status( GeographyPackService::LIVENESS_HOOK, GeographyPackService::LIVENESS_GROUP, ActionSchedulerUniqueStore::STATUS_PENDING ) );
 		unlink( $file );
 	}
 
@@ -223,6 +231,7 @@ final class GeographyPackLivenessTest extends TestCase {
 		$group = GeographyPackService::GROUP . '-' . $pack->id;
 		self::assertSame( 0, $this->store->count_by_status( GeographyPackService::HOOK, $group, ActionSchedulerUniqueStore::STATUS_PENDING ) );
 		self::assertSame( GeographyPackStatus::Failed, $packs->find_by_id( $pack->id )?->status );
+		self::assertSame( 0, $this->store->count_by_status( GeographyPackService::LIVENESS_HOOK, GeographyPackService::LIVENESS_GROUP, ActionSchedulerUniqueStore::STATUS_PENDING ) );
 		unlink( $file );
 	}
 
@@ -261,6 +270,51 @@ final class GeographyPackLivenessTest extends TestCase {
 		$service->ensure_import_liveness();
 		$group = GeographyPackService::GROUP . '-' . $pack->id;
 		self::assertSame( 0, $this->store->count_by_status( GeographyPackService::HOOK, $group, ActionSchedulerUniqueStore::STATUS_PENDING ) );
+		self::assertSame( 1, $this->store->count_by_status( GeographyPackService::LIVENESS_HOOK, GeographyPackService::LIVENESS_GROUP, ActionSchedulerUniqueStore::STATUS_PENDING ) );
+		unlink( $file );
+	}
+
+	public function test_watchdog_is_rate_bounded_and_does_not_hot_loop(): void {
+		[ $service, $packs, $file, $pack ] = $this->importing_fixture( 4 );
+		$packs->update_progress( $pack->id, GeographyPackStatus::Importing, '8', $pack->progress, '', null, $pack->target_token() );
+		$this->store->reset();
+		$this->store->set_now( 1_000 );
+		$service->kick_liveness_if_needed();
+		self::assertSame( 1, $this->store->count_by_status( GeographyPackService::LIVENESS_HOOK, GeographyPackService::LIVENESS_GROUP, ActionSchedulerUniqueStore::STATUS_PENDING ) );
+		self::assertSame( 1_000 + GeographyPackService::LIVENESS_INTERVAL_SECONDS, $this->store->next_scheduled_at( GeographyPackService::LIVENESS_HOOK, GeographyPackService::LIVENESS_GROUP ) );
+
+		$executions = 0;
+		for ( $i = 0; $i < 100; ++$i ) {
+			$id = $this->store->claim_next_pending( GeographyPackService::LIVENESS_HOOK, GeographyPackService::LIVENESS_GROUP );
+			self::assertSame( 0, $id, 'Watchdog must not run before the delayed interval.' );
+		}
+
+		$this->store->set_now( 1_060 );
+		$id = $this->store->claim_next_pending( GeographyPackService::LIVENESS_HOOK, GeographyPackService::LIVENESS_GROUP );
+		self::assertGreaterThan( 0, $id );
+		$service->ensure_import_liveness();
+		$this->store->complete( $id );
+		++$executions;
+		self::assertSame( 1, $executions );
+		self::assertSame( 1, $this->store->count_by_status( GeographyPackService::LIVENESS_HOOK, GeographyPackService::LIVENESS_GROUP, ActionSchedulerUniqueStore::STATUS_PENDING ) );
+		self::assertSame( 1_120, $this->store->next_scheduled_at( GeographyPackService::LIVENESS_HOOK, GeographyPackService::LIVENESS_GROUP ) );
+
+		for ( $i = 0; $i < 100; ++$i ) {
+			$again = $this->store->claim_next_pending( GeographyPackService::LIVENESS_HOOK, GeographyPackService::LIVENESS_GROUP );
+			self::assertSame( 0, $again, 'Watchdog must not execute 100 times at the same clock time.' );
+		}
+		self::assertSame( 1, $this->store->count_by_status( GeographyPackService::HOOK, GeographyPackService::GROUP . '-' . $pack->id, ActionSchedulerUniqueStore::STATUS_PENDING ) );
+		unlink( $file );
+	}
+
+	public function test_watchdog_does_not_rearm_when_a_healthy_tick_is_pending(): void {
+		[ $service, $packs, $file, $pack ] = $this->importing_fixture( 4 );
+		$group = GeographyPackService::GROUP . '-' . $pack->id;
+		$service->retry( $pack->id, $file );
+		self::assertSame( 1, $this->store->count_by_status( GeographyPackService::HOOK, $group, ActionSchedulerUniqueStore::STATUS_PENDING ) );
+		$service->ensure_import_liveness();
+		self::assertSame( 1, $this->store->count_by_status( GeographyPackService::HOOK, $group, ActionSchedulerUniqueStore::STATUS_PENDING ) );
+		self::assertSame( 1, $this->store->count_by_status( GeographyPackService::LIVENESS_HOOK, GeographyPackService::LIVENESS_GROUP, ActionSchedulerUniqueStore::STATUS_PENDING ) );
 		unlink( $file );
 	}
 

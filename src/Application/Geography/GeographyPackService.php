@@ -30,6 +30,8 @@ final class GeographyPackService {
 
 	public const LIVENESS_GROUP = 'cetech-delivery-engine-geography-liveness';
 
+	public const LIVENESS_INTERVAL_SECONDS = 60;
+
 	public const REVISION_OPTION = 'cetech_de_geography_revision';
 
 	public const GEONAMES_URL_PATTERN = '#^https://download\.geonames\.org/export/dump/[A-Z]{2}\.zip$#';
@@ -649,9 +651,10 @@ final class GeographyPackService {
 	}
 
 	/**
-	 * Register bounded import liveness: recover an importing pack that has
+	 * Register delayed import liveness: recover an importing pack that has
 	 * no pending and no in-progress continuation without resetting cursor,
-	 * checksum, source, or generation token.
+	 * checksum, source, or generation token. The watchdog is rate-bounded
+	 * and is not the primary importer.
 	 */
 	public function register_liveness(): void {
 		add_action( self::LIVENESS_HOOK, [ $this, 'ensure_import_liveness' ] );
@@ -707,7 +710,10 @@ final class GeographyPackService {
 		}
 		if ( $unfinished ) {
 			$this->schedule_liveness_check();
+
+			return;
 		}
+		ActionSchedulerReadiness::unschedule_all( self::LIVENESS_HOOK, self::LIVENESS_GROUP );
 	}
 
 	private function rearm_pack_if_orphaned( GeographyPack $pack ): void {
@@ -743,7 +749,12 @@ final class GeographyPackService {
 	}
 
 	private function schedule_liveness_check(): void {
-		ActionSchedulerReadiness::enqueue_unique_async( self::LIVENESS_HOOK, [], self::LIVENESS_GROUP );
+		ActionSchedulerReadiness::schedule_unique_delayed(
+			self::LIVENESS_HOOK,
+			[],
+			self::LIVENESS_GROUP,
+			ActionSchedulerReadiness::current_time() + self::LIVENESS_INTERVAL_SECONDS
+		);
 	}
 
 	private function has_unfinished_pack(): bool {
