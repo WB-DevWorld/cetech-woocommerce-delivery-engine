@@ -36,6 +36,7 @@ use CetechDeliveryEngine\Application\Geography\GeoNamesPackImporter;
 use CetechDeliveryEngine\Application\Geography\GeographyPackService;
 use CetechDeliveryEngine\Application\Geography\GeographyPostcodeRelevance;
 use CetechDeliveryEngine\Application\Geography\LegacyDestinationCoverageMigrator;
+use CetechDeliveryEngine\Application\Geography\Schema6CoverageUpgradeKickoff;
 use CetechDeliveryEngine\Application\Geography\Schema6CoverageUpgradeService;
 use CetechDeliveryEngine\Application\Geography\StorefrontGeographyEndpoint;
 use CetechDeliveryEngine\Application\Geography\WooCommerceGeographyBootstrap;
@@ -297,9 +298,8 @@ final class Plugin {
 		/** @var MigrationRunner $migration_runner */
 		$migration_runner = $this->container->get( MigrationRunner::class );
 		$migration_runner->run();
-		if ( \CetechDeliveryEngine\Infrastructure\Persistence\ConfigurationTables::exists( \CetechDeliveryEngine\Infrastructure\Persistence\CoverageSchema::GROUPS_SUFFIX ) ) {
-			$this->container->get( Schema6CoverageUpgradeService::class )->maybe_run();
-		}
+		// Woo-dependent coverage conversion waits for init after Action Scheduler (priority 1).
+		$this->container->get( Schema6CoverageUpgradeKickoff::class )->register();
 
 		// Capability matrix must self-heal when an active plugin folder is replaced
 		// without reactivation (activation hooks do not run in that path).
@@ -1998,6 +1998,13 @@ final class Plugin {
 				$container->get( DestinationRuleRepositoryInterface::class ),
 				$container->get( WooCommerceGeographyBootstrap::class ),
 				$container->get( LegacyDestinationCoverageMigrator::class )
+			)
+		);
+
+		$this->container->singleton(
+			Schema6CoverageUpgradeKickoff::class,
+			static fn ( ServiceContainer $container ): Schema6CoverageUpgradeKickoff => new Schema6CoverageUpgradeKickoff(
+				$container->get( Schema6CoverageUpgradeService::class )
 			)
 		);
 

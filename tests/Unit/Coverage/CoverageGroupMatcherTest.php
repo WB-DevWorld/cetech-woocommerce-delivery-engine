@@ -222,6 +222,30 @@ final class CoverageGroupMatcherTest extends TestCase {
 		self::assertSame( [], $this->matcher->match_all( 'NG', '', 'Lagos', '' ) );
 	}
 
+	public function test_same_specificity_overlap_configured_priority_wins(): void {
+		$this->save_zone( 70, 'Greater Accra standard', 40 );
+		$this->groups->save_group(
+			[
+				'zone_id'          => 70,
+				'root_location_id' => $this->geo->greater_accra->id,
+				'coverage_mode'    => CoverageMode::EntireArea->value,
+				'status'           => RecordStatus::Active->value,
+			]
+		);
+		$this->save_zone( 71, 'Greater Accra priority', 10 );
+		$this->groups->save_group(
+			[
+				'zone_id'          => 71,
+				'root_location_id' => $this->geo->greater_accra->id,
+				'coverage_mode'    => CoverageMode::EntireArea->value,
+				'status'           => RecordStatus::Active->value,
+			]
+		);
+
+		self::assertSame( [ 71, 70 ], $this->match_ids( 'loc-accra' ) );
+		self::assertSame( [ 71, 70 ], $this->match_ids( 'loc-tema' ) );
+	}
+
 	public function test_postcode_exact_and_prefix(): void {
 		$zone_id = $this->save_zone( 30, 'Postcode' );
 		$this->groups->save_group(

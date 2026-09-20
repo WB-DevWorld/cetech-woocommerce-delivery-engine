@@ -213,13 +213,14 @@ final class WpdbGeographyPackRepository implements GeographyPackRepositoryInterf
 			return false;
 		}
 		global $wpdb;
-		$table = TableNames::for( GeographySchema::PACKS_SUFFIX );
-		$sql   = "UPDATE `{$table}` SET `lease_expires_at` = %d, `updated_at` = %s WHERE `id` = %d AND `lease_owner` = %s";
+		$table      = TableNames::for( GeographySchema::PACKS_SUFFIX );
+		$expires_at = $now + max( 1, $ttl_seconds );
+		$sql        = "UPDATE `{$table}` SET `lease_expires_at` = %d, `updated_at` = %s WHERE `id` = %d AND `lease_owner` = %s";
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		$affected = $wpdb->query(
 			$wpdb->prepare(
 				$sql,
-				$now + max( 1, $ttl_seconds ),
+				$expires_at,
 				gmdate( 'Y-m-d H:i:s' ),
 				$id,
 				$owner
@@ -228,8 +229,18 @@ final class WpdbGeographyPackRepository implements GeographyPackRepositoryInterf
 		if ( false === $affected ) {
 			throw new \RuntimeException( 'Failed to renew geography pack lease for pack ' . $id . '.' );
 		}
+		if ( (int) $affected > 0 ) {
+			return true;
+		}
 
-		return (int) $affected > 0;
+		return $this->lease_matches_renewal( $id, $owner, $expires_at );
+	}
+
+	private function lease_matches_renewal( int $id, string $owner, int $expires_at ): bool {
+		$lease = $this->current_lease( $id );
+
+		return $owner === (string) ( $lease['owner'] ?? '' )
+			&& $expires_at === (int) ( $lease['expires_at'] ?? 0 );
 	}
 
 	public function release_lease( int $id, string $owner ): bool {

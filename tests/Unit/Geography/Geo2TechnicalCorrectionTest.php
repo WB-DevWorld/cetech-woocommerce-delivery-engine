@@ -30,17 +30,24 @@ use PHPUnit\Framework\TestCase;
 
 final class Geo2TechnicalCorrectionTest extends TestCase {
 
-	public function test_plugin_boot_runs_schema6_upgrade_after_migrations(): void {
+	public function test_plugin_boot_defers_schema6_coverage_kickoff_until_init(): void {
 		$source = (string) file_get_contents( dirname( __DIR__, 3 ) . '/src/Bootstrap/Plugin.php' );
-		$runner = strpos( $source, '$migration_runner->run();' );
-		$upgrade = strpos( $source, 'Schema6CoverageUpgradeService::class )->maybe_run()' );
+		$runner  = strpos( $source, '$migration_runner->run();' );
+		$kickoff = strpos( $source, 'Schema6CoverageUpgradeKickoff::class )->register()' );
 		self::assertNotFalse( $runner );
-		self::assertNotFalse( $upgrade );
-		self::assertGreaterThan( $runner, $upgrade );
+		self::assertNotFalse( $kickoff );
+		self::assertGreaterThan( $runner, $kickoff );
+		self::assertStringNotContainsString(
+			'Schema6CoverageUpgradeService::class )->maybe_run()',
+			$source
+		);
 		self::assertStringNotContainsString(
 			'Schema6CoverageUpgradeService::class )->run()',
 			$source
 		);
+		self::assertStringContainsString( 'Schema6CoverageUpgradeService::HOOK', $source );
+		self::assertStringContainsString( 'GeographyPackService::HOOK', $source );
+		self::assertStringContainsString( 'GeographyPackService::DOWNLOAD_HOOK', $source );
 	}
 
 	public function test_schema5_rules_without_geography_rows_bootstrap_all_countries_then_migrate_active(): void {

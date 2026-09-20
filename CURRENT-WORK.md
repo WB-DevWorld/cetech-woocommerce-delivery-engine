@@ -1,6 +1,6 @@
 # Current Work — Post-RC.11 Canonical Geography Stream
 
-Status: ISSUE #23 GEO.14 CAS CLOSURE COMPLETE / DRAFT PR #24 OPEN / NOT MERGED / NOT RC.12 / READY FOR PHYSICAL-QA AUTHORIZATION REVIEW
+Status: ISSUE #23 GEO.15 P1 CLOSURE / READY FOR NARROW TECHNICAL REVIEW / DRAFT PR #24 OPEN / NOT MERGED / NOT RC.12 / DO NOT RUN PHYSICAL QA UNTIL THE EXACT GEO.15 PACKAGE IS ACCEPTED
 
 ## Canonical repository truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
@@ -22,7 +22,7 @@ Status: ISSUE #23 GEO.14 CAS CLOSURE COMPLETE / DRAFT PR #24 OPEN / NOT MERGED /
 - The authoritative product-control-plane package is published under `docs/product/` on protected `master` via PR #25 (`6ee4cef088f0bda2633d4b8e37abf3e37634426b`).
 - `docs/AUTHORITY.md` assigns governing responsibility by artifact. The 372 Requirement IDs are frozen and must not be renumbered.
 - Stable 1.0 scope checkpoint: `STABLE-1.0-SCOPE-1`.
-- Product-control-plane artifacts do not by themselves authorize extra runtime work. Issue #23 / Draft PR #24 / geo.14 remains the only currently authorized runtime implementation stream.
+- Product-control-plane artifacts do not by themselves authorize extra runtime work. Issue #23 / Draft PR #24 / geo.15 is the only currently authorized runtime implementation stream. Frozen geo.14 remains an immutable rejected physical-QA candidate.
 
 ## Active stream — issue #23
 - Issue: `#23 — [POST-RC11] Canonical geography, coverage groups, cascading location UX, and delivery-card redesign`.
@@ -34,7 +34,8 @@ Status: ISSUE #23 GEO.14 CAS CLOSURE COMPLETE / DRAFT PR #24 OPEN / NOT MERGED /
 - Frozen technical-stabilization candidate: `1.0.0-dev.geo.11` / `daef41a85662e1c1dc0aa6f5673ca9749f163a26`.
 - Frozen rejected candidate: `1.0.0-dev.geo.12` / `41861d261fe9c6ca4dead778464de19e5c03ac40`. Frozen package: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.12.zip` (SHA-256 `e66ab64a4869dd6262fe2cea16f2a7b35949e487e34fbafc5c029bd3cb1203c2`). Do not physically QA geo.12 or reuse its package identity.
 - Frozen rejected candidate: `1.0.0-dev.geo.13` / `31147df82a819416f15a2729ed87647c6ef80f9e`. Frozen package: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.13.zip` (SHA-256 `c15c44c31ffee4c1baeb1ea6fdeac4fd1255a3ba86cca223ad793fe5c445797a`). Independent geo.12→geo.13 review accepted the intended worker-fencing and hierarchy-boundedness corrections. Do not physically QA geo.13 or reuse its package identity.
-- Authorized current identity: `1.0.0-dev.geo.14` (schema `6`).
+- Frozen rejected candidate: `1.0.0-dev.geo.14` / `ea53d0486593199898269479be624de262127692`. Frozen package: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.14.zip` (1,759,583 bytes, SHA-256 `cc3f320e8f9856c08d0e5c50ee05f41363db8a8ba79135bde23befdeaa212cc7`). Isolated physical QA confirmed two P1 production-path defects. Do not rebuild, overwrite or reuse the geo.14 package identity.
+- Authorized current identity: `1.0.0-dev.geo.15` (schema `6`).
 - Product-control-plane sync: merged `origin/master` `6ee4cef088f0bda2633d4b8e37abf3e37634426b` into `feat/canonical-geography-coverage` at pre-sync `daef41a85662e1c1dc0aa6f5673ca9749f163a26`; post-sync merge commit `a7b3592d2d862a7b7a279087a66813104d04642c`. Conflicts resolved only in `CURRENT-WORK.md` and `docs/STATUS_CURRENT.md`. `ci.yml` auto-merged and preserves feat/** CI plus product-control-plane validation. No rebase/squash/history rewrite.
 - Target schema: `6`.
 - `1.0.0-dev.geo.1` (`606730e2535896cb18e415b14d62bbb57d050578`) is a rejected technical-review candidate. Do not send it to physical QA or reuse its package identity.
@@ -50,7 +51,7 @@ Status: ISSUE #23 GEO.14 CAS CLOSURE COMPLETE / DRAFT PR #24 OPEN / NOT MERGED /
 - `1.0.0-dev.geo.11` (`daef41a85662e1c1dc0aa6f5673ca9749f163a26`) is a rejected whole-branch closure-review candidate. Frozen package: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.11.zip` (SHA-256 `5ba3eb3a6b10eba60e36735085071b628d1dc030e85f4e79f67e5753c9331400`). Do not physically QA geo.11 or reuse its package identity.
 - `1.0.0-dev.geo.12` (`41861d261fe9c6ca4dead778464de19e5c03ac40`) is a rejected whole-branch review candidate. Frozen package: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.12.zip` (SHA-256 `e66ab64a4869dd6262fe2cea16f2a7b35949e487e34fbafc5c029bd3cb1203c2`). Do not physically QA geo.12 or reuse its package identity.
 - `1.0.0-dev.geo.13` (`31147df82a819416f15a2729ed87647c6ef80f9e`) is a frozen rejected technical-review candidate after independent acceptance of its worker-fencing and hierarchy-boundedness corrections. Frozen package: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.13.zip` (SHA-256 `c15c44c31ffee4c1baeb1ea6fdeac4fd1255a3ba86cca223ad793fe5c445797a`). Do not physically QA geo.13 or reuse its package identity.
-- Implementation: geo.14 single-defect CAS closure (real wpdb zero-row no-op verification, no fallback write) is implemented on this branch. Not physically QA'd; not packaged as RC.11; not merged; not self-accepted.
+- Implementation: geo.15 closed P1 correction pass only. Schema/table `MigrationRunner::run()` stays on `plugins_loaded`. Woo-dependent `Schema6CoverageUpgradeService::maybe_run()` kickoff moved to `init` priority 20 after Action Scheduler priority 1. Action Scheduler enqueue/unschedule requires datastore initialization evidence, not `function_exists` alone. Pack `renew_lease()` treats zero affected rows as ambiguous and verifies the persisted owner/expiry with a direct read; zero rows never trigger an unfenced write. Matching precedence is unchanged. Not packaged as RC.11; not merged; not self-accepted. Do not run physical QA until narrow technical review accepts the exact geo.15 package.
 - Do not package this work as `1.0.0-rc.11`.
 - Keep PR #24 Draft. Do not merge. Do not self-accept.
 
@@ -62,7 +63,7 @@ Cursor/AI is the owner's implementation, testing, migration, packaging and evide
 Ben (`@Ben-001-sys`) and Emmanuel (`@Emmanuel-coder-prog`) have **no** implementation, review, approval or ownership requirement for issue #23 unless the human owner later delegates something explicitly in this file.
 
 ## Central leases
-- plugin bootstrap / version identity: `@wbdevworld` (issue #23 → `1.0.0-dev.geo.14`);
+- plugin bootstrap / version identity: `@wbdevworld` (issue #23 → `1.0.0-dev.geo.15`);
 - schema / migrations: `@wbdevworld` (schema `6`);
 - destination matching / Effective geography contracts: `@wbdevworld`;
 - published release identity/tags: frozen at `v1.0.0-rc.11`;
@@ -75,7 +76,7 @@ Ben (`@Ben-001-sys`) and Emmanuel (`@Emmanuel-coder-prog`) have **no** implement
 - Training site: NO autonomous mutation.
 - Production: NO autonomous mutation.
 - POS repository: outside scope / must not be touched.
-- CETECH is the first production Pilot customer, but no Pilot creation or deployment is authorized until geo.14 has technical closure and physical owner QA.
+- CETECH is the first production Pilot customer, but no Pilot creation or deployment is authorized until geo.15 has technical closure and physical owner QA.
 - WPML/WCML: do not merge. Certification remains separate and is required before Stable 1.0 only if advertised as supported at launch.
 - WP Rocket certification: do not expand; remains separate/unqualified.
 - Stage 15: not started.
@@ -89,26 +90,39 @@ Ben (`@Ben-001-sys`) and Emmanuel (`@Emmanuel-coder-prog`) have **no** implement
 - ZIP SHA-256: `c15c44c31ffee4c1baeb1ea6fdeac4fd1255a3ba86cca223ad793fe5c445797a`.
 - Do not reuse or overwrite this package identity.
 
-## Geo.14 CAS-closure evidence
+## Geo.14 CAS-closure evidence (frozen / physically QA'd / rejected)
 - Identity: `1.0.0-dev.geo.14`; schema `6`.
 - Package-source SHA: `ea53d0486593199898269479be624de262127692`.
 - ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.14.zip`.
 - ZIP bytes: `1,759,583`.
 - ZIP SHA-256: `cc3f320e8f9856c08d0e5c50ee05f41363db8a8ba79135bde23befdeaa212cc7`.
-- Production package verifier: PASS (schema target 6).
-- Extracted root: `cetech-woocommerce-delivery-engine/`.
-- Packaged PHP lint: `497 files / 0 failures`.
+- Isolated physical QA confirmed two P1 production-path defects: schema-6 coverage conversion started too early (`deferred_woo` / unsafe Action Scheduler enqueue) and geography pack same-second `renew_lease()` false `lock_lost`.
+- Local evidence path (outside ZIP): `C:\Users\Jane\Desktop\Learning 2026\Cursor\cetech-de-owner-qa-geo14\evidence\`. In-repo pointer `docs/ISSUE-23-GEO14-PHYSICAL-QA.md` may be local/uncommitted; do not manufacture history.
+- Do not rebuild, overwrite or reuse this package identity.
+
+## Geo.15 P1-closure candidate
+- Identity: `1.0.0-dev.geo.15`; schema `6`.
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.15.zip` (bytes/SHA-256 recorded after the clean package-source SHA is built).
+- Production files: `Plugin.php` deferred kickoff; `Schema6CoverageUpgradeKickoff`; `ActionSchedulerReadiness`; `Schema6CoverageUpgradeService::enqueue_continuation()`; `GeographyPackService` enqueue; `WpdbGeographyPackRepository::renew_lease()`.
+- Lifecycle: `MigrationRunner::run()` remains on `plugins_loaded`. Coverage conversion kickoff is `init` priority 20. Worker callbacks for schema-6 and geography-pack hooks remain registered at boot.
+- Action Scheduler: enqueue/unschedule require `ActionScheduler::is_initialized()` / `did_action('action_scheduler_init')`. `function_exists('as_enqueue_async_action')` is not sufficient. Unsafe scheduler APIs are not invoked; later requests retry the kickoff.
+- Pack renew: database false = failure; affected rows > 0 = success; affected rows === 0 = direct lease read; true only when pack ID, `lease_owner` and `lease_expires_at` already equal the intended renewal. No fallback write.
+- Matching: unchanged. Same-level overlap still ranks by configured Delivery Area priority. Equal-specificity equal-priority overlap diagnostics retained.
 - Requirement IDs referenced in this pass: DE-GEO-011, DE-GEO-012, DE-GEO-013, DE-PERF-002.
-- Frozen rejected geo.13 package remains `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.13.zip` / SHA-256 `c15c44c31ffee4c1baeb1ea6fdeac4fd1255a3ba86cca223ad793fe5c445797a` / source `31147df82a819416f15a2729ed87647c6ef80f9e`.
-- Local gates: Composer validate OK; PHP lint 2802 files / 0 failures; Docker PHP 8.1 runtime lint 482 files OK; default PHPUnit 1210 tests / 7306 assertions; Geo14 unit 4 tests / 18 assertions; Geo14 real-MariaDB `@group geo14-real-db` 5 tests / 54 assertions; Geo13 unit 4 tests / 50 assertions; Vitest 76 tests; team control plane OK; product control plane OK (10 files, 372 Requirement IDs).
-- Real MariaDB `@group geo13-real-db` after CAS fix: 3 tests / 54 assertions in 02:11; >10,000 metadata-only drafts 100.76s / 20142 logged queries; >1,000 hierarchy-changing roots 30.18s / 61 batches / cursor 2004 / 2030 `id >` root-discovery after-ids / 13219 logged queries; real wpdb/CAS stale-worker fencing PASS without `sleep(1)`.
-- Real MariaDB `@group geo14-real-db`: identical expected/replacement no-op CAS PASS; same-second valid renewal PASS; true CAS mismatch does not write replacement PASS; stale worker A after B takeover FAIL for A / PASS for B; `maybe_run` acquire→immediate renew is not `stale_owner` PASS.
 - PR #24 remains Draft / OPEN / unmerged.
+- Do not run physical QA until narrow technical review accepts the exact geo.15 package.
+
+## Recorded P3 / non-blocking (not in geo.15)
+- Blocks script dependency warning.
+- Variable ETA copy/prefix.
+- Lamp default selection UX.
+- Optional Blocks totals evidence polish.
+- WoodMart WP-CLI 128M lab memory limit.
 
 ## Current next work
-1. Independent differential geo.13→geo.14 CAS review plus confirmation that no unrelated accepted runtime changed. Do not merge. Do not start another geo.N iteration from this implementation pass.
-2. If that review is clean, STOP STATIC GEO CANDIDATE ITERATION and authorize physical QA of the exact geo.14 package.
-3. After accepted technical closure and physical owner QA, create a controlled CETECH production Pilot/release candidate. This does not pre-authorize deployment and does not assume the name RC.12.
+1. Narrow ChatGPT technical review of the exact geo.15 package. STOP. Do not run physical QA until that review accepts the package.
+2. After acceptance, physical requalification of the exact geo.15 ZIP: Track A clean install; Track B RC.11 → geo.15 through normal WordPress plugin replacement/HTTP lifecycle with no manual `maybe_run()`.
+3. Keep PR #24 Draft. Do not mark ready. Do not merge. Do not create RC.12 or a CETECH Pilot.
 
 ## Explicit non-actions
 Do not move, rebuild or overwrite RC.11. Do not reuse the RC.11 identity. Do not create RC.12 merely because this implementation succeeds. Do not request Ben/Emmanuel approval. Do not alter frozen Requirement IDs or change product-control-plane registry classifications as part of this stream.

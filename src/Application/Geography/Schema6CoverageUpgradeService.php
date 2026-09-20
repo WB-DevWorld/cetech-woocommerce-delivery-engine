@@ -9,6 +9,7 @@ use CetechDeliveryEngine\Domain\Zone\DestinationRuleRepositoryInterface;
 use CetechDeliveryEngine\Domain\Zone\DestinationZoneRepositoryInterface;
 use CetechDeliveryEngine\Infrastructure\Persistence\ConfigurationTables;
 use CetechDeliveryEngine\Infrastructure\Persistence\CoverageSchema;
+use CetechDeliveryEngine\Infrastructure\WordPress\ActionSchedulerReadiness;
 
 /**
  * Schema-5 → schema-6 coverage conversion after tables exist.
@@ -655,13 +656,7 @@ final class Schema6CoverageUpgradeService {
 	}
 
 	private function enqueue_continuation(): void {
-		if ( ! function_exists( 'as_enqueue_async_action' ) ) {
-			return;
-		}
-		if ( function_exists( 'as_unschedule_all_actions' ) ) {
-			as_unschedule_all_actions( self::HOOK, null, self::GROUP );
-		}
-		as_enqueue_async_action( self::HOOK, [], self::GROUP, true );
+		ActionSchedulerReadiness::enqueue_unique_async( self::HOOK, [], self::GROUP );
 	}
 
 	public function woo_catalog_available(): bool {

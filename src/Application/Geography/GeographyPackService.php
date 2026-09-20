@@ -8,6 +8,7 @@ use CetechDeliveryEngine\Domain\Enum\GeographyPackStatus;
 use CetechDeliveryEngine\Domain\Enum\GeographyProvider;
 use CetechDeliveryEngine\Domain\Geography\GeographyPack;
 use CetechDeliveryEngine\Domain\Geography\GeographyPackRepositoryInterface;
+use CetechDeliveryEngine\Infrastructure\WordPress\ActionSchedulerReadiness;
 
 /**
  * Admin-facing pack lifecycle. Large imports are batched and resumable.
@@ -613,38 +614,26 @@ final class GeographyPackService {
 	}
 
 	private function enqueue_tick( int $pack_id, string $file_path, string $generation_token = '' ): void {
-		if ( function_exists( 'as_enqueue_async_action' ) ) {
-			$group = $this->pack_action_group( $pack_id );
-			if ( function_exists( 'as_unschedule_all_actions' ) ) {
-				as_unschedule_all_actions( self::HOOK, null, $group );
-			}
-			$args = [
-				'pack_id'          => $pack_id,
-				'source_path'      => $file_path,
-				'generation_token' => $generation_token,
-			];
-			as_enqueue_async_action( self::HOOK, $args, $group, true );
-		}
+		$group = $this->pack_action_group( $pack_id );
+		$args  = [
+			'pack_id'          => $pack_id,
+			'source_path'      => $file_path,
+			'generation_token' => $generation_token,
+		];
+		ActionSchedulerReadiness::enqueue_unique_async( self::HOOK, $args, $group );
 	}
 
 	private function enqueue_download( int $pack_id, string $country_code, string $generation_token ): void {
-		if ( ! function_exists( 'as_enqueue_async_action' ) ) {
-			return;
-		}
 		$group = $this->pack_action_group( $pack_id );
-		if ( function_exists( 'as_unschedule_all_actions' ) ) {
-			as_unschedule_all_actions( self::DOWNLOAD_HOOK, null, $group );
-			as_unschedule_all_actions( self::HOOK, null, $group );
-		}
-		as_enqueue_async_action(
+		ActionSchedulerReadiness::unschedule_all( self::HOOK, $group );
+		ActionSchedulerReadiness::enqueue_unique_async(
 			self::DOWNLOAD_HOOK,
 			[
 				'pack_id'          => $pack_id,
 				'country_code'     => $country_code,
 				'generation_token' => $generation_token,
 			],
-			$group,
-			true
+			$group
 		);
 	}
 
