@@ -46,7 +46,7 @@ WooCommerce also needs this plugin’s shipping method, named **Delivery**, on a
 ## Before you configure geography
 
 1. Confirm WooCommerce store country and currency. The Delivery Engine does not replace them.  
-2. Decide which countries you serve with **locality-level** delivery. You do **not** install every country’s Location Pack.  
+2. Decide whether you need **city/town** directory data WooCommerce does not already provide. You do **not** install every country’s Location Pack. Country/region coverage can use WooCommerce administrative geography without a pack.
 3. Understand the pieces: Location Pack = directory of places; Delivery Area = business grouping; Coverage Group = which places qualify; Delivery Option = service; Delivery Charge = money.  
 4. If this store upgraded from RC.11, expect some city rules to say **Review required** until a pack is **ready** and you reconcile. Data was not destroyed.
 
@@ -57,7 +57,7 @@ Ghana is the training/reference market, not a product limitation.
 ## Recommended conceptual order (why this order)
 
 1. Confirm WooCommerce / base store settings.  
-2. Install / verify Location Packs needed by the business.  
+2. Install / verify Location Packs **if** the business needs city/town directory data WooCommerce does not already provide.  
 3. Create or review Delivery Options.  
 4. Create Delivery Areas.  
 5. Add Coverage Groups to those Delivery Areas.  
@@ -71,7 +71,7 @@ Ghana is the training/reference market, not a product limitation.
 13. Place a safe test order (authorised only).  
 14. Review snapshots / logs (order **Delivery information**; do not rewrite history).
 
-**Why:** Locality search and Selected locations coverage need a **ready** pack. Charges need areas. Product rules need options. Customer tests need charges. Skipping Location Packs is why upgraded Accra/Kumasi rules sat on **Review required** on training.
+**Why:** Charges need areas. Product rules need options. Customer tests need charges. A Location Pack is needed when you want city/town directory data WooCommerce does not already provide, or when old locality text needs reconciliation — not merely because a Coverage Group uses **Selected locations** or **Entire selected area except…**. Country/region coverage can use WooCommerce administrative geography without a pack. Skipping a needed Ghana pack is why upgraded Accra/Kumasi city rules sat on **Review required** on training.
 
 **Setup Guide** can still build a first area and charge. After RC.12, still verify Coverage Groups and install packs before you rely on city pickers.
 

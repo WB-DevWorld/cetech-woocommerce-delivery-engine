@@ -35,11 +35,15 @@ Customer sees Ghana → Greater Accra → Accra (or Tema, Madina, Adenta) → St
 
 ## Do I need a Location Pack?
 
-**Yes**, if customers must pick a city/locality, or you use **Selected locations** / **Entire selected area except…**, or an upgraded store shows **Review required** for old city names.
+A Location Pack is needed when the business requires **deeper locality / city / town directory data that WooCommerce does not already provide**, or when old city/town text needs safe canonical mapping / **Review required** reconciliation.
 
-**Not always**, if you only deliver country-wide and never need locality search. WooCommerce can still show Country and Region without a pack.
+Country / region coverage can work **without** a locality pack when WooCommerce already provides those administrative locations. Ghana **Country + Region** can work without a Ghana pack.
 
-You do **not** install every country’s pack. Install packs for countries you actually serve with locality-level delivery.
+Deeper city/town selection **normally** requires the pack. Locality search needs pack-backed locality data **where WooCommerce does not already supply those places**.
+
+A Location Pack is **not** required merely because a Coverage Group uses **Selected locations** or **Entire selected area except…**. Those modes use whatever canonical places exist. If you only select WooCommerce countries/regions, no GeoNames pack is required. If you need Accra, Tema, Madina, Adenta as towns, install the Ghana pack.
+
+You do **not** install every country’s pack. Install packs only where you need that extra city/town directory.
 
 Ghana is the training/reference market, not a product limitation.
 

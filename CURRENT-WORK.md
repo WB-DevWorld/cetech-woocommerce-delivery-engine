@@ -1,6 +1,6 @@
 # Current Work — RC.12 Staff Training Realignment
 
-Status: RC.12 TAGGED AND PUBLISHED — DOCS-ONLY TRAINING REALIGNMENT / NOT DEPLOYED
+Status: RC.12 TAGGED AND PUBLISHED — TRAINING SITE QUALIFIED / CETECH PILOT NOT STARTED / FLAIROC NOT DEPLOYED / PRODUCTION NOT DEPLOYED
 
 ## Canonical repository truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
@@ -48,11 +48,11 @@ Docs-only staff training realignment for RC.12 Location Packs, Coverage Groups, 
 - PR #12 / `1.0.0-dev.qual.1` remains historical qualification provenance.
 
 ## Environment authorization
-- CETECH Pilot: NOT AUTHORIZED.
-- FLAIROC: NO autonomous mutation.
-- Training site: NO autonomous mutation (read-only inspection only).
-- Production: NO autonomous mutation.
+- Training site `https://training.cetechbpa.com`: RC.12 installed, schema 6, training-site qualification **PASS**. Do not mutate it from this docs stream. Training-site qualification is **not** Stable-1.0 certification.
+- CETECH Pilot: **NOT STARTED**.
+- FLAIROC: **NOT DEPLOYED**.
+- Production: **NOT DEPLOYED**.
 - POS repository: outside scope / must not be touched.
 
 ## Explicit non-actions
-Do not deploy CETECH Pilot. Do not deploy FLAIROC/training/production. Do not touch POS. Do not start Stage 15. Do not merge WPML/WCML. Do not expand WP Rocket certification. Do not create RC.13. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not merge `docs/staff-training-rc2`. Do not change runtime PHP, JS, migrations, or schema.
+Do not start CETECH Pilot. Do not deploy FLAIROC or production. Do not mutate the training site from this docs stream. Do not touch POS. Do not start Stage 15. Do not merge WPML/WCML. Do not expand WP Rocket certification. Do not create RC.13. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not merge `docs/staff-training-rc2`. Do not change runtime PHP, JS, migrations, or schema.

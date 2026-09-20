@@ -281,7 +281,7 @@ Sales/customer-service: skip unless a trainer assigns it.
 Install country geography. Status **pending / importing / ready / failed**. **Continue / retry**. **Run safe legacy reconciliation**.
 
 ## 2. Why it matters
-Without a usable pack, locality search has no pack-backed results even when WooCommerce shows Country and Region.
+Without a usable pack, locality search has no pack-backed city/town results even when WooCommerce shows Country and Region. Country/region coverage can still work. A pack is not required merely because a Coverage Group uses **Selected locations** or **Entire selected area except…**.
 
 ## 3. Watch the walkthrough
 Visual Walkthrough 4A. Guide [14](14-LOCATION-PACKS-AND-GEOGRAPHY.md).

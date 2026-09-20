@@ -11,7 +11,7 @@ Geography deep guides: [14](14-LOCATION-PACKS-AND-GEOGRAPHY.md), [15](15-DELIVER
 
 ## Why can't I select a city/locality?
 
-WooCommerce can show Country and Region without a Location Pack. Locality search needs a **ready** pack for that country. Training after RC.12 had **0** packs and no pack-backed locality data — expected, not a crash. Ask an administrator to install the Ghana (or other) pack and wait for **ready**.
+WooCommerce can show Country and Region without a Location Pack. Locality search needs pack-backed city/town data **where WooCommerce does not already supply those places**. Training after RC.12 had **0** packs and no pack-backed locality data — expected, not a crash. Ask an administrator to install the Ghana (or other) pack only if customers must pick those deeper towns, then wait for **ready**.
 
 ---
 

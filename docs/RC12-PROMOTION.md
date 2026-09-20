@@ -1,6 +1,6 @@
 # RC.12 Promotion
 
-Status: COMPLETE / TAGGED / PUBLISHED PRERELEASE / NOT DEPLOYED
+Status: COMPLETE / TAGGED / PUBLISHED PRERELEASE / TRAINING SITE QUALIFIED / CETECH PILOT NOT STARTED / FLAIROC NOT DEPLOYED / PRODUCTION NOT DEPLOYED
 
 ## Purpose
 Promote the owner-accepted Issue #23 geography baseline already integrated into protected `master` to `1.0.0-rc.12` without adding new runtime behavior.
@@ -160,8 +160,10 @@ Issue `#26` closeout comment: https://github.com/WB-DevWorld/cetech-woocommerce-
 
 ## Boundaries
 - RC.11 tag/package remain immutable.
-- No CETECH Pilot deployment.
-- No FLAIROC/training/production deployment.
+- Training site `https://training.cetechbpa.com`: RC.12 installed, schema 6, training-site qualification **PASS**. That is **not** Stable-1.0 certification. Isolated Compose qualification (above) did not itself deploy to training.
+- CETECH Pilot: **NOT STARTED**. This tag/prerelease is not Pilot authorization.
+- FLAIROC: **NOT DEPLOYED**.
+- Production: **NOT DEPLOYED**.
 - No POS repository changes.
 - No WPML/WCML merge.
 - No WP Rocket certification expansion.
@@ -170,7 +172,7 @@ Issue `#26` closeout comment: https://github.com/WB-DevWorld/cetech-woocommerce-
 - No schema 7.
 - Stage 15 not started.
 - Issue `#26` closed after tag + prerelease + asset verification.
-- GitHub prerelease published; this is not deployment authorization.
+- GitHub prerelease published; this is not production or Pilot authorization.
 
 ## Ownership
 Sole owner / release authority: `@wbdevworld`.

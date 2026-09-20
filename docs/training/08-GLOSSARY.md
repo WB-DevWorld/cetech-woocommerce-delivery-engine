@@ -15,7 +15,7 @@ Terms match what you see in the Delivery Engine screens. Technical implementatio
 
 **Administrative Area** — The level under country (Ghana: **Region**; other countries may say State, Province, County, Prefecture).
 
-**Locality** — City or town in the directory (Accra, Tema, Madina, Adenta). Needs a **ready** Location Pack for search.
+**Locality** — City or town in the directory (Accra, Tema, Madina, Adenta). Search needs pack-backed locality data **where WooCommerce does not already provide those places**. Deeper city/town selection normally requires a Location Pack. Country/region coverage does not.
 
 **Delivery Area** — Business grouping of destinations that share intended delivery treatment (example: Greater Accra Selected Cities).
 

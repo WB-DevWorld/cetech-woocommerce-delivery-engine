@@ -146,6 +146,8 @@ The **Coverage** dropdown:
 
 Staff sometimes say “Entire Area / Selected Locations / Entire Area Except.” On the RC.12 screen the labels are the three in the table above.
 
+Country or region **Entire selected area** can use WooCommerce-provided administrative geography without a GeoNames locality pack. A pack is needed when the included or excluded places are deeper cities/towns WooCommerce does not already list, or when old locality text needs reconciliation. The mode name itself does not require a pack.
+
 ### Entire selected area
 
 1. Country: Ghana

@@ -50,19 +50,21 @@ For Ghana, the administrative-area label on screen is **Region**.
 
 ## Why do I need it?
 
-WooCommerce already knows **countries** and, for many countries, **states / regions**. That is why Ghana + Greater Accra can appear even when no Location Pack is installed.
+WooCommerce already knows **countries** and, for many countries, **states / regions**. RC.12 can use those WooCommerce-provided places as canonical administrative geography **without** a GeoNames locality pack. That is why Ghana + Greater Accra can appear even when no Location Pack is installed.
 
-WooCommerce does **not** ship a complete, searchable list of every locality the business may serve. The Location Pack supplies that deeper list.
+WooCommerce does **not** ship a complete, searchable list of every city/town the business may serve. The Location Pack supplies that **deeper** locality directory.
 
-You need a pack when you want any of these:
+A Location Pack is needed when:
 
-- customers to search and pick a **locality** (Accra, Tema, Madina, …)
-- Coverage Groups that use **Selected locations** or **Entire selected area except…**
-- upgraded stores to map old text city names (for example `"Accra"`) onto the exact place in the directory
+- the business requires city/town directory data WooCommerce does not already provide (Accra, Tema, Madina, Adenta, …);
+- customers must search and pick those deeper localities;
+- an upgraded store has old locality text (for example `"Accra"`) that needs safe canonical mapping / **Review required** reconciliation.
 
-You do **not** need a pack for every country on earth. Install packs for countries you actually serve with locality-level delivery.
+A Location Pack is **not** required merely because a Coverage Group uses **Selected locations** or **Entire selected area except…**. Those modes can target WooCommerce countries/regions. They need a pack only when the selected or excluded places are deeper localities WooCommerce does not already list.
 
-Country-wide delivery (the whole country, no city selector) can still work without forcing a locality.
+You do **not** need a pack for every country on earth. Install packs only where you need that extra city/town directory.
+
+Country-wide or region-wide delivery can still work without forcing a locality. Ghana Country + Region can work without a Ghana pack. Deeper city/town selection normally requires the pack.
 
 ---
 
@@ -215,7 +217,7 @@ On the product page, location selection is progressive:
 
 1. **Country**
 2. **Administrative area / Region / State** (WooCommerce can supply this even without a pack)
-3. **Locality** (needs pack-backed directory data)
+3. **Locality** (deeper city/town; normally needs pack-backed data where WooCommerce does not already supply it)
 4. **Postcode** only when it is relevant for that destination
 
 Changing a parent **clears** child selections. If the customer changes Country, Region and Locality reset. If they change Region, Locality and Postcode reset.

@@ -120,10 +120,11 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - WoodMart physically qualified on 8.4.1 for issue #18 PDP-price acceptance.
 - Issue #18 owner QA used WordPress 7.1 / WooCommerce 11.0.1 in its isolated lab.
 - RC.11 package clean-install/upgrade smoke used isolated GitHub Actions WordPress/WooCommerce containers; WooCommerce 11.1.0 was installed during the successful run.
-- RC.12 isolated qualification used WordPress `php8.2-apache` + WooCommerce `11.0.1` in Compose project `cetech-rc12-qual`; not a FLAIROC/training/production claim.
-- External PSP certification: not claimed.
-- FLAIROC/training/production deployment or certification: not claimed by RC.11 or this RC.12 qualification.
-- CETECH Pilot: not authorized by this RC.12 qualification.
+- RC.12 isolated qualification used WordPress `php8.2-apache` + WooCommerce `11.0.1` in Compose project `cetech-rc12-qual`. That isolated lab is not a FLAIROC or production claim.
+- Training site `https://training.cetechbpa.com`: RC.12 installed, schema 6, training-site qualification **PASS**. That is **not** Stable-1.0 certification.
+- FLAIROC: **NOT DEPLOYED**.
+- Production: **NOT DEPLOYED**.
+- CETECH Pilot: **NOT STARTED**. This tag/prerelease is not Pilot authorization.
 - POS repository / VitePOS: outside scope.
 
 ## Development baseline
@@ -166,7 +167,8 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 ## Current documentation stream
 - Branch `docs/rc12-training-realignment` realigns `docs/training/` for RC.12 Location Packs, Coverage Groups, review-required coverage, and the recommended setup order.
 - Later documentation commits on `master` are **not** the RC.12 tag source and must not receive the `v1.0.0-rc.12` tag.
-- Training site `https://training.cetechbpa.com` currently runs RC.12 / schema 6. Qualification: PASS. Do not mutate the live training site from this docs stream.
+- Training site `https://training.cetechbpa.com` currently runs RC.12 / schema 6. Training-site qualification: **PASS**. Do not mutate the live training site from this docs stream. Training-site qualification is **not** Stable-1.0 certification.
+- CETECH Pilot: **NOT STARTED**. FLAIROC: **NOT DEPLOYED**. Production: **NOT DEPLOYED**.
 
 ## Remaining separate work
 1. Create the controlled CETECH production Pilot only after a separate owner authorization; this tag/prerelease is not that authorization.

@@ -206,7 +206,7 @@ Install country locality data used by Delivery Areas and the product-page city s
 Administrators / authorised configuration staff (same access as Delivery Areas). Salespeople do not need this page daily.
 
 **When to use it**  
-Before locality-level Coverage Groups; after an RC.11→RC.12 upgrade that shows **Review required**; when adding a new country later.
+When the business needs city/town directory data WooCommerce does not already provide; after an RC.11→RC.12 upgrade that shows **Review required** for old locality text; when adding a new country’s deeper localities later. Country/region coverage can proceed without a locality pack when WooCommerce already provides those administrative locations.
 
 **What it is not**  
 Not a delivery price, Delivery Area, Delivery Option, carrier, or customer address book. Installing Ghana geography does not create GH₵30.
@@ -237,7 +237,7 @@ Revisits Delivery Areas with no coverage, migration-generated review-required gr
 Notice after run: scanned, skipped manual, reconciled, still review required, activated.
 
 **Recommended**  
-Install packs only for countries you serve with locality-level delivery. Ghana is the training/reference market, not a hard-coded limit. Wait for **ready** before building Selected locations coverage.
+Install packs only where you need city/town directory data WooCommerce does not already provide. Ghana is the training/reference market, not a hard-coded limit. Wait for **ready** before relying on pack-backed locality search. Do not treat **Selected locations** or **Entire selected area except…** as automatic pack requirements.
 
 **Customer experience**  
 Without a usable pack, WooCommerce can still show Country → Region, but locality search has no pack-backed results. That is expected, not a plugin failure. Changing a parent location clears child selections. Postcode appears only when relevant. Country-wide delivery does not force a locality.
@@ -268,7 +268,7 @@ Business groupings of destinations that share intended delivery treatment, plus 
 Administrators / authorised staff.
 
 **When**  
-After Location Packs needed by the business are **ready** (for locality-level work), and before Delivery Charges.
+After any Location Packs the business needs for city/town directory data are **ready**, and before Delivery Charges. Country/region Delivery Areas can be created using WooCommerce administrative geography without a locality pack.
 
 **Key fields**  
 - **Delivery area name**, **Reference code**, **Customer-facing label**, **Status**  

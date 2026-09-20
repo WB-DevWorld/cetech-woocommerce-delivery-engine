@@ -6,7 +6,7 @@
 
 You do **not** need to know PHP, databases, or plugin architecture.
 
-Training site `https://training.cetechbpa.com` currently runs RC.12 / schema 6 (qualification: PASS). Do not treat leftover RC.9 wording, if you see it elsewhere, as current.
+Training site `https://training.cetechbpa.com` currently runs RC.12 / schema 6 (training-site qualification: PASS). That is **not** Stable-1.0 certification. Do not treat leftover RC.9 wording, if you see it elsewhere, as current.
 
 ---
 
@@ -195,7 +195,7 @@ If a menu item is **not** on the everyday list above, do not use it. Ask an admi
 
 ## Golden rules for all roles
 
-1. A Location Pack is a **directory of places**, not a price. Install packs for countries you actually serve with locality-level delivery.
+1. A Location Pack is a **directory of places**, not a price. Install a pack when you need city/town data WooCommerce does not already provide, or when old locality text needs reconciliation — not merely because a Coverage Group uses **Selected locations** or **Entire selected area except…**.
 2. Configure **normal rules once** on Site-wide Defaults. Most products should inherit them.
 3. Customize a product or variation **only** for the fields that must differ. Inheritance is field-by-field. Explicit **0.00** is a valid price when you meant it.
 4. Coverage Groups (AND/OR geography) are **not** the same as Global → Product → Variation inheritance.
