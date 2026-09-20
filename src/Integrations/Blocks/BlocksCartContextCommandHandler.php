@@ -142,7 +142,9 @@ final class BlocksCartContextCommandHandler {
 
 		$address = $this->address_policy->read_checkout_shipping_address();
 		$outcome = $this->apply_all->applyCheckoutAddressToIncomplete( WC()->cart->get_cart(), $address );
-		$this->mutation->commitToCart( $outcome['contents'] );
+		if ( [] !== ( $outcome['updated'] ?? [] ) ) {
+			$this->mutation->commitToCart( $outcome['contents'] );
+		}
 		$this->store_result( $this->line_outcomes( self::ACTION_APPLY_CHECKOUT_ADDRESS, $outcome ) );
 	}
 
@@ -231,8 +233,9 @@ final class BlocksCartContextCommandHandler {
 	private function line_outcomes( string $action, array $outcome ): array {
 		$updated = is_array( $outcome['updated'] ?? null ) ? $outcome['updated'] : [];
 		$skipped = is_array( $outcome['skipped'] ?? null ) ? $outcome['skipped'] : [];
+		$preserved = is_array( $outcome['preserved'] ?? null ) ? $outcome['preserved'] : [];
 		$failed  = [];
-		$unchanged = [];
+		$unchanged = $preserved;
 
 		foreach ( $skipped as $row ) {
 			$reason = strtolower( (string) ( $row['reason'] ?? '' ) );
@@ -240,6 +243,8 @@ final class BlocksCartContextCommandHandler {
 				str_contains( $reason, 'pickup' )
 				|| str_contains( $reason, 'already' )
 				|| str_contains( $reason, 'unchanged' )
+				|| str_contains( $reason, 'will be kept' )
+				|| str_contains( $reason, 'different destination' )
 			) {
 				$unchanged[] = $row;
 			} else {
@@ -253,6 +258,7 @@ final class BlocksCartContextCommandHandler {
 			'failed'    => $failed,
 			'unchanged' => $unchanged,
 			'skipped'   => $skipped,
+			'blocked'   => ! empty( $outcome['blocked'] ),
 		];
 	}
 

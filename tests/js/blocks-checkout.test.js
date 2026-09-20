@@ -242,4 +242,54 @@ describe('Blocks DOM customer editor hardening', () => {
 		loadScript();
 		expect(calls.filter((name) => String(name).includes('context'))).toHaveLength(0);
 	});
+
+	it('hides Use my checkout address when destinations are heterogeneous', () => {
+		window.cetechDeBlocks = {
+			namespace: 'cetech-delivery-engine',
+			i18n: { applyCheckoutAddress: 'Use my checkout address', addDeliveryAddress: 'Add delivery address' }
+		};
+		installCart({
+			items: [],
+			extensions: {
+				'cetech-delivery-engine': {
+					can_apply_checkout_address: false,
+					incomplete_delivery: 2,
+					notices: [
+						{
+							code: 'heterogeneous_destinations',
+							message: 'These items are going to different destinations. Add a delivery address for each item. Your selected destinations will be kept.'
+						}
+					]
+				}
+			}
+		});
+		const api = loadScript();
+		api.renderDomUi();
+		const mount = document.getElementById('cetech-de-blocks-dom-ui');
+		expect(mount).toBeTruthy();
+		expect(mount.textContent).toContain('These items are going to different destinations.');
+		expect(mount.querySelector('.cetech-de-blocks-apply-checkout-address')).toBeNull();
+	});
+
+	it('shows Use my checkout address only when the bulk action is available', () => {
+		window.cetechDeBlocks = {
+			namespace: 'cetech-delivery-engine',
+			i18n: { applyCheckoutAddress: 'Use my checkout address' }
+		};
+		installCart({
+			items: [],
+			extensions: {
+				'cetech-delivery-engine': {
+					can_apply_checkout_address: true,
+					incomplete_delivery: 1,
+					notices: []
+				}
+			}
+		});
+		const api = loadScript();
+		api.renderDomUi();
+		const button = document.querySelector('.cetech-de-blocks-apply-checkout-address');
+		expect(button).toBeTruthy();
+		expect(button.textContent).toContain('Use my checkout address');
+	});
 });

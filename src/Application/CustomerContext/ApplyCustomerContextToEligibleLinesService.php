@@ -198,34 +198,57 @@ final class ApplyCustomerContextToEligibleLinesService {
 	/**
 	 * Apply checkout shipping address to incomplete Delivery lines only.
 	 *
+	 * Never replaces a selected matching destination with a different checkout
+	 * geography. Heterogeneous incomplete destinations block the bulk action.
+	 *
 	 * @param array<string, array<string, mixed>> $contents
 	 * @param array<string, mixed>                 $checkout_address
 	 *
 	 * @return array{
 	 *     contents: array<string, array<string, mixed>>,
 	 *     updated: list<array{key: string, name: string}>,
-	 *     skipped: list<array{key: string, name: string, reason: string}>
+	 *     preserved: list<array{key: string, name: string, reason: string}>,
+	 *     skipped: list<array{key: string, name: string, reason: string}>,
+	 *     blocked: bool
 	 * }
 	 */
 	public function applyCheckoutAddressToIncomplete( array $contents, array $checkout_address ): array {
+		$empty = [
+			'contents'  => $contents,
+			'updated'   => [],
+			'preserved' => [],
+			'skipped'   => [],
+			'blocked'   => false,
+		];
+
 		$address = DeliveryAddress::fromInput( $checkout_address );
 		if ( ! $address->isComplete() ) {
+			$empty['skipped'][] = [
+				'key'    => '',
+				'name'   => '',
+				'reason' => __( 'The checkout shipping address is incomplete.', 'cetech-woocommerce-delivery-engine' ),
+			];
+
+			return $empty;
+		}
+
+		$incomplete_matching = $this->incomplete_delivery_matching_identities( $contents );
+		if ( count( $incomplete_matching ) > 1 ) {
 			return [
-				'contents' => $contents,
-				'updated'  => [],
-				'skipped'  => [
-					[
-						'key'    => '',
-						'name'   => '',
-						'reason' => __( 'The checkout shipping address is incomplete.', 'cetech-woocommerce-delivery-engine' ),
-					],
-				],
+				'contents'  => $contents,
+				'updated'   => [],
+				'preserved' => $this->preservation_rows( $contents ),
+				'skipped'   => [],
+				'blocked'   => true,
 			];
 		}
 
-		$updated = [];
-		$skipped = [];
-		$working = $contents;
+		$updated   = [];
+		$preserved = [];
+		$skipped   = [];
+		$working   = $contents;
+		$checkout_matching_id = $address->matching->isPresent() ? $address->matching->identity() : '';
+		$checkout_is_international = $this->destination_is_international( $address->matching->country_identity );
 
 		foreach ( array_keys( $contents ) as $key ) {
 			$item = $working[ $key ] ?? null;
@@ -242,18 +265,54 @@ final class ApplyCustomerContextToEligibleLinesService {
 				continue;
 			}
 
-			$name = $this->line_name( $item );
+			$name       = $this->line_name( $item );
+			$choice     = sanitize_key( (string) ( $intent['fulfilment_choice'] ?? '' ) );
+			$availability = sanitize_key( (string) ( $intent['fulfilment_availability'] ?? '' ) );
 
-			if ( FulfilmentChoice::StorePickup->value === (string) ( $intent['fulfilment_choice'] ?? '' ) ) {
+			if ( FulfilmentChoice::StorePickup->value === $choice ) {
+				$preserved[] = [
+					'key'    => (string) $key,
+					'name'   => $name,
+					'reason' => __( 'This item uses Store Pickup.', 'cetech-woocommerce-delivery-engine' ),
+				];
+				continue;
+			}
+
+			if ( FulfilmentChoice::Delivery->value !== $choice ) {
 				continue;
 			}
 
 			if ( $context instanceof CustomerCartContext && $context->hasCompleteDeliveryAddress() ) {
+				$preserved[] = [
+					'key'    => (string) $key,
+					'name'   => $name,
+					'reason' => __( 'This item already has its own delivery address.', 'cetech-woocommerce-delivery-engine' ),
+				];
 				continue;
 			}
 
-			if ( FulfilmentChoice::Delivery->value !== sanitize_key( (string) ( $intent['fulfilment_choice'] ?? '' ) ) ) {
+			$line_is_international = FulfilmentAvailability::InternationalFulfilment->value === $availability;
+			if ( $this->has_store_country() && $line_is_international !== $checkout_is_international ) {
+				$skipped[] = [
+					'key'    => (string) $key,
+					'name'   => $name,
+					'reason' => $line_is_international
+						? __( 'This item uses International Air/Sea fulfilment.', 'cetech-woocommerce-delivery-engine' )
+						: __( 'This item uses local fulfilment and cannot take an international destination.', 'cetech-woocommerce-delivery-engine' ),
+				];
 				continue;
+			}
+
+			if ( $context instanceof CustomerCartContext && $context->hasMatchingLocation() ) {
+				$line_matching_id = (string) $context->matching_identity;
+				if ( '' === $checkout_matching_id || $line_matching_id !== $checkout_matching_id ) {
+					$preserved[] = [
+						'key'    => (string) $key,
+						'name'   => $name,
+						'reason' => __( 'This item is going to a different destination. Add a delivery address for this item. Your selected destination will be kept.', 'cetech-woocommerce-delivery-engine' ),
+					];
+					continue;
+				}
 			}
 
 			$offer_id = isset( $intent['delivery_offer_id'] ) ? (int) $intent['delivery_offer_id'] : 0;
@@ -288,10 +347,133 @@ final class ApplyCustomerContextToEligibleLinesService {
 		}
 
 		return [
-			'contents' => $working,
-			'updated'  => $updated,
-			'skipped'  => $skipped,
+			'contents'  => $working,
+			'updated'   => $updated,
+			'preserved' => $preserved,
+			'skipped'   => $skipped,
+			'blocked'   => false,
 		];
+	}
+
+	/**
+	 * Unique matching identities on incomplete Delivery lines.
+	 *
+	 * @param array<string, array<string, mixed>> $contents
+	 *
+	 * @return list<string>
+	 */
+	private function incomplete_delivery_matching_identities( array $contents ): array {
+		$identities = [];
+
+		foreach ( $contents as $item ) {
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+
+			$intent = CartDeliverySelectionSessionData::normalizeIntent(
+				$item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] ?? null
+			);
+			if ( null === $intent ) {
+				continue;
+			}
+
+			if ( FulfilmentChoice::Delivery->value !== sanitize_key( (string) ( $intent['fulfilment_choice'] ?? '' ) ) ) {
+				continue;
+			}
+
+			$context = CustomerCartContext::fromCartItem( $item );
+			if ( ! $context instanceof CustomerCartContext || $context->hasCompleteDeliveryAddress() ) {
+				continue;
+			}
+
+			if ( ! $context->hasMatchingLocation() || ! is_string( $context->matching_identity ) || '' === $context->matching_identity ) {
+				continue;
+			}
+
+			$identities[ $context->matching_identity ] = $context->matching_identity;
+		}
+
+		return array_values( $identities );
+	}
+
+	/**
+	 * @param array<string, array<string, mixed>> $contents
+	 *
+	 * @return list<array{key: string, name: string, reason: string}>
+	 */
+	private function preservation_rows( array $contents ): array {
+		$rows = [];
+
+		foreach ( $contents as $key => $item ) {
+			if ( ! is_array( $item ) ) {
+				continue;
+			}
+
+			$intent = CartDeliverySelectionSessionData::normalizeIntent(
+				$item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] ?? null
+			);
+			if ( null === $intent ) {
+				continue;
+			}
+
+			$choice = sanitize_key( (string) ( $intent['fulfilment_choice'] ?? '' ) );
+			$name   = $this->line_name( $item );
+
+			if ( FulfilmentChoice::StorePickup->value === $choice ) {
+				$rows[] = [
+					'key'    => (string) $key,
+					'name'   => $name,
+					'reason' => __( 'This item uses Store Pickup.', 'cetech-woocommerce-delivery-engine' ),
+				];
+				continue;
+			}
+
+			if ( FulfilmentChoice::Delivery->value !== $choice ) {
+				continue;
+			}
+
+			$context = CustomerCartContext::fromCartItem( $item );
+			if ( $context instanceof CustomerCartContext && $context->hasCompleteDeliveryAddress() ) {
+				$rows[] = [
+					'key'    => (string) $key,
+					'name'   => $name,
+					'reason' => __( 'This item already has its own delivery address.', 'cetech-woocommerce-delivery-engine' ),
+				];
+				continue;
+			}
+
+			$rows[] = [
+				'key'    => (string) $key,
+				'name'   => $name,
+				'reason' => __( 'This item is going to a different destination. Add a delivery address for this item. Your selected destination will be kept.', 'cetech-woocommerce-delivery-engine' ),
+			];
+		}
+
+		return $rows;
+	}
+
+	private function has_store_country(): bool {
+		return '' !== $this->store_country();
+	}
+
+	private function store_country(): string {
+		if ( ! function_exists( 'wc_get_base_location' ) ) {
+			return '';
+		}
+
+		$base = wc_get_base_location();
+		if ( ! is_array( $base ) ) {
+			return '';
+		}
+
+		return strtoupper( (string) ( $base['country'] ?? '' ) );
+	}
+
+	private function destination_is_international( string $country_identity ): bool {
+		$store = $this->store_country();
+		$dest  = strtoupper( $country_identity );
+
+		return '' !== $store && '' !== $dest && $dest !== $store;
 	}
 
 	/**

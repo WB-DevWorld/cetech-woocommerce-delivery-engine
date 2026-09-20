@@ -268,6 +268,7 @@ final class BlocksPerItemCustomerUxTest extends TestCase {
 		self::assertStringContainsString( 'splitQuantity', $handler );
 		self::assertStringContainsString( 'applyDeliveryLocation', $handler );
 		self::assertStringContainsString( 'applyCheckoutAddressToIncomplete', $handler );
+		self::assertStringContainsString( "[] !== ( \$outcome['updated'] ?? [] )", $handler );
 		self::assertStringNotContainsString( 'cart_contents =', $handler );
 	}
 
