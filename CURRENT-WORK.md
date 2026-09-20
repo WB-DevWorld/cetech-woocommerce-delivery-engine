@@ -1,87 +1,58 @@
-# Current Work — RC.12 Promotion
+# Current Work — RC.12 Staff Training Realignment
 
-Status: OWNER-CONTROLLED RC.12 RELEASE PROMOTION / AWAITING MERGE-SAFETY REVIEW / NOT TAGGED / NOT DEPLOYED
+Status: RC.12 TAGGED AND PUBLISHED — DOCS-ONLY TRAINING REALIGNMENT / NOT DEPLOYED
 
 ## Canonical repository truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
 - Canonical development branch: protected `master`.
-- Current protected `master`: `3d786ba6440a5f6f850d736bda0da5a5f5236c1f` (PR #24 merge of owner-accepted Issue #23).
-- Current tagged release candidate: `v1.0.0-rc.11` (immutable).
-- RC.11 annotated tag object: `acaae9bfc9758cdee1b3f2ec47e94848e83f87da`.
-- RC.11 tag peels to immutable release source: `384f564f64a2db766ae6907392e95fb366fb8533`.
-- RC.11 version identity: `1.0.0-rc.11`; schema: `5`.
-- Final qualified RC.11 ZIP: `cetech-woocommerce-delivery-engine-1.0.0-rc.11.zip`.
-- Final qualified ZIP bytes: `1,545,789`.
-- Final qualified ZIP SHA-256: `97423a95273f6148ee855d1fb8a66c6c66e47aa20cb2c5868ecf2f84b2a9a521`.
-- Prior RC.10 remains immutable: `v1.0.0-rc.10` → `d1409258caf1a90675b689ab105471460de4c713`.
-- Stage 15: NOT STARTED.
-- RC.12 tag: DOES NOT EXIST. Active work is identity-only promotion of protected master to `1.0.0-rc.12` / schema `6`.
+- RC.12 release source / current tagged candidate: `78594ad8962868683726373f58f4a8b1b48e4d0e`.
+- Later `master` may advance for documentation only. That later commit is **not** the RC.12 release source and must not receive the `v1.0.0-rc.12` tag.
+- Do not rebuild the RC.12 ZIP merely because training docs are committed later.
+
+## RC.12 published identity
+- Version: `1.0.0-rc.12`
+- Schema: `6`
+- Tag: `v1.0.0-rc.12` (unsigned annotated `tag`)
+- Annotated tag object: `89f34883a017b8bb66f98db345fbbae0d8dd72b0`
+- Peels to: `78594ad8962868683726373f58f4a8b1b48e4d0e`
+- GitHub prerelease: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/releases/tag/v1.0.0-rc.12
+- Final ZIP: `cetech-woocommerce-delivery-engine-1.0.0-rc.12.zip`
+- ZIP bytes: `1,767,204`
+- ZIP SHA-256: `46508c566b505ac470ae94d2829de068e4ff1b53bb4c22e31201e038fb8e03d1`
+- Protected-master CI: `35522128310` SUCCESS
+- Issue `#26`: CLOSED / COMPLETED
+- Training site: `https://training.cetechbpa.com` currently runs RC.12 / schema 6. Qualification: PASS.
+
+## Immutable prior release — RC.11
+- Tag: `v1.0.0-rc.11`
+- Annotated tag object: `acaae9bfc9758cdee1b3f2ec47e94848e83f87da`
+- Peels to: `384f564f64a2db766ae6907392e95fb366fb8533`
+- Version: `1.0.0-rc.11`; schema: `5`
+- ZIP SHA-256: `97423a95273f6148ee855d1fb8a66c6c66e47aa20cb2c5868ecf2f84b2a9a521`
+- Not mutated.
 
 ## Active task
-GitHub issue **#26** — `[RC12] Promote owner-accepted geography baseline to RC.12`.
+Docs-only staff training realignment for RC.12 Location Packs, Coverage Groups, review-required coverage, and setup order.
 
-- Sole owner / release authority: `@wbdevworld`.
-- Release branch: `release/rc12` from exact `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`.
-- RC.12 is release-promotion-only: no new delivery runtime behavior is authorized beyond protected master `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`.
-- Schema remains `6`.
-- Cursor/AI may build/test/package evidence on the owner's behalf but does not become release authority.
-
-## Closed Issue #23 / merged PR #24
-- Issue `#23`: CLOSED / COMPLETED.
-- PR `#24`: MERGED at `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`.
-- Protected-master post-merge CI run `35519854001`: SUCCESS.
-- Owner-accepted geo.16 remains immutable qualification provenance and is not rebuilt:
-  - Identity: `1.0.0-dev.geo.16`
-  - Package-source SHA: `7aeb4c573d04d12d8101c0e05bc8858ff332d63f`
-  - ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.16.zip`
-  - Bytes: `1,764,171`
-  - SHA-256: `500b09878ba08b879e5bdfdb0ea6e58726a71fe90a6994a83bb96b1e314a3925`
-  - Schema: `6`
-
-## Qualification required before final RC.12 publication
-- all four required CI jobs green on the exact RC.12 PR head;
-- owner/ChatGPT merge-safety authorization before protected merge;
-- protected-master CI green after merge;
-- production ZIP built from the exact final protected-master release commit;
-- package verifier PASS against the extracted production root;
-- packaged PHP lint PASS;
-- clean-install smoke PASS;
-- RC.11 → RC.12 upgrade/data-retention smoke PASS;
-- optionally geo.16 → RC.12 identity-upgrade smoke if the existing qualification harness supports it cheaply;
-- exact ZIP byte size + SHA-256 recorded;
-- annotated `v1.0.0-rc.12` tag peels to the exact protected-master release commit.
+- Branch: `docs/rc12-training-realignment` from `78594ad`.
+- Scope: `docs/training/**` plus truthful RC.12 closeout status/docs. **No runtime, schema, or package changes.**
+- Historical `docs/staff-training-rc2` is not merged. Salvage is documented separately.
+- After merge, `.github/workflows/sync-training-docs.yml` publishes `docs/training/**` to `wbdevworld/cetech-woocommerce-delivery-engine-training`.
 
 ## Central leases
-- plugin bootstrap / version identity: `@wbdevworld` (issue #26 → `1.0.0-rc.12`);
-- schema / migrations: frozen at `6`;
-- published release identity/tags: `v1.0.0-rc.11` immutable; `v1.0.0-rc.12` not yet created;
+- plugin bootstrap / version identity: published `1.0.0-rc.12`; do not change without a new authorized promotion;
+- schema / migrations: frozen at `6` for this candidate;
+- published release identity/tags: `v1.0.0-rc.11` and `v1.0.0-rc.12` immutable;
 - canonical `master`: no force-push/rewrite;
-- PR #12 / `1.0.0-dev.qual.1` remains historical qualification provenance and is **not** the current implementation surface.
+- product-control-plane Requirement IDs: frozen;
+- PR #12 / `1.0.0-dev.qual.1` remains historical qualification provenance.
 
 ## Environment authorization
-- Isolated local QA / release-prep packaging: permitted for this stream.
-- CETECH Pilot: NOT AUTHORIZED by this promotion.
+- CETECH Pilot: NOT AUTHORIZED.
 - FLAIROC: NO autonomous mutation.
-- Training site: NO autonomous mutation.
+- Training site: NO autonomous mutation (read-only inspection only).
 - Production: NO autonomous mutation.
 - POS repository: outside scope / must not be touched.
-- WPML/WCML: do not merge.
-- WP Rocket certification: do not expand.
-- Stage 15: not started.
-
-## Recorded P3 / non-blocking (not in RC.12)
-- Blocks script dependency warning.
-- Variable ETA copy/prefix.
-- Lamp default selection UX.
-- Optional Blocks totals evidence polish.
-- WoodMart WP-CLI 128M lab memory limit.
-
-## Geography provenance (immutable; not rebuilt)
-- Frozen physically qualified predecessor: `1.0.0-dev.geo.15` / `eb9f4e4893b32ec8e59d47fb90e13adfed85e78e`. ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.15.zip` (1,763,366 bytes, SHA-256 `95340eed81a3e7d7b5a7bddb3635a825870a6916d5716d27e6ea12f1fcd68690`).
-- Frozen rejected physical-QA candidate: `1.0.0-dev.geo.14` / `ea53d0486593199898269479be624de262127692`. ZIP SHA-256 `cc3f320e8f9856c08d0e5c50ee05f41363db8a8ba79135bde23befdeaa212cc7`.
-- Frozen rejected technical-review candidates: geo.1–geo.13 / geo.11 remain provenance only. Do not rebuild or reuse those package identities.
-- Architecture: `docs/POST-RC11-CANONICAL-GEOGRAPHY-COVERAGE.md`.
-- Product-control-plane artifacts remain published under `docs/product/` via PR #25. Do not alter frozen Requirement IDs as part of RC.12.
 
 ## Explicit non-actions
-Do not merge the RC.12 PR until ChatGPT merge-safety review. Do not use admin bypass. Do not freeze the final canonical RC.12 ZIP from this branch HEAD. Do not create `v1.0.0-rc.12`. Do not create a GitHub release/prerelease. Do not move, rebuild or overwrite RC.11. Do not deploy to CETECH Pilot, FLAIROC, training or production. Do not start Stage 15. Do not merge WPML/WCML. Do not fix recorded P3 in this promotion. Do not introduce schema 7.
+Do not deploy CETECH Pilot. Do not deploy FLAIROC/training/production. Do not touch POS. Do not start Stage 15. Do not merge WPML/WCML. Do not expand WP Rocket certification. Do not create RC.13. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not merge `docs/staff-training-rc2`. Do not change runtime PHP, JS, migrations, or schema.

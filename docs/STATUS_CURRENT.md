@@ -1,16 +1,41 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-20 (RC.12 release-promotion preparation; Issue #23 CLOSED/COMPLETED; PR #24 MERGED; geo.16 immutable; Pilot not authorized).
+Last reconciled: 2026-09-20 (RC.12 tagged and published as a prerelease from protected-master `78594ad`; Issue #26 CLOSED/COMPLETED; training-site qualification PASS; staff-training realignment is docs-only and is not the RC.12 tag source; Pilot not authorized).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
 - Default/canonical development branch: protected `master`
-- Current protected `master`: `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`
-- This master commit is the merge of owner-accepted PR #24 (Issue #23 / `1.0.0-dev.geo.16`).
+- Current protected `master` at RC.12 publication: `78594ad8962868683726373f58f4a8b1b48e4d0e`
+- This master commit is the merge of PR #27 (`release/rc12`) onto prior master `3d786ba6440a5f6f850d736bda0da5a5f5236c1f` (PR #24 / owner-accepted `1.0.0-dev.geo.16`).
+- Later documentation commits on `master`, if any, are **not** the RC.12 tag source.
 - Repository visibility: public during GitHub Free branch/ruleset protection use.
 - Composer license declaration remains `proprietary`; public visibility is not an open-source license grant.
 
-## Current tagged release candidate — RC.11
+## Current tagged release candidate — RC.12
+- Tag: `v1.0.0-rc.12`
+- Type: unsigned annotated `tag`
+- Annotated tag object: `89f34883a017b8bb66f98db345fbbae0d8dd72b0`
+- Peels to release source: `78594ad8962868683726373f58f4a8b1b48e4d0e`
+- Merge parents: `3d786ba6440a5f6f850d736bda0da5a5f5236c1f` + `3eaf0d77ec277e4bb3b633da1ac08e08c0790ea7`
+- Merge time: `2026-09-20T16:15:10Z`
+- Version identity: `1.0.0-rc.12`
+- Schema: `6`
+- Protected-master CI run `35522128310`: SUCCESS (Runtime PHP 8.1, PHP/PHPUnit 8.2, JavaScript/Vitest, Control Plane)
+- GitHub prerelease: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/releases/tag/v1.0.0-rc.12
+- Final ZIP: `cetech-woocommerce-delivery-engine-1.0.0-rc.12.zip`
+- Final ZIP bytes: `1,767,204`
+- Final ZIP SHA-256: `46508c566b505ac470ae94d2829de068e4ff1b53bb4c22e31201e038fb8e03d1`
+- Downloaded GitHub asset verification: PASS (same filename, bytes, SHA-256)
+- Production-package verifier: PASS
+- Packaged PHP lint: `498 files / 0 failures`
+- Clean install: `clean version=1.0.0-rc.12 schema=6 tables=all_tables_ok geo=schema6_tables_ok`
+- RC.11 → RC.12 upgrade/retention: PASS (`sentinel=1 zone=1 rule=1 option=keep_me coverage_groups=1`; schema-6 conversion `completed`, `converted=1`, countries `GH`)
+- Optional geo.16 → RC.12 identity smoke: PASS (`sentinel=1 option=keep_geo16`)
+- Issue `#26`: CLOSED / COMPLETED
+- Evidence: `docs/RC12-PROMOTION.md`
+- Do not move this tag to a later documentation commit. Do not rebuild the ZIP for docs closeout.
+
+## Prior tagged release candidate — RC.11
 - Tag: `v1.0.0-rc.11`
 - Annotated tag object: `acaae9bfc9758cdee1b3f2ec47e94848e83f87da`
 - Peels to release source: `384f564f64a2db766ae6907392e95fb366fb8533`
@@ -25,35 +50,21 @@ Last reconciled: 2026-09-20 (RC.12 release-promotion preparation; Issue #23 CLOS
 ## RC.12 promotion
 GitHub issue #26 — `[RC12] Promote owner-accepted geography baseline to RC.12`
 
-- Release branch: `release/rc12` from exact protected master `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`
-- Target version identity: `1.0.0-rc.12`
+- Issue `#26`: CLOSED / COMPLETED
+- Release branch: `release/rc12`
+- PR #27: MERGED
+- Version identity: `1.0.0-rc.12`
 - Schema: `6`
 - Scope: release identity/bookkeeping/qualification only; no new runtime feature work
-- Final tag/package: not yet published
-- `v1.0.0-rc.12` does not exist
-
-Required before merge:
-1. All four required CI jobs green on the exact RC.12 PR head.
-2. Version identity `1.0.0-rc.12`, schema 6, no runtime/schema drift beyond promotion.
-3. Owner/ChatGPT merge-safety authorization.
-
-Required after merge before tag:
-1. Protected-master CI green.
-2. Exact final RC.12 ZIP built from the final protected-master release commit.
-3. Production-package verifier PASS.
-4. Packaged PHP lint PASS.
-5. Clean-install smoke PASS.
-6. RC.11 → RC.12 upgrade/data-retention smoke PASS.
-7. Optionally geo.16 → RC.12 identity-upgrade smoke if the existing harness supports it cheaply.
-8. Final ZIP bytes/SHA-256 recorded.
-9. Annotated `v1.0.0-rc.12` tag peels to the exact protected-master release commit.
+- Annotated tag `v1.0.0-rc.12` published; GitHub prerelease published
+- Closeout comment: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/26#issuecomment-5751247411
 
 ## Closed Issue #23 / merged PR #24
 Issue #23 — `[POST-RC11] Canonical geography, coverage groups, cascading location UX, and delivery-card redesign`
 
 - Sole owner: `@wbdevworld`
 - Issue #23: CLOSED / COMPLETED
-- PR #24: MERGED at `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`
+- PR `#24`: MERGED at `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`
 - Protected-master post-merge CI run `35519854001`: SUCCESS
 - Owner-accepted geo.16 remains immutable qualification provenance:
   - Identity: `1.0.0-dev.geo.16`
@@ -109,22 +120,23 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - WoodMart physically qualified on 8.4.1 for issue #18 PDP-price acceptance.
 - Issue #18 owner QA used WordPress 7.1 / WooCommerce 11.0.1 in its isolated lab.
 - RC.11 package clean-install/upgrade smoke used isolated GitHub Actions WordPress/WooCommerce containers; WooCommerce 11.1.0 was installed during the successful run.
+- RC.12 isolated qualification used WordPress `php8.2-apache` + WooCommerce `11.0.1` in Compose project `cetech-rc12-qual`; not a FLAIROC/training/production claim.
 - External PSP certification: not claimed.
-- FLAIROC/training/production deployment or certification: not claimed by RC.11 or this RC.12 promotion.
-- CETECH Pilot: not authorized by this RC.12 promotion.
+- FLAIROC/training/production deployment or certification: not claimed by RC.11 or this RC.12 qualification.
+- CETECH Pilot: not authorized by this RC.12 qualification.
 - POS repository / VitePOS: outside scope.
 
 ## Development baseline
 - Immutable RC.11 release anchor: `v1.0.0-rc.11` / `384f564f64a2db766ae6907392e95fb366fb8533`.
-- Current protected-master runtime baseline: `3d786ba6440a5f6f850d736bda0da5a5f5236c1f` (schema `6`).
-- New work should branch from the latest protected `master` after the RC.12 promotion closes, unless a later owner instruction names a different surface.
-- Release source and current development head are deliberately allowed to differ after release closeout; never move a release tag to follow later master commits.
+- Current tagged RC.12 release source: `v1.0.0-rc.12` / `78594ad8962868683726373f58f4a8b1b48e4d0e` (schema `6`).
+- New work should branch from latest protected `master` unless the owner names a different surface.
+- Release source and later documentation commits are deliberately allowed to differ; never move a release tag to follow later master commits.
 
 ## Owner-accepted product truth
 - `PRODUCT-TRUTH-BASELINE-1` was accepted by the owner on 2026-09-19 with all six decisions resolved in `docs/product/DECISION-CONFLICT-REGISTER.md`.
 - The approved 372-Requirement registry and companion artifacts live under `docs/product/`; `docs/AUTHORITY.md` defines which artifact governs each class of truth.
 - Stable 1.0 scope is frozen as `STABLE-1.0-SCOPE-1`. This product baseline is not a claim that missing capabilities are implemented or that Stable 1.0 has shipped.
-- Product-control-plane publication PR #25 is merged to protected master `6ee4cef088f0bda2633d4b8e37abf3e37634426b` and is now an ancestor of current master `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`.
+- Product-control-plane publication PR #25 is merged to protected master `6ee4cef088f0bda2633d4b8e37abf3e37634426b` and is now an ancestor of current master `78594ad8962868683726373f58f4a8b1b48e4d0e`.
 - Frozen Requirement IDs must not be renumbered. RC.12 promotion does not change product-registry classifications.
 
 ## Completed forensic / release-control work
@@ -136,6 +148,7 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - 2026-09-16 RC.11 promotion, final package qualification, annotated tag and closeout completed.
 - 2026-09-19 product-control-plane publication PR #25 merged to protected master.
 - 2026-09-20 Issue #23 / PR #24 merged as owner-accepted `1.0.0-dev.geo.16`; protected-master CI `35519854001` SUCCESS.
+- 2026-09-20 PR #27 merged as RC.12 identity promotion; protected-master CI `35522128310` SUCCESS; annotated tag `v1.0.0-rc.12` / `89f34883a017b8bb66f98db345fbbae0d8dd72b0` published; GitHub prerelease published; Issue `#26` CLOSED / COMPLETED.
 
 ## Geography provenance (immutable; not rebuilt)
 - Frozen physically qualified geography/runtime candidate: `1.0.0-dev.geo.15` / `eb9f4e4893b32ec8e59d47fb90e13adfed85e78e`; schema `6`. ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo.15.zip`, `1,763,366` bytes, SHA-256 `95340eed81a3e7d7b5a7bddb3635a825870a6916d5716d27e6ea12f1fcd68690`.
@@ -150,13 +163,18 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - Lamp default selection UX.
 - Optional Blocks totals evidence polish.
 
+## Current documentation stream
+- Branch `docs/rc12-training-realignment` realigns `docs/training/` for RC.12 Location Packs, Coverage Groups, review-required coverage, and the recommended setup order.
+- Later documentation commits on `master` are **not** the RC.12 tag source and must not receive the `v1.0.0-rc.12` tag.
+- Training site `https://training.cetechbpa.com` currently runs RC.12 / schema 6. Qualification: PASS. Do not mutate the live training site from this docs stream.
+
 ## Remaining separate work
-1. ChatGPT merge-safety review of the RC.12 promotion PR, then protected merge only after that authorization.
-2. After merge: protected-master CI, exact final RC.12 ZIP, verifier, packaged PHP lint, clean-install and RC.11 → RC.12 upgrade smokes, annotated tag. Not part of this preparation PR.
-3. Create the controlled CETECH production Pilot only after a separate owner authorization; deployment remains a separate action.
-4. Certify the Stable 1.0 launch floor: WooCommerce/HPOS, Classic, Blocks, Storefront, current supported WoodMart, B2BKing, and FOX/WOOCS.
-5. Certify WPML/WCML before Stable 1.0 only if it will be advertised as supported at launch; keep other optional targets explicitly uncertified until evidence exists.
-6. Do not start Stage 15.
+1. Create the controlled CETECH production Pilot only after a separate owner authorization; this tag/prerelease is not that authorization.
+2. Certify the Stable 1.0 launch floor: WooCommerce/HPOS, Classic, Blocks, Storefront, current supported WoodMart, B2BKing, and FOX/WOOCS.
+3. Certify WPML/WCML before Stable 1.0 only if it will be advertised as supported at launch; keep other optional targets explicitly uncertified until evidence exists.
+4. Recorded P3 cleanup remains later work.
+5. Do not start Stage 15.
+6. Do not create RC.13 from this closeout.
 
 ## Deferred / not started
 - Stage 15 is NOT STARTED.

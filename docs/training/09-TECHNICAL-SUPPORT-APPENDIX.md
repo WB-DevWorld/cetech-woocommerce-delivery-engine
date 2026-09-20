@@ -3,11 +3,13 @@
 **Audience:** Technical support and developers **only**  
 **Normal staff should not require this document.**
 
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.9** (schema **5**). Includes Cart/Checkout Blocks, overlapping Delivery Area pricing, and constrained fallback.  
-**Schema target:** `5`  
-**Release identity:** Git tag `v1.0.0-rc.9` (do not rewrite). Tags `v1.0.0-rc.8` through `v1.0.0-rc.2` remain untouched.
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.12** (schema **6**). Canonical geography, Coverage Groups, Location Packs, Cart/Checkout Blocks, overlapping Delivery Area pricing, constrained fallback.  
+**Schema target:** `6`  
+**Release identity:** Git tag `v1.0.0-rc.12` peels to `78594ad8962868683726373f58f4a8b1b48e4d0e`. Annotated tag object `89f34883a017b8bb66f98db345fbbae0d8dd72b0`. Do not rewrite. Tags `v1.0.0-rc.11` through `v1.0.0-rc.2` remain untouched.
 
 If WordPress shows a different plugin version, stop and confirm which package is installed before following this appendix.
+
+Do not put site credentials, API keys, or backup secrets in tickets copied from this guide.
 
 ---
 
@@ -22,6 +24,8 @@ If you are store staff configuring products day to day, use:
 - [07-TROUBLESHOOTING-FAQ](07-TROUBLESHOOTING-FAQ.md)
 - [11-STAGE-14-SHIPMENTS](11-STAGE-14-SHIPMENTS.md) (when **Shipments** is in the menu)
 - [13-FEATURE-COVERAGE-AND-CONFIRMATION](13-FEATURE-COVERAGE-AND-CONFIRMATION.md)
+- [14-LOCATION-PACKS-AND-GEOGRAPHY](14-LOCATION-PACKS-AND-GEOGRAPHY.md)
+- [15-DELIVERY-AREAS-AND-COVERAGE-GROUPS](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md)
 
 ---
 
@@ -59,6 +63,41 @@ Do not flip Advanced cutover switches without a change window and owner approval
 | Shipment records (default OFF) | Schema-4 shipment / item / event tables; built from the **saved order** delivery groups | **Delivery Engine → Shipments** after an Administrator enables shipment records |
 | Customer tracking links (default OFF) | Safe `http` / `https` URL only; no carrier polling | **Track shipment** on View Order when a safe URL is saved |
 | AdministratorAccessRecovery | `manage_options` + nonce; independent of diagnostics | Restore Administrator Access notice |
+| Schema 6 geography | Tables `geography_packs`, `geography_locations`, `geography_location_aliases`, `geography_provider_mappings` | Location Packs UI |
+| Schema 6 coverage | Tables `destination_coverage_groups`, `destination_coverage_members`, `destination_coverage_postcodes` | Delivery Area Coverage Groups |
+| Pack statuses | `pending`, `importing`, `ready`, `failed`. Usable dataset ≈ **ready** (or last successful checksum) | Installed packs Status column |
+| Review required | Group not usable until `review_required` is cleared after human confirm (`isUsable` = active + not review_required + root) | Inline warning + **I reviewed this migrated coverage** |
+| Safe reconciliation | Revisits empty / migration review-required / unresolved records; skips protected manual canonical coverage | **Run safe legacy reconciliation** |
+| Action Scheduler | Batched pack import / upgrade ticks | Progress column; **Continue / retry** |
+
+---
+
+## Schema 6 / RC.11 → RC.12 migration (support)
+
+- RC.11 = schema **5**. RC.12 = schema **6**.  
+- Normal plugin upgrade creates canonical geography/coverage structures. Delivery Areas, rate cards, rules, and business references are retained.  
+- Some city rules become `review_required` / `unmapped_city` when no locality pack is installed.  
+- **Do not** manually invoke migration classes. **Do not** downgrade schema by hand. **Do not** edit pack or coverage rows to “force ready.”  
+- Backup before major upgrades (human-controlled). Git rollback does not undo WordPress database side effects.  
+- Evidence of isolated RC.11→RC.12 upgrade retention lives in `docs/RC12-PROMOTION.md`. Training-site qualification: PASS on RC.12 / schema 6. Do not expose server IPs in staff copies.
+
+## What NOT to change manually
+
+- Pack `status` in SQL  
+- Coverage `review_required` flags without the admin checkboxes  
+- Schema option / migration leases  
+- Historical order `_cetech_de_*` snapshots  
+- Production Delivery Charges to “make a screenshot prettier”
+
+## Safe evidence collection
+
+- Plugin version and schema from Settings / Overview  
+- Screenshot of Location Packs row (status, progress, last error) — redact URLs that reveal internals if asked  
+- Screenshot of Coverage Group review-required warning  
+- **Test an address** Primary / Also matches  
+- Preview Delivery for QA products  
+- WooCommerce System Status (no credentials)  
+- Do not dump database, wp-config, or backup archives into chat
 
 ---
 
@@ -95,13 +134,12 @@ Administrator lockout repair is **Restore Administrator Access**, authorised by 
 
 ## Rollback / release identity
 
-- Protected published baseline: tagged `v1.0.0-rc.9`, schema `5`. Do not retag RC.9 or earlier.  
-- Frozen Blocks.4 source was promoted to RC.9. Record: `docs/RC9-FINALIZATION.md`. Constrained fallback: `docs/POST-RC8-BLOCKS-4-CONSTRAINED-FALLBACK.md`.  
-- Historical tagged `v1.0.0-rc.8` (schema `5`), `v1.0.0-rc.7` (schema `5`) and `v1.0.0-rc.6` (schema `4`) remain untouched.  
-- Historical RC.6 package `cetech-woocommerce-delivery-engine-1.0.0-rc.6.zip` remains immutable (`1059918` bytes, SHA-256 `0d4adbef50462d798a4ff9bf802643bed92a35cdd332ceee13a985dbda2a689d`, source `7e52525`). Full RC.6 record: `docs/STAGE-14H-RC6-FINAL.md`.  
-- Do not alter tags `v1.0.0-rc.9` through `v1.0.0-rc.2`. Do not overwrite historical QA ZIPs.
+- Protected published baseline: tagged `v1.0.0-rc.12`, schema `6`. Do not retag RC.12 or earlier. Later documentation commits on `master` are **not** the RC.12 ZIP source.  
+- Immutable prior: `v1.0.0-rc.11` (schema `5`).  
+- Historical tagged `v1.0.0-rc.10` through `v1.0.0-rc.2` remain untouched.  
+- Do not overwrite historical QA ZIPs.
 
-Staff training markdown lives in `docs/training/` in the plugin repository. It is **not** gitignored. Screenshot/video binaries and `training/playwright/` auth stay gitignored. Training docs are **not** part of the production plugin ZIP.
+Staff training markdown lives in `docs/training/` in the plugin repository. It is **not** gitignored. Screenshot/video binaries and `training/playwright/` auth stay gitignored. Training docs are **not** part of the production plugin ZIP. After merge to `master`, `.github/workflows/sync-training-docs.yml` publishes `docs/training/**` to `wbdevworld/cetech-woocommerce-delivery-engine-training`.
 
 ---
 

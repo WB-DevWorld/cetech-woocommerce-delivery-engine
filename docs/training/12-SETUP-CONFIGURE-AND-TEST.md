@@ -1,14 +1,14 @@
-# How to use each Delivery Engine menu
+# Setup, configure, and test
 
-**Audience:** New staff — start here if you are new to this plugin  
-**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.9** (schema **5**)  
+**Audience:** Administrators and authorised configuration staff  
+**Plugin:** CETECH WooCommerce Delivery Engine **1.0.0-rc.12** (schema **6**)  
 **Open:** WordPress admin left menu → **Delivery Engine** (location-pin icon)
 
-This guide is only about the plugin. Each section is one menu. For every menu you get **how to open it, how to do the work, what to type, which button to press, and how to check it**.
+This is the canonical operational sequence. Each section is one menu or one test. You do **not** need PHP, databases, or plugin architecture.
 
-You do **not** need PHP, databases, or plugin architecture. Follow the live screens.
+**Everyday rule:** Install the place directory you need, describe where you serve, then set prices and product rules. Most products should inherit Site-wide Defaults.
 
-**Everyday rule:** Set normal rules once on Site-wide Defaults. Most products should inherit them. Customize a product only when it must be different.
+Teaching example used below: Ghana Location Pack → Delivery Area **Greater Accra Selected Cities** → Coverage **Selected locations** Accra, Tema, Madina, Adenta → Standard Delivery → **GH₵30**.
 
 ---
 
@@ -25,26 +25,59 @@ If a menu name is not in the list below, stop and ask an administrator.
 
 1. Setup Guide (only while setup is incomplete, or from Settings later)  
 2. Overview  
-3. Delivery Options  
-4. Delivery Areas  
-5. Delivery Charges  
-6. Pickup Locations  
-7. Site-wide Defaults  
-8. Settings  
-9. Product Exceptions  
-10. Needs Attention  
-11. **Bulk Tools** (administrators / authorised catalog staff)  
-12. Shipments (only after you turn that setting on)
+3. **Location Packs**  
+4. Delivery Options  
+5. Delivery Areas (Coverage Groups live here)  
+6. Delivery Charges  
+7. Pickup Locations  
+8. Site-wide Defaults  
+9. Settings  
+10. Product Exceptions  
+11. Needs Attention  
+12. **Bulk Tools** (administrators / authorised catalog staff)  
+13. Shipments (only after you turn that setting on)
 
 The product **Delivery** tab and **Preview Delivery** are plugin screens too. They live on the WooCommerce product editor, not in the left menu.
 
 WooCommerce also needs this plugin’s shipping method, named **Delivery**, on a shipping zone. That step is not a Delivery Engine left-menu item. See **How to add the Delivery shipping method in WooCommerce** below.
 
-### First-time order
+---
 
-Do the work in this order so each screen has what it needs:
+## Before you configure geography
 
-**Setup Guide** (if showing) → **Delivery Options** → **Delivery Areas** → **Delivery Charges** → **Pickup Locations** (only if you offer pickup) → **Site-wide Defaults** → **Settings** → **add Delivery in WooCommerce shipping** → **Overview** → product **Delivery** tab and **Preview** → shop check → **Product Exceptions** / **Needs Attention** as needed → **Shipments** last. **Bulk Tools** is not part of first-time setup.
+1. Confirm WooCommerce store country and currency. The Delivery Engine does not replace them.  
+2. Decide which countries you serve with **locality-level** delivery. You do **not** install every country’s Location Pack.  
+3. Understand the pieces: Location Pack = directory of places; Delivery Area = business grouping; Coverage Group = which places qualify; Delivery Option = service; Delivery Charge = money.  
+4. If this store upgraded from RC.11, expect some city rules to say **Review required** until a pack is **ready** and you reconcile. Data was not destroyed.
+
+Ghana is the training/reference market, not a product limitation.
+
+---
+
+## Recommended conceptual order (why this order)
+
+1. Confirm WooCommerce / base store settings.  
+2. Install / verify Location Packs needed by the business.  
+3. Create or review Delivery Options.  
+4. Create Delivery Areas.  
+5. Add Coverage Groups to those Delivery Areas.  
+6. Configure Delivery Charges.  
+7. Configure Pickup Locations where used.  
+8. Configure global / product / variation delivery rules.  
+9. Test in admin matcher tools (**Test an address**, **Check a delivery price**, **Preview Delivery**).  
+10. Test the product page.  
+11. Test cart.  
+12. Test checkout.  
+13. Place a safe test order (authorised only).  
+14. Review snapshots / logs (order **Delivery information**; do not rewrite history).
+
+**Why:** Locality search and Selected locations coverage need a **ready** pack. Charges need areas. Product rules need options. Customer tests need charges. Skipping Location Packs is why upgraded Accra/Kumasi rules sat on **Review required** on training.
+
+**Setup Guide** can still build a first area and charge. After RC.12, still verify Coverage Groups and install packs before you rely on city pickers.
+
+### First-time order (short)
+
+**WooCommerce store settings** → **Location Packs** (if you need localities) → **Setup Guide** if showing, else **Delivery Options** → **Delivery Areas** + Coverage Groups → **Delivery Charges** → **Pickup Locations** (if pickup) → **Site-wide Defaults** → **Settings** → **add Delivery in WooCommerce shipping** → **Overview** → product **Delivery** tab and **Preview** → shop / cart / checkout → **Product Exceptions** / **Needs Attention** as needed → **Shipments** last. **Bulk Tools** is not part of first-time setup.
 
 ---
 
@@ -193,53 +226,95 @@ Same as above, but **Delivery type** = **Air Shipping** or **Sea Shipping**, and
 
 ---
 
+# 3A. Location Packs
+
+**Menu:** **Delivery Engine → Location Packs**
+
+**What it is for**  
+A directory of places for one country. It does **not** set GH₵30.
+
+Full guide: [14](14-LOCATION-PACKS-AND-GEOGRAPHY.md).
+
+## How to install a Ghana pack
+
+1. Open **Delivery Engine → Location Packs**.  
+2. **Country:** `GH`.  
+3. Upload the GeoNames country `.txt` or `.zip`, **or** tick **Fetch the official GeoNames country ZIP in the background (download.geonames.org only).**  
+4. **Operation:** **Install or continue**.  
+5. Click **Install / update pack**.  
+6. Wait for **Status** **ready**. **pending** / **importing** means work is still processing. Use **Continue / retry** once to resume — do not click rapidly.  
+7. If **failed**, read the error under the row. Do not edit the database.
+
+**Provider** / **License** / **Checksum** identify the dataset (GeoNames, CC BY 4.0). Shoppers never call GeoNames.
+
+## How to reconcile after an upgrade
+
+1. Pack must be **ready**.  
+2. Click **Run safe legacy reconciliation**.  
+3. Read the counts (scanned, skipped manual, reconciled, still review required, activated).  
+4. Open affected Delivery Areas. Confirm geography. Tick **I reviewed this migrated coverage** when correct.
+
+This button does not reset all areas and does not overwrite valid manual canonical coverage.
+
+**Check:** Installed packs shows **ready** for GH. Product-page locality search can find Accra after coverage exists. Prices still come from Delivery Charges.
+
+---
+
 # 4. Delivery Areas
 
 **Menu:** **Delivery Engine → Delivery Areas**
 
 **What it is for**  
-Where you deliver. Together with a charge, this decides the fee for the customer’s address.
+A business grouping of destinations plus Coverage Groups that name which canonical places qualify. Together with a Delivery Charge, this decides the fee.
 
-## How to add an area
+Full guide: [15](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md).
+
+## How to add the teaching example (one price for four cities)
 
 1. Click **Delivery Engine → Delivery Areas**.  
 2. Click **Add Delivery Area**.  
-3. **Delivery area name:** `Local delivery` (required).  
-4. **Customer-facing label:** optional; you can leave it the same as the name.  
+3. **Delivery area name:** `Greater Accra Selected Cities`.  
+4. **Customer-facing label:** optional.  
 5. **Status:** **Active**.  
-6. Under **Where should this delivery area apply?** use the table:  
-   - **Location:** choose **Country**  
-   - **Value:** type the 2-letter country code that matches your store, for example `TT` or `GH` (the same country as WooCommerce store address)  
-7. To narrow it later, click **+ Add another location condition** and add **State / Region**, **City**, or **Postcode**.  
-   For **State / Region**, you may type the name customers see in WooCommerce checkout (for example `Greater Accra`) **or** WooCommerce’s short code for that state (for example `AA` in Ghana). Checkout uses the short code. The plugin matches both for that country, so you do **not** need to rewrite existing areas. Do not use another country’s region name.  
-8. Leave **Advanced matching** closed.  
-9. Under **Advanced details**, **Use as fallback for unmatched addresses** is optional:
-   - Tick it **and leave location rules empty** only if this area should catch leftover addresses (a true Everywhere else area).
-   - Tick it **and keep location rules** if this is a fallback inside those places only. A Greater Accra fallback with Ghana + Greater Accra never matches the United States.
-   - Leave it unticked for a normal area.
-10. Click **Create Delivery Area**.
+6. Under Coverage groups, click **+ Add another coverage group** if needed.  
+7. **Country:** Ghana.  
+8. **Region:** Greater Accra.  
+9. **Coverage:** **Selected locations**.  
+10. Under **Include locations**, search and add Accra, Tema, Madina, Adenta.  
+11. Leave postcode rows empty unless you need them.  
+12. Under **Advanced details**, set **Priority** if this area must be preferred over a broader area (**lower numbers are checked first**). Example: Accra special service **8**, Greater Accra general **25**. Do not assume smallest area automatically wins.  
+13. **Use as fallback for unmatched addresses** — leave unticked for this example.  
+14. Click **Create Delivery Area** (or **Save Delivery Area**).
+
+Other modes:
+
+- **Entire selected area** — all of Greater Accra.  
+- **Entire selected area except…** — all of Greater Accra except Ada Foah and Prampram. Exclusions override inclusion inside that group.
+
+Different levels = **AND**. Several places at the same level = **OR**. Extra groups = **OR**.
+
+If a group says **Review required**, data was not destroyed. Install the pack, run **Run safe legacy reconciliation**, confirm places, tick **I reviewed this migrated coverage**. Do not delete the area.
+
+If you remove every coverage group, tick the confirmation that you will not silently fall back to hidden legacy conditions.
 
 ## How to test an address
 
-1. Stay on **Delivery Areas** (list) or open the area.  
+1. Stay on **Delivery Areas** (list).  
 2. Open **Test an address**.  
-3. Fill:  
-   - **Country** (choose the country name from the list, for example Ghana or United States — the plugin uses the standard country code internally)  
-   - **Region**, **City**, **Postcode** if you used those conditions  
-   If the area uses **State / Region**, test once with the name (for example `Greater Accra`) and once with the checkout short code (for example `AA`). Both should name the **same** area.  
+3. Fill **Country** (pick Ghana by name), **Region**, **City**, **Postcode** as needed.  
 4. Click **Run test**.  
-5. Read **Primary match.** It should name the most specific area (for example Accra city before Greater Accra region).  
-6. If more than one area covers the address, read **Also matches.** Nested city-inside-region is normal. Pricing can use a charge from a broader matching area when the selected Delivery Option has no charge in the city. A different Delivery Option is never substituted.
-7. A Fallback area with location rules is a **constrained fallback**. Test Ghana / Greater Accra / Accra and it may match. Test United States / New York and it must **not** match merely because Fallback is ticked. Only a Fallback area with **no** location rules is a true **Everywhere else** (global fallback). If no area and no global fallback match, the test stays unmatched — that is fail closed, not native WooCommerce shipping.
+5. Read **Primary match** (first in the engine’s deterministic order: priority, then specificity).  
+6. Read **Also matches** if more than one area covers the address. Nested coverage is normal. Pricing can use a charge from a broader matching area when the selected Delivery Option has no charge in the more-specific area. A different Delivery Option is never substituted.  
+7. Fallback with geography is constrained (Greater Accra fallback never matches the United States). Fallback with no geography is true Everywhere else. No match stays unmatched — fail closed, not native WooCommerce shipping.
 
 ## How to edit an area
 
 1. Click **Edit**.  
-2. Change the name or conditions.  
+2. Change the name, Coverage Groups, or priority.  
 3. Click **Save Delivery Area**.  
 4. Run **Test an address** again.
 
-**Check:** The test matches, including both the region name and the checkout short code when you used a State / Region condition. Primary match / Also matches make sense for overlapping city and region. You can pick this area on a Delivery Charge. Do **not** copy the same charge onto every city so Air “works.”
+**Check:** Accra, Tema, Madina, and Adenta match this area. A Greater Accra town you did not include does not, unless another group/area covers it. You can pick this area on a Delivery Charge. Do **not** copy the same charge onto every city so a missing city rate “works.”
 
 ---
 
@@ -726,14 +801,18 @@ Customers must not see “In Warehouse”, supplier names, or internal codes.
 
 # Done checklist
 
-- [ ] You can open each everyday Delivery Engine menu and say what it does  
-- [ ] You can add a Delivery Option, Area, and Charge and save them  
-- [ ] Test an address matches your area (region name **and** short code). Primary match / Also matches make sense for city-in-region  
+- [ ] WooCommerce store country/currency confirmed  
+- [ ] Location Packs needed by the business are **ready** (you did not install every country)  
+- [ ] You can add a Delivery Option, Area with Coverage Group, and Charge and save them  
+- [ ] Teaching example works: Greater Accra Selected Cities + Accra/Tema/Madina/Adenta + Standard Delivery + GH₵30  
+- [ ] Test an address Primary match / Also matches make sense. Priority is understood (lower number first; not “smallest always wins”)  
 - [ ] A city without a charge for an option can use the broader area’s charge for **that same option**. You did not copy Air onto every city  
+- [ ] Review required items were reconciled and confirmed, not deleted  
 - [ ] Site-wide Defaults are saved; Preview is **Ready**  
 - [ ] **Delivery** is enabled on the WooCommerce zones where you want this plugin to operate (Rest of the World only if you intend to support leftover addresses)  
 - [ ] Settings show Active / shipping Ready; Advanced left alone; Blocks is a status row, not a toggle  
-- [ ] Shop shows option + estimate; Classic **and** Blocks checkout (whichever the store uses) show the real fee  
+- [ ] Shop shows Country → Region → Locality (when a pack is ready) → option + estimate + fee  
+- [ ] Classic **and** Blocks checkout (whichever the store uses) show the real fee  
 - [ ] Mixed Delivery + Pickup (if offered): real delivery fee + pickup FREE / 0.00; no false missing-price warning  
 - [ ] International is Air/Sea only; In Warehouse is local delivery only  
 - [ ] You can customize one product field and reset it  
@@ -741,9 +820,41 @@ Customers must not see “In Warehouse”, supplier names, or internal codes.
 - [ ] You only open Shipments after that setting is on  
 - [ ] Bulk Tools: you know Preview before Apply, or you will not open it  
 
-Every box is also on [13 — Feature coverage and confirmation](13-FEATURE-COVERAGE-AND-CONFIRMATION.md).  
+Every box is also on [13 — Feature coverage and confirmation](13-FEATURE-COVERAGE-AND-CONFIRMATION.md).
 
 If something fails: [07 — Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md). Stay in these menus. Do not edit PHP. Do not change delivery details on an old paid order.
+
+---
+
+## New-store example
+
+1. WooCommerce store = Ghana, currency = GHS.  
+2. Install Ghana Location Pack; wait until **ready**.  
+3. Create Delivery Option **Standard Delivery**.  
+4. Create Delivery Area **Greater Accra Selected Cities** with Coverage **Selected locations**: Accra, Tema, Madina, Adenta.  
+5. Create Delivery Charge **GH₵30** for that area + option.  
+6. Set Site-wide Defaults to that option.  
+7. Add WooCommerce shipping method **Delivery** on the Ghana zone.  
+8. Preview QA **#39705**.  
+9. Product page: Ghana → Greater Accra → Accra → Standard Delivery GH₵30.  
+10. Cart, checkout, authorised test order, read the order snapshot.
+
+---
+
+## Upgrade-from-RC.11 example
+
+Training upgraded **RC.11 / schema 5 → RC.12 / schema 6**. Migration converted five Delivery Areas. Accra and Kumasi became **Review required** / unmapped city because **no Ghana Location Pack** was installed. WooCommerce still showed Ghana regions. Locality search had no pack-backed results. That is expected.
+
+Staff path:
+
+1. Backup (human-controlled).  
+2. Let the normal plugin upgrade finish. Do not invoke migration classes. Do not downgrade schema.  
+3. Confirm version **1.0.0-rc.12** / schema **6**.  
+4. Install Ghana Location Pack; wait for **ready**.  
+5. **Run safe legacy reconciliation**.  
+6. Open Accra/Kumasi areas; confirm canonical geography; tick **I reviewed this migrated coverage**.  
+7. Test an address, PDP, cart, checkout.  
+8. Keep Delivery Areas, charges, and rules. Do not delete them to “start clean.”
 
 ---
 
@@ -758,3 +869,5 @@ If something fails: [07 — Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md). Sta
 - [07 — Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md)  
 - [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md)  
 - [13 — Feature coverage and confirmation](13-FEATURE-COVERAGE-AND-CONFIRMATION.md)  
+- [14 — Location Packs](14-LOCATION-PACKS-AND-GEOGRAPHY.md)  
+- [15 — Delivery Areas and Coverage Groups](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md)

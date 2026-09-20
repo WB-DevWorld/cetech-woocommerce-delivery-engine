@@ -1,34 +1,43 @@
 # Trainer Guide
 
-**Audience:** People teaching staff to use CETECH Delivery Engine **1.0.0-rc.9** (schema **5**)  
+**Audience:** People teaching staff to use CETECH Delivery Engine **1.0.0-rc.12** (schema **6**)  
 **Companion course:** [05-STAFF-TRAINING-MANUAL](05-STAFF-TRAINING-MANUAL.md)  
 **Coverage register:** [13-FEATURE-COVERAGE-AND-CONFIRMATION.md](13-FEATURE-COVERAGE-AND-CONFIRMATION.md) — tick **every** implemented feature Pass / Fail / N/A. Reading the guides is not confirmation.
 
 Reading the guides is not enough. Trainees must demonstrate skills. Prefer: walk the [Visual Walkthrough](04-VISUAL-WALKTHROUGH.md) on live screens → practise on QA products.
 
-Screenshots and recaptured videos are deferred. Teach from the live screens and these written guides. Do not teach from leftover older images.
+Screenshots and recaptured videos are deferred. Teach from the live screens and these written guides. Do **not** teach from leftover RC.2 images.
 
-For shipment staff, add playbook use cases 20–30 and [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md) after catalogue training. Old menu names from older guides belong only in the [Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md) — do not make them a teaching topic.
+**Required live sequence (admin/configuration track):**
+
+Location Pack → Delivery Area → Coverage Group → Delivery Option → Delivery Charge → product page → cart → checkout.
+
+Sales/customer-service track skips pack install but must still see the customer cascade and the GH₵30 result.
+
+For shipment staff, add playbook use cases 20–30 and [11](11-STAGE-14-SHIPMENTS.md) after catalogue training. Old menu names belong only in the [Troubleshooting FAQ](07-TROUBLESHOOTING-FAQ.md).
 
 ---
 
 ## Recommended training order
 
-1. Module 1–2 (what it is + menu)  
-2. Module 3 (inheritance, field-by-field)  
-3. Module 4 (simple product) live demo  
-4. Module 5 (variable) live demo  
-5. Modules 6–7 (fulfilment + charges) discussion  
-6. Modules 8–9 (customer + cart) live demo without payment  
-7. Module 13 (Classic and/or Blocks checkout, mixed pickup if offered)  
-8. Module 14 (Test an address Primary / Also matches)  
-9. Module 10 (orders) using existing QA orders  
-10. Modules 11–12 (troubleshooting + boundaries)  
-11. If Shipments is on: playbook 20–30 on the live Shipments screen (authorised staff only)  
-12. Administrators: Module 15 Bulk Tools (Preview only unless a change window is authorised)  
-13. Close the session by ticking [13 — Feature coverage](13-FEATURE-COVERAGE-AND-CONFIRMATION.md)
+1. Module 1–2 (what it is + menu). Draw the Start here diagram.  
+2. **Admin track:** Location Packs ([14](14-LOCATION-PACKS-AND-GEOGRAPHY.md), Module 7A). Sales track: watch only.  
+3. **Admin track:** Delivery Area + Coverage Group ([15](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md), Module 7B).  
+4. Delivery Option + Delivery Charge (teaching example GH₵30).  
+5. Module 3 (inheritance, field-by-field — not the same as Coverage Groups).  
+6. Module 4 (simple product) live demo  
+7. Module 5 (variable) live demo  
+8. Module 6 (fulfilment types)  
+9. Modules 8–9 (customer cascade + cart) live demo without payment  
+10. Module 13 (Classic and/or Blocks checkout, mixed pickup if offered)  
+11. Module 14 (priority, Primary / Also matches)  
+12. Module 10 (orders) using existing QA orders  
+13. Modules 11–12 (troubleshooting + boundaries)  
+14. If Shipments is on: playbook 20–30  
+15. Administrators: Module 15 Bulk Tools (Preview only unless authorised)  
+16. Close by ticking [13 — Feature coverage](13-FEATURE-COVERAGE-AND-CONFIRMATION.md)
 
-For a store that is not configured yet, start with [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md) before the staff course.
+For a store that is not configured yet, start with [12](12-SETUP-CONFIGURE-AND-TEST.md).
 
 Quick Start can be handed out before day one once setup is complete.
 
@@ -73,12 +82,17 @@ Do not modify real customer catalogue products for demos. Restore QA configurati
 ## Questions to ask trainees
 
 - Where do you start everyday delivery work?  
+- Is a Location Pack a delivery price?  
+- What does **ready** mean on Location Packs?  
+- What is a Delivery Area vs a Coverage Group?  
+- Which coverage mode lists Accra, Tema, and Madina in one area?  
+- What does Review required mean? What must you not do?  
 - What does Use Site-wide Default / Use Product Setting mean?  
 - How do you open Preview Delivery?  
 - What should you do when Needs Attention lists a product?  
-- What two things should a customer see on the product page?  
+- What should a customer see on the product page (location cascade + card)?  
 - Does this store use Classic Checkout, Cart/Checkout Blocks, or both?  
-- What does Test an address **Also matches** mean?  
+- What does Test an address **Also matches** mean? What does **Priority** mean?  
 - Why must you not copy Air onto every city Delivery Area?  
 - Is pickup 0.00 the same as a missing charge?  
 - What is the difference between Site-wide Defaults and a Product Exception?  
@@ -93,25 +107,32 @@ Do not modify real customer catalogue products for demos. Restore QA configurati
 2. Explain (or apply and restore) one product-level exception on a single field.  
 3. Show variation switch A→B on storefront.  
 4. Find Delivery information on a sample order.  
-5. Triage a “no delivery options” report using the staff FAQ only.  
+5. Triage a “no delivery options” or “no locality” report using the staff FAQ only.  
 6. Confirm checkout on the type this store uses (Classic and/or Blocks).  
-7. Run Test an address and explain Primary / Also matches.  
-8. (Shipment staff) Open one shipment read-only and name status, delivery option, and whether tracking is present.  
-9. (Administrators) Open Bulk Tools and name Preview vs Apply.
+7. Run Test an address and explain Primary / Also matches and priority.  
+8. **(Admin)** “Make Standard Delivery GH₵30 available to Accra, Tema and Madina without creating three Delivery Areas.”  
+9. **(Admin)** Point to Location Packs statuses and the reconciliation button without running it on production.  
+10. (Shipment staff) Open one shipment read-only and name status, delivery option, and whether tracking is present.  
+11. (Administrators) Open Bulk Tools and name Preview vs Apply.
 
 ---
 
 ## Expected answers (summary)
 
 - Everyday home = Overview  
+- Location Pack = directory of places, not a price. **ready** = usable live geography  
+- Delivery Area = business grouping; Coverage Group = which places qualify  
+- Selected locations = one area, many cities, one charge (teaching example GH₵30)  
+- Review required = upgrade refused to guess; data not destroyed; install pack, reconcile, confirm  
 - Defaults editor = Site-wide Defaults  
 - Product exceptions = WooCommerce Delivery tab / Product Exceptions  
-- Inheritance Site-wide → Product → Variation, field-by-field  
+- Inheritance Site-wide → Product → Variation, field-by-field (not Coverage AND/OR)  
 - Preview Delivery confirms Ready / Currently using  
-- Customers see option + estimate only  
+- Customers see Country → Region → Locality (when pack-backed) → option + estimate + fee  
 - Classic and Blocks both use Delivery Engine fees  
 - Pickup 0.00 is valid; missing charges fail closed  
-- Nested city-in-region overlap is normal; do not duplicate city charges  
+- Priority: lower number first; then specificity; not smallest-area-wins  
+- Nested overlap is normal; do not duplicate city charges  
 - Settings / Access / Bulk Tools / hidden support screens need an administrator  
 - No PHP/SQL/SSH for ordinary staff  
 - Past orders keep purchased delivery details  
@@ -121,7 +142,7 @@ Do not modify real customer catalogue products for demos. Restore QA configurati
 
 ## Pass / fail competency criteria
 
-A trainee **passes** only if they can demonstrate all everyday items in [13 — Feature coverage](13-FEATURE-COVERAGE-AND-CONFIRMATION.md) for their role (A + the C checks this store uses). Administrators also pass B. Shipment staff also pass D (or N/A). Bulk operators also pass E.
+A trainee **passes** only if they can demonstrate all everyday items in [13 — Feature coverage](13-FEATURE-COVERAGE-AND-CONFIRMATION.md) for their role (A + the C checks this store uses). Administrators also pass B and geography checks. Shipment staff also pass D (or N/A). Bulk operators also pass E.
 
 Minimum live demonstration (all roles):
 
@@ -131,14 +152,22 @@ Minimum live demonstration (all roles):
 4. Identify Needs Attention and first safe checks  
 5. Find effective settings via Preview Delivery  
 6. Read an order’s Delivery information  
-7. Stay inside the everyday menu; ask before Settings / Access / Bulk Tools  
-8. Describe the compact customer product/thank-you presentation  
+7. Stay inside the everyday menu; ask before Settings / Access / Bulk Tools / Location Packs (sales)  
+8. Describe the compact customer product/thank-you presentation and the location cascade  
 9. Show the checkout shipping line for this store’s checkout type  
 10. Explain Test an address Primary / Also matches if the store uses overlapping areas  
 
+Admin/configuration also pass only if they can:
+
+- Distinguish Location Pack vs Delivery Area vs Coverage Group vs Charge  
+- Choose Entire / Selected / Except for a spoken rule  
+- Explain Review required + reconciliation without proposing delete/recreate  
+
+Exercise 8 expected answer: **one Delivery Area** with a **Selected locations** Coverage Group (Accra, Tema, Madina) and **one** Delivery Charge.
+
 Shipment staff also pass only if they can find a shipment, explain that it is not a new order, and know not to re-type delivery prices.
 
-Fail if they invent $0 shipping, copy Air onto every city to “fix” overlap, change Settings without authorisation, or propose developer-only fixes as first steps.
+Fail if they invent $0 shipping, treat Location Packs as prices, copy Air onto every city to “fix” overlap, delete review-required areas, change Settings without authorisation, or propose developer-only fixes as first steps.
 
 ---
 

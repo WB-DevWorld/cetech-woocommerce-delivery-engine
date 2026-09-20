@@ -12,7 +12,7 @@ Merged to protected master: `3d786ba6440a5f6f850d736bda0da5a5f5236c1f` (PR #24)
 
 Immutable release anchor: `v1.0.0-rc.11` -> `384f564f64a2db766ae6907392e95fb366fb8533`
 
-RC.12 promotion: issue `#26` / `release/rc12` / identity `1.0.0-rc.12` / schema `6`. Not tagged. Pilot not authorized.
+RC.12: tagged `v1.0.0-rc.12` / `78594ad8962868683726373f58f4a8b1b48e4d0e` / schema `6`. Training-site qualification PASS. Pilot not authorized.
 
 Rejected technical-review candidate: `1.0.0-dev.geo.1` (`606730e2535896cb18e415b14d62bbb57d050578`). Do not reuse that package identity or send it to physical QA.
 

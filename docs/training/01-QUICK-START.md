@@ -1,41 +1,167 @@
-# Quick Start (about 10 minutes)
+# Quick Start
 
-**Audience:** New staff  
-**Plugin version:** 1.0.0-rc.9 (schema 5)  
-**Goal:** Do the everyday tasks safely without technical detail.
+**Audience:** New staff
+**Plugin version:** 1.0.0-rc.12 (schema 6)
+**Goal:** Answer the geography and pricing questions you will hit on day one, then do everyday product work safely.
 
 Screenshots are not included in this revision. Follow the live WordPress screens.
 
+Deep guides: [14 — Location Packs](14-LOCATION-PACKS-AND-GEOGRAPHY.md) · [15 — Delivery Areas and Coverage Groups](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md)
+
 ---
 
-## 1. Where to go
+## How the pieces fit (read this first)
 
-In WordPress admin open:
+```text
+Location Pack          = directory of places (not a price)
+Delivery Area          = where the merchant serves
+Coverage Group         = which places inside that area qualify
+Delivery Option        = the service (Standard Delivery, Same Day, Pickup)
+Delivery Charge        = the money (example GH₵30)
+Product / variation    = extra rules only where you set them
+```
 
-**Delivery Engine → Overview**
+**Worked example used everywhere in this training set**
 
-That is the daily home. From there you can see whether delivery is ready, jump to Site-wide Defaults, and open items that need attention.
+- Location Pack: Ghana geography
+- Delivery Area: Greater Accra Selected Cities
+- Coverage: Greater Accra · **Selected locations** · Accra, Tema, Madina, Adenta
+- Delivery Option: Standard Delivery
+- Delivery Charge: GH₵30
+
+Customer sees Ghana → Greater Accra → Accra (or Tema, Madina, Adenta) → Standard Delivery at GH₵30.
+
+---
+
+## Do I need a Location Pack?
+
+**Yes**, if customers must pick a city/locality, or you use **Selected locations** / **Entire selected area except…**, or an upgraded store shows **Review required** for old city names.
+
+**Not always**, if you only deliver country-wide and never need locality search. WooCommerce can still show Country and Region without a pack.
+
+You do **not** install every country’s pack. Install packs for countries you actually serve with locality-level delivery.
+
+Ghana is the training/reference market, not a product limitation.
+
+---
+
+## Where do I install it?
+
+**Delivery Engine → Location Packs**
+
+1. **Country:** `GH` for Ghana.
+2. Upload the GeoNames country `.txt`/`.zip`, **or** tick official download from download.geonames.org.
+3. **Operation:** **Install or continue** (first time).
+4. Click **Install / update pack**.
+5. Wait. Import continues in the background.
+
+Details: [14 — Location Packs](14-LOCATION-PACKS-AND-GEOGRAPHY.md).
+
+---
+
+## What does Ready mean?
+
+On **Installed packs**, **ready** means the geography dataset is **usable live**.
+
+- **pending** / **importing** — still working. Do not mash buttons. Use **Continue / retry** only to resume.
+- **failed** — read the displayed error, then retry/fix the source.
+- Do not edit database status.
+
+Installing a pack does **not** create GH₵30. Prices live on **Delivery Charges**.
+
+---
+
+## What is a Delivery Area?
+
+A business grouping of destinations that share intended delivery treatment.
+
+Example name: **Greater Accra Selected Cities**.
+
+Menu: **Delivery Engine → Delivery Areas** → **Add Delivery Area**.
+
+---
+
+## What is a Coverage Group?
+
+The geography rules **inside** a Delivery Area.
+
+On the area editor the help text says: different levels combine with **AND**; several places at the same level combine with **OR**; extra groups combine with **OR**.
+
+Example: Ghana **AND** Greater Accra **AND** (Accra **OR** Tema **OR** Madina **OR** Adenta).
+
+Details: [15 — Coverage Groups](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md).
+
+---
+
+## Which coverage mode should I choose?
+
+Exact RC.12 labels:
+
+| Choose | When |
+|--------|------|
+| **Entire selected area** | Whole region/country (all of Greater Accra) |
+| **Selected locations** | Only named towns (Accra, Tema, Madina, Adenta) — **this is the teaching example** |
+| **Entire selected area except…** | Whole region minus named towns (except Ada Foah and Prampram) |
+
+Exclusions override inclusion **inside that group**. The town might still match another Delivery Area.
+
+---
+
+## Where is the delivery price configured?
+
+**Delivery Engine → Delivery Charges** (not Location Packs).
+
+Pick the Delivery Area + Delivery Option, enter the amount (teaching example **GH₵30**). A typed **0.00** means you meant free. A missing charge must never become silent free shipping.
+
+---
+
+## What do I do if something says Review Required?
+
+It does **not** mean data was destroyed. The upgrade refused to guess which canonical place an old text city (for example `"Accra"`) meant.
+
+1. Install/verify the Location Pack until **ready**.
+2. **Location Packs** → **Run safe legacy reconciliation**.
+3. Open the Delivery Area, confirm the intended places.
+4. Tick **I reviewed this migrated coverage** when it is correct.
+5. Test the destination.
+
+Do not delete/recreate the area to “clean up.” Reconciliation does not reset all areas and does not overwrite valid manual canonical coverage.
+
+---
+
+## How do I test before customers use it?
+
+1. **Delivery Areas → Test an address** (Primary match / Also matches).
+2. Product **Delivery** tab → **Preview Delivery** should be **Ready**.
+3. QA product page: country → region → locality → option + fee.
+4. Cart, then checkout (Classic and/or Blocks, whichever this store uses).
+5. Authorised safe test order only. Read **Delivery information** on the order. Do not rewrite historical snapshots.
+
+---
+
+## Everyday product work (after geography/prices exist)
+
+### Where to go
+
+**Delivery Engine → Overview** is the daily home.
 
 Also know:
 
-- **Site-wide Defaults** — the normal rules every eligible product can inherit  
-- **WooCommerce → Products** — product **Delivery** tab (exceptions)  
-- **WooCommerce → Orders** — **Delivery information** on a paid order  
-- **Preview Delivery** — from a product’s Delivery tab or Overview, to see what will actually apply  
+- **Site-wide Defaults** — normal rules every eligible product can inherit
+- **WooCommerce → Products** — product **Delivery** tab (exceptions)
+- **WooCommerce → Orders** — **Delivery information** on a paid order
+- **Preview Delivery** — from a product’s Delivery tab or Overview
 
----
-
-## 2. How settings inherit
-
-Think of three layers:
+### How settings inherit
 
 **Site-wide Defaults → Product exception → Variation exception**
 
 - If a product has no special setting, it uses the **Site-wide Default** for its fulfilment type (In Warehouse, In Store, or International).
 - If a variation has no special setting, it uses the **product**.
-- Changing one field (for example Estimated delivery) does **not** freeze the other fields. Inheritance is field-by-field.
+- Changing one field does **not** freeze the other fields. Inheritance is field-by-field.
+- Explicit zero is a valid override.
 
-Modes you will see when you customize:
+This inheritance is **not** Coverage Group AND/OR.
 
 | Label | Meaning |
 |-------|---------|
@@ -44,96 +170,53 @@ Modes you will see when you customize:
 | **Set a different fulfilment / delivery method / estimate** | Use a different value here |
 | **Reset to Site-wide Defaults** / **Reset to Product Settings** | Remove this item’s exceptions |
 
----
+### Configure a normal product
 
-## 3. Configure a normal product
+Most products need **no product-level work**.
 
-Most products need **no product-level work**. They inherit Site-wide Defaults automatically.
+When one product must differ (practice on QA **#39705**):
 
-When one product must differ:
+1. **WooCommerce → Products** → **Delivery** tab.
+2. Confirm **Currently using**.
+3. **Customize This Product**.
+4. Change **only** the fields that must differ.
+5. **Save Product Delivery Settings**.
 
-1. Open **WooCommerce → Products** and edit the product (practice on QA **#39705**).
-2. Open the **Delivery** tab.
-3. Confirm **Currently using** (usually the Site-wide Default).
-4. Click **Customize This Product**.
-5. Change **only** the fields that must differ.
-6. Click **Save Product Delivery Settings**.
+Customized products also appear under **Delivery Engine → Product Exceptions**.
 
-You can also find customized products under **Delivery Engine → Product Exceptions**.
+### Configure a variation
 
----
+1. Edit parent **#39717**.
+2. Open variation **#39718** or **#39719**.
+3. **Customize This Variation**.
+4. Leave **Use Product Setting** when the parent is correct.
+5. **Save Variation Delivery Settings**.
 
-## 4. Configure a variation
+### Save and check the shop
 
-1. Edit the variable parent (QA **#39717**).
-2. Open the variation (QA **#39718** or **#39719**).
-3. In the variation **Delivery** summary, click **Customize This Variation**.
-4. Leave **Use Product Setting** if the parent is correct.
-5. Change only the fields that must differ for that variation.
-6. Click **Save Variation Delivery Settings**.
-
----
-
-## 5. Check Preview
-
-From the product **Delivery** tab, click **Preview Delivery**.
-
-Confirm the product/variation shows **Ready** (or a clear **Needs Attention** message you can act on).
-
----
-
-## 6. Save
-
-After editing, always use the Delivery Engine **Save** button on that screen. If you leave without saving, changes are not applied.
-
-Later Site-wide Default edits apply immediately to inherited fields. You do not re-apply the whole catalogue.
-
----
-
-## 7. Check the customer-facing result
-
-Open the product on the shop.
+Always use the Delivery Engine **Save** button on that screen.
 
 Customers should see:
 
-- the public **Delivery option** name (radio + bold label)
+- public **Delivery option** name
 - **Estimated delivery:** … (or **Ready for pickup** when pickup applies)
+- the fee when a destination is selected (server price, not a typed customer price)
 
-They should **not** see fulfilment labels, internal delivery-method wording, supplier/origin names, or a long internal description on the compact selector.
+### Where orders show delivery
 
-For a variable product, select the variation first, then the delivery choice.
+WooCommerce order → **Delivery information**. That snapshot stays as purchased.
 
----
+### When to ask an administrator
 
-## 8. Where orders show delivery
-
-**WooCommerce → Orders →** open the order → find **Delivery information**.
-
-This is what was saved when the customer ordered. Practice read-only on QA orders **#39721** or **#39724**.
-
-At checkout, the shipping line should show the public Delivery Option name and the configured charge. That is true on **Classic Checkout** and on **Cart/Checkout Blocks**. Store pickup at **0.00** is allowed; a missing charge must not become silent free shipping.
-
----
-
-## 9. When to ask an administrator
-
-Stop and escalate if you need to:
-
-- change **Delivery Engine → Settings** (especially Advanced switches)  
-- change **Settings → Access**  
-- use **Bulk Tools**  
-- open a screen that is not in the everyday menu  
-- “fix” delivery details on an old paid order  
-- change store-wide pricing or areas without authorisation  
-
-Also escalate if **Needs Attention** still lists a product after Site-wide Defaults and the product Delivery tab look complete.
+- Location Packs, Coverage Groups, review-required coverage, Settings, Access, Bulk Tools
+- Missing charges, unexpected GH₵0, or “no locality” after a pack should be ready
+- Anything not on the everyday menu for your role
 
 ---
 
 ## Next
 
-If the plugin is **not** set up yet (Setup Guide is still in the menu, or Preview is not Ready), stop and follow [12 — How to use each menu](12-SETUP-CONFIGURE-AND-TEST.md) first.
-
-Continue with the [Staff Training Manual](05-STAFF-TRAINING-MANUAL.md) or the [Visual Walkthrough](04-VISUAL-WALKTHROUGH.md).
-
-If **Delivery Engine → Shipments** is in the menu, also read [11 — Stage 14 shipments](11-STAGE-14-SHIPMENTS.md) and playbook use cases 20–30.
+- Full admin pages: [02](02-COMPLETE-ADMIN-GUIDE.md)
+- Setup order: [12](12-SETUP-CONFIGURE-AND-TEST.md)
+- Problems: [07](07-TROUBLESHOOTING-FAQ.md)
+- Words: [08](08-GLOSSARY.md)

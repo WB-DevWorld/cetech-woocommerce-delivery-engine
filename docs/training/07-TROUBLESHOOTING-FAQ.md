@@ -1,9 +1,97 @@
 # Troubleshooting FAQ (staff)
 
 **Audience:** Everyday staff and administrators  
-**Version:** 1.0.0-rc.9 (schema 5)  
+**Version:** 1.0.0-rc.12 (schema 6)  
 
 Use this guide first. Do **not** edit PHP, run SQL, clear Redis globally, change the database by hand, install Code Snippets, change Nginx, or use SSH. Those steps belong only in the [Technical Support Appendix](09-TECHNICAL-SUPPORT-APPENDIX.md).
+
+Geography deep guides: [14](14-LOCATION-PACKS-AND-GEOGRAPHY.md), [15](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md).
+
+---
+
+## Why can't I select a city/locality?
+
+WooCommerce can show Country and Region without a Location Pack. Locality search needs a **ready** pack for that country. Training after RC.12 had **0** packs and no pack-backed locality data — expected, not a crash. Ask an administrator to install the Ghana (or other) pack and wait for **ready**.
+
+---
+
+## Why do I see Country/Region but no Locality?
+
+Same as above. Country-wide delivery can still work without forcing a locality. Changing Country clears Region and Locality; changing Region clears Locality.
+
+---
+
+## Does installing a Location Pack create delivery prices?
+
+No. Packs are a directory of places. Prices live on **Delivery Engine → Delivery Charges**. Teaching example GH₵30 is a charge, not a pack.
+
+---
+
+## Why does the system say review required?
+
+The upgrade could not **safely prove** which canonical place old text (for example `"Accra"`) meant. Data was **not** destroyed. The plugin refused to guess. Install/verify the Location Pack, click **Run safe legacy reconciliation**, open the Delivery Area, confirm geography, tick **I reviewed this migrated coverage**. Saving other fields will not clear the warning. Do not delete the area.
+
+---
+
+## Why did my old city rule not migrate automatically?
+
+Without a usable locality pack the engine cannot prove `"Accra"` equals a specific canonical locality. Training: Accra and Kumasi became unmapped city / review-required after RC.11 → RC.12 for that reason.
+
+---
+
+## Why is my pack stuck on Importing?
+
+Large imports continue in background batches. Refresh later. Use **Continue / retry** once to resume. Do not click rapidly. If Progress never moves, escalate with a screenshot of the row (status, progress, last error). Do not paste passwords.
+
+---
+
+## What does Continue / retry do?
+
+It resumes pending, importing, or failed pack work (or retries the current dataset). It is not a price tool and not “reset geography.”
+
+---
+
+## Why is a broader area winning?
+
+**Priority** uses **lower numbers first**, then geographic specificity. The special Accra area must have a lower number than Greater Accra general (example 8 vs 25) and must be usable (active, not review-required). Smallest area does not automatically win.
+
+---
+
+## What does priority mean?
+
+A business ordering number on the Delivery Area. Lower = checked first when more than one area can match. Set it deliberately.
+
+---
+
+## Why is postcode hidden?
+
+Postcode is shown/required only where relevant. Hidden often means “not needed,” not a defect.
+
+---
+
+## Can I delete the legacy rules after migration?
+
+Do not delete Delivery Areas or charges to “clean up” review-required coverage. When canonical coverage is active, leftover old conditions are **compatibility evidence only**. Removing every coverage group requires an explicit confirmation so the engine does not silently fall back to hidden legacy conditions.
+
+---
+
+## Why is an excluded locality still receiving another broader Delivery Area?
+
+Exclusions apply **inside that Coverage Group**. Another Delivery Area can still match. Use **Test an address** → Also matches.
+
+---
+
+## Why are two delivery services both available?
+
+Two Delivery Options are assigned and both have charges for matching areas. That can be correct (Standard and Same Day).
+
+---
+
+## Why doesn't pickup appear on this product?
+
+Pickup needs an In Store (or explicitly customized) path, an active Store pickup option, and a Pickup Location. Location Packs do not create pickup. International products do not offer pickup. Warehouse products stay on local delivery.
+
+---
 
 ---
 
@@ -188,6 +276,7 @@ Use this guide first. Do **not** edit PHP, run SQL, clear Redis globally, change
 | Delivery Offers | Delivery Options |
 | Destination Zones | Delivery Areas |
 | Rate Cards | Delivery Charges |
+| (missing) Location Packs | **Location Packs** — geography directory; not a price |
 | Delivery Settings Preview | Preview Delivery (from the product tab or Overview) |
 | Legacy Delivery Rules | **Do not look for it.** Use Site-wide Defaults and the product **Delivery** tab. |
 
@@ -237,4 +326,4 @@ If the name is not in this table, stay on the everyday menu in [00-START-HERE](0
 - What the customer sees (option name + estimate, or the problem)  
 - What you already tried  
 - Exact wording of Ready / Needs Attention  
-- Plugin version shown in WordPress (**1.0.0-rc.9** expected)
+- Plugin version shown in WordPress (**1.0.0-rc.12** expected)

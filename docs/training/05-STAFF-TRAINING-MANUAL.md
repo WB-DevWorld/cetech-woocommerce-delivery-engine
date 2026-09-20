@@ -1,11 +1,21 @@
 # Staff Training Manual (self-paced)
 
-**Audience:** New and returning staff  
-**Version:** CETECH Delivery Engine **1.0.0-rc.9** (schema **5**)  
+**Audience:** Split by role — see below  
+**Version:** CETECH Delivery Engine **1.0.0-rc.12** (schema **6**)  
 **Everyday home:** Delivery Engine → Overview  
 **Practice products:** Simple QA **#39705**; Variable QA **#39717** / A **#39718** / B **#39719**
 
 Screenshots and recaptured videos are deferred. For “Watch the walkthrough”, use the matching section of [04-VISUAL-WALKTHROUGH](04-VISUAL-WALKTHROUGH.md) on the live screens.
+
+### Who takes which modules
+
+| Role | Do these | Skip these |
+|------|----------|------------|
+| Sales / customer-service | 1–6, 8–11, 13 | Location Packs internals, schema 5→6, Bulk Tools unless told |
+| Admin / configuration | All modules, plus [14](14-LOCATION-PACKS-AND-GEOGRAPHY.md) and [15](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md) | Migration PHP classes |
+| Technical support | Admin path plus [09](09-TECHNICAL-SUPPORT-APPENDIX.md) | Do not send sales staff to 09 |
+
+Sales staff must be able to explain: customers pick Country → Region → Locality; the fee comes from Delivery Charges; **Review required** is an admin job, not “data deleted.”
 
 How every module works:
 
@@ -25,10 +35,10 @@ Complete modules in order unless a trainer assigns a different path.
 # MODULE 1 — Understanding the Delivery Engine
 
 ## 1. What you are learning
-What the Delivery Engine does for the store, customers, and staff — without technical jargon.
+What the Delivery Engine does for the store, customers, and staff — without technical jargon. How Location Packs, Delivery Areas, Coverage Groups, Delivery Options, Delivery Charges, and product rules fit together (they are connected, not the same).
 
 ## 2. Why it matters
-Clear delivery choices and correct fees reduce checkout confusion. Shared picture of the journey: Site-wide Defaults → customer selects a Delivery option → cart/checkout → order Delivery information.
+Clear delivery choices and correct fees reduce checkout confusion. Shared picture: Location Pack (places) → Delivery Area/Coverage → Delivery Option → Delivery Charge → Site-wide Defaults → customer selects destination and option → cart/checkout → order Delivery information.
 
 ## 3. Watch the walkthrough
 Read [04-VISUAL-WALKTHROUGH](04-VISUAL-WALKTHROUGH.md) sections 1–2 (admin → Overview).
@@ -229,37 +239,101 @@ Point to each fulfilment type on Site-wide Defaults and explain it aloud in one 
 
 ---
 
-# MODULE 7 — Delivery Areas and Delivery Charges
+# MODULE 7 — Delivery Areas, Coverage Groups, and Delivery Charges
 
 ## 1. What you are learning
-How Delivery Areas and Delivery Charges produce the checkout shipping fee.
+How Location Packs, Delivery Areas, Coverage Groups, and Delivery Charges produce the checkout shipping fee. Admin/configuration staff go deeper in [14](14-LOCATION-PACKS-AND-GEOGRAPHY.md) and [15](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md). Sales staff only need the picture.
 
 ## 2. Why it matters
-Customers pay the fee shown at checkout. Missing charges must not become silent free shipping.
+Customers pay the fee shown at checkout. Missing charges must not become silent free shipping. A Location Pack is not a price.
 
 ## 3. Watch the walkthrough
-Visual Walkthrough sections 5–6 and 16. Playbook use cases 14 and 16.
+Visual Walkthrough sections 4A, 5–6 and 16. Playbook 43–46.
 
 ## 4. Do it yourself
-Open Delivery Areas and Delivery Charges read-only. Find how an area and an option pair to a fee. If an area uses **State / Region**, notice that the checkout name and the short code (for example `Greater Accra` and `AA`) are the same place. Run **Test an address** if a trainer asks, and read **Primary match** / **Also matches**. Do not edit production rates without authorisation. Do not copy the same charge onto every city.
+Open Location Packs read-only (status **ready** or empty). Open Delivery Areas. Find a Coverage Group. Name the mode: **Entire selected area**, **Selected locations**, or **Entire selected area except…**. Open Delivery Charges. If a trainer asks, run **Test an address** and read **Primary match** / **Also matches**. Do not edit production rates without authorisation.
 
 ## 5. Check your result
-You can describe: customer address → area match (Primary / Also matches) → charge for the selected option (city first, broader area only if that option has no city charge) → shipping line (public option label + amount).
+You can describe: destination → canonical geography → Coverage Group match → Delivery Area (priority then specificity) → charge for the selected option → shipping line.
 
 ## 6. Common mistakes
-Changing fees on the order instead of Delivery Charges; assuming quantity always multiplies a shared delivery fee.
+Treating Location Packs as prices; one Delivery Area per city for one shared fee; assuming smallest area always wins; deleting Review required data.
 
 ## 7. Short quiz
-1. What two things does a typical Delivery Charge connect?  
-2. Where does the customer see the fee?  
-3. Should missing config become $0 shipping?  
-4. What label may the shipping line show?  
-5. Who should approve charge changes?
+1. Does installing a Location Pack create GH₵30?  
+2. What two things does a typical Delivery Charge connect?  
+3. Which coverage mode lists Accra, Tema, Madina, Adenta?  
+4. Should missing config become $0 shipping?  
+5. What does Review required mean?
 
-**Answers:** (1) Area + Delivery Option (2) Checkout shipping (3) No (4) The public Delivery Option name (fallback Delivery / Store pickup) (5) Administrator / authorised staff.
+**Answers:** (1) No (2) Area + Delivery Option (3) Selected locations (4) No (5) Upgrade could not prove old text geography; data was not destroyed.
 
 ## 8. Practical test
-Explain why two compatible items might share one 25.00 charge without using developer terms.
+Explain the teaching example aloud: Ghana pack, Greater Accra Selected Cities, four cities, Standard Delivery, GH₵30.
+
+---
+
+# MODULE 7A — Location Packs (admin / configuration)
+
+Sales/customer-service: skip unless a trainer assigns it.
+
+## 1. What you are learning
+Install country geography. Status **pending / importing / ready / failed**. **Continue / retry**. **Run safe legacy reconciliation**.
+
+## 2. Why it matters
+Without a usable pack, locality search has no pack-backed results even when WooCommerce shows Country and Region.
+
+## 3. Watch the walkthrough
+Visual Walkthrough 4A. Guide [14](14-LOCATION-PACKS-AND-GEOGRAPHY.md).
+
+## 4. Do it yourself
+Open **Delivery Engine → Location Packs**. Name every form label. Do not start an unofficial download on production without authorisation.
+
+## 5. Check your result
+You can say **ready** means usable live geography.
+
+## 6. Common mistakes
+Rapid clicking; editing DB status; installing every country.
+
+## 7. Short quiz
+1. Where is the menu? 2. What does Ready mean? 3. What does Continue / retry do?
+
+**Answers:** (1) Delivery Engine → Location Packs (2) usable dataset (3) resume/recover pending, importing, or failed work.
+
+## 8. Practical test
+Point to Provider, Version, Checksum, License, Progress without changing them.
+
+---
+
+# MODULE 7B — Coverage Groups and Review required (admin / configuration)
+
+Sales/customer-service: skip unless a trainer assigns it.
+
+## 1. What you are learning
+AND across levels, OR at the same level and across groups. Three coverage modes. Priority. Review required workflow.
+
+## 2. Why it matters
+This is how RC.12 decides whether Accra qualifies. Product inheritance is a different hierarchy.
+
+## 3. Watch the walkthrough
+Visual Walkthrough 5. Guide [15](15-DELIVERY-AREAS-AND-COVERAGE-GROUPS.md).
+
+## 4. Do it yourself
+Read one Coverage Group on a QA/demo area. If Review required is showing, do not tick confirmations without a trainer.
+
+## 5. Check your result
+You can choose Entire / Selected / Except for a spoken business rule.
+
+## 6. Common mistakes
+Ticking entire-area replacement when you meant one city; mixing Coverage AND/OR with Global→Product→Variation.
+
+## 7. Short quiz
+1. Accra OR Tema is same-level OR or AND? 2. Lower priority number means what?
+
+**Answers:** (1) OR (2) Checked first.
+
+## 8. Practical test
+“Make Standard Delivery GH₵30 available to Accra, Tema and Madina without three Delivery Areas.” Answer: one area, Selected locations group, one charge.
 
 ---
 
@@ -468,27 +542,30 @@ Show a trainer the live checkout shipping line for this store’s checkout type.
 # MODULE 14 — Overlapping Delivery Areas
 
 ## 1. What you are learning
-City areas can sit inside region areas. **Test an address** shows Primary match and Also matches. The selected option can use a broader area’s charge when the city has none for that option.
+Several Delivery Areas can match the same destination. **Priority** (lower number first) then geographic specificity decides Primary match. **Test an address** shows Also matches. The selected option can use a broader area’s charge when the more-specific area has none for that option. Smallest area does **not** automatically win.
 
 ## 2. Why it matters
-Staff must not duplicate Air (or any option) onto every city “so checkout works.”
+Staff must set priority for the preferred business rule (Accra special **8** vs Greater Accra general **25**) and must not duplicate Air onto every city.
 
 ## 3. Watch the walkthrough
-Visual Walkthrough section 5. Playbook 31–33.
+Visual Walkthrough section 5. Playbook 31–33 and 46.
 
 ## 4. Do it yourself
-Run **Test an address** for Accra / Greater Accra (or the store’s equivalent) with the region name and the short code.
+Run **Test an address** for Accra. Read Primary match / Also matches. Name the priority numbers if a trainer shows two overlapping areas.
 
 ## 5. Check your result
-You can explain Primary vs Also matches, and that a different Delivery Option is never substituted.
+You can explain Primary vs Also matches, priority, and that a different Delivery Option is never substituted.
 
 ## 6. Common mistakes
-Treating nested overlap as an error; copying charges onto every city; assuming an invalid city charge still inherits.
+Treating nested overlap as an error; copying charges onto every city; assuming an invalid city charge still inherits; inventing smallest-area-wins.
 
 ## 7. Short quiz
 1. What does Also matches mean?  
 2. Should you copy Air onto every city?  
-3. Does an invalid city charge silently use the region fee?
+3. Does an invalid city charge silently use the region fee?  
+4. Does smallest area automatically win?
+
+**Answers:** (1) Other active areas that also cover the address (2) No (3) No — fail closed (4) No — priority first, then specificity.
 
 **Answers:** (1) Broader areas that also cover the address (2) No (3) No — fail closed.
 
