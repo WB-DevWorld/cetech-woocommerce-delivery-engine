@@ -4,7 +4,17 @@
 **Schema:** `6` (unchanged; no schema 7)  
 **Branch:** `fix/geography-pack-liveness`  
 **Base:** protected `master` `83effbf081e54b47ef088673c8ac18217ab9dfda`  
+**Runtime / package-source SHA:** `afb3b4bee9a09b235b639a227564a0b0b3166cd5`  
+**PR:** https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/34  
 **Not RC.13. Not deployed.**
+
+## Package (dev qualification, after CI)
+
+- Source SHA: `afb3b4bee9a09b235b639a227564a0b0b3166cd5`
+- Filename: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-live.1.zip`
+- Bytes: `1,783,293`
+- SHA-256: `6281f1b3f7d080ac9bb528fc1a117be909ac1ae05c052d6fe704cc053192ccbf`
+- Built from a clean committed tree after GitHub CI SUCCESS on PR #34. Do not treat this ZIP as RC.13 or as a replacement for RC.12.
 
 ## Training forensics (read-only; captured before any further mutation)
 

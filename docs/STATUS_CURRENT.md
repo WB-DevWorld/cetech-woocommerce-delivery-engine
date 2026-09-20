@@ -41,7 +41,11 @@ Last reconciled: 2026-09-20 (RC.12 tagged and published as a prerelease from pro
 - Base: protected `master` `83effbf081e54b47ef088673c8ac18217ab9dfda`
 - Development identity: `1.0.0-dev.geo-live.1`
 - Schema: `6` (unchanged)
-- Not RC.13. Not deployed. Awaiting ChatGPT/owner review.
+- Runtime / package-source SHA: `afb3b4bee9a09b235b639a227564a0b0b3166cd5`
+- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/34
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-live.1.zip`
+- Bytes: `1,783,293`
+- SHA-256: `6281f1b3f7d080ac9bb528fc1a117be909ac1ae05c052d6fe704cc053192ccbf`
 - Evidence: `docs/POST-RC12-GEO-LIVENESS.md`
 
 ## Post-RC.12 merged — Issue #29 (not a release)
