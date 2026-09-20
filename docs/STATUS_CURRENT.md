@@ -1,13 +1,13 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-20 (RC.12 tagged and published as a prerelease from protected-master `78594ad`; Issue #26 CLOSED/COMPLETED; training-site qualification PASS; staff-training realignment is docs-only and is not the RC.12 tag source; Pilot not authorized).
+Last reconciled: 2026-09-20 (RC.12 tagged and published as a prerelease from protected-master `78594ad`; Issue #26 CLOSED/COMPLETED; training-site qualification PASS; staff-training realignment merged on `c4cee3c` and is **not** the RC.12 tag source; Issue #29 post-RC.12 checkout multi-destination candidate `1.0.0-dev.checkout-mdest.1` is in review and is **not** RC.13; Pilot not authorized).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
 - Default/canonical development branch: protected `master`
-- Current protected `master` at RC.12 publication: `78594ad8962868683726373f58f4a8b1b48e4d0e`
-- This master commit is the merge of PR #27 (`release/rc12`) onto prior master `3d786ba6440a5f6f850d736bda0da5a5f5236c1f` (PR #24 / owner-accepted `1.0.0-dev.geo.16`).
-- Later documentation commits on `master`, if any, are **not** the RC.12 tag source.
+- Current protected `master` (docs after RC.12): `c4cee3c37360789d47f3238207aaa4e74ba86109`
+- RC.12 publication merge on `master`: `78594ad8962868683726373f58f4a8b1b48e4d0e` (PR #27 / `release/rc12` onto `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`).
+- Later documentation commits on `master` are **not** the RC.12 tag source.
 - Repository visibility: public during GitHub Free branch/ruleset protection use.
 - Composer license declaration remains `proprietary`; public visibility is not an open-source license grant.
 
@@ -34,6 +34,15 @@ Last reconciled: 2026-09-20 (RC.12 tagged and published as a prerelease from pro
 - Issue `#26`: CLOSED / COMPLETED
 - Evidence: `docs/RC12-PROMOTION.md`
 - Do not move this tag to a later documentation commit. Do not rebuild the ZIP for docs closeout.
+
+## Post-RC.12 candidate — Issue #29 (not a release)
+- Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/29
+- Branch: `fix/checkout-multi-destination-preservation`
+- Base: protected `master` `c4cee3c37360789d47f3238207aaa4e74ba86109`
+- Development identity: `1.0.0-dev.checkout-mdest.1`
+- Schema: `6` (unchanged)
+- Not RC.13. Not deployed. Awaiting ChatGPT/owner review.
+- Evidence: `docs/POST-RC12-CHECKOUT-MULTIDEST.md`
 
 ## Prior tagged release candidate — RC.11
 - Tag: `v1.0.0-rc.11`

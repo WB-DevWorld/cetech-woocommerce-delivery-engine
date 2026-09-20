@@ -185,7 +185,7 @@ final class DestinationZonesPage {
 
 		if ( $coverage->has_nested_overlaps() ) {
 			AdminPageLayout::render_info_notice(
-				__( 'Some delivery areas overlap. A more-specific area such as a city is used first. If that area has no charge for the selected Delivery Option, pricing can use the broader matching area. A different Delivery Option is never substituted.', 'cetech-woocommerce-delivery-engine' )
+				__( 'Some delivery areas overlap. Matching uses configured priority first (lower number first), then geographic specificity when priority is equal, then a stable tie-break. If the primary area has no charge for the selected Delivery Option, pricing can use a broader matching area. A different Delivery Option is never substituted.', 'cetech-woocommerce-delivery-engine' )
 			);
 		}
 

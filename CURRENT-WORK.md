@@ -1,15 +1,15 @@
-# Current Work — RC.12 Staff Training Realignment
+# Current Work — Issue #29 Checkout Multi-Destination Stabilization
 
-Status: RC.12 TAGGED AND PUBLISHED — TRAINING SITE QUALIFIED / CETECH PILOT NOT STARTED / FLAIROC NOT DEPLOYED / PRODUCTION NOT DEPLOYED
+Status: RC.12 IMMUTABLE — POST-RC.12 DEV CANDIDATE `1.0.0-dev.checkout-mdest.1` — AWAITING REVIEW / NOT RC.13 / NOT DEPLOYED
 
 ## Canonical repository truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
 - Canonical development branch: protected `master`.
-- RC.12 release source / current tagged candidate: `78594ad8962868683726373f58f4a8b1b48e4d0e`.
-- Later `master` may advance for documentation only. That later commit is **not** the RC.12 release source and must not receive the `v1.0.0-rc.12` tag.
-- Do not rebuild the RC.12 ZIP merely because training docs are committed later.
+- Current protected `master` (docs after RC.12): `c4cee3c37360789d47f3238207aaa4e74ba86109`.
+- Immutable RC.12 release source: `78594ad8962868683726373f58f4a8b1b48e4d0e`.
+- Tag `v1.0.0-rc.12` must not be moved. Do not rebuild or overwrite the RC.12 ZIP.
 
-## RC.12 published identity
+## RC.12 published identity (immutable)
 - Version: `1.0.0-rc.12`
 - Schema: `6`
 - Tag: `v1.0.0-rc.12` (unsigned annotated `tag`)
@@ -19,40 +19,36 @@ Status: RC.12 TAGGED AND PUBLISHED — TRAINING SITE QUALIFIED / CETECH PILOT NO
 - Final ZIP: `cetech-woocommerce-delivery-engine-1.0.0-rc.12.zip`
 - ZIP bytes: `1,767,204`
 - ZIP SHA-256: `46508c566b505ac470ae94d2829de068e4ff1b53bb4c22e31201e038fb8e03d1`
-- Protected-master CI: `35522128310` SUCCESS
-- Issue `#26`: CLOSED / COMPLETED
-- Training site: `https://training.cetechbpa.com` currently runs RC.12 / schema 6. Qualification: PASS.
-
-## Immutable prior release — RC.11
-- Tag: `v1.0.0-rc.11`
-- Annotated tag object: `acaae9bfc9758cdee1b3f2ec47e94848e83f87da`
-- Peels to: `384f564f64a2db766ae6907392e95fb366fb8533`
-- Version: `1.0.0-rc.11`; schema: `5`
-- ZIP SHA-256: `97423a95273f6148ee855d1fb8a66c6c66e47aa20cb2c5868ecf2f84b2a9a521`
-- Not mutated.
 
 ## Active task
-Docs-only staff training realignment for RC.12 Location Packs, Coverage Groups, review-required coverage, and setup order.
+Issue `#29` — `[P1] Checkout Use my checkout address flattens multi-destination carts`
 
-- Branch: `docs/rc12-training-realignment` from `78594ad`.
-- Scope: `docs/training/**` plus truthful RC.12 closeout status/docs. **No runtime, schema, or package changes.**
-- Historical `docs/staff-training-rc2` is not merged. Salvage is documented separately.
-- After merge, `.github/workflows/sync-training-docs.yml` publishes `docs/training/**` to `wbdevworld/cetech-woocommerce-delivery-engine-training`.
+- Owner: `@wbdevworld` (explicit owner instruction; checkout runtime + customer copy).
+- Branch: `fix/checkout-multi-destination-preservation` from protected `master` `c4cee3c`.
+- Development identity: `1.0.0-dev.checkout-mdest.1` (schema remains `6`).
+- Not RC.13. Not a release promotion.
+
+Owner-reproduced on `training.cetechbpa.com` (RC.12 runtime):
+- Line A destination GH / Standard Delivery / GH₵30
+- Line B destination Accra / Standard Delivery / GH₵50
+- Cart: subtotal GH₵60 + GH₵30 + GH₵50 = **GH₵140**
+- After **Use my checkout address** (checkout = Accra): both items Accra, only GH₵50 delivery, total **GH₵110**
 
 ## Central leases
-- plugin bootstrap / version identity: published `1.0.0-rc.12`; do not change without a new authorized promotion;
-- schema / migrations: frozen at `6` for this candidate;
+- plugin bootstrap / version identity on this branch: `1.0.0-dev.checkout-mdest.1`; published `1.0.0-rc.12` remains the tagged identity;
+- schema / migrations: frozen at `6`;
 - published release identity/tags: `v1.0.0-rc.11` and `v1.0.0-rc.12` immutable;
 - canonical `master`: no force-push/rewrite;
 - product-control-plane Requirement IDs: frozen;
 - PR #12 / `1.0.0-dev.qual.1` remains historical qualification provenance.
 
 ## Environment authorization
-- Training site `https://training.cetechbpa.com`: RC.12 installed, schema 6, training-site qualification **PASS**. Do not mutate it from this docs stream. Training-site qualification is **not** Stable-1.0 certification.
+- Training site `https://training.cetechbpa.com`: RC.12 / schema 6. Authorized only for bounded reproduction/testing. Do not deploy this candidate until local tests, PR/CI, and owner/ChatGPT review.
+- Ghana Location Pack is currently importing. Do not interfere. Do not run safe reconciliation until it is ready.
 - CETECH Pilot: **NOT STARTED**.
 - FLAIROC: **NOT DEPLOYED**.
 - Production: **NOT DEPLOYED**.
 - POS repository: outside scope / must not be touched.
 
 ## Explicit non-actions
-Do not start CETECH Pilot. Do not deploy FLAIROC or production. Do not mutate the training site from this docs stream. Do not touch POS. Do not start Stage 15. Do not merge WPML/WCML. Do not expand WP Rocket certification. Do not create RC.13. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not merge `docs/staff-training-rc2`. Do not change runtime PHP, JS, migrations, or schema.
+Do not create RC.13. Do not deploy this fix yet. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not start CETECH Pilot. Do not deploy FLAIROC or production. Do not touch POS. Do not start Stage 15. Do not merge WPML/WCML. Do not expand WP Rocket certification. Do not interfere with the Ghana Location Pack import.

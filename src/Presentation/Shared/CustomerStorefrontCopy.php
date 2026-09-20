@@ -71,6 +71,13 @@ final class CustomerStorefrontCopy {
 		return __( 'Use my checkout address', 'cetech-woocommerce-delivery-engine' );
 	}
 
+	public static function heterogeneous_incomplete_destinations(): string {
+		return __(
+			'These items are going to different destinations. Add a delivery address for each item. Your selected destinations will be kept.',
+			'cetech-woocommerce-delivery-engine'
+		);
+	}
+
 	public static function items_keep_own_address(): string {
 		return __( 'Items with their own delivery address will keep that address.', 'cetech-woocommerce-delivery-engine' );
 	}

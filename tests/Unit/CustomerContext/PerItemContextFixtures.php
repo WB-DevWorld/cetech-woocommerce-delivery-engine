@@ -62,6 +62,32 @@ final class PerItemContextFixtures {
 		);
 	}
 
+	public static function matchingGhanaCountry(): MatchingLocation {
+		return MatchingLocation::fromInput(
+			[
+				'country'  => 'GH',
+				'state'    => '',
+				'city'     => '',
+				'postcode' => '',
+			]
+		);
+	}
+
+	public static function matchingBoston(): MatchingLocation {
+		return MatchingLocation::fromInput(
+			[
+				'country'  => 'US',
+				'state'    => 'MA',
+				'city'     => 'Boston',
+				'postcode' => '02108',
+			]
+		);
+	}
+
+	public static function emptyMatchingContext( int $offer_id ): CustomerCartContext {
+		return CustomerCartContext::delivery( $offer_id, null, null );
+	}
+
 	public static function matchingAccra(): MatchingLocation {
 		return MatchingLocation::fromInput( self::accraMatching() );
 	}

@@ -137,7 +137,7 @@ final class BlocksStoreApiExtension {
 				'mixed_fulfilment'     => (bool) ( $notices['mixed_fulfilment'] ?? false ),
 				'incomplete_delivery'  => (int) ( $notices['incomplete_delivery'] ?? 0 ),
 				'notices'              => $notices['messages'] ?? [],
-				'can_apply_checkout_address' => (int) ( $notices['incomplete_delivery'] ?? 0 ) > 0,
+				'can_apply_checkout_address' => ! empty( $notices['can_apply_checkout_address'] ),
 				'keep_address_note'    => (bool) ( $notices['keep_address_note'] ?? false )
 					? CustomerStorefrontCopy::items_keep_own_address()
 					: null,
@@ -215,16 +215,18 @@ final class BlocksStoreApiExtension {
 	 *     multi_destination: bool,
 	 *     mixed_fulfilment: bool,
 	 *     incomplete_delivery: int,
+	 *     can_apply_checkout_address: bool,
 	 *     messages: list<array{code: string, message: string}>
 	 * }
 	 */
 	private function checkout_notices(): array {
 		$empty = [
-			'multi_destination'   => false,
-			'mixed_fulfilment'    => false,
-			'incomplete_delivery' => 0,
-			'keep_address_note'    => false,
-			'messages'            => [],
+			'multi_destination'          => false,
+			'mixed_fulfilment'           => false,
+			'incomplete_delivery'        => 0,
+			'can_apply_checkout_address' => false,
+			'keep_address_note'          => false,
+			'messages'                   => [],
 		];
 
 		if ( ! $this->address_policy instanceof CheckoutAddressPolicy || ! function_exists( 'WC' ) || ! WC()->cart ) {
@@ -255,12 +257,20 @@ final class BlocksStoreApiExtension {
 			];
 		}
 
+		if ( ! empty( $summary['heterogeneous_incomplete_destinations'] ) ) {
+			$messages[] = [
+				'code'    => 'heterogeneous_destinations',
+				'message' => CustomerStorefrontCopy::heterogeneous_incomplete_destinations(),
+			];
+		}
+
 		return [
-			'multi_destination'   => $summary['multi_destination'],
-			'mixed_fulfilment'    => $summary['has_pickup'] && $summary['has_delivery'],
-			'incomplete_delivery' => $summary['incomplete_delivery'],
-			'keep_address_note'    => $summary['has_delivery'] && [] !== $summary['complete_identities'],
-			'messages'            => $messages,
+			'multi_destination'          => $summary['multi_destination'],
+			'mixed_fulfilment'           => $summary['has_pickup'] && $summary['has_delivery'],
+			'incomplete_delivery'        => $summary['incomplete_delivery'],
+			'can_apply_checkout_address' => ! empty( $summary['can_apply_checkout_address'] ),
+			'keep_address_note'          => $summary['has_delivery'] && [] !== $summary['complete_identities'],
+			'messages'                   => $messages,
 		];
 	}
 
