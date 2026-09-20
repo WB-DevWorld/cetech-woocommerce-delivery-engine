@@ -16,12 +16,13 @@ final class SchemaV4InspectionTest extends TestCase {
 		self::assertSame( '6', SchemaVersion::target() );
 	}
 
-	public function test_plugin_version_is_geo_development_identity(): void {
+	public function test_plugin_version_is_rc12_identity(): void {
 		$plugin_root = dirname( __DIR__, 3 );
 		$header      = (string) file_get_contents( $plugin_root . '/cetech-woocommerce-delivery-engine.php' );
 
-		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.geo\\.16'\s*\)/", $header );
-		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.geo\\.16\s*$/m', $header );
+		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-rc\\.12'\s*\)/", $header );
+		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-rc\\.12\s*$/m', $header );
+		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo.16' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo.15' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo.14' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo.13' )", $header );
@@ -38,7 +39,6 @@ final class SchemaV4InspectionTest extends TestCase {
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo.2' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo.1' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-rc.11' )", $header );
-		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-rc.12' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.pdp-price.3' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.pdp-price.2' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.pdp-price.1' )", $header );
