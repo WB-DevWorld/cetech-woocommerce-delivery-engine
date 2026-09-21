@@ -1,6 +1,6 @@
 # Current Work — Issue #35 GeoNames country identity (realigned onto PHP 8.3–8.5 master)
 
-Status: RC.12 IMMUTABLE — POST-RC.12 DEV CANDIDATE `1.0.0-dev.geo-country.5` — AWAITING FINAL DEPLOYMENT REVIEW / NOT RC.13 / NOT DEPLOYED / NOT MERGED
+Status: RC.12 IMMUTABLE — POST-RC.12 DEV CANDIDATE `1.0.0-dev.geo-country.5` — TRAINING PHYSICAL REPAIR QA COMPLETE / AWAITING OWNER REVIEW / NOT RC.13 / NOT MERGED
 
 ## Canonical repository truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
@@ -33,7 +33,7 @@ Realign PR `#36` onto protected `master` `d5ca30d1d92bb69b8a8ffbca2606d30906b8d4
 - Frozen geo-country.1 ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.1.zip` (`1,794,741` bytes, SHA-256 `216e3a28d37e6af5f6cf97a69ef362dc946a94b1d26d8508c3d747d582198a6c`). Do not overwrite.
 - PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/36
 - ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.5.zip` (`1,812,883` bytes, SHA-256 `0d02bb14e2652dd635e858a3c8d4e65c233de81872ffa772225530a525e3d54d`). Do not overwrite frozen .1–.4.
-- Not RC.13. Not a release promotion. Do not merge or deploy until owner/ChatGPT final deployment review.
+- Not RC.13. Not a release promotion. Training physical repair QA completed 2026-09-21; leave installed pending owner review. Do not merge PR #36. Do not close Issue #35.
 
 PHP policy retained from PR #37 (`docs/PHP-RUNTIME-POLICY.md`, `docs/PHP-85-CI-REALIGNMENT.md`):
 
@@ -52,11 +52,11 @@ PHP policy retained from PR #37 (`docs/PHP-RUNTIME-POLICY.md`, `docs/PHP-85-CI-R
 
 ## Environment authorization
 - GitHub Actions ephemeral runners and optional local `docker/php85-qa`.
-- Training site `https://training.cetechbpa.com`: read-only forensics for Issue #35. Plugin currently `1.0.0-dev.geo-live.2`. Training PHP remains 8.4.24. Do not deploy geo-country.1–.5 until owner/ChatGPT review. Do not confirm migrated Accra/Kumasi coverage. Do not click I reviewed this migrated coverage / Confirm replacement. Do not rerun safe reconciliation. Do not reset the GH pack.
+- Training site `https://training.cetechbpa.com`: authorized physical QA only. Plugin now `1.0.0-dev.geo-country.5` (schema 6, PHP 8.4.24 unchanged). Pre-install backups under `/home/cetechtraining/backups/geo-country5-preinstall-20260921T150032Z/`. Do not merge PR #36. Do not confirm migrated Accra/Kumasi coverage. Do not click I reviewed this migrated coverage / Confirm replacement. Do not rerun safe reconciliation. Do not reset the GH pack.
 - CETECH Pilot: **NOT STARTED**.
 - FLAIROC: **NOT DEPLOYED**.
 - Production: **NOT DEPLOYED**.
 - POS repository: outside scope / must not be touched.
 
 ## Explicit non-actions
-Do not create RC.13. Do not deploy this fix yet. Do not merge until final deployment review. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not overwrite the frozen geo-country.1, geo-country.2, geo-country.3, or geo-country.4 ZIPs. Do not start CETECH Pilot. Do not deploy FLAIROC or production. Do not touch POS. Do not start Stage 15. Do not implement Issue #31 or Issue #32. Do not confirm Accra/Kumasi coverage. Do not fix the admin-notice overwrite (out of #35). Do not advertise PHP 8.1 or 8.2 as supported.
+Do not create RC.13. Do not merge PR #36. Do not close Issue #35. Do not implement #31/#32. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not overwrite the frozen geo-country.1, geo-country.2, geo-country.3, or geo-country.4 ZIPs. Do not start CETECH Pilot. Do not deploy FLAIROC or production. Do not touch POS. Do not start Stage 15. Do not implement Issue #31 or Issue #32. Do not confirm Accra/Kumasi coverage. Do not fix the admin-notice overwrite (out of #35). Do not advertise PHP 8.1 or 8.2 as supported.

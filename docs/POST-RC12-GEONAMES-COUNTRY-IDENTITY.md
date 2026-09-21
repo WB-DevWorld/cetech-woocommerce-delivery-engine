@@ -10,7 +10,7 @@
 **Frozen geo-country.2 runtime / package-source SHA:** `23237eedece174b2f9c4334693b137310ce5c54a` (do not rebuild or overwrite)  
 **Frozen geo-country.1 runtime / package-source SHA:** `b61466ffc14c71e1a678eaf2d5b84f22bf6040cb` (do not rebuild or overwrite)  
 **PR:** https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/36  
-**Not RC.13. Not deployed. Awaiting owner/ChatGPT final deployment review.**
+**Not RC.13. Training physical repair QA COMPLETE 2026-09-21. PR #36 unmerged. Issue #35 open. Awaiting owner review.**
 
 Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/35
 
@@ -67,7 +67,7 @@ Built from a clean committed tree after GitHub CI SUCCESS on the runtime/package
 - Production-package verifier: PASS (staged and extracted)
 - Packaged PHP lint: `502 files / 0 failures`
 - GitHub CI on runtime SHA: SUCCESS (`35613002047` pull_request; `35612996976` push) — PHP 8.3 Minimum Supported, PHP 8.4 Compatibility, PHP 8.5 CETECH Production Target, PHP 8.5 MariaDB Geography/Migrations, PHP 8.5 WordPress/WooCommerce, CI Required Gates, JavaScript / Vitest, Control Plane
-- Not deployed to training
+- Training physical repair QA COMPLETE 2026-09-21; plugin left installed pending owner review. PR #36 not merged.
 
 ## Country-identity authority
 
@@ -203,25 +203,17 @@ Only GH has a canonical/normalized split and a wrong identity.
 
 This is **not** a Ghana-only migration, **not** a schema 7 change, **not** a pack reset, and **not** a delete/recreate of country id 1.
 
-## Training physical-QA plan — DO NOT EXECUTE YET
+## Training physical-QA result — 2026-09-21
 
-BEFORE: country id 1 = Dagomba / normalized ghana. Training plugin remains `1.0.0-dev.geo-live.2`.
+Authorized training-only install of the exact geo-country.5 ZIP. PHP remained 8.4.24. Schema remained 6. No schema migration.
 
-AFTER a later authorized deploy of the exact `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.5.zip` (not this task; backup first; training PHP remains 8.4.24):
+BEFORE: plugin `1.0.0-dev.geo-live.2`; country id 1 canonical `Dagomba` / normalized `ghana` / ascii `dagomba`; coordinates `9.5,-0.25`; mappings WooCommerce `GH`, GeoNames `2300660` PCLI, GeoNames `2302058` PCLH; repair revision/lock absent.
 
-- same id `1`, same location_key `1caaf0dc-d575-4dd3-8a9d-217d136e5548`, same `GH`
-- canonical_name `Ghana`, normalized_name `ghana`, ascii consistent
-- coordinates restored from PCLI `2300660` (`8.1`, `-1.2`)
-- PCLH mapping `2302058` removed; PCLI `2300660` retained
-- GH pack stays `ready`, generation remains `3`, checksum unchanged
-- 15,615 generation-3 locations preserved; no import restart; no generation 4
-- Coverage Groups unchanged; Accra/Kumasi remain `review_required`
-- no Delivery Charge or Delivery Option changes
-- storefront/admin breadcrumbs use Ghana
-- repair revision becomes `1`; repair lease absent afterward
-- a second normal request returns `revision_complete` and performs no repair work
+AFTER natural `init` during WP-CLI `plugin install --force --activate` (2026-09-21T15:03:14Z–15:03:22Z): country id 1 remains the same row; canonical `Ghana` / normalized `ghana` / ascii `ghana`; coordinates `8.1,-1.2`; PCLH `2302058` removed; PCLI `2300660` and WooCommerce `GH` retained; revision `1`; lock absent.
 
-Do not deploy. Do not confirm migrated Accra/Kumasi coverage.
+Second/third HTTP requests (15:04:27Z, 15:04:39Z) did not change `updated_at` (`2026-09-21 15:03:23`) and left the lock absent. GH pack stayed `ready`, checksum unchanged, active/target generation `3`. Generation-3 count stayed `15,615`. Accra group 7 and Ashanti/Kumasi group 8 remained `review_required` / inactive / `unmapped_city`. Manual group 6 sentinel unchanged.
+
+PR #36 was not merged. Issue #35 was not closed. Accra/Kumasi coverage was not confirmed.
 
 ## Non-scope
 

@@ -63,7 +63,7 @@ Last reconciled: 2026-09-21 (PR #37 MERGED onto protected `master` `d5ca30d1d92b
 - Frozen geo-country.2 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.2.zip` (`1,798,020` bytes, SHA-256 `6e7f76e2d218a01e2af401cc646471dc2ce27afc8a52c6ad15e671df0b88122c`)
 - Frozen geo-country.1 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.1.zip` (`1,794,741` bytes, SHA-256 `216e3a28d37e6af5f6cf97a69ef362dc946a94b1d26d8508c3d747d582198a6c`)
 - PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/36
-- Not merged. Not deployed. Not RC.13. Awaiting owner/ChatGPT final deployment review.
+- Not merged. Not RC.13. Training physical repair QA COMPLETE 2026-09-21 (`1.0.0-dev.geo-country.5` left installed). Awaiting owner review. Do not close Issue #35.
 - Evidence: `docs/POST-RC12-GEONAMES-COUNTRY-IDENTITY.md`
 
 
