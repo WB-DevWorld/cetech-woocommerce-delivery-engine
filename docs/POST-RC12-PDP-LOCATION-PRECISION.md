@@ -4,6 +4,8 @@
 **Schema:** `6` (unchanged; no schema 7)  
 **Branch:** `fix/pdp-location-precision`  
 **Base:** protected `master` `514ddfc1b4d10b2171d3d3bae020381198c59d2b`  
+**Runtime / package-source SHA:** `dd078712bd97024d49ccd208a0b9d7e82d25f857`  
+**PR:** https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/40  
 **Not RC.13. Not deployed. Do not merge until owner/ChatGPT technical review.**
 
 Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/38
@@ -41,14 +43,22 @@ After administrative children restore the saved Region, City / Town is revealed 
 - JavaScript consumes the server payload. It does not decide Ghana geography itself.
 - `CartDeliverySelectionCapture` rejects Classic and Store API/Blocks Delivery submissions whose matching location is precision-incomplete. `add_cart_item_data()` fail-closes and will not persist an ambiguous Delivery context if validation is bypassed. Pickup is unaffected.
 
+## Package (pdp-precision.1, after CI)
+
+Built from a clean committed tree after GitHub CI SUCCESS on the runtime/package-source SHA. Do not treat this ZIP as RC.13 or as a replacement for RC.12 or geo-country identities. Do not overwrite previous dev ZIPs.
+
+- Source SHA: `dd078712bd97024d49ccd208a0b9d7e82d25f857`
+- Filename: `cetech-woocommerce-delivery-engine-1.0.0-dev.pdp-precision.1.zip`
+- Bytes: `1,823,157`
+- SHA-256: `5773b5b2eb9d63bdc5e8b92bbbd156cb78ba4bc4deb74f34db105673542d3fda`
+- Production-package verifier: PASS (staged and extracted)
+- Packaged PHP lint: `494 files / 0 failures` (PHP 8.5.0, vendor excluded)
+- GitHub CI on runtime SHA: SUCCESS (`35632365005` pull_request; `35632307721` push) — PHP 8.3 Minimum Supported, PHP 8.4 Compatibility, PHP 8.5 CETECH Production Target, PHP 8.5 MariaDB Geography/Migrations, PHP 8.5 WordPress/WooCommerce, CI Required Gates, JavaScript / Vitest, Control Plane
+- PHPUnit (PHP 8.5 CETECH Production Target): Tests: 1340, Assertions: 8479, Deprecations: 14, Skipped: 1
+- Vitest: 87 passed / 7 files
+- Real MariaDB / geography: Tests: 26, Assertions: 1739, Deprecations: 2, failures=0
+- Not deployed to training
+
 ## Non-scope
 
 Issue #39 cart UX, Issues #31/#32, Ashanti Region rename, Accra/Kumasi coverage mutation, GH pack mutation, schema/migration, RC.13, RC.12 mutation, training/Pilot/FLAIROC/production/POS deploy.
-
-## Local verification (pre-CI)
-
-Recorded after implementation. GitHub CI on the committed SHA is the release-gate evidence.
-
-## Package
-
-Built only after the runtime/package-source SHA is committed and GitHub CI SUCCESS. Do not overwrite previous dev ZIPs.

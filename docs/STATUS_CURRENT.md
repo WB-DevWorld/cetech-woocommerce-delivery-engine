@@ -54,6 +54,11 @@ Last reconciled: 2026-09-21 (PR #36 MERGED onto protected `master` `514ddfc1b4d1
 - Development identity: `1.0.0-dev.pdp-precision.1`
 - Schema: `6` (unchanged)
 - Requires PHP: `8.3`
+- Runtime / package-source SHA: `dd078712bd97024d49ccd208a0b9d7e82d25f857`
+- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/40 (open; do not merge)
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.pdp-precision.1.zip`
+- Bytes: `1,823,157`
+- SHA-256: `5773b5b2eb9d63bdc5e8b92bbbd156cb78ba4bc4deb74f34db105673542d3fda`
 - Not merged. Not deployed. Not RC.13. Awaiting technical review. Do not close Issue #38.
 - Evidence: `docs/POST-RC12-PDP-LOCATION-PRECISION.md`
 

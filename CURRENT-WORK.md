@@ -23,6 +23,8 @@ Issue `#38` — `[P1] PDP saved-region hydration can hide City/Town and show bro
 - Owner: `@wbdevworld` (explicit owner/ChatGPT authorization; Issue #38 only).
 - Branch: `fix/pdp-location-precision`.
 - Base: protected `master` `514ddfc1b4d10b2171d3d3bae020381198c59d2b`.
+- Runtime / package-source SHA: `dd078712bd97024d49ccd208a0b9d7e82d25f857`.
+- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/40 (open; do not merge).
 - Development identity: `1.0.0-dev.pdp-precision.1` (schema remains `6`).
 - Requires PHP: `8.3`. Composer: `>=8.3`. Activation guard: `8.3`.
 - Not RC.13. Do not reuse geo-country identities.
