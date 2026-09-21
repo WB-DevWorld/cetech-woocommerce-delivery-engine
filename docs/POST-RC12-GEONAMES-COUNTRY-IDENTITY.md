@@ -4,6 +4,7 @@
 **Schema:** `6` (unchanged; no schema 7)  
 **Branch:** `fix/geonames-country-identity`  
 **Base:** protected `master` `5abfab0b5078e67b158f282088022b2ac2566f22`  
+**Runtime / package-source SHA:** `23237eedece174b2f9c4334693b137310ce5c54a`  
 **Frozen geo-country.1 runtime / package-source SHA:** `b61466ffc14c71e1a678eaf2d5b84f22bf6040cb` (do not rebuild or overwrite)  
 **PR:** https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/36  
 **Not RC.13. Not deployed. Awaiting differential review.**
@@ -21,10 +22,14 @@ Do not overwrite or rebuild this artifact.
 
 ## Package (geo-country.2, after CI)
 
-Built from a clean committed tree after GitHub CI SUCCESS. Do not treat this ZIP as RC.13 or as a replacement for RC.12 or geo-country.1.
+Built from a clean committed tree after GitHub CI SUCCESS on runtime/package-source `23237eedece174b2f9c4334693b137310ce5c54a`. Do not treat this ZIP as RC.13 or as a replacement for RC.12 or geo-country.1.
 
-- Source SHA: pending committed runtime SHA
+- Source SHA: `23237eedece174b2f9c4334693b137310ce5c54a`
 - Filename: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.2.zip`
+- Bytes: `1,798,020`
+- SHA-256: `6e7f76e2d218a01e2af401cc646471dc2ce27afc8a52c6ad15e671df0b88122c`
+- Production-package verifier: PASS (staged and extracted)
+- Packaged PHP lint: `501 files / 0 failures`
 - Not deployed to training
 
 ## Country-identity authority
