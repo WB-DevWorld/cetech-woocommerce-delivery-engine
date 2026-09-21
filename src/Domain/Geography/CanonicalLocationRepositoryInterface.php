@@ -21,6 +21,13 @@ interface CanonicalLocationRepositoryInterface {
 	public function find_country( string $country_code, bool $include_inactive = false ): ?CanonicalLocation;
 
 	/**
+	 * Every canonical country root, including inactive rows. Parent is always NULL.
+	 *
+	 * @return list<CanonicalLocation>
+	 */
+	public function list_country_roots(): array;
+
+	/**
 	 * Exact normalized name under an optional parent. Never fuzzy.
 	 */
 	public function find_exact_child( string $country_code, ?int $parent_id, string $normalized_name, ?GeographyLocationType $type = null, ?int $include_generation = null, string $include_token = '' ): ?CanonicalLocation;

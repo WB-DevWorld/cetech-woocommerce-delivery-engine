@@ -25,8 +25,11 @@ use CetechDeliveryEngine\Domain\Geography\ProviderMappingRepositoryInterface;
  * Hierarchy is provider-neutral:
  * country → ADM1 → ADM2 → ADM3 → ADM4 → locality
  * as far as the source data provides. Localities attach to the deepest
- * resolvable administrative ancestor. PCLI/PCL* rows update the existing
- * country node and never create a duplicate country child.
+ * resolvable administrative ancestor. Accepted GeoNames country-identity
+ * rows (PCLI/PCLD/PCLF/PCLS/PCLIX) enrich the existing WooCommerce country
+ * root and never create a duplicate country child. Historical PCLH and
+ * generic PCL rows are skipped. Multiple country-identity rows never
+ * compete to rename the WooCommerce country.
  *
  * Provider rename/move/coordinate updates rewrite provider-derived metadata
  * on the existing canonical location and keep the internal ID. Former names
@@ -58,8 +61,17 @@ final class GeoNamesPackImporter {
 		private ProviderMappingRepositoryInterface $mappings,
 		private GeographyPackRepositoryInterface $packs,
 		private WooCommerceGeographyBootstrap $woo_bootstrap,
-		private GeoNamesGazetteerParser $parser = new GeoNamesGazetteerParser()
+		private GeoNamesGazetteerParser $parser = new GeoNamesGazetteerParser(),
+		private ?CountryIdentityReconciler $country_identity = null
 	) {
+		$this->country_identity = $country_identity ?? new CountryIdentityReconciler(
+			$locations,
+			$aliases,
+			$mappings,
+			$packs,
+			$woo_bootstrap,
+			$parser
+		);
 	}
 
 	public function ensure_pack( string $country_code, string $source_path = '' ): GeographyPack {
@@ -506,6 +518,8 @@ final class GeoNamesPackImporter {
 			];
 		}
 
+		$this->country_identity?->repair_country_code( $pack->country_code );
+
 		return [
 			'status'    => GeographyPackStatus::Ready->value,
 			'processed' => $processed,
@@ -611,16 +625,112 @@ final class GeoNamesPackImporter {
 	}
 
 	/**
-	 * GeoNames PCLI/PCL* maps onto the existing canonical country. Never Ghana→Ghana.
+	 * Accepted GeoNames country-identity rows enrich the WooCommerce country
+	 * root. They never rename it. Rejected PCL* rows never reach this method.
 	 *
 	 * @param array<string, mixed> $row
 	 */
 	private function map_country_feature( GeographyPack $pack, CanonicalLocation $country, array $row, int $target, string $token ): bool {
-		$this->apply_provider_update( $country, null, $row, $target, $token, false );
+		$feature = (string) ( $row['feature_code'] ?? '' );
+		if ( ! $this->parser->is_country_feature( $feature ) ) {
+			return false;
+		}
+		$row_country = strtoupper( (string) ( $row['country_code'] ?? '' ) );
+		if ( $row_country !== strtoupper( $pack->country_code ) || $row_country !== strtoupper( $country->country_code ) ) {
+			return false;
+		}
+
+		$this->apply_country_enrichment( $country, $row, $target, $token );
 		$this->store_mappings( $country->id, $pack, $row, null, $token );
 		$this->store_aliases( $country->id, $row, $token );
 
 		return true;
+	}
+
+	/**
+	 * Coordinates and aliases only. Canonical country names stay with WooCommerce.
+	 *
+	 * @param array<string, mixed> $row
+	 */
+	private function apply_country_enrichment( CanonicalLocation $country, array $row, int $target, string $token ): void {
+		$existing = $this->locations->find_by_id( $country->id ) ?? $country;
+		$lat      = isset( $row['latitude'] ) ? (float) $row['latitude'] : $existing->latitude;
+		$lon      = isset( $row['longitude'] ) ? (float) $row['longitude'] : $existing->longitude;
+		if ( $this->same_coord( $existing->latitude, $lat ) && $this->same_coord( $existing->longitude, $lon ) ) {
+			return;
+		}
+
+		if ( $existing->isActive() && $existing->generation_token !== $token ) {
+			$draft = [
+				'generation'       => $target,
+				'generation_token' => $token,
+				'latitude'         => $lat,
+				'longitude'        => $lon,
+				'aliases'          => [],
+				'mappings'         => [],
+			];
+			$existing_draft = '' !== $existing->draft_json ? json_decode( $existing->draft_json, true ) : null;
+			if ( is_array( $existing_draft ) && (string) ( $existing_draft['generation_token'] ?? '' ) === $token ) {
+				$draft['aliases']  = is_array( $existing_draft['aliases'] ?? null ) ? $existing_draft['aliases'] : [];
+				$draft['mappings'] = is_array( $existing_draft['mappings'] ?? null ) ? $existing_draft['mappings'] : [];
+			}
+			$this->locations->save(
+				new CanonicalLocation(
+					$existing->id,
+					$existing->location_key,
+					$existing->country_code,
+					$existing->parent_location_id,
+					$existing->location_type,
+					$existing->administrative_level,
+					$existing->canonical_name,
+					$existing->normalized_name,
+					$existing->ascii_name,
+					$existing->latitude,
+					$existing->longitude,
+					$existing->status,
+					$existing->ancestry_path,
+					$existing->generation,
+					$this->encode_draft( $draft ),
+					$existing->generation_token,
+					$token
+				)
+			);
+
+			return;
+		}
+
+		$this->locations->save(
+			new CanonicalLocation(
+				$existing->id,
+				$existing->location_key,
+				$existing->country_code,
+				$existing->parent_location_id,
+				$existing->location_type,
+				$existing->administrative_level,
+				$existing->canonical_name,
+				$existing->normalized_name,
+				$existing->ascii_name,
+				$lat,
+				$lon,
+				$existing->status,
+				$existing->ancestry_path,
+				$existing->generation > 0 ? $existing->generation : $target,
+				$existing->draft_json,
+				$token !== '' ? $token : $existing->generation_token,
+				$existing->draft_generation_token
+			)
+		);
+	}
+
+	private function same_coord( ?float $left, ?float $right ): bool {
+		if ( null === $left && null === $right ) {
+			return true;
+		}
+		if ( null === $left || null === $right ) {
+			return false;
+		}
+
+		return abs( $left - $right ) < 0.000001;
 	}
 
 	/**
@@ -645,6 +755,7 @@ final class GeoNamesPackImporter {
 				'generation'         => $target,
 				'generation_token'   => $token,
 				'canonical_name'     => $name,
+				'normalized_name'    => GeographyNameNormalizer::normalize( $name ),
 				'ascii_name'         => '' !== $ascii ? GeographyNameNormalizer::normalize( $ascii ) : $existing->ascii_name,
 				'parent_location_id' => $new_parent,
 				'latitude'           => isset( $row['latitude'] ) ? (float) $row['latitude'] : $existing->latitude,
@@ -923,6 +1034,16 @@ final class GeoNamesPackImporter {
 		$pending  = [];
 		$ascii    = trim( (string) ( $row['ascii_name'] ?? '' ) );
 		$name     = trim( (string) ( $row['name'] ?? '' ) );
+		if ( $location instanceof CanonicalLocation ) {
+			$canonical_norm = GeographyNameNormalizer::normalize( $location->canonical_name );
+			if ( '' !== $name && GeographyNameNormalizer::normalize( $name ) !== $canonical_norm ) {
+				$pending[] = [
+					'alias'      => $name,
+					'normalized' => GeographyNameNormalizer::normalize( $name ),
+					'type'       => 'alternate',
+				];
+			}
+		}
 		if ( '' !== $ascii && GeographyNameNormalizer::normalize( $ascii ) !== GeographyNameNormalizer::normalize( $name ) ) {
 			$pending[] = [
 				'alias'      => $ascii,

@@ -14,4 +14,6 @@ interface LocationAliasRepositoryInterface {
 	public function list_for_location( int $location_id ): array;
 
 	public function add_alias( int $location_id, string $alias, string $normalized_alias, string $language_code = '', string $alias_type = 'alternate', bool $preferred = false, string $generation_token = '' ): void;
+
+	public function delete_normalized_alias( int $location_id, string $normalized_alias, string $generation_token = '' ): void;
 }

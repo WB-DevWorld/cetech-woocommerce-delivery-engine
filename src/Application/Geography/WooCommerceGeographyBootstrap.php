@@ -125,7 +125,7 @@ final class WooCommerceGeographyBootstrap {
 		];
 	}
 
-	private function country_label( string $country_code ): string {
+	public function country_label( string $country_code ): string {
 		if ( ! function_exists( 'WC' ) || ! is_object( WC() ) || ! isset( WC()->countries ) ) {
 			return $country_code;
 		}

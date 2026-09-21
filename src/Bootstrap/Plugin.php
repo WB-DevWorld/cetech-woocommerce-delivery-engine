@@ -31,6 +31,8 @@ use CetechDeliveryEngine\Application\Coverage\CoverageConfigurationValidator;
 use CetechDeliveryEngine\Application\Coverage\CoverageGroupMatcher;
 use CetechDeliveryEngine\Application\Geography\AdminGeographyEndpoint;
 use CetechDeliveryEngine\Application\Geography\CanonicalLocationResolver;
+use CetechDeliveryEngine\Application\Geography\CountryIdentityKickoff;
+use CetechDeliveryEngine\Application\Geography\CountryIdentityReconciler;
 use CetechDeliveryEngine\Application\Geography\GeoNamesGazetteerParser;
 use CetechDeliveryEngine\Application\Geography\GeoNamesPackImporter;
 use CetechDeliveryEngine\Application\Geography\GeographyPackService;
@@ -300,6 +302,7 @@ final class Plugin {
 		$migration_runner->run();
 		// Woo-dependent coverage conversion waits for init after Action Scheduler (priority 1).
 		$this->container->get( Schema6CoverageUpgradeKickoff::class )->register();
+		$this->container->get( CountryIdentityKickoff::class )->register();
 
 		// Capability matrix must self-heal when an active plugin folder is replaced
 		// without reactivation (activation hooks do not run in that path).
@@ -1939,6 +1942,18 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			CountryIdentityReconciler::class,
+			static fn ( ServiceContainer $container ): CountryIdentityReconciler => new CountryIdentityReconciler(
+				$container->get( CanonicalLocationRepositoryInterface::class ),
+				$container->get( LocationAliasRepositoryInterface::class ),
+				$container->get( ProviderMappingRepositoryInterface::class ),
+				$container->get( GeographyPackRepositoryInterface::class ),
+				$container->get( WooCommerceGeographyBootstrap::class ),
+				$container->get( GeoNamesGazetteerParser::class )
+			)
+		);
+
+		$this->container->singleton(
 			GeoNamesPackImporter::class,
 			static fn ( ServiceContainer $container ): GeoNamesPackImporter => new GeoNamesPackImporter(
 				$container->get( CanonicalLocationRepositoryInterface::class ),
@@ -1946,7 +1961,8 @@ final class Plugin {
 				$container->get( ProviderMappingRepositoryInterface::class ),
 				$container->get( GeographyPackRepositoryInterface::class ),
 				$container->get( WooCommerceGeographyBootstrap::class ),
-				$container->get( GeoNamesGazetteerParser::class )
+				$container->get( GeoNamesGazetteerParser::class ),
+				$container->get( CountryIdentityReconciler::class )
 			)
 		);
 
@@ -2006,6 +2022,13 @@ final class Plugin {
 			Schema6CoverageUpgradeKickoff::class,
 			static fn ( ServiceContainer $container ): Schema6CoverageUpgradeKickoff => new Schema6CoverageUpgradeKickoff(
 				$container->get( Schema6CoverageUpgradeService::class )
+			)
+		);
+
+		$this->container->singleton(
+			CountryIdentityKickoff::class,
+			static fn ( ServiceContainer $container ): CountryIdentityKickoff => new CountryIdentityKickoff(
+				$container->get( CountryIdentityReconciler::class )
 			)
 		);
 

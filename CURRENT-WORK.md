@@ -1,11 +1,11 @@
-# Current Work — PHP 8.3–8.5 support-range correction (PR #37)
+# Current Work — Issue #35 GeoNames country identity (realigned onto PHP 8.3–8.5 master)
 
-Status: RC.12 IMMUTABLE — WS3 CI/RUNTIME POLICY CORRECTION — NOT RC.13 / NOT A RELEASE / NOT DEPLOYED
+Status: RC.12 IMMUTABLE — POST-RC.12 DEV CANDIDATE `1.0.0-dev.geo-country.5` — TRAINING PHYSICAL REPAIR QA COMPLETE / AWAITING OWNER REVIEW / NOT RC.13 / NOT MERGED
 
 ## Canonical repository truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
 - Canonical development branch: protected `master`.
-- Current protected `master` (this task base): `5abfab0b5078e67b158f282088022b2ac2566f22`.
+- Current protected `master`: `d5ca30d1d92bb69b8a8ffbca2606d30906b8d4a1` (PR #37 PHP 8.3–8.5.x support-range correction).
 - Immutable RC.12 release source: `78594ad8962868683726373f58f4a8b1b48e4d0e`.
 - Tag `v1.0.0-rc.12` must not be moved. Do not rebuild or overwrite the RC.12 ZIP.
 - Do not create RC.13.
@@ -18,45 +18,45 @@ Status: RC.12 IMMUTABLE — WS3 CI/RUNTIME POLICY CORRECTION — NOT RC.13 / NOT
 - Peels to: `78594ad8962868683726373f58f4a8b1b48e4d0e`
 
 ## Active task
-Correction to PR #37 (`ws3/php-85-runtime-realignment`).
+Issue `#35` — `[P1] GeoNames PCL* records can overwrite canonical country identity`
 
-The first PR #37 draft incorrectly retained PHP 8.1 as a commercial support floor. That is **not** owner policy.
+Realign PR `#36` onto protected `master` `d5ca30d1d92bb69b8a8ffbca2606d30906b8d4a1` so Issue #35 keeps its accepted runtime and PR #37 PHP policy remains canonical.
 
-Authoritative PHP range (21 September 2026):
+- Owner: `@wbdevworld` (explicit ChatGPT authorization; Issue #35 only).
+- Branch: `fix/geonames-country-identity`.
+- Development identity: `1.0.0-dev.geo-country.5` (schema remains `6`).
+- Requires PHP: `8.3`. Composer: `>=8.3`. Activation guard: `8.3`.
+- Runtime / package-source SHA: `ea2d412326e369bc7168b9de0dd01875673e71e6` (merge of `ef088f096f5ae654b3399e7a0fd8ece9876d3008` + protected master `d5ca30d1d92bb69b8a8ffbca2606d30906b8d4a1` / PR #37).
+- Frozen geo-country.4 ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.4.zip` (`1,798,250` bytes, SHA-256 `2fc4996c0e403c41bce200dec5be680a05f56f9e666b5a3e4a13a400dba24354`). Runtime SHA `ce1bcff053385a042993e50c3b216d8649d7b43d`. Do not overwrite.
+- Frozen geo-country.3 ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.3.zip` (`1,797,361` bytes, SHA-256 `a86a940d8ebac2c9e293dad8690ed8f121b5afa66cb3f1e0537f3f4152b26c66`). Runtime SHA `bae75f79d0094c78706912c9a530f09ea21b9bed`. Do not overwrite.
+- Frozen geo-country.2 ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.2.zip` (`1,798,020` bytes, SHA-256 `6e7f76e2d218a01e2af401cc646471dc2ce27afc8a52c6ad15e671df0b88122c`). Runtime SHA `23237eedece174b2f9c4334693b137310ce5c54a`. Do not overwrite.
+- Frozen geo-country.1 ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.1.zip` (`1,794,741` bytes, SHA-256 `216e3a28d37e6af5f6cf97a69ef362dc946a94b1d26d8508c3d747d582198a6c`). Do not overwrite.
+- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/36
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.5.zip` (`1,812,883` bytes, SHA-256 `0d02bb14e2652dd635e858a3c8d4e65c233de81872ffa772225530a525e3d54d`). Do not overwrite frozen .1–.4.
+- Not RC.13. Not a release promotion. Training physical repair QA completed 2026-09-21; leave installed pending owner review. Do not merge PR #36. Do not close Issue #35.
 
-- **Minimum supported PHP: 8.3** (oldest version currently recommended by both WordPress and WooCommerce).
-- **Supported / certified range: PHP 8.3, 8.4, and 8.5.x.**
-- **CETECH production / currently qualified latest stable: PHP 8.5.x** (latest stable patch at deploy; 8.5.10 as of this date).
-- PHP 8.1 and PHP 8.2 are **not** supported and must not be advertised.
-- PHP 8.6 pre-release is **not** a production target. A later stable PHP line is added only after WordPress, WooCommerce, Delivery Engine, and third-party CETECH stack qualification.
+PHP policy retained from PR #37 (`docs/PHP-RUNTIME-POLICY.md`, `docs/PHP-85-CI-REALIGNMENT.md`):
 
-- Owner: WS3 / `@wbdevworld`.
-- Branch: `ws3/php-85-runtime-realignment` (amend PR #37; do not open a competing PHP-policy PR).
-- Plugin version identity: unchanged (`1.0.0-dev.geo-live.2`). Schema remains `6`.
-- Policy: `docs/PHP-RUNTIME-POLICY.md`. Evidence: `docs/PHP-85-CI-REALIGNMENT.md`.
-- Not RC.13. Not a release promotion. Do not deploy.
-
-## Separate open work (do not edit from this branch)
-- Issue `#35` / PR `#36` (`fix/geonames-country-identity`) remains a separate candidate. This task must not take that lease or mix country-identity runtime changes.
+- Minimum supported PHP: **8.3**.
+- Supported / certified range: PHP **8.3, 8.4, and 8.5.x**.
+- CETECH production / currently qualified latest stable: PHP **8.5.x**.
+- PHP 8.1 and 8.2 are not supported and must not be advertised.
 
 ## Central leases
-- CI workflows / release-package PHP image;
-- GitHub required-check names for protected `master`;
-- PHP runtime policy, Composer/`Requires PHP`/activation floor, and isolated PHP 8.5 QA Compose;
-- living compatibility-matrix documentation.
-- plugin version identity: **not taken** (remains master `1.0.0-dev.geo-live.2`);
+- plugin bootstrap / version identity on this branch: `1.0.0-dev.geo-country.5`; published `1.0.0-rc.12` remains the tagged identity;
+- CI workflows / required-check names / PHP runtime policy: retained from protected master (PR #37);
 - schema / migrations: frozen at `6`;
 - published release identity/tags: `v1.0.0-rc.11` and `v1.0.0-rc.12` immutable;
 - canonical `master`: no force-push/rewrite;
 - product-control-plane Requirement IDs: frozen (no new IDs).
 
 ## Environment authorization
-- GitHub Actions ephemeral runners and optional local `docker/php85-qa` only.
-- Training site `https://training.cetechbpa.com`: **do not mutate**.
+- GitHub Actions ephemeral runners and optional local `docker/php85-qa`.
+- Training site `https://training.cetechbpa.com`: authorized physical QA only. Plugin now `1.0.0-dev.geo-country.5` (schema 6, PHP 8.4.24 unchanged). Pre-install backups under `/home/cetechtraining/backups/geo-country5-preinstall-20260921T150032Z/`. Do not merge PR #36. Do not confirm migrated Accra/Kumasi coverage. Do not click I reviewed this migrated coverage / Confirm replacement. Do not rerun safe reconciliation. Do not reset the GH pack.
 - CETECH Pilot: **NOT STARTED**.
 - FLAIROC: **NOT DEPLOYED**.
 - Production: **NOT DEPLOYED**.
 - POS repository: outside scope / must not be touched.
 
 ## Explicit non-actions
-Do not create RC.13. Do not change schema or Delivery Engine business logic. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not start CETECH Pilot. Do not deploy FLAIROC or production. Do not touch POS. Do not start Stage 15. Do not implement Issue #31, #32, or #35 from this branch. Do not advertise PHP 8.1 or 8.2 as supported.
+Do not create RC.13. Do not merge PR #36. Do not close Issue #35. Do not implement #31/#32. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not overwrite the frozen geo-country.1, geo-country.2, geo-country.3, or geo-country.4 ZIPs. Do not start CETECH Pilot. Do not deploy FLAIROC or production. Do not touch POS. Do not start Stage 15. Do not implement Issue #31 or Issue #32. Do not confirm Accra/Kumasi coverage. Do not fix the admin-notice overwrite (out of #35). Do not advertise PHP 8.1 or 8.2 as supported.

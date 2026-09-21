@@ -3,7 +3,7 @@
  * Plugin Name:       CETECH WooCommerce Delivery Engine
  * Plugin URI:        https://cetech.example.com/woocommerce-delivery-engine
  * Description:       Delivery, fulfilment-choice, delivery-pricing, shipment-status, and tracking engine for WooCommerce.
- * Version:           1.0.0-dev.geo-live.2
+ * Version:           1.0.0-dev.geo-country.5
  * Requires at least: 6.0
  * Requires PHP:      8.3
  * Author:            CETECH
@@ -21,8 +21,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-// Schema-6 release-line marker for the current production-package verifier: 1.0.0-dev.geo through 1.0.0-rc.12, 1.0.0-dev.checkout-mdest, and 1.0.0-dev.geo-live.
-define( 'CETECH_DE_VERSION', '1.0.0-dev.geo-live.2' );
+// Schema-6 release-line marker for the current production-package verifier: 1.0.0-dev.geo through 1.0.0-rc.12, 1.0.0-dev.checkout-mdest, 1.0.0-dev.geo-live, and 1.0.0-dev.geo-country.
+define( 'CETECH_DE_VERSION', '1.0.0-dev.geo-country.5' );
 define( 'CETECH_DE_FILE', __FILE__ );
 define( 'CETECH_DE_PATH', plugin_dir_path( __FILE__ ) );
 define( 'CETECH_DE_URL', plugin_dir_url( __FILE__ ) );

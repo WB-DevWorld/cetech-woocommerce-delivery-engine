@@ -281,6 +281,14 @@ if ( ! function_exists( 'did_action' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_cache_delete' ) ) {
+	function wp_cache_delete( mixed $key, string $group = '' ): bool {
+		$GLOBALS['cetech_de_test_cache_deletes'][] = [ $key, $group ];
+
+		return true;
+	}
+}
+
 if ( ! function_exists( 'add_option' ) ) {
 	function add_option( string $option, mixed $value = '', mixed $deprecated = '', bool|string $autoload = 'yes' ): bool {
 		unset( $deprecated, $autoload );

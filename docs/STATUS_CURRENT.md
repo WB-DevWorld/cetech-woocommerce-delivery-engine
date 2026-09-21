@@ -1,11 +1,11 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-21 (PHP runtime policy correction: supported/certified PHP 8.3–8.5.x, minimum 8.3, CETECH production 8.5.x; PR #37 must not merge until this floor is applied; RC.12 tagged from `78594ad`; Issue #26 CLOSED; Issue #29 MERGED; Issue #33 MERGED to protected `master` `5abfab0b5078e67b158f282088022b2ac2566f22`; Issue #35 remains a separate open candidate and is not this task; Pilot not authorized).
+Last reconciled: 2026-09-21 (PR #37 MERGED onto protected `master` `d5ca30d1d92bb69b8a8ffbca2606d30906b8d4a1` — supported/certified PHP 8.3–8.5.x, minimum 8.3, CETECH production 8.5.x; RC.12 tagged from `78594ad`; Issue #26 CLOSED; Issue #29 MERGED; Issue #33 MERGED to `5abfab0`; Issue #35 post-RC.12 GeoNames country-identity candidate `1.0.0-dev.geo-country.5` is realigned onto that master and is **not** RC.13; Pilot not authorized).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
 - Default/canonical development branch: protected `master`
-- Current protected `master`: `5abfab0b5078e67b158f282088022b2ac2566f22`
+- Current protected `master`: `d5ca30d1d92bb69b8a8ffbca2606d30906b8d4a1`
 - RC.12 publication merge on `master`: `78594ad8962868683726373f58f4a8b1b48e4d0e` (PR #27 / `release/rc12` onto `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`).
 - Later documentation commits on `master` are **not** the RC.12 tag source.
 - Repository visibility: public during GitHub Free branch/ruleset protection use.
@@ -47,21 +47,37 @@ Last reconciled: 2026-09-21 (PHP runtime policy correction: supported/certified 
 - Evidence: `docs/RC12-PROMOTION.md`
 - Do not move this tag to a later documentation commit. Do not rebuild the ZIP for docs closeout.
 
+## Post-RC.12 candidate — Issue #35 (not a release)
+- Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/35
+- Branch: `fix/geonames-country-identity`
+- Base: protected `master` `d5ca30d1d92bb69b8a8ffbca2606d30906b8d4a1` (PR #37 PHP 8.3–8.5.x)
+- Development identity: `1.0.0-dev.geo-country.5`
+- Schema: `6` (unchanged)
+- Requires PHP: `8.3`
+- Runtime / package-source SHA: `ea2d412326e369bc7168b9de0dd01875673e71e6`
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.5.zip`
+- Bytes: `1,812,883`
+- SHA-256: `0d02bb14e2652dd635e858a3c8d4e65c233de81872ffa772225530a525e3d54d`
+- Frozen geo-country.4 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.4.zip` (`1,798,250` bytes, SHA-256 `2fc4996c0e403c41bce200dec5be680a05f56f9e666b5a3e4a13a400dba24354`)
+- Frozen geo-country.3 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.3.zip` (`1,797,361` bytes, SHA-256 `a86a940d8ebac2c9e293dad8690ed8f121b5afa66cb3f1e0537f3f4152b26c66`)
+- Frozen geo-country.2 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.2.zip` (`1,798,020` bytes, SHA-256 `6e7f76e2d218a01e2af401cc646471dc2ce27afc8a52c6ad15e671df0b88122c`)
+- Frozen geo-country.1 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.1.zip` (`1,794,741` bytes, SHA-256 `216e3a28d37e6af5f6cf97a69ef362dc946a94b1d26d8508c3d747d582198a6c`)
+- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/36
+- Not merged. Not RC.13. Training physical repair QA COMPLETE 2026-09-21 (`1.0.0-dev.geo-country.5` left installed). Awaiting owner review. Do not close Issue #35.
+- Evidence: `docs/POST-RC12-GEONAMES-COUNTRY-IDENTITY.md`
+
+
 ## Post-RC.12 merged — Issue #33 (not a release)
 - Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/33
 - MERGED via PR #34 onto protected `master` `5abfab0b5078e67b158f282088022b2ac2566f22`
 - Development identity: `1.0.0-dev.geo-live.2`
 - Schema: `6` (unchanged)
-- Runtime / package-source SHA: `cd5cdfbbebfa243feb5f0bf66121edee55b16e87`
-- Frozen geo-live.1 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-live.1.zip` (`1,783,293` bytes, SHA-256 `6281f1b3f7d080ac9bb528fc1a117be909ac1ae05c052d6fe704cc053192ccbf`)
 - ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-live.2.zip`
 - Bytes: `1,786,463`
 - SHA-256: `c5ea75fd407aa32a9e443a3f883e3036785cc776dcf715a040026087fdf8c149`
+- Frozen geo-live.1 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-live.1.zip` (`1,783,293` bytes, SHA-256 `6281f1b3f7d080ac9bb528fc1a117be909ac1ae05c052d6fe704cc053192ccbf`)
 - Not RC.13.
 - Evidence: `docs/POST-RC12-GEO-LIVENESS.md`
-
-## Post-RC.12 open — Issue #35 (not this task)
-- Issue `#35` / PR `#36` is a separate GeoNames country-identity candidate. Do not mix it into this PHP CI realignment.
 
 ## Post-RC.12 merged — Issue #29 (not a release)
 - Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/29

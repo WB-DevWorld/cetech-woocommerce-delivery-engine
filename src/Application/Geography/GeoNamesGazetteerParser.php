@@ -51,16 +51,33 @@ final class GeoNamesGazetteerParser {
 
 		if ( 'A' === $feature_class ) {
 			return in_array( $feature_code, self::ADMIN_FEATURE_CODES, true )
-				|| in_array( $feature_code, self::COUNTRY_FEATURE_CODES, true )
-				|| str_starts_with( $feature_code, 'PCL' );
+				|| $this->is_country_feature( $feature_code );
 		}
 
 		return false;
 	}
 
+	/**
+	 * Exact GeoNames country/territory identity-enrichment codes. WooCommerce
+	 * remains the canonical country-name authority. Historical PCLH and
+	 * generic PCL rows are political features, not the WooCommerce country root.
+	 */
 	public function is_country_feature( string $feature_code ): bool {
-		return in_array( $feature_code, self::COUNTRY_FEATURE_CODES, true )
-			|| str_starts_with( $feature_code, 'PCL' );
+		return in_array( $feature_code, self::COUNTRY_FEATURE_CODES, true );
+	}
+
+	/**
+	 * Higher wins. Zero means the code must not map onto a country root.
+	 */
+	public function country_identity_rank( string $feature_code ): int {
+		return match ( $feature_code ) {
+			'PCLI'  => 100,
+			'PCLIX' => 90,
+			'PCLS'  => 80,
+			'PCLF'  => 70,
+			'PCLD'  => 60,
+			default => 0,
+		};
 	}
 
 	/**

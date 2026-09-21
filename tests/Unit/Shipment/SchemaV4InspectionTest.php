@@ -16,12 +16,17 @@ final class SchemaV4InspectionTest extends TestCase {
 		self::assertSame( '6', SchemaVersion::target() );
 	}
 
-	public function test_plugin_version_is_geo_live_dev_identity(): void {
+	public function test_plugin_version_is_geo_country_dev_identity(): void {
 		$plugin_root = dirname( __DIR__, 3 );
 		$header      = (string) file_get_contents( $plugin_root . '/cetech-woocommerce-delivery-engine.php' );
 
-		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.geo-live\\.2'\s*\)/", $header );
-		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.geo-live\\.2\s*$/m', $header );
+		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.geo-country\\.5'\s*\)/", $header );
+		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.geo-country\\.5\s*$/m', $header );
+		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo-country.4' )", $header );
+		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo-country.3' )", $header );
+		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo-country.2' )", $header );
+		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo-country.1' )", $header );
+		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo-live.2' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo-live.1' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.checkout-mdest.1' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-rc.12' )", $header );

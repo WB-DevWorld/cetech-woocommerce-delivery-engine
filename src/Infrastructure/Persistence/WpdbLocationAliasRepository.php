@@ -96,4 +96,23 @@ final class WpdbLocationAliasRepository implements LocationAliasRepositoryInterf
 			throw new \RuntimeException( 'Failed to write location alias.' );
 		}
 	}
+
+	public function delete_normalized_alias( int $location_id, string $normalized_alias, string $generation_token = '' ): void {
+		$normalized_alias = trim( $normalized_alias );
+		if ( $location_id <= 0 || '' === $normalized_alias ) {
+			return;
+		}
+
+		global $wpdb;
+		$table = TableNames::for( GeographySchema::ALIASES_SUFFIX );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->delete(
+			$table,
+			[
+				'location_id'      => $location_id,
+				'normalized_alias' => $normalized_alias,
+				'generation_token' => $generation_token,
+			]
+		);
+	}
 }

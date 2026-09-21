@@ -89,6 +89,20 @@ final class WpdbCanonicalLocationRepository extends AbstractWpdbRepository imple
 		return is_array( $row ) ? CanonicalLocation::fromRow( $row ) : null;
 	}
 
+	public function list_country_roots(): array {
+		global $wpdb;
+		$table = $this->table_name();
+		$sql   = "SELECT * FROM `{$table}` WHERE location_type = %s AND parent_location_id IS NULL ORDER BY country_code ASC, id ASC";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, GeographyLocationType::Country->value ), ARRAY_A );
+		$out  = [];
+		foreach ( is_array( $rows ) ? $rows : [] as $row ) {
+			$out[] = CanonicalLocation::fromRow( $row );
+		}
+
+		return $out;
+	}
+
 	public function find_exact_child( string $country_code, ?int $parent_id, string $normalized_name, ?GeographyLocationType $type = null, ?int $include_generation = null, string $include_token = '' ): ?CanonicalLocation {
 		$country_code    = strtoupper( trim( $country_code ) );
 		$normalized_name = GeographyNameNormalizer::normalize( $normalized_name );
