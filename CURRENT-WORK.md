@@ -1,13 +1,14 @@
-# Current Work — Issue #29 Checkout Multi-Destination Stabilization
+# Current Work — Issue #33 Ghana Location Pack liveness
 
-Status: RC.12 IMMUTABLE — POST-RC.12 DEV CANDIDATE `1.0.0-dev.checkout-mdest.1` — AWAITING REVIEW / NOT RC.13 / NOT DEPLOYED
+Status: RC.12 IMMUTABLE — POST-RC.12 DEV CANDIDATE `1.0.0-dev.geo-live.2` — AWAITING DIFFERENTIAL REVIEW / NOT RC.13 / NOT DEPLOYED / NOT MERGED
 
 ## Canonical repository truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
 - Canonical development branch: protected `master`.
-- Current protected `master` (docs after RC.12): `c4cee3c37360789d47f3238207aaa4e74ba86109`.
+- Current protected `master`: `83effbf081e54b47ef088673c8ac18217ab9dfda`.
 - Immutable RC.12 release source: `78594ad8962868683726373f58f4a8b1b48e4d0e`.
 - Tag `v1.0.0-rc.12` must not be moved. Do not rebuild or overwrite the RC.12 ZIP.
+- Do not create RC.13.
 
 ## RC.12 published identity (immutable)
 - Version: `1.0.0-rc.12`
@@ -15,41 +16,33 @@ Status: RC.12 IMMUTABLE — POST-RC.12 DEV CANDIDATE `1.0.0-dev.checkout-mdest.1
 - Tag: `v1.0.0-rc.12` (unsigned annotated `tag`)
 - Annotated tag object: `89f34883a017b8bb66f98db345fbbae0d8dd72b0`
 - Peels to: `78594ad8962868683726373f58f4a8b1b48e4d0e`
-- GitHub prerelease: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/releases/tag/v1.0.0-rc.12
-- Final ZIP: `cetech-woocommerce-delivery-engine-1.0.0-rc.12.zip`
-- ZIP bytes: `1,767,204`
-- ZIP SHA-256: `46508c566b505ac470ae94d2829de068e4ff1b53bb4c22e31201e038fb8e03d1`
 
 ## Active task
-Issue `#29` — `[P1] Checkout Use my checkout address flattens multi-destination carts`
+Issue `#33` — `[P1] Ghana Location Pack can remain importing with no continuation scheduled`
 
-- Owner: `@wbdevworld` (explicit owner instruction; checkout runtime + customer copy).
-- Branch: `fix/checkout-multi-destination-preservation` from protected `master` `c4cee3c`.
-- Development identity: `1.0.0-dev.checkout-mdest.1` (schema remains `6`).
-- Dev ZIP (after CI): `cetech-woocommerce-delivery-engine-1.0.0-dev.checkout-mdest.1.zip` / `1,778,523` bytes / SHA-256 `8ceb27dfa3381db23917fbcae45f31453e8588598241f0c4e9af4fd7855c5df1` / source `b07c3eb1ee3556e5b184ce072c1833ba04459cf9`.
-- Not RC.13. Not a release promotion.
-
-Owner-reproduced on `training.cetechbpa.com` (RC.12 runtime):
-- Line A destination GH / Standard Delivery / GH₵30
-- Line B destination Accra / Standard Delivery / GH₵50
-- Cart: subtotal GH₵60 + GH₵30 + GH₵50 = **GH₵140**
-- After **Use my checkout address** (checkout = Accra): both items Accra, only GH₵50 delivery, total **GH₵110**
+- Owner: `@wbdevworld` (explicit ChatGPT authorization; Issue #33 watchdog correction only).
+- Branch: `fix/geography-pack-liveness` from protected `master` `83effbf081e54b47ef088673c8ac18217ab9dfda`.
+- Development identity: `1.0.0-dev.geo-live.2` (schema remains `6`).
+- Runtime / package-source SHA: `cd5cdfbbebfa243feb5f0bf66121edee55b16e87`.
+- Frozen historical geo-live.1 ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-live.1.zip` (`1,783,293` bytes, SHA-256 `6281f1b3f7d080ac9bb528fc1a117be909ac1ae05c052d6fe704cc053192ccbf`) — do not overwrite.
+- geo-live.2 ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-live.2.zip` (`1,786,463` bytes, SHA-256 `c5ea75fd407aa32a9e443a3f883e3036785cc776dcf715a040026087fdf8c149`).
+- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/34
+- Not RC.13. Not a release promotion. Do not merge or deploy until owner/ChatGPT differential review.
 
 ## Central leases
-- plugin bootstrap / version identity on this branch: `1.0.0-dev.checkout-mdest.1`; published `1.0.0-rc.12` remains the tagged identity;
+- plugin bootstrap / version identity on this branch: `1.0.0-dev.geo-live.2`; published `1.0.0-rc.12` remains the tagged identity;
 - schema / migrations: frozen at `6`;
 - published release identity/tags: `v1.0.0-rc.11` and `v1.0.0-rc.12` immutable;
 - canonical `master`: no force-push/rewrite;
-- product-control-plane Requirement IDs: frozen;
-- PR #12 / `1.0.0-dev.qual.1` remains historical qualification provenance.
+- product-control-plane Requirement IDs: frozen.
 
 ## Environment authorization
-- Training site `https://training.cetechbpa.com`: RC.12 / schema 6. Authorized only for bounded reproduction/testing. Do not deploy this candidate until local tests, PR/CI, and owner/ChatGPT review.
-- Ghana Location Pack is currently importing. Do not interfere. Do not run safe reconciliation until it is ready.
+- Training site `https://training.cetechbpa.com`: read-only forensics for Issue #33. Plugin currently `1.0.0-dev.checkout-mdest.1`. Do not click Continue / retry. Do not run safe reconciliation. Do not edit geography DB rows. Do not deploy geo-live.2 until owner/ChatGPT review.
+- Ghana Location Pack remains the live importing dataset. Cursor/source/checksum/generation must not be reset.
 - CETECH Pilot: **NOT STARTED**.
 - FLAIROC: **NOT DEPLOYED**.
 - Production: **NOT DEPLOYED**.
 - POS repository: outside scope / must not be touched.
 
 ## Explicit non-actions
-Do not create RC.13. Do not deploy this fix yet. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not start CETECH Pilot. Do not deploy FLAIROC or production. Do not touch POS. Do not start Stage 15. Do not merge WPML/WCML. Do not expand WP Rocket certification. Do not interfere with the Ghana Location Pack import.
+Do not create RC.13. Do not deploy this fix yet. Do not merge PR #34 yet. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not overwrite the geo-live.1 ZIP. Do not start CETECH Pilot. Do not deploy FLAIROC or production. Do not touch POS. Do not start Stage 15. Do not implement Issue #31 or Issue #32. Do not click Continue / retry on training. Do not run safe reconciliation. Do not reset the current GH dataset or cursor.

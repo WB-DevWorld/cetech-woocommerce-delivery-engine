@@ -34,6 +34,8 @@ final class BulkBackgroundPortabilityIntegrationTest extends TestCase {
 		$GLOBALS['cetech_de_test_caps']['manage_product_delivery_rules'] = true;
 	}
 
+	#[RunInSeparateProcess]
+	#[PreserveGlobalState( false )]
 	public function test_plugin_boot_registers_bulk_tick_and_progress_without_action_scheduler(): void {
 		Plugin::instance()->boot();
 
@@ -55,6 +57,8 @@ final class BulkBackgroundPortabilityIntegrationTest extends TestCase {
 		self::assertSame( 'unavailable', $health['scheduler_health'] );
 	}
 
+	#[RunInSeparateProcess]
+	#[PreserveGlobalState( false )]
 	public function test_create_preview_fails_safe_when_the_booted_queue_is_unavailable(): void {
 		Plugin::instance()->boot();
 		$engine = Plugin::instance()->container()->get( BulkJobEngine::class );

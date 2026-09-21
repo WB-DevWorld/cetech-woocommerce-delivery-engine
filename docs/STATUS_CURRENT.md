@@ -1,11 +1,11 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-20 (RC.12 tagged and published as a prerelease from protected-master `78594ad`; Issue #26 CLOSED/COMPLETED; training-site qualification PASS; staff-training realignment merged on `c4cee3c` and is **not** the RC.12 tag source; Issue #29 post-RC.12 checkout multi-destination candidate `1.0.0-dev.checkout-mdest.1` is in review and is **not** RC.13; Pilot not authorized).
+Last reconciled: 2026-09-20 (RC.12 tagged and published as a prerelease from protected-master `78594ad`; Issue #26 CLOSED/COMPLETED; training-site qualification PASS; staff-training realignment merged on `c4cee3c` and is **not** the RC.12 tag source; Issue #29 MERGED to protected `master` `83effbf081e54b47ef088673c8ac18217ab9dfda`; Issue #33 post-RC.12 Ghana Location Pack liveness candidate `1.0.0-dev.geo-live.2` is awaiting differential review and is **not** RC.13; geo-live.1 ZIP is frozen historical evidence; Pilot not authorized).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
 - Default/canonical development branch: protected `master`
-- Current protected `master` (docs after RC.12): `c4cee3c37360789d47f3238207aaa4e74ba86109`
+- Current protected `master`: `83effbf081e54b47ef088673c8ac18217ab9dfda`
 - RC.12 publication merge on `master`: `78594ad8962868683726373f58f4a8b1b48e4d0e` (PR #27 / `release/rc12` onto `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`).
 - Later documentation commits on `master` are **not** the RC.12 tag source.
 - Repository visibility: public during GitHub Free branch/ruleset protection use.
@@ -35,17 +35,31 @@ Last reconciled: 2026-09-20 (RC.12 tagged and published as a prerelease from pro
 - Evidence: `docs/RC12-PROMOTION.md`
 - Do not move this tag to a later documentation commit. Do not rebuild the ZIP for docs closeout.
 
-## Post-RC.12 candidate — Issue #29 (not a release)
+## Post-RC.12 candidate — Issue #33 (not a release)
+- Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/33
+- Branch: `fix/geography-pack-liveness`
+- Base: protected `master` `83effbf081e54b47ef088673c8ac18217ab9dfda`
+- Development identity: `1.0.0-dev.geo-live.2`
+- Schema: `6` (unchanged)
+- Runtime / package-source SHA: `cd5cdfbbebfa243feb5f0bf66121edee55b16e87`
+- Frozen geo-live.1 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-live.1.zip` (`1,783,293` bytes, SHA-256 `6281f1b3f7d080ac9bb528fc1a117be909ac1ae05c052d6fe704cc053192ccbf`)
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-live.2.zip`
+- Bytes: `1,786,463`
+- SHA-256: `c5ea75fd407aa32a9e443a3f883e3036785cc776dcf715a040026087fdf8c149`
+- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/34
+- Not merged. Not deployed. Not RC.13.
+- Evidence: `docs/POST-RC12-GEO-LIVENESS.md`
+
+## Post-RC.12 merged — Issue #29 (not a release)
 - Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/29
-- Branch: `fix/checkout-multi-destination-preservation`
-- Base: protected `master` `c4cee3c37360789d47f3238207aaa4e74ba86109`
+- MERGED via PR #30 onto protected `master` `83effbf081e54b47ef088673c8ac18217ab9dfda`
 - Development identity: `1.0.0-dev.checkout-mdest.1`
 - Package-source SHA: `b07c3eb1ee3556e5b184ce072c1833ba04459cf9`
 - ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.checkout-mdest.1.zip`
 - Bytes: `1,778,523`
 - SHA-256: `8ceb27dfa3381db23917fbcae45f31453e8588598241f0c4e9af4fd7855c5df1`
 - Schema: `6` (unchanged)
-- Not RC.13. Not deployed. Awaiting ChatGPT/owner review.
+- Not RC.13.
 - Evidence: `docs/POST-RC12-CHECKOUT-MULTIDEST.md`
 
 ## Prior tagged release candidate — RC.11

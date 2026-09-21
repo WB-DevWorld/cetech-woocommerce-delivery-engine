@@ -77,6 +77,7 @@ final class Geo15TechnicalCorrectionTest extends TestCase {
 		self::assertStringContainsString( 'Schema6CoverageUpgradeService::HOOK', $boot );
 		self::assertStringContainsString( 'GeographyPackService::HOOK', $boot );
 		self::assertStringContainsString( 'GeographyPackService::DOWNLOAD_HOOK', $boot );
+		self::assertStringContainsString( 'register_liveness()', $boot );
 	}
 
 	public function test_action_scheduler_enqueue_is_blocked_before_initialization(): void {
