@@ -23,6 +23,9 @@ Issue `#35` — `[P1] GeoNames PCL* records can overwrite canonical country iden
 - Owner: `@wbdevworld` (explicit ChatGPT authorization; Issue #35 only).
 - Branch: `fix/geonames-country-identity` from protected `master` `5abfab0b5078e67b158f282088022b2ac2566f22`.
 - Development identity: `1.0.0-dev.geo-country.1` (schema remains `6`).
+- Runtime / package-source SHA: `b61466ffc14c71e1a678eaf2d5b84f22bf6040cb`.
+- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/36
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.1.zip` (`1,794,741` bytes, SHA-256 `216e3a28d37e6af5f6cf97a69ef362dc946a94b1d26d8508c3d747d582198a6c`).
 - Not RC.13. Not a release promotion. Do not merge or deploy until owner/ChatGPT technical review.
 
 ## Central leases

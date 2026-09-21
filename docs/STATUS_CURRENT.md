@@ -41,6 +41,11 @@ Last reconciled: 2026-09-21 (RC.12 tagged and published as a prerelease from pro
 - Base: protected `master` `5abfab0b5078e67b158f282088022b2ac2566f22`
 - Development identity: `1.0.0-dev.geo-country.1`
 - Schema: `6` (unchanged)
+- Runtime / package-source SHA: `b61466ffc14c71e1a678eaf2d5b84f22bf6040cb`
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.1.zip`
+- Bytes: `1,794,741`
+- SHA-256: `216e3a28d37e6af5f6cf97a69ef362dc946a94b1d26d8508c3d747d582198a6c`
+- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/36
 - Not merged. Not deployed. Not RC.13.
 - Evidence: `docs/POST-RC12-GEONAMES-COUNTRY-IDENTITY.md`
 
