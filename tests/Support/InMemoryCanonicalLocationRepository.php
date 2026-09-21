@@ -42,6 +42,16 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	/** @var list<int> */
 	public array $prepared_moving_root_after_ids = [];
 
+	public int $list_by_country_calls = 0;
+
+	public int $search_localities_calls = 0;
+
+	public int $count_descendants_calls = 0;
+
+	public int $list_children_calls = 0;
+
+	public int $find_unique_exact_descendant_calls = 0;
+
 	private int $next_id = 1;
 
 	public function seed(
@@ -169,6 +179,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	}
 
 	public function find_unique_exact_descendant( string $country_code, int $ancestor_id, string $normalized_name, ?GeographyLocationType $type = null ): ?CanonicalLocation {
+		++$this->find_unique_exact_descendant_calls;
 		$country_code    = strtoupper( trim( $country_code ) );
 		$normalized_name = GeographyNameNormalizer::normalize( $normalized_name );
 		if ( '' === $country_code || '' === $normalized_name || $ancestor_id <= 0 ) {
@@ -205,6 +216,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	}
 
 	public function list_children( int $parent_id, ?GeographyLocationType $type = null, int $limit = 50, int $offset = 0 ): array {
+		++$this->list_children_calls;
 		$out = [];
 		foreach ( $this->locations as $location ) {
 			if ( $location->parent_location_id !== $parent_id || ! $location->isActive() ) {
@@ -233,6 +245,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	}
 
 	public function count_descendants( int $parent_id, ?GeographyLocationType $type = null, string $search = '' ): int {
+		++$this->count_descendants_calls;
 		$search = GeographyNameNormalizer::normalize( $search );
 		$parent = $this->locations[ $parent_id ] ?? null;
 		if ( ! $parent instanceof CanonicalLocation ) {
@@ -266,6 +279,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	}
 
 	public function search_localities( string $country_code, ?int $parent_id, string $query, int $limit = 25, int $offset = 0 ): array {
+		++$this->search_localities_calls;
 		$country_code = strtoupper( trim( $country_code ) );
 		$query        = GeographyNameNormalizer::normalize( $query );
 		$parent       = ( null !== $parent_id && $parent_id > 0 ) ? ( $this->locations[ $parent_id ] ?? null ) : null;
@@ -288,6 +302,7 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	}
 
 	public function list_by_country( string $country_code, ?GeographyLocationType $type = null, int $limit = 500 ): array {
+		++$this->list_by_country_calls;
 		$out = [];
 		foreach ( $this->locations as $location ) {
 			if ( $location->country_code !== strtoupper( $country_code ) || ! $location->isActive() ) {

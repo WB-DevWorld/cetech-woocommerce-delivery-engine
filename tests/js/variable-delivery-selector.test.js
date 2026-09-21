@@ -62,8 +62,10 @@ function loadController(options = {}) {
 		<form class="variations_form cart">
 			<div class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--variable"
 				data-cetech-de-variable-selector="1" data-cetech-de-selector="1" data-product-id="100">
+				<div class="cetech-de-delivery-selector__location" data-cetech-de-location-panel="1">
 				<div data-cetech-de-matching-location="1">
 					${locationFields}
+				</div>
 				</div>
 				<div class="cetech-de-delivery-selector__status" role="status" aria-live="polite" data-cetech-de-status></div>
 				<div class="cetech-de-delivery-selector__options" data-cetech-de-options></div>
@@ -541,6 +543,55 @@ describe('Variable delivery selector controller', () => {
 		expect(controller.optionsEl.querySelector('[data-cetech-de-choice-panel="delivery"]')).not.toBeNull();
 		expect(controller.optionsEl.textContent).toContain('QA Accra Pickup');
 		expect(controller.optionsEl.textContent).not.toContain('₵10.00');
+	});
+
+	it('keeps Delivery active on need_precision and does not auto-select Pickup', async () => {
+		const { controller, $form, ajax } = loadController();
+		ajax.mockReturnValue(
+			createDeferred({
+				type: 'success',
+				payload: {
+					success: true,
+					data: {
+						status: 'need_precision',
+						product_id: 100,
+						variation_id: 11,
+						message: 'Select your City / Town to see the exact delivery fee.',
+						has_delivery: true,
+						has_pickup: true,
+						available_choices: ['delivery', 'store_pickup'],
+						precision: {
+							sufficient: false,
+							required_level: 'locality',
+							reason: 'selected_descendants_nested_member',
+							message_key: 'need_precision.locality',
+						},
+						options: [
+							{
+								display_key: 'in_store:store_pickup:pickup',
+								fulfilment_choice: 'store_pickup',
+								delivery_offer_public_label: 'Accra showroom',
+								is_available: true,
+								price_text: 'Free',
+							},
+						],
+					},
+				},
+			})
+		);
+
+		$form.trigger('found_variation', { variation_id: 11 });
+		await flush();
+
+		const deliverySwitch = controller.optionsEl.querySelector('[data-cetech-de-choice-switch][value="delivery"]');
+		const pickupSwitch = controller.optionsEl.querySelector('[data-cetech-de-choice-switch][value="store_pickup"]');
+		expect(deliverySwitch.checked).toBe(true);
+		expect(pickupSwitch.checked).toBe(false);
+		expect(document.querySelector('[data-cetech-de-location-panel]').hidden).toBe(false);
+		expect(document.querySelector('[name="cetech_de_matching_city"]')).not.toBeNull();
+		expect(controller.optionsEl.querySelector('[data-cetech-de-choice-panel="delivery"]').hidden).toBe(false);
+		expect(controller.statusEl.textContent).toContain('Select your City / Town');
+		expect(controller.optionsEl.querySelector('input[value="in_store:delivery:10"]')).toBeNull();
 	});
 
 	it('sends empty country before location and keeps need_location instead of unavailable', async () => {

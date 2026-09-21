@@ -10,6 +10,7 @@ use CetechDeliveryEngine\Application\CustomerContext\CustomerBrowsingLocationSto
 use CetechDeliveryEngine\Application\CustomerContext\LocationAwareDeliveryOptions;
 use CetechDeliveryEngine\Application\CustomerContext\MatchingLocationOptionsEndpoint;
 use CetechDeliveryEngine\Application\CustomerContext\ProductPageQuoteContext;
+use CetechDeliveryEngine\Application\CustomerContext\ShopperDeliveryLocationPrecision;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryRuntimeConfigurationRouter;
 use CetechDeliveryEngine\Application\Pickup\PickupLocationAddressFormatter;
@@ -20,6 +21,7 @@ use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
+use CetechDeliveryEngine\Domain\CustomerContext\ShopperLocationPrecision;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Domain\Enum\ProductTargetType;
 use CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy;
@@ -45,7 +47,8 @@ final class ProductDeliverySelectorRenderer {
 		private ProductDeliveryConfigurationSourceInterface $configuration_source,
 		private ProductDeliveryOptionsBuilder $options_builder,
 		private ?CustomerBrowsingLocationStore $browsing_store = null,
-		private ?LocationAwareDeliveryOptions $location_options = null
+		private ?LocationAwareDeliveryOptions $location_options = null,
+		private ?ShopperDeliveryLocationPrecision $precision = null
 	) {
 	}
 
@@ -104,6 +107,8 @@ final class ProductDeliverySelectorRenderer {
 				'productId' => $product_id,
 				'i18n'      => [
 					'needLocation' => CustomerStorefrontCopy::where_do_you_want_this_item(),
+					'needPrecision' => CustomerStorefrontCopy::select_city_town_for_exact_fee(),
+					'needPrecisionRegion' => CustomerStorefrontCopy::select_region_for_exact_fee(),
 					'unavailable' => __( 'Delivery is not available to this location.', 'cetech-woocommerce-delivery-engine' ),
 					'loading'     => __( 'Updating delivery options…', 'cetech-woocommerce-delivery-engine' ),
 					'error'       => __( 'Delivery options are temporarily unavailable. Please try again.', 'cetech-woocommerce-delivery-engine' ),
@@ -250,8 +255,15 @@ final class ProductDeliverySelectorRenderer {
 		echo '<fieldset class="cetech-de-delivery-selector__fieldset">';
 		echo '<legend class="cetech-de-delivery-selector__title">' . esc_html( CustomerStorefrontCopy::delivery_and_pickup() ) . '</legend>';
 		$browsing = $this->browsing_store instanceof CustomerBrowsingLocationStore ? $this->browsing_store->get() : null;
+		$force_locality = false;
+		if ( $this->precision instanceof ShopperDeliveryLocationPrecision && $browsing instanceof MatchingLocation ) {
+			$precision = $this->precision->evaluate( $browsing );
+			$force_locality = ! $precision->sufficient && ShopperLocationPrecision::LEVEL_LOCALITY === $precision->required_level;
+		}
+		echo '<div class="cetech-de-delivery-selector__location" data-cetech-de-location-panel="1">';
 		echo '<p class="cetech-de-matching-location__prompt">' . esc_html( CustomerStorefrontCopy::where_do_you_want_this_item() ) . '</p>';
-		echo MatchingLocationFieldRenderer::render( $browsing, 'cetech-de-matching', false, false, false ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns escaped HTML.
+		echo MatchingLocationFieldRenderer::render( $browsing, 'cetech-de-matching', false, false, false, $force_locality ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns escaped HTML.
+		echo '</div>';
 		echo $this->pdp_context_input(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		echo '<div class="cetech-de-delivery-selector__status" role="status" aria-live="polite" data-cetech-de-status>';
 		echo esc_html__( 'Select your product options to see delivery choices.', 'cetech-woocommerce-delivery-engine' );
@@ -318,6 +330,10 @@ final class ProductDeliverySelectorRenderer {
 		$requires  = $this->location_options instanceof LocationAwareDeliveryOptions
 			? $this->location_options->delivery_requires_matching_location( $available )
 			: false;
+		$precision = $this->precision instanceof ShopperDeliveryLocationPrecision && $browsing instanceof MatchingLocation
+			? $this->precision->evaluate( $browsing )
+			: null;
+		$needs_precision = $precision instanceof ShopperLocationPrecision && ! $precision->sufficient;
 		$currency  = function_exists( 'get_woocommerce_currency' ) ? (string) get_woocommerce_currency() : 'GHS';
 		$visible   = $available;
 		if ( $this->location_options instanceof LocationAwareDeliveryOptions && $requires ) {
@@ -328,6 +344,14 @@ final class ProductDeliverySelectorRenderer {
 				ProductPageQuoteContext::from_request( $product_id, 0, $this->current_quantity() )
 			);
 		}
+		if ( $needs_precision ) {
+			$visible = array_values(
+				array_filter(
+					$visible,
+					static fn ( ProductDeliveryOption $option ): bool => FulfilmentChoice::StorePickup->value === $option->fulfilment_choice
+				)
+			);
+		}
 
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- display-only repopulation of customer choice.
 		$posted = isset( $_POST[ CartDeliverySelectionCapture::POST_FIELD ] )
@@ -336,11 +360,16 @@ final class ProductDeliverySelectorRenderer {
 		$capabilities = ProductDeliveryFulfilmentCapabilities::from_options( $available );
 		$has_switch   = ProductDeliveryFulfilmentCapabilities::has_switch( $capabilities );
 		$selected     = '' !== $posted ? $posted : ProductDeliveryOptionsBuilder::defaultDisplayKey( $visible !== [] ? $visible : $available );
+		if ( $needs_precision && ! empty( $capabilities['has_delivery'] ) ) {
+			$selected = $this->display_key_is_pickup( $available, $posted ) ? $posted : '';
+		}
 		$visible      = CustomerVisibleDeliveryOptionGate::selectable_pdp_cards( $visible );
 		$groups       = ProductDeliveryOptionsBuilder::groupByChoice( $visible );
 		$active_choice = $this->active_choice( $visible !== [] ? $visible : $available, $selected, $has_switch || ! empty( $capabilities['has_pickup'] ) );
 
 		$locality = $browsing instanceof MatchingLocation ? $browsing->publicLocalityLabel() : '';
+		$force_locality = $needs_precision && ShopperLocationPrecision::LEVEL_LOCALITY === $precision->required_level;
+		$status_message = $needs_precision ? $precision->public_message : '';
 
 		echo '<fieldset class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--interactive" data-cetech-de-selector="1" data-product-id="' . esc_attr( (string) $product_id ) . '" data-cetech-de-active-choice="' . esc_attr( $active_choice ) . '" data-cetech-de-has-delivery="' . ( ! empty( $capabilities['has_delivery'] ) ? '1' : '0' ) . '" data-cetech-de-has-pickup="' . ( ! empty( $capabilities['has_pickup'] ) ? '1' : '0' ) . '">';
 		echo '<legend class="cetech-de-delivery-selector__title">' . esc_html( CustomerStorefrontCopy::delivery_and_pickup() ) . '</legend>';
@@ -349,13 +378,15 @@ final class ProductDeliverySelectorRenderer {
 			$location_hidden = FulfilmentChoice::StorePickup->value === $active_choice;
 			echo '<div class="cetech-de-delivery-selector__location"' . ( $location_hidden ? ' hidden' : '' ) . ' data-cetech-de-location-panel="1">';
 			echo '<p class="cetech-de-matching-location__prompt">' . esc_html( CustomerStorefrontCopy::where_do_you_want_this_item() ) . '</p>';
-			echo MatchingLocationFieldRenderer::render( $browsing, 'cetech-de-matching', false, false, false ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns escaped HTML.
+			echo MatchingLocationFieldRenderer::render( $browsing, 'cetech-de-matching', false, false, false, $force_locality ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns escaped HTML.
 			echo '</div>';
 		}
 
 		echo $this->pdp_context_input(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 
-		echo '<div class="cetech-de-delivery-selector__status" role="status" aria-live="polite" data-cetech-de-status></div>';
+		echo '<div class="cetech-de-delivery-selector__status" role="status" aria-live="polite" data-cetech-de-status>';
+		echo esc_html( $status_message );
+		echo '</div>';
 		echo '<div class="cetech-de-delivery-selector__options" data-cetech-de-options>';
 
 		if ( $has_switch ) {
@@ -402,6 +433,23 @@ final class ProductDeliverySelectorRenderer {
 		}
 
 		return $available[0]->fulfilment_choice;
+	}
+
+	/**
+	 * @param list<ProductDeliveryOption> $options
+	 */
+	private function display_key_is_pickup( array $options, string $display_key ): bool {
+		if ( '' === $display_key ) {
+			return false;
+		}
+
+		foreach ( $options as $option ) {
+			if ( $option->display_key === $display_key && FulfilmentChoice::StorePickup->value === $option->fulfilment_choice ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private function render_choice_switch( string $active_choice ): void {

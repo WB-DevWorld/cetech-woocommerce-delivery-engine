@@ -7,6 +7,7 @@ namespace CetechDeliveryEngine\Application\Cart;
 use CetechDeliveryEngine\Application\CustomerContext\ClassicPdpContextPayload;
 use CetechDeliveryEngine\Application\CustomerContext\CustomerBrowsingLocationStore;
 use CetechDeliveryEngine\Application\CustomerContext\LocationOfferQuoteProbe;
+use CetechDeliveryEngine\Application\CustomerContext\ShopperDeliveryLocationPrecision;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
@@ -58,7 +59,8 @@ final class CartDeliverySelectionCapture {
 		private ProductDeliveryOptionsBuilder $options_builder,
 		private ProductDeliverySelectionValidator $selection_validator,
 		private ?CustomerBrowsingLocationStore $browsing_store = null,
-		private ?LocationOfferQuoteProbe $quote_probe = null
+		private ?LocationOfferQuoteProbe $quote_probe = null,
+		private ?ShopperDeliveryLocationPrecision $precision = null
 	) {
 	}
 
@@ -173,6 +175,12 @@ final class CartDeliverySelectionCapture {
 			return false;
 		}
 
+		if ( $this->matching_precision_incomplete( $matching ) ) {
+			wc_add_notice( $this->precision_notice( $matching ), 'error' );
+
+			return false;
+		}
+
 		$offer_id = $option->delivery_offer_id ?? 0;
 		$currency = function_exists( 'get_woocommerce_currency' ) ? (string) get_woocommerce_currency() : 'GHS';
 		if (
@@ -229,11 +237,22 @@ final class CartDeliverySelectionCapture {
 			return $cart_item_data;
 		}
 
+		$option  = ProductDeliveryOption::fromArray( $result->matched_option );
+		if ( FulfilmentChoice::Delivery->value === $option->fulfilment_choice ) {
+			$matching = $this->read_submitted_matching_location();
+			if (
+				! $matching instanceof MatchingLocation
+				|| ! $matching->isPresent()
+				|| $this->matching_precision_incomplete( $matching )
+			) {
+				return $cart_item_data;
+			}
+		}
+
 		$cart_item_data[ self::CART_SELECTION_KEY ] = $result->intent;
 		$cart_item_data[ self::CART_SUMMARY_KEY ]   = $summary;
 		$cart_item_data[ self::CART_HASH_KEY ]      = CartDeliverySelectionFingerprint::fromIntent( $result->intent );
 
-		$option  = ProductDeliveryOption::fromArray( $result->matched_option );
 		$context = $this->context_from_submitted_option( $option );
 		if ( $context instanceof CustomerCartContext ) {
 			if ( $context->isDelivery() && ! $context->hasMatchingLocation() ) {
@@ -615,6 +634,25 @@ final class CartDeliverySelectionCapture {
 			'target_type' => $target_type,
 			'target_id'   => (int) $product->get_id(),
 		];
+	}
+
+	private function matching_precision_incomplete( MatchingLocation $matching ): bool {
+		if ( ! $this->precision instanceof ShopperDeliveryLocationPrecision ) {
+			return false;
+		}
+
+		return ! $this->precision->evaluate( $matching )->sufficient;
+	}
+
+	private function precision_notice( MatchingLocation $matching ): string {
+		if ( $this->precision instanceof ShopperDeliveryLocationPrecision ) {
+			$result = $this->precision->evaluate( $matching );
+			if ( '' !== $result->public_message ) {
+				return $result->public_message;
+			}
+		}
+
+		return \CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy::select_city_town_for_exact_fee();
 	}
 
 	private function is_classic_form_submission(): bool {

@@ -19,6 +19,7 @@ use CetechDeliveryEngine\Application\CustomerContext\LocationOfferQuoteProbe;
 use CetechDeliveryEngine\Application\CustomerContext\MatchingLocationOptionsEndpoint;
 use CetechDeliveryEngine\Application\CustomerContext\ProductPageDeliveryPriceQuote;
 use CetechDeliveryEngine\Application\CustomerContext\ProductPageQuoteContext;
+use CetechDeliveryEngine\Application\CustomerContext\ShopperDeliveryLocationPrecision;
 use CetechDeliveryEngine\Application\ProductRule\ProductDeliveryRuleResolver;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidator;
@@ -768,7 +769,8 @@ final class Plugin {
 			LocationAwareDeliveryOptions::class,
 			static fn ( ServiceContainer $container ): LocationAwareDeliveryOptions => new LocationAwareDeliveryOptions(
 				$container->get( LocationOfferQuoteProbe::class ),
-				$container->get( ProductPageDeliveryPriceQuote::class )
+				$container->get( ProductPageDeliveryPriceQuote::class ),
+				$container->get( ShopperDeliveryLocationPrecision::class )
 			)
 		);
 
@@ -781,7 +783,8 @@ final class Plugin {
 				$container->get( ProductDeliveryOptionsBuilder::class ),
 				$container->get( ProductDeliverySelectionValidator::class ),
 				$container->get( CustomerBrowsingLocationStore::class ),
-				$container->get( LocationOfferQuoteProbe::class )
+				$container->get( LocationOfferQuoteProbe::class ),
+				$container->get( ShopperDeliveryLocationPrecision::class )
 			)
 		);
 
@@ -839,7 +842,8 @@ final class Plugin {
 				$container->get( CartDeliverySelectionCapture::class ),
 				$container->get( LocationAwareDeliveryOptions::class ),
 				$container->get( CustomerBrowsingLocationStore::class ),
-				$container->get( CanonicalLocationResolver::class )
+				$container->get( CanonicalLocationResolver::class ),
+				$container->get( ShopperDeliveryLocationPrecision::class )
 			)
 		);
 
@@ -1209,7 +1213,8 @@ final class Plugin {
 				$container->get( ProductDeliveryConfigurationSourceInterface::class ),
 				$container->get( ProductDeliveryOptionsBuilder::class ),
 				$container->get( CustomerBrowsingLocationStore::class ),
-				$container->get( LocationAwareDeliveryOptions::class )
+				$container->get( LocationAwareDeliveryOptions::class ),
+				$container->get( ShopperDeliveryLocationPrecision::class )
 			)
 		);
 
@@ -1229,7 +1234,8 @@ final class Plugin {
 				$container->get( ProductDeliveryConfigurationSourceInterface::class ),
 				$container->get( ProductDeliveryOptionsBuilder::class ),
 				$container->get( VariationRelationshipInspectorInterface::class ),
-				$container->get( LocationAwareDeliveryOptions::class )
+				$container->get( LocationAwareDeliveryOptions::class ),
+				$container->get( ShopperDeliveryLocationPrecision::class )
 			)
 		);
 
@@ -1922,6 +1928,16 @@ final class Plugin {
 		$this->container->singleton(
 			CoverageGroupMatcher::class,
 			static fn ( ServiceContainer $container ): CoverageGroupMatcher => new CoverageGroupMatcher(
+				$container->get( CoverageGroupRepositoryInterface::class ),
+				$container->get( CanonicalLocationRepositoryInterface::class )
+			)
+		);
+
+		$this->container->singleton(
+			ShopperDeliveryLocationPrecision::class,
+			static fn ( ServiceContainer $container ): ShopperDeliveryLocationPrecision => new ShopperDeliveryLocationPrecision(
+				$container->get( CanonicalLocationResolver::class ),
+				$container->get( DestinationZoneRepositoryInterface::class ),
 				$container->get( CoverageGroupRepositoryInterface::class ),
 				$container->get( CanonicalLocationRepositoryInterface::class )
 			)

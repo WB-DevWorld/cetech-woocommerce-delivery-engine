@@ -1,11 +1,11 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-21 (PR #37 MERGED onto protected `master` `d5ca30d1d92bb69b8a8ffbca2606d30906b8d4a1` — supported/certified PHP 8.3–8.5.x, minimum 8.3, CETECH production 8.5.x; RC.12 tagged from `78594ad`; Issue #26 CLOSED; Issue #29 MERGED; Issue #33 MERGED to `5abfab0`; Issue #35 post-RC.12 GeoNames country-identity candidate `1.0.0-dev.geo-country.5` is realigned onto that master and is **not** RC.13; Pilot not authorized).
+Last reconciled: 2026-09-21 (PR #36 MERGED onto protected `master` `514ddfc1b4d10b2171d3d3bae020381198c59d2b` — Issue #35 CLOSED; supported/certified PHP 8.3–8.5.x, minimum 8.3, CETECH production 8.5.x; RC.12 tagged from `78594ad`; Issue #26 CLOSED; Issue #29 MERGED; Issue #33 MERGED to `5abfab0`; Issue #38 post-RC.12 PDP location-precision candidate `1.0.0-dev.pdp-precision.2` is **not** RC.13 and is **not deployed**; frozen `1.0.0-dev.pdp-precision.1` ZIP must not be overwritten; Pilot not authorized).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
 - Default/canonical development branch: protected `master`
-- Current protected `master`: `d5ca30d1d92bb69b8a8ffbca2606d30906b8d4a1`
+- Current protected `master`: `514ddfc1b4d10b2171d3d3bae020381198c59d2b`
 - RC.12 publication merge on `master`: `78594ad8962868683726373f58f4a8b1b48e4d0e` (PR #27 / `release/rc12` onto `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`).
 - Later documentation commits on `master` are **not** the RC.12 tag source.
 - Repository visibility: public during GitHub Free branch/ruleset protection use.
@@ -47,10 +47,25 @@ Last reconciled: 2026-09-21 (PR #37 MERGED onto protected `master` `d5ca30d1d92b
 - Evidence: `docs/RC12-PROMOTION.md`
 - Do not move this tag to a later documentation commit. Do not rebuild the ZIP for docs closeout.
 
-## Post-RC.12 candidate — Issue #35 (not a release)
+## Post-RC.12 candidate — Issue #38 (not a release)
+- Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/38
+- Branch: `fix/pdp-location-precision`
+- Base: protected `master` `514ddfc1b4d10b2171d3d3bae020381198c59d2b`
+- Development identity: `1.0.0-dev.pdp-precision.2`
+- Schema: `6` (unchanged)
+- Requires PHP: `8.3`
+- Runtime / package-source SHA: `05b9b393995c884d30f9d761513fcd3beb622587`
+- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/40 (open; do not merge)
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.pdp-precision.2.zip`
+- Bytes: `1,824,330`
+- SHA-256: `1b0c02dcc88370b5f8535c59acb00ad3773a95b2182539b333778046a913557e`
+- Frozen pdp-precision.1 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.pdp-precision.1.zip` (`1,823,157` bytes, SHA-256 `5773b5b2eb9d63bdc5e8b92bbbd156cb78ba4bc4deb74f34db105673542d3fda`)
+- Not merged. Not deployed. Not RC.13. Awaiting final deployment review. Do not close Issue #38.
+- Evidence: `docs/POST-RC12-PDP-LOCATION-PRECISION.md`
+
+## Post-RC.12 merged — Issue #35 (not a release)
 - Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/35
-- Branch: `fix/geonames-country-identity`
-- Base: protected `master` `d5ca30d1d92bb69b8a8ffbca2606d30906b8d4a1` (PR #37 PHP 8.3–8.5.x)
+- MERGED via PR #36 onto protected `master` `514ddfc1b4d10b2171d3d3bae020381198c59d2b`
 - Development identity: `1.0.0-dev.geo-country.5`
 - Schema: `6` (unchanged)
 - Requires PHP: `8.3`
@@ -63,7 +78,7 @@ Last reconciled: 2026-09-21 (PR #37 MERGED onto protected `master` `d5ca30d1d92b
 - Frozen geo-country.2 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.2.zip` (`1,798,020` bytes, SHA-256 `6e7f76e2d218a01e2af401cc646471dc2ce27afc8a52c6ad15e671df0b88122c`)
 - Frozen geo-country.1 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.1.zip` (`1,794,741` bytes, SHA-256 `216e3a28d37e6af5f6cf97a69ef362dc946a94b1d26d8508c3d747d582198a6c`)
 - PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/36
-- Not merged. Not RC.13. Training physical repair QA COMPLETE 2026-09-21 (`1.0.0-dev.geo-country.5` left installed). Awaiting owner review. Do not close Issue #35.
+- CLOSED / COMPLETED. Not RC.13. Training physical repair QA COMPLETE 2026-09-21.
 - Evidence: `docs/POST-RC12-GEONAMES-COUNTRY-IDENTITY.md`
 
 

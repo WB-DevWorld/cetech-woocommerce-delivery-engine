@@ -296,7 +296,8 @@ $is_schema5_release = str_contains( $header_source, '1.0.0-dev.bulk' )
 
 $is_schema6_release = str_contains( $header_source, '1.0.0-dev.geo' )
 	|| str_contains( $header_source, '1.0.0-rc.12' )
-	|| str_contains( $header_source, '1.0.0-dev.checkout-mdest' );
+	|| str_contains( $header_source, '1.0.0-dev.checkout-mdest' )
+	|| str_contains( $header_source, '1.0.0-dev.pdp-precision' );
 
 $target = 'unknown';
 if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {

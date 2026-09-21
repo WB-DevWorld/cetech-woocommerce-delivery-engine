@@ -27,7 +27,7 @@ final class MatchingLocationFieldRenderer {
 		];
 	}
 
-	public static function render( ?MatchingLocation $location, string $id_prefix = 'cetech-de-matching', bool $use_woocommerce_fields = true, bool $show_intro = false, bool $default_to_base_country = true ): string {
+	public static function render( ?MatchingLocation $location, string $id_prefix = 'cetech-de-matching', bool $use_woocommerce_fields = true, bool $show_intro = false, bool $default_to_base_country = true, bool $force_locality_visible = false ): string {
 		$names   = self::default_names();
 		$country = $location instanceof MatchingLocation ? $location->country : '';
 		$state   = $location instanceof MatchingLocation ? $location->state : '';
@@ -59,7 +59,7 @@ final class MatchingLocationFieldRenderer {
 		$html .= '<input type="hidden" name="' . esc_attr( $names['location_key'] ) . '" value="' . esc_attr( $location_key ) . '" data-cetech-de-location-key="1" autocomplete="off" />';
 
 		$region_hidden   = $has_country ? '' : ' hidden';
-		$locality_hidden = $has_region ? '' : ' hidden';
+		$locality_hidden = ( $has_region || $force_locality_visible ) ? '' : ' hidden';
 		$postcode_hidden = ( '' !== $postcode ) ? '' : ' hidden';
 
 		if ( $use_woocommerce_fields && function_exists( 'woocommerce_form_field' ) ) {
@@ -138,7 +138,7 @@ final class MatchingLocationFieldRenderer {
 
 		$html .= self::select_or_input( $id_prefix . '-country', $names['country'], __( 'Country', 'cetech-woocommerce-delivery-engine' ), $country, self::countries(), 'country', false );
 		$html .= self::select_or_input( $id_prefix . '-state', $names['state'], \CetechDeliveryEngine\Application\Geography\GeographyAdminLabels::administrative_area_label( $country ), $state, self::states( $country ), 'region', ! $has_country );
-		$html .= self::locality_input( $id_prefix . '-city', $names['city'], $city, ! $has_region );
+		$html .= self::locality_input( $id_prefix . '-city', $names['city'], $city, ! $has_region && ! $force_locality_visible );
 		$html .= self::text_input( $id_prefix . '-postcode', $names['postcode'], __( 'Postcode', 'cetech-woocommerce-delivery-engine' ), $postcode, 'postcode', '' === $postcode );
 		$html .= '</fieldset>';
 

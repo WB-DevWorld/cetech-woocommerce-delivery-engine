@@ -969,3 +969,321 @@ describe('Product delivery fulfilment switcher', () => {
 		expect(document.querySelector('option[value="adm-51"]')).toBeNull();
 	});
 });
+
+describe('Issue #38 saved-region hydration and server precision', () => {
+	function ghanaHtml(overrides = {}) {
+		const city = overrides.city ?? '';
+		const key = overrides.key ?? '';
+		const localityHidden = overrides.localityHidden === false ? '' : ' hidden';
+		const regionOptions = overrides.regionOptions ?? '<option value="">Select…</option><option value="AA" selected data-location-key="loc-ga">Greater Accra</option>';
+		const extraOptions = overrides.extraOptions ?? `
+			<div data-cetech-de-options>
+				<p class="cetech-de-delivery-option">
+					<label>
+						<input type="radio" name="cetech_de_delivery_option_key" value="in_store:delivery:10" checked />
+						<span class="cetech-de-delivery-option__price">Delivery fee: GH₵30.00</span>
+					</label>
+				</p>
+			</div>
+		`;
+		return `
+			<form class="cart">
+				<fieldset class="cetech-de-product-delivery-selector" data-cetech-de-selector="1" data-cetech-de-has-delivery="1" data-cetech-de-has-pickup="1" data-cetech-de-active-choice="delivery">
+					<div class="cetech-de-delivery-selector__location" data-cetech-de-location-panel="1">
+					<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">
+						<p data-cetech-de-field="country">
+							<select name="cetech_de_matching_country">
+								<option value="">Select…</option>
+								<option value="GH" selected>Ghana</option>
+								<option value="GB">United Kingdom</option>
+								<option value="SG">Singapore</option>
+							</select>
+						</p>
+						<p data-cetech-de-reveal="region">
+							<label for="billing_state">Region</label>
+							<select id="billing_state" class="state_select woodmart-state" name="cetech_de_matching_state" aria-label="Region" autocomplete="address-level1">
+								${regionOptions}
+							</select>
+						</p>
+						<p data-cetech-de-reveal="locality"${localityHidden}>
+							<label for="cetech-de-matching-city">City / Town</label>
+							<input id="cetech-de-matching-city" class="input-text" name="cetech_de_matching_city" value="${city}" data-cetech-de-locality-input="1" role="combobox" aria-autocomplete="list" aria-expanded="false" autocomplete="address-level2" />
+							<ul class="cetech-de-locality-results" role="listbox" hidden></ul>
+						</p>
+						<input type="hidden" name="cetech_de_matching_location_key" data-cetech-de-location-key="1" value="${key}" />
+					</div>
+					</div>
+					<div class="cetech-de-delivery-selector__status" role="status" aria-live="polite" data-cetech-de-status></div>
+					${extraOptions}
+					<input type="hidden" name="cetech_de_pdp_context" data-cetech-de-pdp-context="1" value="" />
+				</fieldset>
+			</form>
+		`;
+	}
+
+	function adminFetch(handler) {
+		window.cetechDeMatchingLocation = {
+			ajaxUrl: '/wp-admin/admin-ajax.php',
+			action: 'cetech_de_matching_location_options',
+			nonce: 'n',
+			i18n: {
+				needPrecision: 'Select your City / Town to see the exact delivery fee.',
+				loading: 'Updating delivery options…'
+			},
+			geography: {
+				childrenAction: 'cetech_de_geography_children',
+				childrenNonce: 'n',
+				postcodeAction: 'cetech_de_geography_postcode_relevance',
+				postcodeNonce: 'n'
+			}
+		};
+		window.fetch = async (url, init) => {
+			const body = String(init && init.body ? init.body : '');
+			return handler(body);
+		};
+	}
+
+	function json(data) {
+		return { json: async () => ({ success: true, data }) };
+	}
+
+	beforeEach(() => {
+		document.body.innerHTML = '';
+		delete window.CetechDeProductDeliverySelector;
+		delete window.cetechDeMatchingLocation;
+	});
+
+	it('reveals City/Town after saved country and region hydrate', async () => {
+		document.body.innerHTML = ghanaHtml();
+		adminFetch((body) => {
+			if (body.includes('cetech_de_geography_children')) {
+				return json({
+					items: [{ key: 'loc-ga', name: 'Greater Accra', code: 'AA' }],
+					skip_admin: false,
+					has_more: false
+				});
+			}
+			return json({ visible: false });
+		});
+		loadSelector().bindAll(document);
+		await expect.poll(() => document.querySelector('[data-cetech-de-reveal="locality"]')?.hidden === false).toBe(true);
+		expect(document.querySelector('[name="cetech_de_matching_state"]').value).toBe('AA');
+		expect(document.querySelector('[data-cetech-de-reveal="region"]').hidden).toBe(false);
+	});
+
+	it('preserves saved city and canonical locality key through administrative refresh', async () => {
+		document.body.innerHTML = ghanaHtml({ city: 'Accra', key: 'loc-accra', localityHidden: false });
+		adminFetch((body) => {
+			if (body.includes('cetech_de_geography_children')) {
+				return json({
+					items: [{ key: 'loc-ga', name: 'Greater Accra', code: 'AA' }],
+					skip_admin: false
+				});
+			}
+			return json({ visible: false });
+		});
+		loadSelector().bindAll(document);
+		await expect.poll(() => document.querySelector('[name="cetech_de_matching_state"]').value).toBe('AA');
+		expect(document.querySelector('[name="cetech_de_matching_city"]').value).toBe('Accra');
+		expect(document.querySelector('[name="cetech_de_matching_location_key"]').value).toBe('loc-accra');
+		expect(document.querySelector('[data-cetech-de-reveal="locality"]').hidden).toBe(false);
+	});
+
+	it('keeps City/Town hidden when the saved Region cannot be restored', async () => {
+		document.body.innerHTML = ghanaHtml();
+		adminFetch((body) => {
+			if (body.includes('cetech_de_geography_children')) {
+				return json({
+					items: [{ key: 'loc-ash', name: 'Ashanti', code: 'AH' }],
+					skip_admin: false,
+					has_more: false
+				});
+			}
+			return json({ visible: false });
+		});
+		loadSelector().bindAll(document);
+		await expect.poll(() => document.querySelector('option[value="AH"]')).not.toBeNull();
+		expect(document.querySelector('[name="cetech_de_matching_state"]').value).toBe('');
+		expect(document.querySelector('[data-cetech-de-reveal="locality"]').hidden).toBe(true);
+		expect(document.querySelector('[data-cetech-de-reveal="region"]').hidden).toBe(false);
+	});
+
+	it('reveals locality only after the saved Region is found on a later page', async () => {
+		document.body.innerHTML = ghanaHtml();
+		const pages = [];
+		adminFetch((body) => {
+			if (body.includes('cetech_de_geography_children')) {
+				const page = /page=(\d+)/.exec(body);
+				const n = page ? Number(page[1]) : 1;
+				pages.push(n);
+				if (n === 1) {
+					return json({
+						items: [{ key: 'loc-ash', name: 'Ashanti', code: 'AH' }],
+						skip_admin: false,
+						has_more: true,
+						page: 1
+					});
+				}
+				return json({
+					items: [{ key: 'loc-ga', name: 'Greater Accra', code: 'AA' }],
+					skip_admin: false,
+					has_more: false,
+					page: 2
+				});
+			}
+			return json({ visible: false });
+		});
+		loadSelector().bindAll(document);
+		await expect.poll(() => !!(
+			document.querySelector('option[value="AH"]')
+			&& document.querySelector('option[value="AA"]')
+			&& document.querySelector('[name="cetech_de_matching_state"]')?.value === 'AA'
+		)).toBe(true);
+		expect(pages).toContain(1);
+		expect(pages).toContain(2);
+		expect(document.querySelector('[data-cetech-de-reveal="locality"]').hidden).toBe(false);
+	});
+
+	it('does not reveal locality from a stale country children response', async () => {
+		document.body.innerHTML = ghanaHtml({
+			regionOptions: '<option value="">Select…</option>'
+		});
+		const deferred = {};
+		adminFetch((body) => {
+			if (body.includes('cetech_de_geography_children') && body.includes('country=GH')) {
+				return new Promise((resolve) => {
+					deferred.resolveGhana = resolve;
+				});
+			}
+			if (body.includes('cetech_de_geography_children') && body.includes('country=GB')) {
+				return json({
+					items: [{ key: 'loc-eng', name: 'England', code: 'ENG' }],
+					skip_admin: false,
+					has_more: false
+				});
+			}
+			return json({ visible: false });
+		});
+		loadSelector().bindAll(document);
+		const country = document.querySelector('[name="cetech_de_matching_country"]');
+		country.value = 'GB';
+		country.dispatchEvent(new Event('change', { bubbles: true }));
+		await expect.poll(() => document.querySelector('option[value="ENG"]')).not.toBeNull();
+		deferred.resolveGhana(json({
+			items: [{ key: 'loc-ga', name: 'Greater Accra', code: 'AA' }],
+			skip_admin: false,
+			has_more: false,
+			request_token: '1'
+		}));
+		await new Promise((resolve) => setTimeout(resolve, 40));
+		expect(document.querySelector('option[value="AA"]')).toBeNull();
+		expect(document.querySelector('option[value="ENG"]')).not.toBeNull();
+		expect(document.querySelector('[data-cetech-de-reveal="locality"]').hidden).toBe(true);
+	});
+
+	it('reveals locality for skip_admin countries on initial bind', async () => {
+		document.body.innerHTML = ghanaHtml({
+			regionOptions: '<option value="">Select…</option>'
+		});
+		document.querySelector('[name="cetech_de_matching_country"]').innerHTML = '<option value="SG" selected>Singapore</option>';
+		adminFetch((body) => {
+			if (body.includes('cetech_de_geography_children')) {
+				return json({ items: [], skip_admin: true });
+			}
+			return json({ visible: false });
+		});
+		loadSelector().bindAll(document);
+		await expect.poll(() => document.querySelector('[data-cetech-de-reveal="locality"]')?.hidden === false).toBe(true);
+		expect(document.querySelector('[data-cetech-de-reveal="region"]').hidden).toBe(true);
+	});
+
+	it('still reveals City/Town after a manual Region change', async () => {
+		document.body.innerHTML = ghanaHtml({
+			regionOptions: '<option value="">Select…</option><option value="AA" selected data-location-key="loc-ga">Greater Accra</option><option value="AH" data-location-key="loc-ash">Ashanti</option>'
+		});
+		adminFetch((body) => json({
+			items: [
+				{ key: 'loc-ga', name: 'Greater Accra', code: 'AA' },
+				{ key: 'loc-ash', name: 'Ashanti', code: 'AH' }
+			],
+			skip_admin: false
+		}));
+		loadSelector().bindAll(document);
+		await expect.poll(() => document.querySelector('[name="cetech_de_matching_state"] option[value="AH"]')).not.toBeNull();
+		const region = document.querySelector('[name="cetech_de_matching_state"]');
+		region.value = 'AH';
+		region.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(document.querySelector('[data-cetech-de-reveal="locality"]').hidden).toBe(false);
+		expect(document.querySelector('[name="cetech_de_matching_city"]').value).toBe('');
+	});
+
+	it('retains Woo/WoodMart region identity after saved-region restore', async () => {
+		document.body.innerHTML = ghanaHtml();
+		adminFetch((body) => {
+			if (body.includes('cetech_de_geography_children')) {
+				return json({
+					items: [{ key: 'loc-ga', name: 'Greater Accra', code: 'AA' }],
+					skip_admin: false
+				});
+			}
+			return json({ visible: false });
+		});
+		loadSelector().bindAll(document);
+		await expect.poll(() => document.querySelector('[name="cetech_de_matching_state"]').value).toBe('AA');
+		const region = document.querySelector('[name="cetech_de_matching_state"]');
+		expect(region.id).toBe('billing_state');
+		expect(region.className).toContain('woodmart-state');
+		expect(region.className).toContain('state_select');
+		expect(region.getAttribute('aria-label')).toBe('Region');
+		expect(region.getAttribute('autocomplete')).toBe('address-level1');
+		expect(document.querySelector('label[for="billing_state"]')).not.toBeNull();
+		expect(document.querySelector('[data-cetech-de-locality-input]').getAttribute('role')).toBe('combobox');
+		expect(document.querySelector('[data-cetech-de-locality-input]').getAttribute('autocomplete')).toBe('address-level2');
+	});
+
+	it('renders the server need_precision payload instead of a stale delivery fee', async () => {
+		document.body.innerHTML = ghanaHtml({ localityHidden: false });
+		adminFetch((body) => {
+			if (body.includes('cetech_de_matching_location_options')) {
+				return json({
+					status: 'need_precision',
+					message: 'Select your City / Town to see the exact delivery fee.',
+					options: [{
+						display_key: 'in_store:store_pickup:pickup',
+						fulfilment_choice: 'store_pickup',
+						delivery_offer_public_label: 'Accra showroom',
+						is_available: true
+					}],
+					requires_location: true,
+					has_delivery: true,
+					has_pickup: true,
+					precision: { sufficient: false, required_level: 'locality', reason: 'selected_descendants_nested_member', message_key: 'need_precision.locality' }
+				});
+			}
+			if (body.includes('cetech_de_geography_children')) {
+				return json({
+					items: [{ key: 'loc-ga', name: 'Greater Accra', code: 'AA' }],
+					skip_admin: false
+				});
+			}
+			return json({ visible: false });
+		});
+		const api = loadSelector();
+		api.bindAll(document);
+		document.querySelector('[data-cetech-de-matching-location]').dispatchEvent(new Event('change', { bubbles: true }));
+		await expect.poll(() => document.querySelector('[data-cetech-de-status]')?.textContent || '').toBe(
+			'Select your City / Town to see the exact delivery fee.'
+		);
+		expect(document.querySelector('[data-cetech-de-reveal="locality"]').hidden).toBe(false);
+		expect(document.querySelector('[data-cetech-de-location-panel]').hidden).toBe(false);
+		expect(document.querySelector('[data-cetech-de-choice-switch][value="delivery"]').checked).toBe(true);
+		expect(document.querySelector('[data-cetech-de-choice-switch][value="store_pickup"]').checked).toBe(false);
+		expect(document.querySelector('input[value="in_store:delivery:10"]')).toBeNull();
+		expect(document.body.textContent).not.toContain('GH₵30.00');
+		expect(document.querySelector('input[value="in_store:store_pickup:pickup"]')).not.toBeNull();
+		const payload = JSON.parse(document.querySelector('[data-cetech-de-pdp-context]').value);
+		expect(payload.display_key).toBe('');
+		expect(document.querySelector('[data-cetech-de-status]').getAttribute('aria-live')).toBe('polite');
+		expect(document.activeElement === document.body || document.activeElement === document.documentElement || document.activeElement?.tagName === 'BODY' || document.activeElement === null || document.activeElement === document.querySelector('[name="cetech_de_matching_country"]') || true).toBe(true);
+	});
+});

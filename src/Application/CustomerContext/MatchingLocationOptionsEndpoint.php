@@ -11,6 +11,7 @@ use CetechDeliveryEngine\Application\Geography\CanonicalLocationResolver;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
+use CetechDeliveryEngine\Domain\CustomerContext\ShopperLocationPrecision;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
@@ -28,7 +29,8 @@ final class MatchingLocationOptionsEndpoint {
 		private CartDeliverySelectionCapture $cart_capture,
 		private LocationAwareDeliveryOptions $location_options,
 		private CustomerBrowsingLocationStore $browsing_store,
-		private ?CanonicalLocationResolver $resolver = null
+		private ?CanonicalLocationResolver $resolver = null,
+		private ?ShopperDeliveryLocationPrecision $precision = null
 	) {
 	}
 
@@ -129,6 +131,31 @@ final class MatchingLocationOptionsEndpoint {
 			);
 		}
 
+		$precision = $this->precision instanceof ShopperDeliveryLocationPrecision && $location instanceof MatchingLocation
+			? $this->precision->evaluate( $location )
+			: null;
+
+		if ( $requires && $precision instanceof ShopperLocationPrecision && ! $precision->sufficient ) {
+			$pickup_only = array_values(
+				array_filter(
+					$public,
+					static fn ( array $row ): bool => FulfilmentChoice::StorePickup->value === (string) ( $row['fulfilment_choice'] ?? '' )
+				)
+			);
+
+			return $this->with_capabilities(
+				[
+					'status'            => 'need_precision',
+					'message'           => $precision->public_message,
+					'options'           => $pickup_only,
+					'requires_location' => true,
+					'precision'         => $precision->toArray(),
+					'locality'          => $location->publicLocalityLabel(),
+				],
+				$caps
+			);
+		}
+
 		if ( $requires && [] === $delivery_visible && $location instanceof MatchingLocation ) {
 			$pickup_only = array_filter(
 				$filtered,
@@ -148,17 +175,19 @@ final class MatchingLocationOptionsEndpoint {
 			}
 		}
 
-		return $this->with_capabilities(
-			[
-				'status'            => 'ok',
-				'message'           => '',
-				'options'           => $public,
-				'requires_location' => $requires,
-				'default_key'       => ProductDeliveryOptionsBuilder::defaultDisplayKey( $filtered ),
-				'locality'          => $location instanceof MatchingLocation ? $location->publicLocalityLabel() : '',
-			],
-			$caps
-		);
+		$ok = [
+			'status'            => 'ok',
+			'message'           => '',
+			'options'           => $public,
+			'requires_location' => $requires,
+			'default_key'       => ProductDeliveryOptionsBuilder::defaultDisplayKey( $filtered ),
+			'locality'          => $location instanceof MatchingLocation ? $location->publicLocalityLabel() : '',
+		];
+		if ( $precision instanceof ShopperLocationPrecision ) {
+			$ok['precision'] = $precision->toArray();
+		}
+
+		return $this->with_capabilities( $ok, $caps );
 	}
 
 	/**
