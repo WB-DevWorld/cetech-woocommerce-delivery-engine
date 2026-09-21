@@ -5,7 +5,7 @@
 
 **Primary local/QA runtime:** PHP **8.5.x** (CETECH production target). See `docs/PHP-RUNTIME-POLICY.md` and `docker/php85-qa/`.
 
-Do not qualify a CETECH release only on PHP 8.1/8.2. Isolated qualification must be able to reproduce PHP 8.5, current supported WordPress, current supported WooCommerce, and MariaDB 11.4 (current isolated-qualification database until production names a different version).
+Do not qualify a CETECH release only on PHP 8.3/8.4. Isolated qualification must be able to reproduce PHP 8.5, current supported WordPress, current supported WooCommerce, and MariaDB 11.4 (current isolated-qualification database until production names a different version).
 
 **Purpose:**  
 Primary real-world development/integration environment for CETECH WooCommerce Delivery Engine.
@@ -46,4 +46,4 @@ Redis key namespace / prefix / database isolation hardening was observed as unde
 
 Related:  
 See `docs/POST-RC-BASELINE-VERIFICATION.md` for Stage 0 / Stage 0A / Stage 0B verification results against this environment.  
-See `docs/PHP-RUNTIME-POLICY.md` for CETECH production PHP 8.5 versus commercial minimum PHP 8.1. Isolated PHP 8.5 Compose: `docker/php85-qa/`.
+See `docs/PHP-RUNTIME-POLICY.md` for supported PHP 8.3–8.5.x (minimum 8.3; CETECH production 8.5.x). Isolated PHP 8.5 Compose: `docker/php85-qa/`.

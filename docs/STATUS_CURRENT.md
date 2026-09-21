@@ -1,6 +1,6 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-21 (PHP runtime policy: CETECH production target PHP 8.5.x, commercial minimum PHP 8.1; RC.12 tagged from `78594ad`; Issue #26 CLOSED; Issue #29 MERGED; Issue #33 MERGED to protected `master` `5abfab0b5078e67b158f282088022b2ac2566f22`; Issue #35 remains a separate open candidate and is not this task; Pilot not authorized).
+Last reconciled: 2026-09-21 (PHP runtime policy correction: supported/certified PHP 8.3–8.5.x, minimum 8.3, CETECH production 8.5.x; PR #37 must not merge until this floor is applied; RC.12 tagged from `78594ad`; Issue #26 CLOSED; Issue #29 MERGED; Issue #33 MERGED to protected `master` `5abfab0b5078e67b158f282088022b2ac2566f22`; Issue #35 remains a separate open candidate and is not this task; Pilot not authorized).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
@@ -13,11 +13,13 @@ Last reconciled: 2026-09-21 (PHP runtime policy: CETECH production target PHP 8.
 
 ## PHP runtime policy
 - Canonical policy: `docs/PHP-RUNTIME-POLICY.md`. Realignment evidence: `docs/PHP-85-CI-REALIGNMENT.md`.
-- **CETECH production / certified PHP:** 8.5.x (latest stable patch at deployment; 8.5.10 as of 21 September 2026).
-- **Commercial supported minimum:** PHP 8.1. Plugin header, Composer, and activation guard remain `>=8.1` until a later explicit support-policy decision.
-- **CI:** PHP 8.1 minimum-compatibility; PHP 8.3 WooCommerce recommended-floor; PHP 8.4 mature compatibility; **PHP 8.5 blocking production target**. PHP 8.2 is no longer the principal PHPUnit gate.
-- PHP 8.6 pre-release must not be used as a production target.
-- Historical RC.12 required checks (`Runtime PHP 8.1`, `PHP / PHPUnit 8.2`) are provenance of that tag. They must not be read as the CETECH production runtime. FLAIROC Stage 0B already recorded PHP 8.5.5.
+- **Supported / certified range today:** PHP 8.3, 8.4, and 8.5.x.
+- **Minimum supported PHP:** 8.3. Plugin header, Composer, and activation guard are `>=8.3`. This is the WordPress + WooCommerce recommended floor, not the oldest version those products can still boot.
+- **Recommended production PHP:** latest qualified stable release. **Currently qualified latest stable:** PHP 8.5.x (latest stable patch at deployment; 8.5.10 as of 21 September 2026).
+- **CI:** PHP 8.3 Minimum Supported (blocking); PHP 8.4 Compatibility; **PHP 8.5 CETECH Production Target (blocking)** plus MariaDB and WordPress/WooCommerce jobs. PHP 8.1 and 8.2 must not have support lanes.
+- PHP 8.6 pre-release must not be used as a production target. A later stable PHP line is added only after WordPress, WooCommerce, Delivery Engine, and CETECH stack qualification.
+- PHP 8.1 and PHP 8.2 are **not** supported and must not be advertised.
+- Historical RC.12 required checks (`Runtime PHP 8.1`, `PHP / PHPUnit 8.2`) are provenance of that tag. They must not be read as current commercial support. FLAIROC Stage 0B already recorded PHP 8.5.5.
 - Isolated PHP 8.5 QA Compose: `docker/php85-qa/`.
 
 
@@ -172,7 +174,7 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - Release source and later documentation commits are deliberately allowed to differ; never move a release tag to follow later master commits.
 
 ## Owner-accepted product truth
-- `PRODUCT-TRUTH-BASELINE-1` was accepted by the owner on 2026-09-19 with six decisions resolved in `docs/product/DECISION-CONFLICT-REGISTER.md`. Decision 7 (21 September 2026) records CETECH production PHP 8.5 vs commercial minimum PHP 8.1.
+- `PRODUCT-TRUTH-BASELINE-1` was accepted by the owner on 2026-09-19 with six decisions resolved in `docs/product/DECISION-CONFLICT-REGISTER.md`. Decision 7 (21 September 2026, superseded) incorrectly retained PHP 8.1 as a commercial floor. Decision 8 records the owner correction: supported/certified PHP 8.3–8.5.x, minimum 8.3, CETECH production 8.5.x.
 - The approved 372-Requirement registry and companion artifacts live under `docs/product/`; `docs/AUTHORITY.md` defines which artifact governs each class of truth.
 - Stable 1.0 scope is frozen as `STABLE-1.0-SCOPE-1`. This product baseline is not a claim that missing capabilities are implemented or that Stable 1.0 has shipped.
 - Product-control-plane publication PR #25 is merged to protected master `6ee4cef088f0bda2633d4b8e37abf3e37634426b` and is now an ancestor of current master `78594ad8962868683726373f58f4a8b1b48e4d0e`.

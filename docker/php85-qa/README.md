@@ -10,7 +10,7 @@ It is **not** FLAIROC, training, production, or POS.
 
 ## Policy
 
-See `docs/PHP-RUNTIME-POLICY.md`. Do not qualify a CETECH release only on PHP 8.1/8.2. Do not use PHP 8.6 pre-release images.
+See `docs/PHP-RUNTIME-POLICY.md`. Do not qualify a CETECH release only on PHP 8.3/8.4. Do not use PHP 8.6 pre-release images. PHP 8.1 and 8.2 are not supported.
 
 Mounting the repository as the plugin directory is a development convenience. For package-like qualification, copy a Composer `--no-dev` staged tree (or an extracted ZIP) into `wp-content/plugins/cetech-woocommerce-delivery-engine` instead of the raw git checkout.
 

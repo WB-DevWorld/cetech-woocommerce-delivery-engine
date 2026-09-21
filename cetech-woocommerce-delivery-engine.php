@@ -5,7 +5,7 @@
  * Description:       Delivery, fulfilment-choice, delivery-pricing, shipment-status, and tracking engine for WooCommerce.
  * Version:           1.0.0-dev.geo-live.2
  * Requires at least: 6.0
- * Requires PHP:      8.1
+ * Requires PHP:      8.3
  * Author:            CETECH
  * Text Domain:       cetech-woocommerce-delivery-engine
  * Domain Path:       /languages

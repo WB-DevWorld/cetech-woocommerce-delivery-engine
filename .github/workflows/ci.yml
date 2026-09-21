@@ -1,10 +1,12 @@
 name: Delivery Engine CI
 
 # PHP policy: docs/PHP-RUNTIME-POLICY.md
-# CETECH production target = PHP 8.5.x (blocking).
-# PHP 8.1 = commercial minimum compatibility, not production.
-# PHP 8.2 is no longer the principal PHPUnit gate.
-# PHP 8.6 pre-release must not be added as a production target.
+# Supported/certified range today: PHP 8.3 through PHP 8.5.x
+# Minimum supported: PHP 8.3 (blocking)
+# CETECH production target: latest stable PHP 8.5.x (blocking)
+# PHP 8.1 and 8.2 are not supported and must not be advertised.
+# PHP 8.6+ pre-release is not a production target. A later stable PHP
+# line is added only after WordPress, WooCommerce, and Delivery Engine qualification.
 
 on:
   pull_request:
@@ -28,24 +30,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  min-compat-php81:
-    name: Minimum compatibility PHP 8.1
+  php83-min:
+    name: PHP 8.3 Minimum Supported
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.1'
+          php-version: '8.3'
           tools: composer:v2
           coverage: none
-      - name: Label this lane
-        run: echo "MINIMUM COMPATIBILITY only. This is not the CETECH production PHP target."
+      - name: Show PHP version
+        run: php -v
       - name: Validate Composer metadata
         run: composer validate --no-check-publish
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
-      - name: Lint runtime PHP at declared commercial minimum
+      - name: Runtime PHP lint
         shell: bash
         run: bash scripts/ci-lint-php.sh cetech-woocommerce-delivery-engine.php uninstall.php src database
       - name: Lint application, tests and tooling
@@ -53,26 +55,18 @@ jobs:
         run: bash scripts/ci-lint-php.sh .
       - name: PHPUnit
         run: vendor/bin/phpunit
-      - name: Verify team control plane on minimum PHP
+      - name: Verify team control plane
         run: php scripts/verify-control-plane.php
 
-  php-compat:
-    name: PHP ${{ matrix.php }} ${{ matrix.label }}
+  php84-compat:
+    name: PHP 8.4 Compatibility
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - php: '8.3'
-            label: WooCommerce recommended-floor
-          - php: '8.4'
-            label: mature WooCommerce compatibility
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: ${{ matrix.php }}
+          php-version: '8.4'
           tools: composer:v2
           coverage: none
       - name: Show PHP version
@@ -88,7 +82,7 @@ jobs:
         run: vendor/bin/phpunit
 
   php85-primary:
-    name: PHP 8.5 CETECH production target
+    name: PHP 8.5 CETECH Production Target
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -103,7 +97,7 @@ jobs:
         run: |
           php -v
           php -r 'echo "php_major_minor=" . PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION, PHP_EOL;'
-      - name: Reject PHP 8.6 pre-release as this job
+      - name: Reject pre-release PHP as this production job
         shell: bash
         run: |
           set -euo pipefail
@@ -126,7 +120,7 @@ jobs:
         run: bash scripts/ci-stage-production-tree.sh "${RUNNER_TEMP}/cetech-de-prod-tree"
 
   php85-mariadb:
-    name: PHP 8.5 MariaDB geography/migrations
+    name: PHP 8.5 MariaDB Geography/Migrations
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:
@@ -203,7 +197,7 @@ jobs:
           '
 
   php85-wordpress:
-    name: PHP 8.5 WordPress/WooCommerce activation
+    name: PHP 8.5 WordPress/WooCommerce
     runs-on: ubuntu-latest
     timeout-minutes: 30
     services:
@@ -269,57 +263,32 @@ jobs:
       - name: Verify product control plane
         run: node scripts/verify-product-control-plane.mjs --self-test
 
-  legacy-required-php81:
-    name: Runtime PHP 8.1
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: [min-compat-php81]
-    if: ${{ always() }}
-    steps:
-      - name: Alias for existing GitHub required checks
-        run: |
-          echo "MINIMUM COMPATIBILITY lane. Not the CETECH production PHP target."
-          test "${{ needs.min-compat-php81.result }}" = "success"
-
-  legacy-required-php82:
-    name: PHP / PHPUnit 8.2
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: [php85-primary]
-    if: ${{ always() }}
-    steps:
-      - name: Alias so historical rulesets still require the principal PHP gate
-        run: |
-          echo "PHP 8.2 is no longer the principal PHPUnit gate."
-          echo "This alias fails unless PHP 8.5 CETECH production target succeeded."
-          test "${{ needs.php85-primary.result }}" = "success"
-
   ci-required-gates:
-    name: CI required gates
+    name: CI Required Gates
     runs-on: ubuntu-latest
     timeout-minutes: 5
     if: ${{ always() }}
     needs:
-      - min-compat-php81
-      - php-compat
+      - php83-min
+      - php84-compat
       - php85-primary
       - php85-mariadb
       - php85-wordpress
       - javascript-tests
       - control-plane
     steps:
-      - name: Require PHP 8.5 production target and supporting lanes
+      - name: Require PHP 8.3 minimum and PHP 8.5 production target
         run: |
           set -euo pipefail
-          echo "min-compat=${{ needs.min-compat-php81.result }}"
-          echo "php-compat=${{ needs.php-compat.result }}"
+          echo "php83=${{ needs.php83-min.result }}"
+          echo "php84=${{ needs.php84-compat.result }}"
           echo "php85-primary=${{ needs.php85-primary.result }}"
           echo "php85-mariadb=${{ needs.php85-mariadb.result }}"
           echo "php85-wordpress=${{ needs.php85-wordpress.result }}"
           echo "javascript=${{ needs.javascript-tests.result }}"
           echo "control-plane=${{ needs.control-plane.result }}"
-          test "${{ needs.min-compat-php81.result }}" = "success"
-          test "${{ needs.php-compat.result }}" = "success"
+          test "${{ needs.php83-min.result }}" = "success"
+          test "${{ needs.php84-compat.result }}" = "success"
           test "${{ needs.php85-primary.result }}" = "success"
           test "${{ needs.php85-mariadb.result }}" = "success"
           test "${{ needs.php85-wordpress.result }}" = "success"

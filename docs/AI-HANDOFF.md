@@ -17,7 +17,7 @@
 **Post-RC.6 combined stream:** Bulk Tools schema **`5`** plus approved R1 admin/setup runtime repairs, QA.1 request-path repairs, Bulk.8 background portability, and Bulk.9 physical-QA repairs, frozen as RC.7. Canonical record: `docs/POST-RC6-CONSOLIDATED-DEVELOPMENT-STREAM.md`. RC.7 finalization: `docs/RC7-FINALIZATION.md`. Bulk.9 owner QA: `docs/POST-RC6-BULK9-OWNER-QA.md`. Historical Bulk branch `feat/post-rc6-bulk-tools` @ `720b513` and R1 branch `fix/post-rc6-admin-setup-defects` remain preserved. Previous untagged owner-QA packages **`1.0.0-dev.bulk.2`**–**`1.0.0-dev.bulk.9`** remain immutable (`1.0.0-dev.bulk.9.zip`, `1256253` bytes, SHA-256 `af331732c1529427c85adc8cfaeb7dbf26ef996e2952b3918f15c25da4f100b2`, source `85194cb86ab3d906e6642a3f15b1027767a12da8`, schema `5`). **OWNER PHYSICAL QA of Bulk.9: ALL SIX ACCEPTANCE CHECKS PASSED** on training.cetechbpa.com (2026-08-29). R1 QA.1/QA.2 ZIPs remain immutable.  
 **Schema target:** RC.12 promotion candidate = `6`. Tagged RC.11 = `5`. Tagged RC.10 = `5`. Tagged RC.9 = `5`. Tagged RC.8 = `5`. Tagged RC.7 = `5`. Tagged RC.6 = `4`.  
 **Git:** `release/rc12` is the RC.12 promotion surface. `release/rc10` is the historical RC.10 promotion surface. Historical `batch/pre-rc10-qualification` / PR #12 remains unmerged qualification provenance (`be586a4` / packaged `c0000ab`). Historical recovered branch `feat/post-rc9-customer-ux` remains immutable evidence. WPML is not merged; unique overlay remains `feat/post-rc9-wpml` @ `3b5b60d0d92b2edc00496d536774f8ac907cd6d2`. Historical `feat/post-rc8-integrations` promoted to `v1.0.0-rc.9`. Historical `feat/post-rc7-fulfilment-correctness` promoted to `v1.0.0-rc.8`. Historical `integration/post-rc6-bulk-r1`, `feat/post-rc6-bulk-tools`, and `fix/post-rc6-admin-setup-defects` not rewritten. Unrelated RC.6 security-audit leftovers preserved on `wip/rc6-adversarial-security-audit` @ `a88f28048afcc84456e6933351c71b01a9838c5a`. RC.6 tag `v1.0.0-rc.6`, RC.7 tag `v1.0.0-rc.7`, RC.8 tag `v1.0.0-rc.8`, RC.9 tag `v1.0.0-rc.9`, and RC.11 tag `v1.0.0-rc.11` **untouched**.
-**Hard dependency:** WooCommerce only (PHP 8.1+ commercial minimum; PHP 8.5 CETECH production target; HPOS-compatible)  
+**Hard dependency:** WooCommerce only (PHP 8.3 minimum supported; PHP 8.5.x currently qualified latest stable / CETECH production; HPOS-compatible)  
 **Namespace / root file:** `CetechDeliveryEngine\` / `cetech-woocommerce-delivery-engine.php`  
 **Canonical maintained rulebook:** `docs/DELIVERY-ENGINE-GOVERNING-RULES.md` (mandatory for all implementation work)
 
@@ -117,7 +117,7 @@ Administrator-language requirement: normal-user admin UI must use operational la
 | Doc | Role |
 |-----|------|
 | `docs/PROJECT-GOVERNANCE.md` | Mandatory process / source-of-truth hierarchy |
-| `docs/PHP-RUNTIME-POLICY.md` | CETECH production PHP 8.5 vs commercial minimum PHP 8.1 vs CI matrix |
+| `docs/PHP-RUNTIME-POLICY.md` | Supported/certified PHP 8.3–8.5.x, minimum 8.3, CETECH production 8.5.x, CI matrix |
 | `docs/PHP-85-CI-REALIGNMENT.md` | PHP 8.5 CI/runtime realignment record (not RC.13) |
 | `docs/POST-RC12-GEO-LIVENESS.md` | Issue #33 Ghana Location Pack liveness candidate (`1.0.0-dev.geo-live.2`; geo-live.1 ZIP frozen; not RC.13) |
 | `docs/POST-RC12-CHECKOUT-MULTIDEST.md` | Issue #29 checkout multi-destination stabilization candidate (`1.0.0-dev.checkout-mdest.1`; not RC.13) |

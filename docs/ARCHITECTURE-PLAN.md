@@ -10,7 +10,7 @@
 | Plugin slug | `cetech-woocommerce-delivery-engine` |
 | Root file (future) | `cetech-woocommerce-delivery-engine.php` |
 | Root namespace (future) | `CetechDeliveryEngine\` |
-| Minimum PHP (recommended) | **8.1** |
+| Minimum PHP (recommended) | **8.3** |
 
 ---
 
@@ -704,9 +704,9 @@ All value objects immutable; equality by value.
 
 ### Decision F — PHP enum strategy
 
-**Minimum PHP: 8.1** — native backed enums, `readonly` properties, commercial compatibility floor. **CETECH production / primary qualification PHP is 8.5.x**; see `docs/PHP-RUNTIME-POLICY.md`. Do not treat the 8.1 floor as the production runtime.
+**Minimum PHP: 8.3** — WordPress and WooCommerce recommended floor as of 21 September 2026; native backed enums and `readonly` properties remain available. **CETECH production / currently qualified latest stable PHP is 8.5.x**; see `docs/PHP-RUNTIME-POLICY.md`. PHP 8.1 and 8.2 are not supported.
 
-Use **PHP 8.1 backed enums** in `Domain\Enum\`:
+Use **native backed enums** in `Domain\Enum\`:
 
 ```php
 enum FulfilmentAvailability: string {
@@ -1344,7 +1344,7 @@ Never delete shipment history on routine deactivation.
 
 **Mandatory scenarios:** separate Air/Sea lines, missing rate card blocks checkout, no supplier in HTML, immutable snapshot after paid, idempotent shipment create, exclusive managed packages hide flat rate.
 
-CI target: PHP **8.5** CETECH production (blocking) plus PHP 8.1 minimum-compatibility, PHP 8.3 WooCommerce recommended-floor, and PHP 8.4 mature compatibility. PHP 8.1 remains the commercial floor, not the production runtime.
+CI target: PHP **8.5** CETECH production (blocking), PHP **8.3** minimum supported (blocking), and PHP **8.4** compatibility. PHP 8.1 and 8.2 are not supported. PHP 8.5 is not a permanent architectural maximum; a later stable PHP line is added only after qualification. See `docs/PHP-RUNTIME-POLICY.md`.
 
 ---
 
@@ -1399,7 +1399,7 @@ CI target: PHP **8.5** CETECH production (blocking) plus PHP 8.1 minimum-compati
 | **C** | Category/site fallback rules **optional**; flags default **off** in V1. Product + variation rules first. |
 | **D** | **Classic checkout = V1 baseline.** Blocks adapter **future-only**; flag default off. |
 | **E** | WCFM/VitePOS: **adapter interfaces + Null + stub**; not required for V1 release. |
-| **F** | **PHP 8.1+** commercial minimum; **PHP 8.5.x** CETECH production target; use **backed enums** for domain statuses/routes. |
+| **F** | **PHP 8.3** minimum supported; **PHP 8.5.x** currently qualified latest stable / CETECH production; use **backed enums** for domain statuses/routes. PHP 8.1 and 8.2 are not supported. |
 | **G** | Shipment creation default **`payment_confirmed`**; idempotent; configurable to `order_created`. |
 | **H** | Feature flags default **off** for customer takeover (selector, timeline); integrations auto-suggest but WCFM/VitePOS/Blocks off. |
 | **I** | Privacy table §55 — strict DTO separation; private data never in customer surfaces. |

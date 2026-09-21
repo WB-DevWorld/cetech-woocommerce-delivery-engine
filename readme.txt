@@ -2,7 +2,7 @@
 Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
-Requires PHP: 8.1
+Requires PHP: 8.3
 Stable tag: 1.0.0-dev.geo.10
 License: Proprietary
 WC requires at least: 8.0
@@ -16,7 +16,7 @@ CETECH WooCommerce Delivery Engine is a reusable commercial-style WooCommerce pl
 
 **Hard dependency:** WooCommerce only.
 
-**PHP:** CETECH production recommended/certified runtime is PHP 8.5.x (latest stable patch at deployment). Commercial supported minimum remains PHP 8.1 until a later explicit support-policy decision. PHP 8.6 pre-release is not a production target.
+**PHP:** Minimum supported PHP is 8.3. Recommended production PHP is the latest qualified stable release. Currently qualified latest stable is PHP 8.5.x. PHP 8.1 and 8.2 are not supported. PHP 8.6 pre-release is not a production target.
 
 **Optional integrations (not required):** WoodMart, WPML, WCML, WCFM, VitePOS, Redis, WP Rocket, WooCommerce Blocks, tracking plugins, and future carrier APIs.
 

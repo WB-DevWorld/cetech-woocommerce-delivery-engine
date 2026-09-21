@@ -11,8 +11,8 @@
 
 ## Tests and evidence
 - Composer:
-- PHP lint (8.1 minimum-compatibility and 8.5 production target):
-- PHPUnit (include PHP 8.5 CETECH production target):
+- PHP lint (8.3 minimum supported and 8.5 production target):
+- PHPUnit (include PHP 8.3 minimum, PHP 8.4 compatibility, PHP 8.5 CETECH production target):
 - JS:
 - Package/extracted ZIP (if applicable):
 - Runtime/browser/staging evidence (if applicable):

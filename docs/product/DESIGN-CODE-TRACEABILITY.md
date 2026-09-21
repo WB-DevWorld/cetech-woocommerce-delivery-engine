@@ -139,7 +139,7 @@ This is materially more complete and better structured than early design prose. 
 
 ## 8. Test and qualification inventory
 
-The committed suite covers unit behavior, limited integration harnesses, JavaScript, Playwright admin fixtures, migration inspection, Blocks/Store API, package verification, PHP 8.1 **minimum-compatibility** CI, PHP 8.5 **CETECH production-target** CI, and historical physical owner QA. geo.11 adds real-MariaDB and Ghana pack evidence. See `docs/PHP-RUNTIME-POLICY.md`.
+The committed suite covers unit behavior, limited integration harnesses, JavaScript, Playwright admin fixtures, migration inspection, Blocks/Store API, package verification, PHP 8.3 **minimum-supported** CI, PHP 8.4 compatibility CI, PHP 8.5 **CETECH production-target** CI, and historical physical owner QA. geo.11 adds real-MariaDB and Ghana pack evidence. See `docs/PHP-RUNTIME-POLICY.md`.
 
 Important boundary: this audit container could not execute PHP or JavaScript suites because PHP, Composer vendor binaries and Vitest dependencies were absent. The attempt failed before tests ran. This mapping relies on source inspection and exact-head GitHub CI evidence; it does not falsely claim a new local pass.
 
