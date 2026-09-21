@@ -1,6 +1,6 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-21 (RC.12 tagged and published as a prerelease from protected-master `78594ad`; Issue #26 CLOSED/COMPLETED; training-site qualification PASS; staff-training realignment merged on `c4cee3c` and is **not** the RC.12 tag source; Issue #29 MERGED to protected `master` `83effbf081e54b47ef088673c8ac18217ab9dfda`; Issue #33 MERGED to protected `master` `5abfab0b5078e67b158f282088022b2ac2566f22`; Issue #35 post-RC.12 GeoNames country-identity candidate `1.0.0-dev.geo-country.1` is awaiting technical review and is **not** RC.13; Pilot not authorized).
+Last reconciled: 2026-09-21 (RC.12 tagged and published as a prerelease from protected-master `78594ad`; Issue #26 CLOSED/COMPLETED; training-site qualification PASS; staff-training realignment merged on `c4cee3c` and is **not** the RC.12 tag source; Issue #29 MERGED to protected `master` `83effbf081e54b47ef088673c8ac18217ab9dfda`; Issue #33 MERGED to protected `master` `5abfab0b5078e67b158f282088022b2ac2566f22`; Issue #35 post-RC.12 GeoNames country-identity candidate `1.0.0-dev.geo-country.2` is awaiting differential review and is **not** RC.13; Pilot not authorized).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
@@ -39,12 +39,9 @@ Last reconciled: 2026-09-21 (RC.12 tagged and published as a prerelease from pro
 - Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/35
 - Branch: `fix/geonames-country-identity`
 - Base: protected `master` `5abfab0b5078e67b158f282088022b2ac2566f22`
-- Development identity: `1.0.0-dev.geo-country.1`
+- Development identity: `1.0.0-dev.geo-country.2`
 - Schema: `6` (unchanged)
-- Runtime / package-source SHA: `b61466ffc14c71e1a678eaf2d5b84f22bf6040cb`
-- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.1.zip`
-- Bytes: `1,794,741`
-- SHA-256: `216e3a28d37e6af5f6cf97a69ef362dc946a94b1d26d8508c3d747d582198a6c`
+- Frozen geo-country.1 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.1.zip` (`1,794,741` bytes, SHA-256 `216e3a28d37e6af5f6cf97a69ef362dc946a94b1d26d8508c3d747d582198a6c`)
 - PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/36
 - Not merged. Not deployed. Not RC.13.
 - Evidence: `docs/POST-RC12-GEONAMES-COUNTRY-IDENTITY.md`

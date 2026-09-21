@@ -79,6 +79,7 @@ final class GeoCountryIdentityRealDatabaseProofTest extends TestCase {
 		self::assertSame( $ghana->id, $mappings->find_location_id( GeographyProvider::GeoNames, '2300660' ) );
 		self::assertNull( $mappings->find_location_id( GeographyProvider::GeoNames, '2302058' ) );
 		self::assertNotNull( $mappings->find_location_id( GeographyProvider::GeoNames, '2306108' ) );
+		self::assertSame( 0, $stack['reconciler']->source_scan_count );
 
 		$locations->save(
 			new CanonicalLocation(
@@ -107,6 +108,9 @@ final class GeoCountryIdentityRealDatabaseProofTest extends TestCase {
 		self::assertSame( $ghana->location_key, $after?->location_key );
 		self::assertSame( 'Ghana', $after?->canonical_name );
 		self::assertSame( 'ghana', $after?->normalized_name );
+		self::assertEqualsWithDelta( 8.1, (float) $after?->latitude, 0.000001 );
+		self::assertEqualsWithDelta( -1.2, (float) $after?->longitude, 0.000001 );
+		self::assertSame( 1, $stack['reconciler']->source_scan_count );
 		self::assertSame( $ghana->id, $mappings->find_location_id( GeographyProvider::GeoNames, '2300660' ) );
 		self::assertNull( $mappings->find_location_id( GeographyProvider::GeoNames, '2302058' ) );
 		unlink( $file );

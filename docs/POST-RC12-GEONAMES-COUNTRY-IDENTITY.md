@@ -1,25 +1,30 @@
 # POST-RC.12 — GeoNames canonical country identity (Issue #35)
 
-**Current candidate identity:** `1.0.0-dev.geo-country.1`  
+**Current candidate identity:** `1.0.0-dev.geo-country.2`  
 **Schema:** `6` (unchanged; no schema 7)  
 **Branch:** `fix/geonames-country-identity`  
 **Base:** protected `master` `5abfab0b5078e67b158f282088022b2ac2566f22`  
-**Runtime / package-source SHA:** `b61466ffc14c71e1a678eaf2d5b84f22bf6040cb`  
+**Frozen geo-country.1 runtime / package-source SHA:** `b61466ffc14c71e1a678eaf2d5b84f22bf6040cb` (do not rebuild or overwrite)  
 **PR:** https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/36  
-**Not RC.13. Not deployed. Awaiting technical review.**
+**Not RC.13. Not deployed. Awaiting differential review.**
 
 Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/35
 
-## Package (dev qualification, after CI)
+## Frozen geo-country.1 package (pre-deployment technical-review evidence)
 
-Built from a clean committed tree after GitHub CI SUCCESS on runtime/package-source `b61466ffc14c71e1a678eaf2d5b84f22bf6040cb`. Do not treat this ZIP as RC.13 or as a replacement for RC.12.
+Do not overwrite or rebuild this artifact.
 
 - Source SHA: `b61466ffc14c71e1a678eaf2d5b84f22bf6040cb`
 - Filename: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.1.zip`
 - Bytes: `1,794,741`
 - SHA-256: `216e3a28d37e6af5f6cf97a69ef362dc946a94b1d26d8508c3d747d582198a6c`
-- Production-package verifier: PASS (staged and extracted)
-- Packaged PHP lint: `501 files / 0 failures`
+
+## Package (geo-country.2, after CI)
+
+Built from a clean committed tree after GitHub CI SUCCESS. Do not treat this ZIP as RC.13 or as a replacement for RC.12 or geo-country.1.
+
+- Source SHA: pending committed runtime SHA
+- Filename: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.2.zip`
 - Not deployed to training
 
 ## Country-identity authority
@@ -32,7 +37,7 @@ WooCommerce country identity is the stable canonical root for this plugin.
 
 ## Accepted GeoNames country-feature contract
 
-Exact feature codes only (`GeoNamesGazetteerParser::COUNTRY_FEATURE_CODES`):
+Exact feature codes only. These are **provider identity-enrichment** categories. WooCommerce remains canonical naming authority.
 
 - `PCLI` independent political entity
 - `PCLD` dependent political entity
@@ -146,25 +151,31 @@ Only GH has a canonical/normalized split and a wrong identity.
 - Detaches GeoNames mappings whose feature code is not an accepted country-identity code (Dagomba `2302058` `PCLH`).
 - Keeps the legitimate PCLI mapping (`2300660`) and WooCommerce `GH` mapping.
 - Removes aliases whose normalized form matches a detached invalid mapping name (`dagomba`). Does not wipe Ghana language aliases.
-- Restores coordinates from the accepted identity row in the existing pack file when readable; otherwise clears tainted historical-entity coordinates.
-- Runs after pack promotion and once per plugin identity on `init` via `CountryIdentityKickoff`.
+- Restores coordinates from the accepted identity row in the existing pack file **only when the root already needs repair**.
+- Historical kickoff (`CountryIdentityKickoff` / `maybe_repair()`) persists `cetech_de_country_identity_repair_revision` = `REPAIR_REVISION` `1` (`geo-country-identity-v1`). Plugin version changes do not rerun it.
+- A bounded `add_option` lock (`cetech_de_country_identity_repair_lock`, TTL 60s) ensures one request runs `repair_all()`. Concurrent callers skip. Stale/malformed locks expire. Failure does not mark the revision complete; `finally` releases the lock.
+- `GeoNamesPackImporter` still calls `repair_country_code()` after successful promotion. That path is **not** gated by the historical revision.
+- Live identity is repaired even while a pack is Importing/Pending. Staged `generation_token` mappings and aliases are not listed or deleted. Pack cursor/status/generation are never written by the reconciler.
+- Clean roots return unchanged with source-scan count 0.
 
 This is **not** a Ghana-only migration, **not** a schema 7 change, **not** a pack reset, and **not** a delete/recreate of country id 1.
 
 ## Training physical-QA plan — DO NOT EXECUTE YET
 
-BEFORE: country id 1 = Dagomba / normalized ghana.
+BEFORE: country id 1 = Dagomba / normalized ghana. Training plugin remains `1.0.0-dev.geo-live.2`.
 
-AFTER a later authorized deploy of this candidate (not this task):
+AFTER a later authorized deploy of geo-country.2 (not this task):
 
 - same id `1`, same location_key `1caaf0dc-d575-4dd3-8a9d-217d136e5548`, same `GH`
-- canonical_name `Ghana`, normalized_name `ghana`
+- canonical_name `Ghana`, normalized_name `ghana`, ascii consistent
+- coordinates restored from PCLI `2300660` (`8.1`, `-1.2`)
+- PCLH mapping `2302058` removed; PCLI `2300660` retained
 - GH pack stays `ready`, generation remains `3`, checksum unchanged
-- 15,615 generation-3 locations preserved
+- 15,615 generation-3 locations preserved; no import restart; no generation 4
 - Coverage Groups unchanged; Accra/Kumasi remain `review_required`
-- no geography import restart, no duplicate country, no duplicate descendants
+- no Delivery Charge or Delivery Option changes
 - storefront/admin breadcrumbs use Ghana
-- GeoNames `2302058` is not the country identity; `2300660` remains
+- repair revision marked exactly once; lock cleared; a second normal request performs no repair work
 
 Do not deploy. Do not confirm migrated Accra/Kumasi coverage.
 

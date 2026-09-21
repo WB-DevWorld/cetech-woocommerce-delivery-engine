@@ -126,6 +126,28 @@ final class GeoNamesCountryIdentityTest extends TestCase {
 		self::assertNull( $state['geo']->locations->find_location_id( GeographyProvider::GeoNames, '2635167' ) );
 	}
 
+	public function test_generic_pcl_territory_keeps_woo_root_and_imports_descendants(): void {
+		$geo   = new GhanaGeographyFixture();
+		$packs = new InMemoryGeographyPackRepository();
+		$boot  = new WooCommerceGeographyBootstrap( $geo->locations, $geo->locations, $geo->locations );
+		$boot->bootstrap_country( 'IM' );
+		$importer = new GeoNamesPackImporter( $geo->locations, $geo->locations, $geo->locations, $packs, $boot, new GeoNamesGazetteerParser() );
+		$file     = $this->gazetteer_file(
+			[
+				$this->row( '3042237', 'Isle of Man', 'Isle of Man', 'A', 'PCL', '', '', '', 'IM' ),
+				$this->row( '3042232', 'Douglas', 'Douglas', 'P', 'PPLC', '9782170', '', '', 'IM' ),
+			]
+		);
+		$this->import_until_ready( $importer, $packs, $file, 'IM' );
+		$im = $geo->locations->find_country( 'IM' );
+		self::assertNotNull( $im );
+		self::assertSame( 'Isle of Man', $im->canonical_name );
+		self::assertSame( 'isle of man', $im->normalized_name );
+		self::assertNull( $geo->locations->find_location_id( GeographyProvider::GeoNames, '3042237' ) );
+		self::assertNotNull( $geo->locations->find_location_id( GeographyProvider::GeoNames, '3042232' ) );
+		unlink( $file );
+	}
+
 	public function test_dependent_territory_pcld_is_accepted_and_historical_pclh_is_not(): void {
 		$geo   = new GhanaGeographyFixture();
 		$packs = new InMemoryGeographyPackRepository();
@@ -219,6 +241,18 @@ final class GeoNamesCountryIdentityTest extends TestCase {
 		$geo->locations->upsert( $id, GeographyProvider::GeoNames, '2300660', 1, '2024-09-05', '00', 'A', 'PCLI', [ 'ascii_name' => 'Republic of Ghana' ] );
 		$geo->locations->upsert( $id, GeographyProvider::GeoNames, '2302058', 1, '2019-09-01', '06', 'A', 'PCLH', [ 'ascii_name' => 'Dagomba' ] );
 
+		$file = $this->gazetteer_file(
+			[ $this->row( '2300660', 'Republic of Ghana', 'Republic of Ghana', 'A', 'PCLI', '00', '', 'Ghana,Gaana', 'GH', '8.1', '-1.2' ) ]
+		);
+		$packs->save(
+			[
+				'country_code'     => 'GH',
+				'provider'         => GeographyProvider::GeoNames->value,
+				'dataset_name'     => 'gazetteer',
+				'status'           => GeographyPackStatus::Ready->value,
+				'source_reference' => $file,
+			]
+		);
 		$reconciler = new CountryIdentityReconciler(
 			$geo->locations,
 			$geo->locations,
@@ -236,7 +270,11 @@ final class GeoNamesCountryIdentityTest extends TestCase {
 		self::assertSame( 'Ghana', $after?->canonical_name );
 		self::assertSame( 'ghana', $after?->normalized_name );
 		self::assertSame( GeographyNameNormalizer::fold_ascii( 'Ghana' ), $after?->ascii_name );
+		self::assertSame( 8.1, $after?->latitude );
+		self::assertSame( -1.2, $after?->longitude );
 		self::assertSame( $generation, $after?->generation );
+		self::assertSame( 1, $reconciler->source_scan_count );
+		unlink( $file );
 		self::assertNull( $after?->parent_location_id );
 		self::assertSame( $id, $geo->locations->find_location_id( GeographyProvider::GeoNames, '2300660' ) );
 		self::assertNull( $geo->locations->find_location_id( GeographyProvider::GeoNames, '2302058' ) );
@@ -330,6 +368,7 @@ final class GeoNamesCountryIdentityTest extends TestCase {
 						'PR' => 'Puerto Rico',
 						'US' => 'United States (US)',
 						'GB' => 'United Kingdom (UK)',
+						'IM' => 'Isle of Man',
 					];
 				}
 				public function get_states( string $country ): array {

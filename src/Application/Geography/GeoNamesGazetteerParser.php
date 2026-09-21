@@ -58,7 +58,8 @@ final class GeoNamesGazetteerParser {
 	}
 
 	/**
-	 * Exact GeoNames country/territory identity codes. Historical PCLH and
+	 * Exact GeoNames country/territory identity-enrichment codes. WooCommerce
+	 * remains the canonical country-name authority. Historical PCLH and
 	 * generic PCL rows are political features, not the WooCommerce country root.
 	 */
 	public function is_country_feature( string $feature_code ): bool {

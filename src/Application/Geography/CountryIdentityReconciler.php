@@ -8,6 +8,7 @@ use CetechDeliveryEngine\Domain\Enum\GeographyProvider;
 use CetechDeliveryEngine\Domain\Geography\CanonicalLocation;
 use CetechDeliveryEngine\Domain\Geography\CanonicalLocationRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\GeographyNameNormalizer;
+use CetechDeliveryEngine\Domain\Geography\GeographyPack;
 use CetechDeliveryEngine\Domain\Geography\GeographyPackRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\LocationAliasRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\ProviderMappingRepositoryInterface;
@@ -16,10 +17,28 @@ use CetechDeliveryEngine\Domain\Geography\ProviderMappingRepositoryInterface;
  * Idempotent in-place repair of canonical country roots corrupted by competing
  * GeoNames PCL* rows. Preserves id, location_key, country_code, generation,
  * ancestry and foreign-key relationships. Schema stays 6.
+ *
+ * Historical kickoff is gated by REPAIR_REVISION, not plugin version.
+ * Post-promotion repair_country_code() is independent of that gate.
  */
 final class CountryIdentityReconciler {
 
-	public const OPTION_KEY = 'cetech_de_country_identity_repair';
+	public const REPAIR_REVISION = 1;
+
+	public const REPAIR_TOKEN = 'geo-country-identity-v1';
+
+	public const OPTION_KEY = 'cetech_de_country_identity_repair_revision';
+
+	public const LOCK_OPTION_KEY = 'cetech_de_country_identity_repair_lock';
+
+	public const LOCK_TTL_SECONDS = 60;
+
+	public int $source_scan_count = 0;
+
+	/** @var (\Closure(self):void)|null Test seam for concurrency and failure simulation. */
+	public ?\Closure $before_repair_all = null;
+
+	private string $lock_owner = '';
 
 	public function __construct(
 		private CanonicalLocationRepositoryInterface $locations,
@@ -27,39 +46,64 @@ final class CountryIdentityReconciler {
 		private ProviderMappingRepositoryInterface $mappings,
 		private GeographyPackRepositoryInterface $packs,
 		private WooCommerceGeographyBootstrap $woo,
-		private GeoNamesGazetteerParser $parser = new GeoNamesGazetteerParser()
+		private GeoNamesGazetteerParser $parser = new GeoNamesGazetteerParser(),
+		private ?\Closure $now = null
 	) {
 	}
 
 	/**
-	 * One-shot per plugin identity. Safe on storefront and admin.
+	 * One-shot historical repair keyed to REPAIR_REVISION. Safe on storefront
+	 * and admin. Concurrent callers skip rather than duplicate repair_all().
 	 *
 	 * @return array<string, mixed>
 	 */
-	public function maybe_repair(): array {
-		$version = defined( 'CETECH_DE_VERSION' ) ? (string) CETECH_DE_VERSION : '';
-		if ( function_exists( 'get_option' ) && '' !== $version && (string) get_option( self::OPTION_KEY, '' ) === $version ) {
+	public function maybe_repair( ?int $revision = null ): array {
+		$revision = $revision ?? self::REPAIR_REVISION;
+		if ( $revision < 1 ) {
+			$revision = self::REPAIR_REVISION;
+		}
+
+		if ( $this->stored_revision() >= $revision ) {
 			return [
 				'skipped' => true,
+				'reason'  => 'revision_complete',
 				'results' => [],
 			];
 		}
 
-		$results = $this->repair_all();
-		if ( function_exists( 'update_option' ) && '' !== $version ) {
-			update_option( self::OPTION_KEY, $version, false );
-		}
+		$acquired = false;
+		try {
+			if ( ! $this->try_acquire_lock() ) {
+				return [
+					'skipped' => true,
+					'reason'  => 'locked',
+					'results' => [],
+				];
+			}
+			$acquired = true;
 
-		return [
-			'skipped' => false,
-			'results' => $results,
-		];
+			$results = $this->repair_all();
+			$this->persist_revision( $revision );
+
+			return [
+				'skipped' => false,
+				'reason'  => 'repaired',
+				'results' => $results,
+			];
+		} finally {
+			if ( $acquired ) {
+				$this->release_lock();
+			}
+		}
 	}
 
 	/**
 	 * @return list<array<string, mixed>>
 	 */
 	public function repair_all(): array {
+		if ( $this->before_repair_all instanceof \Closure ) {
+			( $this->before_repair_all )( $this );
+		}
 		$out = [];
 		foreach ( $this->locations->list_country_roots() as $country ) {
 			$out[] = $this->repair_one( $country );
@@ -69,6 +113,9 @@ final class CountryIdentityReconciler {
 	}
 
 	/**
+	 * Per-country enforcement after a successful pack promotion. Not gated by
+	 * the historical repair revision.
+	 *
 	 * @return array<string, mixed>
 	 */
 	public function repair_country_code( string $country_code ): array {
@@ -89,46 +136,36 @@ final class CountryIdentityReconciler {
 	 */
 	private function repair_one( CanonicalLocation $country ): array {
 		$mapping_rows = $this->mappings->list_mappings_for_location( $country->id );
-		$invalid      = [];
-		$candidates   = [];
-		foreach ( $mapping_rows as $row ) {
-			if ( GeographyProvider::GeoNames->value !== (string) ( $row['provider'] ?? '' ) ) {
-				continue;
-			}
-			$feature = (string) ( $row['feature_code'] ?? '' );
-			$rank    = $this->parser->country_identity_rank( $feature );
-			if ( $rank <= 0 ) {
-				$invalid[] = $row;
-				continue;
-			}
-			$row['_rank'] = $rank;
-			$candidates[] = $row;
+		$classified   = $this->classify_geonames_mappings( $mapping_rows );
+		$target_name  = $this->authoritative_name( $country );
+		$target_norm  = GeographyNameNormalizer::normalize( $target_name );
+		$target_ascii = GeographyNameNormalizer::fold_ascii( $target_name );
+		$name_mismatch = $country->canonical_name !== $target_name
+			|| $country->normalized_name !== $target_norm
+			|| $country->ascii_name !== $target_ascii;
+
+		if ( ! $this->needs_repair( $classified, $name_mismatch ) ) {
+			return [
+				'country_code'      => $country->country_code,
+				'id'                => $country->id,
+				'location_key'      => $country->location_key,
+				'generation'        => $country->generation,
+				'changed'           => false,
+				'reason'            => 'clean',
+				'canonical_name'    => $country->canonical_name,
+				'normalized_name'   => $country->normalized_name,
+				'detached_mappings' => [],
+				'source_scanned'    => false,
+			];
 		}
 
-		usort(
-			$candidates,
-			static function ( array $a, array $b ): int {
-				$rank = ( (int) ( $b['_rank'] ?? 0 ) ) <=> ( (int) ( $a['_rank'] ?? 0 ) );
-				if ( 0 !== $rank ) {
-					return $rank;
-				}
-				$aid = (int) ( $a['external_id'] ?? 0 );
-				$bid = (int) ( $b['external_id'] ?? 0 );
-				if ( $aid > 0 && $bid > 0 && $aid !== $bid ) {
-					return $aid <=> $bid;
-				}
-
-				return strcmp( (string) ( $a['external_id'] ?? '' ), (string) ( $b['external_id'] ?? '' ) );
-			}
-		);
-
-		$winner    = $candidates[0] ?? null;
-		$detached  = [];
-		foreach ( $invalid as $row ) {
+		$winner   = $classified['candidates'][0] ?? null;
+		$detached = [];
+		foreach ( $classified['invalid'] as $row ) {
 			$this->detach_geonames_mapping( $country, $row );
 			$detached[] = (string) ( $row['external_id'] ?? '' );
 		}
-		foreach ( $candidates as $index => $row ) {
+		foreach ( $classified['candidates'] as $index => $row ) {
 			if ( 0 === $index ) {
 				continue;
 			}
@@ -136,16 +173,14 @@ final class CountryIdentityReconciler {
 			$detached[] = (string) ( $row['external_id'] ?? '' );
 		}
 
-		$target_name = $this->authoritative_name( $country );
-		$target_norm = GeographyNameNormalizer::normalize( $target_name );
-		$target_ascii = GeographyNameNormalizer::fold_ascii( $target_name );
-
-		$coords  = [ $country->latitude, $country->longitude ];
-		$tainted = $invalid !== [];
+		$coords       = [ $country->latitude, $country->longitude ];
+		$tainted      = $classified['invalid'] !== [];
+		$scanned      = false;
 		if ( is_array( $winner ) ) {
 			$from_source = $this->identity_coordinates( $country, $winner );
-			if ( is_array( $from_source ) ) {
-				$coords  = $from_source;
+			$scanned     = true === ( $from_source['scanned'] ?? false );
+			if ( is_array( $from_source['coords'] ?? null ) ) {
+				$coords  = $from_source['coords'];
 				$tainted = false;
 			}
 		}
@@ -153,13 +188,10 @@ final class CountryIdentityReconciler {
 			$coords = [ null, null ];
 		}
 
-		$name_changed  = $country->canonical_name !== $target_name
-			|| $country->normalized_name !== $target_norm
-			|| $country->ascii_name !== $target_ascii;
 		$coord_changed = ! $this->same_coord( $country->latitude, $coords[0] )
 			|| ! $this->same_coord( $country->longitude, $coords[1] );
 
-		if ( $name_changed || $coord_changed ) {
+		if ( $name_mismatch || $coord_changed ) {
 			$this->locations->save(
 				new CanonicalLocation(
 					$country->id,
@@ -187,15 +219,79 @@ final class CountryIdentityReconciler {
 		}
 
 		return [
-			'country_code'       => $country->country_code,
-			'id'                 => $country->id,
-			'location_key'       => $country->location_key,
-			'generation'         => $country->generation,
-			'changed'            => $name_changed || $coord_changed || $detached !== [],
-			'canonical_name'     => $target_name,
-			'normalized_name'    => $target_norm,
-			'detached_mappings'  => array_values( array_filter( $detached ) ),
+			'country_code'      => $country->country_code,
+			'id'                => $country->id,
+			'location_key'      => $country->location_key,
+			'generation'        => $country->generation,
+			'changed'           => $name_mismatch || $coord_changed || $detached !== [],
+			'reason'            => 'repaired',
+			'canonical_name'    => $target_name,
+			'normalized_name'   => $target_norm,
+			'detached_mappings' => array_values( array_filter( $detached ) ),
+			'source_scanned'    => $scanned,
 		];
+	}
+
+	/**
+	 * Live identity is repaired even while a pack is Importing/Pending.
+	 * Staged generation_token rows are never listed or deleted here.
+	 * Pack cursor/status/generation are never written.
+	 *
+	 * @param list<array<string, mixed>> $mapping_rows
+	 * @return array{invalid:list<array<string, mixed>>, candidates:list<array<string, mixed>>}
+	 */
+	private function classify_geonames_mappings( array $mapping_rows ): array {
+		$invalid    = [];
+		$candidates = [];
+		foreach ( $mapping_rows as $row ) {
+			if ( GeographyProvider::GeoNames->value !== (string) ( $row['provider'] ?? '' ) ) {
+				continue;
+			}
+			$feature = (string) ( $row['feature_code'] ?? '' );
+			$rank    = $this->parser->country_identity_rank( $feature );
+			if ( $rank <= 0 ) {
+				$invalid[] = $row;
+				continue;
+			}
+			$row['_rank']   = $rank;
+			$candidates[] = $row;
+		}
+
+		usort(
+			$candidates,
+			static function ( array $a, array $b ): int {
+				$rank = ( (int) ( $b['_rank'] ?? 0 ) ) <=> ( (int) ( $a['_rank'] ?? 0 ) );
+				if ( 0 !== $rank ) {
+					return $rank;
+				}
+				$aid = (int) ( $a['external_id'] ?? 0 );
+				$bid = (int) ( $b['external_id'] ?? 0 );
+				if ( $aid > 0 && $bid > 0 && $aid !== $bid ) {
+					return $aid <=> $bid;
+				}
+
+				return strcmp( (string) ( $a['external_id'] ?? '' ), (string) ( $b['external_id'] ?? '' ) );
+			}
+		);
+
+		return [
+			'invalid'    => $invalid,
+			'candidates' => $candidates,
+		];
+	}
+
+	/**
+	 * @param array{invalid:list<array<string, mixed>>, candidates:list<array<string, mixed>>} $classified
+	 */
+	private function needs_repair( array $classified, bool $name_mismatch ): bool {
+		if ( $name_mismatch ) {
+			return true;
+		}
+		if ( $classified['invalid'] !== [] ) {
+			return true;
+		}
+
+		return count( $classified['candidates'] ) > 1;
 	}
 
 	private function authoritative_name( CanonicalLocation $country ): string {
@@ -224,7 +320,7 @@ final class CountryIdentityReconciler {
 		if ( '' !== $external ) {
 			$this->mappings->delete_mapping( GeographyProvider::GeoNames, $external );
 		}
-		$meta = $this->mapping_metadata( $row );
+		$meta  = $this->mapping_metadata( $row );
 		$ascii = trim( (string) ( $meta['ascii_name'] ?? '' ) );
 		if ( '' !== $ascii ) {
 			$this->aliases->delete_normalized_alias( $country->id, GeographyNameNormalizer::normalize( $ascii ) );
@@ -250,22 +346,34 @@ final class CountryIdentityReconciler {
 	}
 
 	/**
+	 * Opens the pack gazetteer only for a root already known to need repair.
+	 *
 	 * @param array<string, mixed> $winner
-	 * @return array{0:?float,1:?float}|null
+	 * @return array{coords:array{0:?float,1:?float}|null, scanned:bool}
 	 */
-	private function identity_coordinates( CanonicalLocation $country, array $winner ): ?array {
+	private function identity_coordinates( CanonicalLocation $country, array $winner ): array {
 		$pack = $this->packs->find_by_country_provider( $country->country_code, GeographyProvider::GeoNames );
-		if ( ! $pack instanceof \CetechDeliveryEngine\Domain\Geography\GeographyPack ) {
-			return null;
+		if ( ! $pack instanceof GeographyPack ) {
+			return [
+				'coords'  => null,
+				'scanned' => false,
+			];
 		}
 		$path = (string) $pack->source_reference;
 		if ( '' === $path || ! is_readable( $path ) ) {
-			return null;
+			return [
+				'coords'  => null,
+				'scanned' => false,
+			];
 		}
+		++$this->source_scan_count;
 		$want   = (string) ( $winner['external_id'] ?? '' );
 		$handle = fopen( $path, 'rb' );
 		if ( false === $handle ) {
-			return null;
+			return [
+				'coords'  => null,
+				'scanned' => true,
+			];
 		}
 		while ( false !== ( $line = fgets( $handle ) ) ) {
 			$parts = explode( "\t", $line );
@@ -276,11 +384,122 @@ final class CountryIdentityReconciler {
 			$lat = is_numeric( $parts[4] ) ? (float) $parts[4] : null;
 			$lon = is_numeric( $parts[5] ) ? (float) $parts[5] : null;
 
-			return [ $lat, $lon ];
+			return [
+				'coords'  => [ $lat, $lon ],
+				'scanned' => true,
+			];
 		}
 		fclose( $handle );
 
-		return null;
+		return [
+			'coords'  => null,
+			'scanned' => true,
+		];
+	}
+
+	private function stored_revision(): int {
+		if ( ! function_exists( 'get_option' ) ) {
+			return 0;
+		}
+		$raw = get_option( self::OPTION_KEY, 0 );
+
+		return $this->parse_revision( $raw );
+	}
+
+	private function persist_revision( int $revision ): void {
+		if ( ! function_exists( 'update_option' ) ) {
+			return;
+		}
+		update_option( self::OPTION_KEY, $revision, false );
+	}
+
+	/**
+	 * @param mixed $raw
+	 */
+	private function parse_revision( mixed $raw ): int {
+		if ( is_int( $raw ) || is_float( $raw ) ) {
+			return max( 0, (int) $raw );
+		}
+		if ( is_string( $raw ) ) {
+			$trimmed = trim( $raw );
+			if ( is_numeric( $trimmed ) ) {
+				return max( 0, (int) $trimmed );
+			}
+		}
+
+		return 0;
+	}
+
+	private function try_acquire_lock(): bool {
+		if ( ! function_exists( 'add_option' ) || ! function_exists( 'get_option' ) ) {
+			return true;
+		}
+
+		$owner   = uniqid( 'cir-', true );
+		$payload = [
+			'acquired_at' => $this->now(),
+			'owner'       => $owner,
+		];
+		if ( add_option( self::LOCK_OPTION_KEY, $payload, '', false ) ) {
+			$this->lock_owner = $owner;
+
+			return true;
+		}
+
+		$current = get_option( self::LOCK_OPTION_KEY, false );
+		if ( ! $this->lock_is_expired( $current ) ) {
+			return false;
+		}
+
+		if ( function_exists( 'delete_option' ) ) {
+			delete_option( self::LOCK_OPTION_KEY );
+		}
+		if ( add_option( self::LOCK_OPTION_KEY, $payload, '', false ) ) {
+			$this->lock_owner = $owner;
+
+			return true;
+		}
+
+		return false;
+	}
+
+	private function release_lock(): void {
+		if ( '' === $this->lock_owner || ! function_exists( 'get_option' ) || ! function_exists( 'delete_option' ) ) {
+			$this->lock_owner = '';
+
+			return;
+		}
+		$current = get_option( self::LOCK_OPTION_KEY, false );
+		$owner   = is_array( $current ) ? (string) ( $current['owner'] ?? '' ) : '';
+		if ( $owner === $this->lock_owner ) {
+			delete_option( self::LOCK_OPTION_KEY );
+		}
+		$this->lock_owner = '';
+	}
+
+	/**
+	 * Malformed lock values expire immediately so they cannot block forever.
+	 *
+	 * @param mixed $current
+	 */
+	private function lock_is_expired( mixed $current ): bool {
+		if ( ! is_array( $current ) ) {
+			return true;
+		}
+		$acquired = (int) ( $current['acquired_at'] ?? 0 );
+		if ( $acquired <= 0 ) {
+			return true;
+		}
+
+		return ( $this->now() - $acquired ) >= self::LOCK_TTL_SECONDS;
+	}
+
+	private function now(): int {
+		if ( $this->now instanceof \Closure ) {
+			return (int) ( $this->now )();
+		}
+
+		return time();
 	}
 
 	private function same_coord( ?float $left, ?float $right ): bool {

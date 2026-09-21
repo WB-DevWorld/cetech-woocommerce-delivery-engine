@@ -21,8 +21,9 @@ final class SchemaV6InspectionTest extends TestCase {
 		$plugin_root = dirname( __DIR__, 3 );
 		$header      = (string) file_get_contents( $plugin_root . '/cetech-woocommerce-delivery-engine.php' );
 
-		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.geo-country\\.1'\s*\)/", $header );
-		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.geo-country\\.1\s*$/m', $header );
+		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.geo-country\\.2'\s*\)/", $header );
+		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.geo-country\\.2\s*$/m', $header );
+		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo-country.1' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo-live.2' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.geo-live.1' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.checkout-mdest.1' )", $header );
@@ -80,7 +81,8 @@ final class SchemaV6InspectionTest extends TestCase {
 		self::assertStringContainsString( "'destination_coverage_groups'", $source );
 		self::assertStringContainsString( "'destination_rules'", $source );
 		self::assertStringContainsString( 'cetech_de_schema6_coverage_upgrade', $source );
-		self::assertStringContainsString( 'cetech_de_country_identity_repair', $source );
+		self::assertStringContainsString( 'cetech_de_country_identity_repair_revision', $source );
+		self::assertStringContainsString( 'cetech_de_country_identity_repair_lock', $source );
 		self::assertStringContainsString( 'cetech_de_coverage_migration_report', $source );
 		$migration = (string) file_get_contents( dirname( __DIR__, 3 ) . '/database/migrations/20260917120000_create_geography_coverage_tables.php' );
 		$coverage  = (string) file_get_contents( dirname( __DIR__, 3 ) . '/src/Infrastructure/Persistence/CoverageSchema.php' );
