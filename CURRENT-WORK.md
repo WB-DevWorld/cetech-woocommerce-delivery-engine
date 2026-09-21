@@ -24,12 +24,13 @@ Issue `#39` — `[P2] Cart/checkout delivery-address actions and per-item editor
 - Owner: `@wbdevworld` (explicit owner/ChatGPT authorization; Issue #39 only).
 - Branch: `fix/cart-checkout-address-ux`.
 - Base: protected `master` `ed3753d73e262d8c7467fa936e3e36060960e58c`.
-- Runtime / package-source SHA: `797bdce784ecbe44996cc0e46dbe8d2920a52b08`.
+- Runtime / package-source SHA: `b2acea7ba75f31cd6a7851fcbf594bf798bfd79d`.
 - PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/41 (open; do not merge).
 - Development identity: `1.0.0-dev.address-ux.2` (schema remains `6`).
 - Requires PHP: `8.3`. Composer: `>=8.3`. Activation guard: `8.3`.
+- Frozen `1.0.0-dev.address-ux.1` ZIP must not be overwritten (`1,832,223` bytes, SHA-256 `2a28798140fafaa7d7b4e20bc4e3878fd1949f7014af854b002960a3ae1120fe`).
 - Not RC.13. Do not reuse pdp-precision or geo-country identities as the current plugin version.
-- Do not merge. Do not deploy. Package ZIP is built only after runtime CI SUCCESS.
+- Do not merge. Do not deploy.
 
 PHP policy retained from PR #37 (`docs/PHP-RUNTIME-POLICY.md`, `docs/PHP-85-CI-REALIGNMENT.md`):
 
