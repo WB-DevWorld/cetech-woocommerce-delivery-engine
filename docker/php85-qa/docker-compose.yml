@@ -1,0 +1,55 @@
+# Isolated CETECH qualification stack: PHP 8.5 + current WordPress + MariaDB 11.4.
+# Not FLAIROC, training, production, or POS. PHP 8.6 images must not be used here.
+name: cetech-de-php85-qa
+
+services:
+  db:
+    image: mariadb:11.4
+    environment:
+      MARIADB_ROOT_PASSWORD: cetech
+      MARIADB_DATABASE: wordpress
+      MARIADB_USER: wordpress
+      MARIADB_PASSWORD: wordpress
+    healthcheck:
+      test: ['CMD', 'healthcheck.sh', '--connect', '--innodb_initialized']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  wordpress:
+    image: wordpress:php8.5-apache
+    ports:
+      - '8085:80'
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+      WORDPRESS_DEBUG: 1
+    volumes:
+      - wordpress:/var/www/html
+      - ../..:/var/www/html/wp-content/plugins/cetech-woocommerce-delivery-engine
+    depends_on:
+      db:
+        condition: service_healthy
+
+  wpcli:
+    image: wordpress:cli-php8.5
+    profiles: ['cli']
+    user: '33:33'
+    environment:
+      WORDPRESS_DB_HOST: db
+      WORDPRESS_DB_USER: wordpress
+      WORDPRESS_DB_PASSWORD: wordpress
+      WORDPRESS_DB_NAME: wordpress
+    volumes:
+      - wordpress:/var/www/html
+      - ../..:/var/www/html/wp-content/plugins/cetech-woocommerce-delivery-engine
+    depends_on:
+      wordpress:
+        condition: service_started
+      db:
+        condition: service_healthy
+
+volumes:
+  wordpress:

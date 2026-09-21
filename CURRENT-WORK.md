@@ -1,11 +1,11 @@
-# Current Work — Issue #33 Ghana Location Pack liveness
+# Current Work — PHP 8.3–8.5 support-range correction (PR #37)
 
-Status: RC.12 IMMUTABLE — POST-RC.12 DEV CANDIDATE `1.0.0-dev.geo-live.2` — AWAITING DIFFERENTIAL REVIEW / NOT RC.13 / NOT DEPLOYED / NOT MERGED
+Status: RC.12 IMMUTABLE — WS3 CI/RUNTIME POLICY CORRECTION — NOT RC.13 / NOT A RELEASE / NOT DEPLOYED
 
 ## Canonical repository truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
 - Canonical development branch: protected `master`.
-- Current protected `master`: `83effbf081e54b47ef088673c8ac18217ab9dfda`.
+- Current protected `master` (this task base): `5abfab0b5078e67b158f282088022b2ac2566f22`.
 - Immutable RC.12 release source: `78594ad8962868683726373f58f4a8b1b48e4d0e`.
 - Tag `v1.0.0-rc.12` must not be moved. Do not rebuild or overwrite the RC.12 ZIP.
 - Do not create RC.13.
@@ -18,31 +18,45 @@ Status: RC.12 IMMUTABLE — POST-RC.12 DEV CANDIDATE `1.0.0-dev.geo-live.2` — 
 - Peels to: `78594ad8962868683726373f58f4a8b1b48e4d0e`
 
 ## Active task
-Issue `#33` — `[P1] Ghana Location Pack can remain importing with no continuation scheduled`
+Correction to PR #37 (`ws3/php-85-runtime-realignment`).
 
-- Owner: `@wbdevworld` (explicit ChatGPT authorization; Issue #33 watchdog correction only).
-- Branch: `fix/geography-pack-liveness` from protected `master` `83effbf081e54b47ef088673c8ac18217ab9dfda`.
-- Development identity: `1.0.0-dev.geo-live.2` (schema remains `6`).
-- Runtime / package-source SHA: `cd5cdfbbebfa243feb5f0bf66121edee55b16e87`.
-- Frozen historical geo-live.1 ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-live.1.zip` (`1,783,293` bytes, SHA-256 `6281f1b3f7d080ac9bb528fc1a117be909ac1ae05c052d6fe704cc053192ccbf`) — do not overwrite.
-- geo-live.2 ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-live.2.zip` (`1,786,463` bytes, SHA-256 `c5ea75fd407aa32a9e443a3f883e3036785cc776dcf715a040026087fdf8c149`).
-- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/34
-- Not RC.13. Not a release promotion. Do not merge or deploy until owner/ChatGPT differential review.
+The first PR #37 draft incorrectly retained PHP 8.1 as a commercial support floor. That is **not** owner policy.
+
+Authoritative PHP range (21 September 2026):
+
+- **Minimum supported PHP: 8.3** (oldest version currently recommended by both WordPress and WooCommerce).
+- **Supported / certified range: PHP 8.3, 8.4, and 8.5.x.**
+- **CETECH production / currently qualified latest stable: PHP 8.5.x** (latest stable patch at deploy; 8.5.10 as of this date).
+- PHP 8.1 and PHP 8.2 are **not** supported and must not be advertised.
+- PHP 8.6 pre-release is **not** a production target. A later stable PHP line is added only after WordPress, WooCommerce, Delivery Engine, and third-party CETECH stack qualification.
+
+- Owner: WS3 / `@wbdevworld`.
+- Branch: `ws3/php-85-runtime-realignment` (amend PR #37; do not open a competing PHP-policy PR).
+- Plugin version identity: unchanged (`1.0.0-dev.geo-live.2`). Schema remains `6`.
+- Policy: `docs/PHP-RUNTIME-POLICY.md`. Evidence: `docs/PHP-85-CI-REALIGNMENT.md`.
+- Not RC.13. Not a release promotion. Do not deploy.
+
+## Separate open work (do not edit from this branch)
+- Issue `#35` / PR `#36` (`fix/geonames-country-identity`) remains a separate candidate. This task must not take that lease or mix country-identity runtime changes.
 
 ## Central leases
-- plugin bootstrap / version identity on this branch: `1.0.0-dev.geo-live.2`; published `1.0.0-rc.12` remains the tagged identity;
+- CI workflows / release-package PHP image;
+- GitHub required-check names for protected `master`;
+- PHP runtime policy, Composer/`Requires PHP`/activation floor, and isolated PHP 8.5 QA Compose;
+- living compatibility-matrix documentation.
+- plugin version identity: **not taken** (remains master `1.0.0-dev.geo-live.2`);
 - schema / migrations: frozen at `6`;
 - published release identity/tags: `v1.0.0-rc.11` and `v1.0.0-rc.12` immutable;
 - canonical `master`: no force-push/rewrite;
-- product-control-plane Requirement IDs: frozen.
+- product-control-plane Requirement IDs: frozen (no new IDs).
 
 ## Environment authorization
-- Training site `https://training.cetechbpa.com`: read-only forensics for Issue #33. Plugin currently `1.0.0-dev.checkout-mdest.1`. Do not click Continue / retry. Do not run safe reconciliation. Do not edit geography DB rows. Do not deploy geo-live.2 until owner/ChatGPT review.
-- Ghana Location Pack remains the live importing dataset. Cursor/source/checksum/generation must not be reset.
+- GitHub Actions ephemeral runners and optional local `docker/php85-qa` only.
+- Training site `https://training.cetechbpa.com`: **do not mutate**.
 - CETECH Pilot: **NOT STARTED**.
 - FLAIROC: **NOT DEPLOYED**.
 - Production: **NOT DEPLOYED**.
 - POS repository: outside scope / must not be touched.
 
 ## Explicit non-actions
-Do not create RC.13. Do not deploy this fix yet. Do not merge PR #34 yet. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not overwrite the geo-live.1 ZIP. Do not start CETECH Pilot. Do not deploy FLAIROC or production. Do not touch POS. Do not start Stage 15. Do not implement Issue #31 or Issue #32. Do not click Continue / retry on training. Do not run safe reconciliation. Do not reset the current GH dataset or cursor.
+Do not create RC.13. Do not change schema or Delivery Engine business logic. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not start CETECH Pilot. Do not deploy FLAIROC or production. Do not touch POS. Do not start Stage 15. Do not implement Issue #31, #32, or #35 from this branch. Do not advertise PHP 8.1 or 8.2 as supported.

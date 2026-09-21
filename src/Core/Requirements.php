@@ -10,7 +10,7 @@ namespace CetechDeliveryEngine\Core;
 final class Requirements {
 
 	public function minimum_php_version(): string {
-		return '8.1';
+		return '8.3';
 	}
 
 	public function is_php_version_supported(): bool {

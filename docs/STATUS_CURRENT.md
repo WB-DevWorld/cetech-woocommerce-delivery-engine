@@ -1,15 +1,27 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-20 (RC.12 tagged and published as a prerelease from protected-master `78594ad`; Issue #26 CLOSED/COMPLETED; training-site qualification PASS; staff-training realignment merged on `c4cee3c` and is **not** the RC.12 tag source; Issue #29 MERGED to protected `master` `83effbf081e54b47ef088673c8ac18217ab9dfda`; Issue #33 post-RC.12 Ghana Location Pack liveness candidate `1.0.0-dev.geo-live.2` is awaiting differential review and is **not** RC.13; geo-live.1 ZIP is frozen historical evidence; Pilot not authorized).
+Last reconciled: 2026-09-21 (PHP runtime policy correction: supported/certified PHP 8.3–8.5.x, minimum 8.3, CETECH production 8.5.x; PR #37 must not merge until this floor is applied; RC.12 tagged from `78594ad`; Issue #26 CLOSED; Issue #29 MERGED; Issue #33 MERGED to protected `master` `5abfab0b5078e67b158f282088022b2ac2566f22`; Issue #35 remains a separate open candidate and is not this task; Pilot not authorized).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
 - Default/canonical development branch: protected `master`
-- Current protected `master`: `83effbf081e54b47ef088673c8ac18217ab9dfda`
+- Current protected `master`: `5abfab0b5078e67b158f282088022b2ac2566f22`
 - RC.12 publication merge on `master`: `78594ad8962868683726373f58f4a8b1b48e4d0e` (PR #27 / `release/rc12` onto `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`).
 - Later documentation commits on `master` are **not** the RC.12 tag source.
 - Repository visibility: public during GitHub Free branch/ruleset protection use.
 - Composer license declaration remains `proprietary`; public visibility is not an open-source license grant.
+
+## PHP runtime policy
+- Canonical policy: `docs/PHP-RUNTIME-POLICY.md`. Realignment evidence: `docs/PHP-85-CI-REALIGNMENT.md`.
+- **Supported / certified range today:** PHP 8.3, 8.4, and 8.5.x.
+- **Minimum supported PHP:** 8.3. Plugin header, Composer, and activation guard are `>=8.3`. This is the WordPress + WooCommerce recommended floor, not the oldest version those products can still boot.
+- **Recommended production PHP:** latest qualified stable release. **Currently qualified latest stable:** PHP 8.5.x (latest stable patch at deployment; 8.5.10 as of 21 September 2026).
+- **CI:** PHP 8.3 Minimum Supported (blocking); PHP 8.4 Compatibility; **PHP 8.5 CETECH Production Target (blocking)** plus MariaDB and WordPress/WooCommerce jobs. PHP 8.1 and 8.2 must not have support lanes.
+- PHP 8.6 pre-release must not be used as a production target. A later stable PHP line is added only after WordPress, WooCommerce, Delivery Engine, and CETECH stack qualification.
+- PHP 8.1 and PHP 8.2 are **not** supported and must not be advertised.
+- Historical RC.12 required checks (`Runtime PHP 8.1`, `PHP / PHPUnit 8.2`) are provenance of that tag. They must not be read as current commercial support. FLAIROC Stage 0B already recorded PHP 8.5.5.
+- Isolated PHP 8.5 QA Compose: `docker/php85-qa/`.
+
 
 ## Current tagged release candidate — RC.12
 - Tag: `v1.0.0-rc.12`
@@ -35,10 +47,9 @@ Last reconciled: 2026-09-20 (RC.12 tagged and published as a prerelease from pro
 - Evidence: `docs/RC12-PROMOTION.md`
 - Do not move this tag to a later documentation commit. Do not rebuild the ZIP for docs closeout.
 
-## Post-RC.12 candidate — Issue #33 (not a release)
+## Post-RC.12 merged — Issue #33 (not a release)
 - Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/33
-- Branch: `fix/geography-pack-liveness`
-- Base: protected `master` `83effbf081e54b47ef088673c8ac18217ab9dfda`
+- MERGED via PR #34 onto protected `master` `5abfab0b5078e67b158f282088022b2ac2566f22`
 - Development identity: `1.0.0-dev.geo-live.2`
 - Schema: `6` (unchanged)
 - Runtime / package-source SHA: `cd5cdfbbebfa243feb5f0bf66121edee55b16e87`
@@ -46,9 +57,11 @@ Last reconciled: 2026-09-20 (RC.12 tagged and published as a prerelease from pro
 - ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-live.2.zip`
 - Bytes: `1,786,463`
 - SHA-256: `c5ea75fd407aa32a9e443a3f883e3036785cc776dcf715a040026087fdf8c149`
-- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/34
-- Not merged. Not deployed. Not RC.13.
+- Not RC.13.
 - Evidence: `docs/POST-RC12-GEO-LIVENESS.md`
+
+## Post-RC.12 open — Issue #35 (not this task)
+- Issue `#35` / PR `#36` is a separate GeoNames country-identity candidate. Do not mix it into this PHP CI realignment.
 
 ## Post-RC.12 merged — Issue #29 (not a release)
 - Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/29
@@ -147,7 +160,7 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - WoodMart physically qualified on 8.4.1 for issue #18 PDP-price acceptance.
 - Issue #18 owner QA used WordPress 7.1 / WooCommerce 11.0.1 in its isolated lab.
 - RC.11 package clean-install/upgrade smoke used isolated GitHub Actions WordPress/WooCommerce containers; WooCommerce 11.1.0 was installed during the successful run.
-- RC.12 isolated qualification used WordPress `php8.2-apache` + WooCommerce `11.0.1` in Compose project `cetech-rc12-qual`. That isolated lab is not a FLAIROC or production claim.
+- RC.12 isolated qualification used WordPress `php8.2-apache` + WooCommerce `11.0.1` in Compose project `cetech-rc12-qual`. That isolated lab is historical provenance, not a FLAIROC or production claim, and is **not** the CETECH PHP 8.5 production target. Current isolated QA Compose is `docker/php85-qa/` (`wordpress:php8.5-apache` + MariaDB 11.4).
 - Training site `https://training.cetechbpa.com`: RC.12 installed, schema 6, training-site qualification **PASS**. That is **not** Stable-1.0 certification.
 - FLAIROC: **NOT DEPLOYED**.
 - Production: **NOT DEPLOYED**.
@@ -161,7 +174,7 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - Release source and later documentation commits are deliberately allowed to differ; never move a release tag to follow later master commits.
 
 ## Owner-accepted product truth
-- `PRODUCT-TRUTH-BASELINE-1` was accepted by the owner on 2026-09-19 with all six decisions resolved in `docs/product/DECISION-CONFLICT-REGISTER.md`.
+- `PRODUCT-TRUTH-BASELINE-1` was accepted by the owner on 2026-09-19 with six decisions resolved in `docs/product/DECISION-CONFLICT-REGISTER.md`. Decision 7 (21 September 2026, superseded) incorrectly retained PHP 8.1 as a commercial floor. Decision 8 records the owner correction: supported/certified PHP 8.3–8.5.x, minimum 8.3, CETECH production 8.5.x.
 - The approved 372-Requirement registry and companion artifacts live under `docs/product/`; `docs/AUTHORITY.md` defines which artifact governs each class of truth.
 - Stable 1.0 scope is frozen as `STABLE-1.0-SCOPE-1`. This product baseline is not a claim that missing capabilities are implemented or that Stable 1.0 has shipped.
 - Product-control-plane publication PR #25 is merged to protected master `6ee4cef088f0bda2633d4b8e37abf3e37634426b` and is now an ancestor of current master `78594ad8962868683726373f58f4a8b1b48e4d0e`.

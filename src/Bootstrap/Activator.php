@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Bootstrap;
 
 use CetechDeliveryEngine\Core\Capabilities\Capabilities;
+use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Core\Versioning\MigrationDiscovery;
 use CetechDeliveryEngine\Core\Versioning\MigrationRunner;
 use CetechDeliveryEngine\Core\Versioning\SchemaVersion;
@@ -17,14 +18,12 @@ use CetechDeliveryEngine\Support\Logger;
 final class Activator {
 
 	public static function activate(): void {
-		if ( version_compare( PHP_VERSION, '8.1', '<' ) ) {
+		$requirements = new Requirements();
+		if ( ! $requirements->is_php_version_supported() ) {
 			deactivate_plugins( plugin_basename( CETECH_DE_FILE ) );
 
 			wp_die(
-				esc_html__(
-					'CETECH WooCommerce Delivery Engine requires PHP 8.1 or higher.',
-					'cetech-woocommerce-delivery-engine'
-				),
+				esc_html( $requirements->php_version_notice_message() ),
 				esc_html__( 'Plugin Activation Error', 'cetech-woocommerce-delivery-engine' ),
 				[ 'back_link' => true ]
 			);
