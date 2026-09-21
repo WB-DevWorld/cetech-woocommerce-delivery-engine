@@ -11,6 +11,7 @@ use CetechDeliveryEngine\Application\Cart\CartDeliveryReselectionService;
 use CetechDeliveryEngine\Application\Cart\CartCustomerContextMutationService;
 use CetechDeliveryEngine\Application\Cart\CartCustomerContextEditorService;
 use CetechDeliveryEngine\Application\Checkout\CheckoutDeliverySelectionValidator;
+use CetechDeliveryEngine\Application\Checkout\CheckoutAddressCanonicalizer;
 use CetechDeliveryEngine\Application\Checkout\CheckoutAddressPolicy;
 use CetechDeliveryEngine\Application\CustomerContext\ApplyCustomerContextToEligibleLinesService;
 use CetechDeliveryEngine\Application\CustomerContext\CustomerBrowsingLocationStore;
@@ -907,12 +908,21 @@ final class Plugin {
 		);
 
 		$this->container->singleton(
+			CheckoutAddressCanonicalizer::class,
+			static fn ( ServiceContainer $container ): CheckoutAddressCanonicalizer => new CheckoutAddressCanonicalizer(
+				$container->get( CanonicalLocationResolver::class ),
+				$container->get( WooCommerceStateCatalogInterface::class )
+			)
+		);
+
+		$this->container->singleton(
 			CheckoutAddressPolicy::class,
 			static fn ( ServiceContainer $container ): CheckoutAddressPolicy => new CheckoutAddressPolicy(
 				$container->get( FeatureFlags::class ),
 				$container->get( Requirements::class ),
 				$container->get( ApplyCustomerContextToEligibleLinesService::class ),
-				$container->get( CartCustomerContextMutationService::class )
+				$container->get( CartCustomerContextMutationService::class ),
+				$container->get( CheckoutAddressCanonicalizer::class )
 			)
 		);
 

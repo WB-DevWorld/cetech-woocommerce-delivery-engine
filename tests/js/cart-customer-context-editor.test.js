@@ -104,4 +104,51 @@ describe('Classic cart customer context editor', () => {
 		expect(document.activeElement).toBe(document.querySelector('[data-cetech-de-destination-control="country"]'));
 		expect(document.activeElement).not.toBe(document.querySelector('[data-cetech-de-required-address]'));
 	});
+
+	it('hides Delivery-only actions on unsaved Pickup and restores them on Delivery or Cancel', () => {
+		document.body.innerHTML = `
+			<div class="cetech-de-cart-context" id="cetech-de-delivery-aaaaaaaaaaaaaaaa" data-cetech-de-form-id="cetech-de-delivery-aaaaaaaaaaaaaaaa-form">
+				<details class="cetech-de-cart-context__editor">
+					<summary>Add delivery address</summary>
+					<section data-cetech-de-editor-location="1">Location</section>
+					<section data-cetech-de-editor-address="1">Address</section>
+					<section data-cetech-de-editor-recipient="1">Recipient</section>
+					<details data-cetech-de-qty-split="1"><summary>Apply to quantity</summary></details>
+					<select name="cetech_de_delivery_option_key" form="cetech-de-delivery-aaaaaaaaaaaaaaaa-form">
+						<option value="in_warehouse:delivery:1" data-cetech-de-choice="delivery" selected>Delivery</option>
+						<option value="in_store:store_pickup:4" data-cetech-de-choice="store_pickup">Pickup</option>
+					</select>
+					<button type="submit" class="cetech-de-cart-context__use-for-all" form="cetech-de-delivery-aaaaaaaaaaaaaaaa-form">Use this address for all delivery items</button>
+					<button type="button" data-cetech-de-cancel="1">Cancel</button>
+				</details>
+			</div>
+			<form id="cetech-de-delivery-aaaaaaaaaaaaaaaa-form" class="cetech-de-cart-context__form"></form>
+		`;
+		window.history.replaceState(null, '', '/cart/');
+		loadScript();
+		const select = document.querySelector('select[name="cetech_de_delivery_option_key"]');
+		const useForAll = document.querySelector('.cetech-de-cart-context__use-for-all');
+		const qtySplit = document.querySelector('[data-cetech-de-qty-split]');
+		const location = document.querySelector('[data-cetech-de-editor-location]');
+		expect(useForAll.hidden).toBe(false);
+		expect(qtySplit.hidden).toBe(false);
+		select.value = 'in_store:store_pickup:4';
+		select.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(location.hidden).toBe(true);
+		expect(useForAll.hidden).toBe(true);
+		expect(useForAll.disabled).toBe(true);
+		expect(qtySplit.hidden).toBe(true);
+		select.value = 'in_warehouse:delivery:1';
+		select.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(location.hidden).toBe(false);
+		expect(useForAll.hidden).toBe(false);
+		expect(qtySplit.hidden).toBe(false);
+		select.value = 'in_store:store_pickup:4';
+		select.dispatchEvent(new Event('change', { bubbles: true }));
+		document.querySelector('[data-cetech-de-cancel]').click();
+		expect(select.value).toBe('in_warehouse:delivery:1');
+		expect(useForAll.hidden).toBe(false);
+		expect(qtySplit.hidden).toBe(false);
+		expect(location.hidden).toBe(false);
+	});
 });

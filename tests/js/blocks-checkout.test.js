@@ -503,4 +503,46 @@ describe('Blocks DOM customer editor hardening', () => {
 		expect(editor.open).toBe(false);
 		expect(window.wc.blocksCheckout.extensionCartUpdate).not.toHaveBeenCalled();
 	});
+
+	it('hides use-for-all and quantity disclosure on unsaved Pickup and restores on Delivery or Cancel', () => {
+		window.cetechDeBlocks = { namespace: 'cetech-delivery-engine', i18n: {} };
+		window.wc = { blocksCheckout: { extensionCartUpdate: vi.fn() } };
+		installCart({
+			items: [
+				editableItem('aaa111bbbb2222cccc3333', 'Chair', 'Accra', {}, {
+					ui_anchor: 'cetech-de-delivery-1111111111111111',
+					available_options: [
+						{ display_key: 'in_warehouse:delivery:1', label: 'QA Local Standard', selected: true, fulfilment_choice: 'delivery' },
+						{ display_key: 'in_store:store_pickup:4', label: 'Store pickup', selected: false, fulfilment_choice: 'store_pickup' }
+					]
+				})
+			],
+			extensions: { 'cetech-delivery-engine': { notices: [] } }
+		});
+		loadScript().renderDomUi();
+		const editor = document.getElementById('cetech-de-delivery-1111111111111111');
+		const select = editor.querySelector('select[name="cetech_de_delivery_option_key"]');
+		const useForAll = editor.querySelector('.cetech-de-blocks-editor__use-for-all');
+		const qtySplit = editor.querySelector('[data-cetech-de-qty-split]');
+		editor.open = true;
+		expect(useForAll).toBeTruthy();
+		expect(useForAll.hidden).toBe(false);
+		expect(qtySplit.hidden).toBe(false);
+		select.value = 'in_store:store_pickup:4';
+		select.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(useForAll.hidden).toBe(true);
+		expect(useForAll.disabled).toBe(true);
+		expect(qtySplit.hidden).toBe(true);
+		select.value = 'in_warehouse:delivery:1';
+		select.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(useForAll.hidden).toBe(false);
+		expect(qtySplit.hidden).toBe(false);
+		select.value = 'in_store:store_pickup:4';
+		select.dispatchEvent(new Event('change', { bubbles: true }));
+		editor.querySelector('.cetech-de-blocks-editor__cancel').click();
+		expect(select.value).toBe('in_warehouse:delivery:1');
+		expect(useForAll.hidden).toBe(false);
+		expect(qtySplit.hidden).toBe(false);
+		expect(window.wc.blocksCheckout.extensionCartUpdate).not.toHaveBeenCalled();
+	});
 });

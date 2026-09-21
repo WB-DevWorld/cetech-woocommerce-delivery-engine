@@ -43,6 +43,8 @@
 		var location = editor.querySelector('[data-cetech-de-editor-location]');
 		var address = editor.querySelector('[data-cetech-de-editor-address]');
 		var recipient = editor.querySelector('[data-cetech-de-editor-recipient]');
+		var useForAll = editor.querySelector('.cetech-de-cart-context__use-for-all');
+		var qtySplit = editor.querySelector('[data-cetech-de-qty-split]');
 		if (location) {
 			location.hidden = !!pickup;
 		}
@@ -51,6 +53,13 @@
 		}
 		if (recipient) {
 			recipient.hidden = !!pickup;
+		}
+		if (useForAll) {
+			useForAll.hidden = !!pickup;
+			useForAll.disabled = !!pickup;
+		}
+		if (qtySplit) {
+			qtySplit.hidden = !!pickup;
 		}
 	}
 

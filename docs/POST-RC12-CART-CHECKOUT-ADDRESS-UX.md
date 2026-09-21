@@ -1,16 +1,17 @@
 # POST-RC.12 — Compact cart/checkout delivery-address UX (Issue #39)
 
-**Current candidate identity:** `1.0.0-dev.address-ux.2`  
+**Current candidate identity:** `1.0.0-dev.address-ux.3`  
 **Schema:** `6` (unchanged; no schema 7)  
 **Branch:** `fix/cart-checkout-address-ux`  
 **Base:** protected `master` `ed3753d73e262d8c7467fa936e3e36060960e58c`  
 **Previous `.1` runtime SHA:** `797bdce784ecbe44996cc0e46dbe8d2920a52b08`  
-**Runtime / package-source SHA:** `b2acea7ba75f31cd6a7851fcbf594bf798bfd79d`  
+**Previous `.2` runtime SHA:** `b2acea7ba75f31cd6a7851fcbf594bf798bfd79d`  
+**Runtime / package-source SHA:** pending after `1.0.0-dev.address-ux.3` commit  
 **PR:** https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/41 (open; do not merge)
 
 Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/39
 
-Training remains on `1.0.0-dev.pdp-precision.2`. Do not install this candidate until owner/ChatGPT final deployment review. Frozen address-ux.1, pdp-precision.1/.2 ZIPs must not be overwritten.
+Training remains on `1.0.0-dev.address-ux.2`. Do not install address-ux.3 until owner/ChatGPT final deployment review. Frozen address-ux.1, address-ux.2, pdp-precision.1/.2 ZIPs must not be overwritten.
 
 ## Owner defects (presentation only)
 
@@ -23,6 +24,19 @@ Training remains on `1.0.0-dev.pdp-precision.2`. Do not install this candidate u
 7. Existing capability and Issue #29 multi-destination safety must be kept.
 
 No delivery quoting, geography, Location Pack, coverage, or rate changes.
+
+## address-ux.3 canonical checkout-address compatibility
+
+Physical QA of address-ux.2 showed Classic **Use my checkout address** (`can_apply_checkout_address=true`) for a canonical Accra cart line versus Woo `GH` / `AA` / `Accra`, but apply failed closed because `MatchingLocation::identity()` includes `canonical_location_key` and Woo checkout fields did not.
+
+Correction: canonicalize the WooCommerce checkout destination through `CanonicalLocationResolver` + `CanonicalResolutionContext::WooCommerceDestination` **before** identity comparison. Do not weaken identity, fuzzy-match, hard-code Ghana/Accra, or attach a country/region key as if it were the requested locality.
+
+- `CheckoutAddressCanonicalizer` enriches checkout fields with a validated `canonical_location_key` when a usable Location Pack exists and exact unique locality resolution succeeds.
+- Woo state codes are mapped to labels via `WooCommerceStateCatalogInterface` (`WC()->countries->get_states()`), not a Ghana table.
+- Incoming canonical keys are validated (country + admin ancestry + locality vs city) before retention; unknown/mismatching keys are stripped.
+- Integration is only at `CheckoutAddressPolicy::read_checkout_shipping_address()`, so Classic and Blocks `ACTION_APPLY_CHECKOUT_ADDRESS` share one path.
+- `#29` heterogeneous incomplete destinations remain blocked. Quote probing via `LocationOfferQuoteProbe` / `RateQuoteEngine` is unchanged.
+- Presentation: unsaved Delivery→Pickup hides **Use this address for all delivery items** and Delivery quantity-split; Cancel/switch back restores them.
 
 ## address-ux.2 technical corrections
 
@@ -88,6 +102,10 @@ Built from a clean committed tree after GitHub CI SUCCESS on the runtime/package
 - Product control plane: PASS (372 Requirement IDs)
 - MariaDB real-DB: Tests: 26, Assertions: 1738, skipped=0, failures=0, errors=0
 - Not deployed to training
+
+## Package (address-ux.3, after CI)
+
+Pending exact runtime CI SUCCESS. Do not overwrite frozen address-ux.1 or address-ux.2 ZIPs. Training remains `1.0.0-dev.address-ux.2`. Do not deploy address-ux.3.
 
 ## Explicitly not done
 

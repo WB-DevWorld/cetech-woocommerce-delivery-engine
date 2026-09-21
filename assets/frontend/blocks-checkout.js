@@ -401,10 +401,8 @@
 			escapeHtml(i18n.saveDeliveryDetails || i18n.updateDetails || 'Save delivery details') + '</button>';
 		html += '<button type="button" class="cetech-de-blocks-editor__cancel">' +
 			escapeHtml(i18n.cancel || 'Cancel') + '</button>';
-		if (!isPickup) {
-			html += '<button type="button" class="cetech-de-blocks-editor__use-for-all">' +
-				escapeHtml(i18n.useForAll || 'Use this address for all delivery items') + '</button>';
-		}
+		html += '<button type="button" class="cetech-de-blocks-editor__use-for-all"' + (isPickup ? ' hidden' : '') + '>' +
+			escapeHtml(i18n.useForAll || 'Use this address for all delivery items') + '</button>';
 		html += '</p></div></details></div>';
 		return html;
 	}
@@ -424,6 +422,8 @@
 		var location = editor.querySelector('[data-cetech-de-editor-location]');
 		var address = editor.querySelector('[data-cetech-de-editor-address]');
 		var recipient = editor.querySelector('[data-cetech-de-editor-recipient]');
+		var useForAll = editor.querySelector('.cetech-de-blocks-editor__use-for-all');
+		var qtySplit = editor.querySelector('[data-cetech-de-qty-split]');
 		if (location) {
 			location.hidden = pickup;
 		}
@@ -432,6 +432,13 @@
 		}
 		if (recipient) {
 			recipient.hidden = pickup;
+		}
+		if (useForAll) {
+			useForAll.hidden = pickup;
+			useForAll.disabled = pickup;
+		}
+		if (qtySplit) {
+			qtySplit.hidden = pickup;
 		}
 	}
 

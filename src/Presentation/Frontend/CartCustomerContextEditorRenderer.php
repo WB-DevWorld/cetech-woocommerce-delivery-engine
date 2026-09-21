@@ -228,8 +228,8 @@ final class CartCustomerContextEditorRenderer {
 		$html .= $this->render_address_section( $uid, $address, $pickup_hidden, $form_id );
 		$html .= $this->render_recipient_section( $uid, $address, $pickup_hidden, $form_id );
 
-		if ( $qty > 1 && FulfilmentChoice::Delivery->value === sanitize_key( (string) ( $intent['fulfilment_choice'] ?? '' ) ) ) {
-			$html .= $this->render_quantity_section( $uid, $qty, $form_id );
+		if ( $qty > 1 ) {
+			$html .= $this->render_quantity_section( $uid, $qty, $form_id, $pickup_hidden );
 		}
 
 		$html .= '<p class="cetech-de-cart-context__actions">';
@@ -239,12 +239,10 @@ final class CartCustomerContextEditorRenderer {
 		$html .= ' <button type="button" class="cetech-de-cart-context__cancel cetech-de-cart-context__action--secondary" data-cetech-de-cancel="1">'
 			. esc_html( CustomerStorefrontCopy::cancel() )
 			. '</button>';
-		if ( FulfilmentChoice::Delivery->value === sanitize_key( (string) ( $intent['fulfilment_choice'] ?? '' ) ) ) {
-			$html .= ' <button type="submit" class="cetech-de-cart-context__use-for-all cetech-de-cart-context__action--secondary"' . $form_attr . ' name="'
-				. esc_attr( CartCustomerContextEditorService::POST_USE_FOR_ALL ) . '" value="1">';
-			$html .= esc_html( CustomerStorefrontCopy::use_for_all_delivery_items() );
-			$html .= '</button>';
-		}
+		$html .= ' <button type="submit" class="cetech-de-cart-context__use-for-all cetech-de-cart-context__action--secondary"' . $form_attr . ' name="'
+			. esc_attr( CartCustomerContextEditorService::POST_USE_FOR_ALL ) . '" value="1"' . $pickup_hidden . '>';
+		$html .= esc_html( CustomerStorefrontCopy::use_for_all_delivery_items() );
+		$html .= '</button>';
 		$html .= '</p></details>';
 
 		return $html;
@@ -361,9 +359,9 @@ final class CartCustomerContextEditorRenderer {
 		return $html;
 	}
 
-	private function render_quantity_section( string $uid, int $qty, string $form_id ): string {
+	private function render_quantity_section( string $uid, int $qty, string $form_id, string $pickup_hidden = '' ): string {
 		$form_attr = $this->form_owner_attr( $form_id );
-		$html      = '<details class="cetech-de-cart-context__disclosure cetech-de-cart-context__qty" data-cetech-de-qty-split="1">';
+		$html      = '<details class="cetech-de-cart-context__disclosure cetech-de-cart-context__qty" data-cetech-de-qty-split="1"' . $pickup_hidden . '>';
 		$html     .= '<summary>' . esc_html( CustomerStorefrontCopy::apply_to_quantity() ) . '</summary>';
 		$html     .= '<fieldset>';
 		$html     .= '<legend class="screen-reader-text">' . esc_html( CustomerStorefrontCopy::apply_to_quantity() ) . '</legend>';

@@ -32,7 +32,8 @@ final class CheckoutAddressPolicy {
 		private FeatureFlags $feature_flags,
 		private Requirements $requirements,
 		private ApplyCustomerContextToEligibleLinesService $apply_all,
-		private CartCustomerContextMutationService $mutation
+		private CartCustomerContextMutationService $mutation,
+		private ?CheckoutAddressCanonicalizer $canonicalizer = null
 	) {
 	}
 
@@ -365,27 +366,42 @@ final class CheckoutAddressPolicy {
 	public function read_checkout_shipping_address(): array {
 		$posted = $this->posted_shipping_fields();
 		if ( '' !== (string) ( $posted['country'] ?? '' ) ) {
-			return $posted;
+			return $this->canonicalize_checkout_address( $posted );
 		}
 
 		if ( ! function_exists( 'WC' ) || ! is_object( WC() ) || ! isset( WC()->customer ) || ! is_object( WC()->customer ) ) {
-			return $posted;
+			return $this->canonicalize_checkout_address( $posted );
 		}
 
 		$customer = WC()->customer;
 
-		return [
-			'country'    => method_exists( $customer, 'get_shipping_country' ) ? (string) $customer->get_shipping_country() : '',
-			'state'      => method_exists( $customer, 'get_shipping_state' ) ? (string) $customer->get_shipping_state() : '',
-			'city'       => method_exists( $customer, 'get_shipping_city' ) ? (string) $customer->get_shipping_city() : '',
-			'postcode'   => method_exists( $customer, 'get_shipping_postcode' ) ? (string) $customer->get_shipping_postcode() : '',
-			'address_1'  => method_exists( $customer, 'get_shipping_address_1' ) ? (string) $customer->get_shipping_address_1() : '',
-			'address_2'  => method_exists( $customer, 'get_shipping_address_2' ) ? (string) $customer->get_shipping_address_2() : '',
-			'first_name' => method_exists( $customer, 'get_shipping_first_name' ) ? (string) $customer->get_shipping_first_name() : '',
-			'last_name'  => method_exists( $customer, 'get_shipping_last_name' ) ? (string) $customer->get_shipping_last_name() : '',
-			'company'    => method_exists( $customer, 'get_shipping_company' ) ? (string) $customer->get_shipping_company() : '',
-			'phone'      => method_exists( $customer, 'get_shipping_phone' ) ? (string) $customer->get_shipping_phone() : '',
-		];
+		return $this->canonicalize_checkout_address(
+			[
+				'country'    => method_exists( $customer, 'get_shipping_country' ) ? (string) $customer->get_shipping_country() : '',
+				'state'      => method_exists( $customer, 'get_shipping_state' ) ? (string) $customer->get_shipping_state() : '',
+				'city'       => method_exists( $customer, 'get_shipping_city' ) ? (string) $customer->get_shipping_city() : '',
+				'postcode'   => method_exists( $customer, 'get_shipping_postcode' ) ? (string) $customer->get_shipping_postcode() : '',
+				'address_1'  => method_exists( $customer, 'get_shipping_address_1' ) ? (string) $customer->get_shipping_address_1() : '',
+				'address_2'  => method_exists( $customer, 'get_shipping_address_2' ) ? (string) $customer->get_shipping_address_2() : '',
+				'first_name' => method_exists( $customer, 'get_shipping_first_name' ) ? (string) $customer->get_shipping_first_name() : '',
+				'last_name'  => method_exists( $customer, 'get_shipping_last_name' ) ? (string) $customer->get_shipping_last_name() : '',
+				'company'    => method_exists( $customer, 'get_shipping_company' ) ? (string) $customer->get_shipping_company() : '',
+				'phone'      => method_exists( $customer, 'get_shipping_phone' ) ? (string) $customer->get_shipping_phone() : '',
+			]
+		);
+	}
+
+	/**
+	 * @param array<string, mixed> $address
+	 *
+	 * @return array<string, mixed>
+	 */
+	private function canonicalize_checkout_address( array $address ): array {
+		if ( ! $this->canonicalizer instanceof CheckoutAddressCanonicalizer ) {
+			return $address;
+		}
+
+		return $this->canonicalizer->canonicalize( $address );
 	}
 
 	/**
