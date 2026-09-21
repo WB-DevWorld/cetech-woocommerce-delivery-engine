@@ -53,6 +53,12 @@ final class CountryIdentityReconciler {
 	 */
 	public ?\Closure $after_repair_one = null;
 
+	/** @var (\Closure(self):void)|null Test seam: after first revision check, before lease acquire. */
+	public ?\Closure $before_lock_acquire = null;
+
+	/** @var (\Closure(self):void)|null Test seam: after lease is owned, before post-acquire revision recheck. */
+	public ?\Closure $after_lock_acquire = null;
+
 	public WordPressOptionCasStore $cas;
 
 	private string $lock_owner = '';
@@ -77,7 +83,9 @@ final class CountryIdentityReconciler {
 
 	/**
 	 * One-shot historical repair keyed to REPAIR_REVISION. Safe on storefront
-	 * and admin. Concurrent callers skip rather than duplicate repair_all().
+	 * and admin. Sequence: revision check → lease acquire → revision recheck
+	 * under the owned lease → repair_all → persist revision → release lease.
+	 * Concurrent callers skip rather than duplicate repair_all().
 	 *
 	 * @return array<string, mixed>
 	 */
@@ -97,6 +105,9 @@ final class CountryIdentityReconciler {
 
 		$acquired = false;
 		try {
+			if ( $this->before_lock_acquire instanceof \Closure ) {
+				( $this->before_lock_acquire )( $this );
+			}
 			if ( ! $this->try_acquire_lock( $revision ) ) {
 				return [
 					'skipped' => true,
@@ -105,6 +116,16 @@ final class CountryIdentityReconciler {
 				];
 			}
 			$acquired = true;
+			if ( $this->after_lock_acquire instanceof \Closure ) {
+				( $this->after_lock_acquire )( $this );
+			}
+			if ( $this->stored_revision() >= $revision ) {
+				return [
+					'skipped' => true,
+					'reason'  => 'revision_complete',
+					'results' => [],
+				];
+			}
 
 			$results = $this->repair_all();
 			if ( $this->lease_lost ) {

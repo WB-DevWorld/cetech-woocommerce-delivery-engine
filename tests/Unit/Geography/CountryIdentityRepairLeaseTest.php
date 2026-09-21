@@ -13,7 +13,7 @@ use CetechDeliveryEngine\Tests\Support\InMemoryGeographyPackRepository;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #35 owner-fenced renewable repair lease (geo-country.3).
+ * Issue #35 owner-fenced renewable repair lease (geo-country.4).
  */
 final class CountryIdentityRepairLeaseTest extends TestCase {
 
@@ -308,6 +308,63 @@ final class CountryIdentityRepairLeaseTest extends TestCase {
 		$result = $stack['reconciler']->maybe_repair();
 		self::assertFalse( (bool) ( $result['skipped'] ?? true ) );
 		self::assertSame( 1, (int) get_option( CountryIdentityReconciler::OPTION_KEY, 0 ) );
+	}
+
+	public function test_delayed_contender_rechecks_revision_under_lease_and_skips_repair_all(): void {
+		$a     = $this->stack();
+		$b     = $this->stack_from( $a );
+		$calls = 0;
+		$a['reconciler']->before_repair_all = static function () use ( &$calls ): void {
+			++$calls;
+		};
+		$b['reconciler']->before_repair_all = static function () use ( &$calls ): void {
+			++$calls;
+		};
+		$b_held_revision = null;
+		$b_held_lock     = false;
+		$b['reconciler']->before_lock_acquire = static function () use ( $a ): void {
+			self::assertSame( 0, (int) get_option( CountryIdentityReconciler::OPTION_KEY, 0 ) );
+			$a['reconciler']->maybe_repair();
+			self::assertSame( 1, (int) get_option( CountryIdentityReconciler::OPTION_KEY, 0 ) );
+			self::assertFalse( array_key_exists( CountryIdentityReconciler::LOCK_OPTION_KEY, $GLOBALS['cetech_de_test_options'] ?? [] ) );
+		};
+		$b['reconciler']->after_lock_acquire = static function () use ( &$b_held_revision, &$b_held_lock ): void {
+			$b_held_revision = (int) get_option( CountryIdentityReconciler::OPTION_KEY, 0 );
+			$b_held_lock     = array_key_exists( CountryIdentityReconciler::LOCK_OPTION_KEY, $GLOBALS['cetech_de_test_options'] ?? [] );
+		};
+		$result = $b['reconciler']->maybe_repair();
+		self::assertTrue( (bool) ( $result['skipped'] ?? false ) );
+		self::assertSame( 'revision_complete', $result['reason'] ?? '' );
+		self::assertSame( [], $result['results'] ?? null );
+		self::assertSame( 1, $calls );
+		self::assertSame( 1, $b_held_revision );
+		self::assertTrue( $b_held_lock );
+		self::assertSame( 1, (int) get_option( CountryIdentityReconciler::OPTION_KEY, 0 ) );
+		self::assertFalse( array_key_exists( CountryIdentityReconciler::LOCK_OPTION_KEY, $GLOBALS['cetech_de_test_options'] ?? [] ) );
+		self::assertSame( 0, $b['reconciler']->source_scan_count );
+		self::assertSame( 'Ghana', $a['geo']->locations->find_country( 'GH' )?->canonical_name );
+	}
+
+	public function test_post_acquire_recheck_still_allows_revision_bump_one_to_two(): void {
+		$stack = $this->stack();
+		$stack['reconciler']->maybe_repair( 1 );
+		$calls = 0;
+		$stack['reconciler']->before_repair_all = static function () use ( &$calls ): void {
+			++$calls;
+		};
+		$held = null;
+		$stack['reconciler']->after_lock_acquire = static function () use ( &$held ): void {
+			$held = (int) get_option( CountryIdentityReconciler::OPTION_KEY, 0 );
+		};
+		$bumped = $stack['reconciler']->maybe_repair( 2 );
+		self::assertSame( 1, $held );
+		self::assertFalse( (bool) ( $bumped['skipped'] ?? true ) );
+		self::assertSame( 1, $calls );
+		self::assertSame( 2, (int) get_option( CountryIdentityReconciler::OPTION_KEY, 0 ) );
+		$again = $stack['reconciler']->maybe_repair( 2 );
+		self::assertTrue( (bool) ( $again['skipped'] ?? false ) );
+		self::assertSame( 'revision_complete', $again['reason'] ?? '' );
+		self::assertSame( 1, $calls );
 	}
 
 	/**
