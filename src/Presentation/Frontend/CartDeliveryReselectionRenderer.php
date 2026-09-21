@@ -10,6 +10,7 @@ use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
+use CetechDeliveryEngine\Presentation\Shared\CartDeliveryUiAnchor;
 
 /**
  * Classic Cart inline delivery reselection for lines whose options changed.
@@ -34,6 +35,13 @@ final class CartDeliveryReselectionRenderer {
 
 		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_assets' ] );
 		add_filter( 'woocommerce_cart_item_name', [ $this, 'append_reselection_form' ], 20, 3 );
+		add_action( 'woocommerce_after_cart', [ $this, 'render_deferred_forms' ], 6 );
+		add_action( 'woocommerce_after_checkout_form', [ $this, 'render_deferred_forms' ], 6 );
+		add_action( 'woocommerce_after_mini_cart', [ $this, 'render_deferred_forms' ], 6 );
+	}
+
+	public function render_deferred_forms(): void {
+		echo CartExternalFormBuffer::drain(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns escaped HTML.
 	}
 
 	public function is_active(): bool {
@@ -86,34 +94,49 @@ final class CartDeliveryReselectionRenderer {
 		);
 
 		if ( [] === $options ) {
+			return $this->render_reselection( $cart_item_key, [] );
+		}
+
+		return $this->render_reselection( $cart_item_key, $options );
+	}
+
+	/**
+	 * @param list<ProductDeliveryOption> $options
+	 */
+	public function render_reselection( string $cart_item_key, array $options ): string {
+		if ( [] === $options ) {
 			return '<div class="cetech-de-cart-reselection" role="status"><p>'
 				. esc_html__( 'Delivery is currently unavailable for this product. Please contact the store.', 'cetech-woocommerce-delivery-engine' )
 				. '</p></div>';
 		}
 
-		$action = function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : '';
-		$html   = '<div class="cetech-de-cart-reselection">';
-		$html  .= '<p class="cetech-de-cart-reselection__message">'
+		$action  = function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : '';
+		$form_id = CartDeliveryUiAnchor::reselection_form_id_for_cart_item_key( $cart_item_key );
+		$html    = '<div class="cetech-de-cart-reselection" data-cetech-de-form-id="' . esc_attr( $form_id ) . '">';
+		$html   .= '<p class="cetech-de-cart-reselection__message">'
 			. esc_html__( 'Delivery options for this item have changed. Choose an option to continue.', 'cetech-woocommerce-delivery-engine' )
 			. '</p>';
-		$html  .= '<form class="cetech-de-cart-reselection__form" method="post" action="' . esc_url( $action ) . '">';
-		$html  .= '<input type="hidden" name="' . esc_attr( CartDeliveryReselectionService::POST_ACTION ) . '" value="1" />';
-		$html  .= '<input type="hidden" name="' . esc_attr( CartDeliveryReselectionService::POST_CART_ITEM_KEY ) . '" value="' . esc_attr( $cart_item_key ) . '" />';
-		$html  .= wp_nonce_field( CartDeliveryReselectionService::NONCE_ACTION, '_wpnonce', true, false );
 
 		foreach ( $options as $option ) {
-			$id    = 'cetech-de-cart-reselect-' . $cart_item_key . '-' . md5( $option->display_key );
+			$id    = 'cetech-de-cart-reselect-' . sanitize_html_class( $cart_item_key ) . '-' . md5( $option->display_key );
 			$label = $this->option_label( $option );
 			$html .= '<label class="cetech-de-cart-reselection__option" for="' . esc_attr( $id ) . '">';
-			$html .= '<input type="radio" id="' . esc_attr( $id ) . '" name="' . esc_attr( CartDeliverySelectionCapture::POST_FIELD ) . '" value="' . esc_attr( $option->display_key ) . '" required />';
+			$html .= '<input type="radio" id="' . esc_attr( $id ) . '" name="' . esc_attr( CartDeliverySelectionCapture::POST_FIELD ) . '" value="' . esc_attr( $option->display_key ) . '" form="' . esc_attr( $form_id ) . '" required />';
 			$html .= '<span>' . esc_html( $label ) . '</span>';
 			$html .= '</label>';
 		}
 
-		$html .= '<button type="submit" class="button">'
+		$html .= '<button type="submit" class="button" form="' . esc_attr( $form_id ) . '">'
 			. esc_html__( 'Update delivery option', 'cetech-woocommerce-delivery-engine' )
 			. '</button>';
-		$html .= '</form></div>';
+		$html .= '</div>';
+
+		$shell  = '<form id="' . esc_attr( $form_id ) . '" class="cetech-de-cart-reselection__form" method="post" action="' . esc_url( $action ) . '">';
+		$shell .= '<input type="hidden" name="' . esc_attr( CartDeliveryReselectionService::POST_ACTION ) . '" value="1" />';
+		$shell .= '<input type="hidden" name="' . esc_attr( CartDeliveryReselectionService::POST_CART_ITEM_KEY ) . '" value="' . esc_attr( $cart_item_key ) . '" />';
+		$shell .= wp_nonce_field( CartDeliveryReselectionService::NONCE_ACTION, '_wpnonce', true, false );
+		$shell .= '</form>';
+		CartExternalFormBuffer::queue( $form_id, $shell );
 
 		return $html;
 	}

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -163,7 +163,7 @@ describe('Blocks DOM customer editor hardening', () => {
 					ui_anchor: extras.ui_anchor || ('cetech-de-delivery-' + String(key).replace(/[^a-f0-9]/g, '').padEnd(16, '0').slice(0, 16)),
 					has_matching_location: extras.has_matching_location !== undefined ? extras.has_matching_location : true,
 					destination_summary: extras.destination_summary || (locality ? locality + ', Greater Accra' : ''),
-					matching_location: { country: 'GH', state: 'AA', city: locality, postcode: 'GA-123' },
+					matching_location: extras.matching_location || { country: 'GH', state: 'AA', city: locality, postcode: 'GA-123' },
 					delivery_address: {
 						address_1: address.address_1 || '',
 						address_2: address.address_2 || '',
@@ -402,5 +402,105 @@ describe('Blocks DOM customer editor hardening', () => {
 		api.renderDomUi();
 		expect(document.getElementById('cetech-de-delivery-1111111111111111').open).toBe(true);
 		expect(document.activeElement).toBe(document.getElementById('cetech-de-delivery-1111111111111111').querySelector('[name="cetech_de_address_1"]'));
+	});
+
+	it('focuses the first missing destination field when matching location is absent', () => {
+		window.cetechDeBlocks = { namespace: 'cetech-delivery-engine', i18n: { address1: 'Address line 1' } };
+		window.history.replaceState(null, '', '/cart/#cetech-de-delivery-1111111111111111');
+		installCart({
+			items: [
+				editableItem('aaa111bbbb2222cccc3333', 'Chair', '', {}, {
+					ui_anchor: 'cetech-de-delivery-1111111111111111',
+					has_matching_location: false,
+					matching_location: { country: '', state: '', city: '', postcode: '' }
+				})
+			],
+			extensions: { 'cetech-delivery-engine': { notices: [] } }
+		});
+		const api = loadScript();
+		api.resetDeepLink();
+		api.renderDomUi();
+		const editor = document.getElementById('cetech-de-delivery-1111111111111111');
+		expect(editor.open).toBe(true);
+		expect(editor.querySelector('[data-cetech-de-editor-location] details').open).toBe(true);
+		expect(document.activeElement).toBe(editor.querySelector('[data-cetech-de-destination-control="country"]'));
+		expect(document.activeElement).not.toBe(editor.querySelector('[data-cetech-de-required-address]'));
+	});
+
+	it('restores Delivery sections after unsaved Pickup then Cancel without Store API mutation', () => {
+		window.cetechDeBlocks = { namespace: 'cetech-delivery-engine', i18n: {} };
+		window.wc = { blocksCheckout: { extensionCartUpdate: vi.fn() } };
+		installCart({
+			items: [
+				editableItem('aaa111bbbb2222cccc3333', 'Chair', 'Accra', {}, {
+					ui_anchor: 'cetech-de-delivery-1111111111111111',
+					available_options: [
+						{ display_key: 'in_warehouse:delivery:1', label: 'QA Local Standard', selected: true, fulfilment_choice: 'delivery' },
+						{ display_key: 'in_store:store_pickup:4', label: 'Store pickup', selected: false, fulfilment_choice: 'store_pickup' }
+					]
+				})
+			],
+			extensions: { 'cetech-delivery-engine': { notices: [] } }
+		});
+		const api = loadScript();
+		api.renderDomUi();
+		const editor = document.getElementById('cetech-de-delivery-1111111111111111');
+		const location = editor.querySelector('[data-cetech-de-editor-location]');
+		const address = editor.querySelector('[data-cetech-de-editor-address]');
+		const recipient = editor.querySelector('[data-cetech-de-editor-recipient]');
+		const select = editor.querySelector('select[name="cetech_de_delivery_option_key"]');
+		editor.open = true;
+		expect(location.hidden).toBe(false);
+		select.value = 'in_store:store_pickup:4';
+		select.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(location.hidden).toBe(true);
+		expect(address.hidden).toBe(true);
+		expect(recipient.hidden).toBe(true);
+		editor.querySelector('.cetech-de-blocks-editor__cancel').click();
+		expect(select.value).toBe('in_warehouse:delivery:1');
+		expect(location.hidden).toBe(false);
+		expect(address.hidden).toBe(false);
+		expect(recipient.hidden).toBe(false);
+		expect(editor.open).toBe(false);
+		expect(document.activeElement).toBe(editor.querySelector('summary'));
+		expect(window.wc.blocksCheckout.extensionCartUpdate).not.toHaveBeenCalled();
+		expect(typeof api.resetEditor).toBe('function');
+		expect(typeof api.syncMethodState).toBe('function');
+	});
+
+	it('restores Pickup visibility after unsaved Delivery then Cancel', () => {
+		window.cetechDeBlocks = { namespace: 'cetech-delivery-engine', i18n: {} };
+		window.wc = { blocksCheckout: { extensionCartUpdate: vi.fn() } };
+		installCart({
+			items: [
+				editableItem('aaa111bbbb2222cccc3333', 'Chair', 'Accra', {}, {
+					ui_anchor: 'cetech-de-delivery-1111111111111111',
+					is_pickup: true,
+					address_action_label: 'Edit pickup details',
+					available_options: [
+						{ display_key: 'in_store:store_pickup:4', label: 'Store pickup', selected: true, fulfilment_choice: 'store_pickup' },
+						{ display_key: 'in_warehouse:delivery:1', label: 'QA Local Standard', selected: false, fulfilment_choice: 'delivery' }
+					]
+				})
+			],
+			extensions: { 'cetech-delivery-engine': { notices: [] } }
+		});
+		loadScript().renderDomUi();
+		const editor = document.getElementById('cetech-de-delivery-1111111111111111');
+		const location = editor.querySelector('[data-cetech-de-editor-location]');
+		const address = editor.querySelector('[data-cetech-de-editor-address]');
+		const select = editor.querySelector('select[name="cetech_de_delivery_option_key"]');
+		editor.open = true;
+		expect(location.hidden).toBe(true);
+		select.value = 'in_warehouse:delivery:1';
+		select.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(location.hidden).toBe(false);
+		expect(address.hidden).toBe(false);
+		editor.querySelector('.cetech-de-blocks-editor__cancel').click();
+		expect(select.value).toBe('in_store:store_pickup:4');
+		expect(location.hidden).toBe(true);
+		expect(address.hidden).toBe(true);
+		expect(editor.open).toBe(false);
+		expect(window.wc.blocksCheckout.extensionCartUpdate).not.toHaveBeenCalled();
 	});
 });

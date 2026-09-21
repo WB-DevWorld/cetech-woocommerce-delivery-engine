@@ -1,6 +1,6 @@
 # Current Work — Issue #39 compact cart/checkout delivery-address UX
 
-Status: RC.12 IMMUTABLE — POST-RC.12 DEV CANDIDATE `1.0.0-dev.address-ux.1` — AWAITING TECHNICAL REVIEW / NOT MERGED / NOT DEPLOYED / NOT RC.13
+Status: RC.12 IMMUTABLE — POST-RC.12 DEV CANDIDATE `1.0.0-dev.address-ux.2` — AWAITING FINAL DEPLOYMENT REVIEW / NOT MERGED / NOT DEPLOYED / NOT RC.13
 
 ## Canonical repository truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
@@ -26,7 +26,7 @@ Issue `#39` — `[P2] Cart/checkout delivery-address actions and per-item editor
 - Base: protected `master` `ed3753d73e262d8c7467fa936e3e36060960e58c`.
 - Runtime / package-source SHA: `797bdce784ecbe44996cc0e46dbe8d2920a52b08`.
 - PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/41 (open; do not merge).
-- Development identity: `1.0.0-dev.address-ux.1` (schema remains `6`).
+- Development identity: `1.0.0-dev.address-ux.2` (schema remains `6`).
 - Requires PHP: `8.3`. Composer: `>=8.3`. Activation guard: `8.3`.
 - Not RC.13. Do not reuse pdp-precision or geo-country identities as the current plugin version.
 - Do not merge. Do not deploy. Package ZIP is built only after runtime CI SUCCESS.
@@ -39,7 +39,7 @@ PHP policy retained from PR #37 (`docs/PHP-RUNTIME-POLICY.md`, `docs/PHP-85-CI-R
 - PHP 8.1 and 8.2 are not supported and must not be advertised.
 
 ## Central leases
-- plugin bootstrap / version identity on this branch: `1.0.0-dev.address-ux.1`; published `1.0.0-rc.12` remains the tagged identity; frozen pdp-precision / geo-country ZIPs must not be overwritten;
+- plugin bootstrap / version identity on this branch: `1.0.0-dev.address-ux.2`; published `1.0.0-rc.12` remains the tagged identity; frozen address-ux.1 / pdp-precision / geo-country ZIPs must not be overwritten;
 - CI workflows / required-check names / PHP runtime policy: retained from protected master;
 - schema / migrations: frozen at `6`;
 - published release identity/tags: `v1.0.0-rc.11` and `v1.0.0-rc.12` immutable;
@@ -50,7 +50,7 @@ PHP policy retained from PR #37 (`docs/PHP-RUNTIME-POLICY.md`, `docs/PHP-85-CI-R
 
 ## Environment authorization
 - GitHub Actions ephemeral runners and optional local `docker/php85-qa`.
-- Training site `https://training.cetechbpa.com`: **NOT AUTHORIZED**. Leave installed `1.0.0-dev.pdp-precision.2`. Do not deploy `1.0.0-dev.address-ux.1`.
+- Training site `https://training.cetechbpa.com`: **NOT AUTHORIZED**. Leave installed `1.0.0-dev.pdp-precision.2`. Do not deploy `1.0.0-dev.address-ux.1` or `1.0.0-dev.address-ux.2`.
 - CETECH Pilot: **NOT STARTED**.
 - FLAIROC: **NOT DEPLOYED**.
 - Production: **NOT DEPLOYED**.

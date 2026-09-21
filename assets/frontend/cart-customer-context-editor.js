@@ -38,50 +38,66 @@
 		return hidden ? String(hidden.getAttribute('data-cetech-de-choice') || '') : '';
 	}
 
+	function syncMethodState(editor) {
+		var pickup = selectedChoice(editor) === 'store_pickup';
+		var location = editor.querySelector('[data-cetech-de-editor-location]');
+		var address = editor.querySelector('[data-cetech-de-editor-address]');
+		var recipient = editor.querySelector('[data-cetech-de-editor-recipient]');
+		if (location) {
+			location.hidden = !!pickup;
+		}
+		if (address) {
+			address.hidden = !!pickup;
+		}
+		if (recipient) {
+			recipient.hidden = !!pickup;
+		}
+	}
+
 	function bindChoice(root) {
 		var editor = root.closest ? root.closest('.cetech-de-cart-context') : null;
 		if (!editor) {
 			editor = root;
 		}
-		var location = editor.querySelector('[data-cetech-de-editor-location]');
-		var address = editor.querySelector('[data-cetech-de-editor-address]');
-		var recipient = editor.querySelector('[data-cetech-de-editor-recipient]');
 		var select = editor.querySelector('select[name="cetech_de_delivery_option_key"]');
 		var radios = editor.querySelectorAll('input[name="cetech_de_delivery_option_key"]');
 		if (!select && !radios.length) {
+			syncMethodState(editor);
 			return;
-		}
-
-		function sync() {
-			var pickup = selectedChoice(editor) === 'store_pickup';
-			if (location) {
-				location.hidden = !!pickup;
-			}
-			if (address) {
-				address.hidden = !!pickup;
-			}
-			if (recipient) {
-				recipient.hidden = !!pickup;
-			}
 		}
 
 		if (select) {
-			select.addEventListener('change', sync);
+			select.addEventListener('change', function () {
+				syncMethodState(editor);
+			});
 		}
 		Array.prototype.forEach.call(radios, function (input) {
-			input.addEventListener('change', sync);
+			input.addEventListener('change', function () {
+				syncMethodState(editor);
+			});
 		});
-		sync();
+		syncMethodState(editor);
 	}
 
-	function snapshotForm(form) {
-		if (!form || !form.elements) {
-			return;
-		}
-		Array.prototype.forEach.call(form.elements, function (el) {
-			if (!el || !el.name) {
+	function collectControls(form, root) {
+		var list = [];
+		function add(el) {
+			if (!el || !el.name || list.indexOf(el) !== -1) {
 				return;
 			}
+			list.push(el);
+		}
+		if (form && form.elements) {
+			Array.prototype.forEach.call(form.elements, add);
+		}
+		if (root && root.querySelectorAll) {
+			Array.prototype.forEach.call(root.querySelectorAll('[form]'), add);
+		}
+		return list;
+	}
+
+	function snapshotForm(form, root) {
+		collectControls(form, root).forEach(function (el) {
 			if (el.type === 'checkbox' || el.type === 'radio') {
 				el.setAttribute('data-cetech-de-initial', el.checked ? '1' : '0');
 			} else {
@@ -90,12 +106,9 @@
 		});
 	}
 
-	function resetForm(form) {
-		if (!form || !form.elements) {
-			return;
-		}
-		Array.prototype.forEach.call(form.elements, function (el) {
-			if (!el || !el.hasAttribute('data-cetech-de-initial')) {
+	function resetForm(form, root) {
+		collectControls(form, root).forEach(function (el) {
+			if (!el.hasAttribute('data-cetech-de-initial')) {
 				return;
 			}
 			var initial = el.getAttribute('data-cetech-de-initial');
@@ -110,23 +123,89 @@
 		});
 	}
 
+	function associatedForm(root) {
+		var owned = root.querySelector('[form]');
+		if (owned && owned.form) {
+			return owned.form;
+		}
+		var formId = root.getAttribute('data-cetech-de-form-id') || (owned && owned.getAttribute('form')) || '';
+		if (formId) {
+			return document.getElementById(formId);
+		}
+		return root.querySelector('form.cetech-de-cart-context__form');
+	}
+
 	function bindCancel(root) {
 		var details = root.querySelector('details.cetech-de-cart-context__editor');
-		var form = root.querySelector('form.cetech-de-cart-context__form');
+		var form = associatedForm(root);
 		var cancel = root.querySelector('[data-cetech-de-cancel]');
 		if (!details || !form || !cancel) {
 			return;
 		}
-		snapshotForm(form);
+		snapshotForm(form, root);
 		cancel.addEventListener('click', function (event) {
 			event.preventDefault();
-			resetForm(form);
+			resetForm(form, root);
+			syncMethodState(root);
 			details.open = false;
 			var summary = details.querySelector('summary');
 			if (summary && typeof summary.focus === 'function') {
 				summary.focus();
 			}
 		});
+	}
+
+	function isVisuallyHidden(el) {
+		if (!el) {
+			return true;
+		}
+		if (el.hidden) {
+			return true;
+		}
+		if (el.closest && el.closest('[hidden]')) {
+			return true;
+		}
+		return false;
+	}
+
+	function firstMissingDestinationControl(root) {
+		var order = ['country', 'region', 'locality', 'postcode'];
+		var i;
+		for (i = 0; i < order.length; i += 1) {
+			var key = order[i];
+			var control = root.querySelector('[data-cetech-de-destination-control="' + key + '"]');
+			if (!control || isVisuallyHidden(control)) {
+				continue;
+			}
+			var wrap = control.closest('[data-cetech-de-field="' + key + '"], [data-cetech-de-reveal="' + key + '"]');
+			if (wrap && isVisuallyHidden(wrap)) {
+				continue;
+			}
+			if (String(control.value || '').trim() === '') {
+				return control;
+			}
+		}
+		return null;
+	}
+
+	function focusDeepLinkField(details, wrapper) {
+		var host = wrapper || details;
+		var hasMatching = host.getAttribute('data-cetech-de-has-matching-location') === '1';
+		var destDisclosure = details.querySelector('.cetech-de-cart-context__location details.cetech-de-cart-context__disclosure');
+		if (!hasMatching && destDisclosure) {
+			destDisclosure.open = true;
+		}
+		if (!hasMatching) {
+			var dest = firstMissingDestinationControl(details);
+			if (dest && typeof dest.focus === 'function') {
+				dest.focus();
+				return;
+			}
+		}
+		var required = details.querySelector('[data-cetech-de-required-address]');
+		if (required && !isVisuallyHidden(required) && typeof required.focus === 'function') {
+			required.focus();
+		}
 	}
 
 	function fragmentAnchor() {
@@ -167,10 +246,7 @@
 				block: 'center'
 			});
 		}
-		var required = details.querySelector('[data-cetech-de-required-address]');
-		if (required && !required.closest('[hidden]') && typeof required.focus === 'function') {
-			required.focus();
-		}
+		focusDeepLinkField(details, target);
 		return true;
 	}
 
@@ -192,6 +268,7 @@
 		bindSplit: bindSplit,
 		bindChoice: bindChoice,
 		bindCancel: bindCancel,
+		syncMethodState: syncMethodState,
 		applyDeepLink: applyDeepLink,
 		fragmentAnchor: fragmentAnchor,
 		resetDeepLink: function () {

@@ -13,6 +13,7 @@ use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Presentation\Frontend\CartCustomerContextEditorRenderer;
+use CetechDeliveryEngine\Presentation\Frontend\CartExternalFormBuffer;
 use CetechDeliveryEngine\Presentation\Shared\CartDeliveryUiAnchor;
 use CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy;
 use CetechDeliveryEngine\Tests\Unit\CustomerContext\PerItemContextFixtures;
@@ -29,6 +30,11 @@ final class CartCheckoutAddressUxTest extends TestCase {
 		$capture         = ( new ReflectionClass( CartDeliverySelectionCapture::class ) )->newInstanceWithoutConstructor();
 		$this->renderer  = new CartCustomerContextEditorRenderer( new FeatureFlags(), new Requirements(), $capture );
 		$this->policy    = ( new ReflectionClass( CheckoutAddressPolicy::class ) )->newInstanceWithoutConstructor();
+		CartExternalFormBuffer::reset();
+	}
+
+	protected function tearDown(): void {
+		CartExternalFormBuffer::reset();
 	}
 
 	public function test_incomplete_delivery_line_shows_address_needed_and_add_delivery_address(): void {
@@ -185,6 +191,122 @@ final class CartCheckoutAddressUxTest extends TestCase {
 		self::assertSame( 'Apply to quantity', CustomerStorefrontCopy::apply_to_quantity() );
 		self::assertSame( 'Save delivery details', CustomerStorefrontCopy::save_delivery_details() );
 		self::assertSame( 'Cancel', CustomerStorefrontCopy::cancel() );
+	}
+
+	public function test_classic_line_output_has_no_form_and_owns_external_form(): void {
+		$html    = $this->render_line( 'line-a', PerItemContextFixtures::incompleteContext( 10, PerItemContextFixtures::matchingAccra() ) );
+		$form_id = CartDeliveryUiAnchor::form_id_for_cart_item_key( 'line-a' );
+
+		self::assertStringNotContainsString( '<form', $html );
+		self::assertStringContainsString( 'data-cetech-de-form-id="' . $form_id . '"', $html );
+		self::assertStringContainsString( 'form="' . $form_id . '"', $html );
+		self::assertStringContainsString( 'class="button cetech-de-cart-context__save"', $html );
+		self::assertMatchesRegularExpression( '/cetech-de-cart-context__save"[^>]*form="' . preg_quote( $form_id, '/' ) . '"/', $html );
+		self::assertMatchesRegularExpression( '/cetech-de-cart-context__use-for-all[^>]*form="' . preg_quote( $form_id, '/' ) . '"/', $html );
+		self::assertStringContainsString( 'data-cetech-de-has-matching-location="1"', $html );
+
+		$shells = CartExternalFormBuffer::drain();
+		self::assertStringContainsString( 'id="' . $form_id . '"', $shells );
+		self::assertStringContainsString( 'name="' . CartCustomerContextEditorService::POST_CART_ITEM_KEY . '" value="line-a"', $shells );
+		self::assertStringContainsString( 'name="' . CartCustomerContextEditorService::POST_ACTION . '"', $shells );
+	}
+
+	public function test_two_cart_lines_do_not_cross_submit(): void {
+		$html_a = $this->render_line( 'alpha', PerItemContextFixtures::incompleteContext( 10, PerItemContextFixtures::matchingAccra() ) );
+		$html_b = $this->render_line( 'beta', PerItemContextFixtures::incompleteContext( 10, PerItemContextFixtures::matchingAccra() ) );
+		$form_a = CartDeliveryUiAnchor::form_id_for_cart_item_key( 'alpha' );
+		$form_b = CartDeliveryUiAnchor::form_id_for_cart_item_key( 'beta' );
+
+		self::assertNotSame( $form_a, $form_b );
+		self::assertStringContainsString( 'form="' . $form_a . '"', $html_a );
+		self::assertStringNotContainsString( 'form="' . $form_b . '"', $html_a );
+		self::assertStringContainsString( 'form="' . $form_b . '"', $html_b );
+		self::assertStringNotContainsString( 'form="' . $form_a . '"', $html_b );
+
+		$shells = CartExternalFormBuffer::drain();
+		self::assertStringContainsString( 'id="' . $form_a . '"', $shells );
+		self::assertStringContainsString( 'id="' . $form_b . '"', $shells );
+		preg_match( '/<form id="' . preg_quote( $form_a, '/' ) . '".*?<\/form>/s', $shells, $form_a_html );
+		preg_match( '/<form id="' . preg_quote( $form_b, '/' ) . '".*?<\/form>/s', $shells, $form_b_html );
+		self::assertNotSame( [], $form_a_html );
+		self::assertNotSame( [], $form_b_html );
+		self::assertStringContainsString( 'value="alpha"', $form_a_html[0] );
+		self::assertStringNotContainsString( 'value="beta"', $form_a_html[0] );
+		self::assertStringContainsString( 'value="beta"', $form_b_html[0] );
+		self::assertStringNotContainsString( 'value="alpha"', $form_b_html[0] );
+	}
+
+	public function test_external_forms_are_flushed_after_woo_cart_form_hook(): void {
+		$src = (string) file_get_contents( dirname( __DIR__, 4 ) . '/src/Presentation/Frontend/CartCustomerContextEditorRenderer.php' );
+		self::assertStringContainsString( "add_action( 'woocommerce_after_cart'", $src );
+		self::assertStringContainsString( 'render_deferred_forms', $src );
+		self::assertStringNotContainsString( "add_action( 'woocommerce_after_cart_table'", $src );
+
+		$this->render_line( 'flush-line', PerItemContextFixtures::incompleteContext( 10, PerItemContextFixtures::matchingAccra() ) );
+		self::assertNotSame( [], CartExternalFormBuffer::queued_ids() );
+		ob_start();
+		$this->renderer->render_deferred_forms();
+		$out = (string) ob_get_clean();
+		self::assertStringContainsString( 'data-cetech-de-cart-external-forms="1"', $out );
+		self::assertStringContainsString( '<form id="' . CartDeliveryUiAnchor::form_id_for_cart_item_key( 'flush-line' ) . '"', $out );
+		self::assertSame( [], CartExternalFormBuffer::queued_ids() );
+	}
+
+	public function test_checkout_incomplete_actions_use_div_flow_markup(): void {
+		$html = $this->policy->render_incomplete_actions(
+			[
+				'incomplete_delivery'        => 1,
+				'can_apply_checkout_address' => true,
+				'first_incomplete_anchor'    => CartDeliveryUiAnchor::for_cart_item_key( 'accra' ),
+			]
+		);
+
+		self::assertStringContainsString( '<div class="cetech-de-checkout-incomplete-address__actions">', $html );
+		self::assertStringNotContainsString( '<p class="cetech-de-checkout-incomplete-address__actions">', $html );
+		self::assertStringContainsString( CustomerStorefrontCopy::add_delivery_address(), $html );
+		self::assertStringContainsString( CustomerStorefrontCopy::use_my_checkout_address(), $html );
+	}
+
+	public function test_missing_destination_opens_destination_disclosure(): void {
+		$html = $this->render_line( 'no-dest', PerItemContextFixtures::emptyMatchingContext( 10 ) );
+
+		self::assertStringContainsString( 'data-cetech-de-has-matching-location="0"', $html );
+		self::assertStringContainsString( 'cetech-de-cart-context__disclosure" open', $html );
+		self::assertStringContainsString( 'data-cetech-de-destination-control="country"', $html );
+	}
+
+	public function test_first_incomplete_anchor_skips_reselection_line(): void {
+		$reselect = $this->named_line( PerItemContextFixtures::incompleteContext( 10, PerItemContextFixtures::matchingGhanaCountry() ) );
+		$reselect[ CartDeliverySelectionCapture::CART_NEEDS_RESELECTION_KEY ] = true;
+		$editable = $this->named_line( PerItemContextFixtures::incompleteContext( 10, PerItemContextFixtures::matchingAccra() ) );
+		$summary  = $this->policy->summarize_cart(
+			[
+				'reselect' => $reselect,
+				'accra'    => $editable,
+			]
+		);
+
+		self::assertSame( 2, $summary['incomplete_delivery'] );
+		self::assertSame( CartDeliveryUiAnchor::for_cart_item_key( 'accra' ), $summary['first_incomplete_anchor'] );
+		self::assertStringContainsString( '#' . $summary['first_incomplete_anchor'], $this->policy->primary_add_address_url( $summary ) );
+	}
+
+	public function test_all_reselection_lines_leave_first_incomplete_anchor_empty(): void {
+		$one = $this->named_line( PerItemContextFixtures::incompleteContext( 10, PerItemContextFixtures::matchingAccra() ) );
+		$two = $this->named_line( PerItemContextFixtures::incompleteContext( 10, PerItemContextFixtures::matchingGhanaCountry() ) );
+		$one[ CartDeliverySelectionCapture::CART_NEEDS_RESELECTION_KEY ] = true;
+		$two[ CartDeliverySelectionCapture::CART_NEEDS_RESELECTION_KEY ] = true;
+		$summary = $this->policy->summarize_cart(
+			[
+				'one' => $one,
+				'two' => $two,
+			]
+		);
+
+		self::assertSame( 2, $summary['incomplete_delivery'] );
+		self::assertSame( '', $summary['first_incomplete_anchor'] );
+		self::assertSame( 'https://example.test/cart/', $this->policy->primary_add_address_url( $summary ) );
+		self::assertStringNotContainsString( '#', $this->policy->primary_add_address_url( $summary ) );
 	}
 
 	/**

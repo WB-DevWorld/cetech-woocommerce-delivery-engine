@@ -224,6 +224,7 @@
 				el.value = initial;
 			}
 		});
+		syncMethodState(editor);
 	}
 
 	function readEditor(editor) {
@@ -295,6 +296,7 @@
 		}
 		var isPickup = !!ext.is_pickup;
 		var uiAnchor = ext.ui_anchor || '';
+		var pickupHidden = isPickup ? ' hidden' : '';
 		var html = '<div class="cetech-de-blocks-line" data-cetech-de-address-complete="' +
 			(ext.address_complete ? '1' : '0') + '" data-cetech-de-address-required="' +
 			(ext.address_needed ? '1' : '0') + '">';
@@ -315,24 +317,23 @@
 		html += '</div>';
 		html += '<details class="cetech-de-blocks-editor" id="' + escapeHtml(uiAnchor) +
 			'" data-cetech-de-ui-anchor="' + escapeHtml(uiAnchor) +
+			'" data-cetech-de-has-matching-location="' + (ext.has_matching_location ? '1' : '0') +
 			'" data-cart-item-key="' + escapeHtml(item.key) + '">';
 		html += '<summary>' + escapeHtml(actionLabel(ext, i18n)) + '</summary>';
 		html += '<div class="cetech-de-blocks-editor__body">';
 
-		if (!isPickup) {
-			html += '<section class="cetech-de-blocks-editor__section" data-cetech-de-editor-location="1">';
-			html += '<h3 class="cetech-de-blocks-editor__section-title">' + escapeHtml(i18n.destination || 'Destination') + '</h3>';
-			if (ext.destination_summary) {
-				html += '<p class="cetech-de-blocks-editor__destination-summary">' + escapeHtml(ext.destination_summary) + '</p>';
-			}
-			html += '<details class="cetech-de-blocks-editor__disclosure"' + (ext.has_matching_location ? '' : ' open') + '>';
-			html += '<summary>' + escapeHtml(i18n.changeDestination || 'Change destination') + '</summary>';
-			html += fieldInput(fieldId(item.key, 'country'), 'cetech_de_matching_country', i18n.country || 'Country', matching.country);
-			html += fieldInput(fieldId(item.key, 'state'), 'cetech_de_matching_state', i18n.state || 'State / Region', matching.state);
-			html += fieldInput(fieldId(item.key, 'city'), 'cetech_de_matching_city', i18n.city || 'City', matching.city);
-			html += fieldInput(fieldId(item.key, 'postcode'), 'cetech_de_matching_postcode', i18n.postcode || 'Postcode', matching.postcode);
-			html += '</details></section>';
+		html += '<section class="cetech-de-blocks-editor__section" data-cetech-de-editor-location="1"' + pickupHidden + '>';
+		html += '<h3 class="cetech-de-blocks-editor__section-title">' + escapeHtml(i18n.destination || 'Destination') + '</h3>';
+		if (ext.destination_summary) {
+			html += '<p class="cetech-de-blocks-editor__destination-summary">' + escapeHtml(ext.destination_summary) + '</p>';
 		}
+		html += '<details class="cetech-de-blocks-editor__disclosure"' + (ext.has_matching_location ? '' : ' open') + '>';
+		html += '<summary>' + escapeHtml(i18n.changeDestination || 'Change destination') + '</summary>';
+		html += fieldInput(fieldId(item.key, 'country'), 'cetech_de_matching_country', i18n.country || 'Country', matching.country, ' data-cetech-de-destination-control="country" data-cetech-de-field="country"');
+		html += fieldInput(fieldId(item.key, 'state'), 'cetech_de_matching_state', i18n.state || 'State / Region', matching.state, ' data-cetech-de-destination-control="region" data-cetech-de-field="region"');
+		html += fieldInput(fieldId(item.key, 'city'), 'cetech_de_matching_city', i18n.city || 'City', matching.city, ' data-cetech-de-destination-control="locality" data-cetech-de-field="locality"');
+		html += fieldInput(fieldId(item.key, 'postcode'), 'cetech_de_matching_postcode', i18n.postcode || 'Postcode', matching.postcode, ' data-cetech-de-destination-control="postcode" data-cetech-de-field="postcode"');
+		html += '</details></section>';
 
 		html += '<section class="cetech-de-blocks-editor__section">';
 		html += '<h3 class="cetech-de-blocks-editor__section-title">' + escapeHtml(i18n.deliveryMethod || i18n.optionLegend || 'Delivery method') + '</h3>';
@@ -357,33 +358,31 @@
 		}
 		html += '</section>';
 
-		if (!isPickup) {
-			var hasLine2 = !!(address.address_2 && String(address.address_2).trim());
-			var hasRecipient = !!(address.first_name || address.last_name || address.phone || address.company);
-			html += '<div data-cetech-de-editor-address="1">';
-			html += '<section class="cetech-de-blocks-editor__section">';
-			html += '<h3 class="cetech-de-blocks-editor__section-title">' + escapeHtml(i18n.deliveryAddress || 'Delivery address') + '</h3>';
-			html += fieldInput(
-				fieldId(item.key, 'address-1'),
-				'cetech_de_address_1',
-				i18n.address1 || 'Address line 1',
-				address.address_1,
-				' data-cetech-de-required-address="1" autocomplete="address-line1"'
-			);
-			html += '<details class="cetech-de-blocks-editor__disclosure"' + (hasLine2 ? ' open' : '') + '>';
-			html += '<summary>' + escapeHtml(i18n.addressLine2Optional || i18n.address2 || 'Address line 2 (optional)') + '</summary>';
-			html += fieldInput(fieldId(item.key, 'address-2'), 'cetech_de_address_2', i18n.address2 || 'Address line 2 (optional)', address.address_2);
-			html += '</details></section></div>';
-			html += '<div data-cetech-de-editor-recipient="1">';
-			html += '<details class="cetech-de-blocks-editor__disclosure cetech-de-blocks-editor__recipient"' + (hasRecipient ? ' open' : '') + '>';
-			html += '<summary>' + escapeHtml(i18n.recipientOptional || 'Recipient details (optional)') + '</summary>';
-			html += '<div class="cetech-de-blocks-editor__grid">';
-			html += fieldInput(fieldId(item.key, 'first-name'), 'cetech_de_first_name', i18n.firstName || 'First name', address.first_name);
-			html += fieldInput(fieldId(item.key, 'last-name'), 'cetech_de_last_name', i18n.lastName || 'Last name', address.last_name);
-			html += fieldInput(fieldId(item.key, 'phone'), 'cetech_de_phone', i18n.phone || 'Phone', address.phone);
-			html += fieldInput(fieldId(item.key, 'company'), 'cetech_de_company', i18n.company || 'Company', address.company);
-			html += '</div></details></div>';
-		}
+		var hasLine2 = !!(address.address_2 && String(address.address_2).trim());
+		var hasRecipient = !!(address.first_name || address.last_name || address.phone || address.company);
+		html += '<div data-cetech-de-editor-address="1"' + pickupHidden + '>';
+		html += '<section class="cetech-de-blocks-editor__section">';
+		html += '<h3 class="cetech-de-blocks-editor__section-title">' + escapeHtml(i18n.deliveryAddress || 'Delivery address') + '</h3>';
+		html += fieldInput(
+			fieldId(item.key, 'address-1'),
+			'cetech_de_address_1',
+			i18n.address1 || 'Address line 1',
+			address.address_1,
+			' data-cetech-de-required-address="1" autocomplete="address-line1"'
+		);
+		html += '<details class="cetech-de-blocks-editor__disclosure"' + (hasLine2 ? ' open' : '') + '>';
+		html += '<summary>' + escapeHtml(i18n.addressLine2Optional || i18n.address2 || 'Address line 2 (optional)') + '</summary>';
+		html += fieldInput(fieldId(item.key, 'address-2'), 'cetech_de_address_2', i18n.address2 || 'Address line 2 (optional)', address.address_2);
+		html += '</details></section></div>';
+		html += '<div data-cetech-de-editor-recipient="1"' + pickupHidden + '>';
+		html += '<details class="cetech-de-blocks-editor__disclosure cetech-de-blocks-editor__recipient"' + (hasRecipient ? ' open' : '') + '>';
+		html += '<summary>' + escapeHtml(i18n.recipientOptional || 'Recipient details (optional)') + '</summary>';
+		html += '<div class="cetech-de-blocks-editor__grid">';
+		html += fieldInput(fieldId(item.key, 'first-name'), 'cetech_de_first_name', i18n.firstName || 'First name', address.first_name);
+		html += fieldInput(fieldId(item.key, 'last-name'), 'cetech_de_last_name', i18n.lastName || 'Last name', address.last_name);
+		html += fieldInput(fieldId(item.key, 'phone'), 'cetech_de_phone', i18n.phone || 'Phone', address.phone);
+		html += fieldInput(fieldId(item.key, 'company'), 'cetech_de_company', i18n.company || 'Company', address.company);
+		html += '</div></details></div>';
 
 		if (ext.can_split) {
 			var splitId = fieldId(item.key, 'split');
@@ -410,37 +409,91 @@
 		return html;
 	}
 
+	function selectedMethodChoice(editor) {
+		var select = editor.querySelector('select[name="cetech_de_delivery_option_key"]');
+		if (select && select.options && select.selectedIndex >= 0) {
+			var opt = select.options[select.selectedIndex];
+			return opt ? String(opt.getAttribute('data-cetech-de-choice') || '') : '';
+		}
+		var hidden = editor.querySelector('input[name="cetech_de_delivery_option_key"]');
+		return hidden ? String(hidden.getAttribute('data-cetech-de-choice') || '') : '';
+	}
+
+	function syncMethodState(editor) {
+		var pickup = selectedMethodChoice(editor) === 'store_pickup';
+		var location = editor.querySelector('[data-cetech-de-editor-location]');
+		var address = editor.querySelector('[data-cetech-de-editor-address]');
+		var recipient = editor.querySelector('[data-cetech-de-editor-recipient]');
+		if (location) {
+			location.hidden = pickup;
+		}
+		if (address) {
+			address.hidden = pickup;
+		}
+		if (recipient) {
+			recipient.hidden = pickup;
+		}
+	}
+
 	function bindMethodToggles(mount) {
 		mount.querySelectorAll('.cetech-de-blocks-editor').forEach(function (editor) {
 			var select = editor.querySelector('select[name="cetech_de_delivery_option_key"]');
-			var location = editor.querySelector('[data-cetech-de-editor-location]');
-			var address = editor.querySelector('[data-cetech-de-editor-address]');
-			var recipient = editor.querySelector('[data-cetech-de-editor-recipient]');
-			function sync() {
-				var pickup = false;
-				if (select && select.options && select.selectedIndex >= 0) {
-					var opt = select.options[select.selectedIndex];
-					pickup = !!(opt && opt.getAttribute('data-cetech-de-choice') === 'store_pickup');
-				} else {
-					var hidden = editor.querySelector('input[name="cetech_de_delivery_option_key"]');
-					pickup = !!(hidden && hidden.getAttribute('data-cetech-de-choice') === 'store_pickup');
-				}
-				if (location) {
-					location.hidden = pickup;
-				}
-				if (address) {
-					address.hidden = pickup;
-				}
-				if (recipient) {
-					recipient.hidden = pickup;
-				}
-			}
 			if (select) {
-				select.addEventListener('change', sync);
+				select.addEventListener('change', function () {
+					syncMethodState(editor);
+				});
 			}
-			sync();
+			syncMethodState(editor);
 			snapshotEditor(editor);
 		});
+	}
+
+	function isVisuallyHidden(el) {
+		if (!el) {
+			return true;
+		}
+		if (el.hidden) {
+			return true;
+		}
+		if (el.closest && el.closest('[hidden]')) {
+			return true;
+		}
+		return false;
+	}
+
+	function firstMissingDestinationControl(root) {
+		var order = ['country', 'region', 'locality', 'postcode'];
+		var i;
+		for (i = 0; i < order.length; i += 1) {
+			var key = order[i];
+			var control = root.querySelector('[data-cetech-de-destination-control="' + key + '"]');
+			if (!control || isVisuallyHidden(control)) {
+				continue;
+			}
+			if (String(control.value || '').trim() === '') {
+				return control;
+			}
+		}
+		return null;
+	}
+
+	function focusDeepLinkField(details) {
+		var hasMatching = details.getAttribute('data-cetech-de-has-matching-location') === '1';
+		var destDisclosure = details.querySelector('[data-cetech-de-editor-location] details');
+		if (!hasMatching && destDisclosure) {
+			destDisclosure.open = true;
+		}
+		if (!hasMatching) {
+			var dest = firstMissingDestinationControl(details);
+			if (dest && typeof dest.focus === 'function') {
+				dest.focus();
+				return;
+			}
+		}
+		var required = details.querySelector('[data-cetech-de-required-address]');
+		if (required && !isVisuallyHidden(required) && typeof required.focus === 'function') {
+			required.focus();
+		}
 	}
 
 	function fragmentAnchor() {
@@ -479,10 +532,7 @@
 				block: 'center'
 			});
 		}
-		var required = details.querySelector('[data-cetech-de-required-address]');
-		if (required && !required.closest('[hidden]') && typeof required.focus === 'function') {
-			required.focus();
-		}
+		focusDeepLinkField(details);
 		return true;
 	}
 
@@ -825,6 +875,8 @@
 		uiSignature: uiSignature,
 		fieldId: fieldId,
 		readEditor: readEditor,
+		resetEditor: resetEditor,
+		syncMethodState: syncMethodState,
 		applyDeepLink: applyDeepLink,
 		resetDeepLink: function () {
 			deepLinkApplied = false;

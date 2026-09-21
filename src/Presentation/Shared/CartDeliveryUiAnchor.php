@@ -23,6 +23,14 @@ final class CartDeliveryUiAnchor {
 		return self::PREFIX . substr( $digest, 0, 16 );
 	}
 
+	public static function form_id_for_cart_item_key( string $cart_item_key ): string {
+		return self::for_cart_item_key( $cart_item_key ) . '-form';
+	}
+
+	public static function reselection_form_id_for_cart_item_key( string $cart_item_key ): string {
+		return self::for_cart_item_key( $cart_item_key ) . '-reselect';
+	}
+
 	public static function is_valid( string $anchor ): bool {
 		return 1 === preg_match( '/^' . preg_quote( self::PREFIX, '/' ) . '[a-f0-9]{16}$/', $anchor );
 	}

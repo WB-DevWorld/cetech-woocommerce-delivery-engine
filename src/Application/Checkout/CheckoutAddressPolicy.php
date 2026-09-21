@@ -215,7 +215,7 @@ final class CheckoutAddressPolicy {
 	 * @param array<string, mixed> $summary
 	 */
 	public function render_incomplete_actions( array $summary ): string {
-		$html  = '<p class="cetech-de-checkout-incomplete-address__actions">';
+		$html  = '<div class="cetech-de-checkout-incomplete-address__actions">';
 		$href  = $this->primary_add_address_url( $summary );
 		if ( '' !== $href ) {
 			$html .= '<a class="button cetech-de-checkout-incomplete-address__primary" href="' . esc_url( $href ) . '">'
@@ -232,7 +232,7 @@ final class CheckoutAddressPolicy {
 			$html  .= '</button>';
 			$html  .= '</form>';
 		}
-		$html .= '</p>';
+		$html .= '</div>';
 
 		return $html;
 	}
@@ -303,7 +303,8 @@ final class CheckoutAddressPolicy {
 			}
 
 			++$incomplete_delivery;
-			if ( '' === $first_incomplete_anchor ) {
+			$needs_reselection = ! empty( $item[ CartDeliverySelectionCapture::CART_NEEDS_RESELECTION_KEY ] );
+			if ( '' === $first_incomplete_anchor && ! $needs_reselection ) {
 				$first_incomplete_anchor = CartDeliveryUiAnchor::for_cart_item_key( (string) $cart_item_key );
 			}
 

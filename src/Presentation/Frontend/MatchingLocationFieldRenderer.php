@@ -27,7 +27,7 @@ final class MatchingLocationFieldRenderer {
 		];
 	}
 
-	public static function render( ?MatchingLocation $location, string $id_prefix = 'cetech-de-matching', bool $use_woocommerce_fields = true, bool $show_intro = false, bool $default_to_base_country = true, bool $force_locality_visible = false ): string {
+	public static function render( ?MatchingLocation $location, string $id_prefix = 'cetech-de-matching', bool $use_woocommerce_fields = true, bool $show_intro = false, bool $default_to_base_country = true, bool $force_locality_visible = false, string $form_owner = '' ): string {
 		$names   = self::default_names();
 		$country = $location instanceof MatchingLocation ? $location->country : '';
 		$state   = $location instanceof MatchingLocation ? $location->state : '';
@@ -74,6 +74,9 @@ final class MatchingLocationFieldRenderer {
 					'class'       => [ 'form-row-wide', 'cetech-de-matching-location__control' ],
 					'priority'    => 10,
 					'autocomplete'=> 'country',
+					'custom_attributes' => [
+						'data-cetech-de-destination-control' => 'country',
+					],
 				],
 				$country
 			);
@@ -90,6 +93,9 @@ final class MatchingLocationFieldRenderer {
 					'country'       => $country,
 					'priority'      => 20,
 					'autocomplete'  => 'address-level1',
+					'custom_attributes' => [
+						'data-cetech-de-destination-control' => 'region',
+					],
 				],
 				$state
 			);
@@ -106,6 +112,7 @@ final class MatchingLocationFieldRenderer {
 					'autocomplete' => 'address-level2',
 					'custom_attributes' => [
 						'data-cetech-de-locality-input' => '1',
+						'data-cetech-de-destination-control' => 'locality',
 						'role'                          => 'combobox',
 						'aria-autocomplete'             => 'list',
 						'aria-expanded'                 => 'false',
@@ -125,6 +132,9 @@ final class MatchingLocationFieldRenderer {
 					'class'        => [ 'form-row-wide', 'cetech-de-matching-location__control' ],
 					'priority'     => 40,
 					'autocomplete' => 'postal-code',
+					'custom_attributes' => [
+						'data-cetech-de-destination-control' => 'postcode',
+					],
 				],
 				$postcode
 			);
@@ -133,7 +143,7 @@ final class MatchingLocationFieldRenderer {
 			$html .= '<ul id="' . esc_attr( $id_prefix . '-city-list' ) . '" class="cetech-de-locality-results" role="listbox" hidden></ul>';
 			$html .= '</fieldset>';
 
-			return $html;
+			return self::associate_form_owner( $html, $form_owner );
 		}
 
 		$html .= self::select_or_input( $id_prefix . '-country', $names['country'], __( 'Country', 'cetech-woocommerce-delivery-engine' ), $country, self::countries(), 'country', false );
@@ -142,7 +152,7 @@ final class MatchingLocationFieldRenderer {
 		$html .= self::text_input( $id_prefix . '-postcode', $names['postcode'], __( 'Postcode', 'cetech-woocommerce-delivery-engine' ), $postcode, 'postcode', '' === $postcode );
 		$html .= '</fieldset>';
 
-		return $html;
+		return self::associate_form_owner( $html, $form_owner );
 	}
 
 	/**
@@ -158,7 +168,7 @@ final class MatchingLocationFieldRenderer {
 		$reveal_attr = in_array( $field, [ 'region', 'locality', 'postcode' ], true ) ? ' data-cetech-de-reveal="' . esc_attr( $field ) . '"' : '';
 		$html        = '<p class="cetech-de-matching-location__field"' . $field_attr . $reveal_attr . $hidden_attr . '>';
 		$html       .= '<label for="' . esc_attr( $id ) . '">' . esc_html( $label ) . '</label>';
-		$html       .= '<select id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '">';
+		$html       .= '<select id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '" data-cetech-de-destination-control="' . esc_attr( $field ) . '">';
 		$html       .= '<option value="">' . esc_html__( 'Select…', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		foreach ( $choices as $code => $choice_label ) {
 			$selected = strtoupper( (string) $code ) === strtoupper( $value ) ? ' selected="selected"' : '';
@@ -175,7 +185,7 @@ final class MatchingLocationFieldRenderer {
 
 		return '<p class="cetech-de-matching-location__field" data-cetech-de-field="locality" data-cetech-de-reveal="locality"' . $hidden_attr . '>'
 			. '<label for="' . esc_attr( $id ) . '">' . esc_html__( 'City / Town', 'cetech-woocommerce-delivery-engine' ) . '</label>'
-			. '<input type="search" id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( $value ) . '" data-cetech-de-locality-input="1" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="' . esc_attr( $list_id ) . '" autocomplete="off" />'
+			. '<input type="search" id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( $value ) . '" data-cetech-de-locality-input="1" data-cetech-de-destination-control="locality" role="combobox" aria-autocomplete="list" aria-expanded="false" aria-controls="' . esc_attr( $list_id ) . '" autocomplete="off" />'
 			. '<ul id="' . esc_attr( $list_id ) . '" class="cetech-de-locality-results" role="listbox" hidden></ul>'
 			. '</p>';
 	}
@@ -187,8 +197,21 @@ final class MatchingLocationFieldRenderer {
 
 		return '<p class="cetech-de-matching-location__field"' . $field_attr . $reveal_attr . $hidden_attr . '>'
 			. '<label for="' . esc_attr( $id ) . '">' . esc_html( $label ) . '</label>'
-			. '<input type="text" id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( $value ) . '" />'
+			. '<input type="text" id="' . esc_attr( $id ) . '" name="' . esc_attr( $name ) . '" value="' . esc_attr( $value ) . '"'
+			. ( '' !== $field ? ' data-cetech-de-destination-control="' . esc_attr( $field ) . '"' : '' )
+			. ' />'
 			. '</p>';
+	}
+
+	private static function associate_form_owner( string $html, string $form_owner ): string {
+		if ( '' === $form_owner ) {
+			return $html;
+		}
+
+		$attr    = ' form="' . esc_attr( $form_owner ) . '"';
+		$updated = preg_replace( '/<(input|select|textarea|button)(\s)/i', '<$1' . $attr . '$2', $html );
+
+		return is_string( $updated ) ? $updated : $html;
 	}
 
 	/**

@@ -28,5 +28,8 @@ final class CartDeliveryUiAnchorTest extends TestCase {
 			'https://example.test/cart/#' . $first,
 			CartDeliveryUiAnchor::cart_url( 'https://example.test/cart/#stale', $first )
 		);
+		self::assertSame( $first . '-form', CartDeliveryUiAnchor::form_id_for_cart_item_key( $key ) );
+		self::assertSame( $first . '-reselect', CartDeliveryUiAnchor::reselection_form_id_for_cart_item_key( $key ) );
+		self::assertSame( 'https://example.test/cart/', CartDeliveryUiAnchor::cart_url( 'https://example.test/cart/', '' ) );
 	}
 }

@@ -202,6 +202,34 @@ final class BlocksPerItemCustomerUxTest extends TestCase {
 		self::assertFalse( BlocksPublicPayload::contains_forbidden( $payload ) );
 	}
 
+	public function test_top_level_first_incomplete_anchor_cannot_point_at_reselection_item(): void {
+		$policy   = ( new ReflectionClass( \CetechDeliveryEngine\Application\Checkout\CheckoutAddressPolicy::class ) )->newInstanceWithoutConstructor();
+		$reselect = PerItemContextFixtures::cartItem(
+			$this->intent(),
+			PerItemContextFixtures::incompleteContext( 1, PerItemContextFixtures::matchingGhanaCountry() ),
+			1,
+			[ CartDeliverySelectionCapture::CART_NEEDS_RESELECTION_KEY => true ]
+		);
+		$editable = PerItemContextFixtures::cartItem(
+			$this->intent(),
+			PerItemContextFixtures::incompleteContext( 1, PerItemContextFixtures::matchingAccra() )
+		);
+		$summary = $policy->summarize_cart(
+			[
+				'reselect' => $reselect,
+				'accra'    => $editable,
+			]
+		);
+		$reselect_payload = BlocksPublicPayload::cart_item( $reselect, null, null, 'reselect' );
+		$editable_payload = BlocksPublicPayload::cart_item( $editable, null, null, 'accra' );
+
+		self::assertNull( $reselect_payload['ui_anchor'] );
+		self::assertFalse( $reselect_payload['can_edit_context'] );
+		self::assertSame( CartDeliveryUiAnchor::for_cart_item_key( 'accra' ), $summary['first_incomplete_anchor'] );
+		self::assertSame( $summary['first_incomplete_anchor'], $editable_payload['ui_anchor'] );
+		self::assertNotSame( $summary['first_incomplete_anchor'], $reselect_payload['ui_anchor'] );
+	}
+
 	public function test_quantity_split_uses_mutation_service(): void {
 		$accra  = PerItemContextFixtures::deliveryContext( 1, PerItemContextFixtures::deliveryAccraStreet( '1 Independence Avenue' ) );
 		$street = PerItemContextFixtures::deliveryContext( 1, PerItemContextFixtures::deliveryAccraStreet( '99 Ring Road' ) );
