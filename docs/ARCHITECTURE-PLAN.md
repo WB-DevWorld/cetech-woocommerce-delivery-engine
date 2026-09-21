@@ -704,7 +704,7 @@ All value objects immutable; equality by value.
 
 ### Decision F — PHP enum strategy
 
-**Minimum PHP: 8.1** — native backed enums, `readonly` properties, modern WooCommerce stack alignment; WordPress 6.x + WooCommerce 8+ commonly run PHP 8.1+ in production.
+**Minimum PHP: 8.1** — native backed enums, `readonly` properties, commercial compatibility floor. **CETECH production / primary qualification PHP is 8.5.x**; see `docs/PHP-RUNTIME-POLICY.md`. Do not treat the 8.1 floor as the production runtime.
 
 Use **PHP 8.1 backed enums** in `Domain\Enum\`:
 
@@ -1344,7 +1344,7 @@ Never delete shipment history on routine deactivation.
 
 **Mandatory scenarios:** separate Air/Sea lines, missing rate card blocks checkout, no supplier in HTML, immutable snapshot after paid, idempotent shipment create, exclusive managed packages hide flat rate.
 
-CI target: PHP 8.1 + WC latest L-1 minimum.
+CI target: PHP **8.5** CETECH production (blocking) plus PHP 8.1 minimum-compatibility, PHP 8.3 WooCommerce recommended-floor, and PHP 8.4 mature compatibility. PHP 8.1 remains the commercial floor, not the production runtime.
 
 ---
 
@@ -1399,7 +1399,7 @@ CI target: PHP 8.1 + WC latest L-1 minimum.
 | **C** | Category/site fallback rules **optional**; flags default **off** in V1. Product + variation rules first. |
 | **D** | **Classic checkout = V1 baseline.** Blocks adapter **future-only**; flag default off. |
 | **E** | WCFM/VitePOS: **adapter interfaces + Null + stub**; not required for V1 release. |
-| **F** | **PHP 8.1+** minimum; use **backed enums** for domain statuses/routes. |
+| **F** | **PHP 8.1+** commercial minimum; **PHP 8.5.x** CETECH production target; use **backed enums** for domain statuses/routes. |
 | **G** | Shipment creation default **`payment_confirmed`**; idempotent; configurable to `order_created`. |
 | **H** | Feature flags default **off** for customer takeover (selector, timeline); integrations auto-suggest but WCFM/VitePOS/Blocks off. |
 | **I** | Privacy table §55 — strict DTO separation; private data never in customer surfaces. |

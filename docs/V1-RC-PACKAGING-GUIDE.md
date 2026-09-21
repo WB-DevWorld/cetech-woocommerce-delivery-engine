@@ -32,7 +32,7 @@ Do **not** package from uncommitted changes.
 
 | Tool | Purpose |
 |------|---------|
-| **PHP** 8.1+ | Lint + optional Composer platform |
+| **PHP** 8.5.x for CETECH production qualification (latest stable 8.5 patch). PHP 8.1+ remains the commercial floor. | Lint + Composer + package verification. Do not qualify a CETECH release only on 8.1/8.2. |
 | **Composer** | Generate `vendor/autoload.php` (runtime required) |
 | **PowerShell** 5.1+ | Run `scripts/build-v1-rc-package.ps1` |
 | **Zip** | Provided via `Compress-Archive` in PowerShell |

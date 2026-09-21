@@ -11,11 +11,12 @@
 
 ## Tests and evidence
 - Composer:
-- PHP lint:
-- PHPUnit:
+- PHP lint (8.1 minimum-compatibility and 8.5 production target):
+- PHPUnit (include PHP 8.5 CETECH production target):
 - JS:
 - Package/extracted ZIP (if applicable):
 - Runtime/browser/staging evidence (if applicable):
+- PHP 8.5 WordPress/WooCommerce/HPOS evidence (if this change can affect runtime):
 
 ## Environment / remote side effects
 

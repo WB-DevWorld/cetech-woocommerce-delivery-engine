@@ -5,7 +5,9 @@
 **Project:** CETECH WooCommerce Delivery Engine
 **Repository namespace:** `CetechDeliveryEngine\`
 **WooCommerce dependency:** Required
-**PHP minimum:** 8.1+
+**PHP commercial minimum:** 8.1+
+**PHP CETECH production target:** 8.5.x (latest stable 8.5 patch at deployment; PHP 8.6 pre-release must not be used)
+**Canonical PHP policy:** `docs/PHP-RUNTIME-POLICY.md`
 **Current known implementation baseline:** `1.0.0-rc.10`, schema target `5`; protected published tags `1.0.0-rc.10` (after merge/tag) and historical `1.0.0-rc.9` / `1.0.0-rc.8` / `1.0.0-rc.7` / `1.0.0-rc.6` / `1.0.0-rc.5`  
 **Canonical maintained rulebook:** `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`
 

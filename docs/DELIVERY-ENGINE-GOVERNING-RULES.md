@@ -621,6 +621,18 @@ If Playwright is unavailable, state it.
 
 If WPML is not installed in the test environment, do not claim a WPML-present pass.
 
+Passing PHP 8.1 or PHP 8.2 does not prove PHP 8.5 compatibility.
+
+### PHP runtime targets
+
+Do not treat the commercial minimum PHP version as the CETECH production runtime.
+
+- **CETECH production / primary qualification:** PHP 8.5.x, latest stable patch at deployment. PHP 8.6 pre-release must not be used as the production target.
+- **Commercial supported minimum:** PHP 8.1 unless a later explicit support-policy decision changes it. A minimum-version CI job is a compatibility test, not the production target.
+- Canonical policy: `docs/PHP-RUNTIME-POLICY.md`.
+
+If an upstream WordPress, WooCommerce, theme, or plugin dependency is incompatible with PHP 8.5, report that incompatibility explicitly. Do not silently lower CETECH's production PHP version.
+
 ### Regression protection
 
 New Stage 14 work must protect proven RC.4 behaviour including:

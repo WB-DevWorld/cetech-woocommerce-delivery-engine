@@ -16,6 +16,8 @@ CETECH WooCommerce Delivery Engine is a reusable commercial-style WooCommerce pl
 
 **Hard dependency:** WooCommerce only.
 
+**PHP:** CETECH production recommended/certified runtime is PHP 8.5.x (latest stable patch at deployment). Commercial supported minimum remains PHP 8.1 until a later explicit support-policy decision. PHP 8.6 pre-release is not a production target.
+
 **Optional integrations (not required):** WoodMart, WPML, WCML, WCFM, VitePOS, Redis, WP Rocket, WooCommerce Blocks, tracking plugins, and future carrier APIs.
 
 This 0.1.0 release is the **Phase 1A core foundation skeleton**. It does not yet change product, cart, checkout, shipping, order, or customer-facing delivery behaviour.

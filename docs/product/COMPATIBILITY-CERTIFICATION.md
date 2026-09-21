@@ -45,7 +45,7 @@ Status: owner-approved compatibility policy for `PRODUCT-TRUTH-BASELINE-1`. “D
 | Action Scheduler | Background work | Yes through Woo | Yes for bulk | Yes | RC line evidence | Mandatory when background modules enabled |
 | GeoNames | Geography data provider | Yes, replaceable | geo.11 importer/preflight | Unit + reported official Ghana import/real DB | geo.11 only; not physically accepted | Active geo stream; provider never business identity |
 | OpenStreetMap/Nominatim | Enrichment/verification only | Yes | No live client | No | None | Optional; no public client-side abuse |
-| PHP | Runtime | PHP ≥8.1 | Yes | CI PHP 8.1 and PHPUnit 8.2 | RC.11 CI/package evidence | Mandatory supported matrix |
+| PHP | Runtime | **Certified/recommended: PHP 8.5.x.** Supported minimum: PHP ≥8.1 until a later commercial-support decision. | Yes | CI: 8.1 minimum-compatibility; 8.3; 8.4; **8.5 blocking production target** (PHPUnit, MariaDB, WP/Woo smoke) | Plugin parse/PHPUnit historically run on local PHP 8.5; RC.11/RC.12 GitHub jobs were 8.1 lint + 8.2 PHPUnit and must not be misread as CETECH production. Full WoodMart/B2BKing/FOX stack on 8.5 remains Pilot evidence. | Mandatory: distinguish production vs minimum |
 | WordPress multisite | Platform variant | Not sufficiently specified | Unverified | None | None | Explicitly uncertified and not advertised as supported for Stable 1.0 |
 
 ## Certification gaps that must not be described as support proof

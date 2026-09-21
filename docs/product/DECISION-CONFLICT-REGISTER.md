@@ -22,6 +22,7 @@ When evidence conflicts, use: newer explicit owner instruction → immutable rep
 | Interface model | PHP API, WP hooks, REST/Store API/OpenAPI, WP-CLI, and events/webhooks share application services. | `DE-API-*`, `DE-CLI-*`, `DE-EVENT-*` |
 | Advanced execution | POD/OTP/QR/GPS/photo/driver/live-carrier execution is deferred. | `DE-DEFER-*` |
 | Release truth | Implemented, CI-green, accepted, merged, released, and deployed are separate states. | `DE-REL-*` |
+| PHP production vs minimum | CETECH production/certified PHP is 8.5.x (latest stable patch). Commercial supported minimum remains PHP 8.1 until a later explicit support-policy decision. PHP 8.6 pre-release must not be used. CI 8.1/8.2 jobs are not the production target. | Compatibility matrix; `docs/PHP-RUNTIME-POLICY.md` |
 | Stable 1.0 policy floor | Independent Return Policy and Refund Policy foundations are required before Stable 1.0. | `DE-RETURN-*`, `DE-REFUND-*` |
 | Stable 1.0 economics floor | Customer charge, promotions/subsidy, and private economics are separated at schema/contract level; deeper reconciliation, allocation, and analytics may continue after 1.0. | `DE-PROMO-*`, `DE-ECON-*`, `DE-ANALYTICS-*` |
 | Commercial channel and name | Use an independent direct commercial distribution/update/licensing mechanism; WordPress.org is not required; replace the CETECH working name before the main Stable 1.0 commercial release. | `DE-REL-*`; Constitution |
@@ -109,5 +110,6 @@ These are later implementations that should be adopted into canonical design wor
 | 4 | Compatibility certification | Before Stable 1.0 prioritize WooCommerce/HPOS, Classic, Blocks, Storefront, current supported WoodMart, B2BKing, and FOX/WOOCS. Certify WPML/WCML before 1.0 only if advertised as supported at launch. Keep other optional targets explicitly uncertified. |
 | 5 | Brand and public naming | “CETECH WooCommerce Delivery Engine” remains an internal/working name. Rename the externally commercialized product independently of CETECH before the main Stable 1.0 commercial release. |
 | 6 | Post-geo release | After geo.12 technical closure and physical owner QA, create a controlled CETECH production Pilot/release candidate before waiting for all Stable 1.0 realignment work. Do not infer or create RC.12 from this decision. |
+| 7 | PHP production vs minimum (2026-09-21) | CETECH production and primary qualification use PHP 8.5.x (latest stable patch; 8.5.10 as of this decision). PHP 8.1 remains the commercial supported minimum until deliberately changed. PHP 8.6 must not be used as production. Do not treat historical CI PHP 8.1/8.2 jobs as the CETECH production runtime. |
 
-No owner decision from this audit remains open. Later changes require a new explicit decision record; frozen Requirement IDs must not be renumbered.
+No frozen Requirement IDs were renumbered. Decision 7 (PHP production vs minimum, 2026-09-21) is a later explicit owner instruction recorded after `PRODUCT-TRUTH-BASELINE-1`.

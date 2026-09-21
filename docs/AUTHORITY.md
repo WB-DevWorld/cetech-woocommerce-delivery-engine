@@ -31,5 +31,6 @@ The owner-accepted product-truth baseline is published under `docs/product/`. Us
 | `docs/product/REALIGNMENT-PLAN.md` | Approved dependency order, protected foundations, and implementation waves |
 | `docs/product/AUDIT-MANIFEST.yaml` | Audit provenance, counts, limitations, acceptance checkpoint, and resume state |
 | `docs/product/README.md` | Package index, source coverage, limitations, and publication boundary |
+| `docs/PHP-RUNTIME-POLICY.md` | CETECH production PHP 8.5 versus commercial minimum PHP 8.1 versus CI matrix |
 
 `CURRENT-WORK.md` and `docs/STATUS_CURRENT.md` continue to govern live work authorization and release/deployment state. Product-control-plane artifacts do not by themselves prove that a capability is implemented, accepted, released, certified, or deployed. A newer explicit owner decision may amend the baseline, but the change must be recorded in the decision register and reflected in the registry without renumbering frozen Requirement IDs.
