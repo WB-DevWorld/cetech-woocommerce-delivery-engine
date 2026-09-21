@@ -621,6 +621,21 @@ If Playwright is unavailable, state it.
 
 If WPML is not installed in the test environment, do not claim a WPML-present pass.
 
+Passing PHP 8.3 or PHP 8.4 does not prove PHP 8.5 compatibility. Passing an older PHP that WordPress or WooCommerce can still boot does not make that version commercially supported.
+
+### PHP runtime targets
+
+Do not confuse the oldest PHP version upstream software can run with the oldest PHP version WordPress and WooCommerce currently recommend. This product uses the recommended floor.
+
+- **Supported / certified range today:** PHP 8.3 through PHP 8.5.x.
+- **Minimum supported PHP:** 8.3. Plugin header, Composer, and activation guard must match. PHP 8.3 is a blocking CI gate.
+- **Recommended production PHP:** latest qualified stable release. **Currently qualified latest stable:** PHP 8.5.x, latest stable patch at deployment. PHP 8.5 is a blocking CETECH production CI gate.
+- **Not supported:** PHP 8.1 and PHP 8.2. Do not advertise them.
+- **Future PHP (including 8.6):** do not hard-code 8.5 as a permanent architectural maximum. A newer stable PHP line is added only after WordPress, WooCommerce, Delivery Engine CI, database/migration, stack, and relevant third-party CETECH qualification. Do not run production on pre-release PHP.
+- Canonical policy: `docs/PHP-RUNTIME-POLICY.md`.
+
+If an upstream WordPress, WooCommerce, theme, or plugin dependency is incompatible with PHP 8.5, report that incompatibility explicitly. Do not silently lower CETECH's production PHP version.
+
 ### Regression protection
 
 New Stage 14 work must protect proven RC.4 behaviour including:

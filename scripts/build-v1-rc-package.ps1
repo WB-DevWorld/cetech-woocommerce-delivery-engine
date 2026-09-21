@@ -105,7 +105,7 @@ New-Item -ItemType Directory -Path $DistDir -Force | Out-Null
 $ExcludeDirNames = @(
     '.git', '.github', 'dist', 'build', 'node_modules', 'tests', 'coverage',
     '.vscode', '.idea', '.cursor', 'vendor', 'training', 'test-results',
-    'Design Reference'
+    'Design Reference', 'docker'
 )
 
 $ExcludeDirPrefixes = @(
@@ -114,7 +114,7 @@ $ExcludeDirPrefixes = @(
 
 $ExcludeFilePatterns = @(
     '*.zip', '*.log', '.env', '.env.local', '.DS_Store', 'Thumbs.db', 'desktop.ini',
-    'phpunit.xml', 'phpunit-baseline.txt', 'package.json', 'package-lock.json',
+    'phpunit.xml', 'phpunit.real-db.xml', 'phpunit-baseline.txt', 'package.json', 'package-lock.json',
     'vitest.config.js', 'vitest.config.ts', 'npm-debug.log*'
 )
 

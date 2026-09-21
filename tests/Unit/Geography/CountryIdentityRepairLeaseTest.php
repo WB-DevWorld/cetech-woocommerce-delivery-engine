@@ -13,7 +13,7 @@ use CetechDeliveryEngine\Tests\Support\InMemoryGeographyPackRepository;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Issue #35 owner-fenced renewable repair lease (geo-country.4).
+ * Issue #35 owner-fenced renewable repair lease (geo-country.5).
  */
 final class CountryIdentityRepairLeaseTest extends TestCase {
 

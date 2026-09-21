@@ -1,15 +1,16 @@
 # POST-RC.12 — GeoNames canonical country identity (Issue #35)
 
-**Current candidate identity:** `1.0.0-dev.geo-country.4`  
+**Current candidate identity:** `1.0.0-dev.geo-country.5`  
 **Schema:** `6` (unchanged; no schema 7)  
 **Branch:** `fix/geonames-country-identity`  
-**Base:** protected `master` `5abfab0b5078e67b158f282088022b2ac2566f22`  
-**Runtime / package-source SHA:** `ce1bcff053385a042993e50c3b216d8649d7b43d`  
+**Base:** protected `master` `d5ca30d1d92bb69b8a8ffbca2606d30906b8d4a1` (PR #37 PHP 8.3–8.5.x)  
+**Runtime / package-source SHA:** pending committed runtime SHA  
+**Frozen geo-country.4 runtime / package-source SHA:** `ce1bcff053385a042993e50c3b216d8649d7b43d` (do not rebuild or overwrite)  
 **Frozen geo-country.3 runtime / package-source SHA:** `bae75f79d0094c78706912c9a530f09ea21b9bed` (do not rebuild or overwrite)  
 **Frozen geo-country.2 runtime / package-source SHA:** `23237eedece174b2f9c4334693b137310ce5c54a` (do not rebuild or overwrite)  
 **Frozen geo-country.1 runtime / package-source SHA:** `b61466ffc14c71e1a678eaf2d5b84f22bf6040cb` (do not rebuild or overwrite)  
 **PR:** https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/36  
-**Not RC.13. Not deployed. Awaiting owner/ChatGPT deployment review.**
+**Not RC.13. Not deployed. Awaiting owner/ChatGPT final deployment review.**
 
 Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/35
 
@@ -43,9 +44,9 @@ Do not overwrite or rebuild this artifact.
 - Packaged PHP lint: `501 files / 0 failures`
 - Not deployed to training
 
-## Package (geo-country.4, after CI)
+## Package (geo-country.4, frozen pre-master-realignment evidence)
 
-Built from a clean committed tree after GitHub CI SUCCESS on runtime/package-source `ce1bcff053385a042993e50c3b216d8649d7b43d`. Do not treat this ZIP as RC.13 or as a replacement for RC.12, geo-country.1, geo-country.2, or geo-country.3.
+Do not overwrite or rebuild this artifact.
 
 - Source SHA: `ce1bcff053385a042993e50c3b216d8649d7b43d`
 - Filename: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.4.zip`
@@ -54,6 +55,17 @@ Built from a clean committed tree after GitHub CI SUCCESS on runtime/package-sou
 - Production-package verifier: PASS (staged and extracted)
 - Packaged PHP lint: `501 files / 0 failures`
 - Not deployed to training
+
+## Package (geo-country.5, after CI)
+
+Built from a clean committed tree after GitHub CI SUCCESS on the runtime/package-source SHA, with protected master `d5ca30d1d92bb69b8a8ffbca2606d30906b8d4a1` (PR #37) integrated. Do not treat this ZIP as RC.13 or as a replacement for RC.12 or geo-country.1–.4.
+
+- Source SHA: pending committed runtime SHA
+- Filename: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.5.zip`
+- Bytes: pending package build
+- SHA-256: pending package build
+- Production-package verifier: pending
+- Packaged PHP lint: pending
 - Not deployed to training
 
 ## Country-identity authority
@@ -194,7 +206,7 @@ This is **not** a Ghana-only migration, **not** a schema 7 change, **not** a pac
 
 BEFORE: country id 1 = Dagomba / normalized ghana. Training plugin remains `1.0.0-dev.geo-live.2`.
 
-AFTER a later authorized deploy of the exact `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.4.zip` (not this task; backup first):
+AFTER a later authorized deploy of the exact `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.5.zip` (not this task; backup first; training PHP remains 8.4.24):
 
 - same id `1`, same location_key `1caaf0dc-d575-4dd3-8a9d-217d136e5548`, same `GH`
 - canonical_name `Ghana`, normalized_name `ghana`, ascii consistent

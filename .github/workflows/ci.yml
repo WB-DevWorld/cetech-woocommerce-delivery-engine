@@ -1,5 +1,13 @@
 name: Delivery Engine CI
 
+# PHP policy: docs/PHP-RUNTIME-POLICY.md
+# Supported/certified range today: PHP 8.3 through PHP 8.5.x
+# Minimum supported: PHP 8.3 (blocking)
+# CETECH production target: latest stable PHP 8.5.x (blocking)
+# PHP 8.1 and 8.2 are not supported and must not be advertised.
+# PHP 8.6+ pre-release is not a production target. A later stable PHP
+# line is added only after WordPress, WooCommerce, and Delivery Engine qualification.
+
 on:
   pull_request:
     branches:
@@ -22,55 +30,185 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  runtime-php81:
-    name: Runtime PHP 8.1
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.1'
-          coverage: none
-      - name: Lint runtime PHP at declared minimum
-        shell: bash
-        run: |
-          set -euo pipefail
-          targets=(cetech-woocommerce-delivery-engine.php uninstall.php src database)
-          for target in "${targets[@]}"; do
-            if [ -f "$target" ]; then
-              php -l "$target" >/dev/null
-            elif [ -d "$target" ]; then
-              while IFS= read -r -d '' file; do
-                php -l "$file" >/dev/null
-              done < <(find "$target" -type f -name '*.php' -print0)
-            fi
-          done
-
-  php-tests:
-    name: PHP / PHPUnit 8.2
+  php83-min:
+    name: PHP 8.3 Minimum Supported
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.3'
           tools: composer:v2
           coverage: none
+      - name: Show PHP version
+        run: php -v
+      - name: Validate Composer metadata
+        run: composer validate --no-check-publish
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Runtime PHP lint
+        shell: bash
+        run: bash scripts/ci-lint-php.sh cetech-woocommerce-delivery-engine.php uninstall.php src database
+      - name: Lint application, tests and tooling
+        shell: bash
+        run: bash scripts/ci-lint-php.sh .
+      - name: PHPUnit
+        run: vendor/bin/phpunit
+      - name: Verify team control plane
+        run: php scripts/verify-control-plane.php
+
+  php84-compat:
+    name: PHP 8.4 Compatibility
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+          coverage: none
+      - name: Show PHP version
+        run: php -v
       - name: Validate Composer metadata
         run: composer validate --no-check-publish
       - name: Install PHP dependencies
         run: composer install --no-interaction --prefer-dist --no-progress
       - name: Lint application, tests and tooling
         shell: bash
-        run: |
-          set -euo pipefail
-          while IFS= read -r -d '' file; do
-            php -l "$file" >/dev/null
-          done < <(find . -type f -name '*.php' -not -path './vendor/*' -print0)
+        run: bash scripts/ci-lint-php.sh .
       - name: PHPUnit
         run: vendor/bin/phpunit
+
+  php85-primary:
+    name: PHP 8.5 CETECH Production Target
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          tools: composer:v2
+          coverage: none
+          extensions: zip, mbstring
+      - name: Show PHP version
+        run: |
+          php -v
+          php -r 'echo "php_major_minor=" . PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION, PHP_EOL;'
+      - name: Reject pre-release PHP as this production job
+        shell: bash
+        run: |
+          set -euo pipefail
+          major_minor="$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')"
+          test "$major_minor" = "8.5"
+      - name: Validate Composer metadata
+        run: composer validate --no-check-publish
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Production PHP lint
+        shell: bash
+        run: bash scripts/ci-lint-php.sh cetech-woocommerce-delivery-engine.php uninstall.php src database
+      - name: Lint application, tests and tooling
+        shell: bash
+        run: bash scripts/ci-lint-php.sh .
+      - name: Full PHPUnit suite
+        run: vendor/bin/phpunit
+      - name: Production tree autoload and extracted PHP lint
+        shell: bash
+        run: bash scripts/ci-stage-production-tree.sh "${RUNNER_TEMP}/cetech-de-prod-tree"
+
+  php85-mariadb:
+    name: PHP 8.5 MariaDB Geography/Migrations
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: geo11pass
+          MARIADB_DATABASE: cetech_geo11
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          tools: composer:v2
+          coverage: none
+          extensions: pdo_mysql, zip
+      - name: Install PHP dependencies
+        run: composer install --no-interaction --prefer-dist --no-progress
+      - name: Fail if MariaDB is not reachable
+        env:
+          CETECH_DE_REAL_DB_HOST: 127.0.0.1
+          CETECH_DE_REAL_DB_PORT: 3306
+          CETECH_DE_REAL_DB_USER: root
+          CETECH_DE_REAL_DB_PASSWORD: geo11pass
+          CETECH_DE_REAL_DB_NAME: cetech_geo11
+        run: |
+          php -r '
+            require "vendor/autoload.php";
+            $db = CetechDeliveryEngine\Tests\Support\RealMysqliWpdb::try_connect();
+            if ( ! $db instanceof CetechDeliveryEngine\Tests\Support\RealMysqliWpdb ) {
+              fwrite(STDERR, "MariaDB preflight failed on PHP 8.5\n");
+              exit(1);
+            }
+            echo "mariadb_preflight=ok\n";
+          '
+      - name: Real MariaDB / geography / migration proofs
+        env:
+          CETECH_DE_REAL_DB_HOST: 127.0.0.1
+          CETECH_DE_REAL_DB_PORT: 3306
+          CETECH_DE_REAL_DB_USER: root
+          CETECH_DE_REAL_DB_PASSWORD: geo11pass
+          CETECH_DE_REAL_DB_NAME: cetech_geo11
+        run: |
+          vendor/bin/phpunit \
+            -c phpunit.real-db.xml \
+            --log-junit "${RUNNER_TEMP}/cetech-de-real-db.junit.xml"
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5
+
+  php85-wordpress:
+    name: PHP 8.5 WordPress/WooCommerce
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      mariadb:
+        image: mariadb:11.4
+        env:
+          MARIADB_ROOT_PASSWORD: wordpress
+          MARIADB_DATABASE: wordpress
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="healthcheck.sh --connect --innodb_initialized"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          tools: composer:v2
+          coverage: none
+          extensions: mysqli, pdo_mysql, zip, mbstring, intl, xml, curl, gd, soap, bcmath
+      - name: WordPress bootstrap, WooCommerce, HPOS, Store API, upgrade from RC.12
+        env:
+          CETECH_DE_WP_DB_HOST: 127.0.0.1
+          CETECH_DE_WP_DB_PORT: 3306
+          CETECH_DE_WP_DB_USER: root
+          CETECH_DE_WP_DB_PASSWORD: wordpress
+        shell: bash
+        run: bash scripts/ci-wordpress-php85-smoke.sh
 
   javascript-tests:
     name: JavaScript / Vitest
@@ -95,7 +233,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.1'
+          php-version: '8.5'
           coverage: none
       - uses: actions/setup-node@v4
         with:
@@ -104,3 +242,35 @@ jobs:
         run: php scripts/verify-control-plane.php
       - name: Verify product control plane
         run: node scripts/verify-product-control-plane.mjs --self-test
+
+  ci-required-gates:
+    name: CI Required Gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    if: ${{ always() }}
+    needs:
+      - php83-min
+      - php84-compat
+      - php85-primary
+      - php85-mariadb
+      - php85-wordpress
+      - javascript-tests
+      - control-plane
+    steps:
+      - name: Require PHP 8.3 minimum and PHP 8.5 production target
+        run: |
+          set -euo pipefail
+          echo "php83=${{ needs.php83-min.result }}"
+          echo "php84=${{ needs.php84-compat.result }}"
+          echo "php85-primary=${{ needs.php85-primary.result }}"
+          echo "php85-mariadb=${{ needs.php85-mariadb.result }}"
+          echo "php85-wordpress=${{ needs.php85-wordpress.result }}"
+          echo "javascript=${{ needs.javascript-tests.result }}"
+          echo "control-plane=${{ needs.control-plane.result }}"
+          test "${{ needs.php83-min.result }}" = "success"
+          test "${{ needs.php84-compat.result }}" = "success"
+          test "${{ needs.php85-primary.result }}" = "success"
+          test "${{ needs.php85-mariadb.result }}" = "success"
+          test "${{ needs.php85-wordpress.result }}" = "success"
+          test "${{ needs.javascript-tests.result }}" = "success"
+          test "${{ needs.control-plane.result }}" = "success"
