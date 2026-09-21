@@ -67,6 +67,76 @@ final class CustomerStorefrontCopy {
 		return __( 'Change', 'cetech-woocommerce-delivery-engine' );
 	}
 
+	public static function address_needed(): string {
+		return __( 'Address needed', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function edit_delivery_details(): string {
+		return __( 'Edit delivery details', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function edit_pickup_details(): string {
+		return __( 'Edit pickup details', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function change_destination(): string {
+		return __( 'Change destination', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function destination(): string {
+		return __( 'Destination', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function delivery_method(): string {
+		return __( 'Delivery method', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function delivery_address(): string {
+		return __( 'Delivery address', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function address_line_1(): string {
+		return __( 'Address line 1', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function address_line_2_optional(): string {
+		return __( 'Address line 2 (optional)', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function recipient_details_optional(): string {
+		return __( 'Recipient details (optional)', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function apply_to_quantity(): string {
+		return __( 'Apply to quantity', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function save_delivery_details(): string {
+		return __( 'Save delivery details', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function cancel(): string {
+		return __( 'Cancel', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function apply_to_all_n( int $quantity ): string {
+		$quantity = max( 1, $quantity );
+
+		return sprintf(
+			/* translators: %d: quantity */
+			__( 'Apply to all %d items', 'cetech-woocommerce-delivery-engine' ),
+			$quantity
+		);
+	}
+
+	public static function editor_action_label( string $fulfilment_choice, bool $address_complete ): string {
+		if ( FulfilmentChoice::StorePickup->value === $fulfilment_choice ) {
+			return self::edit_pickup_details();
+		}
+
+		return $address_complete ? self::edit_delivery_details() : self::add_delivery_address();
+	}
+
 	public static function your_deliveries(): string {
 		return __( 'Your deliveries', 'cetech-woocommerce-delivery-engine' );
 	}

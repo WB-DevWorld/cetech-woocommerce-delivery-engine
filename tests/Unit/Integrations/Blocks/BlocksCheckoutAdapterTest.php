@@ -289,6 +289,11 @@ final class BlocksCheckoutAdapterTest extends TestCase {
 		$extension = ( new ReflectionClass( BlocksStoreApiExtension::class ) )->newInstanceWithoutConstructor();
 		$schema    = array_merge( $extension->cart_item_schema(), $extension->cart_schema() );
 
+		self::assertArrayHasKey( 'ui_anchor', $schema );
+		self::assertArrayHasKey( 'first_incomplete_anchor', $schema );
+		self::assertArrayHasKey( 'address_needed', $schema );
+		self::assertArrayHasKey( 'address_action_label', $schema );
+
 		foreach ( array_keys( $schema ) as $key ) {
 			self::assertFalse(
 				\CetechDeliveryEngine\Integrations\Blocks\BlocksPublicPayload::contains_forbidden( [ (string) $key => true ] ),

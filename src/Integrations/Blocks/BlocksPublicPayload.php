@@ -15,6 +15,7 @@ use CetechDeliveryEngine\Domain\CustomerContext\DeliveryAddress;
 use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Presentation\Frontend\CartFulfilmentPackagePresentation;
+use CetechDeliveryEngine\Presentation\Shared\CartDeliveryUiAnchor;
 use CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy;
 use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
 
@@ -179,6 +180,21 @@ final class BlocksPublicPayload {
 		$payload['available_options'] = $can_edit && null !== $capture
 			? self::available_options( $cart_item, $capture, is_array( $intent ) ? (string) ( $intent['display_key'] ?? '' ) : '' )
 			: [];
+
+		$resolved_key = '' !== $cart_item_key
+			? $cart_item_key
+			: ( is_string( $cart_item['key'] ?? null ) ? (string) $cart_item['key'] : '' );
+		$address_needed = $can_edit && ! $is_pickup && empty( $payload['address_complete'] );
+
+		$payload['ui_anchor']             = $can_edit && '' !== $resolved_key
+			? CartDeliveryUiAnchor::for_cart_item_key( $resolved_key )
+			: null;
+		$payload['address_needed']        = $address_needed;
+		$payload['address_action_label']  = $can_edit
+			? CustomerStorefrontCopy::editor_action_label( $choice, ! empty( $payload['address_complete'] ) )
+			: null;
+		$payload['has_matching_location'] = $context instanceof CustomerCartContext && $context->hasMatchingLocation();
+		$payload['destination_summary']   = self::destination_summary( $context instanceof CustomerCartContext ? $context->matching_location : null );
 
 		return self::strip_forbidden( $payload );
 	}
@@ -355,6 +371,28 @@ final class BlocksPublicPayload {
 		}
 
 		return false;
+	}
+
+	private static function destination_summary( ?MatchingLocation $matching ): ?string {
+		if ( ! $matching instanceof MatchingLocation || ! $matching->isPresent() ) {
+			return null;
+		}
+
+		$city  = trim( $matching->city );
+		$state = trim( $matching->state );
+		if ( '' !== $city && '' !== $state ) {
+			return $city . ', ' . $state;
+		}
+		if ( '' !== $city ) {
+			return $city;
+		}
+		if ( '' !== $state ) {
+			return $state;
+		}
+
+		$country = trim( $matching->country );
+
+		return '' !== $country ? $country : null;
 	}
 
 	private static function nullable_string( mixed $value ): ?string {

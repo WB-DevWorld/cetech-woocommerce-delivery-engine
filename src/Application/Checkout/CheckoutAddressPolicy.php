@@ -13,6 +13,7 @@ use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
 use CetechDeliveryEngine\Domain\CustomerContext\DeliveryAddress;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
+use CetechDeliveryEngine\Presentation\Shared\CartDeliveryUiAnchor;
 use CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy;
 
 /**
@@ -153,24 +154,8 @@ final class CheckoutAddressPolicy {
 					. esc_html( CustomerStorefrontCopy::heterogeneous_incomplete_destinations() )
 					. '</p>';
 			}
-			echo '<p class="cetech-de-checkout-incomplete-address__actions">';
-			$cart_url = function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : '';
-			if ( '' !== $cart_url ) {
-				echo '<a class="button cetech-de-checkout-incomplete-address__primary" href="' . esc_url( $cart_url ) . '">'
-					. esc_html( CustomerStorefrontCopy::add_delivery_address() )
-					. '</a> ';
-			}
-			if ( ! empty( $summary['can_apply_checkout_address'] ) ) {
-				$action = function_exists( 'wc_get_checkout_url' ) ? wc_get_checkout_url() : '';
-				echo '<form class="cetech-de-use-checkout-address" method="post" action="' . esc_url( $action ) . '">';
-				echo '<input type="hidden" name="' . esc_attr( self::POST_USE_CHECKOUT_ADDRESS ) . '" value="1" />';
-				echo wp_nonce_field( self::NONCE_ACTION, '_wpnonce', true, false );
-				echo '<button type="submit" class="cetech-de-use-checkout-address__button cetech-de-use-checkout-address__button--secondary">';
-				echo esc_html( CustomerStorefrontCopy::use_my_checkout_address() );
-				echo '</button>';
-				echo '</form>';
-			}
-			echo '</p></div>';
+			echo $this->render_incomplete_actions( $summary ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- helper returns escaped HTML.
+			echo '</div>';
 		}
 
 		if ( $summary['has_delivery'] && [] !== $summary['complete_identities'] ) {
@@ -227,6 +212,41 @@ final class CheckoutAddressPolicy {
 	}
 
 	/**
+	 * @param array<string, mixed> $summary
+	 */
+	public function render_incomplete_actions( array $summary ): string {
+		$html  = '<p class="cetech-de-checkout-incomplete-address__actions">';
+		$href  = $this->primary_add_address_url( $summary );
+		if ( '' !== $href ) {
+			$html .= '<a class="button cetech-de-checkout-incomplete-address__primary" href="' . esc_url( $href ) . '">'
+				. esc_html( CustomerStorefrontCopy::add_delivery_address() )
+				. '</a> ';
+		}
+		if ( ! empty( $summary['can_apply_checkout_address'] ) ) {
+			$action = function_exists( 'wc_get_checkout_url' ) ? wc_get_checkout_url() : '';
+			$html  .= '<form class="cetech-de-use-checkout-address" method="post" action="' . esc_url( (string) $action ) . '">';
+			$html  .= '<input type="hidden" name="' . esc_attr( self::POST_USE_CHECKOUT_ADDRESS ) . '" value="1" />';
+			$html  .= wp_nonce_field( self::NONCE_ACTION, '_wpnonce', true, false );
+			$html  .= '<button type="submit" class="cetech-de-use-checkout-address__button cetech-de-use-checkout-address__button--secondary">';
+			$html  .= esc_html( CustomerStorefrontCopy::use_my_checkout_address() );
+			$html  .= '</button>';
+			$html  .= '</form>';
+		}
+		$html .= '</p>';
+
+		return $html;
+	}
+
+	/**
+	 * @param array<string, mixed> $summary
+	 */
+	public function primary_add_address_url( array $summary ): string {
+		$cart_url = function_exists( 'wc_get_cart_url' ) ? (string) wc_get_cart_url() : '';
+
+		return CartDeliveryUiAnchor::cart_url( $cart_url, (string) ( $summary['first_incomplete_anchor'] ?? '' ) );
+	}
+
+	/**
 	 * @param array<string, array<string, mixed>> $contents
 	 *
 	 * @return array{
@@ -237,17 +257,19 @@ final class CheckoutAddressPolicy {
 	 *     complete_identities: list<string>,
 	 *     incomplete_matching_identities: list<string>,
 	 *     heterogeneous_incomplete_destinations: bool,
-	 *     can_apply_checkout_address: bool
+	 *     can_apply_checkout_address: bool,
+	 *     first_incomplete_anchor: string
 	 * }
 	 */
 	public function summarize_cart( array $contents ): array {
-		$complete_identities             = [];
-		$incomplete_matching_identities  = [];
-		$has_pickup                      = false;
-		$has_delivery                    = false;
-		$incomplete_delivery             = 0;
+		$complete_identities            = [];
+		$incomplete_matching_identities = [];
+		$has_pickup                     = false;
+		$has_delivery                   = false;
+		$incomplete_delivery            = 0;
+		$first_incomplete_anchor        = '';
 
-		foreach ( $contents as $item ) {
+		foreach ( $contents as $cart_item_key => $item ) {
 			if ( ! is_array( $item ) ) {
 				continue;
 			}
@@ -281,6 +303,9 @@ final class CheckoutAddressPolicy {
 			}
 
 			++$incomplete_delivery;
+			if ( '' === $first_incomplete_anchor ) {
+				$first_incomplete_anchor = CartDeliveryUiAnchor::for_cart_item_key( (string) $cart_item_key );
+			}
 
 			if (
 				$context instanceof CustomerCartContext
@@ -292,20 +317,21 @@ final class CheckoutAddressPolicy {
 			}
 		}
 
-		$unique_complete   = array_values( array_unique( $complete_identities ) );
-		$unique_incomplete = array_values( array_unique( $incomplete_matching_identities ) );
+		$unique_complete       = array_values( array_unique( $complete_identities ) );
+		$unique_incomplete     = array_values( array_unique( $incomplete_matching_identities ) );
 		$selected_destinations = array_values( array_unique( array_merge( $unique_complete, $unique_incomplete ) ) );
-		$heterogeneous     = count( $unique_incomplete ) > 1;
+		$heterogeneous         = count( $unique_incomplete ) > 1;
 
 		return [
-			'multi_destination'                      => count( $selected_destinations ) > 1,
-			'has_pickup'                             => $has_pickup,
-			'has_delivery'                           => $has_delivery,
-			'incomplete_delivery'                    => $incomplete_delivery,
-			'complete_identities'                    => $unique_complete,
-			'incomplete_matching_identities'         => $unique_incomplete,
-			'heterogeneous_incomplete_destinations'  => $heterogeneous,
-			'can_apply_checkout_address'             => $incomplete_delivery > 0 && ! $heterogeneous,
+			'multi_destination'                     => count( $selected_destinations ) > 1,
+			'has_pickup'                            => $has_pickup,
+			'has_delivery'                          => $has_delivery,
+			'incomplete_delivery'                   => $incomplete_delivery,
+			'complete_identities'                   => $unique_complete,
+			'incomplete_matching_identities'        => $unique_incomplete,
+			'heterogeneous_incomplete_destinations' => $heterogeneous,
+			'can_apply_checkout_address'            => $incomplete_delivery > 0 && ! $heterogeneous,
+			'first_incomplete_anchor'               => $first_incomplete_anchor,
 		];
 	}
 
