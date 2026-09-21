@@ -85,10 +85,17 @@ install_site() {
 		--admin_email="qa@example.com" \
 		--skip-email
 	"${WP[@]}" plugin install woocommerce --activate --path="$dest"
+	# WooCommerce 11 removed FeaturesController::change_feature_is_enabled().
+	# Prefer the current WP-CLI command, then fall back to remaining controller APIs / options.
+	"${WP[@]}" wc hpos enable --user=1 --path="$dest" || true
 	"${WP[@]}" eval --path="$dest" '
 		if ( function_exists( "wc_get_container" ) && class_exists( "Automattic\\WooCommerce\\Internal\\Features\\FeaturesController" ) ) {
 			$controller = wc_get_container()->get( Automattic\WooCommerce\Internal\Features\FeaturesController::class );
-			$controller->change_feature_is_enabled( "custom_order_tables", true );
+			if ( method_exists( $controller, "change_feature_is_enabled" ) ) {
+				$controller->change_feature_is_enabled( "custom_order_tables", true );
+			} elseif ( method_exists( $controller, "change_feature_enable" ) ) {
+				$controller->change_feature_enable( "custom_order_tables", true );
+			}
 		}
 		update_option( "woocommerce_custom_orders_table_enabled", "yes" );
 		echo "hpos=" . (string) get_option( "woocommerce_custom_orders_table_enabled" ) . PHP_EOL;

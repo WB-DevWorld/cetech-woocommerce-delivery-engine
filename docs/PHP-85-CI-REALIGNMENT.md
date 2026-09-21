@@ -77,10 +77,17 @@ Docker **PHP 8.4.25**:
 
 Deprecations were not treated as failures. They are consistent with historical PHP 8.4/8.5 `ReflectionMethod::setAccessible()` use in **tests**, not `src/`. This task does not mix test-harness cleanup into the CI change.
 
-Not run in this correction (gated to GitHub Actions / Pilot):
+Not run locally in this correction (gated to GitHub Actions / Pilot):
 
-- real MariaDB geography groups (`phpunit.real-db.xml`)
-- WordPress + WooCommerce activation / HPOS / Store API / RC.12 upgrade smoke
 - WoodMart / B2BKing / FOX-WOOCS / cache / payment (proprietary; not in public CI)
+
+## GitHub Actions on correction HEAD
+
+PHP 8.3, 8.4, and PHP 8.5 CETECH Production Target **passed** on `fdb60fca90423054bbdde44cf7724a2fd65c79c1`.
+
+First GitHub pass of the PHP 8.5 MariaDB and WordPress jobs failed for **CI harness** reasons, not Delivery Engine `src/` incompatibility:
+
+- MariaDB: PHPUnit **23 tests / 1663 assertions / OK** on PHP 8.5.10 + MariaDB 11.4.13. The follow-up JUnit parser read the PHPUnit 10 `<testsuites>` root (`tests=0`) and falsely failed.
+- WordPress/WooCommerce: WordPress installed; WooCommerce **11.1.1** activated on PHP **8.5.10**. The smoke script called removed `FeaturesController::change_feature_is_enabled()`. WP-CLI nightly also emitted PHP 8.5 deprecations in `php-cli-tools` `Colors.php`. Those are reported; PHP is not lowered.
 
 No plugin `src/` compatibility failure was found on PHP 8.3, 8.4, or 8.5.

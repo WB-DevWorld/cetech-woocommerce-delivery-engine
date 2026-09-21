@@ -174,27 +174,7 @@ jobs:
           vendor/bin/phpunit \
             -c phpunit.real-db.xml \
             --log-junit "${RUNNER_TEMP}/cetech-de-real-db.junit.xml"
-          php -r '
-            $file = getenv("RUNNER_TEMP") . "/cetech-de-real-db.junit.xml";
-            $xml = simplexml_load_file($file);
-            if ( ! $xml ) {
-              fwrite(STDERR, "missing real-db JUnit log\n");
-              exit(1);
-            }
-            $tests = (int) $xml["tests"];
-            $skipped = (int) $xml["skipped"];
-            $failures = (int) $xml["failures"];
-            $errors = (int) $xml["errors"];
-            $executed = $tests - $skipped;
-            echo "real_db tests={$tests} skipped={$skipped} executed={$executed} failures={$failures} errors={$errors}\n";
-            if ( $failures > 0 || $errors > 0 ) {
-              exit(1);
-            }
-            if ( $executed < 5 ) {
-              fwrite(STDERR, "too few real MariaDB tests executed on PHP 8.5\n");
-              exit(1);
-            }
-          '
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5
 
   php85-wordpress:
     name: PHP 8.5 WordPress/WooCommerce
