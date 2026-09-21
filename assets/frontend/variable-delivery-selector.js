@@ -249,8 +249,8 @@
 				return;
 			}
 
-			if (payload.status === 'need_location') {
-				this.setStatus(payload.message || ((config.i18n && config.i18n.selectOptions) || ''), 'need-location');
+			if (payload.status === 'need_location' || payload.status === 'need_precision') {
+				this.setStatus(payload.message || ((config.i18n && (payload.status === 'need_precision' ? config.i18n.needPrecision : config.i18n.selectOptions)) || ''), payload.status === 'need_precision' ? 'need-precision' : 'need-location');
 				this.renderOptions(Array.isArray(payload.options) ? payload.options : [], variationId, payload);
 				this.setVariationBinding(variationId);
 				return;

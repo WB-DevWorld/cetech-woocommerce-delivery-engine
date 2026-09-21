@@ -20,7 +20,8 @@ final class LocationAwareDeliveryOptions {
 
 	public function __construct(
 		private LocationOfferQuoteProbe $quote_probe,
-		private ?ProductPageDeliveryPriceQuote $price_quote = null
+		private ?ProductPageDeliveryPriceQuote $price_quote = null,
+		private ?ShopperDeliveryLocationPrecision $precision = null
 	) {
 	}
 
@@ -59,6 +60,13 @@ final class LocationAwareDeliveryOptions {
 
 			if ( ! $location instanceof MatchingLocation || ! $location->isPresent() ) {
 				continue;
+			}
+
+			if ( $this->precision instanceof ShopperDeliveryLocationPrecision ) {
+				$precision = $this->precision->evaluate( $location );
+				if ( ! $precision->sufficient ) {
+					continue;
+				}
 			}
 
 			$offer_id = $option->delivery_offer_id;

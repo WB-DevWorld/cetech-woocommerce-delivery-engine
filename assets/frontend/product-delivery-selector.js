@@ -320,7 +320,20 @@
 					if (data.status === 'need_location') {
 						status.textContent = '';
 					} else {
-						status.textContent = data.message || '';
+						status.textContent = data.message || (data.status === 'need_precision' && config.i18n && config.i18n.needPrecision) || '';
+					}
+				}
+				if (data.status === 'need_precision' && data.precision && data.precision.required_level) {
+					var requiredLevel = String(data.precision.required_level || '');
+					if (requiredLevel === 'locality') {
+						Array.prototype.forEach.call(locationRoot.querySelectorAll('[data-cetech-de-reveal="locality"]'), function (node) {
+							node.hidden = false;
+						});
+					}
+					if (requiredLevel === 'region') {
+						Array.prototype.forEach.call(locationRoot.querySelectorAll('[data-cetech-de-reveal="region"]'), function (node) {
+							node.hidden = false;
+						});
 					}
 				}
 				if (optionsEl) {
@@ -329,11 +342,19 @@
 					if (choiceSwitch) {
 						previousChoice = String(choiceSwitch.value || '');
 					}
-					optionsEl.innerHTML = renderOptionsHtml(data.options || [], data.default_key || '', config, data.locality || '', previousChoice, data);
+					var defaultKey = data.status === 'need_precision' ? '' : (data.default_key || '');
+					optionsEl.innerHTML = renderOptionsHtml(data.options || [], defaultKey, config, data.locality || '', previousChoice, data);
 					root.removeAttribute('data-cetech-de-switch-bound');
 					bind(root);
 					var radios = optionsEl.querySelectorAll('input[name="cetech_de_delivery_option_key"]:not([disabled])');
-					if (radios.length && !Array.prototype.some.call(radios, function (input) { return input.checked; })) {
+					if (data.status === 'need_precision') {
+						Array.prototype.forEach.call(optionsEl.querySelectorAll('input[name="cetech_de_delivery_option_key"]'), function (input) {
+							var panel = input.closest('[data-cetech-de-choice-panel]');
+							if (panel && panel.getAttribute('data-cetech-de-choice-panel') === 'delivery') {
+								input.checked = false;
+							}
+						});
+					} else if (radios.length && !Array.prototype.some.call(radios, function (input) { return input.checked; })) {
 						radios[0].checked = true;
 					}
 					writePayload(root);
@@ -602,9 +623,25 @@
 			};
 		}
 
+		function persistSavedRegion(region, saved) {
+			if (!region || !saved) {
+				return;
+			}
+			if (saved.value) {
+				region.setAttribute('data-cetech-de-saved-region', saved.value);
+			}
+			if (saved.key) {
+				region.setAttribute('data-cetech-de-saved-region-key', saved.key);
+			}
+			if (saved.code) {
+				region.setAttribute('data-cetech-de-saved-region-code', saved.code);
+			}
+		}
+
 		function ensureRegionSelect() {
 			var current = regionField();
 			if (current && current.tagName === 'SELECT') {
+				persistSavedRegion(current, captureSavedRegion(current));
 				return current;
 			}
 			var wrap = locationRoot.querySelector('[data-cetech-de-field="region"], [data-cetech-de-reveal="region"]');
@@ -701,11 +738,13 @@
 				}
 				setReveal(locationRoot, 'region', true);
 				setReveal(locationRoot, 'locality', false);
+				var selected = region.selectedIndex >= 0 ? region.options[region.selectedIndex] : null;
 				var saved = {
 					value: region.value || region.getAttribute('data-cetech-de-saved-region') || '',
-					key: region.getAttribute('data-cetech-de-saved-region-key') || '',
+					key: (selected && selected.getAttribute('data-location-key')) || region.getAttribute('data-cetech-de-saved-region-key') || '',
 					code: region.getAttribute('data-cetech-de-saved-region-code') || ''
 				};
+				persistSavedRegion(region, saved);
 				if (!append) {
 					region.innerHTML = '<option value="">' + escapeHtml('Select…') + '</option>';
 				}
@@ -716,13 +755,18 @@
 					option.textContent = item.name || '';
 					if (regionMatchesSaved(saved, item, option)) {
 						option.selected = true;
+						region.value = option.value;
 					}
 					region.appendChild(option);
 				});
-				var foundSaved = !!(saved.value || saved.key || saved.code) && !!region.selectedOptions[0] && region.selectedOptions[0].value;
-				if (!foundSaved && saved.value) {
-					foundSaved = Array.prototype.some.call(region.options, function (opt) {
-						return opt.value === saved.value || opt.getAttribute('data-location-key') === saved.key;
+				var foundSaved = !!(saved.value || saved.key || saved.code) && !!region.value;
+				if (!foundSaved && (saved.value || saved.key || saved.code)) {
+					Array.prototype.forEach.call(region.options, function (opt) {
+						if (opt.value && (opt.value === saved.value || opt.getAttribute('data-location-key') === saved.key || (saved.code && opt.value === saved.code))) {
+							opt.selected = true;
+							region.value = opt.value;
+							foundSaved = true;
+						}
 					});
 				}
 				if (!foundSaved && data && data.has_more) {
@@ -744,6 +788,12 @@
 					more.hidden = false;
 				} else if (more) {
 					more.hidden = true;
+				}
+				if (foundSaved && region.value) {
+					setReveal(locationRoot, 'locality', true);
+					refreshPostcode();
+				} else {
+					setReveal(locationRoot, 'locality', false);
 				}
 			}).catch(function () { /* keep existing options */ });
 		}

@@ -6,11 +6,13 @@ namespace CetechDeliveryEngine\Application\Selector;
 
 use CetechDeliveryEngine\Application\CustomerContext\LocationAwareDeliveryOptions;
 use CetechDeliveryEngine\Application\CustomerContext\ProductPageQuoteContext;
+use CetechDeliveryEngine\Application\CustomerContext\ShopperDeliveryLocationPrecision;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
 use CetechDeliveryEngine\Application\Runtime\VariationRelationshipInspectorInterface;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
+use CetechDeliveryEngine\Domain\CustomerContext\ShopperLocationPrecision;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Domain\Enum\ProductTargetType;
 use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
@@ -31,7 +33,8 @@ final class VariationDeliveryOptionsEndpoint {
 		private ProductDeliveryConfigurationSourceInterface $configuration_source,
 		private ProductDeliveryOptionsBuilder $options_builder,
 		private VariationRelationshipInspectorInterface $variation_inspector,
-		private ?LocationAwareDeliveryOptions $location_options = null
+		private ?LocationAwareDeliveryOptions $location_options = null,
+		private ?ShopperDeliveryLocationPrecision $precision = null
 	) {
 	}
 
@@ -191,6 +194,29 @@ final class VariationDeliveryOptionsEndpoint {
 				);
 			}
 
+			$precision = $this->precision instanceof ShopperDeliveryLocationPrecision
+				? $this->precision->evaluate( $location )
+				: null;
+			if ( $precision instanceof ShopperLocationPrecision && ! $precision->sufficient ) {
+				$pickup_only = $this->location_options->filter( $options, $location, $currency, $context );
+				$public_pickup = [];
+				foreach ( $pickup_only as $option ) {
+					if ( FulfilmentChoice::StorePickup->value === $option->fulfilment_choice ) {
+						$public_pickup[] = $this->public_option_array( $option );
+					}
+				}
+
+				return $this->payload(
+					'need_precision',
+					$product_id,
+					$variation_id,
+					$precision->public_message,
+					$public_pickup,
+					$caps,
+					$precision
+				);
+			}
+
 			$options = $this->location_options->filter( $options, $location, $currency, $context );
 		}
 
@@ -237,12 +263,12 @@ final class VariationDeliveryOptionsEndpoint {
 	 *     options: list<array<string, mixed>>
 	 * }
 	 */
-	private function payload( string $status, int $product_id, int $variation_id, string $message, array $options, array $capabilities = [] ): array {
+	private function payload( string $status, int $product_id, int $variation_id, string $message, array $options, array $capabilities = [], ?ShopperLocationPrecision $precision = null ): array {
 		$caps = [] === $capabilities
 			? ProductDeliveryFulfilmentCapabilities::from_options( [] )
 			: $capabilities;
 
-		return [
+		$payload = [
 			'status'             => $status,
 			'product_id'         => $product_id,
 			'variation_id'       => $variation_id,
@@ -252,6 +278,11 @@ final class VariationDeliveryOptionsEndpoint {
 			'has_pickup'         => ! empty( $caps['has_pickup'] ),
 			'available_choices'  => $caps['available_choices'] ?? [],
 		];
+		if ( $precision instanceof ShopperLocationPrecision ) {
+			$payload['precision'] = $precision->toArray();
+		}
+
+		return $payload;
 	}
 
 	/**

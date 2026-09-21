@@ -83,3 +83,12 @@ if ( ! class_exists( 'WooCommerce', false ) && '1' !== getenv( 'CETECH_DE_DISABL
 	class WooCommerce {
 	}
 }
+
+if ( ! function_exists( 'wc_add_notice' ) ) {
+	function wc_add_notice( string $message, string $notice_type = 'success' ): void {
+		$GLOBALS['cetech_de_test_notices'][] = [
+			'message' => $message,
+			'type'    => $notice_type,
+		];
+	}
+}

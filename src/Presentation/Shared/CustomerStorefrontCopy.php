@@ -28,6 +28,14 @@ final class CustomerStorefrontCopy {
 		return __( 'Where do you want this item?', 'cetech-woocommerce-delivery-engine' );
 	}
 
+	public static function select_city_town_for_exact_fee(): string {
+		return __( 'Select your City / Town to see the exact delivery fee.', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function select_region_for_exact_fee(): string {
+		return __( 'Select your Region to see the exact delivery fee.', 'cetech-woocommerce-delivery-engine' );
+	}
+
 	public static function delivery(): string {
 		return __( 'Delivery', 'cetech-woocommerce-delivery-engine' );
 	}
