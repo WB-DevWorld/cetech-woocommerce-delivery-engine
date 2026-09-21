@@ -28,6 +28,8 @@ use CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy;
  */
 final class ShopperDeliveryLocationPrecision {
 
+	private const MAX_ANCESTRY_WALK = 16;
+
 	public function __construct(
 		private CanonicalLocationResolver $resolver,
 		private DestinationZoneRepositoryInterface $zones,
@@ -173,7 +175,7 @@ final class ShopperDeliveryLocationPrecision {
 
 		if ( $root_is_descendant ) {
 			return [
-				'level'  => $this->next_level( $current, $root ),
+				'level'  => $this->next_level( $current, $root, $loaded ),
 				'reason' => ShopperLocationPrecision::REASON_NARROWER_COVERAGE,
 			];
 		}
@@ -185,7 +187,7 @@ final class ShopperDeliveryLocationPrecision {
 			foreach ( $includes as $member ) {
 				if ( $this->is_strict_descendant( $member, $current ) ) {
 					return [
-						'level'  => $this->next_level( $current, $member ),
+						'level'  => $this->next_level( $current, $member, $loaded ),
 						'reason' => ShopperLocationPrecision::REASON_SELECTED_DESCENDANT,
 					];
 				}
@@ -196,7 +198,7 @@ final class ShopperDeliveryLocationPrecision {
 			foreach ( $excludes as $member ) {
 				if ( $this->is_strict_descendant( $member, $current ) ) {
 					return [
-						'level'  => $this->next_level( $current, $member ),
+						'level'  => $this->next_level( $current, $member, $loaded ),
 						'reason' => ShopperLocationPrecision::REASON_ENTIRE_EXCEPT,
 					];
 				}
@@ -223,11 +225,42 @@ final class ShopperDeliveryLocationPrecision {
 		return $out;
 	}
 
-	private function next_level( CanonicalLocation $current, CanonicalLocation $narrower ): string {
-		if ( $current->isCountry() ) {
-			return $narrower->isLocality()
-				? ShopperLocationPrecision::LEVEL_LOCALITY
-				: ShopperLocationPrecision::LEVEL_REGION;
+	/**
+	 * Next shopper-selectable step. Country must not jump to a nested locality
+	 * when an administrative ancestor exists beneath the country.
+	 *
+	 * @param array<int, CanonicalLocation> $known
+	 */
+	private function next_level( CanonicalLocation $current, CanonicalLocation $narrower, array $known = [] ): string {
+		if ( ! $current->isCountry() ) {
+			return ShopperLocationPrecision::LEVEL_LOCALITY;
+		}
+
+		if ( $narrower->isAdministrative() ) {
+			return ShopperLocationPrecision::LEVEL_REGION;
+		}
+
+		$cursor = $narrower;
+		for ( $depth = 0; $depth < self::MAX_ANCESTRY_WALK; $depth++ ) {
+			$parent_id = $cursor->parent_location_id;
+			if ( ! is_int( $parent_id ) || $parent_id <= 0 || $parent_id === $current->id ) {
+				break;
+			}
+
+			$parent = $known[ $parent_id ] ?? $this->locations->find_by_id( $parent_id );
+			if ( ! $parent instanceof CanonicalLocation || ! $parent->isActive() ) {
+				break;
+			}
+
+			if ( $parent->id === $current->id ) {
+				break;
+			}
+
+			if ( $parent->isAdministrative() ) {
+				return ShopperLocationPrecision::LEVEL_REGION;
+			}
+
+			$cursor = $parent;
 		}
 
 		return ShopperLocationPrecision::LEVEL_LOCALITY;

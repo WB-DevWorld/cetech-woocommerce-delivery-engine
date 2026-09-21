@@ -988,7 +988,8 @@ describe('Issue #38 saved-region hydration and server precision', () => {
 		`;
 		return `
 			<form class="cart">
-				<fieldset class="cetech-de-product-delivery-selector" data-cetech-de-selector="1" data-cetech-de-has-delivery="1" data-cetech-de-has-pickup="1">
+				<fieldset class="cetech-de-product-delivery-selector" data-cetech-de-selector="1" data-cetech-de-has-delivery="1" data-cetech-de-has-pickup="1" data-cetech-de-active-choice="delivery">
+					<div class="cetech-de-delivery-selector__location" data-cetech-de-location-panel="1">
 					<div class="cetech-de-matching-location" data-cetech-de-matching-location="1">
 						<p data-cetech-de-field="country">
 							<select name="cetech_de_matching_country">
@@ -1010,6 +1011,7 @@ describe('Issue #38 saved-region hydration and server precision', () => {
 							<ul class="cetech-de-locality-results" role="listbox" hidden></ul>
 						</p>
 						<input type="hidden" name="cetech_de_matching_location_key" data-cetech-de-location-key="1" value="${key}" />
+					</div>
 					</div>
 					<div class="cetech-de-delivery-selector__status" role="status" aria-live="polite" data-cetech-de-status></div>
 					${extraOptions}
@@ -1255,7 +1257,7 @@ describe('Issue #38 saved-region hydration and server precision', () => {
 					requires_location: true,
 					has_delivery: true,
 					has_pickup: true,
-					precision: { sufficient: false, required_level: 'locality' }
+					precision: { sufficient: false, required_level: 'locality', reason: 'selected_descendants_nested_member', message_key: 'need_precision.locality' }
 				});
 			}
 			if (body.includes('cetech_de_geography_children')) {
@@ -1273,6 +1275,9 @@ describe('Issue #38 saved-region hydration and server precision', () => {
 			'Select your City / Town to see the exact delivery fee.'
 		);
 		expect(document.querySelector('[data-cetech-de-reveal="locality"]').hidden).toBe(false);
+		expect(document.querySelector('[data-cetech-de-location-panel]').hidden).toBe(false);
+		expect(document.querySelector('[data-cetech-de-choice-switch][value="delivery"]').checked).toBe(true);
+		expect(document.querySelector('[data-cetech-de-choice-switch][value="store_pickup"]').checked).toBe(false);
 		expect(document.querySelector('input[value="in_store:delivery:10"]')).toBeNull();
 		expect(document.body.textContent).not.toContain('GH₵30.00');
 		expect(document.querySelector('input[value="in_store:store_pickup:pickup"]')).not.toBeNull();

@@ -45,6 +45,8 @@ final class ShopperDeliveryLocationPrecisionTest extends TestCase {
 			[
 				'sufficient'     => false,
 				'required_level' => ShopperLocationPrecision::LEVEL_REGION,
+				'reason'         => ShopperLocationPrecision::REASON_NARROWER_COVERAGE,
+				'message_key'    => ShopperLocationPrecision::MESSAGE_KEY_REGION,
 			],
 			$result->toArray()
 		);
@@ -227,5 +229,47 @@ final class ShopperDeliveryLocationPrecisionTest extends TestCase {
 
 		self::assertTrue( $fx->precision->evaluate( null )->sufficient );
 		self::assertTrue( $fx->precision->evaluate( MatchingLocation::fromInput( [] ) )->sufficient );
+	}
+
+	public function test_country_selected_descendant_locality_with_adm1_requires_region(): void {
+		$fx = ( new ShopperLocationPrecisionFixture() )->with_usable_gh_pack();
+		$fx->add_country_root_selected_locality( $fx->geo->accra );
+
+		$result = $fx->precision->evaluate( $fx->matching_country() );
+
+		self::assertFalse( $result->sufficient );
+		self::assertSame( ShopperLocationPrecision::LEVEL_REGION, $result->required_level );
+		self::assertSame( ShopperLocationPrecision::REASON_SELECTED_DESCENDANT, $result->reason );
+	}
+
+	public function test_country_direct_locality_requires_locality(): void {
+		$fx      = ( new ShopperLocationPrecisionFixture() )->with_usable_gh_pack();
+		$harbour = $fx->seed_direct_country_locality();
+		$fx->add_country_root_selected_locality( $harbour, 12 );
+
+		$result = $fx->precision->evaluate( $fx->matching_country() );
+
+		self::assertFalse( $result->sufficient );
+		self::assertSame( ShopperLocationPrecision::LEVEL_LOCALITY, $result->required_level );
+	}
+
+	public function test_country_descendant_administrative_root_requires_region(): void {
+		$fx = ( new ShopperLocationPrecisionFixture() )->with_usable_gh_pack();
+		$fx->add_greater_accra_entire_area();
+
+		$result = $fx->precision->evaluate( $fx->matching_country() );
+
+		self::assertFalse( $result->sufficient );
+		self::assertSame( ShopperLocationPrecision::LEVEL_REGION, $result->required_level );
+	}
+
+	public function test_region_nested_locality_requires_locality(): void {
+		$fx = ( new ShopperLocationPrecisionFixture() )->with_usable_gh_pack();
+		$fx->add_accra_selected_descendants();
+
+		$result = $fx->precision->evaluate( $fx->matching_greater_accra() );
+
+		self::assertFalse( $result->sufficient );
+		self::assertSame( ShopperLocationPrecision::LEVEL_LOCALITY, $result->required_level );
 	}
 }

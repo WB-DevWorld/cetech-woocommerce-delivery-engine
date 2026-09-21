@@ -29,6 +29,9 @@ final class ProductDeliverySelectorPrecisionRendererTest extends TestCase {
 		if ( ! function_exists( 'get_woocommerce_currency' ) ) {
 			eval( 'function get_woocommerce_currency(): string { return "GHS"; }' ); // phpcs:ignore Squiz.PHP.Eval -- test bootstrap only.
 		}
+
+		PdpPrecisionTestKit::enable_quote_runtime();
+		PdpPrecisionTestKit::seed_simple_product();
 	}
 
 	protected function tearDown(): void {
@@ -44,13 +47,23 @@ final class ProductDeliverySelectorPrecisionRendererTest extends TestCase {
 
 		$html = $this->render( $fx, [ $this->priced_delivery(), $this->pickup() ] );
 
+		self::assertStringContainsString( 'data-cetech-de-location-panel="1"', $html );
+		self::assertDoesNotMatchRegularExpression( '/class="cetech-de-delivery-selector__location"[^>]*\bhidden\b/', $html );
+		self::assertDoesNotMatchRegularExpression( '/\bhidden\b[^>]*data-cetech-de-location-panel="1"/', $html );
+		self::assertStringContainsString( 'data-cetech-de-active-choice="delivery"', $html );
+		self::assertMatchesRegularExpression( '/id="cetech-de-fulfilment-ui-delivery"[^>]*checked/', $html );
+		self::assertStringContainsString( 'id="cetech-de-fulfilment-ui-store_pickup"', $html );
+		self::assertDoesNotMatchRegularExpression( '/id="cetech-de-fulfilment-ui-store_pickup"[^>]*checked/', $html );
+		self::assertStringContainsString( 'City / Town', $html );
 		self::assertStringContainsString( 'data-cetech-de-reveal="locality"', $html );
 		self::assertDoesNotMatchRegularExpression( '/data-cetech-de-reveal="locality"[^>]*\bhidden\b/', $html );
 		self::assertStringContainsString( CustomerStorefrontCopy::select_city_town_for_exact_fee(), $html );
+		self::assertDoesNotMatchRegularExpression( '/Delivery fee: (GHS|USD) (30|50)\.00/', $html );
 		self::assertStringNotContainsString( 'GH₵30.00', $html );
 		self::assertStringNotContainsString( 'in_store:delivery:10" checked', $html );
 		self::assertStringNotContainsString( 'value="in_store:delivery:10"', $html );
 		self::assertStringContainsString( 'Accra showroom', $html );
+		self::assertDoesNotMatchRegularExpression( '/value="in_store:store_pickup:[^"]+"[^>]*checked/', $html );
 		self::assertStringContainsString( 'role="status"', $html );
 		self::assertStringContainsString( 'aria-live="polite"', $html );
 	}
@@ -63,7 +76,9 @@ final class ProductDeliverySelectorPrecisionRendererTest extends TestCase {
 
 		$html = $this->render( $fx, [ $this->priced_delivery(), $this->pickup() ] );
 
-		self::assertStringContainsString( 'GH₵30.00', $html );
+		self::assertMatchesRegularExpression( '/Delivery fee: (GHS|USD) 50\.00/', $html );
+		self::assertDoesNotMatchRegularExpression( '/Delivery fee: (GHS|USD) 30\.00/', $html );
+		self::assertStringContainsString( 'data-cetech-de-active-choice="delivery"', $html );
 		self::assertStringContainsString( 'value="in_store:delivery:10"', $html );
 		self::assertStringNotContainsString( CustomerStorefrontCopy::select_city_town_for_exact_fee(), $html );
 	}
@@ -79,7 +94,7 @@ final class ProductDeliverySelectorPrecisionRendererTest extends TestCase {
 			PdpPrecisionTestKit::source(),
 			PdpPrecisionTestKit::builder(),
 			new CustomerBrowsingLocationStore(),
-			PdpPrecisionTestKit::always_quote_ghana( $precision ),
+			PdpPrecisionTestKit::location_aware_quote( $fx ),
 			$precision
 		);
 		$method = new ReflectionMethod( ProductDeliverySelectorRenderer::class, 'render_interactive_options' );

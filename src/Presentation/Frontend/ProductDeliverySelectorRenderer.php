@@ -260,8 +260,10 @@ final class ProductDeliverySelectorRenderer {
 			$precision = $this->precision->evaluate( $browsing );
 			$force_locality = ! $precision->sufficient && ShopperLocationPrecision::LEVEL_LOCALITY === $precision->required_level;
 		}
+		echo '<div class="cetech-de-delivery-selector__location" data-cetech-de-location-panel="1">';
 		echo '<p class="cetech-de-matching-location__prompt">' . esc_html( CustomerStorefrontCopy::where_do_you_want_this_item() ) . '</p>';
 		echo MatchingLocationFieldRenderer::render( $browsing, 'cetech-de-matching', false, false, false, $force_locality ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns escaped HTML.
+		echo '</div>';
 		echo $this->pdp_context_input(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
 		echo '<div class="cetech-de-delivery-selector__status" role="status" aria-live="polite" data-cetech-de-status>';
 		echo esc_html__( 'Select your product options to see delivery choices.', 'cetech-woocommerce-delivery-engine' );
@@ -358,8 +360,8 @@ final class ProductDeliverySelectorRenderer {
 		$capabilities = ProductDeliveryFulfilmentCapabilities::from_options( $available );
 		$has_switch   = ProductDeliveryFulfilmentCapabilities::has_switch( $capabilities );
 		$selected     = '' !== $posted ? $posted : ProductDeliveryOptionsBuilder::defaultDisplayKey( $visible !== [] ? $visible : $available );
-		if ( $needs_precision ) {
-			$selected = $this->pickup_display_key( $visible );
+		if ( $needs_precision && ! empty( $capabilities['has_delivery'] ) ) {
+			$selected = $this->display_key_is_pickup( $available, $posted ) ? $posted : '';
 		}
 		$visible      = CustomerVisibleDeliveryOptionGate::selectable_pdp_cards( $visible );
 		$groups       = ProductDeliveryOptionsBuilder::groupByChoice( $visible );
@@ -436,14 +438,18 @@ final class ProductDeliverySelectorRenderer {
 	/**
 	 * @param list<ProductDeliveryOption> $options
 	 */
-	private function pickup_display_key( array $options ): string {
+	private function display_key_is_pickup( array $options, string $display_key ): bool {
+		if ( '' === $display_key ) {
+			return false;
+		}
+
 		foreach ( $options as $option ) {
-			if ( FulfilmentChoice::StorePickup->value === $option->fulfilment_choice ) {
-				return $option->display_key;
+			if ( $option->display_key === $display_key && FulfilmentChoice::StorePickup->value === $option->fulfilment_choice ) {
+				return true;
 			}
 		}
 
-		return '';
+		return false;
 	}
 
 	private function render_choice_switch( string $active_choice ): void {

@@ -310,26 +310,31 @@
 				? window.CetechDeProductDeliverySelector.fulfilmentCapabilities(this.root, payload || {})
 				: { hasDelivery: groups.delivery.length > 0, hasPickup: groups.store_pickup.length > 0 };
 			var hasSwitch = (caps.hasDelivery && caps.hasPickup) || (groups.delivery.length > 0 && groups.store_pickup.length > 0);
+			var needPrecision = payload && payload.status === 'need_precision';
 			var defaultKey = '';
-			options.forEach(function (option) {
-				if (option && option.is_default && option.display_key) {
-					defaultKey = String(option.display_key);
+			if (!needPrecision) {
+				options.forEach(function (option) {
+					if (option && option.is_default && option.display_key) {
+						defaultKey = String(option.display_key);
+					}
+				});
+				if (!defaultKey && options.length === 1) {
+					defaultKey = String(options[0].display_key || '');
 				}
-			});
-			if (!defaultKey && options.length === 1) {
-				defaultKey = String(options[0].display_key || '');
 			}
 			var activeChoice = 'delivery';
 			if (hasSwitch) {
-				options.forEach(function (option) {
-					if (option && String(option.display_key || '') === defaultKey) {
-						activeChoice = String(option.fulfilment_choice || 'delivery');
-					}
-				});
+				if (!needPrecision) {
+					options.forEach(function (option) {
+						if (option && String(option.display_key || '') === defaultKey) {
+							activeChoice = String(option.fulfilment_choice || 'delivery');
+						}
+					});
+				}
 				if (activeChoice !== 'store_pickup') {
 					activeChoice = 'delivery';
 				}
-			} else if (groups.delivery.length === 0) {
+			} else if (groups.delivery.length === 0 && !needPrecision && !caps.hasDelivery) {
 				activeChoice = 'store_pickup';
 			}
 

@@ -48,14 +48,18 @@ final class MatchingLocationOptionsPrecisionTest extends TestCase {
 		self::assertSame( 'need_precision', $payload['status'] );
 		self::assertFalse( $payload['precision']['sufficient'] );
 		self::assertSame( ShopperLocationPrecision::LEVEL_LOCALITY, $payload['precision']['required_level'] );
+		self::assertSame( ShopperLocationPrecision::REASON_SELECTED_DESCENDANT, $payload['precision']['reason'] );
+		self::assertSame( ShopperLocationPrecision::MESSAGE_KEY_LOCALITY, $payload['precision']['message_key'] );
 		self::assertSame( CustomerStorefrontCopy::select_city_town_for_exact_fee(), $payload['message'] );
 		self::assertTrue( $payload['requires_location'] );
 		self::assertArrayNotHasKey( 'default_key', $payload );
 		self::assertTrue( $payload['has_pickup'] );
 		self::assertSame( [], $this->delivery_options( $payload ) );
 		self::assertNotEmpty( $this->pickup_options( $payload ) );
-		self::assertStringNotContainsString( '30.00', (string) wp_json_encode( $payload ) );
-		self::assertStringNotContainsString( 'GH₵30', (string) wp_json_encode( $payload ) );
+		$encoded = (string) wp_json_encode( $payload );
+		self::assertStringNotContainsString( '50.00', $encoded );
+		self::assertStringNotContainsString( '30.00', $encoded );
+		self::assertStringNotContainsString( 'GH₵30', $encoded );
 	}
 
 	public function test_canonical_accra_returns_ok_delivery_quote(): void {
@@ -65,7 +69,10 @@ final class MatchingLocationOptionsPrecisionTest extends TestCase {
 
 		self::assertSame( 'ok', $payload['status'] );
 		self::assertTrue( $payload['precision']['sufficient'] );
-		self::assertNotEmpty( $this->delivery_options( $payload ) );
+		$delivery = $this->delivery_options( $payload );
+		self::assertNotEmpty( $delivery );
+		self::assertSame( '50.0000', (string) ( $delivery[0]['price_amount'] ?? '' ) );
+		self::assertNotSame( '30.0000', (string) ( $delivery[0]['price_amount'] ?? '' ) );
 		self::assertNotSame( '', (string) ( $payload['default_key'] ?? '' ) );
 	}
 
@@ -76,7 +83,10 @@ final class MatchingLocationOptionsPrecisionTest extends TestCase {
 
 		self::assertSame( 'ok', $payload['status'] );
 		self::assertTrue( $payload['precision']['sufficient'] );
-		self::assertNotEmpty( $this->delivery_options( $payload ) );
+		$delivery = $this->delivery_options( $payload );
+		self::assertNotEmpty( $delivery );
+		self::assertSame( '30.0000', (string) ( $delivery[0]['price_amount'] ?? '' ) );
+		self::assertNotSame( '50.0000', (string) ( $delivery[0]['price_amount'] ?? '' ) );
 	}
 
 	private function accra_fixture(): ShopperLocationPrecisionFixture {
@@ -94,7 +104,7 @@ final class MatchingLocationOptionsPrecisionTest extends TestCase {
 			new FeatureFlags(),
 			new Requirements(),
 			PdpPrecisionTestKit::capture( $precision ),
-			PdpPrecisionTestKit::always_quote_ghana( $precision ),
+			PdpPrecisionTestKit::location_aware_quote( $fx ),
 			new CustomerBrowsingLocationStore(),
 			$fx->resolver,
 			$precision

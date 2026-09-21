@@ -8,9 +8,11 @@ use CetechDeliveryEngine\Application\CustomerContext\ShopperDeliveryLocationPrec
 use CetechDeliveryEngine\Application\Geography\CanonicalLocationResolver;
 use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
 use CetechDeliveryEngine\Domain\Enum\CoverageMode;
+use CetechDeliveryEngine\Domain\Enum\GeographyLocationType;
 use CetechDeliveryEngine\Domain\Enum\GeographyPackStatus;
 use CetechDeliveryEngine\Domain\Enum\GeographyProvider;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
+use CetechDeliveryEngine\Domain\Geography\CanonicalLocation;
 use CetechDeliveryEngine\Tests\Unit\Runtime\InMemoryDestinationZoneRepository;
 
 /**
@@ -102,6 +104,34 @@ final class ShopperLocationPrecisionFixture {
 		);
 
 		return $zone_id;
+	}
+
+	public function add_country_root_selected_locality( CanonicalLocation $locality, int $zone_id = 11 ): int {
+		$this->add_active_zone( $zone_id, 'Country nested ' . $locality->canonical_name );
+		$this->groups->save_group(
+			[
+				'zone_id'          => $zone_id,
+				'root_location_id' => $this->geo->ghana->id,
+				'coverage_mode'    => CoverageMode::SelectedDescendants->value,
+				'status'           => RecordStatus::Active->value,
+				'members'          => [
+					[ 'location_id' => $locality->id, 'membership' => 'include' ],
+				],
+			]
+		);
+
+		return $zone_id;
+	}
+
+	public function seed_direct_country_locality( string $name = 'Harbour' ): CanonicalLocation {
+		return $this->geo->locations->seed(
+			'GH',
+			GeographyLocationType::Locality,
+			$name,
+			$this->geo->ghana->id,
+			null,
+			'loc-' . strtolower( $name )
+		);
 	}
 
 	public function matching_country(): MatchingLocation {

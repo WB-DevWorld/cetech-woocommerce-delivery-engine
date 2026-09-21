@@ -50,12 +50,14 @@ final class ShopperLocationPrecision {
 	}
 
 	/**
-	 * @return array{sufficient: bool, required_level: string|null}
+	 * @return array{sufficient: bool, required_level: string|null, reason: string, message_key: string}
 	 */
 	public function toArray(): array {
 		return [
 			'sufficient'     => $this->sufficient,
 			'required_level' => $this->required_level,
+			'reason'         => $this->reason,
+			'message_key'    => $this->message_key,
 		];
 	}
 }
