@@ -4,7 +4,7 @@
 **Schema:** `6` (unchanged; no schema 7)  
 **Branch:** `fix/geonames-country-identity`  
 **Base:** protected `master` `d5ca30d1d92bb69b8a8ffbca2606d30906b8d4a1` (PR #37 PHP 8.3–8.5.x)  
-**Runtime / package-source SHA:** pending committed runtime SHA  
+**Runtime / package-source SHA:** `ea2d412326e369bc7168b9de0dd01875673e71e6`  
 **Frozen geo-country.4 runtime / package-source SHA:** `ce1bcff053385a042993e50c3b216d8649d7b43d` (do not rebuild or overwrite)  
 **Frozen geo-country.3 runtime / package-source SHA:** `bae75f79d0094c78706912c9a530f09ea21b9bed` (do not rebuild or overwrite)  
 **Frozen geo-country.2 runtime / package-source SHA:** `23237eedece174b2f9c4334693b137310ce5c54a` (do not rebuild or overwrite)  
@@ -60,12 +60,13 @@ Do not overwrite or rebuild this artifact.
 
 Built from a clean committed tree after GitHub CI SUCCESS on the runtime/package-source SHA, with protected master `d5ca30d1d92bb69b8a8ffbca2606d30906b8d4a1` (PR #37) integrated. Do not treat this ZIP as RC.13 or as a replacement for RC.12 or geo-country.1–.4.
 
-- Source SHA: pending committed runtime SHA
+- Source SHA: `ea2d412326e369bc7168b9de0dd01875673e71e6`
 - Filename: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.5.zip`
-- Bytes: pending package build
-- SHA-256: pending package build
-- Production-package verifier: pending
-- Packaged PHP lint: pending
+- Bytes: `1,812,883`
+- SHA-256: `0d02bb14e2652dd635e858a3c8d4e65c233de81872ffa772225530a525e3d54d`
+- Production-package verifier: PASS (staged and extracted)
+- Packaged PHP lint: `502 files / 0 failures`
+- GitHub CI on runtime SHA: SUCCESS (`35613002047` pull_request; `35612996976` push) — PHP 8.3 Minimum Supported, PHP 8.4 Compatibility, PHP 8.5 CETECH Production Target, PHP 8.5 MariaDB Geography/Migrations, PHP 8.5 WordPress/WooCommerce, CI Required Gates, JavaScript / Vitest, Control Plane
 - Not deployed to training
 
 ## Country-identity authority

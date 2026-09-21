@@ -54,10 +54,10 @@ Last reconciled: 2026-09-21 (PR #37 MERGED onto protected `master` `d5ca30d1d92b
 - Development identity: `1.0.0-dev.geo-country.5`
 - Schema: `6` (unchanged)
 - Requires PHP: `8.3`
-- Runtime / package-source SHA: pending committed runtime SHA after master integration
+- Runtime / package-source SHA: `ea2d412326e369bc7168b9de0dd01875673e71e6`
 - ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.5.zip`
-- Bytes: pending package build after runtime CI SUCCESS
-- SHA-256: pending package build after runtime CI SUCCESS
+- Bytes: `1,812,883`
+- SHA-256: `0d02bb14e2652dd635e858a3c8d4e65c233de81872ffa772225530a525e3d54d`
 - Frozen geo-country.4 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.4.zip` (`1,798,250` bytes, SHA-256 `2fc4996c0e403c41bce200dec5be680a05f56f9e666b5a3e4a13a400dba24354`)
 - Frozen geo-country.3 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.3.zip` (`1,797,361` bytes, SHA-256 `a86a940d8ebac2c9e293dad8690ed8f121b5afa66cb3f1e0537f3f4152b26c66`)
 - Frozen geo-country.2 ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.2.zip` (`1,798,020` bytes, SHA-256 `6e7f76e2d218a01e2af401cc646471dc2ce27afc8a52c6ad15e671df0b88122c`)
