@@ -105,4 +105,43 @@ final class WpdbProviderMappingRepository implements ProviderMappingRepositoryIn
 
 		return is_array( $row ) ? $row : null;
 	}
+
+	public function list_mappings_for_location( int $location_id, string $generation_token = '' ): array {
+		if ( $location_id <= 0 ) {
+			return [];
+		}
+
+		global $wpdb;
+		$table = TableNames::for( GeographySchema::MAPPINGS_SUFFIX );
+		$sql   = "SELECT * FROM `{$table}` WHERE location_id = %d AND generation_token = %s ORDER BY id ASC";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $location_id, $generation_token ), ARRAY_A );
+		$out  = [];
+		foreach ( is_array( $rows ) ? $rows : [] as $row ) {
+			$meta = json_decode( (string) ( $row['provider_metadata_json'] ?? '' ), true );
+			$row['metadata'] = is_array( $meta ) ? $meta : [];
+			$out[]           = $row;
+		}
+
+		return $out;
+	}
+
+	public function delete_mapping( GeographyProvider $provider, string $external_id, string $generation_token = '' ): void {
+		$external_id = trim( $external_id );
+		if ( '' === $external_id ) {
+			return;
+		}
+
+		global $wpdb;
+		$table = TableNames::for( GeographySchema::MAPPINGS_SUFFIX );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$wpdb->delete(
+			$table,
+			[
+				'provider'         => $provider->value,
+				'external_id'      => $external_id,
+				'generation_token' => $generation_token,
+			]
+		);
+	}
 }

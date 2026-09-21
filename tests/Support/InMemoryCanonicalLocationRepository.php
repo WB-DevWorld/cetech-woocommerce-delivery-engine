@@ -121,6 +121,26 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 		return $inactive;
 	}
 
+	public function list_country_roots(): array {
+		$out = [];
+		foreach ( $this->locations as $location ) {
+			if ( ! $location->isCountry() || null !== $location->parent_location_id ) {
+				continue;
+			}
+			$out[] = $location;
+		}
+		usort(
+			$out,
+			static function ( CanonicalLocation $a, CanonicalLocation $b ): int {
+				$cmp = strcmp( $a->country_code, $b->country_code );
+
+				return 0 !== $cmp ? $cmp : $a->id <=> $b->id;
+			}
+		);
+
+		return $out;
+	}
+
 	public function find_exact_child( string $country_code, ?int $parent_id, string $normalized_name, ?GeographyLocationType $type = null, ?int $include_generation = null, string $include_token = '' ): ?CanonicalLocation {
 		$country_code    = strtoupper( trim( $country_code ) );
 		$normalized_name = GeographyNameNormalizer::normalize( $normalized_name );
@@ -1190,9 +1210,14 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			$live              = $this->mapping_key( $provider_external['provider'], $provider_external['external_id'], '' );
 			$this->mapping_rows[ $live ] = [
 				'location_id'      => $row['location_id'],
+				'provider'         => $provider_external['provider'],
+				'external_id'      => $provider_external['external_id'],
 				'generation_token' => '',
 				'pack_id'          => $row['pack_id'],
 				'dataset_version'  => $row['dataset_version'],
+				'feature_class'    => (string) ( $row['feature_class'] ?? '' ),
+				'feature_code'     => (string) ( $row['feature_code'] ?? '' ),
+				'metadata'         => is_array( $row['metadata'] ?? null ) ? $row['metadata'] : [],
 			];
 			$this->external_by_location[ $row['location_id'] . ':' . $provider_external['provider'] ] = $provider_external['external_id'];
 			if ( $key !== $live ) {
@@ -1406,13 +1431,18 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 			$this->fail_next_upsert = false;
 			throw new \RuntimeException( 'Simulated provider mapping write failure.' );
 		}
-		unset( $provider_parent_reference, $feature_class, $feature_code, $metadata );
+		unset( $provider_parent_reference );
 		$key = $this->mapping_key( $provider->value, $external_id, $generation_token );
 		$this->mapping_rows[ $key ] = [
 			'location_id'      => $location_id,
+			'provider'         => $provider->value,
+			'external_id'      => $external_id,
 			'generation_token' => $generation_token,
 			'pack_id'          => $pack_id,
 			'dataset_version'  => $dataset_version,
+			'feature_class'    => $feature_class,
+			'feature_code'     => $feature_code,
+			'metadata'         => $metadata,
 		];
 		if ( '' === $generation_token ) {
 			$this->external_by_location[ $location_id . ':' . $provider->value ] = $external_id;
@@ -1420,12 +1450,69 @@ final class InMemoryCanonicalLocationRepository implements CanonicalLocationRepo
 	}
 
 	public function find_mapping( GeographyProvider $provider, string $external_id ): ?array {
-		$id = $this->find_location_id( $provider, $external_id );
+		$row = $this->mapping_rows[ $this->mapping_key( $provider->value, $external_id, '' ) ] ?? null;
+		if ( ! is_array( $row ) ) {
+			return null;
+		}
 
-		return null === $id ? null : [
-			'location_id' => $id,
-			'provider'    => $provider->value,
-			'external_id' => $external_id,
+		return [
+			'location_id'   => $row['location_id'],
+			'provider'      => $provider->value,
+			'external_id'   => $external_id,
+			'feature_class' => (string) ( $row['feature_class'] ?? '' ),
+			'feature_code'  => (string) ( $row['feature_code'] ?? '' ),
+			'metadata'      => is_array( $row['metadata'] ?? null ) ? $row['metadata'] : [],
 		];
+	}
+
+	public function list_mappings_for_location( int $location_id, string $generation_token = '' ): array {
+		$out = [];
+		foreach ( $this->mapping_rows as $row ) {
+			if ( (int) ( $row['location_id'] ?? 0 ) !== $location_id ) {
+				continue;
+			}
+			if ( (string) ( $row['generation_token'] ?? '' ) !== $generation_token ) {
+				continue;
+			}
+			$out[] = [
+				'location_id'   => $location_id,
+				'provider'      => (string) ( $row['provider'] ?? '' ),
+				'external_id'   => (string) ( $row['external_id'] ?? '' ),
+				'pack_id'       => $row['pack_id'] ?? null,
+				'feature_class' => (string) ( $row['feature_class'] ?? '' ),
+				'feature_code'  => (string) ( $row['feature_code'] ?? '' ),
+				'metadata'      => is_array( $row['metadata'] ?? null ) ? $row['metadata'] : [],
+			];
+		}
+
+		return $out;
+	}
+
+	public function delete_mapping( GeographyProvider $provider, string $external_id, string $generation_token = '' ): void {
+		$key = $this->mapping_key( $provider->value, $external_id, $generation_token );
+		unset( $this->mapping_rows[ $key ] );
+		if ( '' === $generation_token ) {
+			foreach ( $this->external_by_location as $loc_key => $ext ) {
+				if ( $ext === $external_id && str_ends_with( (string) $loc_key, ':' . $provider->value ) ) {
+					unset( $this->external_by_location[ $loc_key ] );
+					break;
+				}
+			}
+		}
+	}
+
+	public function delete_normalized_alias( int $location_id, string $normalized_alias, string $generation_token = '' ): void {
+		$normalized_alias = trim( $normalized_alias );
+		if ( $location_id <= 0 || '' === $normalized_alias ) {
+			return;
+		}
+		$kept = [];
+		foreach ( $this->aliases[ $location_id ] ?? [] as $row ) {
+			if ( ( $row['normalized'] ?? '' ) === $normalized_alias && ( $row['generation_token'] ?? '' ) === $generation_token ) {
+				continue;
+			}
+			$kept[] = $row;
+		}
+		$this->aliases[ $location_id ] = $kept;
 	}
 }

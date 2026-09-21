@@ -58,5 +58,7 @@ final class Uninstaller {
 		delete_option( \CetechDeliveryEngine\Application\Configuration\SetupWizardProgress::OPTION_NAME );
 		delete_option( \CetechDeliveryEngine\Application\Shipment\ShipmentCreationFailureStore::INDEX_OPTION );
 		delete_option( \CetechDeliveryEngine\Application\Shipment\CodAwaitingShipmentStore::INDEX_OPTION );
+		delete_option( \CetechDeliveryEngine\Application\Geography\Schema6CoverageUpgradeService::OPTION_KEY );
+		delete_option( \CetechDeliveryEngine\Application\Geography\CountryIdentityReconciler::OPTION_KEY );
 	}
 }

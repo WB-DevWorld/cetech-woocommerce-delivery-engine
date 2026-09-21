@@ -32,4 +32,13 @@ interface ProviderMappingRepositoryInterface {
 	 * @return array<string, mixed>|null
 	 */
 	public function find_mapping( GeographyProvider $provider, string $external_id ): ?array;
+
+	/**
+	 * Live or staged mappings attached to one canonical location.
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	public function list_mappings_for_location( int $location_id, string $generation_token = '' ): array;
+
+	public function delete_mapping( GeographyProvider $provider, string $external_id, string $generation_token = '' ): void;
 }
