@@ -54,10 +54,13 @@ Last reconciled: 2026-09-21 (PR #40 MERGED onto protected `master` `ed3753d73e26
 - Development identity: `1.0.0-dev.address-ux.1`
 - Schema: `6` (unchanged)
 - Requires PHP: `8.3`
-- Runtime / package-source SHA: pending first runtime commit
+- Runtime / package-source SHA: `797bdce784ecbe44996cc0e46dbe8d2920a52b08`
 - PR: pending
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.address-ux.1.zip`
+- Bytes: `1,832,223`
+- SHA-256: `2a28798140fafaa7d7b4e20bc4e3878fd1949f7014af854b002960a3ae1120fe`
 - Not merged. Not deployed. Not RC.13. Awaiting technical review. Training remains `1.0.0-dev.pdp-precision.2`.
-- Evidence: `docs/POST-RC12-CART-CHECKOUT-ADDRESS-UX.md` after CI SUCCESS
+- Evidence: `docs/POST-RC12-CART-CHECKOUT-ADDRESS-UX.md`
 
 ## Post-RC.12 merged — Issue #38 (not a release)
 - Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/38
