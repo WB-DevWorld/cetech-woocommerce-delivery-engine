@@ -12,6 +12,7 @@ use CetechDeliveryEngine\Domain\Geography\GeographyPack;
 use CetechDeliveryEngine\Domain\Geography\GeographyPackRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\LocationAliasRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\ProviderMappingRepositoryInterface;
+use CetechDeliveryEngine\Infrastructure\Persistence\WordPressOptionCasStore;
 
 /**
  * Idempotent in-place repair of canonical country roots corrupted by competing
@@ -38,7 +39,28 @@ final class CountryIdentityReconciler {
 	/** @var (\Closure(self):void)|null Test seam for concurrency and failure simulation. */
 	public ?\Closure $before_repair_all = null;
 
+	/**
+	 * Invoked after a stale lock is observed and before CAS takeover.
+	 *
+	 * @var (\Closure(mixed):void)|null
+	 */
+	public ?\Closure $after_observe_lock = null;
+
+	/**
+	 * Invoked after each country in a leased repair_all() pass.
+	 *
+	 * @var (\Closure(self, CanonicalLocation):void)|null
+	 */
+	public ?\Closure $after_repair_one = null;
+
+	public WordPressOptionCasStore $cas;
+
 	private string $lock_owner = '';
+
+	/** @var array<string, mixed> */
+	private array $held_lease = [];
+
+	private bool $lease_lost = false;
 
 	public function __construct(
 		private CanonicalLocationRepositoryInterface $locations,
@@ -47,8 +69,10 @@ final class CountryIdentityReconciler {
 		private GeographyPackRepositoryInterface $packs,
 		private WooCommerceGeographyBootstrap $woo,
 		private GeoNamesGazetteerParser $parser = new GeoNamesGazetteerParser(),
-		private ?\Closure $now = null
+		private ?\Closure $now = null,
+		?WordPressOptionCasStore $cas = null
 	) {
+		$this->cas = $cas ?? new WordPressOptionCasStore();
 	}
 
 	/**
@@ -73,7 +97,7 @@ final class CountryIdentityReconciler {
 
 		$acquired = false;
 		try {
-			if ( ! $this->try_acquire_lock() ) {
+			if ( ! $this->try_acquire_lock( $revision ) ) {
 				return [
 					'skipped' => true,
 					'reason'  => 'locked',
@@ -83,6 +107,13 @@ final class CountryIdentityReconciler {
 			$acquired = true;
 
 			$results = $this->repair_all();
+			if ( $this->lease_lost ) {
+				return [
+					'skipped' => true,
+					'reason'  => 'lease_lost',
+					'results' => $results,
+				];
+			}
 			$this->persist_revision( $revision );
 
 			return [
@@ -106,7 +137,18 @@ final class CountryIdentityReconciler {
 		}
 		$out = [];
 		foreach ( $this->locations->list_country_roots() as $country ) {
+			if ( $this->lease_active() && ! $this->renew_lease() ) {
+				$this->lease_lost = true;
+				break;
+			}
 			$out[] = $this->repair_one( $country );
+			if ( $this->after_repair_one instanceof \Closure ) {
+				( $this->after_repair_one )( $this, $country );
+			}
+			if ( $this->lease_active() && ! $this->renew_lease() ) {
+				$this->lease_lost = true;
+				break;
+			}
 		}
 
 		return $out;
@@ -430,55 +472,93 @@ final class CountryIdentityReconciler {
 		return 0;
 	}
 
-	private function try_acquire_lock(): bool {
-		if ( ! function_exists( 'add_option' ) || ! function_exists( 'get_option' ) ) {
-			return true;
-		}
-
-		$owner   = uniqid( 'cir-', true );
-		$payload = [
-			'acquired_at' => $this->now(),
-			'owner'       => $owner,
-		];
-		if ( add_option( self::LOCK_OPTION_KEY, $payload, '', false ) ) {
-			$this->lock_owner = $owner;
+	private function try_acquire_lock( int $revision ): bool {
+		$owner = uniqid( 'cir-', true );
+		$lease = $this->lease_payload( $owner, $revision );
+		if ( $this->cas->add( self::LOCK_OPTION_KEY, $lease ) ) {
+			$this->hold_lease( $lease );
 
 			return true;
 		}
 
-		$current = get_option( self::LOCK_OPTION_KEY, false );
+		$current = $this->cas->get( self::LOCK_OPTION_KEY, false );
 		if ( ! $this->lock_is_expired( $current ) ) {
 			return false;
 		}
-
-		if ( function_exists( 'delete_option' ) ) {
-			delete_option( self::LOCK_OPTION_KEY );
+		if ( $this->after_observe_lock instanceof \Closure ) {
+			( $this->after_observe_lock )( $current );
 		}
-		if ( add_option( self::LOCK_OPTION_KEY, $payload, '', false ) ) {
-			$this->lock_owner = $owner;
-
-			return true;
+		if ( ! $this->cas->compare_and_swap( self::LOCK_OPTION_KEY, $current, $lease ) ) {
+			return false;
 		}
+		$this->hold_lease( $lease );
 
-		return false;
+		return true;
+	}
+
+	private function renew_lease(): bool {
+		if ( ! $this->lease_active() ) {
+			return false;
+		}
+		$next = $this->lease_payload(
+			$this->lock_owner,
+			(int) ( $this->held_lease['revision'] ?? self::REPAIR_REVISION ),
+			(int) ( $this->held_lease['acquired_at'] ?? $this->now() )
+		);
+		if ( ! $this->cas->compare_and_swap( self::LOCK_OPTION_KEY, $this->held_lease, $next ) ) {
+			$this->lock_owner  = '';
+			$this->held_lease  = [];
+			$this->lease_lost  = true;
+
+			return false;
+		}
+		$this->held_lease = $next;
+
+		return true;
 	}
 
 	private function release_lock(): void {
-		if ( '' === $this->lock_owner || ! function_exists( 'get_option' ) || ! function_exists( 'delete_option' ) ) {
+		if ( '' === $this->lock_owner || [] === $this->held_lease ) {
 			$this->lock_owner = '';
+			$this->held_lease = [];
 
 			return;
 		}
-		$current = get_option( self::LOCK_OPTION_KEY, false );
-		$owner   = is_array( $current ) ? (string) ( $current['owner'] ?? '' ) : '';
-		if ( $owner === $this->lock_owner ) {
-			delete_option( self::LOCK_OPTION_KEY );
-		}
+		$this->cas->compare_and_delete( self::LOCK_OPTION_KEY, $this->held_lease );
 		$this->lock_owner = '';
+		$this->held_lease = [];
+	}
+
+	private function lease_active(): bool {
+		return '' !== $this->lock_owner && [] !== $this->held_lease && ! $this->lease_lost;
 	}
 
 	/**
-	 * Malformed lock values expire immediately so they cannot block forever.
+	 * @param array<string, mixed> $lease
+	 */
+	private function hold_lease( array $lease ): void {
+		$this->lock_owner = (string) ( $lease['owner'] ?? '' );
+		$this->held_lease = $lease;
+		$this->lease_lost = false;
+	}
+
+	/**
+	 * @return array{owner:string,expires_at:int,acquired_at:int,revision:int}
+	 */
+	private function lease_payload( string $owner, int $revision, ?int $acquired_at = null ): array {
+		$now = $this->now();
+
+		return [
+			'owner'       => $owner,
+			'expires_at'  => $now + self::LOCK_TTL_SECONDS,
+			'acquired_at' => $acquired_at ?? $now,
+			'revision'    => $revision,
+		];
+	}
+
+	/**
+	 * Malformed/legacy lock values expire immediately so they cannot block
+	 * forever. Takeover still uses CAS against the exact observed value.
 	 *
 	 * @param mixed $current
 	 */
@@ -486,12 +566,16 @@ final class CountryIdentityReconciler {
 		if ( ! is_array( $current ) ) {
 			return true;
 		}
-		$acquired = (int) ( $current['acquired_at'] ?? 0 );
-		if ( $acquired <= 0 ) {
+		$owner = trim( (string) ( $current['owner'] ?? '' ) );
+		if ( '' === $owner ) {
+			return true;
+		}
+		$expires = (int) ( $current['expires_at'] ?? 0 );
+		if ( $expires <= 0 ) {
 			return true;
 		}
 
-		return ( $this->now() - $acquired ) >= self::LOCK_TTL_SECONDS;
+		return $expires < $this->now();
 	}
 
 	private function now(): int {

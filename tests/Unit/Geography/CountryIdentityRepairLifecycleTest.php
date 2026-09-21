@@ -111,11 +111,14 @@ final class CountryIdentityRepairLifecycleTest extends TestCase {
 	}
 
 	public function test_g_active_lock_blocks_duplicate_repair(): void {
+		$now = time();
 		add_option(
 			CountryIdentityReconciler::LOCK_OPTION_KEY,
 			[
-				'acquired_at' => time(),
 				'owner'       => 'other',
+				'expires_at'  => $now + CountryIdentityReconciler::LOCK_TTL_SECONDS,
+				'acquired_at' => $now,
+				'revision'    => CountryIdentityReconciler::REPAIR_REVISION,
 			],
 			'',
 			false
@@ -137,8 +140,10 @@ final class CountryIdentityRepairLifecycleTest extends TestCase {
 		add_option(
 			CountryIdentityReconciler::LOCK_OPTION_KEY,
 			[
-				'acquired_at' => $now - CountryIdentityReconciler::LOCK_TTL_SECONDS - 1,
 				'owner'       => 'stale',
+				'expires_at'  => $now - 1,
+				'acquired_at' => $now - CountryIdentityReconciler::LOCK_TTL_SECONDS - 1,
+				'revision'    => CountryIdentityReconciler::REPAIR_REVISION,
 			],
 			'',
 			false
@@ -245,8 +250,16 @@ final class CountryIdentityRepairLifecycleTest extends TestCase {
 		self::assertCount( 1, $staged );
 		self::assertSame( '99999', $staged[0]['external_id'] ?? '' );
 		self::assertSame( $id, $stack['geo']->locations->find_location_id( GeographyProvider::GeoNames, '99999', $token ) );
-		$again = $stack['geo']->locations->add_alias( $id, 'Staged Ghana', 'staged ghana', '', 'alternate', false, $token );
-		unset( $again );
+		$alias_prop = new \ReflectionProperty( $stack['geo']->locations, 'aliases' );
+		$alias_prop->setAccessible( true );
+		$alias_rows = $alias_prop->getValue( $stack['geo']->locations );
+		$staged_aliases = [];
+		foreach ( $alias_rows[ $id ] ?? [] as $row ) {
+			if ( $token === ( $row['generation_token'] ?? '' ) ) {
+				$staged_aliases[] = $row['alias'];
+			}
+		}
+		self::assertContains( 'Staged Ghana', $staged_aliases );
 		$live = $stack['geo']->locations->find_by_id( $id );
 		self::assertSame( 'Ghana', $live?->canonical_name );
 		if ( is_string( $stack['file'] ) ) {

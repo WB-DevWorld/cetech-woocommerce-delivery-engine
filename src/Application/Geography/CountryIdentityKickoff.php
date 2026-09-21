@@ -9,9 +9,9 @@ use CetechDeliveryEngine\Infrastructure\Persistence\GeographySchema;
 
 /**
  * Runs the historical country-root identity repair after geography tables exist.
- * Gated by repair revision and a bounded lock. Does not start a pack import,
- * coverage review, or schema 7. Pack promotion still calls repair_country_code()
- * independently of this kickoff.
+ * Gated by repair revision and an owner-fenced renewable lease. Does not start
+ * a pack import, coverage review, or schema 7. Pack promotion still calls
+ * repair_country_code() independently of this kickoff.
  */
 final class CountryIdentityKickoff {
 

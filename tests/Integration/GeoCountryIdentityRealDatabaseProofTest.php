@@ -142,6 +142,79 @@ final class GeoCountryIdentityRealDatabaseProofTest extends TestCase {
 	}
 
 	/**
+	 * @group geo-live-real-db
+	 * @group geo15-real-db
+	 */
+	public function test_owner_fenced_option_cas_on_real_options_table(): void {
+		$table = (string) $this->wpdb->options;
+		$this->wpdb->query( 'DROP TABLE IF EXISTS `' . $table . '`' );
+		$created = $this->wpdb->query(
+			'CREATE TABLE `' . $table . '` (
+				option_id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+				option_name VARCHAR(191) NOT NULL,
+				option_value LONGTEXT NOT NULL,
+				autoload VARCHAR(20) NOT NULL DEFAULT \'yes\',
+				PRIMARY KEY (option_id),
+				UNIQUE KEY option_name (option_name)
+			) ' . $this->wpdb->get_charset_collate()
+		);
+		self::assertNotFalse( $created, $this->wpdb->last_error );
+
+		$store = new \CetechDeliveryEngine\Infrastructure\Persistence\WordPressOptionCasStore();
+		$key   = CountryIdentityReconciler::LOCK_OPTION_KEY;
+		$l0    = [
+			'owner'       => 'stale',
+			'expires_at'  => 10,
+			'acquired_at' => 1,
+			'revision'    => 1,
+		];
+		$la    = [
+			'owner'       => 'a',
+			'expires_at'  => 1060,
+			'acquired_at' => 1000,
+			'revision'    => 1,
+		];
+		$lb    = [
+			'owner'       => 'b',
+			'expires_at'  => 1060,
+			'acquired_at' => 1000,
+			'revision'    => 1,
+		];
+		self::assertTrue( $store->add( $key, $l0 ) );
+		self::assertTrue( $store->compare_and_swap( $key, $l0, $la ) );
+		$raw = $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				'SELECT option_value FROM `' . $table . '` WHERE option_name = %s LIMIT 1',
+				$key
+			)
+		);
+		self::assertSame( serialize( $la ), $raw );
+		self::assertFalse( $store->compare_and_swap( $key, $l0, $lb ) );
+		$raw_after = $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				'SELECT option_value FROM `' . $table . '` WHERE option_name = %s LIMIT 1',
+				$key
+			)
+		);
+		self::assertSame( serialize( $la ), $raw_after );
+		self::assertFalse( $store->compare_and_delete( $key, $lb ) );
+		self::assertSame( serialize( $la ), $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				'SELECT option_value FROM `' . $table . '` WHERE option_name = %s LIMIT 1',
+				$key
+			)
+		) );
+		self::assertTrue( $store->compare_and_delete( $key, $la ) );
+		self::assertNull( $this->wpdb->get_var(
+			$this->wpdb->prepare(
+				'SELECT option_value FROM `' . $table . '` WHERE option_name = %s LIMIT 1',
+				$key
+			)
+		) );
+		$this->wpdb->query( 'DROP TABLE IF EXISTS `' . $table . '`' );
+	}
+
+	/**
 	 * @return array{
 	 *   locations:WpdbCanonicalLocationRepository,
 	 *   aliases:WpdbLocationAliasRepository,
