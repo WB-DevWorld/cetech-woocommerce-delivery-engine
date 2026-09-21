@@ -23,11 +23,11 @@ Issue `#35` — `[P1] GeoNames PCL* records can overwrite canonical country iden
 - Owner: `@wbdevworld` (explicit ChatGPT authorization; Issue #35 only).
 - Branch: `fix/geonames-country-identity` from protected `master` `5abfab0b5078e67b158f282088022b2ac2566f22`.
 - Development identity: `1.0.0-dev.geo-country.3` (schema remains `6`).
-- Runtime / package-source SHA: pending exact committed runtime SHA.
+- Runtime / package-source SHA: `bae75f79d0094c78706912c9a530f09ea21b9bed`.
 - Frozen geo-country.2 runtime / package-source SHA: `23237eedece174b2f9c4334693b137310ce5c54a` / ZIP `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.2.zip` (`1,798,020` bytes, SHA-256 `6e7f76e2d218a01e2af401cc646471dc2ce27afc8a52c6ad15e671df0b88122c`). Do not overwrite.
 - Frozen geo-country.1 ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.1.zip` (`1,794,741` bytes, SHA-256 `216e3a28d37e6af5f6cf97a69ef362dc946a94b1d26d8508c3d747d582198a6c`). Do not overwrite.
 - PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/36
-- ZIP: pending `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.3.zip` after exact-head CI.
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.geo-country.3.zip` (`1,797,361` bytes, SHA-256 `a86a940d8ebac2c9e293dad8690ed8f121b5afa66cb3f1e0537f3f4152b26c66`).
 - Not RC.13. Not a release promotion. Do not merge or deploy until owner/ChatGPT differential review.
 
 ## Central leases
