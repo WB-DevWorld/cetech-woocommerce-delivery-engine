@@ -5,7 +5,7 @@
 **Branch:** `fix/cart-checkout-address-ux`  
 **Base:** protected `master` `ed3753d73e262d8c7467fa936e3e36060960e58c`  
 **Runtime / package-source SHA:** `797bdce784ecbe44996cc0e46dbe8d2920a52b08`  
-**Not RC.13. Not deployed. Do not merge until owner/ChatGPT technical review.**
+**PR:** https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/41 (open; do not merge)
 
 Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/39
 

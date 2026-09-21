@@ -55,7 +55,7 @@ Last reconciled: 2026-09-21 (PR #40 MERGED onto protected `master` `ed3753d73e26
 - Schema: `6` (unchanged)
 - Requires PHP: `8.3`
 - Runtime / package-source SHA: `797bdce784ecbe44996cc0e46dbe8d2920a52b08`
-- PR: pending
+- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/41 (open; do not merge)
 - ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.address-ux.1.zip`
 - Bytes: `1,832,223`
 - SHA-256: `2a28798140fafaa7d7b4e20bc4e3878fd1949f7014af854b002960a3ae1120fe`

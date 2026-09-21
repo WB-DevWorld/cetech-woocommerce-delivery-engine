@@ -25,6 +25,7 @@ Issue `#39` — `[P2] Cart/checkout delivery-address actions and per-item editor
 - Branch: `fix/cart-checkout-address-ux`.
 - Base: protected `master` `ed3753d73e262d8c7467fa936e3e36060960e58c`.
 - Runtime / package-source SHA: `797bdce784ecbe44996cc0e46dbe8d2920a52b08`.
+- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/41 (open; do not merge).
 - Development identity: `1.0.0-dev.address-ux.1` (schema remains `6`).
 - Requires PHP: `8.3`. Composer: `>=8.3`. Activation guard: `8.3`.
 - Not RC.13. Do not reuse pdp-precision or geo-country identities as the current plugin version.
