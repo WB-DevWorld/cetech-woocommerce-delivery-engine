@@ -5,6 +5,7 @@
 **Branch:** `fix/shipment-workspace-order-read`  
 **Base:** protected `master` `baa273c2af00672d22268eb6968012ac7a51cfdd`  
 **Runtime / package-source SHA:** `528e7c8b264f74848c85d77e172a25213db327dc`  
+**PR:** https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/42 (open; do not merge)  
 **Requires PHP:** `8.3`  
 **Not RC.13. Not deployed. Do not merge until owner/ChatGPT technical review.**
 
