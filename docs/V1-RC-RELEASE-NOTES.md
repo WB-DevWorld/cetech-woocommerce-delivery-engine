@@ -1,5 +1,7 @@
 # CETECH WooCommerce Delivery Engine — v1.0.0-rc.1
 
+> **Historical release-note notice (2026-09-22):** this document records the early private-staging V1 RC baseline. Current published release candidate is RC.12/schema 6; see `docs/RC12-PROMOTION.md` and `docs/STATUS_CURRENT.md`. Do not use this file as current release identity.
+
 **Status:** Release Candidate (private staging)  
 **Package identity:** `cetech-woocommerce-delivery-engine-v1.0.0-rc.1.zip`  
 **Plugin header version:** `1.0.0-rc.1`
