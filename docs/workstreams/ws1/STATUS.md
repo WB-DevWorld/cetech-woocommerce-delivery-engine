@@ -1,4 +1,6 @@
 # WS1 Status
-State: Owner QA PASS on the core candidate. Remaining optional customer-surface work is post-RC.10 collaboration against the RC.10 baseline after protected merge. WoodMart was physically qualified on 8.4.1.
+State: **NO ACTIVE RUNTIME TASK ASSIGNED** as of 2026-09-22.
 
-No coding on published `master` is authorized by this status file until RC.10 is merged.
+Protected master is `88c9ec09f3cfabf73b83780c0c37d397e9acdad6`; RC.12 is immutable. Issue #45 is documentation/control-plane cleanup only.
+
+WS1's earlier RC.10/WoodMart/customer-surface qualification records are historical evidence. Any new customer-surface, WoodMart, accessibility, or browser qualification work requires a fresh explicitly authorized issue/branch from current master.
