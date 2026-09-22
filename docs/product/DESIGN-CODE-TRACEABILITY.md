@@ -11,8 +11,8 @@ Status: independent Codex read-only mapping against `PRODUCT-TRUTH-BASELINE-1`. 
 | Protected master | `72fa354d52b49ffd9cbc32862a6b2e3d7117ea4e` | Same 829-path runtime tree as RC.11; differs only in three closeout/status documents |
 | Active branch | `feat/canonical-geography-coverage` at `daef41a85662e1c1dc0aa6f5673ca9749f163a26` | 18 commits and 129 changed paths versus master; 903-path tree |
 | Active identity | `1.0.0-dev.geo.11`, schema 6 | Implemented, CI-green, Draft/unmerged, rejected from physical QA |
-| Active governance | issue #23; Draft PR #24 | Sole owner `@wbdevworld`; PR mergeable mechanically but blocked/governance-Draft |
-| Next named work | `1.0.0-dev.geo.12`, schema 6 | Finite closure-correction pass; no RC.12 and no Stage 15 |
+| Audit-freeze governance | issue #23; Draft PR #24 | Historical 2026-09-19 snapshot; Issue #23/PR #24 later completed and merged |
+| Audit-freeze next named work | `1.0.0-dev.geo.12`, schema 6 | Historical plan; execution later advanced through accepted geo.16, RC.12, and post-RC.12 hardening; Stage 15 still not started |
 
 ## 2. Release/master/active-branch delta
 
@@ -76,7 +76,7 @@ The owner/architect closure review confirms substantial correctness gains but bl
 | `ws3/rc11-closeout-truth` | `bc485a6…` | Incorporated RC.11 closeout source |
 | `ws3/sync-current-status-2026-09-16` | `dbf90ca…` | Stale open PR #15; do not merge into current master |
 
-No side branch contains a more authoritative current Standalone runtime than master plus the explicitly active geo.11 stream. Recovery branches are valuable provenance, not candidates to merge wholesale.
+At audit freeze, no side branch contained a more authoritative runtime than master plus geo.11. Current protected master is now authoritative after geo/RC.12/post-RC.12 merges. Recovery/optional branches remain provenance or explicitly separate work and are not candidates to merge wholesale; see `docs/recovery/BRANCH-RETIREMENT-2026-09-22.md`.
 
 ## 4. Source architecture inventory
 
@@ -143,7 +143,7 @@ The committed suite covers unit behavior, limited integration harnesses, JavaScr
 
 Important boundary: this audit container could not execute PHP or JavaScript suites because PHP, Composer vendor binaries and Vitest dependencies were absent. The attempt failed before tests ran. This mapping relies on source inspection and exact-head GitHub CI evidence; it does not falsely claim a new local pass.
 
-Current certification boundaries remain: RC.11 has no production deployment claim; WPML/WCML, WP Rocket, external PSP and POS certification are separate; geo.11 has not entered physical QA.
+Audit-time certification boundaries were: RC.11 had no production deployment claim; WPML/WCML, WP Rocket, external PSP and POS certification were separate; geo.11 had not entered physical QA. Current status has since advanced through geo physical QA and RC.12, while those optional certification boundaries and the absence of Pilot/production authorization remain.
 
 ## 9. Requirements-to-code traceability
 
@@ -203,7 +203,7 @@ These are compatible safeguards or UX/operations improvements, not scope drift t
 
 ## 11. Documentation drift
 
-`readme.txt` still contains early skeleton/Classic-only statements, a stale `Stable tag: 1.0.0-rc.10`, and exclusions later implemented and accepted. Several stage documents are valuable history but must not compete with the owner-approved product-control files. PR #15 is stale. Canonical documentation must preserve history while treating this product constitution, structured registry, release scope, traceability and compatibility matrix as current authority for their assigned truth classes.
+As of Issue #44, `readme.txt` has been reconciled to published RC.12/current development truth and obsolete PR #15 is closed without merge. Several stage documents remain valuable history and must not compete with the owner-approved product-control files. Canonical documentation preserves history while distinguishing frozen audit assessments from live repository/runtime status.
 
 ## 12. Codex completion statement
 
