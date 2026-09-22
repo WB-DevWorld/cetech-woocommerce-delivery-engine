@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Admin;
 
-use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionCountQuery;
 use CetechDeliveryEngine\Core\Capabilities\Capabilities;
 use CetechDeliveryEngine\Application\Configuration\OperationalStateService;
 use CetechDeliveryEngine\Application\Configuration\SetupWizardProgress;
@@ -26,7 +26,7 @@ final class OverviewPage {
 		private readonly SiteWideDefaultsService $defaults,
 		private readonly SiteWideDefaultsSettings $settings,
 		private readonly SiteWideDefaultSummary $summaries,
-		private readonly NeedsAttentionQuery $needs_attention,
+		private readonly NeedsAttentionCountQuery $needs_attention_count,
 		private readonly AdminActionHandler $action_handler,
 		private readonly OperationalStateService $operational_state
 	) {
@@ -61,7 +61,6 @@ final class OverviewPage {
 		$preview = $this->defaults->preview();
 		$op      = $this->operational_state->current();
 		$primary = FulfilmentProfileRegistry::get( (string) $state['primary_profile'] );
-		$attention_count = $this->needs_attention->count();
 		$wizard  = $this->progress->read();
 
 		AdminPageLayout::open_page();
@@ -121,18 +120,21 @@ final class OverviewPage {
 			AdminPageRenderer::list_url( ProductExceptionsPage::SLUG ),
 			'dashicons-tag'
 		);
-		$this->render_stat_card(
-			__( 'Needs attention', 'cetech-woocommerce-delivery-engine' ),
-			sprintf(
-				/* translators: %d items */
-				_n( '%d item', '%d items', $attention_count, 'cetech-woocommerce-delivery-engine' ),
-				$attention_count
-			),
-			__( 'View items', 'cetech-woocommerce-delivery-engine' ),
-			AdminPageRenderer::list_url( NeedsAttentionPage::SLUG ),
-			'dashicons-warning',
-			$attention_count > 0
-		);
+		if ( $this->needs_attention_count->current_user_can_see_needs_attention() ) {
+			$attention_count = max( 0, $this->needs_attention_count->unresolved_count_for_current_user() );
+			$this->render_stat_card(
+				__( 'Needs attention', 'cetech-woocommerce-delivery-engine' ),
+				sprintf(
+					/* translators: %d items */
+					_n( '%d item', '%d items', $attention_count, 'cetech-woocommerce-delivery-engine' ),
+					$attention_count
+				),
+				__( 'View items', 'cetech-woocommerce-delivery-engine' ),
+				AdminPageRenderer::list_url( NeedsAttentionPage::SLUG ),
+				'dashicons-warning',
+				$attention_count > 0
+			);
+		}
 		echo '</div>';
 
 		AdminPageLayout::render_summary_stats(

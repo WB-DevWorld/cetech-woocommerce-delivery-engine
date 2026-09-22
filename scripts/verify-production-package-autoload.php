@@ -299,7 +299,8 @@ $is_schema6_release = str_contains( $header_source, '1.0.0-dev.geo' )
 	|| str_contains( $header_source, '1.0.0-dev.checkout-mdest' )
 	|| str_contains( $header_source, '1.0.0-dev.pdp-precision' )
 	|| str_contains( $header_source, '1.0.0-dev.address-ux' )
-	|| str_contains( $header_source, '1.0.0-dev.shipment-order-read' );
+	|| str_contains( $header_source, '1.0.0-dev.shipment-order-read' )
+	|| str_contains( $header_source, '1.0.0-dev.attention-count' );
 
 $target = 'unknown';
 if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
