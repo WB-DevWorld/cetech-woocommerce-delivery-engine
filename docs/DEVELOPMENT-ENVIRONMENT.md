@@ -1,7 +1,7 @@
 # Primary Development Environment
 
-**Current development target:**  
-`https://flairoc.com/intl/`
+**Current development / qualification policy (2026-09-22):**  
+Use disposable CI/local isolated environments by default. Shared `https://training.cetechbpa.com` is the current authorized physical-QA surface only when a task explicitly permits writes. FLAIROC is **not** the current post-RC.12 development target and requires separate human authorization.
 
 **Primary local/QA runtime:** PHP **8.5.x** (CETECH production target). See `docs/PHP-RUNTIME-POLICY.md` and `docker/php85-qa/`.
 
@@ -20,7 +20,7 @@ Former staging target. Stage 0 on 2026-08-10 was blocked by Cloudflare HTTP 525 
 **Credentials:**  
 Do not store passwords, application passwords, API keys, tokens, cookies, or other secrets in this document. Use a local gitignored `.env.local` (or equivalent) for agent/developer access.
 
-Typical local keys (names only): `FLAIROC_BASE_URL` / `FLAIROC_WP_ADMIN_URL`, `FLAIROC_WP_USERNAME`, `FLAIROC_WP_APP_PASSWORD`, optional WooCommerce `WC_CONSUMER_KEY` / `WC_CONSUMER_SECRET`.
+Environment credentials are local-only. Historical FLAIROC key names may still exist in private tooling, but no FLAIROC access is implied by repository documentation. Training/other target credentials must likewise remain outside Git and be used only under explicit task authorization.
 
 **Environment facts (Stage 0B final, 2026-08-10):**  
 - WordPress **7.0.3**; WooCommerce **11.0.0** (DB **11.0.0**); PHP **8.5.5**; table prefix `flagh_`  
