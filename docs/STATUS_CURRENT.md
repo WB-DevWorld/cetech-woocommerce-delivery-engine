@@ -56,9 +56,11 @@ Last reconciled: 2026-09-21 (PR #40 MERGED onto protected `master` `ed3753d73e26
 - Requires PHP: `8.3`
 - Previous `.1` runtime SHA: `797bdce784ecbe44996cc0e46dbe8d2920a52b08`
 - Previous `.2` runtime SHA: `b2acea7ba75f31cd6a7851fcbf594bf798bfd79d`
-- Runtime / package-source SHA: pending `1.0.0-dev.address-ux.3` commit
+- Runtime / package-source SHA: `3f02e10e377d641d7036357242033b3f6534cbb8`
 - PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/41 (open; do not merge)
-- ZIP: pending exact runtime CI SUCCESS (do not overwrite frozen `.1` / `.2`)
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.address-ux.3.zip`
+- Bytes: `1,841,881`
+- SHA-256: `5f17abeaedbb078055963d98cd5992fadf9ed7ec2c8d7f5f1d785a294129265d`
 - Frozen `.2` ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.address-ux.2.zip` (`1,837,972` bytes, SHA-256 `e914efc0ee73132efffab6899cf9627ac3d01ecf6b579f190b3050cdd43e117f`)
 - Frozen predecessor ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.address-ux.1.zip` (`1,832,223` bytes, SHA-256 `2a28798140fafaa7d7b4e20bc4e3878fd1949f7014af854b002960a3ae1120fe`)
 - Not merged. Not deployed. Not RC.13. Awaiting final deployment review. Training remains `1.0.0-dev.address-ux.2`.

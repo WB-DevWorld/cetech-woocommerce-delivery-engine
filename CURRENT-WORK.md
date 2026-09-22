@@ -26,7 +26,7 @@ Issue `#39` — `[P2] Cart/checkout delivery-address actions and per-item editor
 - Branch: `fix/cart-checkout-address-ux`.
 - Base: protected `master` `ed3753d73e262d8c7467fa936e3e36060960e58c`.
 - Previous `.2` runtime / package-source SHA: `b2acea7ba75f31cd6a7851fcbf594bf798bfd79d`.
-- Runtime / package-source SHA: pending commit of `1.0.0-dev.address-ux.3`.
+- Runtime / package-source SHA: `3f02e10e377d641d7036357242033b3f6534cbb8`.
 - PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/41 (open; do not merge).
 - Development identity: `1.0.0-dev.address-ux.3` (schema remains `6`).
 - Requires PHP: `8.3`. Composer: `>=8.3`. Activation guard: `8.3`.

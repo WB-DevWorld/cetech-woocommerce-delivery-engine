@@ -6,7 +6,7 @@
 **Base:** protected `master` `ed3753d73e262d8c7467fa936e3e36060960e58c`  
 **Previous `.1` runtime SHA:** `797bdce784ecbe44996cc0e46dbe8d2920a52b08`  
 **Previous `.2` runtime SHA:** `b2acea7ba75f31cd6a7851fcbf594bf798bfd79d`  
-**Runtime / package-source SHA:** pending after `1.0.0-dev.address-ux.3` commit  
+**Runtime / package-source SHA:** `3f02e10e377d641d7036357242033b3f6534cbb8`  
 **PR:** https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/41 (open; do not merge)
 
 Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/39
@@ -105,7 +105,24 @@ Built from a clean committed tree after GitHub CI SUCCESS on the runtime/package
 
 ## Package (address-ux.3, after CI)
 
-Pending exact runtime CI SUCCESS. Do not overwrite frozen address-ux.1 or address-ux.2 ZIPs. Training remains `1.0.0-dev.address-ux.2`. Do not deploy address-ux.3.
+Built from a clean committed tree after GitHub CI SUCCESS on the runtime/package-source SHA. Do not overwrite frozen address-ux.1 or address-ux.2 ZIPs. Do not treat this ZIP as RC.13 or as a replacement for RC.12. Training remains `1.0.0-dev.address-ux.2`. Do not deploy address-ux.3.
+
+- Source SHA: `3f02e10e377d641d7036357242033b3f6534cbb8`
+- Filename: `cetech-woocommerce-delivery-engine-1.0.0-dev.address-ux.3.zip`
+- Bytes: `1,841,881`
+- SHA-256: `5f17abeaedbb078055963d98cd5992fadf9ed7ec2c8d7f5f1d785a294129265d`
+- Production-package verifier: PASS (staged and extracted)
+- Packaged PHP lint: `497 files / 0 failures` (PHP 8.5.0, vendor excluded)
+- GitHub CI on runtime SHA: SUCCESS (`35670060402` push; `35670078690` pull_request) — PHP 8.3 Minimum Supported, PHP 8.4 Compatibility, PHP 8.5 CETECH Production Target, PHP 8.5 MariaDB Geography/Migrations, PHP 8.5 WordPress/WooCommerce, CI Required Gates, JavaScript / Vitest, Control Plane
+- PHPUnit (GitHub PHP 8.5.10): Tests: 1389, Assertions: 8794, Deprecations: 14, Skipped: 1
+- PHPUnit (local PHP 8.5.0): Tests: 1389, Assertions: 8791, Deprecations: 14, Skipped: 1
+- Vitest: 101 passed / 8 files
+- Composer validate: PASS
+- Team control plane: PASS
+- Product control plane: PASS (372 Requirement IDs)
+- MariaDB real-DB: Tests: 26, Assertions: 1738, skipped=0, failures=0, errors=0
+- Frozen `.2` ZIP unchanged: `1,837,972` bytes, SHA-256 `e914efc0ee73132efffab6899cf9627ac3d01ecf6b579f190b3050cdd43e117f`
+- Not deployed to training
 
 ## Explicitly not done
 
