@@ -1,5 +1,7 @@
 # CETECH WooCommerce Delivery Engine — Architecture Plan
 
+> **Current implementation reconciliation (2026-09-22):** this architecture document contains early V1 planning language as well as durable architecture. Current protected master is post-RC.12/schema 6 and supports both Classic and Blocks checkout. When an old planning statement conflicts with current code/status, `CURRENT-WORK.md`, `docs/STATUS_CURRENT.md`, and the implemented contracts win.
+
 **Phase:** 0B — Productized Architecture Plan  
 **Sources:** `docs/AI-HANDOFF.md`, `docs/PROJECT-RULES.md`  
 **Status:** Planning only — no plugin code in this phase
@@ -44,7 +46,7 @@ Architecture priorities: server-side authority, per-line delivery selection, imm
 |------------|-------------|
 | Multiple independent WooCommerce sites | No shared DB, suppliers, zones, or policies; no hardcoded brand/country/carrier |
 | Unknown plugin/theme stack at install time | Runtime integration detection; Null adapters; no fatal errors when optional plugins absent |
-| Sites differ in HPOS, checkout type, cache, multilingual state | Declare HPOS compatibility; classic checkout V1 baseline; cache-safe dynamic endpoints |
+| Sites differ in HPOS, checkout type, cache, multilingual state | Declare HPOS compatibility; Classic + Blocks checkout support; cache-safe dynamic endpoints |
 | Operators configure per site | Onboarding wizard optional; no auto-seeding of offers/rate cards unless demo mode |
 | Commercial maintainability | Composer autoload, namespaced PHP, versioned migrations, semantic versioning |
 | Pilot-first rollout | Feature flags default off for customer-facing takeover; expand catalog deliberately |
@@ -428,7 +430,7 @@ Same-day offers may use hour-range manual text instead of full business-day stac
 
 **Silent replacement:** forbidden — invalidate line and show notice.
 
-**V1 baseline:** `ClassicCheckoutAdapter` only. Blocks **not** registered unless future flag enabled.
+**Current baseline:** Classic and Cart/Checkout Blocks are both supported surfaces using shared server-authoritative Delivery Engine rules. Do not maintain a Classic-only business-logic fork.
 
 ---
 
@@ -1311,7 +1313,7 @@ Per-product enablement: product rule `active` + global selector flag + optional 
 
 ## 61. Migration/upgrade strategy
 
-- Schema version option: `cetech_de_db_version` (current target: `3` — scoped configuration storage; see `docs/STAGE-2-SCOPED-CONFIGURATION-STORAGE.md`)
+- Schema version option: `cetech_de_db_version` (current target: `6`; earlier schema-3 scoped-configuration history is documented in `docs/STAGE-2-SCOPED-CONFIGURATION-STORAGE.md`)
 - Migrations in `database/migrations/` named `YYYYMMDDHHMMSS_description.php`
 - Each migration: `up()`, `idempotent check`, logged result
 - Properties: versioned, non-destructive default, batch-capable for large tables, no long locks during peak checkout
@@ -1397,7 +1399,7 @@ CI target: PHP **8.5** CETECH production (blocking), PHP **8.3** minimum support
 | **A** | Managed packages default **`exclusive`**. Native WC rates remain for non-managed packages. Setting allows `coexist` / `fallback_native`. |
 | **B** | Missing rate card → **never zero shipping**. Block ATC/checkout, customer-safe message, admin diagnostic. |
 | **C** | Category/site fallback rules **optional**; flags default **off** in V1. Product + variation rules first. |
-| **D** | **Classic checkout = V1 baseline.** Blocks adapter **future-only**; flag default off. |
+| **D** | **Classic and Blocks are current checkout surfaces.** Shared server-side business rules and snapshot semantics must remain aligned; neither surface may become a separate pricing authority. |
 | **E** | WCFM/VitePOS: **adapter interfaces + Null + stub**; not required for V1 release. |
 | **F** | **PHP 8.3** minimum supported; **PHP 8.5.x** currently qualified latest stable / CETECH production; use **backed enums** for domain statuses/routes. PHP 8.1 and 8.2 are not supported. |
 | **G** | Shipment creation default **`payment_confirmed`**; idempotent; configurable to `order_created`. |
