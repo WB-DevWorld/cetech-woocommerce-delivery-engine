@@ -3,7 +3,7 @@ Contributors: cetech
 Requires at least: 6.0
 Tested up to: 6.8
 Requires PHP: 8.3
-Stable tag: 1.0.0-dev.geo.10
+Stable tag: 1.0.0-rc.12
 License: Proprietary
 WC requires at least: 8.0
 WC tested up to: 10.9
@@ -20,7 +20,7 @@ CETECH WooCommerce Delivery Engine is a reusable commercial-style WooCommerce pl
 
 **Optional integrations (not required):** WoodMart, WPML, WCML, WCFM, VitePOS, Redis, WP Rocket, WooCommerce Blocks, tracking plugins, and future carrier APIs.
 
-This 0.1.0 release is the **Phase 1A core foundation skeleton**. It does not yet change product, cart, checkout, shipping, order, or customer-facing delivery behaviour.
+The published stable-tag baseline is **1.0.0-rc.12** (schema 6). It includes server-authoritative fulfilment and delivery pricing, Classic and Blocks checkout integration, immutable order delivery snapshots, shipment records/status/tracking foundations, bulk tools, canonical geography/coverage, and the current admin/customer delivery surfaces. Later post-RC.12 fixes are development hardening and do not move the RC.12 tag.
 
 == Version 1 exclusions ==
 
@@ -47,9 +47,18 @@ No. WooCommerce is the only required dependency.
 
 = Does this version change checkout shipping? =
 
-No. Phase 1A is a safe core skeleton only.
+Yes. When the Delivery Engine manages a package, eligible delivery/pickup choices and authoritative rates are resolved and validated server-side through the WooCommerce integration. Unmanaged WooCommerce behavior remains outside Delivery Engine authority.
 
 == Changelog ==
+
+= Post-RC.12 development (not a tagged release) =
+* Protected master includes merged post-RC.12 hardening through Issue #32 / PR #43. Training currently runs the verified `1.0.0-dev.attention-count.1` package; schema remains 6. RC.12 remains immutable; RC.13 has not been created.
+
+= 1.0.0-rc.12 =
+* Promotes the owner-accepted schema-6 canonical geography/coverage baseline to the published prerelease. Includes Location Packs, Coverage Groups and schema-6 qualification. Tagged source and release asset are immutable.
+
+= 1.0.0-rc.11 =
+* Promotes the accepted PDP authoritative delivery-price baseline on schema 5. RC.11 remains immutable.
 
 = 1.0.0-rc.10 =
 * Promotes the owner-qualified 1.0.0-dev.qual.1 core runtime to the tagged collaboration baseline. Schema remains 5. Not Stage 15. WPML/WCML and WP Rocket certification remain separate. Historical 1.0.0-dev.qual.1 and tagged 1.0.0-rc.9 remain unchanged.
