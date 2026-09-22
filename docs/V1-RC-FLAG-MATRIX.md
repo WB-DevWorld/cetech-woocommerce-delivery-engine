@@ -1,9 +1,11 @@
 # V1 Release Candidate — Feature Flag Matrix
 
+> **Historical matrix note (2026-09-22):** this file originated in the schema-3/early-RC period and remains useful for feature-flag provenance. It is not the live environment/status authority. Current schema is 6; current release/runtime state is in `CURRENT-WORK.md` and `docs/STATUS_CURRENT.md`. Verify current flag defaults and environment state from code/runtime before use.
+
 **Plugin:** CETECH WooCommerce Delivery Engine  
 **Version:** `1.0.0-rc.2`  
-**Schema target:** `3`  
-**Live status:** **VERIFIED ON** for required production features (FLAIROC Classic Checkout)
+**Current schema target:** `6` (historical rows may describe earlier schema-3 behavior)  
+**Historical live-status claim:** prior FLAIROC Classic Checkout verification. Current post-RC.12 FLAIROC/production deployment is not authorized by this matrix.
 
 Install defaults stay **safe/OFF**. Production use is intentional. After the RC.2 final live smoke, required features remain **ON** on the live site.
 
