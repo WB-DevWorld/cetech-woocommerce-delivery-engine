@@ -1,21 +1,25 @@
 # Primary Development Environment
 
-**Current development target:**  
-`https://flairoc.com/intl/`
+**Current operational environment truth (2026-09-22):**
+- `https://training.cetechbpa.com` is the currently authorized shared physical-QA/training environment. It runs `1.0.0-dev.attention-count.1`, schema `6`, after Issue #32 physical QA PASS.
+- `https://flairoc.com/intl/` remains an important CETECH reference/target environment with historical Stage 0B evidence, but the post-RC.12 candidate stream has **not** been promoted there.
+- Neither training installation nor FLAIROC historical qualification is production promotion. Pilot/production writes require separate explicit authorization.
 
 **Primary local/QA runtime:** PHP **8.5.x** (CETECH production target). See `docs/PHP-RUNTIME-POLICY.md` and `docker/php85-qa/`.
 
 Do not qualify a CETECH release only on PHP 8.3/8.4. Isolated qualification must be able to reproduce PHP 8.5, current supported WordPress, current supported WooCommerce, and MariaDB 11.4 (current isolated-qualification database until production names a different version).
 
-**Purpose:**  
-Primary real-world development/integration environment for CETECH WooCommerce Delivery Engine.
+**Purpose:**
+Provide controlled local/CI qualification plus explicitly authorized shared-environment QA without making any one hostname part of product architecture.
 
 **Portability:**  
 The Delivery Engine must remain a reusable WooCommerce plugin. It must **not** depend on the hostname, theme, currency, country, products, suppliers, origins, or configuration of this environment. Do not hardcode `flairoc.com` (or any store hostname) into core business logic, resolvers, rates, or shipping behaviour. Site-specific credentials and test fixtures belong in local environment configuration and documentation only.
 
-**Historical environment:**  
-`https://training.cetechbpa.com`  
-Former staging target. Stage 0 on 2026-08-10 was blocked by Cloudflare HTTP 525 (origin SSL failure). That condition must not by itself block post-RC development after the project owner designated FLAIROC International as the canonical development target.
+**Training environment history:**
+`https://training.cetechbpa.com` was blocked by Cloudflare HTTP 525 during an earlier 2026-08-10 staging attempt, but later recovered and became the active shared physical-QA/training surface used through RC.12 and post-RC.12 candidate verification. Treat older “former staging target” language as historical only.
+
+**FLAIROC history:**
+The Stage 0B facts below remain historical qualification evidence for `https://flairoc.com/intl/`; they are not a statement that the latest post-RC.12 candidate is deployed there.
 
 **Credentials:**  
 Do not store passwords, application passwords, API keys, tokens, cookies, or other secrets in this document. Use a local gitignored `.env.local` (or equivalent) for agent/developer access.
