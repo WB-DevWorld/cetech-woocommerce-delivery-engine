@@ -1,11 +1,11 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-22 (PR #41 MERGED onto protected `master` `baa273c2af00672d22268eb6968012ac7a51cfdd` — Issue #39 CLOSED; Issue #31 candidate `1.0.0-dev.shipment-order-read.1` is **not** RC.13 and is **not deployed**; training remains `1.0.0-dev.address-ux.3`; frozen `1.0.0-dev.address-ux.1` / `.2` / `.3` ZIPs must not be overwritten; supported/certified PHP 8.3–8.5.x, minimum 8.3, CETECH production 8.5.x; RC.12 tagged from `78594ad`; Issue #26 CLOSED; Issue #29 MERGED; Issue #33 MERGED to `5abfab0`; Issue #35 CLOSED; Issue #38 CLOSED; frozen `1.0.0-dev.pdp-precision.1`/`.2` ZIPs must not be overwritten; Pilot not authorized).
+Last reconciled: 2026-09-22 (PR #42 MERGED onto protected `master` `d66e5e366612468d7e5b4874e1a4290c5d2582cc` — Issue #31 CLOSED; Issue #32 candidate `1.0.0-dev.attention-count.1` is **not** RC.13 and is **not deployed**; training remains `1.0.0-dev.shipment-order-read.1`; frozen shipment-order-read / address-ux / pdp-precision ZIPs must not be overwritten; supported/certified PHP 8.3–8.5.x, minimum 8.3, CETECH production 8.5.x; RC.12 tagged from `78594ad`; Pilot not authorized).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
 - Default/canonical development branch: protected `master`
-- Current protected `master`: `baa273c2af00672d22268eb6968012ac7a51cfdd`
+- Current protected `master`: `d66e5e366612468d7e5b4874e1a4290c5d2582cc`
 - RC.12 publication merge on `master`: `78594ad8962868683726373f58f4a8b1b48e4d0e` (PR #27 / `release/rc12` onto `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`).
 - Later documentation commits on `master` are **not** the RC.12 tag source.
 - Repository visibility: public during GitHub Free branch/ruleset protection use.
@@ -47,20 +47,34 @@ Last reconciled: 2026-09-22 (PR #41 MERGED onto protected `master` `baa273c2af00
 - Evidence: `docs/RC12-PROMOTION.md`
 - Do not move this tag to a later documentation commit. Do not rebuild the ZIP for docs closeout.
 
-## Post-RC.12 candidate — Issue #31 (not a release)
+## Post-RC.12 candidate — Issue #32 (not a release)
+- Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/32
+- Branch: `fix/needs-attention-count-contract`
+- Base: protected `master` `d66e5e366612468d7e5b4874e1a4290c5d2582cc`
+- Development identity: `1.0.0-dev.attention-count.1`
+- Schema: `6` (unchanged)
+- Requires PHP: `8.3`
+- Runtime / package-source SHA: `6e9e2ea71796170afb0508954a18d206cdc7017a`
+- Pull request: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/43
+- Runtime CI: run `35759882478` SUCCESS
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.attention-count.1.zip`
+- Bytes: `1,848,319`
+- SHA-256: `2027e5941916dff0302d7e2e545de5a2fd027f0c8f1615d97e3991dcfc5fdcb3`
+- Not merged. Not deployed. Not RC.13. Awaiting technical review. Training remains `1.0.0-dev.shipment-order-read.1`.
+- Evidence: `docs/POST-RC12-NEEDS-ATTENTION-COUNT.md`
+
+## Post-RC.12 merged — Issue #31 (not a release)
 - Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/31
-- Branch: `fix/shipment-workspace-order-read`
-- Base: protected `master` `baa273c2af00672d22268eb6968012ac7a51cfdd`
+- MERGED via PR #42 onto protected `master` `d66e5e366612468d7e5b4874e1a4290c5d2582cc`
+- Post-merge CI: run `35756300042` SUCCESS
 - Development identity: `1.0.0-dev.shipment-order-read.1`
 - Schema: `6` (unchanged)
 - Requires PHP: `8.3`
 - Runtime / package-source SHA: `528e7c8b264f74848c85d77e172a25213db327dc`
-- GitHub CI on runtime SHA: SUCCESS (`35748159485` push)
-- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/42 (open; do not merge)
 - ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.shipment-order-read.1.zip`
 - Bytes: `1,845,224`
 - SHA-256: `3dd4602ceedc26bcc3dab673271752c47c47e02d7e90e81fed832e9d498539f5`
-- Not merged. Not deployed. Not RC.13. Awaiting technical review. Training remains `1.0.0-dev.address-ux.3`.
+- CLOSED / COMPLETED. Not RC.13. Training currently `1.0.0-dev.shipment-order-read.1`.
 - Evidence: `docs/POST-RC12-SHIPMENT-ORDER-READ.md`
 
 ## Post-RC.12 merged — Issue #39 (not a release)

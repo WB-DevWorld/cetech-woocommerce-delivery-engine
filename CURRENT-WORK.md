@@ -1,13 +1,14 @@
-# Current Work — Issue #31 shipment workspace order-read recovery
+# Current Work — Issue #32 Needs Attention count contract
 
-Status: RC.12 IMMUTABLE — POST-RC.12 DEV CANDIDATE `1.0.0-dev.shipment-order-read.1` — AWAITING TECHNICAL REVIEW / NOT MERGED / NOT DEPLOYED / NOT RC.13
+Status: RC.12 IMMUTABLE — POST-RC.12 DEV CANDIDATE `1.0.0-dev.attention-count.1` — AWAITING TECHNICAL REVIEW / NOT MERGED / NOT DEPLOYED / NOT RC.13
 
 ## Canonical repository truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
 - Canonical development branch: protected `master`.
-- Current protected `master`: `baa273c2af00672d22268eb6968012ac7a51cfdd` (PR #41 MERGED; Issue #39 CLOSED / COMPLETED; post-merge CI run `35726028768` SUCCESS).
+- Current protected `master`: `d66e5e366612468d7e5b4874e1a4290c5d2582cc` (PR #42 MERGED; Issue #31 CLOSED / COMPLETED; post-merge CI run `35756300042` SUCCESS).
 - Immutable RC.12 release source: `78594ad8962868683726373f58f4a8b1b48e4d0e`.
 - Tag `v1.0.0-rc.12` must not be moved. Do not rebuild or overwrite the RC.12 ZIP.
+- Frozen `1.0.0-dev.shipment-order-read.1` ZIP must not be overwritten.
 - Frozen `1.0.0-dev.pdp-precision.1` / `1.0.0-dev.pdp-precision.2` ZIPs must not be overwritten.
 - Frozen `1.0.0-dev.address-ux.1` / `1.0.0-dev.address-ux.2` / `1.0.0-dev.address-ux.3` ZIPs must not be overwritten.
 - Do not create RC.13.
@@ -20,19 +21,18 @@ Status: RC.12 IMMUTABLE — POST-RC.12 DEV CANDIDATE `1.0.0-dev.shipment-order-r
 - Peels to: `78594ad8962868683726373f58f4a8b1b48e4d0e`
 
 ## Active task
-Issue `#31` — `[P2] Shipment workspace can show Customer unavailable for existing HPOS order`
+Issue `#32` — `[P2] Overview Needs Attention count omits actionable shipment/COD work`
 
-- Owner: `@wbdevworld` (explicit owner/ChatGPT authorization; Issue #31 only).
-- Branch: `fix/shipment-workspace-order-read`.
-- Base: protected `master` `baa273c2af00672d22268eb6968012ac7a51cfdd`.
-- Development identity: `1.0.0-dev.shipment-order-read.1` (schema remains `6`).
-- Runtime / package-source SHA: `528e7c8b264f74848c85d77e172a25213db327dc`.
-- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/42 (open; do not merge).
-- GitHub CI on runtime SHA: SUCCESS (`35748159485` push) — PHP 8.3 Minimum Supported, PHP 8.4 Compatibility, PHP 8.5 CETECH Production Target, PHP 8.5 MariaDB Geography/Migrations, PHP 8.5 WordPress/WooCommerce, CI Required Gates, JavaScript / Vitest, Control Plane.
-- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.shipment-order-read.1.zip` (`1,845,224` bytes, SHA-256 `3dd4602ceedc26bcc3dab673271752c47c47e02d7e90e81fed832e9d498539f5`).
+- Owner: `@wbdevworld` (explicit owner/ChatGPT authorization; Issue #32 only).
+- Branch: `fix/needs-attention-count-contract`.
+- Base: protected `master` `d66e5e366612468d7e5b4874e1a4290c5d2582cc`.
+- Development identity: `1.0.0-dev.attention-count.1` (schema remains `6`).
 - Requires PHP: `8.3`. Composer: `>=8.3`. Activation guard: `8.3`.
-- Not RC.13. Do not call this candidate an “HPOS fix” as architectural truth; training investigation reproduced a bulk-include miss while `wc_get_order` succeeded, without proving HPOS caused the omission.
-- Do not merge. Do not deploy.
+- Runtime / package-source SHA: `6e9e2ea71796170afb0508954a18d206cdc7017a`.
+- Pull request: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/43 (do not merge).
+- Runtime CI: `35759882478` SUCCESS.
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.attention-count.1.zip` (`1,848,319` bytes, SHA-256 `2027e5941916dff0302d7e2e545de5a2fd027f0c8f1615d97e3991dcfc5fdcb3`).
+- Not RC.13. Do not merge. Do not deploy.
 
 PHP policy retained from PR #37 (`docs/PHP-RUNTIME-POLICY.md`, `docs/PHP-85-CI-REALIGNMENT.md`):
 
@@ -42,7 +42,7 @@ PHP policy retained from PR #37 (`docs/PHP-RUNTIME-POLICY.md`, `docs/PHP-85-CI-R
 - PHP 8.1 and 8.2 are not supported and must not be advertised.
 
 ## Central leases
-- plugin bootstrap / version identity on this branch: `1.0.0-dev.shipment-order-read.1`; published `1.0.0-rc.12` remains the tagged identity; frozen address-ux / pdp-precision / geo-country ZIPs must not be overwritten;
+- plugin bootstrap / version identity on this branch: `1.0.0-dev.attention-count.1`; published `1.0.0-rc.12` remains the tagged identity; frozen shipment-order-read / address-ux / pdp-precision / geo-country ZIPs must not be overwritten;
 - CI workflows / required-check names / PHP runtime policy: retained from protected master;
 - schema / migrations: frozen at `6`;
 - published release identity/tags: `v1.0.0-rc.11` and `v1.0.0-rc.12` immutable;
@@ -53,11 +53,11 @@ PHP policy retained from PR #37 (`docs/PHP-RUNTIME-POLICY.md`, `docs/PHP-85-CI-R
 
 ## Environment authorization
 - GitHub Actions ephemeral runners and optional local `docker/php85-qa`.
-- Training site `https://training.cetechbpa.com`: **READ-ONLY investigation authorized**. Installed runtime remains `1.0.0-dev.address-ux.3`. **NOT AUTHORIZED to deploy** `1.0.0-dev.shipment-order-read.1`.
+- Training site `https://training.cetechbpa.com`: **READ-ONLY investigation authorized**. Installed runtime is `1.0.0-dev.shipment-order-read.1`. **NOT AUTHORIZED to deploy** `1.0.0-dev.attention-count.1`.
 - CETECH Pilot: **NOT STARTED**.
 - FLAIROC: **NOT DEPLOYED**.
 - Production: **NOT DEPLOYED**.
 - POS repository: outside scope / must not be touched.
 
 ## Explicit non-actions
-Do not create RC.13. Do not merge this PR. Do not implement #32. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not overwrite frozen address-ux, geo-country, or pdp-precision ZIPs. Do not start CETECH Pilot. Do not deploy FLAIROC, training, or production. Do not touch POS. Do not start Stage 15. Do not rename Ashanti Region. Do not mutate Accra/Kumasi coverage, Greater Accra charges, or the GH Location Pack. Do not rerun safe legacy reconciliation. Do not query `wp_wc_orders` / `wp_posts` / `wp_postmeta` for this fix.
+Do not create RC.13. Do not merge this PR. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not overwrite frozen shipment-order-read, address-ux, geo-country, or pdp-precision ZIPs. Do not start CETECH Pilot. Do not deploy FLAIROC, training, or production. Do not touch POS. Do not start Stage 15. Do not rename Ashanti Region. Do not mutate Accra/Kumasi coverage, Greater Accra charges, or the GH Location Pack. Do not rerun safe legacy reconciliation. Do not change shipment lifecycle, COD semantics, or the Bulk stale threshold.

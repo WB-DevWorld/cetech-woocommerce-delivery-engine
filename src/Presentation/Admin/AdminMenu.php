@@ -265,7 +265,7 @@ final class AdminMenu {
 			);
 		}
 
-		if ( current_user_can( 'manage_product_delivery_rules' ) || $this->should_show_shipments_menu() ) {
+		if ( $this->current_user_can_see_needs_attention_menu() ) {
 			$attention_cap   = current_user_can( 'manage_product_delivery_rules' )
 				? 'manage_product_delivery_rules'
 				: 'manage_shipments';
@@ -491,6 +491,10 @@ final class AdminMenu {
 	}
 
 	private function current_user_can_see_needs_attention_menu(): bool {
+		if ( $this->needs_attention_count instanceof NeedsAttentionCountQuery ) {
+			return $this->needs_attention_count->current_user_can_see_needs_attention();
+		}
+
 		return current_user_can( 'manage_product_delivery_rules' ) || $this->should_show_shipments_menu();
 	}
 

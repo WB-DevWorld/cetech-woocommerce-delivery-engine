@@ -37,12 +37,12 @@ final class NeedsAttentionCountQuery {
 	public function unresolved_count_for_current_user(): int {
 		$count = 0;
 
-		if ( $this->can_see_catalog() ) {
+		if ( $this->current_user_can_see_catalog_attention() ) {
 			$count += $this->catalog->count();
 			$count += $this->bulk_stale instanceof BulkStaleJobQuery ? $this->bulk_stale->count() : 0;
 		}
 
-		if ( $this->can_see_shipment_attention() ) {
+		if ( $this->current_user_can_see_shipment_attention() ) {
 			$count += $this->creation->count();
 			$count += $this->operations->count();
 			$count += $this->cod_awaiting instanceof CodAwaitingShipmentQuery
@@ -54,15 +54,16 @@ final class NeedsAttentionCountQuery {
 	}
 
 	public function current_user_can_see_needs_attention(): bool {
-		return $this->can_see_catalog() || $this->can_see_shipment_attention();
+		return $this->current_user_can_see_catalog_attention()
+			|| $this->current_user_can_see_shipment_attention();
 	}
 
-	private function can_see_catalog(): bool {
+	public function current_user_can_see_catalog_attention(): bool {
 		return function_exists( 'current_user_can' )
 			&& current_user_can( 'manage_product_delivery_rules' );
 	}
 
-	private function can_see_shipment_attention(): bool {
+	public function current_user_can_see_shipment_attention(): bool {
 		return $this->flags->is_enabled( 'enable_shipment_records' )
 			&& function_exists( 'current_user_can' )
 			&& current_user_can( 'manage_shipments' );

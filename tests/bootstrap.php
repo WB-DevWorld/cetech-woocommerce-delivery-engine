@@ -373,6 +373,12 @@ if ( ! function_exists( 'wp_kses' ) ) {
 	}
 }
 
+if ( ! function_exists( 'wp_kses_post' ) ) {
+	function wp_kses_post( mixed $data ): string {
+		return (string) $data;
+	}
+}
+
 if ( ! function_exists( 'selected' ) ) {
 	function selected( mixed $selected, mixed $current = true, bool $display = true ): string {
 		$result = (string) $selected === (string) $current ? ' selected="selected"' : '';

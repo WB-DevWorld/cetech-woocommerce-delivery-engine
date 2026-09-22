@@ -1482,6 +1482,7 @@ final class Plugin {
 				$container->get( ShipmentService::class ),
 				$container->get( FeatureFlags::class ),
 				$container->get( ShipmentOperationsIssueQuery::class ),
+				$container->get( NeedsAttentionCountQuery::class ),
 				$container->get( CodAwaitingShipmentQuery::class ),
 				$container->get( BulkStaleJobQuery::class )
 			)
@@ -1601,7 +1602,7 @@ final class Plugin {
 				$container->get( SiteWideDefaultsService::class ),
 				$container->get( SiteWideDefaultsSettings::class ),
 				$container->get( SiteWideDefaultSummary::class ),
-				$container->get( NeedsAttentionQuery::class ),
+				$container->get( NeedsAttentionCountQuery::class ),
 				$container->get( AdminActionHandler::class ),
 				$container->get( OperationalStateService::class )
 			)

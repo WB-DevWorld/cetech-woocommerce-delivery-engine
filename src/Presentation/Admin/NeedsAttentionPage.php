@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Bulk\BulkStaleJobQuery;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionCountQuery;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
 use CetechDeliveryEngine\Application\Configuration\OperationalState;
 use CetechDeliveryEngine\Application\Configuration\OperationalStateService;
@@ -36,6 +37,7 @@ final class NeedsAttentionPage {
 		private readonly ShipmentService $shipment_service,
 		private readonly FeatureFlags $flags,
 		private readonly ShipmentOperationsIssueQuery $operations_issues,
+		private readonly NeedsAttentionCountQuery $attention_count,
 		private readonly ?CodAwaitingShipmentQuery $cod_actions = null,
 		private readonly ?BulkStaleJobQuery $bulk_stale = null
 	) {
@@ -78,17 +80,23 @@ final class NeedsAttentionPage {
 	}
 
 	public function render(): void {
-		if ( ! current_user_can( 'manage_product_delivery_rules' ) && ! current_user_can( 'manage_shipments' ) ) {
+		$can_catalog_attention  = $this->can_see_catalog_attention();
+		$can_shipment_attention = $this->can_see_shipment_attention();
+
+		if (
+			AdminPageAccess::current_user_is_restricted()
+			|| ( ! $can_catalog_attention && ! $can_shipment_attention )
+		) {
 			AdminPageAccess::require_capability( 'manage_product_delivery_rules' );
 		}
 
 		$this->action_handler->notices()->render_notices();
 
-		$items      = current_user_can( 'manage_product_delivery_rules' ) ? $this->query->list( 200 ) : [];
-		$shipments  = $this->shipment_issues->list( 50 );
-		$operations = $this->operations_issues->list( 50 );
-		$cod        = $this->cod_action_items();
-		$bulk       = $this->bulk_stale_items();
+		$items      = $can_catalog_attention ? $this->query->list( 200 ) : [];
+		$bulk       = $can_catalog_attention ? $this->bulk_stale_items() : [];
+		$shipments  = $can_shipment_attention ? $this->shipment_issues->list( 50 ) : [];
+		$operations = $can_shipment_attention ? $this->operations_issues->list( 50 ) : [];
+		$cod        = $can_shipment_attention ? $this->cod_action_items() : [];
 		$op         = $this->operational_state->current();
 
 		AdminPageLayout::open_page();
@@ -169,8 +177,16 @@ final class NeedsAttentionPage {
 	/**
 	 * @return list<array{order_id: int, order_number: string, url: string, payment_method_label: string, title: string, detail: string}>
 	 */
+	private function can_see_catalog_attention(): bool {
+		return $this->attention_count->current_user_can_see_catalog_attention();
+	}
+
+	private function can_see_shipment_attention(): bool {
+		return $this->attention_count->current_user_can_see_shipment_attention();
+	}
+
 	private function cod_action_items(): array {
-		if ( ! $this->flags->is_enabled( 'enable_shipment_records' ) || ! current_user_can( 'manage_shipments' ) ) {
+		if ( ! $this->can_see_shipment_attention() ) {
 			return [];
 		}
 
@@ -185,7 +201,7 @@ final class NeedsAttentionPage {
 	 * @return list<\CetechDeliveryEngine\Domain\Bulk\BulkJob>
 	 */
 	private function bulk_stale_items(): array {
-		if ( ! current_user_can( 'manage_product_delivery_rules' ) || ! $this->bulk_stale instanceof BulkStaleJobQuery ) {
+		if ( ! $this->can_see_catalog_attention() || ! $this->bulk_stale instanceof BulkStaleJobQuery ) {
 			return [];
 		}
 
