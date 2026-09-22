@@ -1,10 +1,10 @@
 # CETECH Delivery Standalone Realignment Plan
 
-Status: owner-approved on 2026-09-19; implementation authorized subject to the dependency gates below. Until geo.12 closes, PR #24 remains the only authorized runtime implementation stream.
+Status: owner-approved on 2026-09-19. **Execution note updated 2026-09-22:** the geography pre-wave has since closed, PR #24 is merged, RC.12 is published/immutable, and post-RC.12 corrections through Issue #32 are merged. The dependency waves remain the approved Stable-1.0 plan, but none is automatically authorized merely because the pre-wave is complete. Current live authorization is Issue #45 repository/docs cleanup only.
 
-## 1. Geography-stream decision
+## 1. Geography-stream decision — historical gate now complete
 
-**A — FINISH GEO.12 FIRST.**
+**A — FINISH GEO.12 FIRST.** This was the required pre-wave decision and is preserved as historical rationale. The resulting geography stream was completed, accepted, merged through Issue #23 / PR #24, and promoted into immutable RC.12. Do not treat the remaining text in this section as unfinished current work.
 
 Reason:
 
