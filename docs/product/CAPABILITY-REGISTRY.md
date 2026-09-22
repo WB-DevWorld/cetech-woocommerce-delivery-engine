@@ -24,7 +24,7 @@ Status: `PRODUCT-TRUTH-BASELINE-1`; owner accepted on 2026-09-19 and all 372 sta
 | MISSING IMPLEMENTATION | 90 |
 | PARTIAL IMPLEMENTATION | 164 |
 
-These are evidence classifications, not completion percentages. `PARTIAL IMPLEMENTATION` includes domains with a strong current foundation but material missing contracts, and active geo.11 work that is implemented but unmerged and still blocked from physical QA.
+These are **2026-09-19 audit-snapshot evidence classifications**, not completion percentages. At audit freeze, `PARTIAL IMPLEMENTATION` included domains with a strong foundation but material missing contracts and the then-unmerged geo.11 work. Geography subsequently advanced through accepted geo.16 / RC.12; a new explicit reassessment is required before changing registry conformance counts.
 
 ## Domain index
 
@@ -705,6 +705,6 @@ Release-intent and conformance values are machine-stable enum-like labels from t
 
 1. The implemented Woo-native core is substantial and fundamentally sound: scoped configuration, resolver, offers, deterministic rate calculation, native shipping, PDP/cart/checkout, immutable snapshots, per-item grouping, shipment records, bulk jobs, admin recovery, and fail-closed behavior.
 2. The largest lost current scope is first-class quote lifecycle, Return Policy, Refund Policy, Fulfillment Labels & Product Promise, service/promise policy, delivery promotions, internal economics, first-class APIs/OpenAPI, broad WP-CLI, and governed events/webhooks.
-3. geo.11 is a substantial partial implementation of canonical geography and coverage, not an accepted or merge-ready completion; the finite geo.12 closure list remains governing.
+3. At the audit freeze, geo.11 was a substantial partial implementation and the finite geo.12 closure list governed. That geography closure subsequently completed through accepted geo.16 / PR #24 and RC.12. This historical registry conclusion is retained as snapshot provenance; current status is in `docs/STATUS_CURRENT.md`.
 4. Multi-leg journey execution, advanced overrides, exception depth, notification orchestration, and analytics are accepted product completion work but need not all block Stable 1.0.
 5. POD/OTP/QR/GPS/photo/driver/live-carrier execution remains explicitly deferred.
