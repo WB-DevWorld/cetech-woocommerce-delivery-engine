@@ -80,6 +80,7 @@ List page (bounded):
 1. `ShipmentRepositoryInterface::list()` — `COUNT(*)` + page `SELECT` with `LIMIT`
 2. `countItemsByShipmentIds()` — one `GROUP BY` query
 3. `wc_get_orders( [ 'include' => order_ids ] )` — one batched WooCommerce lookup
+4. `wc_get_order( $missing_id )` — only for requested IDs absent from the bulk result (Issue #31)
 
 Not loaded on the list: shipment events, per-row `findItems()`, current product/config/resolver.
 
