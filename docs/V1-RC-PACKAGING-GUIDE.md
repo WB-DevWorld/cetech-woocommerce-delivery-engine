@@ -1,5 +1,7 @@
 # V1 Release Candidate — Packaging Guide
 
+> **Current packaging note (2026-09-22):** use this as general packaging discipline, not as a version/schema authority. Published baseline is RC.12/schema 6; later master is not automatically RC.13. Exact release source, identity, schema, checksum, and authorization must come from the active release issue and `docs/STATUS_CURRENT.md`.
+
 **Target:** `v1.0.0-rc.2`  
 **Plugin slug:** `cetech-woocommerce-delivery-engine`  
 **Package name:** `cetech-woocommerce-delivery-engine-v1.0.0-rc.2.zip`
@@ -150,7 +152,7 @@ cetech-woocommerce-delivery-engine/vendor/autoload.php
    - `ConfigurationHealthChecker` autoloads from `Application\Diagnostics`
    - `Plugin.php` imports that class (prevents Bootstrap namespace collision)
    - boot factory short-class references have imports
-   - schema target `3` and ECR cutover flag default OFF
+   - schema target `6` for the current line; verify current feature-flag defaults from code and the active release issue rather than carrying forward schema-3 assumptions
    - PHPUnit is **not** present in production `vendor/`
 
 Staging always rebuilds production `vendor/` (repo `vendor/` is not copied).
