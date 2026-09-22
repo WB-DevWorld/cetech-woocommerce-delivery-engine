@@ -1,5 +1,7 @@
 # Compatibility & Certification Matrix
 
+> **Execution note (2026-09-22):** published baseline is RC.12 (schema 6), current protected master is `88c9ec09f3cfabf73b83780c0c37d397e9acdad6` before Issue #44 docs merge, and training currently runs verified `1.0.0-dev.attention-count.1`. This does not automatically upgrade any Stable 1.0 compatibility claim; physical certification remains evidence-specific.
+
 Status: owner-approved compatibility policy for `PRODUCT-TRUTH-BASELINE-1`. “Designed,” “implemented,” and “certified” remain deliberately separate.
 
 ## Status vocabulary
