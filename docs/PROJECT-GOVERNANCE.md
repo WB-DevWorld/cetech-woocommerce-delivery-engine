@@ -8,7 +8,7 @@
 **PHP minimum supported:** 8.3 (WordPress + WooCommerce recommended floor; PHP 8.1 and 8.2 are not supported)
 **PHP CETECH production target:** 8.5.x (latest qualified stable 8.5 patch at deployment; PHP 8.6 pre-release must not be used)
 **Canonical PHP policy:** `docs/PHP-RUNTIME-POLICY.md`
-**Current known implementation baseline:** `1.0.0-rc.10`, schema target `5`; protected published tags `1.0.0-rc.10` (after merge/tag) and historical `1.0.0-rc.9` / `1.0.0-rc.8` / `1.0.0-rc.7` / `1.0.0-rc.6` / `1.0.0-rc.5`  
+**Current known implementation baseline:** published `1.0.0-rc.12` (schema `6`) plus merged post-RC.12 hardening through Issue #32 on protected master `88c9ec09f3cfabf73b83780c0c37d397e9acdad6`; training currently runs verified `1.0.0-dev.attention-count.1` / schema `6`. RC.13 absent; Pilot not started.  
 **Canonical maintained rulebook:** `docs/DELIVERY-ENGINE-GOVERNING-RULES.md`
 
 ---
@@ -83,8 +83,10 @@ Repository code and completed phase documentation are authoritative for what act
 
 Read:
 
+* `CURRENT-WORK.md`
+* `docs/STATUS_CURRENT.md`
 * `docs/AI-HANDOFF.md`
-* matching `docs/PHASE-*-IMPLEMENTATION.md`
+* matching current/post-RC evidence; older `docs/PHASE-*-IMPLEMENTATION.md` files are historical unless explicitly named by current status
 * `docs/V1-RC-RELEASE-NOTES.md`
 * `docs/V1-RC-FLAG-MATRIX.md`
 * `docs/V1-RC-SMOKE-TEST-CHECKLIST.md`
@@ -134,20 +136,18 @@ Document the conflict and resolve it deliberately.
 
 At the current known baseline:
 
-* plugin version is `1.0.0-rc.5` on master (tagged/protected runtime is `1.0.0-rc.5`, schema `4`; historical tag `1.0.0-rc.4` remains untouched);
-* schema target is `4` on master (tagged RC.4 / FLAIROC remain schema `3` until a later deploy);
-* the simple-product customer path through order delivery snapshots is implemented;
-* runtime customer-facing flags default off;
-* WooCommerce is the only hard dependency;
-* HPOS compatibility exists through WooCommerce CRUD;
-* shipment tables, repository, paid-order creation, and staff list/detail workspace exist; they remain feature-gated OFF (`enable_shipment_records`);
-* tracking editing and customer shipment presentation are not yet implemented;
-* customer shipment timeline is not yet implemented;
-* variable-product delivery capture is not yet complete;
-* WooCommerce Blocks checkout support is not yet complete;
-* optional real WPML/WCML/WCFM/VitePOS/WoodMart adapters are not yet complete.
+* published release candidate is `1.0.0-rc.12`, schema `6`, with immutable tag/release source `78594ad8962868683726373f58f4a8b1b48e4d0e`;
+* current protected master is `88c9ec09f3cfabf73b83780c0c37d397e9acdad6` after merged post-RC.12 hardening through Issue #32;
+* training currently runs verified `1.0.0-dev.attention-count.1`, schema `6`; this is not Stable 1.0 or Pilot authorization;
+* WooCommerce remains the only hard application dependency;
+* scoped configuration / ECR, authoritative PDP pricing, per-item destination context, Classic and Blocks checkout, immutable order delivery snapshots, shipment records/status/tracking, durable bulk tools, canonical geography/coverage, and current Needs Attention aggregation exist in the codebase;
+* feature availability still depends on the relevant flags, capabilities, configuration, and qualification boundary;
+* HPOS compatibility is maintained through WooCommerce CRUD and current CI;
+* WPML/WCML, WP Rocket, B2BKing, FOX/WOOCS and other optional integrations must be described according to actual certification evidence, not merely design intent;
+* CETECH Pilot is NOT STARTED; FLAIROC/production/POS are not authorized by the post-RC.12 hardening stream;
+* Stage 15 is NOT STARTED.
 
-Never confuse intended future design with this implementation baseline.
+Never confuse intended future design, audit-time snapshots, or historical stage documents with current implementation truth.
 
 Before modifying an area, inspect its actual current code.
 
