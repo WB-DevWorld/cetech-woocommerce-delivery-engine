@@ -1,6 +1,8 @@
 # CETECH Delivery Standalone Alignment Audit
 
-This folder is the durable audit package prepared and owner-accepted on 2026-09-19 as `PRODUCT-TRUTH-BASELINE-1`. This publication updates documentation and control-plane validation only; it does not change product/runtime code, WordPress, WooCommerce, any database, PR #24, the geography branch, RC.11, a release tag/package, or a deployment.
+This folder is the durable audit package prepared and owner-accepted on 2026-09-19 as `PRODUCT-TRUTH-BASELINE-1`. The 372 Requirement IDs and the audit-time conformance counts are a frozen **2026-09-19 assessment snapshot**. They must not be silently rewritten as current implementation counts without a new explicit reassessment.
+
+**Current execution addendum (2026-09-22):** protected `master` is `88c9ec09f3cfabf73b83780c0c37d397e9acdad6` after PR #43 / Issue #32; post-merge CI `35766468276` is SUCCESS; published RC.12 remains immutable at release source `78594ad8962868683726373f58f4a8b1b48e4d0e`; training runs verified `1.0.0-dev.attention-count.1` / schema 6; RC.13 is absent; Pilot has not started. Current repository/runtime status is governed by `CURRENT-WORK.md`, `docs/STATUS_CURRENT.md`, and the post-RC.12 evidence files.
 
 ## Authority and freeze points
 
@@ -8,7 +10,7 @@ This folder is the durable audit package prepared and owner-accepted on 2026-09-
 - Immutable release: `v1.0.0-rc.11` → `384f564f64a2db766ae6907392e95fb366fb8533`, schema 5.
 - Protected master at audit freeze: `72fa354d52b49ffd9cbc32862a6b2e3d7117ea4e`.
 - Active stream at audit freeze: `feat/canonical-geography-coverage` → `daef41a85662e1c1dc0aa6f5673ca9749f163a26`, `1.0.0-dev.geo.11`, schema 6.
-- Active governance: issue #23; Draft PR #24; next explicitly named candidate `1.0.0-dev.geo.12`; no RC.12; Stage 15 not started.
+- Audit-freeze governance (historical): issue #23 / Draft PR #24 / planned geo.12 closure. Execution has since advanced through merged geo.16, published RC.12, and post-RC.12 hardening through Issue #32. Stage 15 remains not started.
 
 ## Artifact map
 
@@ -118,4 +120,4 @@ Targeted residual searches were completed for quote lifecycle, return policy, re
 
 The owner explicitly accepted the audit, froze product truth, resolved the six recorded decisions, and separately approved the realignment plan on 2026-09-19. This package is published through the dedicated `docs/product-control-plane` branch and a reviewed PR to protected `master`.
 
-Publication does not claim that missing requirements are implemented, certified, released, or deployed. While this documentation PR is reviewed, geo.12 on PR #24 remains the only authorized runtime implementation stream. No RC.12, Pilot, release, tag, package, or deployment is created by this publication.
+Publication does not claim that missing requirements are implemented, certified, released, or deployed. At the 2026-09-19 audit freeze, geo.12/PR #24 was the authorized runtime stream and RC.12 did not yet exist. That statement is historical provenance, not current repository status. Current execution state is recorded in `docs/STATUS_CURRENT.md`; the product-truth IDs and Stable 1.0 decisions remain frozen unless explicitly amended.
