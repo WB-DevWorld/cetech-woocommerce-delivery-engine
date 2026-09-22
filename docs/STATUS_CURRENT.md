@@ -1,11 +1,11 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-22 after PR #43 / Issue #32 closeout. Protected `master` is `88c9ec09f3cfabf73b83780c0c37d397e9acdad6`; post-merge CI run `35766468276` SUCCESS. Training is running the physically verified `1.0.0-dev.attention-count.1` package, schema `6`. RC.12 remains the immutable published release candidate; RC.13 does not exist; Pilot, FLAIROC production promotion, production, and POS remain unchanged. Issue #45 is documentation/control-plane cleanup only.
+Last reconciled: 2026-09-22 after PR #43 / Issue #32 closeout. Protected `master` baseline before repository-truth PR #46 is `88c9ec09f3cfabf73b83780c0c37d397e9acdad6`; PR #46 carries the synchronization and its merge commit becomes the newer head; post-merge CI run `35766468276` SUCCESS. Training is running the physically verified `1.0.0-dev.attention-count.1` package, schema `6`. RC.12 remains the immutable published release candidate; RC.13 does not exist; Pilot, FLAIROC production promotion, production, and POS remain unchanged. Issue #45 is documentation/control-plane cleanup only.
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
 - Default/canonical development branch: protected `master`
-- Current protected `master`: `88c9ec09f3cfabf73b83780c0c37d397e9acdad6` (PR #43 merged; Issue #32 closed; post-merge CI `35766468276` SUCCESS).
+- Protected `master` baseline before PR #46: `88c9ec09f3cfabf73b83780c0c37d397e9acdad6` (PR #43 merged; Issue #32 closed; post-merge CI `35766468276` SUCCESS). After PR #46 merges, use its merge commit as the newer master head.
 - RC.12 publication merge on `master`: `78594ad8962868683726373f58f4a8b1b48e4d0e` (PR #27 / `release/rc12` onto `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`).
 - Later documentation commits on `master` are **not** the RC.12 tag source.
 - Repository visibility: public during GitHub Free branch/ruleset protection use.
