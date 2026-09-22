@@ -1,17 +1,18 @@
 # POST-RC.12 — Compact cart/checkout delivery-address UX (Issue #39)
 
 **Current candidate identity:** `1.0.0-dev.address-ux.3`  
+**Status:** MERGED via PR #41 onto protected `master` `baa273c2af00672d22268eb6968012ac7a51cfdd`. Training currently `1.0.0-dev.address-ux.3`. Not RC.13.  
 **Schema:** `6` (unchanged; no schema 7)  
 **Branch:** `fix/cart-checkout-address-ux`  
 **Base:** protected `master` `ed3753d73e262d8c7467fa936e3e36060960e58c`  
 **Previous `.1` runtime SHA:** `797bdce784ecbe44996cc0e46dbe8d2920a52b08`  
 **Previous `.2` runtime SHA:** `b2acea7ba75f31cd6a7851fcbf594bf798bfd79d`  
 **Runtime / package-source SHA:** `3f02e10e377d641d7036357242033b3f6534cbb8`  
-**PR:** https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/41 (open; do not merge)
+**PR:** https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/41
 
 Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/39
 
-Training remains on `1.0.0-dev.address-ux.2`. Do not install address-ux.3 until owner/ChatGPT final deployment review. Frozen address-ux.1, address-ux.2, pdp-precision.1/.2 ZIPs must not be overwritten.
+Training currently `1.0.0-dev.address-ux.3` after PR #41 merge. Frozen address-ux.1, address-ux.2, pdp-precision.1/.2 ZIPs must not be overwritten.
 
 ## Owner defects (presentation only)
 

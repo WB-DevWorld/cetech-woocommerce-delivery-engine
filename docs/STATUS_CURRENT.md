@@ -1,11 +1,11 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-21 (PR #40 MERGED onto protected `master` `ed3753d73e262d8c7467fa936e3e36060960e58c` — Issue #38 CLOSED; Issue #39 candidate `1.0.0-dev.address-ux.3` is **not** RC.13 and is **not deployed**; frozen `1.0.0-dev.address-ux.1` / `1.0.0-dev.address-ux.2` ZIPs must not be overwritten; training remains `1.0.0-dev.address-ux.2`; supported/certified PHP 8.3–8.5.x, minimum 8.3, CETECH production 8.5.x; RC.12 tagged from `78594ad`; Issue #26 CLOSED; Issue #29 MERGED; Issue #33 MERGED to `5abfab0`; Issue #35 CLOSED; frozen `1.0.0-dev.pdp-precision.1`/`.2` ZIPs must not be overwritten; Pilot not authorized).
+Last reconciled: 2026-09-22 (PR #41 MERGED onto protected `master` `baa273c2af00672d22268eb6968012ac7a51cfdd` — Issue #39 CLOSED; Issue #31 candidate `1.0.0-dev.shipment-order-read.1` is **not** RC.13 and is **not deployed**; training remains `1.0.0-dev.address-ux.3`; frozen `1.0.0-dev.address-ux.1` / `.2` / `.3` ZIPs must not be overwritten; supported/certified PHP 8.3–8.5.x, minimum 8.3, CETECH production 8.5.x; RC.12 tagged from `78594ad`; Issue #26 CLOSED; Issue #29 MERGED; Issue #33 MERGED to `5abfab0`; Issue #35 CLOSED; Issue #38 CLOSED; frozen `1.0.0-dev.pdp-precision.1`/`.2` ZIPs must not be overwritten; Pilot not authorized).
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
 - Default/canonical development branch: protected `master`
-- Current protected `master`: `ed3753d73e262d8c7467fa936e3e36060960e58c`
+- Current protected `master`: `baa273c2af00672d22268eb6968012ac7a51cfdd`
 - RC.12 publication merge on `master`: `78594ad8962868683726373f58f4a8b1b48e4d0e` (PR #27 / `release/rc12` onto `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`).
 - Later documentation commits on `master` are **not** the RC.12 tag source.
 - Repository visibility: public during GitHub Free branch/ruleset protection use.
@@ -47,23 +47,39 @@ Last reconciled: 2026-09-21 (PR #40 MERGED onto protected `master` `ed3753d73e26
 - Evidence: `docs/RC12-PROMOTION.md`
 - Do not move this tag to a later documentation commit. Do not rebuild the ZIP for docs closeout.
 
-## Post-RC.12 candidate — Issue #39 (not a release)
+## Post-RC.12 candidate — Issue #31 (not a release)
+- Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/31
+- Branch: `fix/shipment-workspace-order-read`
+- Base: protected `master` `baa273c2af00672d22268eb6968012ac7a51cfdd`
+- Development identity: `1.0.0-dev.shipment-order-read.1`
+- Schema: `6` (unchanged)
+- Requires PHP: `8.3`
+- Runtime / package-source SHA: `528e7c8b264f74848c85d77e172a25213db327dc`
+- GitHub CI on runtime SHA: SUCCESS (`35748159485` push)
+- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/42 (open; do not merge)
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.shipment-order-read.1.zip`
+- Bytes: `1,845,224`
+- SHA-256: `3dd4602ceedc26bcc3dab673271752c47c47e02d7e90e81fed832e9d498539f5`
+- Not merged. Not deployed. Not RC.13. Awaiting technical review. Training remains `1.0.0-dev.address-ux.3`.
+- Evidence: `docs/POST-RC12-SHIPMENT-ORDER-READ.md`
+
+## Post-RC.12 merged — Issue #39 (not a release)
 - Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/39
-- Branch: `fix/cart-checkout-address-ux`
-- Base: protected `master` `ed3753d73e262d8c7467fa936e3e36060960e58c`
+- MERGED via PR #41 onto protected `master` `baa273c2af00672d22268eb6968012ac7a51cfdd`
+- Post-merge CI: run `35726028768` SUCCESS
 - Development identity: `1.0.0-dev.address-ux.3`
 - Schema: `6` (unchanged)
 - Requires PHP: `8.3`
 - Previous `.1` runtime SHA: `797bdce784ecbe44996cc0e46dbe8d2920a52b08`
 - Previous `.2` runtime SHA: `b2acea7ba75f31cd6a7851fcbf594bf798bfd79d`
 - Runtime / package-source SHA: `3f02e10e377d641d7036357242033b3f6534cbb8`
-- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/41 (open; do not merge)
+- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/41
 - ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.address-ux.3.zip`
 - Bytes: `1,841,881`
 - SHA-256: `5f17abeaedbb078055963d98cd5992fadf9ed7ec2c8d7f5f1d785a294129265d`
 - Frozen `.2` ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.address-ux.2.zip` (`1,837,972` bytes, SHA-256 `e914efc0ee73132efffab6899cf9627ac3d01ecf6b579f190b3050cdd43e117f`)
 - Frozen predecessor ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.address-ux.1.zip` (`1,832,223` bytes, SHA-256 `2a28798140fafaa7d7b4e20bc4e3878fd1949f7014af854b002960a3ae1120fe`)
-- Not merged. Not deployed. Not RC.13. Awaiting final deployment review. Training remains `1.0.0-dev.address-ux.2`.
+- CLOSED / COMPLETED. Not RC.13. Training currently `1.0.0-dev.address-ux.3`.
 - Evidence: `docs/POST-RC12-CART-CHECKOUT-ADDRESS-UX.md`
 
 ## Post-RC.12 merged — Issue #38 (not a release)

@@ -34,12 +34,14 @@ final class StaffShipmentsWorkspaceTest extends TestCase {
 	protected function setUp(): void {
 		parent::setUp();
 
-		$GLOBALS['cetech_de_test_options']              = [];
-		$GLOBALS['cetech_de_test_caps']                 = [ 'manage_shipments' => true, 'edit_shop_orders' => true ];
-		$GLOBALS['cetech_de_test_wc_orders']            = [];
-		$GLOBALS['cetech_de_test_wc_get_orders_calls']  = [];
-		$GLOBALS['cetech_de_test_submenus']             = [];
-		$GLOBALS['cetech_de_test_menus']                = [];
+		$GLOBALS['cetech_de_test_options']                 = [];
+		$GLOBALS['cetech_de_test_caps']                    = [ 'manage_shipments' => true, 'edit_shop_orders' => true ];
+		$GLOBALS['cetech_de_test_wc_orders']               = [];
+		$GLOBALS['cetech_de_test_wc_get_orders_calls']     = [];
+		$GLOBALS['cetech_de_test_wc_get_orders_omit_ids']  = [];
+		$GLOBALS['cetech_de_test_wc_get_order_calls']      = [];
+		$GLOBALS['cetech_de_test_submenus']                = [];
+		$GLOBALS['cetech_de_test_menus']                   = [];
 		$_GET = [];
 
 		$this->wpdb = new FakeWpdb();
@@ -375,10 +377,149 @@ final class StaffShipmentsWorkspaceTest extends TestCase {
 		self::assertStringNotContainsString( 'use CetechDeliveryEngine\\Application\\Configuration\\EffectiveConfigurationResolver', $source );
 		self::assertStringNotContainsString( 'ProductDeliveryRule', $source );
 		self::assertStringNotContainsString( 'RateCard', $source );
+		self::assertStringNotContainsString( 'wp_wc_orders', $source );
+		self::assertStringNotContainsString( 'wp_wc_order_addresses', $source );
+		self::assertStringNotContainsString( 'wp_posts', $source );
+		self::assertStringNotContainsString( 'wp_postmeta', $source );
 
 		$page = (string) file_get_contents( dirname( __DIR__, 3 ) . '/src/Presentation/Admin/ShipmentsPage.php' );
 		self::assertStringNotContainsString( 'EffectiveConfigurationResolver', $page );
 		self::assertStringNotContainsString( 'wc_get_product', $page );
+	}
+
+	public function test_bulk_complete_list_uses_one_wc_get_orders_and_zero_direct_reads(): void {
+		$this->store_order( 1001, 'QA One' );
+		$this->store_order( 1002, 'QA Two' );
+		$this->store_order( 1003, 'QA Three' );
+		$this->store_shipment( 1001, 'g-1001', '1001-D1', 'Air' );
+		$this->store_shipment( 1002, 'g-1002', '1002-D1', 'Air' );
+		$this->store_shipment( 1003, 'g-1003', '1003-D1', 'Air' );
+
+		$this->wpdb->query_count = 0;
+		$this->wpdb->sql_log     = [];
+		$GLOBALS['cetech_de_test_wc_get_orders_calls'] = [];
+		$GLOBALS['cetech_de_test_wc_get_order_calls']  = [];
+
+		$result = $this->query->list( '', '', 1, 2 );
+		$by_order = $this->rows_by_order_id( $result->rows );
+
+		self::assertSame( 3, $result->total );
+		self::assertCount( 2, $result->rows );
+		self::assertCount( 1, $GLOBALS['cetech_de_test_wc_get_orders_calls'] );
+		self::assertSame( [], $GLOBALS['cetech_de_test_wc_get_order_calls'] );
+		self::assertStringContainsString( 'LIMIT 2', implode( "\n", $this->wpdb->sql_log ) );
+		self::assertStringContainsString( 'COUNT(*)', implode( "\n", $this->wpdb->sql_log ) );
+		$expected = [
+			1001 => 'QA One',
+			1002 => 'QA Two',
+			1003 => 'QA Three',
+		];
+		foreach ( $by_order as $order_id => $row ) {
+			self::assertSame( $expected[ $order_id ], $row->customer_label );
+			self::assertSame( (string) $order_id, $row->order_number );
+			self::assertNotNull( $row->order_edit_url );
+		}
+	}
+
+	public function test_partial_bulk_miss_recovers_direct_order_without_replacing_bulk_hits(): void {
+		$this->store_order( 1001, 'QA Recovered One' );
+		$this->store_order( 1002, 'QA Bulk Two' );
+		$this->store_shipment( 1001, 'g-1001', '1001-D1', 'Air' );
+		$this->store_shipment( 1002, 'g-1002', '1002-D1', 'Air' );
+		$GLOBALS['cetech_de_test_wc_get_orders_omit_ids'] = [ 1001 ];
+		$GLOBALS['cetech_de_test_wc_get_orders_calls']    = [];
+		$GLOBALS['cetech_de_test_wc_get_order_calls']     = [];
+
+		$result   = $this->query->list();
+		$by_order = $this->rows_by_order_id( $result->rows );
+
+		self::assertCount( 1, $GLOBALS['cetech_de_test_wc_get_orders_calls'] );
+		self::assertSame( [ 1001 ], $GLOBALS['cetech_de_test_wc_get_order_calls'] );
+		self::assertSame( 'QA Recovered One', $by_order[1001]->customer_label );
+		self::assertSame( 'QA Bulk Two', $by_order[1002]->customer_label );
+		self::assertStringNotContainsString( 'Customer unavailable', $by_order[1001]->customer_label . $by_order[1002]->customer_label );
+	}
+
+	public function test_duplicate_missing_order_id_falls_back_once(): void {
+		$this->store_order( 1001, 'QA Shared Order' );
+		$this->store_shipment( 1001, 'g-1001-a', '1001-D1', 'Air' );
+		$this->store_shipment( 1001, 'g-1001-b', '1001-D2', 'Air' );
+		$GLOBALS['cetech_de_test_wc_get_orders_omit_ids'] = [ 1001 ];
+		$GLOBALS['cetech_de_test_wc_get_orders_calls']    = [];
+		$GLOBALS['cetech_de_test_wc_get_order_calls']     = [];
+
+		$result = $this->query->list();
+
+		self::assertCount( 1, $GLOBALS['cetech_de_test_wc_get_orders_calls'] );
+		self::assertSame( [ 1001 ], $GLOBALS['cetech_de_test_wc_get_order_calls'] );
+		self::assertCount( 2, $result->rows );
+		self::assertSame( 'QA Shared Order', $result->rows[0]->customer_label );
+		self::assertSame( 'QA Shared Order', $result->rows[1]->customer_label );
+	}
+
+	public function test_bulk_and_direct_miss_keeps_customer_unavailable(): void {
+		$this->store_shipment( 4040, 'g-missing', '4040-D1', 'Air' );
+		$GLOBALS['cetech_de_test_wc_get_orders_calls'] = [];
+		$GLOBALS['cetech_de_test_wc_get_order_calls']  = [];
+
+		$result = $this->query->list();
+
+		self::assertCount( 1, $result->rows );
+		self::assertSame( 'Customer unavailable', $result->rows[0]->customer_label );
+		self::assertSame( '4040', $result->rows[0]->order_number );
+		self::assertNull( $result->rows[0]->order_edit_url );
+		self::assertCount( 1, $GLOBALS['cetech_de_test_wc_get_orders_calls'] );
+		self::assertSame( [ 4040 ], $GLOBALS['cetech_de_test_wc_get_order_calls'] );
+	}
+
+	public function test_detail_recovers_omitted_order_customer_and_sku(): void {
+		$this->enable_flag();
+		$shipment = $this->store_shipment( 1001, 'g-detail-miss', '1001-D1', 'Air', 1, '25.00', '5-7 business days', null, 'Snapshot Name' );
+		$this->store_order(
+			1001,
+			'QA Detail Recovered',
+			[ new WC_Order_Item_Product( [ 'id' => 501, 'name' => 'Live Name', 'sku' => 'SKU-REC-1' ] ) ]
+		);
+		$GLOBALS['cetech_de_test_wc_get_orders_omit_ids'] = [ 1001 ];
+		$GLOBALS['cetech_de_test_wc_get_orders_calls']    = [];
+		$GLOBALS['cetech_de_test_wc_get_order_calls']     = [];
+
+		$detail = $this->query->detail( $shipment->id );
+
+		self::assertNotNull( $detail );
+		self::assertCount( 1, $GLOBALS['cetech_de_test_wc_get_orders_calls'] );
+		self::assertSame( [ 1001 ], $GLOBALS['cetech_de_test_wc_get_order_calls'] );
+		self::assertSame( 'QA Detail Recovered', $detail->customer_label );
+		self::assertSame( '1001', $detail->order_number );
+		self::assertNotNull( $detail->order_edit_url );
+		self::assertSame( 'SKU-REC-1', $detail->order_item_facts[501]['sku'] ?? null );
+		self::assertStringNotContainsString( 'Customer unavailable', $detail->customer_label );
+
+		$html = $this->render_html( [ 'shipment' => (string) $shipment->id ] );
+		self::assertStringContainsString( 'QA Detail Recovered', $html );
+		self::assertStringContainsString( 'SKU-REC-1', $html );
+		self::assertStringContainsString( 'Order 1001', $html );
+	}
+
+	public function test_fallback_queries_only_ids_missing_from_bulk(): void {
+		$this->store_order( 1001, 'QA Keep Bulk One' );
+		$this->store_order( 1002, 'QA Recover Two' );
+		$this->store_order( 1003, 'QA Keep Bulk Three' );
+		$this->store_shipment( 1001, 'g-1001', '1001-D1', 'Air' );
+		$this->store_shipment( 1002, 'g-1002', '1002-D1', 'Air' );
+		$this->store_shipment( 1003, 'g-1003', '1003-D1', 'Air' );
+		$GLOBALS['cetech_de_test_wc_get_orders_omit_ids'] = [ 1002 ];
+		$GLOBALS['cetech_de_test_wc_get_orders_calls']    = [];
+		$GLOBALS['cetech_de_test_wc_get_order_calls']     = [];
+
+		$result   = $this->query->list();
+		$by_order = $this->rows_by_order_id( $result->rows );
+
+		self::assertCount( 1, $GLOBALS['cetech_de_test_wc_get_orders_calls'] );
+		self::assertSame( [ 1002 ], $GLOBALS['cetech_de_test_wc_get_order_calls'] );
+		self::assertSame( 'QA Keep Bulk One', $by_order[1001]->customer_label );
+		self::assertSame( 'QA Recover Two', $by_order[1002]->customer_label );
+		self::assertSame( 'QA Keep Bulk Three', $by_order[1003]->customer_label );
 	}
 
 	public function test_customer_facing_files_do_not_gain_shipment_workspace(): void {
@@ -455,6 +596,20 @@ final class StaffShipmentsWorkspaceTest extends TestCase {
 		$this->repository->replaceItems( $created->id, $items );
 
 		return $created;
+	}
+
+	/**
+	 * @param list<object> $rows
+	 * @return array<int, object>
+	 */
+	private function rows_by_order_id( array $rows ): array {
+		$by_order = [];
+
+		foreach ( $rows as $row ) {
+			$by_order[ $row->shipment->order_id ] = $row;
+		}
+
+		return $by_order;
 	}
 
 	/**

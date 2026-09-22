@@ -283,7 +283,8 @@ if ( ! function_exists( 'wc_get_orders' ) ) {
 	 */
 	function wc_get_orders( $args = [] ) {
 		$GLOBALS['cetech_de_test_wc_get_orders_calls'][] = $args;
-		$map = $GLOBALS['cetech_de_test_wc_orders'] ?? [];
+		$map  = $GLOBALS['cetech_de_test_wc_orders'] ?? [];
+		$omit = array_map( 'intval', (array) ( $GLOBALS['cetech_de_test_wc_get_orders_omit_ids'] ?? [] ) );
 		$include = [];
 
 		foreach ( (array) ( $args['include'] ?? [] ) as $id ) {
@@ -293,6 +294,10 @@ if ( ! function_exists( 'wc_get_orders' ) ) {
 		$found = [];
 
 		foreach ( $include as $id ) {
+			if ( in_array( $id, $omit, true ) ) {
+				continue;
+			}
+
 			if ( isset( $map[ $id ] ) && $map[ $id ] instanceof WC_Order ) {
 				$found[] = $map[ $id ];
 			}
@@ -307,8 +312,12 @@ if ( ! function_exists( 'wc_get_order' ) ) {
 	 * @return WC_Order|false
 	 */
 	function wc_get_order( $order_id ) {
+		$id = (int) $order_id;
+		if ( ! isset( $GLOBALS['cetech_de_test_wc_get_order_calls'] ) || ! is_array( $GLOBALS['cetech_de_test_wc_get_order_calls'] ) ) {
+			$GLOBALS['cetech_de_test_wc_get_order_calls'] = [];
+		}
+		$GLOBALS['cetech_de_test_wc_get_order_calls'][] = $id;
 		$map = $GLOBALS['cetech_de_test_wc_orders'] ?? [];
-		$id  = (int) $order_id;
 
 		return isset( $map[ $id ] ) && $map[ $id ] instanceof WC_Order ? $map[ $id ] : false;
 	}

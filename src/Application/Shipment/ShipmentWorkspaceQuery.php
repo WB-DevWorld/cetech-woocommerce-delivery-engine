@@ -144,12 +144,14 @@ final class ShipmentWorkspaceQuery {
 					}
 				}
 			}
-
-			return $orders;
 		}
 
 		if ( function_exists( 'wc_get_order' ) ) {
 			foreach ( $ids as $order_id ) {
+				if ( isset( $orders[ $order_id ] ) ) {
+					continue;
+				}
+
 				$order = wc_get_order( $order_id );
 
 				if ( $order instanceof WC_Order ) {
