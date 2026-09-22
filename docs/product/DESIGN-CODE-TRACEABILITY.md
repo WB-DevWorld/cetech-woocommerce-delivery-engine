@@ -74,7 +74,7 @@ The owner/architect closure review confirms substantial correctness gains but bl
 | `ws3/reconcile-desktop-artifacts` | `c5c6395…` | Historical artifact-reconciliation documentation |
 | `ws3/rc10-closeout-truth` | `3a85d52…` | Superseded RC.10 closeout branch; PR #17 closed |
 | `ws3/rc11-closeout-truth` | `bc485a6…` | Incorporated RC.11 closeout source |
-| `ws3/sync-current-status-2026-09-16` | `dbf90ca…` | Stale open PR #15; do not merge into current master |
+| `ws3/sync-current-status-2026-09-16` | `dbf90ca…` | PR #15 CLOSED WITHOUT MERGE on 2026-09-22; superseded historical documentation; safe retirement candidate |
 
 At audit freeze, no side branch contained a more authoritative runtime than master plus geo.11. Current protected master is now authoritative after geo/RC.12/post-RC.12 merges. Recovery/optional branches remain provenance or explicitly separate work and are not candidates to merge wholesale; see `docs/recovery/BRANCH-RETIREMENT-2026-09-22.md`.
 
