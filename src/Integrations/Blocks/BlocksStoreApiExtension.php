@@ -102,6 +102,11 @@ final class BlocksStoreApiExtension {
 			'matching_location'     => [ 'description' => 'Customer matching location for editing this cart line.', 'type' => [ 'object', 'null' ], 'readonly' => true ],
 			'delivery_address'      => [ 'description' => 'Customer delivery address for editing this cart line.', 'type' => [ 'object', 'null' ], 'readonly' => true ],
 			'available_options'     => [ 'description' => 'Public delivery options available for this line.', 'type' => 'array', 'readonly' => true ],
+			'ui_anchor'             => [ 'description' => 'Customer-safe cart editor DOM anchor.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'address_needed'        => [ 'description' => 'Whether this Delivery line still needs an address.', 'type' => 'boolean', 'readonly' => true ],
+			'address_action_label'  => [ 'description' => 'Customer-facing editor action label.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'has_matching_location' => [ 'description' => 'Whether a matching destination is already selected.', 'type' => 'boolean', 'readonly' => true ],
+			'destination_summary'   => [ 'description' => 'Compact destination summary for the cart editor.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
 		];
 	}
 
@@ -138,6 +143,7 @@ final class BlocksStoreApiExtension {
 				'incomplete_delivery'  => (int) ( $notices['incomplete_delivery'] ?? 0 ),
 				'notices'              => $notices['messages'] ?? [],
 				'can_apply_checkout_address' => ! empty( $notices['can_apply_checkout_address'] ),
+				'first_incomplete_anchor' => (string) ( $notices['first_incomplete_anchor'] ?? '' ),
 				'keep_address_note'    => (bool) ( $notices['keep_address_note'] ?? false )
 					? CustomerStorefrontCopy::items_keep_own_address()
 					: null,
@@ -192,6 +198,11 @@ final class BlocksStoreApiExtension {
 				'type'        => 'boolean',
 				'readonly'    => true,
 			],
+			'first_incomplete_anchor' => [
+				'description' => 'Customer-safe cart fragment for the first incomplete Delivery line.',
+				'type'        => 'string',
+				'readonly'    => true,
+			],
 			'keep_address_note'    => [
 				'description' => 'Short note that per-item addresses are kept.',
 				'type'        => [ 'string', 'null' ],
@@ -216,6 +227,8 @@ final class BlocksStoreApiExtension {
 	 *     mixed_fulfilment: bool,
 	 *     incomplete_delivery: int,
 	 *     can_apply_checkout_address: bool,
+	 *     first_incomplete_anchor: string,
+	 *     keep_address_note: bool,
 	 *     messages: list<array{code: string, message: string}>
 	 * }
 	 */
@@ -225,6 +238,7 @@ final class BlocksStoreApiExtension {
 			'mixed_fulfilment'           => false,
 			'incomplete_delivery'        => 0,
 			'can_apply_checkout_address' => false,
+			'first_incomplete_anchor'    => '',
 			'keep_address_note'          => false,
 			'messages'                   => [],
 		];
@@ -269,6 +283,7 @@ final class BlocksStoreApiExtension {
 			'mixed_fulfilment'           => $summary['has_pickup'] && $summary['has_delivery'],
 			'incomplete_delivery'        => $summary['incomplete_delivery'],
 			'can_apply_checkout_address' => ! empty( $summary['can_apply_checkout_address'] ),
+			'first_incomplete_anchor'    => (string) ( $summary['first_incomplete_anchor'] ?? '' ),
 			'keep_address_note'          => $summary['has_delivery'] && [] !== $summary['complete_identities'],
 			'messages'                   => $messages,
 		];

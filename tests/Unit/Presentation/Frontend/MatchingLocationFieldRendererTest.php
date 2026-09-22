@@ -32,6 +32,15 @@ final class MatchingLocationFieldRendererTest extends TestCase {
 		self::assertMatchesRegularExpression( '/<option value="GH"[^>]*selected="selected"/', $html );
 	}
 
+	public function test_optional_form_owner_is_applied_only_when_supplied(): void {
+		$owned = MatchingLocationFieldRenderer::render( null, 'cetech-de-matching', false, false, false, false, 'cetech-de-delivery-abc123-form' );
+		$pdp   = MatchingLocationFieldRenderer::render( null, 'cetech-de-matching', false, false, false );
+
+		self::assertStringContainsString( 'form="cetech-de-delivery-abc123-form"', $owned );
+		self::assertStringContainsString( 'data-cetech-de-destination-control="country"', $owned );
+		self::assertStringNotContainsString( ' form="', $pdp );
+	}
+
 	public function test_saved_browsing_location_is_prepopulated_without_base_country_fallback(): void {
 		$this->stub_store_country( 'NG' );
 		$location = MatchingLocation::fromInput(

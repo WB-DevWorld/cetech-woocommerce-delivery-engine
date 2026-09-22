@@ -25,6 +25,7 @@ use CetechDeliveryEngine\Domain\Enum\FulfilmentAvailability;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Domain\Enum\RateCardChargeType;
 use CetechDeliveryEngine\Domain\ValueObject\CurrencyCode;
+use CetechDeliveryEngine\Presentation\Shared\CartDeliveryUiAnchor;
 use CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy;
 use CetechDeliveryEngine\Tests\Unit\Runtime\InMemoryQuoteRateCardRepository;
 use PHPUnit\Framework\TestCase;
@@ -108,6 +109,7 @@ final class CheckoutMultiDestinationStabilizationTest extends TestCase {
 		self::assertTrue( $summary['heterogeneous_incomplete_destinations'] );
 		self::assertFalse( $summary['can_apply_checkout_address'] );
 		self::assertSame( 2, $summary['incomplete_delivery'] );
+		self::assertSame( CartDeliveryUiAnchor::for_cart_item_key( 'gh' ), $summary['first_incomplete_anchor'] );
 
 		$outcome = $this->service->applyCheckoutAddressToIncomplete( $contents, $this->checkout_accra() );
 
@@ -172,6 +174,11 @@ final class CheckoutMultiDestinationStabilizationTest extends TestCase {
 		$line = $this->named_line( 101, 'Accra matching', PerItemContextFixtures::incompleteContext( 10, PerItemContextFixtures::matchingAccra() ) );
 		$before = CustomerCartContext::fromCartItem( $line );
 		self::assertSame( '50.00', $this->quote_amount( $before, 10 ) );
+
+		$summary = $this->policy->summarize_cart( [ 'accra' => $line ] );
+		self::assertTrue( $summary['can_apply_checkout_address'] );
+		self::assertFalse( $summary['heterogeneous_incomplete_destinations'] );
+		self::assertSame( CartDeliveryUiAnchor::for_cart_item_key( 'accra' ), $summary['first_incomplete_anchor'] );
 
 		$outcome = $this->service->applyCheckoutAddressToIncomplete(
 			[ 'accra' => $line ],

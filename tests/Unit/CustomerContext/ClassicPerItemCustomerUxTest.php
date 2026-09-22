@@ -389,10 +389,10 @@ final class ClassicPerItemCustomerUxTest extends TestCase {
 
 	public function test_cart_editor_markup_exposes_quantity_split_and_use_for_all(): void {
 		$src = (string) file_get_contents( dirname( __DIR__, 3 ) . '/src/Presentation/Frontend/CartCustomerContextEditorRenderer.php' );
-		self::assertStringContainsString( 'Apply to all %d items', $src );
+		self::assertStringContainsString( 'apply_to_all_n', $src );
 		self::assertStringContainsString( 'Move some quantity', $src );
 		self::assertStringContainsString( 'use_for_all_delivery_items', $src );
-		self::assertStringContainsString( 'CustomerStorefrontCopy::change()', $src );
+		self::assertStringContainsString( 'editor_action_label', $src );
 		self::assertStringNotContainsString( 'Change delivery', $src );
 		self::assertStringContainsString( '-apply-all', $src );
 		self::assertStringContainsString( '-apply-split', $src );

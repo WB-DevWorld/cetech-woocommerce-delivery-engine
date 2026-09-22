@@ -11,6 +11,8 @@ use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
 use CetechDeliveryEngine\Integrations\Blocks\BlocksAddToCartBridge;
 use CetechDeliveryEngine\Integrations\Blocks\BlocksCheckoutAdapter;
 use CetechDeliveryEngine\Integrations\Blocks\BlocksPublicPayload;
+use CetechDeliveryEngine\Presentation\Shared\CartDeliveryUiAnchor;
+use CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy;
 use CetechDeliveryEngine\Tests\Unit\CustomerContext\PerItemContextFixtures;
 use PHPUnit\Framework\TestCase;
 use ReflectionClass;
@@ -175,11 +177,57 @@ final class BlocksPerItemCustomerUxTest extends TestCase {
 		self::assertSame( 'Accra', $payload['locality'] );
 		self::assertSame( 'Accra', $payload['matching_location']['city'] ?? null );
 		self::assertSame( '12 Boundary Rd', $payload['delivery_address']['address_1'] ?? null );
+		self::assertSame( 'CETECH', $payload['delivery_address']['company'] ?? null );
+		self::assertSame( CartDeliveryUiAnchor::for_cart_item_key( 'abc123' ), $payload['ui_anchor'] );
+		self::assertFalse( $payload['address_needed'] );
+		self::assertSame( CustomerStorefrontCopy::edit_delivery_details(), $payload['address_action_label'] );
 		self::assertArrayNotHasKey( 'matching_identity', $payload );
 		self::assertArrayNotHasKey( 'delivery_location_identity', $payload );
 		self::assertArrayNotHasKey( 'delivery_offer_id', $payload );
 		self::assertFalse( BlocksPublicPayload::contains_forbidden( $payload ) );
 		self::assertStringNotContainsString( '12 Boundary Rd', (string) ( $payload['cart_item_key'] ?? '' ) );
+	}
+
+	public function test_incomplete_payload_exposes_customer_safe_anchor_and_address_needed(): void {
+		$ctx  = PerItemContextFixtures::incompleteContext( 1, PerItemContextFixtures::matchingAccra() );
+		$item = PerItemContextFixtures::cartItem( $this->intent(), $ctx, 1 );
+		$payload = BlocksPublicPayload::cart_item( $item, null, null, 'incomplete-key' );
+
+		self::assertTrue( $payload['address_needed'] );
+		self::assertFalse( $payload['address_complete'] );
+		self::assertSame( CustomerStorefrontCopy::add_delivery_address(), $payload['address_action_label'] );
+		self::assertSame( CartDeliveryUiAnchor::for_cart_item_key( 'incomplete-key' ), $payload['ui_anchor'] );
+		self::assertTrue( CartDeliveryUiAnchor::is_valid( (string) $payload['ui_anchor'] ) );
+		self::assertStringNotContainsString( 'Accra', (string) $payload['ui_anchor'] );
+		self::assertFalse( BlocksPublicPayload::contains_forbidden( $payload ) );
+	}
+
+	public function test_top_level_first_incomplete_anchor_cannot_point_at_reselection_item(): void {
+		$policy   = ( new ReflectionClass( \CetechDeliveryEngine\Application\Checkout\CheckoutAddressPolicy::class ) )->newInstanceWithoutConstructor();
+		$reselect = PerItemContextFixtures::cartItem(
+			$this->intent(),
+			PerItemContextFixtures::incompleteContext( 1, PerItemContextFixtures::matchingGhanaCountry() ),
+			1,
+			[ CartDeliverySelectionCapture::CART_NEEDS_RESELECTION_KEY => true ]
+		);
+		$editable = PerItemContextFixtures::cartItem(
+			$this->intent(),
+			PerItemContextFixtures::incompleteContext( 1, PerItemContextFixtures::matchingAccra() )
+		);
+		$summary = $policy->summarize_cart(
+			[
+				'reselect' => $reselect,
+				'accra'    => $editable,
+			]
+		);
+		$reselect_payload = BlocksPublicPayload::cart_item( $reselect, null, null, 'reselect' );
+		$editable_payload = BlocksPublicPayload::cart_item( $editable, null, null, 'accra' );
+
+		self::assertNull( $reselect_payload['ui_anchor'] );
+		self::assertFalse( $reselect_payload['can_edit_context'] );
+		self::assertSame( CartDeliveryUiAnchor::for_cart_item_key( 'accra' ), $summary['first_incomplete_anchor'] );
+		self::assertSame( $summary['first_incomplete_anchor'], $editable_payload['ui_anchor'] );
+		self::assertNotSame( $summary['first_incomplete_anchor'], $reselect_payload['ui_anchor'] );
 	}
 
 	public function test_quantity_split_uses_mutation_service(): void {
@@ -276,11 +324,13 @@ final class BlocksPerItemCustomerUxTest extends TestCase {
 		$i18n = (string) file_get_contents( dirname( __DIR__, 4 ) . '/src/Integrations/Blocks/BlocksScriptIntegration.php' );
 		$js   = (string) file_get_contents( dirname( __DIR__, 4 ) . '/assets/frontend/blocks-checkout.js' );
 
-		self::assertStringContainsString( 'Address line 1', $i18n );
-		self::assertStringContainsString( 'Address line 2', $i18n );
+		self::assertStringContainsString( 'address_line_1', $i18n );
+		self::assertStringContainsString( 'address_line_2_optional', $i18n );
 		self::assertStringContainsString( 'Quantity to move', $i18n );
-		self::assertStringContainsString( 'Use my checkout address', $i18n );
-		self::assertStringContainsString( 'Your deliveries', $i18n );
+		self::assertStringContainsString( 'use_my_checkout_address', $i18n );
+		self::assertStringContainsString( 'your_deliveries', $i18n );
+		self::assertStringContainsString( 'add_delivery_address', $i18n );
+		self::assertStringContainsString( 'edit_delivery_details', $i18n );
 		self::assertStringNotContainsString( 'Fulfilment and delivery option', $i18n );
 		self::assertStringNotContainsString( 'per-destination tax', $i18n );
 		self::assertStringNotContainsString( 'per destination tax', $i18n );

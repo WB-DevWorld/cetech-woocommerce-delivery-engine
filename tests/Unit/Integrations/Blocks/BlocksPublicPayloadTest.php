@@ -268,6 +268,8 @@ final class BlocksPublicPayloadTest extends TestCase {
 		self::assertNull( $payload['estimate_text'] );
 		self::assertSame( 'Cable', $payload['product_name'] );
 		self::assertSame( 'abc123', $payload['cart_item_key'] );
+		self::assertNull( $payload['ui_anchor'] );
+		self::assertFalse( $payload['can_edit_context'] );
 		self::assertStringContainsString( 'Cable', (string) $payload['reselection_message'] );
 		self::assertStringContainsString( 'do not need to remove', strtolower( (string) $payload['reselection_message'] ) );
 		self::assertFalse( BlocksPublicPayload::contains_forbidden( $payload ) );

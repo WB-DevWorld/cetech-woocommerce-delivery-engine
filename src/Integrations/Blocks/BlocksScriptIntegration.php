@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Integrations\Blocks;
 
+use CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy;
+
 /**
  * WooCommerce Blocks IntegrationInterface-compatible script registration.
  *
@@ -75,31 +77,45 @@ final class BlocksScriptIntegration {
 					'i18n'      => [
 						'update' => __( 'Update delivery option', 'cetech-woocommerce-delivery-engine' ),
 						'choose' => __( 'Choose a delivery option', 'cetech-woocommerce-delivery-engine' ),
-						'change' => __( 'Change', 'cetech-woocommerce-delivery-engine' ),
-						'changeDelivery' => __( 'Change', 'cetech-woocommerce-delivery-engine' ),
-						'changePickup' => __( 'Change', 'cetech-woocommerce-delivery-engine' ),
+						'change' => CustomerStorefrontCopy::change(),
+						'addressNeeded' => CustomerStorefrontCopy::address_needed(),
+						'addDeliveryAddress' => CustomerStorefrontCopy::add_delivery_address(),
+						'editDeliveryDetails' => CustomerStorefrontCopy::edit_delivery_details(),
+						'editPickupDetails' => CustomerStorefrontCopy::edit_pickup_details(),
+						'changeDestination' => CustomerStorefrontCopy::change_destination(),
+						'destination' => CustomerStorefrontCopy::destination(),
+						'deliveryMethod' => CustomerStorefrontCopy::delivery_method(),
+						'deliveryAddress' => CustomerStorefrontCopy::delivery_address(),
+						'recipientOptional' => CustomerStorefrontCopy::recipient_details_optional(),
+						'applyToQuantity' => CustomerStorefrontCopy::apply_to_quantity(),
+						'saveDeliveryDetails' => CustomerStorefrontCopy::save_delivery_details(),
+						'cancel' => CustomerStorefrontCopy::cancel(),
+						'addressLine2Optional' => CustomerStorefrontCopy::address_line_2_optional(),
+						'changeDelivery' => CustomerStorefrontCopy::edit_delivery_details(),
+						'changePickup' => CustomerStorefrontCopy::edit_pickup_details(),
 						'deliveringTo' => __( 'Delivering to', 'cetech-woocommerce-delivery-engine' ),
-						'storePickup' => __( 'Store Pickup', 'cetech-woocommerce-delivery-engine' ),
-						'yourDeliveries' => __( 'Your deliveries', 'cetech-woocommerce-delivery-engine' ),
-						'addDeliveryAddress' => __( 'Add delivery address', 'cetech-woocommerce-delivery-engine' ),
-						'updateDetails' => __( 'Update', 'cetech-woocommerce-delivery-engine' ),
-						'useForAll' => __( 'Use this address for all delivery items', 'cetech-woocommerce-delivery-engine' ),
-						'applyAll' => __( 'Apply to all items', 'cetech-woocommerce-delivery-engine' ),
+						'storePickup' => CustomerStorefrontCopy::store_pickup(),
+						'yourDeliveries' => CustomerStorefrontCopy::your_deliveries(),
+						'updateDetails' => CustomerStorefrontCopy::save_delivery_details(),
+						'useForAll' => CustomerStorefrontCopy::use_for_all_delivery_items(),
+						'applyAll' => CustomerStorefrontCopy::apply_to_quantity(),
 						'split' => __( 'Move some quantity', 'cetech-woocommerce-delivery-engine' ),
-						'applyCheckoutAddress' => __( 'Use my checkout address', 'cetech-woocommerce-delivery-engine' ),
+						'applyCheckoutAddress' => CustomerStorefrontCopy::use_my_checkout_address(),
 						'cartUrl' => function_exists( 'wc_get_cart_url' ) ? wc_get_cart_url() : '',
 						'country' => __( 'Country', 'cetech-woocommerce-delivery-engine' ),
 						'state' => __( 'State / Region', 'cetech-woocommerce-delivery-engine' ),
 						'city' => __( 'City', 'cetech-woocommerce-delivery-engine' ),
 						'postcode' => __( 'Postcode', 'cetech-woocommerce-delivery-engine' ),
-						'address1' => __( 'Address line 1', 'cetech-woocommerce-delivery-engine' ),
-						'address2' => __( 'Address line 2', 'cetech-woocommerce-delivery-engine' ),
+						'address1' => CustomerStorefrontCopy::address_line_1(),
+						'address2' => CustomerStorefrontCopy::address_line_2_optional(),
 						'firstName' => __( 'First name', 'cetech-woocommerce-delivery-engine' ),
 						'lastName' => __( 'Last name', 'cetech-woocommerce-delivery-engine' ),
 						'phone' => __( 'Phone', 'cetech-woocommerce-delivery-engine' ),
-						'applyAllN' => __( 'Apply to all items', 'cetech-woocommerce-delivery-engine' ),
+						'company' => __( 'Company', 'cetech-woocommerce-delivery-engine' ),
+						'applyAllN' => __( 'Apply to all %d items', 'cetech-woocommerce-delivery-engine' ),
+						'applyToAllN' => __( 'Apply to all %d items', 'cetech-woocommerce-delivery-engine' ),
 						'splitQty' => __( 'Quantity to move', 'cetech-woocommerce-delivery-engine' ),
-						'optionLegend' => __( 'Delivery', 'cetech-woocommerce-delivery-engine' ),
+						'optionLegend' => CustomerStorefrontCopy::delivery_method(),
 					],
 				]
 			);

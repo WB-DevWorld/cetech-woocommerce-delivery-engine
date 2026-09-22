@@ -1,13 +1,15 @@
-# Current Work — Issue #38 PDP location precision / exact delivery quote
+# Current Work — Issue #39 compact cart/checkout delivery-address UX
 
-Status: RC.12 IMMUTABLE — POST-RC.12 DEV CANDIDATE `1.0.0-dev.pdp-precision.2` — AWAITING FINAL DEPLOYMENT REVIEW / NOT MERGED / NOT DEPLOYED / NOT RC.13
+Status: RC.12 IMMUTABLE — POST-RC.12 DEV CANDIDATE `1.0.0-dev.address-ux.3` — AWAITING FINAL DEPLOYMENT REVIEW / NOT MERGED / NOT DEPLOYED / NOT RC.13
 
 ## Canonical repository truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
 - Canonical development branch: protected `master`.
-- Current protected `master`: `514ddfc1b4d10b2171d3d3bae020381198c59d2b` (merged/green post-Issue-#35 baseline; PR #36 MERGED; Issue #35 CLOSED).
+- Current protected `master`: `ed3753d73e262d8c7467fa936e3e36060960e58c` (PR #40 MERGED; Issue #38 CLOSED / COMPLETED; protected-master CI SUCCESS).
 - Immutable RC.12 release source: `78594ad8962868683726373f58f4a8b1b48e4d0e`.
 - Tag `v1.0.0-rc.12` must not be moved. Do not rebuild or overwrite the RC.12 ZIP.
+- Frozen `1.0.0-dev.pdp-precision.1` / `1.0.0-dev.pdp-precision.2` ZIPs must not be overwritten.
+- Frozen `1.0.0-dev.address-ux.1` / `1.0.0-dev.address-ux.2` ZIPs must not be overwritten.
 - Do not create RC.13.
 
 ## RC.12 published identity (immutable)
@@ -18,18 +20,20 @@ Status: RC.12 IMMUTABLE — POST-RC.12 DEV CANDIDATE `1.0.0-dev.pdp-precision.2`
 - Peels to: `78594ad8962868683726373f58f4a8b1b48e4d0e`
 
 ## Active task
-Issue `#38` — `[P1] PDP saved-region hydration can hide City/Town and show broader-area delivery fee`
+Issue `#39` — `[P2] Cart/checkout delivery-address actions and per-item editor need clearer hierarchy and compact UX`
 
-- Owner: `@wbdevworld` (explicit owner/ChatGPT authorization; Issue #38 only).
-- Branch: `fix/pdp-location-precision`.
-- Base: protected `master` `514ddfc1b4d10b2171d3d3bae020381198c59d2b`.
-- Runtime / package-source SHA: `05b9b393995c884d30f9d761513fcd3beb622587`.
-- Frozen pdp-precision.1 runtime SHA: `dd078712bd97024d49ccd208a0b9d7e82d25f857` (ZIP must not be overwritten).
-- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/40 (open; do not merge).
-- Development identity: `1.0.0-dev.pdp-precision.2` (schema remains `6`).
+- Owner: `@wbdevworld` (explicit owner/ChatGPT authorization; Issue #39 only).
+- Branch: `fix/cart-checkout-address-ux`.
+- Base: protected `master` `ed3753d73e262d8c7467fa936e3e36060960e58c`.
+- Previous `.2` runtime / package-source SHA: `b2acea7ba75f31cd6a7851fcbf594bf798bfd79d`.
+- Runtime / package-source SHA: `3f02e10e377d641d7036357242033b3f6534cbb8`.
+- PR: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/41 (open; do not merge).
+- Development identity: `1.0.0-dev.address-ux.3` (schema remains `6`).
 - Requires PHP: `8.3`. Composer: `>=8.3`. Activation guard: `8.3`.
-- Not RC.13. Do not reuse geo-country identities.
-- Do not merge. Do not deploy. Do not close Issue #38.
+- Frozen `1.0.0-dev.address-ux.2` ZIP must not be overwritten (`1,837,972` bytes, SHA-256 `e914efc0ee73132efffab6899cf9627ac3d01ecf6b579f190b3050cdd43e117f`).
+- Frozen `1.0.0-dev.address-ux.1` ZIP must not be overwritten (`1,832,223` bytes, SHA-256 `2a28798140fafaa7d7b4e20bc4e3878fd1949f7014af854b002960a3ae1120fe`).
+- Not RC.13. Do not reuse pdp-precision or geo-country identities as the current plugin version.
+- Do not merge. Do not deploy.
 
 PHP policy retained from PR #37 (`docs/PHP-RUNTIME-POLICY.md`, `docs/PHP-85-CI-REALIGNMENT.md`):
 
@@ -39,7 +43,7 @@ PHP policy retained from PR #37 (`docs/PHP-RUNTIME-POLICY.md`, `docs/PHP-85-CI-R
 - PHP 8.1 and 8.2 are not supported and must not be advertised.
 
 ## Central leases
-- plugin bootstrap / version identity on this branch: `1.0.0-dev.pdp-precision.2`; published `1.0.0-rc.12` remains the tagged identity; frozen `1.0.0-dev.pdp-precision.1` ZIP must not be overwritten;
+- plugin bootstrap / version identity on this branch: `1.0.0-dev.address-ux.3`; published `1.0.0-rc.12` remains the tagged identity; frozen address-ux.1 / address-ux.2 / pdp-precision / geo-country ZIPs must not be overwritten;
 - CI workflows / required-check names / PHP runtime policy: retained from protected master;
 - schema / migrations: frozen at `6`;
 - published release identity/tags: `v1.0.0-rc.11` and `v1.0.0-rc.12` immutable;
@@ -50,11 +54,11 @@ PHP policy retained from PR #37 (`docs/PHP-RUNTIME-POLICY.md`, `docs/PHP-85-CI-R
 
 ## Environment authorization
 - GitHub Actions ephemeral runners and optional local `docker/php85-qa`.
-- Training site `https://training.cetechbpa.com`: **NOT AUTHORIZED** for this task. Do not deploy.
+- Training site `https://training.cetechbpa.com`: **NOT AUTHORIZED for address-ux.3**. Leave installed `1.0.0-dev.address-ux.2`. Do not deploy `1.0.0-dev.address-ux.3`.
 - CETECH Pilot: **NOT STARTED**.
 - FLAIROC: **NOT DEPLOYED**.
 - Production: **NOT DEPLOYED**.
 - POS repository: outside scope / must not be touched.
 
 ## Explicit non-actions
-Do not create RC.13. Do not merge this PR. Do not close Issue #38. Do not implement #39/#31/#32. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not overwrite frozen geo-country ZIPs or the frozen `1.0.0-dev.pdp-precision.1` ZIP. Do not start CETECH Pilot. Do not deploy FLAIROC, training, or production. Do not touch POS. Do not start Stage 15. Do not rename Ashanti Region. Do not mutate Accra/Kumasi coverage, Greater Accra charges, or the GH Location Pack. Do not rerun safe legacy reconciliation.
+Do not create RC.13. Do not merge this PR. Do not implement #31/#32. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not overwrite frozen address-ux.1, address-ux.2, geo-country, or pdp-precision ZIPs. Do not start CETECH Pilot. Do not deploy FLAIROC, training, or production. Do not touch POS. Do not start Stage 15. Do not rename Ashanti Region. Do not mutate Accra/Kumasi coverage, Greater Accra charges, or the GH Location Pack. Do not rerun safe legacy reconciliation.

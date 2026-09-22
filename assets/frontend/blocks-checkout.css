@@ -27,6 +27,7 @@
 	padding: 0.75rem;
 	border: 1px solid rgba(0, 0, 0, 0.12);
 	background: #fff;
+	box-sizing: border-box;
 }
 
 .cetech-de-blocks-line__kicker,
@@ -40,6 +41,18 @@
 	opacity: 0.9;
 }
 
+.cetech-de-blocks-line__status {
+	display: inline-flex;
+	align-items: center;
+	margin: 0 0 0.35rem;
+	padding: 0.2rem 0.55rem;
+	min-height: 1.75rem;
+	border: 1px solid currentColor;
+	border-radius: 999px;
+	font-weight: 700;
+	font-size: 0.85em;
+}
+
 .cetech-de-blocks-editor {
 	margin-top: 0.25rem;
 }
@@ -50,9 +63,29 @@
 	margin-top: 0.5rem;
 }
 
+.cetech-de-blocks-editor__section-title {
+	margin: 0;
+	font-size: 1em;
+	font-weight: 700;
+}
+
+.cetech-de-blocks-editor__disclosure > summary {
+	cursor: pointer;
+	min-height: 2.75rem;
+	display: inline-flex;
+	align-items: center;
+	font-weight: 600;
+}
+
 .cetech-de-blocks-editor__field {
 	display: grid;
 	gap: 0.25rem;
+}
+
+.cetech-de-blocks-editor__grid {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 0 0.75rem;
 }
 
 .cetech-de-blocks-editor summary {
@@ -65,7 +98,8 @@
 
 .cetech-de-blocks-editor input,
 .cetech-de-blocks-editor select,
-.cetech-de-blocks-editor button {
+.cetech-de-blocks-editor button,
+.cetech-de-blocks-editor a {
 	max-width: 100%;
 	box-sizing: border-box;
 }
@@ -77,13 +111,47 @@
 	width: 100%;
 }
 
+.cetech-de-blocks-editor__actions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 0.75rem;
+}
+
 .cetech-de-blocks-editor__update,
-.cetech-de-blocks-editor__use-for-all,
-.cetech-de-blocks-apply-checkout-address {
-	margin-right: 0.5rem;
-	margin-top: 0.25rem;
+.cetech-de-blocks-add-delivery-address {
 	min-height: 2.75rem;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	font-weight: 700;
 	white-space: normal;
+}
+
+.cetech-de-blocks-editor__cancel,
+.cetech-de-blocks-editor__use-for-all,
+.cetech-de-blocks-apply-checkout-address--secondary {
+	background: transparent;
+	border: 0;
+	box-shadow: none;
+	padding: 0;
+	min-height: 2.75rem;
+	text-decoration: underline;
+	cursor: pointer;
+	font: inherit;
+	font-weight: 400;
+	color: inherit;
+}
+
+.wc-block-checkout .cetech-de-blocks-apply-checkout-address.cetech-de-blocks-apply-checkout-address--secondary,
+.wc-block-cart .cetech-de-blocks-apply-checkout-address.cetech-de-blocks-apply-checkout-address--secondary,
+.wc-block-checkout .cetech-de-blocks-editor__cancel,
+.wc-block-cart .cetech-de-blocks-editor__cancel,
+.wc-block-checkout .cetech-de-blocks-editor__use-for-all,
+.wc-block-cart .cetech-de-blocks-editor__use-for-all {
+	background: transparent !important;
+	border: 0 !important;
+	box-shadow: none !important;
 }
 
 .cetech-de-blocks-incomplete-actions {
@@ -94,22 +162,7 @@
 	margin: 0.5rem 0;
 }
 
-.cetech-de-blocks-add-delivery-address {
-	min-height: 2.75rem;
-	display: inline-flex;
-	align-items: center;
-	font-weight: 600;
-}
-
-.cetech-de-blocks-apply-checkout-address--secondary {
-	background: transparent;
-	border: 0;
-	padding: 0;
-	min-height: 2.75rem;
-	text-decoration: underline;
-	cursor: pointer;
-	font: inherit;
-}
+.cetech-de-delivery-plan {
 	margin: 0.75rem 0;
 	padding: 0.85rem;
 	border: 1px solid rgba(0, 0, 0, 0.12);
@@ -136,9 +189,26 @@
 	margin: 0.5rem 0;
 }
 
+.cetech-de-blocks-customer-context :focus-visible,
+.cetech-de-blocks-add-delivery-address:focus-visible,
+.cetech-de-blocks-editor__update:focus-visible,
+.cetech-de-blocks-editor__cancel:focus-visible {
+	outline: 2px solid currentColor;
+	outline-offset: 2px;
+}
+
+@media (min-width: 769px) {
+	.cetech-de-blocks-editor__grid {
+		grid-template-columns: 1fr 1fr;
+	}
+}
+
 @media (max-width: 768px) {
 	.cetech-de-blocks-editor__use-for-all,
-	.cetech-de-blocks-apply-checkout-address {
+	.cetech-de-blocks-apply-checkout-address,
+	.cetech-de-blocks-add-delivery-address,
+	.cetech-de-blocks-editor__update,
+	.cetech-de-blocks-editor__cancel {
 		display: block;
 		width: 100%;
 		margin-right: 0;
