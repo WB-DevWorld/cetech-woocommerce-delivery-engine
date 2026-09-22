@@ -1,5 +1,7 @@
 # V1 Release Candidate — Smoke Test Checklist
 
+> **Historical checklist notice (2026-09-22):** retain these early V1 smoke scenarios as supplemental regression coverage. Current release/schema/environment truth comes from the active release issue, `CURRENT-WORK.md`, `docs/STATUS_CURRENT.md`, and later RC/post-RC evidence. Do not assume “all flags off” is the current environment state.
+
 **Plugin:** CETECH WooCommerce Delivery Engine  
 **Use with:** [V1-RC-FLAG-MATRIX.md](V1-RC-FLAG-MATRIX.md)
 
