@@ -5,7 +5,7 @@ Status: RC.12 IMMUTABLE — ISSUE #32 MERGED/CLOSED — ISSUE #45 REPOSITORY/TRU
 ## Canonical repository truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
 - Canonical development branch: protected `master`.
-- Current protected `master`: `88c9ec09f3cfabf73b83780c0c37d397e9acdad6` (PR #43 MERGED; Issue #32 CLOSED / COMPLETED).
+- Protected `master` baseline at the start of Issue #45: `88c9ec09f3cfabf73b83780c0c37d397e9acdad6` (PR #43 MERGED; Issue #32 CLOSED / COMPLETED). PR #46 carries this documentation synchronization; once it merges, its merge commit becomes the newer protected-master head. Do not treat `88c9...` as the post-PR-#46 head.
 - Post-merge CI run `35766468276`: SUCCESS across PHP 8.3, PHP 8.4, PHP 8.5 production, PHP 8.5 MariaDB, PHP 8.5 WordPress/WooCommerce, JavaScript/Vitest, Control Plane, and CI Required Gates.
 - Immutable RC.12 release source: `78594ad8962868683726373f58f4a8b1b48e4d0e`.
 - Tag `v1.0.0-rc.12` must not be moved. Do not rebuild or overwrite the RC.12 ZIP.
@@ -38,11 +38,11 @@ Issue #32 — `[P2] Overview Needs Attention count omits actionable shipment/COD
 - Issue #32: CLOSED / COMPLETED.
 - Evidence: `docs/POST-RC12-NEEDS-ATTENTION-COUNT.md`.
 
-## Active task
+## Repository synchronization checkpoint
 Issue #45 — `[REPO] Post-#32 repository truth sync and branch retirement`
 - Branch: `docs/post-issue32-repository-truth`.
 - Base: protected `master` `88c9ec09f3cfabf73b83780c0c37d397e9acdad6`.
-- Scope: documentation/control-plane truth, stale PR retirement, branch classification, and safe branch retirement only.
+- Scope: documentation/control-plane truth, stale PR retirement, branch classification, and safe branch retirement only. PR #46 is the merge surface for this checkpoint; after merge, Issue #45 is expected to close via `Closes #45`.
 - No plugin runtime, schema, package, tag, geography, coverage, rate, checkout, shipment, COD, production, FLAIROC, Pilot, or POS mutation.
 - Obsolete PR #15 is CLOSED / SUPERSEDED and must not be merged.
 - Branch classification record: `docs/REPOSITORY-BRANCH-RETIREMENT-2026-09-22.md`.
