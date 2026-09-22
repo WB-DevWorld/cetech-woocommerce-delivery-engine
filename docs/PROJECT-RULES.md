@@ -146,7 +146,7 @@ All of the following are **optional adapters**. The plugin must work correctly w
 | **VitePOS** | POS order fulfilment selection and shipment creation |
 | **Redis** | Optional object cache for configuration data |
 | **WP Rocket** | Page-cache compatibility; cart/checkout/My Account exclusions |
-| **WooCommerce Blocks** | Block cart/checkout adapter (separate from V1 classic baseline) |
+| **WooCommerce Blocks** | Current block cart/checkout surface; must share server-authoritative rules with Classic |
 | **Tracking plugins** | Optional display or handoff; no V1 auto-sync requirement |
 | **Carrier APIs** | Future connectivity only; excluded from V1 live quotes/dispatch |
 
@@ -196,7 +196,7 @@ Version 1 must deliver the full **product → cart → checkout → order snapsh
 
 **Platform and admin:**
 
-- Classic WooCommerce cart/checkout support (full V1 baseline)
+- Classic and WooCommerce Cart/Checkout Blocks support using the same authoritative delivery contracts
 - Optional WPML/WCML adapters
 - Optional WoodMart adapter (hooks-based)
 - Optional WCFM/VitePOS adapters
@@ -1037,7 +1037,7 @@ Do not add complexity before core product-to-cart-to-checkout-to-shipment workfl
 
 ## 41. Cursor/developer discipline rules
 
-### Phase discipline (current: Phase 0A — Project Rule Locking)
+### Phase discipline (historical handoff phase: Phase 0A — Project Rule Locking; current task/phase lives in `CURRENT-WORK.md`)
 
 Until architecture is approved:
 
