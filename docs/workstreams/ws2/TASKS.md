@@ -1,11 +1,8 @@
 # WS2 Tasks — Emmanuel
 
-Post-RC.10 collaboration queue (starts from the protected RC.10 baseline after merge; do not implement on published RC.9 `master`). Do not merge the unique WPML stream without explicit milestone authorization.
+## Current state
+No active coding task is authorized by this file.
 
-## WS2-Q1 — Paid multi-destination Woo lifecycle qualification
-Prove on the exact combined candidate: paid two-destination order, correct order-line snapshots, actual two shipment records, shipment idempotency, Thank You, My Account and customer email. Include one pickup control case with zero delivery charge/no delivery shipment.
+The historical paid multi-destination qualification queue has been superseded by later merged work and qualification. The unique WPML/WCML stream must not be merged merely because repository cleanup is underway.
 
-## WS2-Q2 — Optional-integration certification support
-Reconcile current WCFM, WPML/WCML and VitePOS adapter status. Do not merge the unique WPML stream without explicit milestone authorization. Never use unauthorized/nulled licensed packages.
-
-Do not redesign customer UX or core resolver/schema/security semantics.
+Future WS2 work starts from current protected master under a new issue and may cover Woo lifecycle or optional-integration certification only when explicitly authorized.

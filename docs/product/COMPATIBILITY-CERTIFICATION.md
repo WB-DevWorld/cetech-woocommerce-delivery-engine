@@ -2,6 +2,10 @@
 
 Status: owner-approved compatibility policy for `PRODUCT-TRUTH-BASELINE-1`. “Designed,” “implemented,” and “certified” remain deliberately separate.
 
+## Current operational note — 2026-09-22
+
+This matrix was frozen with `PRODUCT-TRUTH-BASELINE-1` and several row narratives still name RC.11/geo.11-era evidence. Treat those exact-version statements as certification provenance, not live repository status. Since the audit freeze, the geography stream was accepted into RC.12 and post-RC.12 fixes through Issue #32 were merged. No new B2BKing, FOX/WOOCS, WPML/WCML, WP Rocket, POS, carrier, or PSP certification is implied by those merges. Use `CURRENT-WORK.md` and `docs/STATUS_CURRENT.md` for current repository/deployment state.
+
 ## Status vocabulary
 
 - **Core dependency** — required for the plugin to perform its primary job.

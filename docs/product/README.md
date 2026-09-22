@@ -2,6 +2,10 @@
 
 This folder is the durable audit package prepared and owner-accepted on 2026-09-19 as `PRODUCT-TRUTH-BASELINE-1`. This publication updates documentation and control-plane validation only; it does not change product/runtime code, WordPress, WooCommerce, any database, PR #24, the geography branch, RC.11, a release tag/package, or a deployment.
 
+## Current operational supersession — 2026-09-22
+
+The audit freeze points below are intentionally preserved as historical provenance. They are **not current repository status**. Current protected `master` is `88c9ec09f3cfabf73b83780c0c37d397e9acdad6`; RC.12 is published and immutable; the geography stream and Issue #23 are closed; post-RC.12 fixes through Issue #32 are merged; training currently runs `1.0.0-dev.attention-count.1`, schema 6, after physical QA PASS. Use `CURRENT-WORK.md` and `docs/STATUS_CURRENT.md` for live operational truth.
+
 ## Authority and freeze points
 
 - Product-truth checkpoint: `PRODUCT-TRUTH-BASELINE-1`.

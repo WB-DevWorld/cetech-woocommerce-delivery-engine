@@ -1,6 +1,8 @@
 # Stable Standalone 1.0 Scope Reconciliation
 
-Status: owner-approved `STABLE-1.0-SCOPE-1`. It does not declare RC.11, geo.11, or any future build to be Stable 1.0.
+Status: owner-approved `STABLE-1.0-SCOPE-1`. It does not declare RC.11, RC.12, any post-RC.12 development build, or any future build to be Stable 1.0.
+
+**Current execution note — 2026-09-22:** Sections 1–2 below record the pre-RC.12 gates that existed when this scope was frozen. Those geography/RC.12 gates are now complete: Issue #23/PR #24 closed, RC.12 published and immutable, and post-RC.12 fixes through Issue #32 are merged on protected master. CETECH Pilot remains not started. The Stable-1.0 capability requirements in Section 3 and later remain authoritative unless separately amended by the owner.
 
 ## Executive boundary
 

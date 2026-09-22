@@ -1,3 +1,28 @@
+# Final closeout — 2026-09-22
+
+Issue #32 is **CLOSED / COMPLETED** and PR #43 is **MERGED**.
+
+- protected-master merge commit: `88c9ec09f3cfabf73b83780c0c37d397e9acdad6`
+- runtime/package-source SHA: `6e9e2ea71796170afb0508954a18d206cdc7017a`
+- final PR head: `658316f775099b0dfc43205bb07c905681a4af10`
+- runtime CI `35759882478`: SUCCESS
+- final-head PR CI `35760847856`: SUCCESS
+- post-merge master CI `35766468276`: SUCCESS
+- exact frozen package: `cetech-woocommerce-delivery-engine-1.0.0-dev.attention-count.1.zip`
+- package bytes: `1,848,319`
+- SHA-256: `2027e5941916dff0302d7e2e545de5a2fd027f0c8f1615d97e3991dcfc5fdcb3`
+- schema: `6`
+- training physical QA: PASS
+- pre-deploy mismatch: canonical/menu `8`, Overview `0`
+- post-deploy truth: canonical `8`, Overview `8`, menu `8`
+- post-deploy sources: catalog `0`, stale bulk `0`, shipment creation `2`, operations `3`, COD `3`
+- no operational data was mutated to manufacture QA results
+- RC.12 unchanged; RC.13 absent; Pilot / FLAIROC / production / POS unchanged
+
+Training currently runs `1.0.0-dev.attention-count.1`. This development identity is qualification evidence only and is not a release promotion.
+
+---
+
 # POST-RC.12 — Unified Needs Attention count (Issue #32)
 
 **Current candidate identity:** `1.0.0-dev.attention-count.1`  
