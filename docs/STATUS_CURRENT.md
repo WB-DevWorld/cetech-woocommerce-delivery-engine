@@ -54,9 +54,12 @@ Last reconciled: 2026-09-22 (PR #41 MERGED onto protected `master` `baa273c2af00
 - Development identity: `1.0.0-dev.shipment-order-read.1`
 - Schema: `6` (unchanged)
 - Requires PHP: `8.3`
-- Runtime / package-source SHA: pending CI-green runtime commit
+- Runtime / package-source SHA: `528e7c8b264f74848c85d77e172a25213db327dc`
+- GitHub CI on runtime SHA: SUCCESS (`35748159485` push)
 - PR: pending (do not merge)
 - ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.shipment-order-read.1.zip`
+- Bytes: `1,845,224`
+- SHA-256: `3dd4602ceedc26bcc3dab673271752c47c47e02d7e90e81fed832e9d498539f5`
 - Not merged. Not deployed. Not RC.13. Awaiting technical review. Training remains `1.0.0-dev.address-ux.3`.
 - Evidence: `docs/POST-RC12-SHIPMENT-ORDER-READ.md`
 

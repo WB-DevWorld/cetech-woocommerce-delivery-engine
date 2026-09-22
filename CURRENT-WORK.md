@@ -26,6 +26,9 @@ Issue `#31` — `[P2] Shipment workspace can show Customer unavailable for exist
 - Branch: `fix/shipment-workspace-order-read`.
 - Base: protected `master` `baa273c2af00672d22268eb6968012ac7a51cfdd`.
 - Development identity: `1.0.0-dev.shipment-order-read.1` (schema remains `6`).
+- Runtime / package-source SHA: `528e7c8b264f74848c85d77e172a25213db327dc`.
+- GitHub CI on runtime SHA: SUCCESS (`35748159485` push) — PHP 8.3 Minimum Supported, PHP 8.4 Compatibility, PHP 8.5 CETECH Production Target, PHP 8.5 MariaDB Geography/Migrations, PHP 8.5 WordPress/WooCommerce, CI Required Gates, JavaScript / Vitest, Control Plane.
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.shipment-order-read.1.zip` (`1,845,224` bytes, SHA-256 `3dd4602ceedc26bcc3dab673271752c47c47e02d7e90e81fed832e9d498539f5`).
 - Requires PHP: `8.3`. Composer: `>=8.3`. Activation guard: `8.3`.
 - Not RC.13. Do not call this candidate an “HPOS fix” as architectural truth; training investigation reproduced a bulk-include miss while `wc_get_order` succeeded, without proving HPOS caused the omission.
 - Do not merge. Do not deploy.

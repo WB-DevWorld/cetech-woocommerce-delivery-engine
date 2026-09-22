@@ -4,6 +4,7 @@
 **Schema:** `6` (unchanged; no schema 7)  
 **Branch:** `fix/shipment-workspace-order-read`  
 **Base:** protected `master` `baa273c2af00672d22268eb6968012ac7a51cfdd`  
+**Runtime / package-source SHA:** `528e7c8b264f74848c85d77e172a25213db327dc`  
 **Requires PHP:** `8.3`  
 **Not RC.13. Not deployed. Do not merge until owner/ChatGPT technical review.**
 
@@ -80,12 +81,23 @@ If bulk and direct both fail: no fatal; customer label remains **Customer unavai
 
 ## Package (shipment-order-read.1, after CI)
 
-Recorded after GitHub CI SUCCESS on the runtime/package-source SHA. Do not overwrite frozen address-ux / pdp-precision / geo-country ZIPs. Do not treat this ZIP as RC.13 or as a replacement for RC.12. Training remains `1.0.0-dev.address-ux.3`. Do not deploy shipment-order-read.1.
+Built from a clean committed tree after GitHub CI SUCCESS on the runtime/package-source SHA. Do not overwrite frozen address-ux / pdp-precision / geo-country ZIPs. Do not treat this ZIP as RC.13 or as a replacement for RC.12. Training remains `1.0.0-dev.address-ux.3`. Do not deploy shipment-order-read.1.
 
-- Source SHA: pending CI-green runtime commit
+- Source SHA: `528e7c8b264f74848c85d77e172a25213db327dc`
 - Filename: `cetech-woocommerce-delivery-engine-1.0.0-dev.shipment-order-read.1.zip`
-- Bytes: pending package
-- SHA-256: pending package
+- Bytes: `1,845,224`
+- SHA-256: `3dd4602ceedc26bcc3dab673271752c47c47e02d7e90e81fed832e9d498539f5`
+- Production-package verifier: PASS (staged and extracted)
+- Packaged PHP lint: `497 files / 0 failures` (PHP 8.5.0, vendor excluded)
+- GitHub CI on runtime SHA: SUCCESS (`35748159485` push) — PHP 8.3 Minimum Supported, PHP 8.4 Compatibility, PHP 8.5 CETECH Production Target, PHP 8.5 MariaDB Geography/Migrations, PHP 8.5 WordPress/WooCommerce, CI Required Gates, JavaScript / Vitest, Control Plane
+- PHPUnit (GitHub PHP 8.5.10): Tests: 1395, Assertions: 8844, Deprecations: 14, Skipped: 1
+- PHPUnit (local PHP 8.5.0): Tests: 1395, Assertions: 8841, Deprecations: 14, Skipped: 1
+- Vitest: 101 passed / 8 files
+- Composer validate: PASS
+- Team control plane: PASS
+- Product control plane: PASS (372 Requirement IDs)
+- MariaDB real-DB: Tests: 26, Assertions: 1738, skipped=0, failures=0, errors=0
+- Not deployed to training
 
 ## Explicitly not done
 
