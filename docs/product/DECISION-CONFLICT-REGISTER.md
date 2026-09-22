@@ -27,7 +27,7 @@ When evidence conflicts, use: newer explicit owner instruction → immutable rep
 | Stable 1.0 economics floor | Customer charge, promotions/subsidy, and private economics are separated at schema/contract level; deeper reconciliation, allocation, and analytics may continue after 1.0. | `DE-PROMO-*`, `DE-ECON-*`, `DE-ANALYTICS-*` |
 | Commercial channel and name | Use an independent direct commercial distribution/update/licensing mechanism; WordPress.org is not required; replace the CETECH working name before the main Stable 1.0 commercial release. | `DE-REL-*`; Constitution |
 | Stable 1.0 certification floor | Prioritize WooCommerce/HPOS, Classic, Blocks, Storefront, current supported WoodMart, B2BKing, and FOX/WOOCS; WPML/WCML is launch-claim conditional. | `DE-COMPAT-*` |
-| First production Pilot | CETECH is first; after geo.12 technical closure and physical owner QA, create a controlled Pilot/release candidate without assuming the name RC.12. | Release scope; realignment plan |
+| First production Pilot | CETECH remains first. The geo technical-closure/physical-QA prerequisite and RC.12 publication have since completed, but CETECH Pilot is still **NOT STARTED** and requires a separate explicit deployment authorization. No RC.13 is implied. | Release scope; realignment plan; current status |
 
 ## Material chronology and supersessions
 
@@ -78,7 +78,7 @@ These are later implementations that should be adopted into canonical design wor
 | WP-CLI covers bulk jobs only. | `DE-CLI-*` | Expand governed CLI across diagnostics, quote, geography, policies, shipments, jobs and maintenance. |
 | No governed events/webhooks. | `DE-EVENT-*` | Introduce versioned events and signed, retryable webhooks. |
 | No provider-neutral FX conversion/provenance. | `DE-FX-*` | Add adapter contract and convert-once snapshot semantics. |
-| geo.11 known closure defects. | `DE-GEO-*`, `DE-AREA-*` | Finish the finite geo.12 pass before physical QA; do not mix broader realignment into PR #24. |
+| geo.11 known closure defects. | `DE-GEO-*`, `DE-AREA-*` | Historical correction boundary. The bounded geography closure later completed through accepted geo.16 / PR #24 and RC.12 promotion; broader Stable 1.0 realignment remains separate. |
 
 ## Negative-invariant register and audit result
 
@@ -109,7 +109,7 @@ These are later implementations that should be adopted into canonical design wor
 | 3 | Distribution/update channel | CETECH is the first production Pilot customer. The commercial product will use an independent direct commercial distribution/update/licensing mechanism; WordPress.org is not required. |
 | 4 | Compatibility certification | Before Stable 1.0 prioritize WooCommerce/HPOS, Classic, Blocks, Storefront, current supported WoodMart, B2BKing, and FOX/WOOCS. Certify WPML/WCML before 1.0 only if advertised as supported at launch. Keep other optional targets explicitly uncertified. |
 | 5 | Brand and public naming | “CETECH WooCommerce Delivery Engine” remains an internal/working name. Rename the externally commercialized product independently of CETECH before the main Stable 1.0 commercial release. |
-| 6 | Post-geo release | After geo.12 technical closure and physical owner QA, create a controlled CETECH production Pilot/release candidate before waiting for all Stable 1.0 realignment work. Do not infer or create RC.12 from this decision. |
+| 6 | Post-geo release | Original decision: after geography technical closure and physical QA, proceed to a separately controlled CETECH Pilot/release candidate before all Stable 1.0 realignment. Execution update: geo closure and RC.12 publication are complete; Pilot remains not started and any future RC.13/release/deployment requires a separate explicit control decision. |
 | 7 | PHP production vs minimum (2026-09-21, superseded by decision 8) | Historical first draft: CETECH production PHP 8.5.x with PHP 8.1 retained as commercial minimum. **Superseded the same day.** Do not treat this row as current support. |
 | 8 | PHP recommended-floor support range (2026-09-21) | Supported/certified PHP is 8.3 through 8.5.x. Minimum supported PHP is 8.3 — the oldest version currently recommended by both WordPress and WooCommerce, not the oldest those products can still boot. CETECH production / currently qualified latest stable is PHP 8.5.x (latest stable patch at deploy; 8.5.10 as of this decision). PHP 8.1 and 8.2 are not supported and must not be advertised. PHP 8.6 pre-release must not be used as production. A later stable PHP line is added only after WordPress, WooCommerce, Delivery Engine, and CETECH stack qualification. Durable required CI checks must use truthful names. |
 
