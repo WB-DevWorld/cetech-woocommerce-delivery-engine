@@ -1,6 +1,6 @@
 # Stable Standalone 1.0 Scope Reconciliation
 
-Status: owner-approved `STABLE-1.0-SCOPE-1`. It does not declare RC.11, geo.11, or any future build to be Stable 1.0.
+Status: owner-approved `STABLE-1.0-SCOPE-1`. It does not declare RC.12, current protected master, or any development build to be Stable 1.0. The 2026-09-19 product-scope decisions remain frozen; execution status below is reconciled to 2026-09-22.
 
 ## Executive boundary
 
@@ -8,9 +8,9 @@ Stable Standalone 1.0 is a commercially shippable WooCommerce delivery product w
 
 Stable 1.0 is **not** the complete ultimate platform. Rich multi-leg execution, advanced operations/analytics, full carrier automation, POD/OTP/QR/GPS/photo/driver workflows, and Connected peer orchestration do not all belong before 1.0.
 
-## 1. Required before the current active stream closes
+## 1. Completed prerequisite — canonical geography/coverage closure
 
-Applies to `DE-GEO-*` and `DE-AREA-*`:
+Applies to `DE-GEO-*` and `DE-AREA-*`. The following was the audit-time closure checklist. It was subsequently completed through the accepted geo.16 line, PR #24, RC.12 promotion, and follow-up geography hardening; retain it as acceptance provenance:
 
 - build `1.0.0-dev.geo.12` from the finite PR #24 closure list;
 - correct the schema-6 upgrade/reconciliation coordinator and prove owner-fenced bounded execution on real MariaDB;
@@ -26,16 +26,16 @@ Applies to `DE-GEO-*` and `DE-AREA-*`:
 
 No policy/API/label/economics realignment should be added to PR #24.
 
-## 2. Required before the controlled CETECH Pilot/release candidate
+## 2. Next production-facing gate — controlled CETECH Pilot
 
-After geo.12 technical closure and physical owner QA, create a controlled CETECH production Pilot/release candidate before waiting for all Stable 1.0 realignment work. The exact version name remains a separate release-control choice; this decision does not assume or create RC.12.
+The geography technical-closure and physical-QA prerequisite is complete and RC.12 has already been published. CETECH Pilot is still **NOT STARTED**. A Pilot build/deployment requires a separate explicit owner/release-control authorization; this scope document does not create RC.13 or authorize deployment.
 
-- merge only an accepted geo package through normal protected-branch governance;
-- reconcile current-status/readme/version-support documentation;
-- rerun full clean-install and RC.11 retained-data upgrade qualification;
-- verify package contents, checksum, lint, CI, and exact source SHA;
-- record the release’s deliberately included scope and certification boundaries;
-- do not promote a release merely because PR #24 merges.
+- branch the Pilot candidate only from an explicitly authorized protected-master source;
+- reconcile current-status/readme/version-support documentation for that exact Pilot candidate;
+- rerun clean-install and retained-data upgrade qualification from the supported predecessor path;
+- verify package contents, checksum, lint, CI, exact source SHA, rollback, and environment preconditions;
+- record the Pilot’s deliberately included scope and certification boundaries;
+- do not infer a new release or RC.13 merely because current master is green.
 
 Broader product realignment may continue after the controlled geo-based Pilot/release candidate. That candidate is not Stable 1.0, and deployment remains a separately controlled action.
 
@@ -135,12 +135,12 @@ These do not block Stable 1.0 and must not be pulled into the active geo stream.
 
 `DE-CONNECT-*` belongs only to the separate Connected product: Invordex, Alcide, HubLoft, AIM PIM, Suproma, GeoMesh, ReLoop, AccessLobby, MoneyMove, DonLoft, DataPlane and other peer orchestration. Shared contracts may be developed independently, but peer runtime dependencies/UI do not enter Standalone.
 
-## 9. What RC.11 already satisfies
+## 9. What RC.12 and the current post-RC.12 baseline already satisfy
 
-RC.11 is a strong release-candidate baseline for:
+RC.12, plus merged post-RC.12 hardening through Issue #32, is a strong non-Stable-1.0 baseline for:
 
 - Woo-only modular plugin bootstrap and governance;
-- schema-5 forward migrations and explicit uninstall;
+- schema-6 forward migrations, canonical geography/coverage foundations, and explicit uninstall;
 - scoped configuration and effective resolver;
 - core delivery offers, legacy delivery areas, logistics/supplier/origin/pickup records and Rate Cards;
 - authoritative product-page price, cart persistence/reselection, Classic and Blocks validation;
@@ -162,6 +162,6 @@ The owner froze `STABLE-1.0-SCOPE-1` on 2026-09-19:
 3. Use an independent direct commercial distribution/update/licensing mechanism; WordPress.org is not required.
 4. Certify WooCommerce/HPOS, Classic, Blocks, Storefront, current supported WoodMart, B2BKing, and FOX/WOOCS; make WPML/WCML conditional on a launch support claim.
 5. Replace the CETECH working name before the main Stable 1.0 commercial release.
-6. Create a controlled CETECH production Pilot/release candidate after geo.12 technical closure and physical owner QA, without assuming RC.12.
+6. CETECH remains the first controlled production Pilot. Geography closure and RC.12 publication are complete; Pilot itself remains separately authorized and must not be inferred from RC.12 or current master. Any RC.13 decision is separate.
 
 Future scope changes require an explicit decision record and corresponding registry update without renumbering Requirement IDs.
