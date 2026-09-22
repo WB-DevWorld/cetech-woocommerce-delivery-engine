@@ -2,6 +2,10 @@
 
 Status: independent Codex read-only mapping against `PRODUCT-TRUTH-BASELINE-1`. No repository or runtime mutation was performed.
 
+## Snapshot supersession note — 2026-09-22
+
+This document is intentionally preserved as the exact 2026-09-19 implementation/audit snapshot. Its “Protected master,” “Active branch,” geo.11, and “Next named work” rows are historical freeze points and must not be used as live status. Current protected master is `88c9ec09f3cfabf73b83780c0c37d397e9acdad6`; RC.12 is immutable; Issue #23/PR #24 and post-RC.12 fixes through Issue #32 are closed/merged. Live truth is governed by `CURRENT-WORK.md` and `docs/STATUS_CURRENT.md`.
+
 ## 1. Frozen implementation anchors
 
 | Surface | Exact state | Interpretation |
