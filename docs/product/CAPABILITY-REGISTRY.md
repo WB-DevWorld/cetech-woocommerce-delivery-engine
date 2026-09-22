@@ -1,6 +1,8 @@
 # Product & Capability Master Registry
 
-Status: `PRODUCT-TRUTH-BASELINE-1`; owner accepted on 2026-09-19 and all 372 stable IDs are frozen. The structured source of truth is `CAPABILITY-REGISTRY.yaml`.
+Status: `PRODUCT-TRUTH-BASELINE-1`; owner accepted on 2026-09-19 and all 372 stable IDs are frozen.
+
+**Snapshot semantics:** the conformance classifications and counts in this registry describe the implementation assessment performed on 2026-09-19. Runtime implementation has advanced since then (including canonical geography/coverage, RC.12, and post-RC.12 hardening). Do not reinterpret the frozen counts as live completion percentages or silently reclassify Requirement IDs. Current execution state lives in `CURRENT-WORK.md` and `docs/STATUS_CURRENT.md`; a future explicit reassessment may update conformance while preserving IDs. The structured source of truth is `CAPABILITY-REGISTRY.yaml`.
 
 ## Counts
 
