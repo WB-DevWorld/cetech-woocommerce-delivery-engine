@@ -54,6 +54,12 @@ Last reconciled: 2026-09-22 (PR #42 MERGED onto protected `master` `d66e5e366612
 - Development identity: `1.0.0-dev.attention-count.1`
 - Schema: `6` (unchanged)
 - Requires PHP: `8.3`
+- Runtime / package-source SHA: `6e9e2ea71796170afb0508954a18d206cdc7017a`
+- Pull request: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/43
+- Runtime CI: run `35759882478` SUCCESS
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.attention-count.1.zip`
+- Bytes: `1,848,319`
+- SHA-256: `2027e5941916dff0302d7e2e545de5a2fd027f0c8f1615d97e3991dcfc5fdcb3`
 - Not merged. Not deployed. Not RC.13. Awaiting technical review. Training remains `1.0.0-dev.shipment-order-read.1`.
 - Evidence: `docs/POST-RC12-NEEDS-ATTENTION-COUNT.md`
 

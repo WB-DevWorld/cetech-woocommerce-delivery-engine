@@ -28,6 +28,10 @@ Issue `#32` — `[P2] Overview Needs Attention count omits actionable shipment/C
 - Base: protected `master` `d66e5e366612468d7e5b4874e1a4290c5d2582cc`.
 - Development identity: `1.0.0-dev.attention-count.1` (schema remains `6`).
 - Requires PHP: `8.3`. Composer: `>=8.3`. Activation guard: `8.3`.
+- Runtime / package-source SHA: `6e9e2ea71796170afb0508954a18d206cdc7017a`.
+- Pull request: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/43 (do not merge).
+- Runtime CI: `35759882478` SUCCESS.
+- ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.attention-count.1.zip` (`1,848,319` bytes, SHA-256 `2027e5941916dff0302d7e2e545de5a2fd027f0c8f1615d97e3991dcfc5fdcb3`).
 - Not RC.13. Do not merge. Do not deploy.
 
 PHP policy retained from PR #37 (`docs/PHP-RUNTIME-POLICY.md`, `docs/PHP-85-CI-REALIGNMENT.md`):

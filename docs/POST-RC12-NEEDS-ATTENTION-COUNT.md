@@ -5,6 +5,8 @@
 **Branch:** `fix/needs-attention-count-contract`  
 **Base:** protected `master` `d66e5e366612468d7e5b4874e1a4290c5d2582cc`  
 **Requires PHP:** `8.3`  
+**Runtime / package-source SHA:** `6e9e2ea71796170afb0508954a18d206cdc7017a`  
+**Pull request:** https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/43  
 **Not RC.13. Not deployed. Do not merge until owner/ChatGPT technical review.**
 
 Issue: https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/32
@@ -86,6 +88,16 @@ Count limits and page list limits stay independent. The badge is not the number 
 
 ## Package
 
-Built only after GitHub CI SUCCESS on the runtime/package-source SHA. Do not overwrite the frozen shipment-order-read ZIP. Do not treat this ZIP as RC.13.
+Built from the clean runtime/package-source SHA `6e9e2ea71796170afb0508954a18d206cdc7017a` after GitHub CI run `35759882478` SUCCESS. Do not overwrite the frozen shipment-order-read ZIP. Do not treat this ZIP as RC.13.
 
-Package identity is recorded after that CI run.
+- Filename: `cetech-woocommerce-delivery-engine-1.0.0-dev.attention-count.1.zip`
+- Bytes: `1,848,319`
+- SHA-256: `2027e5941916dff0302d7e2e545de5a2fd027f0c8f1615d97e3991dcfc5fdcb3`
+- Production-package verifier: PASS (staged build and extracted ZIP)
+- Packaged PHP lint: `497 files / 0 failures` (PHP 8.5.0, vendor excluded)
+- GitHub CI on runtime SHA: SUCCESS (`35759882478` push) — PHP 8.3 Minimum Supported, PHP 8.4 Compatibility, PHP 8.5 CETECH Production Target, PHP 8.5 MariaDB Geography/Migrations, PHP 8.5 WordPress/WooCommerce, JavaScript / Vitest, Control Plane, CI Required Gates
+- PHPUnit (local PHP 8.5.0, runtime SHA): Tests: 1403, Assertions: 8944, Deprecations: 14, Skipped: 1
+- Vitest: 101 passed / 8 files
+- Composer validate: PASS
+- Team control plane: PASS
+- Product control plane: PASS (372 Requirement IDs)
