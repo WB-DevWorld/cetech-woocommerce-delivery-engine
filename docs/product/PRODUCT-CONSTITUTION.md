@@ -109,7 +109,7 @@ The plugin uses forward, idempotent, verified migrations; non-destructive update
 
 The commercial product must use an independent direct commercial distribution, update, and licensing mechanism. WordPress.org is not a required dependency. Public repository visibility does not grant an open-source license.
 
-“CETECH WooCommerce Delivery Engine” and “CETECH Delivery Standalone” are internal/working names. The externally commercialized product must be renamed independently of CETECH before the main Stable 1.0 commercial release. CETECH is the first production Pilot customer after geo.12 technical closure and physical owner QA; that sequencing does not itself authorize a deployment.
+“CETECH WooCommerce Delivery Engine” and “CETECH Delivery Standalone” are internal/working names. The externally commercialized product must be renamed independently of CETECH before the main Stable 1.0 commercial release. CETECH remains the first production Pilot customer. The geography technical-closure/physical-QA prerequisite has since completed and RC.12 was published, but Pilot is still not started; no release or deployment is authorized merely by satisfying that prerequisite.
 
 Implemented, tested, CI-green, reviewed, owner-accepted, merged, staging-qualified, released, and production-approved are distinct states.
 
