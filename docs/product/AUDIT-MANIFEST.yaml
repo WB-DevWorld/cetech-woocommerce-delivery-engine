@@ -12,6 +12,33 @@ latest_checkpoint_at: 2026-09-19T17:25:00Z
 product_truth_checkpoint: PRODUCT-TRUTH-BASELINE-1
 stable_scope_checkpoint: STABLE-1.0-SCOPE-1
 
+manifest_semantics:
+  product_truth_ids_frozen: true
+  requirement_ids: 372
+  implementation_conformance_is_snapshot: true
+  implementation_conformance_snapshot_as_of: "2026-09-19"
+  current_runtime_status_authority:
+    - "../../CURRENT-WORK.md"
+    - "../STATUS_CURRENT.md"
+    - "../POST-RC12-REPOSITORY-TRUTH-SYNC.md"
+
+post_audit_reconciliation:
+  observed_on: "2026-09-22"
+  protected_master: "88c9ec09f3cfabf73b83780c0c37d397e9acdad6"
+  post_merge_ci: "35766468276 SUCCESS"
+  current_published_release_tag: "v1.0.0-rc.12"
+  current_published_release_source: "78594ad8962868683726373f58f4a8b1b48e4d0e"
+  current_release_schema: 6
+  issue_32: "CLOSED_COMPLETED"
+  pr_43: "MERGED"
+  training_runtime: "1.0.0-dev.attention-count.1"
+  training_schema: 6
+  training_physical_qa: "PASS"
+  rc_13: "ABSENT_NOT_AUTHORIZED"
+  pilot: "NOT_STARTED"
+  branch_retirement_evidence: "../recovery/BRANCH-RETIREMENT-2026-09-22.md"
+  note: "github_truth below is the immutable audit-time 2026-09-19 snapshot, not a live-status block."
+
 phase_gates:
   - phase: 1
     name: Product Truth Extraction
