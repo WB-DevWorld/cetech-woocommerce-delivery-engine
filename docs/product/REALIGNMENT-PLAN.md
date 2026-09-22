@@ -257,7 +257,7 @@ Complement rather than delete `docs/AUTHORITY.md`, governance, status, release a
 3. Publish the approved control-plane artifacts through their own reviewed documentation PR.
 4. In parallel, build only geo.12’s finite correction list and perform the promised final technical review.
 5. If technically clean, physically QA the exact geo.12 package and obtain explicit owner acceptance.
-6. Create a controlled CETECH production Pilot/release candidate; do not assume the name RC.12 and do not deploy without separate control.
+6. Geography closure and RC.12 publication are complete. The next production-facing step is a separately authorized CETECH Pilot when the owner opens that gate; do not infer RC.13 or deploy without separate release/deployment control.
 7. Execute Waves 1–6 through requirement-ID issues and bounded PRs after the geo.12 predecessor gate; do not run a second runtime stream concurrently with geo.12.
 8. Requalify clean install, RC.11 upgrade, compatibility, security, performance, accessibility and package integrity on the final Stable 1.0 candidate.
 9. Make an explicit Stable 1.0 go/no-go decision; do not infer it from green CI or merged code.
