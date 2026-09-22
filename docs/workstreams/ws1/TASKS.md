@@ -1,11 +1,8 @@
 # WS1 Tasks — Ben
 
-Post-RC.10 collaboration queue (starts from the protected RC.10 baseline after merge; do not implement on published RC.9 `master`):
+## Current state
+No active coding task is authorized by this file.
 
-## WS1-Q1 — Current-candidate WoodMart/customer-surface qualification
-Scope: PDP, variable/swatches, AJAX Add to Cart, mini-cart, Classic cart/checkout, Blocks customer surfaces, responsive/accessibility. Quick View/Buy Now only if enabled in target WoodMart environment.
-Output: exact tested SHA if fixes are needed; otherwise evidence-only handoff.
-Do not change core resolver/schema/security/release identity.
+Historical RC.10 qualification tasks are complete/provenance only. Future WS1 work should be opened from current protected master and may include customer-surface/browser regression, WoodMart reference certification, accessibility, or presentation work only when explicitly assigned.
 
-## WS1-Q2 — Customer-surface regression after integration
-Run focused browser regression on the final combined candidate and hand exact evidence to WS3.
+Do not reuse historical branches as current implementation bases. Do not modify RC.12 or create RC.13 without release authorization.
