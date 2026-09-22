@@ -3,10 +3,10 @@
 **Document status:** Canonical, mandatory, maintained rulebook  
 **Applies to:** All human developers, Cursor agents, AI coding agents, reviewers, and maintainers  
 **Plugin:** CETECH WooCommerce Delivery Engine  
-**Current protected runtime baseline:** `1.0.0-rc.10` (schema `5`; tag `v1.0.0-rc.10` after protected merge)  
+**Current published runtime baseline:** `1.0.0-rc.12` (schema `6`; immutable tag `v1.0.0-rc.12`) with later protected-master hardening through Issue #32.  
 **Previous protected published tag:** `1.0.0-rc.9` (schema `5`; **do not retag**)  
 **Historical qualification identity:** `1.0.0-dev.qual.1` on `batch/pre-rc10-qualification` / PR #12 remains provenance only. Do not rebuild historical `1.0.0-dev.integrated.2` or `1.0.0-dev.qual.1` ZIPs.
-**Schema target:** `5` on tagged `1.0.0-rc.10`, `1.0.0-rc.9`, `1.0.0-rc.8`, and `1.0.0-rc.7`. Tagged RC.6 remains schema `4`.  
+**Current schema:** `6` on RC.12 and current protected master. Historical RC.11/RC.10/RC.9/RC.8/RC.7 remain schema `5`; RC.6 remains schema `4`.  
 **Text domain:** `cetech-woocommerce-delivery-engine`
 
 This file is the **canonical maintained rulebook**. It consolidates hard invariants from `docs/PROJECT-GOVERNANCE.md`, `docs/PROJECT-RULES.md`, owner-accepted RC.4 behaviour, and the Stage 14A architecture decisions.
@@ -24,7 +24,7 @@ Where this rulebook and an older rules file conflict on a **hard invariant**, th
 
 ## 1. Authority and release baseline
 
-1. **RC.4 is a protected completed baseline.** Do not treat it as disposable scaffolding.
+1. **Published release candidates are immutable historical baselines.** RC.12 is current published baseline; RC.4 and earlier/later historical RC tags remain protected provenance.
 2. **Never amend or move a released tag** (`v1.0.0-rc.2`, `v1.0.0-rc.3`, `v1.0.0-rc.4`, `v1.0.0-rc.5`, `v1.0.0-rc.6`, `v1.0.0-rc.7`, `v1.0.0-rc.8`, `v1.0.0-rc.9`, `v1.0.0-rc.10`, or any later release tag).
 3. **Never silently replace a released package.** QA/release ZIPs must come from identified committed source.
 4. **New work is additive** unless an explicitly proven defect requires modification of existing behaviour.
@@ -32,7 +32,7 @@ Where this rulebook and an older rules file conflict on a **hard invariant**, th
 6. **Do not discard owner-tested behaviour** without explicit owner/authorisation.
 7. **Current implementation truth** = repository code + latest completed stage documentation. Visionary handoff sections are not proof that a feature exists.
 8. **Intended product/end-state** = latest `Delivery Shipping Plugin Up-To-Date Design and Expectations.md`. Do not implement a future vision merely because it appears there.
-9. Tagged **`1.0.0-rc.10`** is the current protected runtime/collaboration baseline (schema **`5`**). Tagged **`1.0.0-rc.9`** remains a protected historical baseline (schema **`5`**). Tagged **`1.0.0-rc.8`** remains a protected historical baseline (schema **`5`**). Tagged **`1.0.0-rc.7`** remains a protected historical baseline (schema **`5`**). Tagged **`1.0.0-rc.6`** remains a protected historical baseline (schema **`4`**). Tagged **`1.0.0-rc.5`** remains a protected historical Stage 14 baseline (schema **`4`**). Tagged **`1.0.0-rc.4`** remains a protected historical baseline (schema **`3`** at tag time). Stage 14 flags default **OFF**. Do not retag RC.9 or earlier. Do not start Stage 15 without explicit owner authorisation. Do not retag or rebuild `v1.0.0-rc.6`, `v1.0.0-rc.7`, `v1.0.0-rc.8`, `v1.0.0-rc.9`, or `v1.0.0-rc.10` after publication.
+9. Tagged **`1.0.0-rc.12`** is the current published release-candidate baseline (schema **`6`**). Current protected master may contain later reviewed post-RC.12 hardening and must not be confused with the immutable RC.12 tag source. RC.11/RC.10/RC.9/RC.8/RC.7 remain schema **`5`** historical baselines; RC.6/RC.5 remain schema **`4`** historical baselines; earlier tags remain immutable. Do not create Stage 15 or RC.13 without explicit owner authorization, and never move/rebuild a published tag/artifact.
 
 Testable: a commit that retags RC.4, changes `CETECH_DE_VERSION` without authorisation, or rewrites checkout grouping “to prepare for shipments” violates this section.
 
@@ -40,7 +40,7 @@ Testable: a commit that retags RC.4, changes `CETECH_DE_VERSION` without authori
 
 ## 2. Scope control
 
-**Stage 14 currently means:** Shipment & Tracking Operations V1 only.
+**Historical Stage 14 scope:** Shipment & Tracking Operations V1. Stage 14 is completed provenance; current work is governed by `CURRENT-WORK.md` / `docs/STATUS_CURRENT.md`.
 
 Stage 14 does **not** authorise:
 
@@ -797,7 +797,7 @@ Historical paid shipping must not be reconverted because exchange rates changed.
 
 Stage 14A currently recommends (change only through an explicit reviewed architecture decision):
 
-- schema 4 for shipment persistence (applied in source; live RC.4/FLAIROC remain schema 3 until authorised deploy)
+- historical Stage 14 introduced schema 4 shipment persistence; current RC.12/master schema is 6
 - shipment tables pin `ENGINE=InnoDB` so aggregate writes cannot silently lose transactions on a MyISAM/host-default engine
 - Delivery Engine custom tables as V1 canonical shipment repository
 - repository abstraction
