@@ -2,7 +2,7 @@
 
 Issue: #45 — Post-#32 repository truth sync and branch retirement
 
-Canonical protected `master`: `88c9ec09f3cfabf73b83780c0c37d397e9acdad6`
+Protected `master` baseline at audit start: `88c9ec09f3cfabf73b83780c0c37d397e9acdad6`. PR #46 is the documentation merge surface; its merge commit becomes the later protected-master head.
 
 This record classifies every branch visible in the repository after Issue #32 / PR #43. Classification is based on live GitHub PR state and compare evidence. No branch is treated as disposable merely because it is old.
 
