@@ -26,7 +26,7 @@ Status: RC.12 IMMUTABLE — ISSUE #32 MERGED/CLOSED — ISSUE #45 REPOSITORY/TRU
 ## Completed post-RC.12 fix
 Issue #32 — `[P2] Overview Needs Attention count omits actionable shipment/COD work`
 - PR: #43 — MERGED.
-- Merge commit / current master: `88c9ec09f3cfabf73b83780c0c37d397e9acdad6`.
+- Issue #32 merge commit / protected-master head before PR #46: `88c9ec09f3cfabf73b83780c0c37d397e9acdad6`.
 - Final PR head: `658316f775099b0dfc43205bb07c905681a4af10`.
 - Runtime/package-source SHA: `6e9e2ea71796170afb0508954a18d206cdc7017a`.
 - Development identity: `1.0.0-dev.attention-count.1`.
