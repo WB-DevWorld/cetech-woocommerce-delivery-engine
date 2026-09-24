@@ -93,29 +93,23 @@ If another authorized tester has already completed those two parts:
 
 ## Every other test must be done again by every tester
 
-Even if another tester already created:
+When you reach the functional tests, **do not assume that any Delivery Area, Delivery Option, Delivery Charge, Pickup Location, product exception, variation exception, or Site-wide Default already exists.**
 
-- a Delivery Area;
-- a Delivery Option;
-- a Delivery Charge;
-- Site-wide Defaults;
-- a Pickup Location;
-- product settings;
-- variation settings;
-- test orders;
+The first tester may need to create the minimum test setup as part of the test.
 
-you must still perform the actual test yourself.
+If a previous tester has already created that same test setup, the next tester should **reuse it instead of creating duplicates**, but must still perform the full test.
 
-You may **reuse the existing setup**, but you must repeat the test.
+Examples:
 
-For example:
-
-- If Greater Accra is already set up, use it and test it again.
-- If Standard Delivery already exists, use it and test it again.
-- If a product is already configured, use that product and test it again.
-- If another tester already placed an order, create your own fresh order when the order test requires one.
+- If there is no Greater Accra Delivery Area yet, create it as instructed in the Delivery Area test. If one was created by an earlier tester, open it and perform the full Delivery Area test with it.
+- If there is no Delivery Option yet, create one as instructed. If one already exists from this test campaign, use it and test it again.
+- If there is no Delivery Charge yet, create one as instructed. If one already exists from this test campaign, verify its settings and use it throughout the customer journey.
+- If a product has not yet been prepared for testing, configure a suitable product as instructed. If an earlier tester already prepared one, reuse it and repeat the test.
+- If another tester already placed an order, that does **not** replace your order test. Create your own fresh test order when required.
 
 A previous tester's PASS does not count as your PASS.
+
+**In short: create what the test needs if it does not exist; reuse it if an earlier tester already created it; but always perform the functional test yourself.**
 
 ---
 
@@ -165,16 +159,11 @@ These numbers describe the **original starting point**.
 
 They are **not** numbers that every tester should try to restore.
 
-After testing starts, there may already be:
+At the start of the first functional test run, these items may still be empty.
 
-- Delivery Areas;
-- Delivery Options;
-- Delivery Charges;
-- configured products;
-- test orders;
-- shipments.
+As testing continues, later testers may find that earlier testers have created some of them. That is also normal.
 
-That is normal.
+Do not assume they exist, and do not reset them just because the original clean-state values were zero.
 
 ---
 
@@ -255,6 +244,18 @@ Use the [Defect Report Template](./DEFECT-REPORT-TEMPLATE.md).
 ---
 
 # 8. Suggested order if you have limited time
+
+## Important: the functional setup may still be empty
+
+After the Baseline and Setup Guide, the Delivery Engine may still have **no Delivery Areas, no Delivery Options, no Delivery Charges, no Pickup Locations, and empty Site-wide Defaults**.
+
+That is not a problem.
+
+The first tester should create the minimum setup needed as each test instructs.
+
+Later testers should reuse that test setup and repeat the tests rather than creating duplicates.
+
+
 
 If time is short, test in this order:
 
@@ -413,19 +414,32 @@ If time permits, also find:
 
 # 12. Delivery Areas
 
-## DE-RAPID-AREA-001 — Check Greater Accra Delivery Area
+## DE-RAPID-AREA-001 — Create or test a Greater Accra Delivery Area
 
-Use the Greater Accra Delivery Area that already exists.
+First check whether a Greater Accra test Delivery Area already exists.
 
-Do not skip this test because it was created by somebody else.
+### If it does not exist
 
-Open it and check:
+Create one for this test.
+
+Configure it so that the intended Greater Accra locations can be tested, including Accra and Tema.
+
+Record the choices you make so later testers know exactly what should happen.
+
+### If an earlier tester already created it
+
+Do not create a duplicate.
+
+Open the existing test Delivery Area and perform the same checks again.
+
+### Every tester must check
 
 1. the area name;
-2. the selected coverage;
-3. Accra;
-4. Tema;
-5. one location that should not belong to this delivery area.
+2. the coverage rule;
+3. whether Accra is covered as intended;
+4. whether Tema is covered as intended;
+5. one location that should not be covered;
+6. whether the area saves correctly.
 
 If it is safe, save the form without changing the intended setup.
 
@@ -444,9 +458,11 @@ If it is safe, save the form without changing the intended setup.
 
 ---
 
-## DE-RAPID-AREA-002 — Check included and excluded places
+## DE-RAPID-AREA-002 — Test included and excluded places
 
-Use an existing Delivery Area that includes or excludes selected locations.
+If the test campaign does not yet have an Area that uses selected locations or exclusions, create a simple test case now.
+
+If an earlier tester already created one, reuse it.
 
 Test one place that should be included and one that should be excluded.
 
@@ -464,13 +480,25 @@ The plugin follows the rule exactly.
 
 # 13. Delivery Options
 
-## DE-RAPID-OPTION-001 — Check a Delivery Option
+## DE-RAPID-OPTION-001 — Create or test a Delivery Option
 
-Open the Delivery Option being used for this test, for example:
+First check whether a suitable Delivery Option has already been created for this test campaign.
 
-**Standard Delivery**
+### If none exists
 
-Check:
+Create one.
+
+Use a clear customer-facing name, for example **Standard Delivery**, and enter a simple delivery-time/ETA value that can be checked later.
+
+Write down exactly what you entered.
+
+### If an earlier tester already created one
+
+Do not create a duplicate.
+
+Open that option and test it again.
+
+### Every tester must check
 
 - its public name;
 - whether it is enabled;
@@ -493,11 +521,23 @@ Do not leave the option disabled if you temporarily test disabling it.
 
 # 14. Delivery Charges
 
-## DE-RAPID-CHARGE-001 — Check the delivery price
+## DE-RAPID-CHARGE-001 — Create or test a Delivery Charge
 
-Open the Delivery Charge being used for this test.
+First check whether a Delivery Charge has already been created for the Delivery Area and Delivery Option used in this test.
 
-Write down:
+### If none exists
+
+Create one.
+
+Choose a clear test amount and write it down. The exact value is less important than being able to prove that the same value reaches the product page, cart, and checkout.
+
+### If an earlier tester already created one
+
+Do not create a duplicate.
+
+Open it, record its current amount, and use that amount as the expected value for your test.
+
+### Every tester must write down
 
 - Delivery Area;
 - Delivery Option;
@@ -526,15 +566,23 @@ A missing amount must not be treated as free delivery.
 
 # 15. Site-wide Defaults
 
-## DE-RAPID-DEFAULT-001 — Check the main/default settings
+## DE-RAPID-DEFAULT-001 — Create or test the Site-wide Defaults
 
 Open Site-wide Defaults.
 
-Use the current shared test setup.
+### If they are still empty
 
-Do not change the shared settings merely to make your test different.
+Enter the minimum settings needed for the rapid test and record what you entered.
 
-### Check
+Do not try to configure every possible field today.
+
+### If an earlier tester has already entered the test defaults
+
+Do not replace them merely to make your test different.
+
+Inspect them and use them for the inheritance tests that follow.
+
+### Every tester must check
 
 - the settings are understandable;
 - a normal product can use the default settings;
@@ -558,9 +606,19 @@ A product or variation should only replace the specific setting that was changed
 
 # 16. Simple product test
 
-## DE-RAPID-PRODUCT-001 — Check one simple product
+## DE-RAPID-PRODUCT-001 — Prepare and test one simple product
 
-Use the nominated simple test product.
+Choose a suitable simple WooCommerce product.
+
+If the test coordinator has already named a test product, use that one.
+
+### If the product has not yet been prepared for Delivery Engine testing
+
+Configure the minimum delivery settings needed for the test, preferably using Site-wide Defaults unless this test specifically needs a product-level change.
+
+### If an earlier tester already prepared the product
+
+Reuse it, but still perform the full test.
 
 Record:
 
@@ -589,11 +647,17 @@ If the product changes only one delivery setting, unrelated settings should stil
 
 # 17. Variable product test
 
-## DE-RAPID-VARIATION-001 — Check two variations
+## DE-RAPID-VARIATION-001 — Prepare and test two variations
 
-Use the nominated variable product.
+Choose a suitable variable WooCommerce product.
 
-Test at least two variations.
+If the test coordinator has already named one, use it.
+
+If no useful variation-level test setup exists yet, create one small, clear variation override so the behavior can be checked.
+
+If an earlier tester already prepared the variable product, reuse it.
+
+Every tester must test at least two variations.
 
 ### Steps
 
@@ -621,7 +685,7 @@ Information from the previous variation must not remain by mistake.
 
 ## DE-RAPID-PDP-001 — Test delivery on a product page
 
-Open the nominated simple product as a customer.
+Open the simple product you used in the earlier product test as a customer.
 
 ### Steps
 
@@ -795,9 +859,18 @@ There should not be duplicate delivery charges or duplicate shipping summaries.
 
 # 23. Pickup test
 
-## DE-RAPID-PICKUP-001 — Test Store Pickup
+## DE-RAPID-PICKUP-001 — Create or test Store Pickup
 
-Use the nominated pickup-enabled product.
+First check whether the rapid-test setup already includes:
+
+- a Pickup Location; and
+- a product that is allowed to use Store Pickup.
+
+If either one does not exist, create the minimum test setup needed.
+
+If an earlier tester already created them, reuse them.
+
+Every tester must still perform the customer pickup flow.
 
 ### Steps
 
@@ -827,7 +900,9 @@ Use the nominated pickup-enabled product.
 
 ## DE-RAPID-FAIL-001 — Try a location that should not be supported
 
-Use the nominated unsupported location.
+Choose a location that is clearly outside the Delivery Area you created or tested earlier.
+
+If the test coordinator has already named an unsupported test location, use that one.
 
 Do not damage or delete the working Delivery Area to create this test.
 
@@ -851,9 +926,11 @@ If the plugin cannot find a valid delivery price but quietly gives the customer 
 
 ## DE-RAPID-FAIL-002 — Test a product with no valid delivery price
 
-Use the nominated intentionally unconfigured product or another approved test case that has no valid delivery price.
+Choose or prepare a safe test case that has no valid delivery price.
 
-Do not delete a working Delivery Charge to create the test.
+For example, use a product or destination that has deliberately not been covered by the test configuration.
+
+Do not delete a working Delivery Charge or damage the shared working setup just to create this condition.
 
 ### Expected
 
