@@ -1,70 +1,152 @@
-# Delivery Engine Testing
+# Delivery Engine Rapid Test Guide
 
-## Rapid Test Pack v0.1 — 24 September 2026
+**For testing on 24 September 2026**
 
-**Purpose:** time-boxed physical QA for the CETECH WooCommerce Delivery Engine before broader testing begins.
+This guide is for staff testers. You do **not** need to understand how the Delivery Engine is built internally.
 
-**Primary release under test:** `1.0.0-rc.12`  
-**Schema:** `6`  
-**Release source:** `78594ad8962868683726373f58f4a8b1b48e4d0e`  
-**Target:** find release-blocking defects quickly, validate the most important staff/customer journeys, and collect reproducible evidence.
+Your job is simple:
 
-This page is the **single tester entry point**. Testers should work from this page rather than inventing their own configuration or test order.
+> Use the plugin like a normal staff member and customer, check that it behaves correctly, and report anything that does not work.
 
----
-
-# 1. Critical rule: what may be skipped and what must be repeated
-
-## Baseline and Setup Guide only
-
-The **Baseline** and **Setup Guide** sections are the only sections that may be treated as already completed.
-
-If those were already completed by the main tester or another authorized tester:
-
-- do **not** reset the plugin;
-- do **not** delete configuration just to reproduce a clean state;
-- do **not** re-run a setup wizard merely to make the test look fresh;
-- confirm the current state is consistent with the recorded baseline/setup outcome;
-- record **CONFIRMED — PREVIOUSLY COMPLETED** or **CONFIRMED — CURRENT STATE**;
-- continue immediately to the functional tests.
-
-## Every functional test after Baseline / Setup Guide must be run by every tester
-
-An existing Delivery Option, Delivery Area, Delivery Charge, product exception, pickup location, order, or other configuration is **not a reason to skip a functional test**.
-
-Later testers should use the existing configuration as test data and execute the test again.
-
-Examples:
-
-- If **Greater Accra** already exists, do not skip the Delivery Area tests. Open it, exercise the relevant controls, and test its storefront behavior again.
-- If **Standard Delivery** already exists, do not skip Delivery Option tests. Verify it, use it in a quote, cart, and checkout again.
-- If a simple or variable product was already configured, use it and repeat the customer journey.
-- If a previous tester already placed an order, place another test order when the case requires an order. A previous PASS is evidence, not a substitute for your test.
-
-**Only Baseline and Setup Guide can be confirmation-only. Everything else is repeatable physical QA.**
+**Plugin version being tested:** `1.0.0-rc.12`  
+**Database/schema version:** `6`
 
 ---
 
-# 2. Do not alter these campaign assumptions
+# Table of Contents
 
-## Ghana Location Pack
+1. [Read this first](#1-read-this-first)
+2. [What can be skipped and what must be tested again](#2-what-can-be-skipped-and-what-must-be-tested-again)
+3. [Important Ghana Location Pack instruction](#3-important-ghana-location-pack-instruction)
+4. [What the original clean starting point was](#4-what-the-original-clean-starting-point-was)
+5. [Before you begin](#5-before-you-begin)
+6. [How to record results](#6-how-to-record-results)
+7. [What to do when something fails](#7-what-to-do-when-something-fails)
+8. [Suggested order if you have limited time](#8-suggested-order-if-you-have-limited-time)
+9. [Baseline checks](#9-baseline-checks)
+10. [Setup Guide check](#10-setup-guide-check)
+11. [Ghana locations](#11-ghana-locations)
+12. [Delivery Areas](#12-delivery-areas)
+13. [Delivery Options](#13-delivery-options)
+14. [Delivery Charges](#14-delivery-charges)
+15. [Site-wide Defaults](#15-site-wide-defaults)
+16. [Simple product test](#16-simple-product-test)
+17. [Variable product test](#17-variable-product-test)
+18. [Product page customer test](#18-product-page-customer-test)
+19. [Cart test](#19-cart-test)
+20. [Checkout test](#20-checkout-test)
+21. [Place a fresh test order](#21-place-a-fresh-test-order)
+22. [Check the completed order](#22-check-the-completed-order)
+23. [Pickup test](#23-pickup-test)
+24. [Unsupported location test](#24-unsupported-location-test)
+25. [Missing delivery price test](#25-missing-delivery-price-test)
+26. [Shipment check](#26-shipment-check)
+27. [Needs Attention check](#27-needs-attention-check)
+28. [Mobile and WoodMart check](#28-mobile-and-woodmart-check)
+29. [Error and log check](#29-error-and-log-check)
+30. [Optional tests if there is time](#30-optional-tests-if-there-is-time)
+31. [What not to spend time on today](#31-what-not-to-spend-time-on-today)
+32. [Final tester sign-off](#32-final-tester-sign-off)
+33. [Defect and test report templates](#33-defect-and-test-report-templates)
 
-The Ghana Location Pack is already installed and is expected to be **Ready**.
+---
 
-**DO NOT DOWNLOAD OR REINSTALL THE GHANA LOCATION PACK.**
+# 1. Read this first
 
-If Ghana is unexpectedly missing, Failed, or not Ready:
+This is a **rapid real-world test**.
+
+It is not meant to test every feature in the Delivery Engine.
+
+We mainly want to know:
+
+- Can staff understand and use the plugin?
+- Can staff create and manage delivery settings?
+- Do Ghana locations work correctly?
+- Can a customer select a delivery option?
+- Does the customer see the correct delivery price and delivery time?
+- Does the delivery choice stay correct in the cart and checkout?
+- Does WooCommerce charge the correct delivery amount?
+- Does the completed order keep the correct delivery information?
+- Does pickup work?
+- Does the plugin refuse invalid or unsupported delivery instead of accidentally giving free delivery?
+- Does anything crash, show an error, or expose private internal information?
+
+---
+
+# 2. What can be skipped and what must be tested again
+
+This is very important.
+
+## Only these two parts may be treated as already completed
+
+1. **Baseline checks**
+2. **Setup Guide**
+
+If another authorized tester has already completed those two parts:
+
+- do not reset the plugin;
+- do not delete their setup;
+- do not restart the Setup Guide;
+- simply confirm that the current state looks correct;
+- write **CONFIRMED — ALREADY COMPLETED**;
+- continue to the next test.
+
+## Every other test must be done again by every tester
+
+Even if another tester already created:
+
+- a Delivery Area;
+- a Delivery Option;
+- a Delivery Charge;
+- Site-wide Defaults;
+- a Pickup Location;
+- product settings;
+- variation settings;
+- test orders;
+
+you must still perform the actual test yourself.
+
+You may **reuse the existing setup**, but you must repeat the test.
+
+For example:
+
+- If Greater Accra is already set up, use it and test it again.
+- If Standard Delivery already exists, use it and test it again.
+- If a product is already configured, use that product and test it again.
+- If another tester already placed an order, create your own fresh order when the order test requires one.
+
+A previous tester's PASS does not count as your PASS.
+
+---
+
+# 3. Important Ghana Location Pack instruction
+
+## DO NOT DOWNLOAD GHANA AGAIN
+
+The Ghana Location Pack is already installed.
+
+It should show:
+
+**Ready**
+
+If it is already Ready, leave it alone.
+
+If Ghana is missing, Failed, or does not show Ready:
 
 1. take a screenshot;
-2. record the exact status;
-3. mark affected tests **BLOCKED**;
-4. do not reinstall it unless separately instructed.
+2. record what you see;
+3. mark the test **BLOCKED**;
+4. tell the test coordinator.
 
-## Initial clean-slate campaign baseline
+Do not download or reinstall Ghana unless you are specifically instructed to do so.
 
-The campaign was originally reset to approximately:
+---
 
-| Item | Initial campaign baseline |
+# 4. What the original clean starting point was
+
+Before this test campaign started, the Delivery Engine was reset to approximately:
+
+| Item | Original clean state |
 | --- | --- |
 | Ghana Location Pack | Ready |
 | Delivery Options | 0 |
@@ -74,153 +156,149 @@ The campaign was originally reset to approximately:
 | Product / Variation Exceptions | 0 |
 | Shipments | 0 |
 | Bulk history | 0 |
-| Site-wide configuration | Empty |
-| Needs Attention | May be high because products genuinely have no delivery configuration |
+| Site-wide delivery settings | Empty |
+| Needs Attention | High because many products had no delivery setup |
 
-A previously observed clean-state Needs Attention catalog count was around **75**.
+At one point the Needs Attention count was about **75**.
 
-These are the **initial campaign baseline facts**, not values that every later tester must restore.
+These numbers describe the **original starting point**.
 
-If previous testing has already created configuration, later testers should expect counts to have changed.
+They are **not** numbers that every tester should try to restore.
+
+After testing starts, there may already be:
+
+- Delivery Areas;
+- Delivery Options;
+- Delivery Charges;
+- configured products;
+- test orders;
+- shipments.
+
+That is normal.
 
 ---
 
-# 3. Tester information
+# 5. Before you begin
 
-Fill this before starting.
+Fill this in:
 
-| Field | Tester fills |
+| Information | Tester fills |
 | --- | --- |
 | Tester name | |
-| Date | 24 September 2026 |
+| Test date | 24 September 2026 |
 | Start time | |
 | Finish time | |
-| Site URL | |
+| Website being tested | |
 | WordPress user / role | |
 | Browser | |
 | Device | |
 | Plugin version shown | |
-| Schema shown, if visible | |
-| Test run ID | e.g. RAPID-20260924-JD-01 |
+| Test Run ID | Example: RAPID-JANE-01 |
+
+Use a fresh browser session where practical.
+
+For customer tests, use a normal customer/guest view where the test requires it.
 
 ---
 
-# 4. Result and severity vocabulary
+# 6. How to record results
 
-Use only these test results:
+For every test, use one of these:
 
-- **PASS**
-- **FAIL**
-- **BLOCKED**
-- **NOT TESTED**
-- **CONFIRMED — PREVIOUSLY COMPLETED** — Baseline / Setup Guide only
-- **CONFIRMED — CURRENT STATE** — Baseline / Setup Guide only
+- **PASS** — it worked correctly.
+- **FAIL** — it did not work correctly.
+- **BLOCKED** — you could not complete the test because something else prevented it.
+- **NOT TESTED** — you ran out of time or did not perform it.
 
-Severity for failures:
+For the **Baseline** and **Setup Guide only**, you may also use:
 
-- **P0 / Critical** — fatal error, checkout impossible, wrong money charged, data corruption, silent free delivery from missing configuration, serious privacy/security exposure.
-- **P1 / Major** — core workflow fails, wrong eligibility, wrong delivery option/price/ETA, cart/checkout state lost, shipment/order result materially wrong.
-- **P2 / Moderate** — meaningful UX/operational defect with workaround.
-- **P3 / Minor** — cosmetic, wording, alignment, low-risk usability defect.
+- **CONFIRMED — ALREADY COMPLETED**
+
+Do not use PASS for something you did not actually test.
+
+## How serious is the problem?
+
+Use:
+
+- **Critical** — checkout cannot work, wrong money is charged, the site crashes, free delivery appears by mistake, data is lost, or private information is exposed.
+- **Major** — an important delivery feature gives the wrong result or cannot be used.
+- **Moderate** — a real problem exists, but there is a reasonable workaround.
+- **Minor** — wording, spacing, layout, small usability issue, or other low-risk problem.
 
 ---
 
-# 5. Evidence rule
+# 7. What to do when something fails
 
-When something fails, capture evidence **before changing the state again**:
+Before changing anything, record:
 
-1. exact page / URL;
-2. tester user/role;
-3. product and product ID/SKU;
-4. variation if applicable;
-5. selected Country / Region / Locality / Postcode;
-6. Delivery Option;
-7. quantity;
-8. configured Delivery Charge if relevant;
-9. exact action performed;
-10. expected result;
-11. actual result;
-12. screenshot or short video;
-13. time of failure;
-14. cart/order/shipment ID if one exists;
-15. whether the failure reproduces.
+1. the page you were on;
+2. the product;
+3. the variation if there was one;
+4. the location you selected;
+5. the Delivery Option;
+6. the quantity;
+7. what you clicked;
+8. what you expected;
+9. what actually happened;
+10. a screenshot or short video;
+11. the time;
+12. the order or shipment number if one exists.
 
-Do not report only: **"delivery is not working."**
+Then try the same steps once more if it is safe to do so.
+
+Do not report only:
+
+> Delivery is not working.
 
 Use the [Defect Report Template](./DEFECT-REPORT-TEMPLATE.md).
 
 ---
 
-# 6. Standard campaign test data
+# 8. Suggested order if you have limited time
 
-The first tester or test coordinator should fill these once. Later testers should reuse them unless a case explicitly requires different data.
+If time is short, test in this order:
 
-| Purpose | Product / ID / SKU |
-| --- | --- |
-| Simple In-Store product | |
-| Simple In-Warehouse product | |
-| Variable product | |
-| International product | |
-| Pickup-enabled product | |
-| Product with product override | |
-| Variation with variation override | |
-| Intentionally unconfigured product | |
-| Multi-quantity product | |
-| Multi-destination product A | |
-| Multi-destination product B | |
-
-Standard geography:
-
-- Ghana → Greater Accra → Accra
-- Ghana → Greater Accra → Tema
-- Ghana → Greater Accra → one other locality
-- Ghana → Ashanti → Kumasi
-- one deliberately unsupported destination
-
-Do not create random alternatives when the campaign already has nominated test data.
-
----
-
-# 7. Time-boxed order for today's rapid pass
-
-If there is limited time, execute in this order:
-
-| Priority | Area |
-| --- | --- |
-| 1 | Baseline / Setup Guide confirmation |
-| 2 | Location Pack and geography |
+| Order | Test |
+| ---: | --- |
+| 1 | Baseline and Setup Guide confirmation |
+| 2 | Ghana locations |
 | 3 | Delivery Area |
 | 4 | Delivery Option |
 | 5 | Delivery Charge |
-| 6 | Site-wide Defaults / inheritance |
-| 7 | Simple product storefront |
+| 6 | Site-wide Defaults |
+| 7 | Simple product |
 | 8 | Variable product |
-| 9 | Cart persistence / revalidation |
-| 10 | Classic checkout / genuine WooCommerce shipping |
-| 11 | Order snapshot / customer presentation |
-| 12 | Pickup |
-| 13 | Unsupported / missing-rate fail-closed |
-| 14 | Shipment sanity |
-| 15 | Needs Attention |
-| 16 | Mobile / WoodMart visual sanity |
-| 17 | Logs and sign-off |
+| 9 | Product page customer journey |
+| 10 | Cart |
+| 11 | Checkout |
+| 12 | Fresh test order |
+| 13 | Order information |
+| 14 | Pickup |
+| 15 | Unsupported location |
+| 16 | Missing delivery price |
+| 17 | Shipment |
+| 18 | Needs Attention |
+| 19 | Mobile / WoodMart |
+| 20 | Errors and logs |
 
-If the tester cannot complete all cases before the deadline, mark the remainder **NOT TESTED**. Do not convert untested cases into PASS.
+If you run out of time, mark the remaining tests **NOT TESTED**.
 
 ---
 
-# 8. BASELINE — confirmation-only allowed
+# 9. Baseline checks
 
-## DE-RAPID-BASE-001 — Release identity
+## DE-RAPID-BASE-001 — Check the plugin version
 
-Confirm the installed test target.
+Open the Delivery Engine and confirm the installed version.
 
-**Expected**
+### Expected
 
-- Version: `1.0.0-rc.12`
-- Schema: `6`, where visible/applicable
+- Plugin version: **1.0.0-rc.12**
+- Schema: **6**, if the screen shows it
 
-If a different build is installed, record the exact build and notify the test coordinator before treating version-specific differences as defects.
+If you see another version, record exactly what you see.
+
+### Result
 
 **Result:**  
 **Evidence:**  
@@ -228,33 +306,19 @@ If a different build is installed, record the exact build and notify the test co
 
 ---
 
-## DE-RAPID-BASE-002 — Initial reset history / current campaign state
+## DE-RAPID-BASE-002 — Check the current starting state
 
-If the clean reset was already confirmed by an authorized tester, do not reset again.
+If another tester already confirmed the original clean baseline, do not reset anything.
 
-Confirm only that the current configuration state is plausible given testing already performed.
+Simply check that the current setup makes sense based on testing that has already happened.
 
-The original clean campaign state was the table in Section 2.
+### Important
 
-**PASS / confirmation means:** no unexplained configuration appears and current counts can be explained by prior campaign work.
+Do not fail this test just because Delivery Options, Areas, Charges, or products are no longer zero.
 
-**Do not fail** merely because Delivery Options / Areas / Charges are no longer zero after testing has begun.
+That is expected once testing has begun.
 
-**Result:**  
-**Evidence:**  
-**Notes:**
-
----
-
-## DE-RAPID-BASE-003 — Ghana Location Pack
-
-Open Location Packs.
-
-**Expected:** Ghana is **Ready**.
-
-Confirm that Greater Accra can be found.
-
-**Do not download Ghana again.**
+### Result
 
 **Result:**  
 **Evidence:**  
@@ -262,60 +326,50 @@ Confirm that Greater Accra can be found.
 
 ---
 
-# 9. SETUP GUIDE — confirmation-only allowed
+## DE-RAPID-BASE-003 — Check Ghana Location Pack
 
-## DE-RAPID-SETUP-001 — Setup Guide state
+Open the Location Packs area.
 
-If the Setup Guide has already been completed:
+Find Ghana.
 
-- confirm its completed/appropriate state;
+### Expected
+
+Ghana shows:
+
+**Ready**
+
+Do not download it again.
+
+### Result
+
+**Result:**  
+**Evidence:**  
+**Notes:**
+
+---
+
+# 10. Setup Guide check
+
+## DE-RAPID-SETUP-001 — Setup Guide
+
+If another authorized tester has already completed the Setup Guide:
+
 - do not restart it;
-- do not wipe configuration;
-- record **CONFIRMED — PREVIOUSLY COMPLETED**;
-- move on.
+- do not reset anything;
+- confirm that it appears completed or no longer requires action;
+- record **CONFIRMED — ALREADY COMPLETED**.
 
-If it has not been completed, follow the visible Setup Guide normally and record anything confusing, contradictory, inaccessible, or broken.
+If it has not been completed, follow it normally.
 
-**Result:**  
-**Evidence:**  
-**Notes:**
+### Report a problem if
 
----
+- the instructions are confusing;
+- the guide sends you to the wrong place;
+- a required button does not work;
+- the guide asks you to repeat something that is already complete;
+- the guide cannot be completed.
 
-# 10. FUNCTIONAL TESTS — every tester must repeat these
-
-From this point onward, **no test may be skipped merely because another tester already passed it or because the configuration already exists.**
-
-Existing objects should normally be reused as controlled fixtures.
-
----
-
-## DE-RAPID-GEO-001 — Geography hierarchy
-
-Open the relevant geography/location controls.
-
-Confirm the tester can navigate/search:
-
-1. Ghana
-2. Greater Accra
-3. Accra
-4. Tema
-
-Also confirm Ashanti → Kumasi if time permits.
-
-**Expected**
-
-- hierarchy is sensible;
-- locations are discoverable;
-- no obvious duplicate Greater Accra hierarchy;
-- no confusing internal identifiers are required from ordinary staff.
-
-**FAIL if**
-
-- valid locality cannot be found;
-- locality is under the wrong region;
-- duplicate/ambiguous canonical records prevent normal use;
-- internal IDs are exposed as normal customer/staff labels.
+### Result
 
 **Result:**  
 **Evidence:**  
@@ -323,41 +377,33 @@ Also confirm Ashanti → Kumasi if time permits.
 
 ---
 
-## DE-RAPID-AREA-001 — Delivery Area administration
+# 11. Ghana locations
 
-Use the existing Greater Accra Delivery Area if already created.
+## DE-RAPID-GEO-001 — Check important Ghana locations
 
-Do **not** mark PASS because it exists.
+Open the location controls.
 
-Exercise the area:
+Find:
 
-1. open it;
-2. confirm its coverage mode and selected geography;
-3. save a harmless/no-op confirmation if the UI supports it safely;
-4. confirm Accra coverage;
-5. confirm Tema coverage;
-6. confirm one locality that should not match does not accidentally match.
+- Ghana
+- Greater Accra
+- Accra
+- Tema
 
-If the campaign specifically requires a create test and no safe temporary QA area exists, create a clearly named temporary QA area and remove it after evidence is captured.
+If time permits, also find:
 
-**Expected**
+- Ashanti
+- Kumasi
 
-- area remains valid after save;
-- intended descendants are available;
-- include/exclude semantics are understandable;
-- unsupported geography does not silently match.
+### Expected
 
-**Result:**  
-**Evidence:**  
-**Notes:**
+- Accra appears under the correct Ghana geography.
+- Tema appears under the correct Ghana geography.
+- Kumasi appears under Ashanti.
+- You can find the locations without knowing internal database numbers.
+- There should not be confusing duplicate locations that make normal selection impossible.
 
----
-
-## DE-RAPID-AREA-002 — Include / exclude behavior
-
-Using the campaign Delivery Area, exercise one configured include/exclude or Entire Area / Selected Locations / Entire Area Except behavior.
-
-**Expected:** effective coverage matches what staff configured.
+### Result
 
 **Result:**  
 **Evidence:**  
@@ -365,23 +411,79 @@ Using the campaign Delivery Area, exercise one configured include/exclude or Ent
 
 ---
 
-## DE-RAPID-OPTION-001 — Delivery Option
+# 12. Delivery Areas
 
-Open the campaign Delivery Option, such as Standard Delivery.
+## DE-RAPID-AREA-001 — Check Greater Accra Delivery Area
 
-Every tester must verify it again.
+Use the Greater Accra Delivery Area that already exists.
+
+Do not skip this test because it was created by somebody else.
+
+Open it and check:
+
+1. the area name;
+2. the selected coverage;
+3. Accra;
+4. Tema;
+5. one location that should not belong to this delivery area.
+
+If it is safe, save the form without changing the intended setup.
+
+### Expected
+
+- The correct places are covered.
+- A place that should not be covered does not accidentally match.
+- The area saves correctly.
+- The screen is understandable to normal staff.
+
+### Result
+
+**Result:**  
+**Evidence:**  
+**Notes:**
+
+---
+
+## DE-RAPID-AREA-002 — Check included and excluded places
+
+Use an existing Delivery Area that includes or excludes selected locations.
+
+Test one place that should be included and one that should be excluded.
+
+### Expected
+
+The plugin follows the rule exactly.
+
+### Result
+
+**Result:**  
+**Evidence:**  
+**Notes:**
+
+---
+
+# 13. Delivery Options
+
+## DE-RAPID-OPTION-001 — Check a Delivery Option
+
+Open the Delivery Option being used for this test, for example:
+
+**Standard Delivery**
 
 Check:
 
-- public name;
-- enabled state;
-- ETA/timeframe configuration;
-- public presentation;
-- disable/enable behavior only if doing so will not disrupt another tester.
+- its public name;
+- whether it is enabled;
+- its delivery time/ETA settings;
+- how it appears to the customer.
 
-Do not leave the option disabled.
+### Expected
 
-**Expected:** the option is usable, clearly named, and customer-safe.
+The name and delivery time are understandable to customers.
+
+Do not leave the option disabled if you temporarily test disabling it.
+
+### Result
 
 **Result:**  
 **Evidence:**  
@@ -389,56 +491,64 @@ Do not leave the option disabled.
 
 ---
 
-## DE-RAPID-RATE-001 — Delivery Charge
+# 14. Delivery Charges
 
-Open the campaign Delivery Charge / Rate Card.
+## DE-RAPID-CHARGE-001 — Check the delivery price
 
-Record:
+Open the Delivery Charge being used for this test.
 
-- area;
+Write down:
+
+- Delivery Area;
 - Delivery Option;
 - currency;
-- configured amount.
+- amount.
 
-Then use that same configuration in storefront/cart/checkout later.
+You will compare this amount with the product page, cart, and checkout later.
 
-**Expected:** configured value saves and is not confused with missing configuration.
+### Expected
 
-**Configured expected amount:**  
+The saved amount is correct.
+
+A real zero amount must mean zero/free where intentionally configured.
+
+A missing amount must not be treated as free delivery.
+
+**Expected delivery charge:**  
+
+### Result
+
 **Result:**  
 **Evidence:**  
 **Notes:**
 
 ---
 
-## DE-RAPID-DEFAULT-001 — Site-wide Defaults
+# 15. Site-wide Defaults
+
+## DE-RAPID-DEFAULT-001 — Check the main/default settings
 
 Open Site-wide Defaults.
 
-Every tester should inspect the active global configuration and confirm that a normal inheriting product receives the intended values.
+Use the current shared test setup.
 
-Do not overwrite the shared campaign defaults simply to create a unique tester state.
+Do not change the shared settings merely to make your test different.
 
-**Expected:** effective configuration follows the current inheritance model and is understandable to staff.
+### Check
 
-**Result:**  
-**Evidence:**  
-**Notes:**
+- the settings are understandable;
+- a normal product can use the default settings;
+- a product only needs special settings when it is genuinely different.
 
----
+### Expected
 
-## DE-RAPID-INHERIT-001 — GLOBAL → PRODUCT
+The normal rule should behave like:
 
-Use the nominated simple product.
+**Site-wide settings → product changes → variation changes**
 
-1. open the product delivery settings;
-2. identify inherited values;
-3. identify any product override;
-4. save only if necessary;
-5. open the storefront product page;
-6. verify the effective behavior.
+A product or variation should only replace the specific setting that was changed.
 
-**Expected:** product inheritance is correct and no unrelated inherited field disappears because one field is overridden.
+### Result
 
 **Result:**  
 **Evidence:**  
@@ -446,125 +556,30 @@ Use the nominated simple product.
 
 ---
 
-## DE-RAPID-INHERIT-002 — PRODUCT → VARIATION
+# 16. Simple product test
 
-Use the nominated variable product and variation.
+## DE-RAPID-PRODUCT-001 — Check one simple product
 
-1. select the parent product;
-2. inspect the variation;
-3. identify the variation override;
-4. view that variation on the storefront;
-5. switch to another variation;
-6. switch back.
-
-**Expected**
-
-- variation-specific delivery state is correct;
-- no stale price/ETA/location/eligibility leaks from the previous variation;
-- parent values continue to inherit where not overridden.
-
-**Result:**  
-**Evidence:**  
-**Notes:**
-
----
-
-## DE-RAPID-PDP-001 — Simple product customer journey
-
-Open the nominated simple product as a customer.
-
-1. select Ghana;
-2. select Greater Accra;
-3. select Accra;
-4. select the configured Delivery Option;
-5. note the delivery fee;
-6. note the ETA;
-7. change to Tema and observe recalculation;
-8. return to the intended destination;
-9. add to cart.
-
-**Expected**
-
-- correct option;
-- correct authoritative delivery fee;
-- configured/current ETA;
-- Add to Cart succeeds;
-- customer does not see supplier/origin/internal logistics IDs, priorities, rate-card internals, or other private data.
-
-**Result:**  
-**Evidence:**  
-**Notes:**
-
----
-
-## DE-RAPID-PDP-002 — Variable product recalculation
-
-Use the nominated variable product.
-
-Repeat destination selection and switch between at least two variations.
-
-**Expected:** eligibility, fee and ETA reflect the currently selected variation.
-
-**FAIL if:** stale data from another variation remains authoritative.
-
-**Result:**  
-**Evidence:**  
-**Notes:**
-
----
-
-## DE-RAPID-CART-001 — Cart persistence
-
-Using a fresh cart created by this tester:
-
-1. add the configured product;
-2. open cart;
-3. navigate to another page;
-4. return to cart;
-5. refresh;
-6. change quantity if safe;
-7. proceed toward checkout.
-
-**Expected**
-
-- the selected delivery context persists where valid;
-- changed quantity/state is revalidated;
-- stale invalid configuration is not blindly trusted.
-
-**Result:**  
-**Evidence:**  
-**Notes:**
-
----
-
-## DE-RAPID-CHECKOUT-001 — Genuine WooCommerce shipping
-
-Proceed through Classic checkout if available.
-
-Enter a complete test shipping address corresponding to the selected destination.
-
-Compare:
-
-- configured Delivery Charge;
-- product-page delivery fee;
-- cart shipping;
-- checkout shipping.
-
-**Expected:** the amounts agree unless a documented rule legitimately changes the quote.
-
-The Delivery Engine charge must appear as a **genuine WooCommerce shipping charge**, not:
-
-- a merchandise-price mutation;
-- a hidden product add-on;
-- a duplicate fee;
-- an unexplained zero.
+Use the nominated simple test product.
 
 Record:
 
-**Configured charge:**  
-**PDP charge:**  
-**Cart shipping:**  
-**Checkout shipping:**
+**Product name:**  
+**Product ID/SKU:**
+
+Open its Delivery Engine settings.
+
+Check whether it uses the Site-wide Defaults or has its own changes.
+
+Then open the same product on the customer-facing website.
+
+### Expected
+
+The product receives the correct delivery setup.
+
+If the product changes only one delivery setting, unrelated settings should still come from the Site-wide Defaults.
+
+### Result
 
 **Result:**  
 **Evidence:**  
@@ -572,45 +587,205 @@ Record:
 
 ---
 
-## DE-RAPID-CHECKOUT-002 — Complete a test order
+# 17. Variable product test
 
-Complete a fresh test order for this tester using an authorized safe payment method.
+## DE-RAPID-VARIATION-001 — Check two variations
 
-COD is acceptable for rapid Delivery Engine testing.
+Use the nominated variable product.
 
-Paystack test mode may be used only if the test coordinator intends to exercise the Delivery Engine through Paystack; do not spend the rapid window reconfiguring payment gateways.
+Test at least two variations.
 
-Record the **new order ID**.
+### Steps
 
-**Expected:** checkout completes without Delivery Engine fatal/error and the shipping amount is correct.
+1. Choose variation A.
+2. Check its delivery option, price, and ETA.
+3. Change to variation B.
+4. Check the delivery information again.
+5. Change back to variation A.
 
-**Order ID:**  
+### Expected
+
+The delivery result follows the currently selected variation.
+
+Information from the previous variation must not remain by mistake.
+
+### Result
+
 **Result:**  
 **Evidence:**  
 **Notes:**
 
 ---
 
-## DE-RAPID-ORDER-001 — Order snapshot / purchase-time facts
+# 18. Product page customer test
 
-Open the order created by this tester.
+## DE-RAPID-PDP-001 — Test delivery on a product page
 
-Verify:
+Open the nominated simple product as a customer.
+
+### Steps
+
+1. Select **Ghana**.
+2. Select **Greater Accra**.
+3. Select **Accra**.
+4. Select the test Delivery Option.
+5. Write down the delivery price.
+6. Write down the estimated delivery time.
+7. Change the location to **Tema**.
+8. Confirm the delivery information updates.
+9. Return to the intended location.
+10. Add the product to cart.
+
+### Expected
+
+The customer sees:
+
+- the correct Delivery Option;
+- the correct delivery price;
+- a clear delivery time/ETA;
+- a working Add to Cart button.
+
+### The customer must NOT see internal information such as
+
+- supplier name;
+- internal warehouse/origin details;
+- internal logistics IDs;
+- internal rate-card information;
+- priority numbers;
+- technical database IDs.
+
+### Result
+
+**Result:**  
+**Delivery price shown:**  
+**ETA shown:**  
+**Evidence:**  
+**Notes:**
+
+---
+
+# 19. Cart test
+
+## DE-RAPID-CART-001 — Check that delivery information stays correct
+
+Use a fresh cart created by you.
+
+### Steps
+
+1. Add the test product.
+2. Open the cart.
+3. Go to another page.
+4. Return to the cart.
+5. Refresh the page.
+6. Change the quantity if safe.
+7. Continue to checkout.
+
+### Expected
+
+The customer's delivery choice should remain correct.
+
+If something changed that makes the old delivery choice invalid, the plugin should check again and ask for a valid choice instead of silently using old information.
+
+### Result
+
+**Result:**  
+**Evidence:**  
+**Notes:**
+
+---
+
+# 20. Checkout test
+
+## DE-RAPID-CHECKOUT-001 — Check the WooCommerce shipping charge
+
+Proceed to checkout.
+
+Use a complete test shipping address that matches the selected destination.
+
+Compare these four amounts:
+
+| Place | Amount |
+| --- | ---: |
+| Delivery Charge in admin | |
+| Product page | |
+| Cart | |
+| Checkout | |
+
+### Expected
+
+The amounts should match unless there is a clear, legitimate rule that explains the difference.
+
+The delivery fee must appear as a normal **WooCommerce shipping charge**.
+
+It must not:
+
+- be hidden inside the product price;
+- appear twice;
+- appear as a random product fee;
+- become zero without a valid reason.
+
+### Result
+
+**Result:**  
+**Evidence:**  
+**Notes:**
+
+---
+
+# 21. Place a fresh test order
+
+## DE-RAPID-ORDER-001 — Complete checkout
+
+Every tester should create a fresh test order for this test.
+
+Use an approved safe payment method.
+
+Cash on Delivery is acceptable for the rapid test.
+
+If Paystack test mode is being specifically tested for the Delivery Engine, it may be used. Do not spend this test session changing payment-gateway settings.
+
+### Expected
+
+- Checkout completes.
+- The correct delivery fee is charged.
+- No Delivery Engine error appears.
+- A new WooCommerce order is created.
+
+**New order number:**  
+
+### Result
+
+**Result:**  
+**Evidence:**  
+**Notes:**
+
+---
+
+# 22. Check the completed order
+
+## DE-RAPID-ORDER-002 — Check the delivery information saved with the order
+
+Open the new order you just created.
+
+Check:
 
 - selected Delivery Option;
-- shipping amount;
+- delivery amount;
 - customer destination;
-- ETA/promise information where applicable;
-- delivery group/shipment information where applicable.
+- delivery time/ETA where shown;
+- shipment information where appropriate.
 
-Check customer-facing Thank You / My Account presentation where available.
+Also check the customer Thank You page or My Account order page if available.
 
-**Expected**
+### Expected
 
-- purchase-time delivery facts match checkout;
-- customer-safe information is present;
-- private supplier/origin/logistics data is not exposed;
-- no duplicate delivery charge/shipping summary.
+The order should show the same delivery choice and price that the customer agreed to at checkout.
+
+The customer must not see private supplier/origin/internal logistics information.
+
+There should not be duplicate delivery charges or duplicate shipping summaries.
+
+### Result
 
 **Result:**  
 **Evidence:**  
@@ -618,38 +793,29 @@ Check customer-facing Thank You / My Account presentation where available.
 
 ---
 
-## DE-RAPID-PICKUP-001 — Pickup
+# 23. Pickup test
+
+## DE-RAPID-PICKUP-001 — Test Store Pickup
 
 Use the nominated pickup-enabled product.
 
-Every tester should execute the customer flow again.
+### Steps
 
-1. open product;
-2. choose pickup;
-3. select the intended pickup location if required;
-4. add to cart;
-5. proceed far enough to verify checkout/order behavior.
+1. Open the product.
+2. Choose Store Pickup.
+3. Select the pickup location if asked.
+4. Add the product to cart.
+5. Continue far enough through checkout to confirm pickup remains correct.
 
-**Expected**
+### Expected
 
-- pickup is selectable only where valid;
-- genuine zero/free pickup displays correctly;
-- zero does not mean missing configuration;
-- pickup-only fulfilment does not create a false delivery-to-address shipment.
+- Pickup is available only when allowed.
+- Free pickup should clearly show Free or GH₵0 where intended.
+- A real zero price must work correctly.
+- Pickup must not create a fake delivery-to-address charge.
+- Pickup-only orders should not create a false delivery shipment.
 
-**Result:**  
-**Evidence:**  
-**Notes:**
-
----
-
-## DE-RAPID-FAIL-001 — Unsupported destination
-
-Use a deliberately unsupported destination without changing the campaign's valid area/rate configuration.
-
-**Expected:** unavailable delivery fails closed with a clear customer outcome.
-
-**P0 / Critical:** missing/unconfigured delivery silently becomes free delivery and checkout can continue as if valid.
+### Result
 
 **Result:**  
 **Evidence:**  
@@ -657,82 +823,23 @@ Use a deliberately unsupported destination without changing the campaign's valid
 
 ---
 
-## DE-RAPID-FAIL-002 — Missing-rate safety
+# 24. Unsupported location test
 
-Use the nominated intentionally unconfigured product or an authorized test condition that has no valid matching rate.
+## DE-RAPID-FAIL-001 — Try a location that should not be supported
 
-Do not damage the shared working Rate Card to create the condition.
+Use the nominated unsupported location.
 
-**Expected:** no valid rate means no silently free shipping.
+Do not damage or delete the working Delivery Area to create this test.
 
-**Result:**  
-**Evidence:**  
-**Notes:**
+### Expected
 
----
+The Delivery Engine should clearly say that the delivery is unavailable or should refuse to continue with that invalid delivery choice.
 
-## DE-RAPID-SHIP-001 — Shipment sanity
+### Critical failure
 
-Using the order created by this tester, inspect shipment behavior appropriate to its payment/fulfilment state.
+If the plugin cannot find a valid delivery price but quietly gives the customer **free delivery**, report this immediately as **Critical**.
 
-**Expected**
-
-- shipment creation occurs only when appropriate;
-- no duplicate shipment is produced;
-- grouping is sensible;
-- customer-safe information matches the order;
-- pickup-only flow does not create a false delivery shipment.
-
-If payment state intentionally prevents shipment creation, verify that this is expected rather than failing the case automatically.
-
-**Shipment ID(s):**  
-**Result:**  
-**Evidence:**  
-**Notes:**
-
----
-
-## DE-RAPID-ATTN-001 — Needs Attention
-
-Open Needs Attention.
-
-Do not compare blindly with the original clean-state count of ~75.
-
-Instead verify that:
-
-- currently unresolved products/configurations appear truthfully;
-- resolved/configured conditions update appropriately;
-- obvious stale or impossible counts are not shown;
-- the page loads without error.
-
-**Count observed:**  
-**Result:**  
-**Evidence:**  
-**Notes:**
-
----
-
-## DE-RAPID-UX-001 — Mobile / WoodMart rapid visual pass
-
-On a real phone or responsive browser:
-
-1. open the test product;
-2. use the location controls;
-3. select delivery;
-4. inspect fee/ETA;
-5. add to cart;
-6. view cart/checkout.
-
-**Expected**
-
-- no broken/overlapping fields;
-- fee and ETA remain readable;
-- delivery cards remain selectable;
-- location controls remain usable;
-- mobile layout does not require impossible horizontal scrolling;
-- WoodMart does not hide/break core Delivery Engine controls.
-
-This is rapid visual QA, not full accessibility or cross-browser certification.
+### Result
 
 **Result:**  
 **Evidence:**  
@@ -740,112 +847,242 @@ This is rapid visual QA, not full accessibility or cross-browser certification.
 
 ---
 
-## DE-RAPID-LOG-001 — Error/log check
+# 25. Missing delivery price test
 
-At the end of the tester's run:
+## DE-RAPID-FAIL-002 — Test a product with no valid delivery price
 
-1. note the test end time;
-2. inspect available PHP/WooCommerce logs if permitted;
-3. correlate any errors to the test timestamps.
+Use the nominated intentionally unconfigured product or another approved test case that has no valid delivery price.
 
-**FAIL if:** the run produced a new Delivery Engine fatal, uncaught exception, or repeated runtime warning affecting tested behavior.
+Do not delete a working Delivery Charge to create the test.
+
+### Expected
+
+No valid delivery price should mean:
+
+- the delivery option is unavailable; or
+- the customer is clearly told that delivery cannot currently be quoted.
+
+It must **not** silently turn into free delivery.
+
+### Result
 
 **Result:**  
-**Evidence / log time:**  
+**Evidence:**  
 **Notes:**
 
 ---
 
-# 11. Optional tests if time remains
+# 26. Shipment check
 
-Only after the core rapid tests:
+## DE-RAPID-SHIP-001 — Check the shipment for your new order
 
-- Cart/Checkout Blocks parity;
+Use the fresh order you created.
+
+Open the Delivery Engine shipment area.
+
+### Check
+
+- whether a shipment should exist for this order;
+- whether exactly the correct number of shipments exists;
+- whether the products are grouped correctly;
+- whether customer-visible shipment information is safe and understandable.
+
+### Expected
+
+- No duplicate shipment.
+- Delivery orders create the expected shipment when the order/payment state requires it.
+- Pickup-only orders do not create a fake delivery shipment.
+
+If the order is in a state where a shipment should not yet exist, that may be correct. Record what happened.
+
+**Shipment number(s):**
+
+### Result
+
+**Result:**  
+**Evidence:**  
+**Notes:**
+
+---
+
+# 27. Needs Attention check
+
+## DE-RAPID-ATTENTION-001 — Check Needs Attention
+
+Open **Needs Attention**.
+
+Do not expect the original count of about 75 to still be there.
+
+Testing and configuration may already have changed it.
+
+### Check
+
+- genuinely unconfigured products are still reported;
+- products that were correctly configured are updated appropriately;
+- the count changes sensibly;
+- the page opens without errors.
+
+### Result
+
+**Count shown:**  
+**Result:**  
+**Evidence:**  
+**Notes:**
+
+---
+
+# 28. Mobile and WoodMart check
+
+## DE-RAPID-UX-001 — Quick mobile/customer display check
+
+Use a real phone if possible. Otherwise use your browser's mobile view.
+
+### Test
+
+1. Open the test product.
+2. Select a location.
+3. Select a Delivery Option.
+4. Check the delivery price and ETA.
+5. Add to cart.
+6. Open cart.
+7. Open checkout.
+
+### Expected
+
+- nothing important overlaps;
+- text is readable;
+- buttons can be pressed;
+- location fields work;
+- delivery cards work;
+- delivery price is easy to see;
+- ETA is easy to understand;
+- the WoodMart theme does not hide or break the Delivery Engine.
+
+This is only a quick check today. It is not full mobile/accessibility certification.
+
+### Result
+
+**Result:**  
+**Evidence:**  
+**Notes:**
+
+---
+
+# 29. Error and log check
+
+## DE-RAPID-LOG-001 — Check for new errors
+
+At the end of your test:
+
+1. write down the finish time;
+2. check available WordPress, PHP, or WooCommerce logs if you have access;
+3. look for errors that happened during your test.
+
+### Fail this test if your test caused
+
+- a new Delivery Engine fatal error;
+- an uncaught exception;
+- repeated Delivery Engine warnings that affected the test;
+- a WooCommerce critical error caused by the Delivery Engine.
+
+### Result
+
+**Result:**  
+**Log time:**  
+**Evidence:**  
+**Notes:**
+
+---
+
+# 30. Optional tests if there is time
+
+Only do these after the main rapid tests:
+
+- Cart/Checkout Blocks;
 - Ashanti / Kumasi;
-- additional Greater Accra locality;
-- International Air/Sea product;
-- multi-item order;
-- multi-destination order;
-- a safe Paystack test-mode Delivery Engine checkout;
-- a second browser.
-
-These are valuable, but do not sacrifice the core sale path to reach them.
+- another Greater Accra locality;
+- International product using Air or Sea;
+- cart with several products;
+- different destinations for different products;
+- Paystack test-mode order specifically for Delivery Engine compatibility;
+- second browser.
 
 ---
 
-# 12. Do not spend today's rapid window on
+# 31. What not to spend time on today
 
-- exhaustive Ghana locality enumeration;
-- every variation combination;
-- full Bulk Tools qualification;
-- exhaustive role/security matrix;
-- all compatibility combinations;
-- WPML/WCML certification;
-- B2BKing/FOX full certification;
-- WP Rocket certification;
+Do not spend today's rapid-test window trying to complete:
+
+- every Ghana locality;
+- every product variation;
+- full Bulk Tools testing;
+- every WordPress role;
+- every plugin combination;
+- full WPML/WCML testing;
+- full B2BKing testing;
+- full FOX/WOOCS testing;
+- WP Rocket testing;
 - full accessibility certification;
-- penetration testing;
-- performance/load certification;
-- carrier APIs;
-- driver app;
-- POD/OTP/QR/GPS/photo workflows;
+- security penetration testing;
+- load/performance certification;
+- carrier API testing;
+- driver app testing;
+- OTP/QR/GPS/photo Proof of Delivery;
 - unrelated POS work.
 
-Those belong in the comprehensive Testing Guide v1.0.
+Those belong in the full testing programme.
 
 ---
 
-# 13. Rapid sign-off
+# 32. Final tester sign-off
 
-Use the [Test Run Report Template](./TEST-RUN-REPORT-TEMPLATE.md) or record the same information below.
+Complete this at the end.
 
-| Question | Result |
+| Question | Answer |
 | --- | --- |
-| Can staff operate the configured Delivery Engine without developer knowledge? | YES / NO / PARTLY |
-| Does Ghana → Greater Accra → Accra/Tema behave correctly? | YES / NO / PARTLY |
-| Can a shopper obtain a valid delivery option, price and ETA? | YES / NO |
-| Does the correct delivery charge survive PDP → cart → checkout? | YES / NO |
-| Is it a genuine WooCommerce shipping charge? | YES / NO |
-| Does the new order preserve the correct delivery facts? | YES / NO |
-| Is customer/private-data separation correct? | YES / NO |
-| Does unsupported/missing-rate delivery fail closed? | YES / NO |
-| Does pickup behave correctly? | YES / NO / NOT TESTED |
-| Are shipments sane/idempotent for the tested order? | YES / NO / NOT APPLICABLE |
-| Any new fatal/critical Delivery Engine errors? | YES / NO |
+| Could you understand and use the Delivery Engine without developer help? | YES / NO / PARTLY |
+| Did Ghana → Greater Accra → Accra/Tema work correctly? | YES / NO / PARTLY |
+| Could you get a valid delivery option, price and ETA on the product page? | YES / NO |
+| Did the delivery price remain correct in cart and checkout? | YES / NO |
+| Was the delivery price shown as a real WooCommerce shipping charge? | YES / NO |
+| Did the new order keep the correct delivery information? | YES / NO |
+| Was private internal delivery information hidden from the customer? | YES / NO |
+| Did unsupported/missing delivery fail safely instead of becoming free delivery? | YES / NO |
+| Did Store Pickup work correctly? | YES / NO / NOT TESTED |
+| Was shipment behavior correct? | YES / NO / NOT APPLICABLE |
+| Did you see any new fatal/critical Delivery Engine error? | YES / NO |
 
-Tester recommendation:
+## Final recommendation
 
-- **PASS — no release-blocking defect found**
-- **PASS WITH ISSUES — no blocker, defects recorded**
-- **HOLD — P1/Major defect requires repair/retest**
-- **STOP — P0/Critical defect found**
+Choose one:
+
+### PASS
+No release-blocking problem found.
+
+### PASS WITH ISSUES
+The main flow works, but I found non-blocking problems that should be fixed.
+
+### HOLD
+A Major problem should be fixed and tested again before proceeding.
+
+### STOP
+A Critical problem was found.
+
+**Most important problem found:**  
+
+**Tester name:**  
+
+**Finish time:**  
 
 ---
 
-# 14. Full testing system
+# 33. Defect and test report templates
 
-This rapid pack is intentionally time-boxed.
+Use:
 
-The next version-controlled testing system should expand under `docs/testing/` into the broader structure already planned for:
+- [Defect Report Template](./DEFECT-REPORT-TEMPLATE.md)
+- [Rapid Test Run Report](./TEST-RUN-REPORT-TEMPLATE.md)
 
-- clean baseline;
-- admin/setup;
-- location packs;
-- Delivery Areas;
-- Delivery Options;
-- Delivery Charges;
-- inheritance/exceptions;
-- storefront;
-- cart/checkout;
-- multi-destination;
-- orders/snapshots;
-- shipments/tracking;
-- Needs Attention;
-- Bulk Tools;
-- roles/security;
-- compatibility;
-- failure/recovery;
-- final regression;
-- defect and test-run evidence.
+This Rapid Test Guide is only the short testing pack for the current campaign.
 
-Do not treat today's Rapid Pack as full Stable-1.0 certification.
+A larger **Delivery Engine Testing Guide v1.0** will later cover the complete test programme, including compatibility, roles/security, Bulk Tools, full failure/recovery testing, accessibility, full regression, and release sign-off.
