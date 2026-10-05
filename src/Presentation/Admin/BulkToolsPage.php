@@ -191,6 +191,7 @@ final class BulkToolsPage {
 
 	public function render(): void {
 		AdminPageAccess::require_capability( 'manage_product_delivery_rules' );
+		$this->action_handler->notices()->render_notices();
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( (string) $_GET['tab'] ) ) : 'catalog';
 		AdminPageLayout::open_page( 'cetech-de-bulk-tools' );
