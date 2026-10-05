@@ -5,6 +5,7 @@ This module never constructs cookies/nonces, bypasses handlers or runs a worker.
 """
 
 import copy
+import hashlib
 import json
 from urllib.parse import urlencode, urlsplit, parse_qs
 
@@ -96,11 +97,64 @@ def run_configuration(client, state, bridge, recorder, Page, login):
             return client.get(client.location(response))
         return response
 
-    def denial(case, form, changes=None, endpoint=None, reason=None):
+    def denial(case, form, changes=None, endpoint=None, reason=None, allow_native_admission=False):
         destination = form_destinations[id(form)]
+        # Signed cookie values stay in memory only. Preserve the exact logged-in
+        # cookie tuple across the opted-in revoked POST, rather than accepting
+        # mere presence of an unrelated or newly issued authentication cookie.
+        auth_cookie_before = tuple(sorted(
+            (cookie.domain, cookie.path, cookie.name, cookie.value, cookie.secure, cookie.expires)
+            for cookie in client.cookies if cookie.name.startswith("wordpress_logged_in_")
+        )) if allow_native_admission else ()
         before = snapshot()
         response, _ = submit(form, changes, endpoint)
         after = snapshot()
+        if allow_native_admission:
+            admission_cases = {
+                "REVOKED-PLUGIN-CAPABILITY-SAVE-DENIED": (save_action, "cetech-delivery-engine-scoped-config"),
+                "REVOKED-PLUGIN-CAPABILITY-EXCEPTION-RESET-DENIED": (exception_action, "cetech-delivery-engine-product-exceptions"),
+            }
+            if case not in admission_cases:
+                raise RuntimeError("Native admission evidence is reserved for the explicit revoked-capability cases.")
+            expected_action, expected_page = admission_cases[case]
+            if scalar(form.fields.get("cetech_de_action")) != expected_action or parse_qs(urlsplit(destination).query).get("page") != [expected_page]:
+                raise RuntimeError("Revoked native admission target differs from its actual rendered form route.")
+            if response.status == 403:
+                # WordPress admission may deny the revoked principal before the
+                # plugin page's POST callback. An earlier nonce flash is then
+                # unchanged; it is not a new validation witness for this POST.
+                native_sentence = "Sorry, you are not allowed to access this page."
+                physical_revoked = all(
+                    snap["authority"]["product_gate"] is False
+                    and snap["authority"]["persisted_role_product_gate"] is True
+                    and snap["authority"]["persisted_user_override"] is False
+                    and snap["authority"]["persisted_effective_matches_native"] is True
+                    and snap["authority"]["own_parent"] is True
+                    and snap["authority"]["own_variation"] is True
+                    for snap in (before, after)
+                )
+                flash_unchanged = before.get("flash_notice") == after.get("flash_notice")
+                permission_body_matched = native_sentence in page_for(response).text
+                auth_cookie_after = tuple(sorted(
+                    (cookie.domain, cookie.path, cookie.name, cookie.value, cookie.secure, cookie.expires)
+                    for cookie in client.cookies if cookie.name.startswith("wordpress_logged_in_")
+                ))
+                retained_auth_cookie = bool(auth_cookie_before) and auth_cookie_before == auth_cookie_after
+                recorder.check(prefix + case,
+                               "location" not in response.headers
+                               and permission_body_matched
+                               and response.url == destination
+                               and physical_revoked and same_data(before, after) and flash_unchanged
+                               and retained_auth_cookie,
+                               {**evidence(before, after, response), "terminal": response.evidence(),
+                                "denial_path": "native wp-admin admission before plugin POST callback",
+                                "permission_body_matched": permission_body_matched,
+                                "retained_auth_cookie": retained_auth_cookie,
+                                "authority_before": before["authority"], "authority_after": after["authority"],
+                                "flash_unchanged": flash_unchanged,
+                                "unchanged_flash_sha256": hashlib.sha256(json.dumps(before.get("flash_notice"), sort_keys=True, separators=(",", ":")).encode()).hexdigest(),
+                                "notice_proof": "No new plugin notice claimed; any prior flash remains unchanged."})
+                return
         landing = follow(response)
         notice = after.get("flash_notice") or {}
         redirect_ok = response.status in (302, 303) and parse_qs(urlsplit(client.location(response)).query).get("page") == parse_qs(urlsplit(destination).query).get("page")
@@ -169,7 +223,7 @@ def run_configuration(client, state, bridge, recorder, Page, login):
     recorder.check(prefix + "REVOKED-SCOPED-READ-DENIED",
                    permission_terminal(revoked_render)
                    and same_data(revoked, snapshot()), revoked_render.evidence())
-    denial("REVOKED-PLUGIN-CAPABILITY-SAVE-DENIED", form, changed)
+    denial("REVOKED-PLUGIN-CAPABILITY-SAVE-DENIED", form, changed, allow_native_admission=True)
     bridge.call("configcaps", 1)
     restored = snapshot()
     recorder.check(prefix + "PLUGIN-CAPABILITY-RESTORED",
@@ -239,7 +293,7 @@ def run_configuration(client, state, bridge, recorder, Page, login):
            {"cetech_de_nonce": "invalid-qualification-nonce"}, exceptions_path)
     bridge.call("configcaps", 0)
     denial("REVOKED-PLUGIN-CAPABILITY-EXCEPTION-RESET-DENIED", exception_form,
-           endpoint=exceptions_path, reason="permission to perform this action")
+           endpoint=exceptions_path, reason="permission to perform this action", allow_native_admission=True)
     bridge.call("configcaps", 1)
     recorder.check(prefix + "EXCEPTION-RESET-CAPABILITY-RESTORED",
                    snapshot()["authority"]["product_gate"], {"actor": state["user_id"]})
