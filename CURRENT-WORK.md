@@ -14,7 +14,8 @@ The owner authorized this bounded batch in the same run: implement COR-004, then
 - Exclusive file lease for COR-004: `src/Application/Bulk/Catalog/CatalogTargetFilters.php`, `CatalogFilterMatcher.php`, `WooCommerceCatalogTargetQuery.php`, `InMemoryCatalogTargetQuery.php`, new catalog identity tests, this checkpoint, and the COR-004 report. `BulkToolsPage.php` stays on the existing COR-001 admission path unless a caller change is required.
 - COR-006 file lease begins only after the COR-004 commit: `WpdbBulkJobRepository.php`, `BulkJobWorker.php`, `BulkJobRepositoryInterface.php`, and their in-memory adapter/tests. Schema changes are not authorized by this lease.
 - COR-005 scan/count policy, COR-006 P07 recovery architecture, and COR-006 P08 backlog limit remain outside this authorization until their own reviewed inputs exist.
-- COR-004 repair is in `docs/COR-004-CATALOG-TARGET-IDENTITY-2026-10-05.md`. PHP 8.5 Bulk unit suite: 147 tests / 849 assertions, OK, 2 existing deprecations. Disposable MariaDB catalog proof: 4 tests / 23 assertions, OK. The COR-004 commit is the tested checkpoint; COR-006 starts after it.
+- COR-004 repair is in `docs/COR-004-CATALOG-TARGET-IDENTITY-2026-10-05.md`. PHP 8.5 Bulk unit suite at that checkpoint: 147 tests / 849 assertions, OK, 2 existing deprecations. Disposable MariaDB catalog proof: 4 tests / 23 assertions, OK. Commit `0af5a8ca36f7a81c4a91bf5283318fb555694c88` is that tested checkpoint.
+- COR-006 fence is in `docs/COR-006-CLAIM-FENCE-2026-10-05.md`. It uses the existing claim columns only. P07 recovery architecture and P08 backlog/liveness limit were not chosen and were not executed. Disposable MariaDB worker proof on `cetech_cor006_worker`: 3 tests / 33 assertions, OK, including two processes and two connections. The COR-006 commit is the tested checkpoint for that fence.
 
 ## Earlier opening-corrections checkpoint
 

@@ -237,9 +237,7 @@ final class BulkJobWorker {
 				$this->jobs->save_item(
 					$item->with(
 						[
-							'status'      => BulkJobItemStatus::Pending,
-							'claim_token' => null,
-							'claimed_at'  => null,
+							'status' => BulkJobItemStatus::Pending,
 						]
 					)
 				);
@@ -297,9 +295,7 @@ final class BulkJobWorker {
 					),
 					'error_code'               => $result['error_code'],
 					'error_summary'            => $result['error_summary'],
-					'completed_at'             => gmdate( 'Y-m-d H:i:s' ),
-					'claim_token'              => null,
-					'claimed_at'               => null,
+					'completed_at' => gmdate( 'Y-m-d H:i:s' ),
 				]
 			);
 			$this->jobs->save_item( $saved_item );
@@ -350,7 +346,7 @@ final class BulkJobWorker {
 		$failed = 0;
 		foreach ( $items as $item ) {
 			if ( $this->over_budget( $started ) ) {
-				$this->jobs->save_item( $item->with( [ 'status' => BulkJobItemStatus::Pending, 'claim_token' => null, 'claimed_at' => null ] ) );
+				$this->jobs->save_item( $item->with( [ 'status' => BulkJobItemStatus::Pending ] ) );
 				break;
 			}
 			$parent = $item->parent_target_id;
@@ -403,9 +399,7 @@ final class BulkJobWorker {
 						'status'        => $status,
 						'error_code'    => $result['error_code'],
 						'error_summary' => $result['error_summary'],
-						'completed_at'  => gmdate( 'Y-m-d H:i:s' ),
-						'claim_token'   => null,
-						'claimed_at'    => null,
+						'completed_at' => gmdate( 'Y-m-d H:i:s' ),
 					]
 				)
 			);

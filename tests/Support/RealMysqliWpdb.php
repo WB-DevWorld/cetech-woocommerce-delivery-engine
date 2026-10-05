@@ -123,7 +123,14 @@ final class RealMysqliWpdb {
 	public function query( mixed $sql ): int|bool {
 		$sql = (string) $sql;
 		$this->log_sql( $sql );
-		$result = $this->pdo->exec( $sql );
+		try {
+			$result = $this->pdo->exec( $sql );
+		} catch ( \PDOException $exception ) {
+			$this->last_error    = $exception->getMessage();
+			$this->rows_affected = 0;
+
+			return false;
+		}
 		if ( false === $result ) {
 			$this->last_error    = $this->error_message();
 			$this->rows_affected = 0;
@@ -149,8 +156,16 @@ final class RealMysqliWpdb {
 			$columns[] = '`' . str_replace( '`', '', (string) $column ) . '`';
 			$values[]  = $this->sql_value( $value );
 		}
-		$sql    = 'INSERT INTO `' . str_replace( '`', '', $table ) . '` (' . implode( ',', $columns ) . ') VALUES (' . implode( ',', $values ) . ')';
-		$result = $this->pdo->exec( $sql );
+		$sql = 'INSERT INTO `' . str_replace( '`', '', $table ) . '` (' . implode( ',', $columns ) . ') VALUES (' . implode( ',', $values ) . ')';
+		try {
+			$result = $this->pdo->exec( $sql );
+		} catch ( \PDOException $exception ) {
+			$this->last_error    = $exception->getMessage();
+			$this->insert_id     = 0;
+			$this->rows_affected = 0;
+
+			return false;
+		}
 		if ( false === $result ) {
 			$this->last_error    = $this->error_message();
 			$this->insert_id     = 0;

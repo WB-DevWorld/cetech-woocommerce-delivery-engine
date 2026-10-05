@@ -23,6 +23,7 @@
             <group>geo15-real-db</group>
             <group>geo-live-real-db</group>
             <group>cor004-real-db</group>
+            <group>cor006-real-db</group>
         </exclude>
     </groups>
 </phpunit>

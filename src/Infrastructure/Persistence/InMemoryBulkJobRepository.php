@@ -40,6 +40,16 @@ final class InMemoryBulkJobRepository implements BulkJobRepositoryInterface {
 			return $saved;
 		}
 
+		$current = $this->jobs[ $job->id ] ?? null;
+		if ( ! $current instanceof BulkJob ) {
+			$this->jobs[ $job->id ] = $job;
+			$this->next_job_id      = max( $this->next_job_id, $job->id + 1 );
+
+			return $job;
+		}
+		if ( (string) $current->claim_token !== (string) $job->claim_token ) {
+			throw new \RuntimeException( 'Stale bulk claim.' );
+		}
 		$this->jobs[ $job->id ] = $job;
 
 		return $job;
@@ -156,6 +166,13 @@ final class InMemoryBulkJobRepository implements BulkJobRepositoryInterface {
 			if ( BulkJobItemStatus::Pending !== $item->status && ! $expired ) {
 				continue;
 			}
+			$current = $this->items[ $id ];
+			if ( BulkJobItemStatus::Claimed === $item->status && ( $current->claim_token !== $item->claim_token || $current->claimed_at !== $item->claimed_at ) ) {
+				continue;
+			}
+			if ( BulkJobItemStatus::Pending === $item->status && BulkJobItemStatus::Pending !== $current->status ) {
+				continue;
+			}
 			$row = $item->with(
 				[
 					'status'        => BulkJobItemStatus::Claimed,
@@ -173,7 +190,36 @@ final class InMemoryBulkJobRepository implements BulkJobRepositoryInterface {
 
 	public function save_item( BulkJobItem $item ): BulkJobItem {
 		if ( null === $item->id ) {
-			return $this->insert_items( [ $item ] )[0];
+			$saved = $this->insert_items( [ $item ] );
+			if ( ! isset( $saved[0] ) ) {
+				throw new \RuntimeException( 'Bulk item write failed.' );
+			}
+
+			return $saved[0];
+		}
+		$current = $this->items[ $item->id ] ?? null;
+		if ( ! $current instanceof BulkJobItem ) {
+			throw new \RuntimeException( 'Bulk item write failed.' );
+		}
+		if ( (string) $current->claim_token !== (string) $item->claim_token ) {
+			$already_released = null === $current->claim_token
+				&& null !== $item->claim_token
+				&& '' !== $item->claim_token
+				&& $current->status === $item->status
+				&& BulkJobItemStatus::Claimed !== $item->status;
+			if ( ! $already_released ) {
+				throw new \RuntimeException( 'Stale bulk claim.' );
+			}
+
+			return $current;
+		}
+		if ( BulkJobItemStatus::Claimed !== $item->status ) {
+			$item = $item->with(
+				[
+					'claim_token' => null,
+					'claimed_at'  => null,
+				]
+			);
 		}
 		$this->items[ $item->id ] = $item;
 
@@ -281,7 +327,7 @@ final class InMemoryBulkJobRepository implements BulkJobRepositoryInterface {
 		}
 
 		$now     = time();
-		$expired = null !== $job->claimed_at && strtotime( $job->claimed_at ) < ( $now - $claim_ttl_seconds );
+		$expired = null === $job->claimed_at || strtotime( (string) $job->claimed_at ) < ( $now - $claim_ttl_seconds );
 		if ( null !== $job->claim_token && $job->claim_token !== $claim_token && ! $expired ) {
 			return null;
 		}
