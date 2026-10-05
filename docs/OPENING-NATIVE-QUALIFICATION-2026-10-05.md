@@ -2,7 +2,7 @@
 
 The owner instructed continuation after the four focused repairs were implemented and PR #51 passed its initial CI. This batch adds targeted native evidence for those same COR-001/002/003/010 repairs. It changes validation scripts, CI receipt retention and documentation; the repaired production source is unchanged.
 
-Candidate at continuation start: `08e6aa2ff53d22ac8e5c8c00a66c19a2b74d2b70`, protected-master base `637c02f182ca273b40819631d23ac8e0dcc4004f`. The draft PR records the final committed head, exact CI run and execution outcome. This committed preparation record does not pre-claim a native PASS.
+Candidate at continuation start: `08e6aa2ff53d22ac8e5c8c00a66c19a2b74d2b70`, protected-master base `637c02f182ca273b40819631d23ac8e0dcc4004f`. The draft PR records the final committed head, exact CI run and execution outcome. The result below records actual native execution; final documentation-head CI is recorded separately in the draft PR.
 
 ## Environment and execution
 
@@ -55,7 +55,24 @@ The first native candidate `7b94884f1043b2d2f13ff65d244585100203e7a3` failed at 
 
 The fixture incorrectly assumed Woo variations enforce author ownership through native `edit_post` mapping like products. [WooCommerce 11.1.2 registration](https://github.com/woocommerce/woocommerce/blob/11.1.2/plugins/woocommerce/includes/class-wc-post-types.php) leaves variation `map_meta_cap` disabled; [WordPress 7.1.2 mapping](https://github.com/WordPress/WordPress/blob/7.1.2/wp-includes/capabilities.php) returns the registered singular primitive. Native evidence returned `edit_product` for both owned and foreign variations. The original fixture omitted that primitive and also expected native foreign-variation denial, so its precondition was false.
 
-The corrected fixture grants the registered variation primitive through persisted native user capabilities, records each permission decision and post-type mapping, and tests removal/restoration of that grant. Native product and parent ownership denials stay intact. With a foreign variation's primitive allowed, its foreign actual parent must still be denied by the production explicit parent gate. Wrong-but-owned-parent rejection remains required. No native function replacement or production authorization change is introduced. A later run must execute and pass these corrected assertions before a native PASS is recorded.
+The corrected fixture grants the registered variation primitive through persisted native user capabilities, records each permission decision and post-type mapping, and tests removal/restoration of that grant. Native product and parent ownership denials stay intact. With a foreign variation's primitive allowed, its foreign actual parent must still be denied by the production explicit parent gate. Wrong-but-owned-parent rejection remains required. No native function replacement or production authorization change is introduced. The later corrected execution below passed these assertions; the original failed result remains retained.
+
+## Completed native execution
+
+Corrected tested candidate `faa287e70e47c4a2b9d174d3ba6efddd6d4e263e`, tree `ec8965457c1a50ebbc047b61a8177ad0defe26bf`: **167 recorded checks, all PASS**. The installed production PHP manifest stayed unchanged at `69b6774a57f6cbc538f5f24353963f1695510f85214f2b5f4c59ace2e348ffdc` across all 494 files. The following documentation-only checkpoint does not alter the scripts or repaired source; its exact head and CI result are recorded in PR #51.
+
+| Module | Recorded checks | Executed outcome |
+| --- | ---: | --- |
+| Authority/wizard/recovery | 83 | Native role/capability and nonce controls, selected actual PHP callbacks, persisted effects and Administrator recovery passed. |
+| Configuration | 58 | Native Product/Parent ownership and Variation primitive controls; foreign-parent denial, revocation/restoration, guard/service save, physical exact-slice reset and ordinary audit/no-op passed. |
+| Migrations | 25 | Ordered native-option progress, synthetic callback and simulated write-denial stop/retry/reconciliation, discovery controls and exact restoration passed. |
+| Runner | 1 | Schema restored to 6. |
+
+PR execution [37305412977](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/actions/runs/37305412977) used merge checkout `6f92e708b6f84e15136f30998ae6247644bc2059`, whose tree is exactly the tested candidate tree above. Its [receipt artifact 11342739003](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/actions/runs/37305412977/artifacts/11342739003) ZIP SHA-256 is `6618fccc2afc75571ab26b777a79e34d6c3211d581535635e19393b8dbfdc78c`. Push execution [37305407099](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/actions/runs/37305407099) ran the exact candidate checkout and completed all eight CI jobs successfully; its [receipt artifact 11343193639](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/actions/runs/37305407099/artifacts/11343193639) ZIP SHA-256 is `79a59f98450895f68718870b8017971bfa978996ded97c7b04616308de616ca0`.
+
+Both receipts were downloaded and parsed directly. Artifact ZIP hashes matched GitHub metadata; candidate/tree/runtime and all installed file hashes matched expectations; their 167 unique case/status sequences matched. Runtime was PHP 8.5.11 / WordPress 7.1.2 / WooCommerce 11.1.2 / MariaDB 11.4.13, HPOS enabled, schema 6. Native variation edit was permitted while the foreign actual parent was denied with the explicit parent-permission reason. Original migration schema/status rows restored with identical SHA-256 `839127ae491740e413d8605eb2525424a6b7c64d556c37080782719955c224f0`; fixture marker deleted and no cleanup failures. Those hashes bind this synthetic fixture's row snapshots, not a general storage-atomicity guarantee.
+
+Corrected-source PHP 8.3/8.4/8.5 suites each passed 1,470 tests / 9,304 assertions / one skipped. PHP 8.4 reported two existing deprecations; PHP 8.5 reported the 14 retained sites. The separate MariaDB suite passed 26 tests / 1,738 assertions / zero errors, failures or skips, with two deprecations. These results do not convert the recorded native check count into canonical scenario completions. Independent source and bounded passing-receipt review both passed: the reviewer checked unique IDs/counts, native permission decisions, SQL reset/audit state, migration stop/retry traces, original-option restoration and equality of all 494 installed source hashes. This review is not a second native execution or human approval.
 
 ## Remaining gates
 
