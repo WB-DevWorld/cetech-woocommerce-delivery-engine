@@ -1,6 +1,35 @@
 # Current Work — Post-#32 repository truth synchronization
 
-Status: RC.12 IMMUTABLE — ISSUE #32 MERGED/CLOSED — ISSUE #45 REPOSITORY/TRUTH CLEANUP ACTIVE — NO RUNTIME CHANGE — NOT RC.13
+Status: RC.12 IMMUTABLE — OPENING CORRECTIONS AUTHORIZED ON ISOLATED FIX BRANCH — UNMERGED — NOT RC.13
+
+## 2026-10-05 — bounded opening corrections
+
+After presentation of the four-unit approval packet, the owner instructed:
+"let us continue to the next steps.. if possible, tackle multiple steps one after another in the same run.. be as thorough as necessary".
+In that context, this authorizes the presented focused COR-001/002/003/010 repairs, isolated validation, commits and a draft PR. It does not freeze the full Wave 1 contract or authorize merge, release, deployment, live-site mutation, payment/order tests or external messages.
+
+- Base: protected master `637c02f182ca273b40819631d23ac8e0dcc4004f`.
+- Branch: `fix/audit-opening-authority-migration`.
+- Integration editor / current central-file lease holder: Codex, acting under this owner instruction. Review agents prepare proposals outside the checkout; only the integration editor applies repository changes. Recorded human workstream ownership remains unchanged.
+- Environment: fresh disposable local checkout, PHP unit/integration fixtures and supported PHP runtimes. No training, Pilot, FLAIROC, production, POS or external database connection is authorized.
+- COR-001: wp-admin stored-operation/private-content checks before later actions, job presentation and AJAX. Foreign-job delegation, CLI authority and broader qualification remain reserved; no creator-only/sharing grant or worker-user policy is introduced.
+- COR-002: recognized scope/object/actual-parent permission, exact represented slice and ordinary successful reset audit. COR-007 fault/transaction/revision policy remains reserved.
+- COR-003: existing entity permissions for wizard writes, including implicit area creation. Existing Administrator recovery remains intact and requires separate native qualification.
+- COR-010: prerequisite stop, durable progress/status read-back, retry truth and unambiguous discovery. Unknown absent migration files and native storage qualification remain reserved.
+- COR-004/006 remain outside this authorization with their original COR-001 prerequisite. The nine proposed atom scopes, requirement classes and release intent are unchanged.
+
+Exclusive source-file reservations for this batch:
+- `src/Presentation/Admin/BulkJobAccess.php`, `BulkToolsPage.php`, `BulkJobProgressEndpoint.php`;
+- `src/Application/Configuration/Admin/ProductVariationScopeGuard.php`, `ScopedConfigurationAuthorization.php`, `ScopedConfigurationTargetGuard.php`, `ScopedConfigurationAdminService.php`;
+- `src/Application/Configuration/Catalog/ProductExceptionsQuery.php`;
+- `src/Presentation/Admin/ProductExceptionsPage.php`, `ScopedConfigurationPage.php`, `SetupWizardPage.php`;
+- `src/Application/Configuration/ContextualEntityService.php`;
+- `src/Bootstrap/Plugin.php` (only the configuration caller's dependency wiring);
+- `src/Core/Versioning/MigrationRunner.php`, `MigrationDiscovery.php`, `SchemaVersion.php`, `MigrationStatus.php`.
+
+Test reservations: new `BulkJobAdminAuthorizationTest`, `ScopedConfigurationCallerAuthorityTest`, `SetupWizardEntityAuthorizationTest`, `MigrationRunnerFailureTest` and their isolated fixtures; `tests/bootstrap.php` only for resource-specific `edit_post` fixture support. The exact final changed paths and check results will be recorded in `docs/OPENING-CORRECTIONS-2026-10-05.md`. Schema target stays 6; published/frozen package identities are untouched. No release package is built by this task.
+
+The sections below preserve the earlier Issue #45 and release/deployment checkpoints; their docs-only authorization does not describe this newer bounded owner instruction.
 
 ## Canonical repository truth
 - Canonical organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`.
