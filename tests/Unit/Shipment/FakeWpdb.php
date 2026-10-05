@@ -1232,8 +1232,21 @@ final class FakeWpdb {
 		if ( preg_match( '/^`?([a-z0-9_]+)`?\s*=\s*(\d+)$/i', $clause, $matches ) ) {
 			return (string) ( $row[ $matches[1] ] ?? '' ) === (string) $matches[2];
 		}
+		if ( preg_match( '/^`?([a-z0-9_]+)`?\s+IS\s+NULL$/i', $clause, $matches ) ) {
+			$value = $row[ $matches[1] ] ?? null;
+
+			return null === $value || '' === $value;
+		}
+		if ( preg_match( '/^`?([a-z0-9_]+)`?\s+IS\s+NOT\s+NULL$/i', $clause, $matches ) ) {
+			$value = $row[ $matches[1] ] ?? null;
+
+			return null !== $value && '' !== $value;
+		}
 		if ( preg_match( '/^`?([a-z0-9_]+)`?\s*<\s*(\d+)$/i', $clause, $matches ) ) {
 			return (int) ( $row[ $matches[1] ] ?? 0 ) < (int) $matches[2];
+		}
+		if ( preg_match( '/^`?([a-z0-9_]+)`?\s*<\s*\'((?:\\\\\'|[^\'])*)\'$/i', $clause, $matches ) ) {
+			return (string) ( $row[ $matches[1] ] ?? '' ) < stripcslashes( $matches[2] );
 		}
 		if ( preg_match( '/^`?([a-z0-9_]+)`?\s*>\s*(\d+)$/i', $clause, $matches ) ) {
 			return (int) ( $row[ $matches[1] ] ?? 0 ) > (int) $matches[2];
