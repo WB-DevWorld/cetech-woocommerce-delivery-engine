@@ -18,6 +18,10 @@ COR-001 on the base candidate already rechecks stored operation capability, priv
 
 PHP 8.5.0. Before the repair, `CatalogTargetIdentityTest` was 5 failures / 7 tests: unknown keys were kept, pickup matched in-store and the other endpoint, and Remove was treated as inclusion. After the repair the same file is 8 tests / 17 assertions, OK. `tests/Unit/Bulk` is 147 tests / 849 assertions, OK, with 2 existing deprecations. Physical MariaDB `cetech_cor004_catalog` on `127.0.0.1:33079` (`phpunit.cor004-sql.xml`): 4 tests / 23 assertions, OK. Those SQL runs checked returned ids and unchanged table checksums. They are excluded from the default PHPUnit configuration so CI does not require that disposable database.
 
+## Review repair
+
+A nonempty unsupported value is rejected before normalization. An array such as `unsupported_filter => [900]` beside a real category is not dropped. Remove mode blocks only the requested member; inherited membership of a different member remains. PHP 8.5 `CatalogTargetIdentityTest`: 9 tests / 20 assertions, OK. Disposable MariaDB catalog proof: 4 tests / 24 assertions, OK. Product 308 inherits member 1 through a local Remove of member 10. Product 309 removes member 1 and is excluded.
+
 ## Limits
 
 CET-Q-061 large-catalog qualification is not claimed. Effective-fulfilment count can still differ from the SQL candidate count; that remains COR-005. Variation offer inheritance is implemented in SQL and was not part of the product-only MariaDB fixture. No schema change.

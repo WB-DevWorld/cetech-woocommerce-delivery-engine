@@ -81,6 +81,20 @@ final class CatalogTargetIdentityTest extends TestCase {
 		);
 	}
 
+	public function test_nonscalar_unsupported_filter_is_not_erased_before_validation(): void {
+		$this->expectException( \InvalidArgumentException::class );
+		$this->expectExceptionMessage( 'Unsupported catalog filter.' );
+		CatalogTargetDefinition::from_array(
+			[
+				'scope'   => BulkTargetScope::MatchingFilters->value,
+				'filters' => [
+					CatalogTargetFilters::CATEGORY_ID => 50,
+					'unsupported_filter'              => [ 900 ],
+				],
+			]
+		);
+	}
+
 	public function test_known_criterion_and_empty_filters_keep_their_existing_results(): void {
 		$query      = $this->populated_query();
 		$legitimate = CatalogTargetDefinition::from_array(
@@ -129,7 +143,8 @@ final class CatalogTargetIdentityTest extends TestCase {
 			)
 		);
 
-		self::assertSame( [ 301, 304, 305 ], $ids );
+		self::assertSame( [ 301, 304, 305, 306 ], $ids );
+		self::assertNotContains( 307, $ids );
 	}
 
 	public function test_direct_matcher_does_not_treat_an_unknown_key_as_a_match(): void {
@@ -244,6 +259,22 @@ final class CatalogTargetIdentityTest extends TestCase {
 		$query->add(
 			new CatalogTarget( 'product', 305, 'INHERIT-1' ),
 			[ 'delivery_option_mode' => 'inherit', 'inherited_delivery_option_ids' => [ 1 ] ]
+		);
+		$query->add(
+			new CatalogTarget( 'product', 306, 'REMOVE-OTHER-MEMBER' ),
+			[
+				'delivery_option_ids'            => [ 10 ],
+				'delivery_option_mode'           => 'remove',
+				'inherited_delivery_option_ids'  => [ 1 ],
+			]
+		);
+		$query->add(
+			new CatalogTarget( 'product', 307, 'REMOVE-REQUESTED-MEMBER' ),
+			[
+				'delivery_option_ids'            => [ 1 ],
+				'delivery_option_mode'           => 'remove',
+				'inherited_delivery_option_ids'  => [ 1 ],
+			]
 		);
 
 		return $query;

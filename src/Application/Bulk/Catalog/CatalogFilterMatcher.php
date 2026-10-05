@@ -52,8 +52,8 @@ final class CatalogFilterMatcher {
 	}
 
 	/**
-	 * Add and Replace include an exact member. Remove never counts as inclusion.
-	 * Inherit uses only the separately supplied inherited member list.
+	 * Add and Replace include an exact member. Remove is not inclusion: it blocks
+	 * only the requested member and otherwise leaves inherited membership intact.
 	 *
 	 * @param array<string, mixed> $attributes
 	 */
@@ -62,7 +62,7 @@ final class CatalogFilterMatcher {
 		$members = $attributes['delivery_option_ids'] ?? [];
 		$exact   = self::in_int_list( $members, $wanted ) || self::same_int( $attributes[ CatalogTargetFilters::DELIVERY_OPTION_ID ] ?? 0, $wanted );
 		if ( 'remove' === $mode ) {
-			return false;
+			return ! $exact && self::in_int_list( $attributes['inherited_delivery_option_ids'] ?? [], $wanted );
 		}
 		if ( 'inherit' === $mode ) {
 			return self::in_int_list( $attributes['inherited_delivery_option_ids'] ?? [], $wanted );

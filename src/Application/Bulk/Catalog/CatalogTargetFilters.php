@@ -111,25 +111,34 @@ final class CatalogTargetFilters {
 	 * @return array<string, mixed>
 	 */
 	public static function sanitize( array $filters ): array {
-		$clean       = [];
-		$unsupported = [];
+		$clean = [];
 		foreach ( $filters as $key => $value ) {
-			$key  = (string) $key;
+			$key = (string) $key;
+			if ( ! in_array( $key, self::supported_keys(), true ) ) {
+				if ( self::criterion_is_present( $value ) ) {
+					throw new \InvalidArgumentException( 'Unsupported catalog filter.' );
+				}
+				continue;
+			}
 			$kept = self::kept_value( $key, $value );
 			if ( null === $kept ) {
 				continue;
 			}
-			if ( ! in_array( $key, self::supported_keys(), true ) ) {
-				$unsupported[] = $key;
-				continue;
-			}
 			$clean[ $key ] = $kept;
-		}
-		if ( [] !== $unsupported ) {
-			throw new \InvalidArgumentException( 'Unsupported catalog filter.' );
 		}
 
 		return $clean;
+	}
+
+	private static function criterion_is_present( mixed $value ): bool {
+		if ( is_array( $value ) ) {
+			return [] !== $value;
+		}
+		if ( null === $value || false === $value || '' === $value || 0 === $value || '0' === $value ) {
+			return false;
+		}
+
+		return true;
 	}
 
 	private static function kept_value( string $key, mixed $value ): mixed {

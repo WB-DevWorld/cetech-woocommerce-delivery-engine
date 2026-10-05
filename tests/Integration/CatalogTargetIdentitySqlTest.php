@@ -74,7 +74,8 @@ final class CatalogTargetIdentitySqlTest extends TestCase {
 	public function test_offer_member_one_does_not_match_member_ten_and_remove_is_not_inclusion(): void {
 		$ids = $this->ids( [ CatalogTargetFilters::DELIVERY_OPTION_ID => 1 ] );
 
-		self::assertSame( [ 301, 304, 305, 306 ], $ids );
+		self::assertSame( [ 301, 304, 305, 306, 308 ], $ids );
+		self::assertNotContains( 309, $ids );
 		self::assertStringContainsString( 'JSON_CONTAINS', $this->last_sql() );
 		self::assertStringNotContainsString( 'LIKE', $this->last_sql() );
 		$this->assert_unchanged();
@@ -192,6 +193,8 @@ final class CatalogTargetIdentitySqlTest extends TestCase {
 			(304,'product','publish','Add offer 1',0),
 			(305,'product','publish','Inherit offer 1',0),
 			(306,'product','publish','Replace both',0),
+			(308,'product','publish','Remove other member',0),
+			(309,'product','publish','Remove requested member',0),
 			(401,'product_variation','publish','Wrong type',101)"
 		);
 	}
@@ -217,7 +220,9 @@ final class CatalogTargetIdentitySqlTest extends TestCase {
 			(7,'product',302,'','active'),
 			(8,'product',303,'','active'),
 			(9,'product',304,'','active'),
-			(10,'product',306,'','active')" );
+			(10,'product',306,'','active'),
+			(18,'product',308,'','active'),
+			(19,'product',309,'','active')" );
 		$pickup = ConfigurationFieldKey::PICKUP_LOCATION_ID;
 		$fulfil = ConfigurationFieldKey::FULFILMENT_AVAILABILITY;
 		$this->pdo->exec( "INSERT INTO `{$engine}configuration_fields` (scope_row_id, field_key, mode, value_text) VALUES
@@ -239,7 +244,9 @@ final class CatalogTargetIdentitySqlTest extends TestCase {
 			(7,'{$offers}','replace','[10]'),
 			(8,'{$offers}','remove','[1]'),
 			(9,'{$offers}','add','[1]'),
-			(10,'{$offers}','replace','[1,10]')" );
+			(10,'{$offers}','replace','[1,10]'),
+			(18,'{$offers}','remove','[10]'),
+			(19,'{$offers}','remove','[1]')" );
 		unset( $offers );
 	}
 
