@@ -49,6 +49,7 @@ final class BulkClaimFenceSqlTest extends TestCase {
 	}
 
 	protected function tearDown(): void {
+		\CetechDeliveryEngine\Infrastructure\Persistence\AbstractWpdbRepository::reset_transaction_state();
 		unset( $GLOBALS['wpdb'] );
 		parent::tearDown();
 	}
@@ -189,6 +190,23 @@ final class BulkClaimFenceSqlTest extends TestCase {
 		self::assertSame( BulkJobStatus::Ready, $job->status );
 	}
 
+	public function test_configuration_import_keeps_the_item_lock_through_the_rule_write(): void {
+		$seed = $this->seed_rule_import_job();
+		$owner = $this->start( 'worker-import', $seed['job_id'], 'owner', false, [ 'CETECH_DE_COR006_ITEM_ID' => (string) $seed['item_id'] ] );
+		$contender = $this->start( 'worker-import-contender', $seed['job_id'], 'contender', false, [ 'CETECH_DE_COR006_ITEM_ID' => (string) $seed['item_id'] ] );
+		$contender_result = $this->finish( $contender );
+		$owner_result = $this->finish( $owner );
+		$rules = $this->pdo->query( 'SELECT rule_value FROM cor006_delivery_engine_destination_rules' )->fetchAll();
+
+		self::assertNotSame( $owner_result['pid'], $contender_result['pid'] );
+		self::assertNotSame( $owner_result['connection_id'], $contender_result['connection_id'] );
+		self::assertNull( $owner_result['error'] );
+		self::assertStringContainsString( 'Lock wait timeout', (string) $contender_result['error'] );
+		self::assertGreaterThan( 0.5, (float) $contender_result['elapsed'] );
+		self::assertSame( [ 'GH' ], array_map( static fn ( array $row ): string => (string) $row['rule_value'], $rules ) );
+		self::assertSame( 1, $this->repository->find_job( $seed['job_id'] )->changed_count );
+	}
+
 	public function test_source_write_holds_the_claim_until_the_contender_times_out(): void {
 		$seed = $this->seed_observable_rate_job( false );
 		$owner = $this->start( 'worker-owner', $seed['job_id'], 'owner', false, [ 'CETECH_DE_COR006_PHASE' => 'inside_source' ] );
@@ -249,6 +267,64 @@ final class BulkClaimFenceSqlTest extends TestCase {
 		$items = $this->repository->insert_items(
 			[
 				BulkJobItem::pending( (int) $job->id, 'rate_card', 1, 'RC-1' ),
+			]
+		);
+
+		return [
+			'job_id'  => (int) $job->id,
+			'item_id' => (int) $items[0]->id,
+		];
+	}
+
+	/**
+	 * @return array{job_id: int, item_id: int}
+	 */
+	private function seed_rule_import_job(): array {
+		$this->pdo->exec( 'DROP TABLE IF EXISTS cor006_delivery_engine_destination_rules' );
+		$this->pdo->exec( 'DROP TABLE IF EXISTS cor006_delivery_engine_destination_zones' );
+		$this->pdo->exec( 'DROP TABLE IF EXISTS cor006_worker_gate' );
+		$this->pdo->exec( 'CREATE TABLE cor006_delivery_engine_destination_zones (id bigint unsigned NOT NULL AUTO_INCREMENT, internal_code varchar(64) NOT NULL, internal_name varchar(255) NOT NULL, public_label varchar(255) DEFAULT NULL, is_fallback tinyint(1) NOT NULL DEFAULT 0, remote_area_flag tinyint(1) NOT NULL DEFAULT 0, priority int NOT NULL DEFAULT 100, status varchar(16) NOT NULL DEFAULT \'active\', created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (id), UNIQUE KEY internal_code (internal_code))' );
+		$this->pdo->exec( "INSERT INTO cor006_delivery_engine_destination_zones (internal_code, internal_name) VALUES ('accra', 'Accra')" );
+		$this->pdo->exec( 'CREATE TABLE cor006_delivery_engine_destination_rules (id bigint unsigned NOT NULL AUTO_INCREMENT, zone_id bigint unsigned NOT NULL, rule_type varchar(32) NOT NULL, rule_value varchar(255) NOT NULL, match_mode varchar(16) NOT NULL DEFAULT \'exact\', priority int NOT NULL DEFAULT 100, created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY (id), KEY zone_id (zone_id))' );
+		$this->pdo->exec( "CREATE TABLE cor006_worker_gate (name varchar(32) NOT NULL PRIMARY KEY, state int NOT NULL, note varchar(64) NOT NULL DEFAULT '')" );
+		$this->pdo->exec( "INSERT INTO cor006_worker_gate (name, state) VALUES ('a_paused', 0), ('b_finished', 0)" );
+		$job = $this->repository->save_job(
+			BulkJob::create(
+				BulkOperationType::ConfigImport,
+				4,
+				[
+					'scope'            => 'selected_ids',
+					'selected_ids'     => [ 1 ],
+					'variation_policy' => 'preserve_overrides',
+				],
+				[
+					'conflict_mode' => 'replace',
+				],
+				false
+			)->with(
+				[
+					'status'               => BulkJobStatus::Running,
+					'enumeration_complete' => true,
+					'total_count'          => 1,
+					'enumerated_count'     => 1,
+				]
+			)
+		);
+		$items = $this->repository->insert_items(
+			[
+				BulkJobItem::pending( (int) $job->id, 'delivery_area_rules', 1, 'accra-country' )->with(
+					[
+						'result' => [
+							'row' => [
+								'zone_code'  => 'accra',
+								'rule_type'  => 'country',
+								'rule_value' => 'GH',
+								'match_mode' => 'exact',
+								'priority'   => 10,
+							],
+						],
+					]
+				),
 			]
 		);
 

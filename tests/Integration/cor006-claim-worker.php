@@ -19,9 +19,19 @@ use CetechDeliveryEngine\Domain\DeliveryOffer\DeliveryOfferRepositoryInterface;
 use CetechDeliveryEngine\Tests\Support\RateCardActiveListingTrait;
 use CetechDeliveryEngine\Tests\Support\RealMysqliWpdb;
 
+use CetechDeliveryEngine\Application\Bulk\Portability\ConfigurationImporter;
+use CetechDeliveryEngine\Infrastructure\Persistence\AbstractWpdbRepository;
+use CetechDeliveryEngine\Infrastructure\Persistence\WpdbDestinationRuleRepository;
+use CetechDeliveryEngine\Infrastructure\Persistence\WpdbDestinationZoneRepository;
+use CetechDeliveryEngine\Tests\Support\Cor006LogisticsStore;
+use CetechDeliveryEngine\Tests\Support\Cor006OriginStore;
+use CetechDeliveryEngine\Tests\Support\Cor006PickupStore;
+use CetechDeliveryEngine\Tests\Support\Cor006SupplierStore;
+
 require dirname( __DIR__, 2 ) . '/vendor/autoload.php';
 require dirname( __DIR__, 2 ) . '/tests/bootstrap.php';
 require dirname( __DIR__, 2 ) . '/tests/Support/Cor006WorkerProofStores.php';
+require dirname( __DIR__, 2 ) . '/tests/Support/Cor006ImportStubs.php';
 
 $mode   = (string) ( getenv( 'CETECH_DE_COR006_MODE' ) ?: 'claim' );
 $result = (string) getenv( 'CETECH_DE_COR006_RESULT' );
@@ -80,6 +90,9 @@ file_put_contents( $result, json_encode( $outcome ) );
  * @return array<string, mixed>
  */
 function cor006_run_worker_mode( string $mode, PDO $pdo, WpdbBulkJobRepository $repository, int $job_id ): array {
+	if ( str_starts_with( $mode, 'worker-import' ) ) {
+		return cor006_run_import_mode( $mode, $pdo, $job_id );
+	}
 	$gate = cor006_gate_connection();
 	$started = microtime( true );
 	$worker  = cor006_worker( $pdo );
@@ -187,6 +200,78 @@ function cor006_gate_connection(): PDO {
 	$name = (string) ( getenv( 'CETECH_DE_COR006_DB_NAME' ) ?: 'cetech_cor006_worker' );
 
 	return new PDO( "mysql:host={$host};port={$port};dbname={$name};charset=utf8mb4", $user, $pass, [ PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION ] );
+}
+
+/**
+ * @return array<string, mixed>
+ */
+function cor006_run_import_mode( string $mode, PDO $pdo, int $job_id ): array {
+	$gate    = cor006_gate_connection();
+	$started = microtime( true );
+	if ( 'worker-import' === $mode ) {
+		$worker = cor006_import_worker();
+		AbstractWpdbRepository::set_qualification_probe(
+			static function ( string $phase ) use ( $gate ): void {
+				if ( 'after_transaction_open' !== $phase ) {
+					return;
+				}
+				$gate->exec( "UPDATE cor006_worker_gate SET state = 1 WHERE name = 'a_paused'" );
+				sleep( 3 );
+			}
+		);
+		$worker->tick( $job_id );
+
+		return [
+			'error'   => null,
+			'elapsed' => microtime( true ) - $started,
+		];
+	}
+
+	cor006_wait_gate( $gate, 'a_paused' );
+	$pdo->exec( 'SET innodb_lock_wait_timeout = 1' );
+	$item_id = (int) getenv( 'CETECH_DE_COR006_ITEM_ID' );
+	try {
+		$pdo->prepare( 'UPDATE cor006_delivery_engine_bulk_job_items SET claimed_at = ? WHERE id = ?' )->execute( [ '2000-01-01 00:00:00', $item_id ] );
+	} catch ( Throwable $exception ) {
+		return [
+			'error'   => $exception->getMessage(),
+			'elapsed' => microtime( true ) - $started,
+		];
+	}
+
+	return [
+		'error'   => null,
+		'elapsed' => microtime( true ) - $started,
+	];
+}
+
+function cor006_import_worker(): BulkJobWorker {
+	$offers = new Cor006OfferStore();
+	$mutator = new CatalogScopeMutator(
+		new InMemoryScopedConfigurationRepository(),
+		new EffectiveConfigurationValidator(),
+		new HardFulfilmentConstraintService( $offers ),
+		new SiteWideDefaultsSettings()
+	);
+
+	return new BulkJobWorker(
+		new WpdbBulkJobRepository(),
+		new InMemoryCatalogTargetQuery(),
+		$mutator,
+		new InMemoryBoundedQueue(),
+		30,
+		null,
+		new ConfigurationImporter(
+			$offers,
+			new WpdbDestinationZoneRepository(),
+			new WpdbDestinationRuleRepository(),
+			new Cor006ObservableRateStore( $GLOBALS['wpdb']->pdo() ),
+			new Cor006LogisticsStore(),
+			new Cor006PickupStore(),
+			new Cor006SupplierStore(),
+			new Cor006OriginStore()
+		)
+	);
 }
 
 function cor006_worker( PDO $pdo ): BulkJobWorker {

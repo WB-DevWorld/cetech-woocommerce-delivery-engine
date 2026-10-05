@@ -247,7 +247,13 @@ final class RealMysqliWpdb {
 
 	public function get_var( string $sql ) {
 		$this->log_sql( $sql );
-		$statement = $this->pdo->query( $sql );
+		try {
+			$statement = $this->pdo->query( $sql );
+		} catch ( \PDOException $exception ) {
+			$this->last_error = $exception->getMessage();
+
+			return null;
+		}
 		if ( false === $statement ) {
 			$this->last_error = $this->error_message();
 

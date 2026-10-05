@@ -17,6 +17,9 @@ final class FakeWpdb {
 
 	public string $last_error = '';
 
+	/** @var list<string> */
+	public array $fail_sql_containing = [];
+
 	public int $query_count = 0;
 
 	public int $id_only_updates = 0;
@@ -96,6 +99,9 @@ final class FakeWpdb {
 
 	public function query( mixed $sql ): int|bool {
 		$this->record_sql( (string) $sql );
+		if ( $this->consume_sql_failure( (string) $sql ) ) {
+			return false;
+		}
 		$normalized = strtoupper( trim( (string) $sql ) );
 
 		if ( preg_match( '/^DROP TABLE IF EXISTS `([^`]+)`\s*$/i', trim( (string) $sql ), $drop ) ) {
@@ -140,6 +146,20 @@ final class FakeWpdb {
 		}
 
 		throw new \RuntimeException( 'Unsupported SQL: ' . (string) $sql );
+	}
+
+	private function consume_sql_failure( string $sql ): bool {
+		foreach ( $this->fail_sql_containing as $index => $needle ) {
+			if ( '' !== $needle && str_contains( $sql, $needle ) ) {
+				unset( $this->fail_sql_containing[ $index ] );
+				$this->fail_sql_containing = array_values( $this->fail_sql_containing );
+				$this->last_error          = 'Simulated SQL failure: ' . $needle;
+
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	public function prepare( string $query, mixed ...$args ): string {
@@ -287,6 +307,10 @@ final class FakeWpdb {
 
 	public function get_var( string $sql ) {
 		$this->record_sql( $sql );
+		if ( $this->consume_sql_failure( $sql ) ) {
+			return null;
+		}
+		$this->last_error = '';
 		$trimmed = trim( $sql );
 
 		if ( preg_match( '/^SHOW TABLES LIKE \'((?:\\\\\'|[^\'])*)\'\s*$/i', $trimmed, $like ) ) {

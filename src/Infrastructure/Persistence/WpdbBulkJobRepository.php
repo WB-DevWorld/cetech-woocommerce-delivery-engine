@@ -199,25 +199,37 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 	public function call_while_item_claimed( int $item_id, string $token, callable $callback ): mixed {
 		global $wpdb;
 		$table = TableNames::for( BulkJobSchema::ITEMS_SUFFIX );
-		$wpdb->query( 'START TRANSACTION' );
+		if ( ! $this->open_owned_transaction() ) {
+			$detail = trim( (string) $wpdb->last_error );
+			throw new \RuntimeException( 'Bulk item write failed.' . ( '' !== $detail ? ' ' . $detail : '' ) );
+		}
 		try {
 			$sql = "SELECT id FROM `{$table}` WHERE id = %d AND claim_token = %s AND status = %s LIMIT 1 FOR UPDATE";
 			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
-			$locked = $wpdb->get_var( $wpdb->prepare( $sql, $item_id, $token, BulkJobItemStatus::Claimed->value ) );
+			$locked     = $wpdb->get_var( $wpdb->prepare( $sql, $item_id, $token, BulkJobItemStatus::Claimed->value ) );
+			$read_error = trim( (string) $wpdb->last_error );
+			if ( '' !== $read_error ) {
+				throw new \RuntimeException( 'Bulk item write failed. ' . $read_error );
+			}
 			if ( (int) $locked !== $item_id ) {
-				$wpdb->query( 'ROLLBACK' );
+				if ( ! $this->rollback_owned_transaction() ) {
+					throw new \RuntimeException( 'Bulk item write failed.' );
+				}
 
 				return null;
 			}
 			$result = $callback();
-			$committed = $wpdb->query( 'COMMIT' );
-			if ( false === $committed ) {
-				throw new \RuntimeException( 'Bulk item write failed.' );
+			if ( ! $this->commit_owned_transaction() ) {
+				$detail = trim( (string) $wpdb->last_error );
+				throw new \RuntimeException( 'Bulk item write failed.' . ( '' !== $detail ? ' ' . $detail : '' ) );
 			}
 
 			return $result;
 		} catch ( \Throwable $exception ) {
-			$wpdb->query( 'ROLLBACK' );
+			$detail = $exception->getMessage();
+			if ( $this->transaction_is_open() && ! $this->rollback_owned_transaction() && ! str_contains( $detail, 'Rollback also failed.' ) ) {
+				throw new \RuntimeException( $detail . ' Rollback also failed.', 0, $exception );
+			}
 			throw $exception;
 		}
 	}

@@ -13,6 +13,85 @@ abstract class AbstractWpdbRepository {
 
 	protected const SAVE_NOT_IMPLEMENTED_MESSAGE = 'Repository save() is not implemented until Phase 2B CRUD.';
 
+	protected static int $transaction_depth = 0;
+
+	/** @var null|callable(string):void */
+	private static $qualification_probe = null;
+
+	public static function set_qualification_probe( ?callable $probe ): void {
+		self::$qualification_probe = $probe;
+	}
+
+	public static function reset_transaction_state(): void {
+		self::$transaction_depth    = 0;
+		self::$qualification_probe = null;
+	}
+
+	protected static function probe_transaction( string $phase ): void {
+		if ( null !== self::$qualification_probe ) {
+			( self::$qualification_probe )( $phase );
+		}
+	}
+
+	protected function transaction_is_open(): bool {
+		return self::$transaction_depth > 0;
+	}
+
+	protected function open_owned_transaction(): bool {
+		global $wpdb;
+
+		if ( self::$transaction_depth > 0 ) {
+			++self::$transaction_depth;
+
+			return true;
+		}
+		$started = $wpdb->query( 'START TRANSACTION' );
+		if ( false === $started ) {
+			return false;
+		}
+		self::$transaction_depth = 1;
+
+		return true;
+	}
+
+	protected function commit_owned_transaction(): bool {
+		global $wpdb;
+
+		if ( self::$transaction_depth > 1 ) {
+			--self::$transaction_depth;
+
+			return true;
+		}
+		if ( 1 !== self::$transaction_depth ) {
+			return true;
+		}
+		$committed = $wpdb->query( 'COMMIT' );
+		if ( false === $committed ) {
+			return false;
+		}
+		self::$transaction_depth = 0;
+
+		return true;
+	}
+
+	protected function rollback_owned_transaction(): bool {
+		global $wpdb;
+
+		if ( self::$transaction_depth > 1 ) {
+			$rolled = $wpdb->query( 'ROLLBACK' );
+			self::$transaction_depth = 0;
+
+			return false !== $rolled;
+		}
+		if ( self::$transaction_depth < 1 ) {
+			return true;
+		}
+		$rolled = $wpdb->query( 'ROLLBACK' );
+		self::$transaction_depth = 0;
+
+		return false !== $rolled;
+	}
+
 	abstract protected function table_suffix(): string;
 
 	protected function throw_save_not_implemented(): never {
