@@ -94,7 +94,9 @@ finish_http_fixture() {
     # Retain only an allowlisted diagnostic code/class and a one-way log hash.
     # Raw WP-CLI/bootstrap output, paths, SQL, credentials and payloads stay
     # private and are deleted immediately below, including on early failures.
-    python3 - "$RECEIPT" "$PRIVATE/import-prepare-command.log" "$QUALIFICATION_STAGE" <<'PY'
+    local diagnostic_log="$PRIVATE/import-prepare-command.log"
+    if [[ "$QUALIFICATION_STAGE" == "origin_preflight" ]]; then diagnostic_log="$PRIVATE/origin-preflight-command.log"; fi
+    python3 - "$RECEIPT" "$diagnostic_log" "$QUALIFICATION_STAGE" "$PRIVATE/origin-preflight-output.json" <<'PY'
 import hashlib, json, re, sys
 from pathlib import Path
 receipt = Path(sys.argv[1])
@@ -126,8 +128,8 @@ messages = {
     "HTTP_IMPORT_STATE_FORMAT": "Unrecognized HTTP import fixture state.",
 }
 codes = [code for code, literal in messages.items() if literal in text]
-for prefix in ("HTTP_MU_GUARD_", "HTTP_COMMON_GUARD_"):
-    for condition in ("FLAGS", "DB_HOST", "DB_NAME", "SITE_PATH", "WORK_PATH", "PRIVATE_PATH", "MARKER", "CRON", "SITEURL", "HOME", "NATIVE_CONTEXT", "PLUGIN_CLASSES"):
+for prefix in ("HTTP_MU_GUARD_", "HTTP_COMMON_GUARD_", "HTTP_ORIGIN_PREFLIGHT_"):
+    for condition in ("FLAGS", "DB_HOST", "DB_NAME", "SITE_PATH", "WORK_PATH", "PRIVATE_PATH", "MARKER", "CRON", "SITEURL", "HOME", "NATIVE_CONTEXT", "PLUGIN_CLASSES", "NATIVE_STORAGE_CONTEXT", "OUTPUT_PATH", "RECEIPT_WRITE", "URL_SQL", "EXACT_READBACK", "NATIVE_RECEIPT", "NATIVE_IDENTITY", "FAILED"):
         literal = prefix + condition
         if re.search(r"\b" + re.escape(literal) + r"\b", text):
             codes.append(literal)
@@ -141,13 +143,21 @@ if "must be the very first statement" in text:
     codes.append("PHP_STRICT_TYPES_POSITION")
 classes = [name for name in ("RuntimeException", "Error", "TypeError", "ParseError", "ValueError", "JsonException", "Exception") if re.search(r"Uncaught\s+" + name + r"(?:\s|:)", text)]
 report["fixture_diagnostic"] = {
-    "stage": sys.argv[3] if sys.argv[3] in ("allocated", "mu_copy", "import_prepare", "listener_preflight", "listener_readiness", "http_driver", "complete") else "unknown_stage",
-    "import_prepare_log_present": log.is_file(),
-    "import_prepare_log_sha256": hashlib.sha256(raw).hexdigest() if raw else None,
+    "stage": sys.argv[3] if sys.argv[3] in ("allocated", "origin_preflight", "mu_copy", "import_prepare", "listener_preflight", "listener_readiness", "http_driver", "complete") else "unknown_stage",
+    "command_log_present": log.is_file(),
+    "command_log_sha256": hashlib.sha256(raw).hexdigest() if raw else None,
     "allowlisted_error_codes": sorted(set(codes)),
     "allowlisted_error_classes": classes,
     "raw_output_retained": False,
 }
+origin_path = Path(sys.argv[4])
+if origin_path.is_file():
+    try:
+        origin = json.loads(origin_path.read_text(encoding="utf-8"))
+        if origin.get("format") == "cetech-opening-http-origin-preflight-v1" and origin.get("expected_origin") == "http://127.0.0.1:8085":
+            report["fixture_origin_preflight"] = {key: origin[key] for key in ("format", "status", "expected_origin", "same_run_native_pass_before_mutations", "before", "after", "option_update_returns", "identity", "installed_php_source_files", "error_class", "error_code") if key in origin}
+    except (OSError, ValueError, TypeError):
+        report["fixture_origin_preflight"] = {"status": "UNREADABLE", "raw_output_retained": False}
 receipt.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 PY
     if [[ "$?" != "0" ]]; then result=1; fi
@@ -167,9 +177,13 @@ except (OSError, ValueError):
     report = {"format": "cetech-opening-http-qualification-v1", "status": "FAIL", "cases": []}
 result, started, attested, stopped, mu_removed, private_removed, tracked_cleanup = map(int, sys.argv[2:])
 cases = report.setdefault("cases", [])
+origin = report.get("fixture_origin_preflight", {})
+after = origin.get("after", {})
+origin_verified = origin.get("status") == "PASS" and origin.get("same_run_native_pass_before_mutations") is True and origin.get("installed_php_source_files") == 494 and all(after.get(layer, {}).get(option, {}).get("exact_expected") is True for layer in ("physical", "native") for option in ("home", "siteurl"))
 new_cases = [
+    ("HTTP-FIXTURE-EXACT-LOOPBACK-ORIGIN", origin_verified, {"same_run_native_pass_before_mutations": origin.get("same_run_native_pass_before_mutations") is True, "physical_and_native_home_siteurl_exact": origin_verified, "origin": "http://127.0.0.1:8085", "source_map_files": origin.get("installed_php_source_files")}),
     ("HTTP-FIXTURE-OWNED-LISTENER-ATTESTED", started == 1 and attested == 1, {"loopback": "127.0.0.1:8085", "actual_docroot": "exact third fresh native site", "pid_liveness_and_header_token": attested == 1}),
-    ("HTTP-FIXTURE-OWNED-LISTENER-STOPPED", stopped == 1, {"owned_pid_waited": stopped == 1}),
+    ("HTTP-FIXTURE-OWNED-LISTENER-STOPPED", stopped == 1, {"owned_pid_waited": started == 1 and stopped == 1, "listener_never_started": started == 0}),
     ("HTTP-FIXTURE-MU-AND-CREDENTIAL-FILES-REMOVED", mu_removed == 1 and private_removed == 1, {"fixture_mu_removed": mu_removed == 1, "private_directory_removed": private_removed == 1}),
 ]
 for case_id, passed, evidence in new_cases:
@@ -191,6 +205,8 @@ PY
 }
 trap finish_http_fixture EXIT
 
+QUALIFICATION_STAGE="origin_preflight"
+"${WP[@]}" eval-file "$ROOT/scripts/qualification/opening-http-origin-preflight.php" "$PRIVATE/origin-preflight-output.json" >"$PRIVATE/origin-preflight-command.log" 2>&1
 QUALIFICATION_STAGE="mu_copy"
 cp "$ROOT/scripts/qualification/opening-http-mu.php" "$MU"
 MU_CREATED=1
