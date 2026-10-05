@@ -97,6 +97,20 @@ final class FakeWpdb {
 		return array_keys( $this->tables );
 	}
 
+	/**
+	 * Rows captured when the current transaction opened. Empty when no transaction is open.
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	public function transaction_snapshot( string $table ): array {
+		if ( ! is_array( $this->transaction_tables ) ) {
+			return [];
+		}
+		$rows = $this->transaction_tables[ $table ] ?? [];
+
+		return is_array( $rows ) ? array_values( $rows ) : [];
+	}
+
 	public function query( mixed $sql ): int|bool {
 		$this->record_sql( (string) $sql );
 		if ( $this->consume_sql_failure( (string) $sql ) ) {

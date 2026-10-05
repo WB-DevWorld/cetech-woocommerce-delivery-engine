@@ -37,6 +37,8 @@ final class WpdbDestinationRuleRepository extends AbstractWpdbRepository impleme
 	}
 
 	public function replaceForZone( int $zone_id, array $rules ): bool {
+		global $wpdb;
+
 		$joined = $this->transaction_is_open();
 		if ( ! $joined && ! $this->open_owned_transaction() ) {
 			return false;
@@ -45,6 +47,7 @@ final class WpdbDestinationRuleRepository extends AbstractWpdbRepository impleme
 		self::probe_transaction( 'after_transaction_open' );
 
 		if ( ! $this->deleteByZoneId( $zone_id ) ) {
+			$this->remember_transaction_cause( trim( (string) $wpdb->last_error ) );
 			$this->rollback_owned_transaction();
 
 			return false;
@@ -54,6 +57,7 @@ final class WpdbDestinationRuleRepository extends AbstractWpdbRepository impleme
 
 		foreach ( $rules as $rule ) {
 			if ( ! $this->insert_rule_row( $zone_id, $rule, $now ) ) {
+				$this->remember_transaction_cause( trim( (string) $wpdb->last_error ) );
 				$this->rollback_owned_transaction();
 
 				return false;

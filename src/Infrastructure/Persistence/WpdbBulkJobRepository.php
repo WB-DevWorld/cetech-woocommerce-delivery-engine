@@ -20,6 +20,7 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 
 	public function save_job( BulkJob $job ): BulkJob {
 		global $wpdb;
+		$this->throw_if_transaction_unresolved();
 		$row = $this->job_to_row( $job );
 		if ( null === $job->id ) {
 			$id = $this->insert_row( $row['data'], $row['formats'] );
@@ -200,6 +201,7 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 		global $wpdb;
 		$table = TableNames::for( BulkJobSchema::ITEMS_SUFFIX );
 		if ( ! $this->open_owned_transaction() ) {
+			$this->throw_if_transaction_unresolved();
 			$detail = trim( (string) $wpdb->last_error );
 			throw new \RuntimeException( 'Bulk item write failed.' . ( '' !== $detail ? ' ' . $detail : '' ) );
 		}
@@ -213,12 +215,14 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 			}
 			if ( (int) $locked !== $item_id ) {
 				if ( ! $this->rollback_owned_transaction() ) {
+					$this->throw_if_transaction_unresolved();
 					throw new \RuntimeException( 'Bulk item write failed.' );
 				}
 
 				return null;
 			}
 			$result = $callback();
+			$this->throw_if_transaction_unresolved();
 			if ( ! $this->commit_owned_transaction() ) {
 				$detail = trim( (string) $wpdb->last_error );
 				throw new \RuntimeException( 'Bulk item write failed.' . ( '' !== $detail ? ' ' . $detail : '' ) );
@@ -226,6 +230,9 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 
 			return $result;
 		} catch ( \Throwable $exception ) {
+			if ( self::$transaction_cleanup_failed ) {
+				throw $exception;
+			}
 			$detail = $exception->getMessage();
 			if ( $this->transaction_is_open() && ! $this->rollback_owned_transaction() && ! str_contains( $detail, 'Rollback also failed.' ) ) {
 				throw new \RuntimeException( $detail . ' Rollback also failed.', 0, $exception );
@@ -236,6 +243,7 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 
 	public function save_item( BulkJobItem $item, ?bool &$applied = null ): BulkJobItem {
 		global $wpdb;
+		$this->throw_if_transaction_unresolved();
 		$applied = false;
 		$table = TableNames::for( BulkJobSchema::ITEMS_SUFFIX );
 		$data  = $this->item_to_row( $item );
@@ -392,6 +400,7 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 
 	public function release_job_claim( int $job_id, string $claim_token ): bool {
 		global $wpdb;
+		$this->throw_if_transaction_unresolved();
 		$updated = $wpdb->query(
 			$wpdb->prepare(
 				'UPDATE `' . $this->table_name() . '` SET claim_token = NULL, claimed_at = NULL WHERE id = %d AND claim_token = %s',

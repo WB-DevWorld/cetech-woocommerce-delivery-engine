@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Tests\Integration;
 
+require_once dirname( __DIR__ ) . '/Unit/Bulk/BulkJobBulk9RepairTest.php';
+require_once dirname( __DIR__ ) . '/Support/Cor006ImportStubs.php';
+
+use CetechDeliveryEngine\Application\Bulk\Portability\ConfigImportConflictMode;
+use CetechDeliveryEngine\Application\Bulk\Portability\ConfigurationImporter;
 use CetechDeliveryEngine\Domain\Bulk\BulkJob;
 use CetechDeliveryEngine\Domain\Bulk\BulkJobItem;
 use CetechDeliveryEngine\Domain\Enum\BulkJobItemStatus;
@@ -11,6 +16,14 @@ use CetechDeliveryEngine\Domain\Enum\BulkJobStatus;
 use CetechDeliveryEngine\Domain\Enum\BulkOperationType;
 use CetechDeliveryEngine\Infrastructure\Persistence\BulkJobSchema;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbBulkJobRepository;
+use CetechDeliveryEngine\Infrastructure\Persistence\WpdbDestinationRuleRepository;
+use CetechDeliveryEngine\Infrastructure\Persistence\WpdbDestinationZoneRepository;
+use CetechDeliveryEngine\Tests\Support\Cor006LogisticsStore;
+use CetechDeliveryEngine\Tests\Support\Cor006OriginStore;
+use CetechDeliveryEngine\Tests\Support\Cor006PickupStore;
+use CetechDeliveryEngine\Tests\Support\Cor006SupplierStore;
+use CetechDeliveryEngine\Tests\Unit\Bulk\ArrayDeliveryOfferStore;
+use CetechDeliveryEngine\Tests\Unit\Bulk\ArrayRateCardStore;
 use CetechDeliveryEngine\Tests\Support\RealMysqliWpdb;
 use PHPUnit\Framework\TestCase;
 
@@ -205,6 +218,54 @@ final class BulkClaimFenceSqlTest extends TestCase {
 		self::assertGreaterThan( 0.5, (float) $contender_result['elapsed'] );
 		self::assertSame( [ 'GH' ], array_map( static fn ( array $row ): string => (string) $row['rule_value'], $rules ) );
 		self::assertSame( 1, $this->repository->find_job( $seed['job_id'] )->changed_count );
+	}
+
+	public function test_a_rejected_rule_insert_rolls_back_on_the_joined_connection(): void {
+		$seed = $this->seed_rule_import_job();
+		$this->pdo->exec( "INSERT INTO cor006_delivery_engine_destination_rules (zone_id, rule_type, rule_value, match_mode, priority) VALUES (1, 'country', 'NG', 'exact', 10)" );
+		$this->pdo->exec( "CREATE TRIGGER cor006_reject_rule_insert BEFORE INSERT ON cor006_delivery_engine_destination_rules FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'rejected destination_rules insert'" );
+		$job = $this->repository->claim_job( $seed['job_id'], 'owner', 300 );
+		$items = $this->repository->claim_items( $seed['job_id'], 1, 'owner', 30 );
+		self::assertNotNull( $job );
+		self::assertCount( 1, $items );
+		$importer = new ConfigurationImporter(
+			new ArrayDeliveryOfferStore(),
+			new WpdbDestinationZoneRepository(),
+			new WpdbDestinationRuleRepository(),
+			new ArrayRateCardStore(),
+			new Cor006LogisticsStore(),
+			new Cor006PickupStore(),
+			new Cor006SupplierStore(),
+			new Cor006OriginStore()
+		);
+		$result = $this->repository->call_while_item_claimed(
+			$seed['item_id'],
+			'owner',
+			static function () use ( $importer ): array {
+				return $importer->apply_item(
+					'delivery_area_rules',
+					[
+						'zone_code'  => 'accra',
+						'rule_type'  => 'country',
+						'rule_value' => 'GH',
+						'match_mode' => 'exact',
+						'priority'   => 10,
+					],
+					ConfigImportConflictMode::Replace,
+					false,
+					false
+				);
+			}
+		);
+		$rules = $this->pdo->query( 'SELECT rule_value FROM cor006_delivery_engine_destination_rules' )->fetchAll( \PDO::FETCH_COLUMN );
+
+		self::assertSame( 'failed', $result['outcome'] ?? null );
+		self::assertSame( 0, (int) $this->pdo->query( 'SELECT @@in_transaction' )->fetchColumn() );
+		self::assertSame( [ 'NG' ], $rules );
+		self::assertStringContainsString(
+			'rejected destination_rules insert',
+			(string) $this->pdo->query( "SELECT ACTION_STATEMENT FROM information_schema.TRIGGERS WHERE TRIGGER_NAME = 'cor006_reject_rule_insert'" )->fetchColumn()
+		);
 	}
 
 	public function test_source_write_holds_the_claim_until_the_contender_times_out(): void {

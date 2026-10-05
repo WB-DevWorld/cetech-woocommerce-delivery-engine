@@ -15,6 +15,12 @@ abstract class AbstractWpdbRepository {
 
 	protected static int $transaction_depth = 0;
 
+	protected static bool $transaction_cleanup_failed = false;
+
+	protected static string $transaction_cause = '';
+
+	protected static string $transaction_cleanup_error = '';
+
 	/** @var null|callable(string):void */
 	private static $qualification_probe = null;
 
@@ -23,8 +29,11 @@ abstract class AbstractWpdbRepository {
 	}
 
 	public static function reset_transaction_state(): void {
-		self::$transaction_depth    = 0;
-		self::$qualification_probe = null;
+		self::$transaction_depth          = 0;
+		self::$transaction_cleanup_failed = false;
+		self::$transaction_cause          = '';
+		self::$transaction_cleanup_error  = '';
+		self::$qualification_probe        = null;
 	}
 
 	protected static function probe_transaction( string $phase ): void {
@@ -40,6 +49,9 @@ abstract class AbstractWpdbRepository {
 	protected function open_owned_transaction(): bool {
 		global $wpdb;
 
+		if ( self::$transaction_cleanup_failed ) {
+			return false;
+		}
 		if ( self::$transaction_depth > 0 ) {
 			++self::$transaction_depth;
 
@@ -57,6 +69,9 @@ abstract class AbstractWpdbRepository {
 	protected function commit_owned_transaction(): bool {
 		global $wpdb;
 
+		if ( self::$transaction_cleanup_failed ) {
+			return false;
+		}
 		if ( self::$transaction_depth > 1 ) {
 			--self::$transaction_depth;
 
@@ -74,22 +89,52 @@ abstract class AbstractWpdbRepository {
 		return true;
 	}
 
+	protected function remember_transaction_cause( string $cause ): void {
+		self::$transaction_cause = trim( $cause );
+	}
+
+	protected function throw_if_transaction_unresolved(): void {
+		if ( ! self::$transaction_cleanup_failed ) {
+			return;
+		}
+
+		throw new \RuntimeException( $this->unresolved_transaction_message() );
+	}
+
+	protected function unresolved_transaction_message(): string {
+		$cause   = self::$transaction_cause;
+		$cleanup = self::$transaction_cleanup_error;
+		$message = 'Bulk item write failed.';
+		if ( '' !== $cause ) {
+			$message .= ' ' . $cause;
+		}
+		$message .= ' Rollback also failed.';
+		if ( '' !== $cleanup && ! str_contains( $message, $cleanup ) ) {
+			$message .= ' ' . $cleanup;
+		}
+
+		return $message;
+	}
+
 	protected function rollback_owned_transaction(): bool {
 		global $wpdb;
 
-		if ( self::$transaction_depth > 1 ) {
-			$rolled = $wpdb->query( 'ROLLBACK' );
-			self::$transaction_depth = 0;
-
-			return false !== $rolled;
-		}
 		if ( self::$transaction_depth < 1 ) {
-			return true;
+			return ! self::$transaction_cleanup_failed;
 		}
 		$rolled = $wpdb->query( 'ROLLBACK' );
-		self::$transaction_depth = 0;
+		if ( false === $rolled ) {
+			self::$transaction_cleanup_failed = true;
+			self::$transaction_cleanup_error  = trim( (string) $wpdb->last_error );
 
-		return false !== $rolled;
+			return false;
+		}
+		self::$transaction_depth          = 0;
+		self::$transaction_cleanup_failed = false;
+		self::$transaction_cause          = '';
+		self::$transaction_cleanup_error  = '';
+
+		return true;
 	}
 
 	abstract protected function table_suffix(): string;
