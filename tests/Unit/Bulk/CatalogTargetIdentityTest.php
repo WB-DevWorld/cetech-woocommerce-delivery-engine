@@ -188,6 +188,45 @@ final class CatalogTargetIdentityTest extends TestCase {
 		self::assertSame( 0, $jobs->count_items( (int) $job->id ) );
 	}
 
+	public function test_authorized_detail_renders_a_stored_invalid_filter_failure(): void {
+		AdminPageAccess::bind( null );
+		$GLOBALS['cetech_de_test_caps']      = [ 'manage_product_delivery_rules' => true ];
+		$GLOBALS['cetech_de_test_user_id']   = 7;
+		$GLOBALS['cetech_de_test_is_admin']  = true;
+		$GLOBALS['cetech_de_test_logged_in'] = true;
+		$jobs = new InMemoryBulkJobRepository();
+		$stored = [
+			'scope'   => BulkTargetScope::MatchingFilters->value,
+			'filters' => [
+				CatalogTargetFilters::CATEGORY_ID => 50,
+				'unsupported_filter'              => [ 900 ],
+			],
+		];
+		$job = $jobs->save_job(
+			BulkJob::create( BulkOperationType::CatalogUpdate, 7, $stored, [ 'field_actions' => [] ] )->with(
+				[
+					'status'        => BulkJobStatus::Failed,
+					'error_code'    => 'unsupported_catalog_filter',
+					'error_summary' => 'Unsupported catalog filter.',
+				]
+			)
+		);
+		$page = $this->page_for( $jobs );
+		$_GET = [ 'tab' => 'jobs', 'job' => (string) $job->id ];
+		ob_start();
+		try {
+			$page->render();
+			$html = (string) ob_get_contents();
+		} finally {
+			ob_end_clean();
+		}
+
+		self::assertStringContainsString( 'Unsupported catalog filter.', $html );
+		self::assertStringContainsString( $job->job_code, $html );
+		self::assertStringNotContainsString( 'Apply these changes', $html );
+		self::assertSame( $stored, $jobs->find_job( (int) $job->id )->target_definition );
+	}
+
 	public function test_denied_catalog_preview_preserves_job_state(): void {
 		AdminPageAccess::bind( null );
 		$GLOBALS['cetech_de_test_caps']       = [ 'manage_product_delivery_rules' => false ];

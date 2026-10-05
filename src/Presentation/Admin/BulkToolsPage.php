@@ -545,6 +545,18 @@ final class BulkToolsPage {
 		AdminPageLayout::close_content_panel();
 	}
 
+	private function display_target_definition( BulkJob $job ): ?CatalogTargetDefinition {
+		try {
+			return CatalogTargetDefinition::from_array( $job->target_definition );
+		} catch ( \InvalidArgumentException $exception ) {
+			if ( 'Unsupported catalog filter.' !== $exception->getMessage() ) {
+				throw $exception;
+			}
+
+			return null;
+		}
+	}
+
 	private function render_job_detail( BulkJob $job, int $per_page ): void {
 		if ( ! ( new BulkJobAccess( $this->engine ) )->can_access( $job ) ) {
 			echo '<div class="notice notice-error inline"><p>' . esc_html__( 'You do not have permission to access this bulk job.', 'cetech-woocommerce-delivery-engine' ) . '</p></div>';
@@ -594,8 +606,12 @@ final class BulkToolsPage {
 		}
 		AdminPageLayout::render_summary_stats( $stats );
 
-		$definition = CatalogTargetDefinition::from_array( $job->target_definition );
-		echo '<p class="cetech-de-bulk-variation-note">' . esc_html( BulkJobAdminCopy::variation_policy_notice( $definition->variation_policy, $phase ) ) . '</p>';
+		$definition = $this->display_target_definition( $job );
+		if ( $definition instanceof CatalogTargetDefinition ) {
+			echo '<p class="cetech-de-bulk-variation-note">' . esc_html( BulkJobAdminCopy::variation_policy_notice( $definition->variation_policy, $phase ) ) . '</p>';
+		} else {
+			echo '<div class="notice notice-error inline"><p>' . esc_html( (string) ( $job->error_summary ?: 'Unsupported catalog filter.' ) ) . '</p></div>';
+		}
 
 		echo '<div class="cetech-de-bulk-actions">';
 		echo '<div class="cetech-de-bulk-actions-primary">';
@@ -664,7 +680,7 @@ final class BulkToolsPage {
 		$labels      = BulkJobTargetLabelResolver::for_page( $items );
 		$manifest    = CatalogActionManifest::from_array( $job->action_manifest );
 		$results     = new BulkJobItemResultPresenter( $this->catalog_choices->delivery_options() );
-		$definition  = CatalogTargetDefinition::from_array( $job->target_definition );
+		$definition  = $this->display_target_definition( $job );
 
 		AdminPageLayout::open_content_panel(
 			__( 'Job items', 'cetech-woocommerce-delivery-engine' ),
@@ -703,7 +719,7 @@ final class BulkToolsPage {
 				if ( 'variation' !== $item->target_type && in_array( $item->target_type, [ 'product', '' ], true ) ) {
 					$counts = $labels->variation_counts( $item->target_id );
 					$note   = BulkJobAdminCopy::variation_inherit_count_note( $counts['inherit'], $counts['override'], $phase );
-					if ( '' !== $note && BulkVariationPolicy::PreserveOverrides === $definition->variation_policy ) {
+					if ( '' !== $note && $definition instanceof CatalogTargetDefinition && BulkVariationPolicy::PreserveOverrides === $definition->variation_policy ) {
 						echo '<span class="cetech-de-bulk-target-secondary">' . esc_html( $note ) . '</span>';
 					}
 				}
