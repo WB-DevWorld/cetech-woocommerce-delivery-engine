@@ -79,12 +79,33 @@ final class BulkClaimFenceTest extends TestCase {
 
 		self::assertCount( 1, $winner );
 		self::assertSame( [], $loser );
-		$done = $jobs->save_item( $winner[0]->with( [ 'status' => BulkJobItemStatus::Changed, 'result' => [ 'ok' => true ] ] ) );
+		$applied = false;
+		$done    = $jobs->save_item( $winner[0]->with( [ 'status' => BulkJobItemStatus::Changed, 'result' => [ 'ok' => true ] ] ), $applied );
+		self::assertTrue( $applied );
 		self::assertNull( $done->claim_token );
 		self::assertSame( BulkJobItemStatus::Changed, $jobs->list_items( (int) $job->id, 10 )[0]->status );
-		$repeat = $jobs->save_item( $winner[0]->with( [ 'status' => BulkJobItemStatus::Changed, 'result' => [ 'ok' => false ] ] ) );
-		self::assertNull( $repeat->claim_token );
+		$replayed = true;
+		$repeat   = $jobs->save_item( $winner[0]->with( [ 'status' => BulkJobItemStatus::Changed, 'result' => [ 'ok' => true ] ] ), $replayed );
+		self::assertFalse( $replayed );
 		self::assertSame( [ 'ok' => true ], $repeat->result );
+		try {
+			$jobs->save_item( $winner[0]->with( [ 'status' => BulkJobItemStatus::Changed, 'result' => [ 'ok' => false ] ] ) );
+			self::fail( 'A different outcome with the old token must not be acknowledged.' );
+		} catch ( \RuntimeException $exception ) {
+			self::assertSame( 'Stale bulk claim.', $exception->getMessage() );
+		}
+		self::assertSame( [ 'ok' => true ], $jobs->list_items( (int) $job->id, 10 )[0]->result );
+	}
+
+	public function test_lost_release_is_distinct_from_a_failed_release_statement(): void {
+		$jobs = new InMemoryBulkJobRepository();
+		$job  = $jobs->save_job( BulkJob::create( BulkOperationType::CatalogUpdate, 7, [ 'scope' => 'selected_ids' ], [] ) );
+		$owned = $jobs->claim_job( (int) $job->id, 'owner', 300 );
+
+		self::assertTrue( $jobs->release_job_claim( (int) $job->id, 'owner' ) );
+		self::assertNull( $jobs->find_job( (int) $job->id )->claim_token );
+		self::assertFalse( $jobs->release_job_claim( (int) $job->id, 'owner' ) );
+		unset( $owned );
 	}
 
 	public function test_identical_job_save_is_not_a_write_failure(): void {

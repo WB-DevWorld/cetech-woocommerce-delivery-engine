@@ -67,6 +67,15 @@ final class BulkJobItem {
 		);
 	}
 
+	public function same_outcome( self $other ): bool {
+		return $this->status === $other->status
+			&& $this->result == $other->result
+			&& (string) $this->error_code === (string) $other->error_code
+			&& (string) $this->error_summary === (string) $other->error_summary
+			&& $this->precondition_fingerprint === $other->precondition_fingerprint
+			&& $this->after_fingerprint === $other->after_fingerprint;
+	}
+
 	/**
 	 * @param array<string, mixed> $overrides
 	 */

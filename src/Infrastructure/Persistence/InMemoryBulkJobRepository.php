@@ -188,12 +188,14 @@ final class InMemoryBulkJobRepository implements BulkJobRepositoryInterface {
 		return $claimed;
 	}
 
-	public function save_item( BulkJobItem $item ): BulkJobItem {
+	public function save_item( BulkJobItem $item, ?bool &$applied = null ): BulkJobItem {
+		$applied = false;
 		if ( null === $item->id ) {
 			$saved = $this->insert_items( [ $item ] );
 			if ( ! isset( $saved[0] ) ) {
 				throw new \RuntimeException( 'Bulk item write failed.' );
 			}
+			$applied = null === $item->id;
 
 			return $saved[0];
 		}
@@ -202,17 +204,12 @@ final class InMemoryBulkJobRepository implements BulkJobRepositoryInterface {
 			throw new \RuntimeException( 'Bulk item write failed.' );
 		}
 		if ( (string) $current->claim_token !== (string) $item->claim_token ) {
-			$already_released = null === $current->claim_token
-				&& null !== $item->claim_token
-				&& '' !== $item->claim_token
-				&& $current->status === $item->status
-				&& BulkJobItemStatus::Claimed !== $item->status;
-			if ( ! $already_released ) {
-				throw new \RuntimeException( 'Stale bulk claim.' );
+			if ( null === $current->claim_token && $current->same_outcome( $item ) && BulkJobItemStatus::Claimed !== $item->status ) {
+				return $current;
 			}
-
-			return $current;
+			throw new \RuntimeException( 'Stale bulk claim.' );
 		}
+		$applied = ! $current->same_outcome( $item );
 		if ( BulkJobItemStatus::Claimed !== $item->status ) {
 			$item = $item->with(
 				[
@@ -338,12 +335,14 @@ final class InMemoryBulkJobRepository implements BulkJobRepositoryInterface {
 		return $claimed;
 	}
 
-	public function release_job_claim( int $job_id, string $claim_token ): void {
+	public function release_job_claim( int $job_id, string $claim_token ): bool {
 		$job = $this->jobs[ $job_id ] ?? null;
 		if ( ! $job instanceof BulkJob || $job->claim_token !== $claim_token ) {
-			return;
+			return false;
 		}
 		$this->jobs[ $job_id ] = $job->with_claim( null, null );
+
+		return true;
 	}
 
 	public function save_recipe( BulkRecipe $recipe ): BulkRecipe {

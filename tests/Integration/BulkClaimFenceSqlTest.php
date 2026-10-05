@@ -123,6 +123,27 @@ final class BulkClaimFenceSqlTest extends TestCase {
 		self::assertSame( 4, $this->repository->find_job( (int) $job->id )->processed_count );
 	}
 
+	public function test_release_failure_remains_held_and_a_lost_token_does_not(): void {
+		$job = $this->repository->save_job( BulkJob::create( BulkOperationType::CatalogUpdate, 4, [ 'scope' => 'selected_ids' ], [] ) );
+		$this->repository->claim_job( (int) $job->id, 'releaser', 300 );
+		self::assertFalse( $this->repository->release_job_claim( (int) $job->id, 'someone-else' ) );
+		self::assertSame( 'releaser', $this->repository->find_job( (int) $job->id )->claim_token );
+
+		$this->pdo->exec( "SET SESSION sql_mode = 'STRICT_TRANS_TABLES,ERROR_FOR_DIVISION_BY_ZERO,NO_ENGINE_SUBSTITUTION'" );
+		$this->pdo->exec( 'CREATE TRIGGER cor006_fail_release BEFORE UPDATE ON cor006_delivery_engine_bulk_jobs FOR EACH ROW SET NEW.processed_count = IF(@cor006_fail_release = 1 AND NEW.claim_token IS NULL AND OLD.claim_token IS NOT NULL, -1, NEW.processed_count)' );
+		$this->pdo->exec( 'SET @cor006_fail_release = 1' );
+		try {
+			$this->repository->release_job_claim( (int) $job->id, 'releaser' );
+			self::fail( 'A rejected release must be explicit.' );
+		} catch ( \RuntimeException $exception ) {
+			self::assertSame( 'Bulk job write failed.', $exception->getMessage() );
+		}
+		self::assertSame( 'releaser', $this->repository->find_job( (int) $job->id )->claim_token );
+		$this->pdo->exec( 'SET @cor006_fail_release = 0' );
+		self::assertTrue( $this->repository->release_job_claim( (int) $job->id, 'releaser' ) );
+		self::assertNull( $this->repository->find_job( (int) $job->id )->claim_token );
+	}
+
 	/**
 	 * @return array{process: resource, result: string, output: string}
 	 */

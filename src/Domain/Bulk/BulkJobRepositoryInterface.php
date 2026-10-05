@@ -42,7 +42,7 @@ interface BulkJobRepositoryInterface {
 	 */
 	public function claim_items( int $job_id, int $limit, string $claim_token, int $claim_ttl_seconds = 300 ): array;
 
-	public function save_item( BulkJobItem $item ): BulkJobItem;
+	public function save_item( BulkJobItem $item, ?bool &$applied = null ): BulkJobItem;
 
 	/**
 	 * @return list<BulkJobItem>
@@ -70,7 +70,7 @@ interface BulkJobRepositoryInterface {
 	 */
 	public function claim_job( int $job_id, string $claim_token, int $claim_ttl_seconds = 300 ): ?BulkJob;
 
-	public function release_job_claim( int $job_id, string $claim_token ): void;
+	public function release_job_claim( int $job_id, string $claim_token ): bool;
 
 	public function save_recipe( BulkRecipe $recipe ): BulkRecipe;
 

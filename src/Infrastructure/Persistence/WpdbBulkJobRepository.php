@@ -196,8 +196,9 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 		return $claimed;
 	}
 
-	public function save_item( BulkJobItem $item ): BulkJobItem {
+	public function save_item( BulkJobItem $item, ?bool &$applied = null ): BulkJobItem {
 		global $wpdb;
+		$applied = false;
 		$table = TableNames::for( BulkJobSchema::ITEMS_SUFFIX );
 		$data  = $this->item_to_row( $item );
 		if ( null === $item->id ) {
@@ -209,6 +210,7 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 				}
 				throw new \RuntimeException( 'Bulk item write failed.' );
 			}
+			$applied = true;
 			$id    = (int) $wpdb->insert_id;
 			$saved = $this->find_item_by_id( $id );
 			if ( ! $saved instanceof BulkJobItem || (int) $saved->id !== $id ) {
@@ -231,21 +233,21 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 		if ( ! $saved instanceof BulkJobItem ) {
 			throw new \RuntimeException( 'Bulk item write failed.' );
 		}
-		if ( null !== $item->claim_token && '' !== $item->claim_token && $saved->claim_token !== $item->claim_token && BulkJobItemStatus::Claimed === $item->status ) {
+		if ( null !== $saved->claim_token && $saved->claim_token !== $item->claim_token ) {
 			throw new \RuntimeException( 'Stale bulk claim.' );
 		}
-		if ( null !== $item->claim_token && '' !== $item->claim_token && BulkJobItemStatus::Claimed !== $item->status && null !== $saved->claim_token && $saved->claim_token !== $item->claim_token ) {
-			throw new \RuntimeException( 'Stale bulk claim.' );
+		if ( $updated > 0 ) {
+			$applied = true;
+
+			return $saved;
 		}
-		if ( 0 === $updated && $saved->status !== $item->status ) {
-			$current = $this->find_item_by_id( (int) $item->id );
-			if ( ! $current instanceof BulkJobItem || $current->claim_token !== $item->claim_token ) {
-				throw new \RuntimeException( 'Stale bulk claim.' );
-			}
+		if ( $saved->same_outcome( $item ) ) {
+			return $saved;
+		}
+		if ( null === $item->claim_token || '' === $item->claim_token || $saved->claim_token === $item->claim_token ) {
 			throw new \RuntimeException( 'Bulk item write failed.' );
 		}
-
-		return $saved;
+		throw new \RuntimeException( 'Stale bulk claim.' );
 	}
 
 	public function list_items( int $job_id, int $limit = 50, int $after_id = 0, ?BulkJobItemStatus $status = null ): array {
@@ -350,15 +352,20 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 		return $saved instanceof BulkJob && $saved->claim_token === $claim_token ? $saved : null;
 	}
 
-	public function release_job_claim( int $job_id, string $claim_token ): void {
+	public function release_job_claim( int $job_id, string $claim_token ): bool {
 		global $wpdb;
-		$wpdb->query(
+		$updated = $wpdb->query(
 			$wpdb->prepare(
 				'UPDATE `' . $this->table_name() . '` SET claim_token = NULL, claimed_at = NULL WHERE id = %d AND claim_token = %s',
 				$job_id,
 				$claim_token
 			)
 		);
+		if ( false === $updated ) {
+			throw new \RuntimeException( 'Bulk job write failed.' );
+		}
+
+		return $updated > 0;
 	}
 
 	public function save_recipe( BulkRecipe $recipe ): BulkRecipe {
