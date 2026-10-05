@@ -2,6 +2,16 @@
 
 Status: RC.12 IMMUTABLE — OPENING CORRECTIONS AUTHORIZED ON ISOLATED FIX BRANCH — UNMERGED — NOT RC.13
 
+## 2026-10-05 — targeted native qualification continuation
+
+The owner again instructed continuation after the four repairs and draft PR #51 were handed off. This continues the same bounded validation queue with targeted native WordPress/WooCommerce/MariaDB checks for COR-001/002/003/010. It does not authorize the reserved business contracts, COR-004/006 implementation, human review substitution, merge, release or live-site operations.
+
+- Candidate: PR #51 head `08e6aa2ff53d22ac8e5c8c00a66c19a2b74d2b70`; protected master remains `637c02f182ca273b40819631d23ac8e0dcc4004f` at continuation start. Existing repair source remains unchanged by this qualification batch.
+- Environment: a third fresh CI-only WordPress site in the runner's disposable MariaDB service, uniquely allocated database name beginning `cetech_wp_opening_qualification`, loopback connection and explicit disposable-site marker. No existing installed site or external database is used. The fixture may create test principals, roles, products/variations and plugin configuration/jobs/entities, and manipulate and restore fixed migration options for synthetic migration fault cases. It creates no order or payment.
+- Integration editor / exclusive added leases: Codex for `scripts/qualification/opening-*.php`, `scripts/qualification/admin-context.php`, the qualification-only wiring in `scripts/ci-wordpress-php85-smoke.sh` and artifact step in `.github/workflows/ci.yml`, plus this checkpoint and the qualification handoff. Review agents prepare modules outside the repository; only the integration editor applies changes. Human ownership stays unchanged.
+- Evidence: native capability mapping, nonce verification and physical SQL state supplement existing regression fixtures. Direct PHP callbacks/services, redirected/die control-flow interception and simulated option-write denials will be identified explicitly. These are not HTTP/browser/session proofs or exhaustive native storage-crash, upgrade, theme/cache/payment certification.
+- New results are recorded separately in `docs/OPENING-NATIVE-QUALIFICATION-2026-10-05.md` and CI's machine receipt; the frozen 36-unit/64-scenario audit registers remain unchanged.
+
 ## 2026-10-05 — bounded opening corrections
 
 After presentation of the four-unit approval packet, the owner instructed:

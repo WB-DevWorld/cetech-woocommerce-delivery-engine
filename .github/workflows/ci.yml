@@ -203,12 +203,21 @@ jobs:
           extensions: mysqli, pdo_mysql, zip, mbstring, intl, xml, curl, gd, soap, bcmath
       - name: WordPress bootstrap, WooCommerce, HPOS, Store API, upgrade from RC.12
         env:
+          CETECH_DE_NATIVE_OPENING_QUALIFICATION: '1'
+          CETECH_DE_QUALIFICATION_CANDIDATE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
           CETECH_DE_WP_DB_HOST: 127.0.0.1
           CETECH_DE_WP_DB_PORT: 3306
           CETECH_DE_WP_DB_USER: root
           CETECH_DE_WP_DB_PASSWORD: wordpress
         shell: bash
         run: bash scripts/ci-wordpress-php85-smoke.sh
+      - name: Retain targeted native opening qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-native-qualification
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-qualification-results.json
+          if-no-files-found: warn
 
   javascript-tests:
     name: JavaScript / Vitest

@@ -12,11 +12,17 @@ DB_USER="${CETECH_DE_WP_DB_USER:-root}"
 DB_PASSWORD="${CETECH_DE_WP_DB_PASSWORD:-wordpress}"
 DB_NAME_CLEAN="${CETECH_DE_WP_DB_CLEAN:-cetech_wp_clean}"
 DB_NAME_UPGRADE="${CETECH_DE_WP_DB_UPGRADE:-cetech_wp_upgrade}"
+NATIVE_OPENING_ENABLED="${CETECH_DE_NATIVE_OPENING_QUALIFICATION:-0}"
 RC12_ZIP_URL="${CETECH_DE_RC12_ZIP_URL:-https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/releases/download/v1.0.0-rc.12/cetech-woocommerce-delivery-engine-1.0.0-rc.12.zip}"
 PHP_MAJOR_MINOR="$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')"
 
 if [[ "$PHP_MAJOR_MINOR" != "8.5" ]]; then
 	echo "BLOCKED: this smoke must run on PHP 8.5, found $(php -r 'echo PHP_VERSION;')" >&2
+	exit 1
+fi
+
+if [[ "$NATIVE_OPENING_ENABLED" == "1" && "$DB_HOST" != "127.0.0.1" ]]; then
+	echo "BLOCKED: targeted native checks require the disposable loopback database service" >&2
 	exit 1
 fi
 
@@ -239,3 +245,24 @@ if [[ "$SENTINEL" != "keep_me" ]]; then
 fi
 
 echo "wordpress_woocommerce_php85_smoke=PASS"
+
+# Targeted opening checks get their own database/site, never the clean/upgrade sites.
+if [[ "$NATIVE_OPENING_ENABLED" != "1" ]]; then
+	echo "opening_native_qualification=NOT_REQUESTED"
+	exit 0
+fi
+DB_NAME_QUALIFICATION="cetech_wp_opening_qualification_$(php -r 'echo bin2hex(random_bytes(6));')"
+# Plain CREATE fails on a collision; no populated fixture database is reused.
+mysql_admin "CREATE DATABASE \`${DB_NAME_QUALIFICATION}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+NATIVE="$WORK/opening-qualification"
+install_site "$NATIVE" "$DB_NAME_QUALIFICATION"
+"${WP[@]}" config set DISABLE_WP_CRON true --raw --path="$NATIVE"
+copy_plugin "$NATIVE" "$PLUGIN_STAGE"
+inspect_engine "$NATIVE" "opening_qualification"
+"${WP[@]}" option update cetech_opening_qualification_disposable 1 --path="$NATIVE"
+export CETECH_DE_QUALIFICATION_HEAD="$(git -C "$ROOT" rev-parse HEAD)"
+export CETECH_DE_QUALIFICATION_CANDIDATE_HEAD="${CETECH_DE_QUALIFICATION_CANDIDATE_HEAD:-$CETECH_DE_QUALIFICATION_HEAD}"
+export CETECH_DE_QUALIFICATION_TREE="$(git -C "$ROOT" rev-parse HEAD^{tree})"
+"${WP[@]}" --require="$ROOT/scripts/qualification/admin-context.php" \
+	eval-file "$ROOT/scripts/qualification/opening-runner.php" \
+	"$WORK/opening-qualification-results.json" --path="$NATIVE"
