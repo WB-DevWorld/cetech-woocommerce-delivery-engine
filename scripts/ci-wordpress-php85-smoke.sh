@@ -13,6 +13,7 @@ DB_PASSWORD="${CETECH_DE_WP_DB_PASSWORD:-wordpress}"
 DB_NAME_CLEAN="${CETECH_DE_WP_DB_CLEAN:-cetech_wp_clean}"
 DB_NAME_UPGRADE="${CETECH_DE_WP_DB_UPGRADE:-cetech_wp_upgrade}"
 NATIVE_OPENING_ENABLED="${CETECH_DE_NATIVE_OPENING_QUALIFICATION:-0}"
+HTTP_OPENING_ENABLED="${CETECH_DE_HTTP_OPENING_QUALIFICATION:-0}"
 RC12_ZIP_URL="${CETECH_DE_RC12_ZIP_URL:-https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/releases/download/v1.0.0-rc.12/cetech-woocommerce-delivery-engine-1.0.0-rc.12.zip}"
 PHP_MAJOR_MINOR="$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')"
 
@@ -23,6 +24,11 @@ fi
 
 if [[ "$NATIVE_OPENING_ENABLED" == "1" && "$DB_HOST" != "127.0.0.1" ]]; then
 	echo "BLOCKED: targeted native checks require the disposable loopback database service" >&2
+	exit 1
+fi
+
+if [[ "$HTTP_OPENING_ENABLED" == "1" && "$NATIVE_OPENING_ENABLED" != "1" ]]; then
+	echo "BLOCKED: HTTP qualification requires preceding native qualification" >&2
 	exit 1
 fi
 
@@ -210,6 +216,7 @@ fi
 echo "debug_log=no_delivery_engine_fatal"
 
 kill "$SERVER_PID" 2>/dev/null || true
+wait "$SERVER_PID" 2>/dev/null || true
 trap - EXIT
 
 echo "Downloading immutable RC.12 ZIP for upgrade verification"
@@ -266,3 +273,9 @@ export CETECH_DE_QUALIFICATION_TREE="$(git -C "$ROOT" rev-parse HEAD^{tree})"
 "${WP[@]}" --require="$ROOT/scripts/qualification/admin-context.php" \
 	eval-file "$ROOT/scripts/qualification/opening-runner.php" \
 	"$WORK/opening-qualification-results.json" --path="$NATIVE"
+
+if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
+	bash "$ROOT/scripts/ci-opening-http-qualification.sh" "$WORK" "$NATIVE"
+else
+	echo "opening_http_qualification=NOT_REQUESTED"
+fi

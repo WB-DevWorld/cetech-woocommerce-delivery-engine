@@ -1,0 +1,45 @@
+# Authenticated HTTP opening qualification — 2026-10-05
+
+The owner requested continuation after PR #51's public-import repair and native qualification. Published WS3 re-review `5414988387` passes that bounded repair at `425559d2c47b1ab6831642fdd4d3852abba78ff3` and supersedes the earlier P1 hold for newly initiated public imports. It remains a Codex technical COMMENT review, not competent-human acceptance or merge/release authority.
+
+This batch adds qualification scripts and CI evidence for the remaining COR-001/002 admin request boundary. Production source, schema, dependencies and release identities are unchanged. All 494 installed production PHP files must match the preceding same-run native receipt; expected manifest SHA-256 remains `64f6ce3974ff1b2199eedac842195532726b268803722c221fd8e041475f7eb5`.
+
+## Environment and authority
+
+The existing CI smoke first runs clean bootstrap, HPOS/Store API smoke, immutable RC.12 upgrade and the earlier native opening modules. HTTP qualification then uses only its already allocated **third fresh site**, explicit disposable marker and randomly named `cetech_wp_opening_qualification_...` loopback database. It refuses an unexpected actual host/database/path, disabled enable flags, absent marker, missing cron suppression or divergent installed source identity.
+
+A PHP listener binds only `127.0.0.1:8085` to that exact fixture document root. Free-port and owned-process checks plus an unpredictable header-token attestation bind the listener to the site/database/source before credentials are sent. Requests and each followed redirect must stay on the explicit loopback origin. The client disables proxies and automatic redirect following. Request/response sizes, subprocesses, readiness and progress loops are bounded.
+
+The setup bridge creates separate synthetic principals. The importer has only baseline WordPress/Woo admin admission plus product-rule/import permissions, with no private-source grant. The configuration principal additionally has the native product edit/published-edit permissions and Woo's registered variation primitive, while foreign-product, global-default and private-source permissions stay denied. Role/user grants and revocations are read from native capabilities and physical SQL. These grants are fixture inputs, not a new staff/delegation policy.
+
+Only synthetic import jobs/public configuration rows and explicitly tracked published Woo products/variations are mutated. No existing installed site, order, payment, external recipient, theme/cache service or production environment is used. The temporary MU fixture is copied only into this disposable site: it attests the listener and suppresses Action Scheduler asynchronous dispatch across HTTP requests. It does not replace authentication, nonce checks, capability mapping, production handlers, redirects or `wp_die`.
+
+## Evidence collected
+
+| Family | Actual HTTP boundary and SQL controls |
+| --- | --- |
+| COR-001 public import | Native WordPress login form, test/authentication cookies, nonce-bearing import form and localized AJAX nonce from returned HTML; mixed upload through the initiating POST; real terminal job redirect and success flash; current job detail/history and Apply control; read-only Ready preview; actual Apply POST/redirect/notice and AJAX worker advancement to Completed with one public offer. Job/item/private-store SQL hashes bind the effects and omitted private payload. |
+| COR-001 denials | Anonymous wp-admin/admin-AJAX, malformed native nonce and persisted import-capability revocation deny before selected job/item/public/private changes. The same authenticated cookie session is retained across grant changes; native authorization still governs each later request. |
+| COR-002 configuration | Separate native login/principal, rendered variation `in_store` form with actual parent; wrong authorized parent, foreign actual parent, invalid slice/nonce and plugin-permission revocation deny without configuration/audit/private changes. Real save persists the selected slice and its ordinary audit, then actual Product Exceptions reset removes exactly that slice's scope/field/collection rows while preserving sibling, parent and global/unrelated state. Replay of the deleted slice adds no audit. |
+
+WordPress's unauthenticated admin-AJAX route has no registered `nopriv` handler and normally returns its native HTTP 400/`0`; authenticated bad AJAX nonce normally returns HTTP 403/`-1`. Admin form permission/nonce denial uses the existing error-flash redirect. These distinct terminal behaviors are inspected directly, rather than treated as one generic success.
+
+No HTTP handler is invoked by the CLI observer. The setup/observer may select principals to record native permission decisions; qualified requests authenticate naturally through the real login/cookie flow and obtain their nonces from server-generated forms/localization. The ordinary successful save/reset audit is tested; no COR-007 audit-failure, transaction or stale-revision contract is chosen.
+
+## Receipts and cleanup
+
+`opening-http-qualification-results.json` is separate from the earlier `opening-qualification-results.json`. It binds checkout/candidate/tree, installed production source map, runtime, unique PASS/FAIL IDs, redacted HTTP status/routes/body hashes, native permission facts and SQL before/after evidence. Each check is persisted before failure; CI retains the HTTP artifact on success or failure when available. A refusal before fixture preparation is a failure, not native/HTTP PASS.
+
+Credentials, cookies, nonces, private package/sentinel payload and raw observer snapshots stay in memory or protected ephemeral files outside the document root. They are excluded from uploaded receipts. The probe token is a header, not a logged query value. Only the explicitly named redacted JSON receipt is uploaded, not server/private bridge logs or credential state.
+
+Successful import cleanup restores the prior job/item/private-store hashes and removes its tracked public offer, principal and role. Configuration cleanup removes its tracked scopes/fields/collections, products, principal and role, verifies absence of tracked child-row orphans, and preserves unrelated configuration/private-store hashes. The owned listener is stopped and waited for; its temporary MU file and private files are removed. This is **not whole-database rollback**: ordinary audit/queue/ancillary fixture state may remain until the disposable CI site/service is discarded. Partial preparation failure before complete fixture state exists relies on that same disposable-site discard, while listener/MU/private-file cleanup remains bounded. It is not production retention or cleanup-policy evidence.
+
+## Execution status and limits
+
+This committed source report defines the checks and their proof boundary; it does not preclaim native HTTP completion. The draft PR records the exact committed candidate/tree, actual CI runs, downloaded HTTP/native artifact identities and digests, unique per-family outcomes, independent receipt review and two bounded final freshness passes after execution. Any first failed qualification candidate remains identifiable instead of being rewritten as successful evidence.
+
+The earlier 207-check native result at `425559d...` remains historical at its own head. Repeated same-run native checks and new HTTP counts include fixture/precondition/permission/cleanup checks; they do not change the frozen **36-unit/64-scenario** register, **372 Requirement IDs** or completed **665-file audit**.
+
+Actual HTTP login/cookie/nonce/redirect/admin-AJAX proof still differs from browser execution. Browser JavaScript/polling, accessibility, multiple tabs, customer frontend/theme behavior, TLS/deployed cookie configuration, Redis/WP Rocket/session-cache isolation, private/transitive/aggregate policy, granular import authority, CLI/delegation/external worker policy, transaction/crash qualification and broader retained upgrades remain separate. Paid-order shipment/email, other COR units/contracts and promotion gates also remain open in their own scope.
+
+PR #51 remains draft and unmerged. Competent human WS3 review and separately authorized remaining qualification/contracts are the next gates. No merge, release, deployment, live-site or order/payment operation is performed by this batch.

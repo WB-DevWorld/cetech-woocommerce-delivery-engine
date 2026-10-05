@@ -204,6 +204,7 @@ jobs:
       - name: WordPress bootstrap, WooCommerce, HPOS, Store API, upgrade from RC.12
         env:
           CETECH_DE_NATIVE_OPENING_QUALIFICATION: '1'
+          CETECH_DE_HTTP_OPENING_QUALIFICATION: '1'
           CETECH_DE_QUALIFICATION_CANDIDATE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
           CETECH_DE_WP_DB_HOST: 127.0.0.1
           CETECH_DE_WP_DB_PORT: 3306
@@ -217,6 +218,14 @@ jobs:
         with:
           name: opening-native-qualification
           path: ${{ runner.temp }}/cetech-de-php85-wp/opening-qualification-results.json
+          if-no-files-found: warn
+
+      - name: Retain authenticated HTTP opening qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-http-qualification
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-qualification-results.json
           if-no-files-found: warn
 
   javascript-tests:
