@@ -225,6 +225,49 @@ final class ScopedConfigurationAdminService {
 	}
 
 	/**
+	 * Remove exactly one scope slice and append its ordinary mutation audit.
+	 * Caller must first validate its current capability, nonce and object access.
+	 */
+	public function reset( ConfigurationScopeType $scope_type, int $scope_id, string $slice_key, ?int $parent_product_id = null ): bool {
+		$errors = $this->scope_guard->validate( $scope_type, $scope_id, $parent_product_id );
+		if ( ConfigurationScopeType::Global === $scope_type || ! $this->is_valid_slice_key( $slice_key ) || [] !== $errors ) {
+			throw new \InvalidArgumentException( 'Invalid configuration reset target. ' . implode( ' ', $errors ) );
+		}
+		if ( ConfigurationScopeType::Variation === $scope_type && null !== $this->variation_relationship_checker ) {
+			$error = $this->scope_guard->assert_variation_belongs_to_parent( $scope_id, (int) $parent_product_id, $this->variation_relationship_checker );
+			if ( null !== $error ) {
+				throw new \InvalidArgumentException( $error );
+			}
+		}
+
+		$previous = $this->repository->findByScopeAndSlice( $scope_type, $scope_id, $slice_key );
+		if ( null === $previous ) {
+			return false;
+		}
+		if ( ! $this->repository->deleteScope( $scope_type, $scope_id, $slice_key ) ) {
+			return false;
+		}
+		$this->resolver->clearMemoization();
+		if ( null !== $this->audit_logger ) {
+			$this->audit_logger->log(
+				'scoped_configuration_reset',
+				'configuration_scope',
+				(int) ( $previous->scope->id ?? 0 ),
+				array_merge( $this->instruction_snapshot( $previous ), [
+					'scope_type' => $scope_type->value,
+					'scope_id' => $scope_id,
+					'slice_key' => $slice_key,
+					'parent_product_id' => $parent_product_id,
+					'config_version' => $previous->scope->config_version,
+				] ),
+				[ 'scope_type' => $scope_type->value, 'scope_id' => $scope_id, 'slice_key' => $slice_key, 'parent_product_id' => $parent_product_id, 'inherits' => true ]
+			);
+		}
+
+		return true;
+	}
+
+	/**
 	 * Read-only preview. Must never write configuration or audit.
 	 */
 	public function preview(

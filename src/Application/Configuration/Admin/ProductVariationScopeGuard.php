@@ -48,6 +48,9 @@ final class ProductVariationScopeGuard {
 		}
 
 		if ( ConfigurationScopeType::Product === $scope_type ) {
+			if ( null !== $parent_product_id ) {
+				$errors[] = 'Product scope cannot include a parent product id.';
+			}
 			$error = $this->validate_product( $scope_id );
 			if ( null !== $error ) {
 				$errors[] = $error;
@@ -83,7 +86,7 @@ final class ProductVariationScopeGuard {
 		}
 
 		if ( ! $this->product_target_resolver->is_woocommerce_available() ) {
-			return null;
+			return 'WooCommerce is not available. Product targets cannot be validated.';
 		}
 
 		return $this->product_target_resolver->validate_target( ProductTargetType::Product->value, $product_id );
@@ -95,7 +98,7 @@ final class ProductVariationScopeGuard {
 		}
 
 		if ( ! $this->product_target_resolver->is_woocommerce_available() ) {
-			return $this->validate_variation_without_woocommerce( $variation_id, $parent_product_id );
+			return 'WooCommerce is not available. Variation ownership cannot be validated.';
 		}
 
 		$error = $this->product_target_resolver->validate_target( ProductTargetType::Variation->value, $variation_id );

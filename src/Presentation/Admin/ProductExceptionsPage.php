@@ -5,6 +5,10 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Configuration\Catalog\ProductExceptionsQuery;
+use CetechDeliveryEngine\Application\Configuration\Admin\ProductVariationScopeGuard;
+use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationAdminService;
+use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationAuthorization;
+use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationTargetGuard;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsService;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
 use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
@@ -22,7 +26,10 @@ final class ProductExceptionsPage {
 	public function __construct(
 		private readonly ProductExceptionsQuery $query,
 		private readonly SiteWideDefaultsService $defaults,
-		private readonly AdminActionHandler $action_handler
+		private readonly AdminActionHandler $action_handler,
+		private readonly ProductTargetResolver $product_target_resolver,
+		private readonly ScopedConfigurationAuthorization $authorization,
+		private readonly ScopedConfigurationAdminService $admin_service
 	) {
 	}
 
@@ -31,12 +38,22 @@ final class ProductExceptionsPage {
 			return;
 		}
 
-		$type = isset( $_POST['item_type'] ) ? sanitize_key( wp_unslash( (string) $_POST['item_type'] ) ) : '';
-		$id   = isset( $_POST['item_id'] ) ? absint( wp_unslash( $_POST['item_id'] ) ) : 0;
-
-		$ok = 'variation' === $type
-			? $this->defaults->reset_variation_to_product( $id )
-			: $this->defaults->reset_product_to_site_wide( $id );
+		try {
+			$target = $this->target_guard()->resolve( wp_unslash( [
+				'scope_type' => $_POST['item_type'] ?? '',
+				'scope_id' => $_POST['item_id'] ?? 0,
+				'slice_key' => $_POST['slice_key'] ?? ConfigurationScope::DEFAULT_SLICE_KEY,
+				'parent_product_id' => $_POST['parent_product_id'] ?? null,
+			] ) );
+			if ( ConfigurationScopeType::Global === $target['scope_type'] ) {
+				throw new \InvalidArgumentException( 'Global settings cannot be reset here.' );
+			}
+		} catch ( \InvalidArgumentException $exception ) {
+			$this->action_handler->notices()->flash_error( $exception->getMessage() );
+			$this->action_handler->redirect( self::SLUG );
+		}
+		$type = $target['scope_type']->value;
+		$ok = $this->admin_service->reset( $target['scope_type'], $target['scope_id'], $target['slice_key'], $target['parent_product_id'] );
 
 		if ( $ok ) {
 			$this->action_handler->notices()->flash_success(
@@ -61,7 +78,14 @@ final class ProductExceptionsPage {
 			'type'        => isset( $_GET['exception_type'] ) ? sanitize_key( wp_unslash( (string) $_GET['exception_type'] ) ) : '',
 			'status'      => isset( $_GET['exception_status'] ) ? sanitize_key( wp_unslash( (string) $_GET['exception_status'] ) ) : '',
 		];
-		$items = $this->query->list( 200, $filters );
+		$items = array_values( array_filter( $this->query->list( 200, $filters ), function ( array $item ): bool {
+			try {
+				$this->target_guard()->resolve( [ 'scope_type' => $item['type'], 'scope_id' => $item['id'], 'slice_key' => $item['slice_key'], 'parent_product_id' => $item['parent_id'] ] );
+				return true;
+			} catch ( \InvalidArgumentException $exception ) {
+				return false;
+			}
+		} ) );
 
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
@@ -105,7 +129,7 @@ final class ProductExceptionsPage {
 					'page'       => ScopedConfigurationPage::SLUG,
 					'scope_type' => 'variation' === $item['type'] ? ConfigurationScopeType::Variation->value : ConfigurationScopeType::Product->value,
 					'scope_id'   => $item['id'],
-					'slice_key'  => ConfigurationScope::DEFAULT_SLICE_KEY,
+					'slice_key'  => $item['slice_key'],
 					'customize'  => 1,
 				] + ( null !== $item['parent_id'] ? [ 'parent_product_id' => $item['parent_id'] ] : [] ),
 				admin_url( 'admin.php' )
@@ -115,6 +139,10 @@ final class ProductExceptionsPage {
 			$reset .= '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_RESET ) . '" />';
 			$reset .= '<input type="hidden" name="item_type" value="' . esc_attr( $item['type'] ) . '" />';
 			$reset .= '<input type="hidden" name="item_id" value="' . esc_attr( (string) $item['id'] ) . '" />';
+			$reset .= '<input type="hidden" name="slice_key" value="' . esc_attr( $item['slice_key'] ) . '" />';
+			if ( null !== $item['parent_id'] ) {
+				$reset .= '<input type="hidden" name="parent_product_id" value="' . esc_attr( (string) $item['parent_id'] ) . '" />';
+			}
 			$reset .= wp_nonce_field( self::ACTION_RESET, 'cetech_de_nonce', true, false );
 			$reset .= '<button type="submit" class="button">' . esc_html(
 				'variation' === $item['type']
@@ -156,5 +184,8 @@ final class ProductExceptionsPage {
 		);
 
 		AdminPageLayout::close_page();
+	}
+	private function target_guard(): ScopedConfigurationTargetGuard {
+		return new ScopedConfigurationTargetGuard( new ProductVariationScopeGuard( $this->product_target_resolver ), $this->authorization );
 	}
 }

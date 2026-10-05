@@ -1468,7 +1468,10 @@ final class Plugin {
 			static fn ( ServiceContainer $container ): ProductExceptionsPage => new ProductExceptionsPage(
 				$container->get( ProductExceptionsQuery::class ),
 				$container->get( SiteWideDefaultsService::class ),
-				$container->get( AdminActionHandler::class )
+				$container->get( AdminActionHandler::class ),
+				$container->get( ProductTargetResolver::class ),
+				$container->get( ScopedConfigurationAuthorization::class ),
+				$container->get( ScopedConfigurationAdminService::class )
 			)
 		);
 
