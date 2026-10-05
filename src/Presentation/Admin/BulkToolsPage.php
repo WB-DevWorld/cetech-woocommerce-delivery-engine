@@ -953,6 +953,10 @@ final class BulkToolsPage {
 		try {
 			ImportPackageGuard::assert_json_size( $json );
 			$package = ConfigurationPackage::from_json( $json );
+			$include_private_sources = current_user_can( 'manage_private_sources' );
+			if ( ! $include_private_sources ) {
+				$package = $package->without_private_sources();
+			}
 			$mode    = sanitize_key( (string) ( $_POST['conflict_mode'] ?? ConfigImportConflictMode::SkipConflicts->value ) );
 			$job     = $this->engine->create_preview(
 				BulkOperationType::ConfigImport,
@@ -961,7 +965,7 @@ final class BulkToolsPage {
 				[
 					'package'                 => $package->to_array(),
 					'conflict_mode'           => $mode,
-					'include_private_sources' => current_user_can( 'manage_private_sources' ),
+					'include_private_sources' => $include_private_sources,
 				]
 			);
 			$this->redirect_job( $job->id, $job->job_code, $job->error_code );

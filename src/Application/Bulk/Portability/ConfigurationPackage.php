@@ -57,6 +57,25 @@ final class ConfigurationPackage {
 		];
 	}
 
+	/**
+	 * Prepare the existing public-only import before any private rows are stored
+	 * or enumerated into job results. Keep source metadata and public references.
+	 */
+	public function without_private_sources(): self {
+		$sections = $this->sections;
+		unset( $sections['suppliers'], $sections['origins'] );
+		$counts = [];
+		foreach ( $sections as $key => $value ) {
+			$counts[ $key ] = is_array( $value ) ? count( $value ) : 1;
+		}
+		$manifest = $this->manifest;
+		$manifest['include_private_sources'] = false;
+		$manifest['exported_sections'] = array_keys( $sections );
+		$manifest['counts'] = $counts;
+
+		return new self( $manifest, $sections );
+	}
+
 	public function to_json(): string {
 		return wp_json_encode( $this->to_array(), JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) ?: '{}';
 	}

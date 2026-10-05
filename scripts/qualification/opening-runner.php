@@ -90,7 +90,7 @@ echo 'opening_candidate_head=' . $report['candidate_head'] . ' checkout=' . $rep
 // Leave suppression in place through shutdown on this dedicated fixture process.
 add_filter( 'action_scheduler_allow_async_request_runner', '__return_false', PHP_INT_MAX );
 try {
-	foreach ( array( 'authority', 'configuration', 'migrations' ) as $module ) {
+	foreach ( array( 'authority', 'public-import', 'configuration', 'migrations' ) as $module ) {
 		$run = require __DIR__ . '/opening-' . $module . '.php';
 		if ( ! is_callable( $run ) ) {
 			throw new RuntimeException( 'Invalid qualification module: ' . $module );
