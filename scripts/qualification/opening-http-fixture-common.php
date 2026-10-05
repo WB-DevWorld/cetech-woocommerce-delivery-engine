@@ -6,28 +6,28 @@ function opening_http_fixture_guard(): void {
     $site = (string) getenv('CETECH_DE_HTTP_FIXTURE_SITE');
     $work = (string) getenv('CETECH_DE_HTTP_WORK_PATH');
     $private = (string) getenv('CETECH_DE_HTTP_PRIVATE_DIR');
-    if (
-        '1' !== getenv('CETECH_DE_NATIVE_OPENING_QUALIFICATION')
-        || '1' !== getenv('CETECH_DE_HTTP_OPENING_QUALIFICATION')
-        || '127.0.0.1' !== getenv('CETECH_DE_WP_DB_HOST')
-        || !defined('WP_CLI') || !WP_CLI
-        || !defined('WP_ADMIN') || !WP_ADMIN
-        || !defined('ABSPATH') || !defined('DB_HOST')
-        || !preg_match('/^127\\.0\\.0\\.1(?::[0-9]+)?$/D', (string) DB_HOST)
-        || !defined('DB_NAME') || !preg_match('/^cetech_wp_opening_qualification_[a-z0-9]+$/D', (string) DB_NAME)
-        || '' === $site || false === realpath($site) || realpath($site) !== realpath(ABSPATH)
-        || '' === $work || false === realpath($work) || dirname((string) realpath($site)) !== realpath($work)
-        || '' === $private || false === realpath($private)
-        || dirname((string) realpath($private)) !== realpath($work)
-        || str_starts_with((string) realpath($private) . '/', rtrim((string) realpath(ABSPATH), '/') . '/')
-        || '1' !== (string) get_option('cetech_opening_qualification_disposable')
-        || !defined('DISABLE_WP_CRON') || !DISABLE_WP_CRON
-        || 'http://127.0.0.1:8085' !== (string) get_option('siteurl')
-        || 'http://127.0.0.1:8085' !== (string) get_option('home')
-        || !class_exists('WC_Product')
-        || !class_exists('CetechDeliveryEngine\\Bootstrap\\Plugin')
-    ) {
-        throw new RuntimeException('Refusing HTTP fixture access outside the marked, exact-path disposable loopback CI site.');
+    $checks = [
+        'FLAGS' => '1' === getenv('CETECH_DE_NATIVE_OPENING_QUALIFICATION') && '1' === getenv('CETECH_DE_HTTP_OPENING_QUALIFICATION'),
+        'DB_HOST' => '127.0.0.1' === getenv('CETECH_DE_WP_DB_HOST') && defined('DB_HOST') && (bool) preg_match('/^127\\.0\\.0\\.1(?::[0-9]+)?$/D', (string) DB_HOST),
+        'DB_NAME' => defined('DB_NAME') && (bool) preg_match('/^cetech_wp_opening_qualification_[a-z0-9]+$/D', (string) DB_NAME),
+        'SITE_PATH' => defined('ABSPATH') && '' !== $site && false !== realpath($site) && realpath($site) === realpath(ABSPATH),
+        'WORK_PATH' => '' !== $work && false !== realpath($work) && false !== realpath($site) && dirname((string) realpath($site)) === realpath($work),
+        'PRIVATE_PATH' => '' !== $private && false !== realpath($private) && dirname((string) realpath($private)) === realpath($work) && defined('ABSPATH') && !str_starts_with((string) realpath($private) . '/', rtrim((string) realpath(ABSPATH), '/') . '/'),
+        'MARKER' => function_exists('get_option') && '1' === (string) get_option('cetech_opening_qualification_disposable'),
+        'CRON' => defined('DISABLE_WP_CRON') && DISABLE_WP_CRON,
+        'SITEURL' => function_exists('get_option') && 'http://127.0.0.1:8085' === (string) get_option('siteurl'),
+        'HOME' => function_exists('get_option') && 'http://127.0.0.1:8085' === (string) get_option('home'),
+        'NATIVE_CONTEXT' => defined('WP_CLI') && WP_CLI && defined('WP_ADMIN') && WP_ADMIN,
+        'PLUGIN_CLASSES' => class_exists('WC_Product') && class_exists('CetechDeliveryEngine\\Bootstrap\\Plugin'),
+    ];
+    $failed = [];
+    foreach ($checks as $code => $passed) {
+        if (!$passed) {
+            $failed[] = 'HTTP_COMMON_GUARD_' . $code;
+        }
+    }
+    if ([] !== $failed) {
+        throw new RuntimeException('Refusing HTTP fixture access outside the marked, exact-path disposable loopback CI site. ' . implode(' ', $failed));
     }
     // Real queue persists jobs, but this fixture controls progress through HTTP.
     add_filter('action_scheduler_allow_async_request_runner', '__return_false', PHP_INT_MAX);

@@ -45,6 +45,7 @@ LISTENER_ATTESTED=0
 MU_CREATED=0
 MU_REMOVED=0
 ROW_CLEANUP=1
+QUALIFICATION_STAGE="allocated"
 
 python3 - "$RECEIPT" <<'PY'
 import json, os, sys
@@ -90,6 +91,66 @@ finish_http_fixture() {
     elif [[ "$MU_CREATED" == "0" ]]; then
         MU_REMOVED=1
     fi
+    # Retain only an allowlisted diagnostic code/class and a one-way log hash.
+    # Raw WP-CLI/bootstrap output, paths, SQL, credentials and payloads stay
+    # private and are deleted immediately below, including on early failures.
+    python3 - "$RECEIPT" "$PRIVATE/import-prepare-command.log" "$QUALIFICATION_STAGE" <<'PY'
+import hashlib, json, re, sys
+from pathlib import Path
+receipt = Path(sys.argv[1])
+log = Path(sys.argv[2])
+try:
+    report = json.loads(receipt.read_text(encoding="utf-8"))
+except (OSError, ValueError):
+    report = {"format": "cetech-opening-http-qualification-v1", "status": "FAIL", "cases": []}
+raw = log.read_bytes() if log.is_file() else b""
+text = raw[:262144].decode("utf-8", "replace")
+messages = {
+    "HTTP_MU_FIXTURE_GUARD": "HTTP fixture MU plugin refused an unmarked or different disposable site.",
+    "HTTP_COMMON_FIXTURE_GUARD": "Refusing HTTP fixture access outside the marked, exact-path disposable loopback CI site.",
+    "HTTP_NATIVE_RECEIPT_REQUIRED": "HTTP qualification requires the native PASS receipt from this fresh fixture.",
+    "HTTP_INSTALLED_SOURCE_IDENTITY": "HTTP installed production sources diverged from the same-run native qualification receipt.",
+    "HTTP_IMPORT_ARGUMENTS": "Usage: opening-http-fixture.php MODE PRIVATE_STATE OUTPUT [JOB_ID]",
+    "HTTP_IMPORT_STATE_EXISTS": "Refusing to overwrite an existing HTTP credential state.",
+    "HTTP_IMPORT_PROBE_TOKEN": "HTTP fixture preparation requires a fresh unpredictable listener token.",
+    "HTTP_IMPORT_ROLE_CREATE": "Could not create the exclusive synthetic HTTP import role.",
+    "HTTP_IMPORT_PRINCIPAL_CREATE": "Could not create the synthetic HTTP import principal.",
+    "HTTP_OUTPUT_PATH_GUARD": "HTTP fixture output must be an ordinary file outside the WordPress document root.",
+    "HTTP_JSON_PERSIST": "Could not persist the HTTP fixture JSON.",
+    "HTTP_HTTP_MARKER_PERSIST": "Could not persist the HTTP qualification fixture marker.",
+    "HTTP_IMPORT_PRINCIPAL_GRANTS": "Synthetic HTTP import grants or public fixture uniqueness diverged.",
+    "HTTP_SQL_SNAPSHOT": "HTTP fixture SQL snapshot failed:",
+    "HTTP_ROLE_SQL_READ": "Could not read physical fixture role capabilities.",
+    "HTTP_PRIVATE_STATE_GUARD": "HTTP fixture state must be a private ordinary file outside the document root.",
+    "HTTP_PRIVATE_STATE_SITE": "HTTP fixture state belongs to a different disposable site.",
+    "HTTP_IMPORT_STATE_FORMAT": "Unrecognized HTTP import fixture state.",
+}
+codes = [code for code, literal in messages.items() if literal in text]
+for prefix in ("HTTP_MU_GUARD_", "HTTP_COMMON_GUARD_"):
+    for condition in ("FLAGS", "DB_HOST", "DB_NAME", "SITE_PATH", "WORK_PATH", "PRIVATE_PATH", "MARKER", "CRON", "SITEURL", "HOME", "NATIVE_CONTEXT", "PLUGIN_CLASSES"):
+        literal = prefix + condition
+        if re.search(r"\b" + re.escape(literal) + r"\b", text):
+            codes.append(literal)
+if "Call to undefined function " in text:
+    codes.append("PHP_UNDEFINED_FUNCTION")
+if "Class " in text and " not found" in text:
+    codes.append("PHP_CLASS_NOT_FOUND")
+if "Call to undefined method " in text:
+    codes.append("PHP_UNDEFINED_METHOD")
+if "must be the very first statement" in text:
+    codes.append("PHP_STRICT_TYPES_POSITION")
+classes = [name for name in ("RuntimeException", "Error", "TypeError", "ParseError", "ValueError", "JsonException", "Exception") if re.search(r"Uncaught\s+" + name + r"(?:\s|:)", text)]
+report["fixture_diagnostic"] = {
+    "stage": sys.argv[3] if sys.argv[3] in ("allocated", "mu_copy", "import_prepare", "listener_preflight", "listener_readiness", "http_driver", "complete") else "unknown_stage",
+    "import_prepare_log_present": log.is_file(),
+    "import_prepare_log_sha256": hashlib.sha256(raw).hexdigest() if raw else None,
+    "allowlisted_error_codes": sorted(set(codes)),
+    "allowlisted_error_classes": classes,
+    "raw_output_retained": False,
+}
+receipt.write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+PY
+    if [[ "$?" != "0" ]]; then result=1; fi
     # Only this newly allocated, exact directory is removed. It contains all
     # passwords, package-private markers, cookies, nonces and server responses.
     rm -rf "$PRIVATE"
@@ -130,12 +191,15 @@ PY
 }
 trap finish_http_fixture EXIT
 
+QUALIFICATION_STAGE="mu_copy"
 cp "$ROOT/scripts/qualification/opening-http-mu.php" "$MU"
 MU_CREATED=1
+QUALIFICATION_STAGE="import_prepare"
 "${WP[@]}" eval-file "$IMPORT_BRIDGE" prepare "$IMPORT_STATE" "$IMPORT_PREPARE" >"$PRIVATE/import-prepare-command.log" 2>&1
 
 # Refuse a port collision before sending any fixture credentials. The later
 # token/PID check also rejects a listener that races this availability probe.
+QUALIFICATION_STAGE="listener_preflight"
 python3 - <<'PY'
 import socket
 with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
@@ -148,6 +212,7 @@ PY
 "$PHP_EXECUTABLE" -S 127.0.0.1:8085 -t "$SITE" >"$PRIVATE/php-server.log" 2>&1 &
 SERVER_PID=$!
 SERVER_STARTED=1
+QUALIFICATION_STAGE="listener_readiness"
 python3 - "$SERVER_PID" "$IMPORT_STATE" <<'PY'
 import hashlib, json, os, sys, time
 from pathlib import Path
@@ -188,6 +253,7 @@ else:
 PY
 LISTENER_ATTESTED=1
 
+QUALIFICATION_STAGE="http_driver"
 python3 "$ROOT/scripts/qualification/opening-http-driver.py" \
     --php "$PHP_EXECUTABLE" --wpcli "$WORK/wp-cli.phar" --site "$SITE" \
     --admin-context "$ROOT/scripts/qualification/admin-context.php" \
@@ -195,6 +261,7 @@ python3 "$ROOT/scripts/qualification/opening-http-driver.py" \
     --receipt "$RECEIPT" --prepare-output "$IMPORT_PREPARE" \
     --configuration-driver "$ROOT/scripts/qualification/opening-http-configuration-driver.py" \
     --configuration-bridge "$CONFIG_BRIDGE" --configuration-state "$CONFIG_STATE"
+QUALIFICATION_STAGE="complete"
 
 # EXIT performs final owned-listener/MU/private-file cleanup and appends its
 # proof to the single durable receipt. An existing driver failure remains FAIL.

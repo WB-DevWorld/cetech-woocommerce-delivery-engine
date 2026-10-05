@@ -26,6 +26,7 @@ def run_configuration(client, state, bridge, recorder, Page, login):
     }
     selected_id = int(state["selected_scope_row_id"])
     target_url = client.resolve(scoped_path + "&" + urlencode(target))
+    form_destinations = {}
 
     def snapshot():
         return bridge.call("snapshotconfig")["snapshot"]
@@ -61,34 +62,48 @@ def run_configuration(client, state, bridge, recorder, Page, login):
         text = page_for(response).text.lower()
         return response.status in (403, 500) and ("permission" in text or "not allowed to access this page" in text)
 
-    def form_for(page, action, item_id=None):
+    def form_for(response, action, item_id=None):
+        page = page_for(response)
         if item_id is None:
-            return page.form_for_action(action)
-        forms = [form for form in page.forms
-                 if scalar(form.fields.get("cetech_de_action")) == action
-                 and scalar(form.fields.get("item_id")) == str(item_id)]
-        if len(forms) != 1:
-            raise RuntimeError("Expected exactly one rendered target reset form.")
-        return forms[0]
+            form = page.form_for_action(action)
+        else:
+            forms = [form for form in page.forms
+                     if scalar(form.fields.get("cetech_de_action")) == action
+                     and scalar(form.fields.get("item_id")) == str(item_id)]
+            if len(forms) != 1:
+                raise RuntimeError("Expected exactly one rendered target reset form.")
+            form = forms[0]
+        if form.attrs.get("method", "get").lower() != "post" or not scalar(form.fields.get("cetech_de_nonce")):
+            raise RuntimeError("Expected rendered native nonce-bearing POST form.")
+        # Browser submission uses the rendered action, or the exact document URL
+        # when action is absent. The current simplified form has no action;
+        # the advanced editor explicitly posts to the scoped page slug only.
+        from urllib.parse import urljoin
+        form_destinations[id(form)] = client.resolve(urljoin(response.url, form.attrs.get("action") or response.url))
+        return form
 
-    def submit(form, changes=None, endpoint=target_url):
+    def submit(form, changes=None, endpoint=None):
+        destination = form_destinations[id(form)]
+        if endpoint is not None and client.resolve(endpoint) != destination:
+            raise RuntimeError("Qualification POST override differs from the rendered form destination.")
         fields = copy.deepcopy(form.fields)
         if changes:
             fields.update(changes)
-        return client.post(endpoint, fields), fields
+        return client.post(destination, fields), fields
 
     def follow(response):
         if response.status in (302, 303):
             return client.get(client.location(response))
         return response
 
-    def denial(case, form, changes=None, endpoint=target_url, reason=None):
+    def denial(case, form, changes=None, endpoint=None, reason=None):
+        destination = form_destinations[id(form)]
         before = snapshot()
         response, _ = submit(form, changes, endpoint)
         after = snapshot()
         landing = follow(response)
         notice = after.get("flash_notice") or {}
-        redirect_ok = response.status in (302, 303) and parse_qs(urlsplit(client.location(response)).query).get("page") == parse_qs(urlsplit(endpoint).query).get("page")
+        redirect_ok = response.status in (302, 303) and parse_qs(urlsplit(client.location(response)).query).get("page") == parse_qs(urlsplit(destination).query).get("page")
         reason = reason or ("security check failed" if "NONCE" in case else
                             "permission to edit the parent product" if "FOREIGN-PARENT" in case else
                             "valid delivery setup" if "UNKNOWN-SLICE" in case else
@@ -117,8 +132,8 @@ def run_configuration(client, state, bridge, recorder, Page, login):
 
     login(client, state, target_url, recorder, prefix + "LOGIN-")
     response = client.get(target_url)
-    form = form_for(page_for(response), save_action)
-    required = {"cetech_de_action": save_action, **target}
+    form = form_for(response, save_action)
+    required = {"cetech_de_action": save_action, **{key: value for key, value in target.items() if key != "customize"}}
     recorder.check(prefix + "RENDERED-EXACT-SLICE-SAVE-FORM",
                    response.status == 200
                    and all(scalar(form.fields.get(k)) == v for k, v in required.items())
@@ -127,6 +142,9 @@ def run_configuration(client, state, bridge, recorder, Page, login):
                    and "fields[estimated_delivery][value]" in form.fields,
                    {"http": response.evidence(), "scope_id": state["variation_id"],
                     "parent_id": state["parent_id"], "slice_key": "in_store",
+                    "form_class": form.attrs.get("class", ""),
+                    "form_action_present": bool(form.attrs.get("action")),
+                    "posted_customize": scalar(form.fields.get("customize")),
                     "nonce": "obtained from actual rendered HTTP form; value omitted"})
 
     changed = {"fields[estimated_delivery][mode]": "override",
@@ -160,7 +178,7 @@ def run_configuration(client, state, bridge, recorder, Page, login):
                    evidence(revoked, restored))
 
     before = snapshot()
-    response, _ = submit(form, changed)
+    response, saved_fields = submit(form, changed)
     after = snapshot()
     before_row, after_row = scope_row(before), scope_row(after)
     selected_fields = [row for row in after["fields"] if int(row["scope_row_id"]) == selected_id]
@@ -186,21 +204,27 @@ def run_configuration(client, state, bridge, recorder, Page, login):
                    {**evidence(before, after, response), "scope_row_id": selected_id,
                     "saved_synthetic_estimate": "Opening HTTP after save", "new_audit_ids": [a["id"] for a in new_audits]})
     landing = follow(response)
+    customize_posted = scalar(saved_fields.get("customize")) == "1"
+    successful_notice = "Delivery settings saved" if customize_posted else "Scoped configuration saved. Version is now"
+    redirect_parameters = parse_qs(urlsplit(client.location(response)).query)
     recorder.check(prefix + "REAL-SAVE-REDIRECT-AND-NOTICE",
                    landing.status == 200
-                   and page_for(landing).has_notice("success", "Delivery settings saved")
-                   and scalar(form_for(page_for(landing), save_action).fields.get("fields[estimated_delivery][value]")) == "Opening HTTP after save",
-                   {"http": landing.evidence(), "redirect_parameters": parse_qs(urlsplit(client.location(response)).query)})
+                   and page_for(landing).has_notice("success", successful_notice)
+                   and (redirect_parameters.get("customize") == ["1"] if customize_posted else "customize" not in redirect_parameters)
+                   and all(redirect_parameters.get(key) == [value] for key, value in required.items() if key != "cetech_de_action")
+                   and scalar(form_for(landing, save_action).fields.get("fields[estimated_delivery][value]")) == "Opening HTTP after save",
+                   {"http": landing.evidence(), "redirect_parameters": redirect_parameters,
+                    "posted_customize": customize_posted, "notice_checked": successful_notice})
 
     # Submit the actual scoped reset form with bad nonce and relationship controls.
-    scoped_reset = form_for(page_for(landing), reset_action)
+    scoped_reset = form_for(landing, reset_action)
     denial("WRONG-AUTHORIZED-PARENT-SCOPED-RESET-DENIED", scoped_reset,
            {"parent_product_id": str(state["wrong_parent_id"])})
     denial("INVALID-NONCE-SCOPED-RESET-DENIED", scoped_reset,
            {"cetech_de_nonce": "invalid-qualification-nonce"})
 
     response = client.get(exceptions_path)
-    exception_form = form_for(page_for(response), exception_action, state["variation_id"])
+    exception_form = form_for(response, exception_action, state["variation_id"])
     recorder.check(prefix + "ACTUAL-EXCEPTION-RESET-FORM-EXACT-SLICE",
                    response.status == 200
                    and scalar(exception_form.fields.get("item_type")) == "variation"

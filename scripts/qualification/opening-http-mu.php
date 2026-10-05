@@ -11,18 +11,24 @@ if ('1' !== getenv('CETECH_DE_HTTP_OPENING_QUALIFICATION')) {
     return;
 }
 $fixture_site = (string) getenv('CETECH_DE_HTTP_FIXTURE_SITE');
-if (
-    '1' !== getenv('CETECH_DE_NATIVE_OPENING_QUALIFICATION')
-    || '127.0.0.1' !== getenv('CETECH_DE_WP_DB_HOST')
-    || !defined('ABSPATH') || '' === $fixture_site || false === realpath($fixture_site) || realpath(ABSPATH) !== realpath($fixture_site)
-    || !defined('DB_HOST') || !preg_match('/^127\\.0\\.0\\.1(?::[0-9]+)?$/D', (string) DB_HOST)
-    || !defined('DB_NAME') || !preg_match('/^cetech_wp_opening_qualification_[a-z0-9]+$/D', (string) DB_NAME)
-    || '1' !== (string) get_option('cetech_opening_qualification_disposable')
-    || !defined('DISABLE_WP_CRON') || !DISABLE_WP_CRON
-    || 'http://127.0.0.1:8085' !== (string) get_option('siteurl')
-    || 'http://127.0.0.1:8085' !== (string) get_option('home')
-) {
-    throw new RuntimeException('HTTP fixture MU plugin refused an unmarked or different disposable site.');
+$opening_http_mu_guard_checks = [
+    'FLAGS' => '1' === getenv('CETECH_DE_NATIVE_OPENING_QUALIFICATION'),
+    'DB_HOST' => '127.0.0.1' === getenv('CETECH_DE_WP_DB_HOST') && defined('DB_HOST') && (bool) preg_match('/^127\\.0\\.0\\.1(?::[0-9]+)?$/D', (string) DB_HOST),
+    'DB_NAME' => defined('DB_NAME') && (bool) preg_match('/^cetech_wp_opening_qualification_[a-z0-9]+$/D', (string) DB_NAME),
+    'SITE_PATH' => defined('ABSPATH') && '' !== $fixture_site && false !== realpath($fixture_site) && realpath(ABSPATH) === realpath($fixture_site),
+    'MARKER' => function_exists('get_option') && '1' === (string) get_option('cetech_opening_qualification_disposable'),
+    'CRON' => defined('DISABLE_WP_CRON') && DISABLE_WP_CRON,
+    'SITEURL' => function_exists('get_option') && 'http://127.0.0.1:8085' === (string) get_option('siteurl'),
+    'HOME' => function_exists('get_option') && 'http://127.0.0.1:8085' === (string) get_option('home'),
+];
+$opening_http_mu_guard_failed = [];
+foreach ($opening_http_mu_guard_checks as $opening_http_mu_guard_code => $opening_http_mu_guard_passed) {
+    if (!$opening_http_mu_guard_passed) {
+        $opening_http_mu_guard_failed[] = 'HTTP_MU_GUARD_' . $opening_http_mu_guard_code;
+    }
+}
+if ([] !== $opening_http_mu_guard_failed) {
+    throw new RuntimeException('HTTP fixture MU plugin refused an unmarked or different disposable site. ' . implode(' ', $opening_http_mu_guard_failed));
 }
 add_filter('action_scheduler_allow_async_request_runner', '__return_false', PHP_INT_MAX);
 
