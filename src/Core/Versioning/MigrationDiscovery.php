@@ -37,12 +37,24 @@ final class MigrationDiscovery {
 		foreach ( $files as $file ) {
 			$migration = self::load_migration_file( $file, $logger );
 
-			if ( null !== $migration ) {
-				$migrations[] = $migration;
+			if ( null === $migration ) {
+				self::record_discovery_failure( $file, $logger );
+				return [];
 			}
+			$migrations[] = $migration;
 		}
 
 		return $migrations;
+	}
+
+	private static function record_discovery_failure( string $file, Logger $logger ): void {
+		$error = sprintf( 'Migration discovery failed at %s; no migrations will be applied.', basename( $file ) );
+		$logger->error( $error );
+		try {
+			MigrationStatus::record( [ 'status' => 'failed', 'error' => $error, 'file' => basename( $file ) ] );
+		} catch ( \Throwable $exception ) {
+			$logger->error( 'Migration discovery failure status could not be persisted.', [ 'error' => $exception->getMessage() ] );
+		}
 	}
 
 	private static function load_migration_file( string $file, Logger $logger ): ?MigrationInterface {

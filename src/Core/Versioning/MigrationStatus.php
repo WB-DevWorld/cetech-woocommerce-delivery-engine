@@ -23,6 +23,9 @@ final class MigrationStatus {
 		);
 
 		update_option( self::OPTION_NAME, $payload, false );
+		if ( $payload !== get_option( self::OPTION_NAME, null ) ) {
+			throw new \RuntimeException( 'Migration status could not be persisted.' );
+		}
 	}
 
 	/**

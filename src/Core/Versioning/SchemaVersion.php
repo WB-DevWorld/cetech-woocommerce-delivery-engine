@@ -41,11 +41,18 @@ final class SchemaVersion {
 
 	public static function set( string $version ): void {
 		update_option( self::OPTION_NAME, $version, false );
+		$stored = get_option( self::OPTION_NAME, null );
+		if ( null === $stored || $version !== (string) $stored ) {
+			throw new \RuntimeException( 'Schema version could not be persisted.' );
+		}
 	}
 
 	public static function ensure_initialized(): void {
 		if ( null === get_option( self::OPTION_NAME, null ) ) {
 			add_option( self::OPTION_NAME, self::FOUNDATION, '', false );
+		}
+		if ( null === get_option( self::OPTION_NAME, null ) ) {
+			throw new \RuntimeException( 'Schema version could not be initialized.' );
 		}
 	}
 }
