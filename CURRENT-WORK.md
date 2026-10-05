@@ -27,7 +27,7 @@ Exclusive source-file reservations for this batch:
 - `src/Bootstrap/Plugin.php` (only the configuration caller's dependency wiring);
 - `src/Core/Versioning/MigrationRunner.php`, `MigrationDiscovery.php`, `SchemaVersion.php`, `MigrationStatus.php`.
 
-Test reservations: new `BulkJobAdminAuthorizationTest`, `ScopedConfigurationCallerAuthorityTest`, `SetupWizardEntityAuthorizationTest`, `MigrationRunnerFailureTest` and their isolated fixtures; `tests/bootstrap.php` only for resource-specific `edit_post` fixture support. The exact final changed paths and check results will be recorded in `docs/OPENING-CORRECTIONS-2026-10-05.md`. Schema target stays 6; published/frozen package identities are untouched. No release package is built by this task.
+Test reservations: new `BulkJobAdminAuthorizationTest`, `ScopedConfigurationCallerAuthorityTest`, `SetupWizardEntityAuthorizationTest`, `MigrationRunnerFailureTest` and their isolated fixtures, including `RestoresWordPressFixtureGlobals`; `tests/bootstrap.php` only for resource-specific `edit_post` and the missing `esc_js` fixture support. The exact final changed paths and check results are recorded in `docs/OPENING-CORRECTIONS-2026-10-05.md`. Schema target stays 6; published/frozen package identities are untouched. No release package is built by this task.
 
 The sections below preserve the earlier Issue #45 and release/deployment checkpoints; their docs-only authorization does not describe this newer bounded owner instruction.
 
