@@ -16,6 +16,7 @@ use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultSummary;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsService;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsSettings;
 use CetechDeliveryEngine\Application\Shipping\WooCommerceShippingReadiness;
+use CetechDeliveryEngine\Core\Capabilities\Capabilities;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
 use CetechDeliveryEngine\Domain\Configuration\ScopedConfigurationRepositoryInterface;
@@ -1305,7 +1306,22 @@ final class SetupWizardPage {
 			return (bool) wp_verify_nonce( $nonce, self::ACTION_SAVE_LATER ) && current_user_can( 'manage_delivery_settings' );
 		}
 
-		return $this->action_handler->verify_post( $action, $action, 'manage_delivery_settings', self::SLUG );
+		if ( ! $this->action_handler->verify_post( $action, $action, 'manage_delivery_settings', self::SLUG ) ) {
+			return false;
+		}
+
+		$entity_capability = match ( $action ) {
+			self::ACTION_CREATE_OPTION => 'manage_delivery_offers',
+			self::ACTION_CREATE_CHARGE => 'manage_delivery_rate_cards',
+			self::ACTION_CREATE_AREA => 'manage_delivery_zones',
+			self::ACTION_CREATE_PICKUP => Capabilities::PICKUP,
+			default => null,
+		};
+		if ( null !== $entity_capability ) {
+			AdminPageAccess::require_capability( $entity_capability );
+		}
+
+		return true;
 	}
 
 	/**
