@@ -9,8 +9,10 @@ require_once dirname( __DIR__, 2 ) . '/Support/Cor006ImportStubs.php';
 
 use CetechDeliveryEngine\Application\Bulk\Portability\ConfigImportConflictMode;
 use CetechDeliveryEngine\Application\Bulk\Portability\ConfigurationImporter;
+use CetechDeliveryEngine\Domain\Bulk\BulkJob;
 use CetechDeliveryEngine\Domain\Bulk\BulkJobItem;
 use CetechDeliveryEngine\Domain\Enum\BulkJobItemStatus;
+use CetechDeliveryEngine\Domain\Enum\BulkOperationType;
 use CetechDeliveryEngine\Infrastructure\Persistence\AbstractWpdbRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbBulkJobRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbDestinationRuleRepository;
@@ -163,7 +165,9 @@ final class BulkClaimLockErrorTest extends TestCase {
 
 		self::assertNotContains( 'COMMIT', $this->wpdb->sql_log );
 		self::assertSame( [ 'NG' ], $this->snapshot_rule_values() );
+		self::assertSame( '', $this->rule_value() );
 		$starts = $this->start_transaction_count();
+		$sql_before = count( $this->wpdb->sql_log );
 		try {
 			$this->repository->save_item(
 				BulkJobItem::pending( 1, 'delivery_area_rules', 1, 'accra' )->with(
@@ -178,19 +182,39 @@ final class BulkClaimLockErrorTest extends TestCase {
 		} catch ( \RuntimeException $exception ) {
 			self::assertStringContainsString( 'Rollback also failed.', $exception->getMessage() );
 		}
-		self::assertSame( $starts, $this->start_transaction_count() );
-		( new WpdbDestinationRuleRepository() )->replaceForZone(
-			1,
-			[
+		try {
+			$this->repository->save_job( BulkJob::create( BulkOperationType::ConfigImport, 1, [], [] ) );
+			self::fail( 'A later job write must not enter an unresolved transaction.' );
+		} catch ( \RuntimeException $exception ) {
+			self::assertStringContainsString( 'Rollback also failed.', $exception->getMessage() );
+		}
+		try {
+			$this->repository->release_job_claim( 1, 'owner' );
+			self::fail( 'A later claim release must not enter an unresolved transaction.' );
+		} catch ( \RuntimeException $exception ) {
+			self::assertStringContainsString( 'Rollback also failed.', $exception->getMessage() );
+		}
+		try {
+			( new WpdbDestinationRuleRepository() )->replaceForZone(
+				1,
 				[
-					'rule_type'  => 'country',
-					'rule_value' => 'GH',
-					'match_mode' => 'exact',
-					'priority'   => 10,
-				],
-			]
-		);
+					[
+						'rule_type'  => 'country',
+						'rule_value' => 'GH',
+						'match_mode' => 'exact',
+						'priority'   => 10,
+					],
+				]
+			);
+			self::fail( 'A later rules replacement must not join an unresolved transaction.' );
+		} catch ( \RuntimeException $exception ) {
+			self::assertStringContainsString( 'Rollback also failed.', $exception->getMessage() );
+		}
 		self::assertSame( $starts, $this->start_transaction_count() );
+		self::assertNotContains( 'COMMIT', $this->wpdb->sql_log );
+		self::assertSame( $sql_before, count( $this->wpdb->sql_log ) );
+		self::assertSame( '', $this->rule_value() );
+		self::assertSame( [ 'NG' ], $this->snapshot_rule_values() );
 	}
 
 	public function test_a_joined_insert_failure_with_a_successful_rollback_restores_the_old_rule(): void {

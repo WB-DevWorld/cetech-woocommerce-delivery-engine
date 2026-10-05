@@ -39,6 +39,7 @@ final class WpdbDestinationRuleRepository extends AbstractWpdbRepository impleme
 	public function replaceForZone( int $zone_id, array $rules ): bool {
 		global $wpdb;
 
+		$this->throw_if_transaction_unresolved();
 		$joined = $this->transaction_is_open();
 		if ( ! $joined && ! $this->open_owned_transaction() ) {
 			return false;
