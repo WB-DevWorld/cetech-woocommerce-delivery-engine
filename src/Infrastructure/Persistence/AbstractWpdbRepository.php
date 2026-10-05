@@ -101,6 +101,40 @@ abstract class AbstractWpdbRepository {
 		throw new \RuntimeException( $this->unresolved_transaction_message() );
 	}
 
+	/**
+	 * End the shared session before another callback can start a transaction on it.
+	 * Metadata is cleared only after close succeeds. A failed close stays unresolved
+	 * and the handle is quarantined so a later START cannot implicit-commit.
+	 */
+	protected function abandon_unresolved_connection(): void {
+		global $wpdb;
+
+		if ( ! self::$transaction_cleanup_failed || ! is_object( $wpdb ) ) {
+			return;
+		}
+		$closed = method_exists( $wpdb, 'close' ) && true === $wpdb->close();
+		if ( $closed ) {
+			self::$transaction_depth          = 0;
+			self::$transaction_cleanup_failed = false;
+			self::$transaction_cause          = '';
+			self::$transaction_cleanup_error  = '';
+
+			return;
+		}
+		if ( method_exists( $wpdb, 'quarantine_failed_connection' ) ) {
+			$wpdb->quarantine_failed_connection();
+		}
+		if ( property_exists( $wpdb, 'dbh' ) ) {
+			$wpdb->dbh = null;
+		}
+		if ( property_exists( $wpdb, 'ready' ) ) {
+			$wpdb->ready = false;
+		}
+		if ( property_exists( $wpdb, 'has_connected' ) ) {
+			$wpdb->has_connected = false;
+		}
+	}
+
 	protected function unresolved_transaction_message(): string {
 		$cause   = self::$transaction_cause;
 		$cleanup = self::$transaction_cleanup_error;

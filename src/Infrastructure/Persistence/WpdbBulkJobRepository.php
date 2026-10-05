@@ -141,6 +141,7 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 	}
 
 	public function insert_items( array $items ): array {
+		$this->throw_if_transaction_unresolved();
 		$saved = [];
 		foreach ( $items as $item ) {
 			if ( ! $item instanceof BulkJobItem ) {
@@ -159,6 +160,7 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 
 	public function claim_items( int $job_id, int $limit, string $claim_token, int $claim_ttl_seconds = 300 ): array {
 		global $wpdb;
+		$this->throw_if_transaction_unresolved();
 		$table   = TableNames::for( BulkJobSchema::ITEMS_SUFFIX );
 		$limit   = max( 1, min( 100, $limit ) );
 		$expired = gmdate( 'Y-m-d H:i:s', time() - $claim_ttl_seconds );
@@ -231,6 +233,7 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 			return $result;
 		} catch ( \Throwable $exception ) {
 			if ( self::$transaction_cleanup_failed ) {
+				$this->abandon_unresolved_connection();
 				throw $exception;
 			}
 			$detail = $exception->getMessage();
@@ -365,6 +368,7 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 
 	public function reset_item_statuses( int $job_id, array $from_statuses, BulkJobItemStatus $to ): int {
 		global $wpdb;
+		$this->throw_if_transaction_unresolved();
 		$table = TableNames::for( BulkJobSchema::ITEMS_SUFFIX );
 		$codes = [];
 		foreach ( $from_statuses as $status ) {
@@ -386,6 +390,7 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 
 	public function claim_job( int $job_id, string $claim_token, int $claim_ttl_seconds = 300 ): ?BulkJob {
 		global $wpdb;
+		$this->throw_if_transaction_unresolved();
 		$now     = gmdate( 'Y-m-d H:i:s' );
 		$expired = gmdate( 'Y-m-d H:i:s', time() - max( 1, $claim_ttl_seconds ) );
 		$sql     = 'UPDATE `' . $this->table_name() . '` SET claim_token = %s, claimed_at = %s, updated_at = %s WHERE id = %d AND (claim_token IS NULL OR claim_token = %s OR claimed_at IS NULL OR claimed_at < %s)';
@@ -417,6 +422,7 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 
 	public function save_recipe( BulkRecipe $recipe ): BulkRecipe {
 		global $wpdb;
+		$this->throw_if_transaction_unresolved();
 		$table = TableNames::for( BulkJobSchema::RECIPES_SUFFIX );
 		$data  = [
 			'recipe_code'             => $recipe->recipe_code,

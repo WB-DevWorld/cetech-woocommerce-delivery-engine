@@ -34,7 +34,25 @@ final class RealMysqliWpdb {
 	/** @var list<string> */
 	public array $sql_log = [];
 
-	private \PDO $pdo;
+	public bool $reject_next_rollback = false;
+
+	public bool $fail_next_close = false;
+
+	public int $close_count = 0;
+
+	public int $reconnect_count = 0;
+
+	private ?\PDO $pdo;
+
+	private bool $connected = true;
+
+	private bool $quarantined = false;
+
+	private string $reconnect_dsn = '';
+
+	private string $reconnect_user = '';
+
+	private string $reconnect_pass = '';
 
 	public function __construct( \PDO $pdo, string $prefix = 'wp_' ) {
 		$this->pdo                = $pdo;
@@ -85,6 +103,70 @@ final class RealMysqliWpdb {
 	}
 
 	public function pdo(): \PDO {
+		return $this->connection();
+	}
+
+	public function remember_reconnect( string $dsn, string $user, string $pass ): void {
+		$this->reconnect_dsn  = $dsn;
+		$this->reconnect_user = $user;
+		$this->reconnect_pass = $pass;
+	}
+
+	/**
+	 * Injected rejection. The ROLLBACK text is not sent, so this is not a server rollback failure.
+	 * close() then ends the session; MariaDB rolls that session back.
+	 */
+	public function close(): bool {
+		$this->close_count++;
+		$this->log_sql( 'CLOSE' );
+		if ( $this->fail_next_close ) {
+			$this->fail_next_close = false;
+			$this->last_error      = 'Simulated connection close failure';
+
+			return false;
+		}
+		if ( $this->pdo instanceof \PDO ) {
+			try {
+				$this->pdo->exec( 'KILL CONNECTION_ID()' );
+			} catch ( \PDOException ) {
+				// The killed session ends, and MariaDB rolls back its open transaction.
+			}
+		}
+		$this->pdo         = null;
+		$this->connected   = false;
+		$this->quarantined = false;
+
+		return true;
+	}
+
+	public function quarantine_failed_connection(): void {
+		$this->quarantined = true;
+		$this->last_error  = 'Connection disposal failed.';
+	}
+
+	private function connection(): \PDO {
+		if ( $this->quarantined ) {
+			throw new \RuntimeException( 'Connection disposal failed.' );
+		}
+		if ( $this->connected && $this->pdo instanceof \PDO ) {
+			return $this->pdo;
+		}
+		if ( '' === $this->reconnect_dsn ) {
+			throw new \RuntimeException( 'Database connection was closed.' );
+		}
+		$this->pdo = new \PDO(
+			$this->reconnect_dsn,
+			$this->reconnect_user,
+			$this->reconnect_pass,
+			[
+				\PDO::ATTR_ERRMODE            => \PDO::ERRMODE_EXCEPTION,
+				\PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC,
+			]
+		);
+		$this->connected = true;
+		$this->reconnect_count++;
+		$this->log_sql( 'RECONNECT' );
+
 		return $this->pdo;
 	}
 
@@ -114,7 +196,7 @@ final class RealMysqliWpdb {
 					return (string) (float) $value;
 				}
 
-				return $this->pdo->quote( (string) $value );
+				return $this->connection()->quote( (string) $value );
 			},
 			$query
 		);
@@ -122,9 +204,22 @@ final class RealMysqliWpdb {
 
 	public function query( mixed $sql ): int|bool {
 		$sql = (string) $sql;
+		if ( $this->quarantined ) {
+			$this->last_error = 'Connection disposal failed.';
+			$this->log_sql( 'REJECTED ' . $sql );
+
+			return false;
+		}
+		if ( $this->reject_next_rollback && preg_match( '/^\s*ROLLBACK\b/i', $sql ) ) {
+			$this->reject_next_rollback = false;
+			$this->last_error           = 'Simulated SQL failure: ROLLBACK';
+			$this->log_sql( $sql );
+
+			return false;
+		}
 		$this->log_sql( $sql );
 		try {
-			$result = $this->pdo->exec( $sql );
+			$result = $this->connection()->exec( $sql );
 		} catch ( \PDOException $exception ) {
 			$this->last_error    = $exception->getMessage();
 			$this->rows_affected = 0;
@@ -158,7 +253,7 @@ final class RealMysqliWpdb {
 		}
 		$sql = 'INSERT INTO `' . str_replace( '`', '', $table ) . '` (' . implode( ',', $columns ) . ') VALUES (' . implode( ',', $values ) . ')';
 		try {
-			$result = $this->pdo->exec( $sql );
+			$result = $this->connection()->exec( $sql );
 		} catch ( \PDOException $exception ) {
 			$this->last_error    = $exception->getMessage();
 			$this->insert_id     = 0;
@@ -174,7 +269,7 @@ final class RealMysqliWpdb {
 			return false;
 		}
 		$this->last_error    = '';
-		$this->insert_id     = (int) $this->pdo->lastInsertId();
+		$this->insert_id     = (int) $this->connection()->lastInsertId();
 		$this->rows_affected = (int) $result;
 
 		return $this->rows_affected;
@@ -194,7 +289,7 @@ final class RealMysqliWpdb {
 			$sets[] = '`' . str_replace( '`', '', (string) $column ) . '` = ' . $this->sql_value( $value );
 		}
 		$sql    = 'UPDATE `' . str_replace( '`', '', $table ) . '` SET ' . implode( ', ', $sets ) . ' WHERE ' . $this->where_sql( $where );
-		$result = $this->pdo->exec( $sql );
+		$result = $this->connection()->exec( $sql );
 		if ( false === $result ) {
 			$this->last_error    = $this->error_message();
 			$this->rows_affected = 0;
@@ -215,7 +310,7 @@ final class RealMysqliWpdb {
 	public function delete( string $table, array $where, $where_format = null ) {
 		unset( $where_format );
 		$sql    = 'DELETE FROM `' . str_replace( '`', '', $table ) . '` WHERE ' . $this->where_sql( $where );
-		$result = $this->pdo->exec( $sql );
+		$result = $this->connection()->exec( $sql );
 		if ( false === $result ) {
 			$this->last_error    = $this->error_message();
 			$this->rows_affected = 0;
@@ -233,7 +328,7 @@ final class RealMysqliWpdb {
 	 */
 	public function get_col( string $sql ): array {
 		$this->log_sql( $sql );
-		$statement = $this->pdo->query( $sql );
+		$statement = $this->connection()->query( $sql );
 		if ( false === $statement ) {
 			$this->last_error = $this->error_message();
 
@@ -248,7 +343,7 @@ final class RealMysqliWpdb {
 	public function get_var( string $sql ) {
 		$this->log_sql( $sql );
 		try {
-			$statement = $this->pdo->query( $sql );
+			$statement = $this->connection()->query( $sql );
 		} catch ( \PDOException $exception ) {
 			$this->last_error = $exception->getMessage();
 
@@ -271,7 +366,7 @@ final class RealMysqliWpdb {
 	public function get_row( string $sql, $output = 'ARRAY_A' ): ?array {
 		unset( $output );
 		$this->log_sql( $sql );
-		$statement = $this->pdo->query( $sql );
+		$statement = $this->connection()->query( $sql );
 		if ( false === $statement ) {
 			$this->last_error = $this->error_message();
 
@@ -289,7 +384,7 @@ final class RealMysqliWpdb {
 	public function get_results( string $sql, $output = 'ARRAY_A' ): array {
 		unset( $output );
 		$this->log_sql( $sql );
-		$statement = $this->pdo->query( $sql );
+		$statement = $this->connection()->query( $sql );
 		if ( false === $statement ) {
 			$this->last_error = $this->error_message();
 
@@ -324,11 +419,11 @@ final class RealMysqliWpdb {
 			return (string) $value;
 		}
 
-		return (string) $this->pdo->quote( (string) $value );
+		return (string) $this->connection()->quote( (string) $value );
 	}
 
 	private function error_message(): string {
-		$info = $this->pdo->errorInfo();
+		$info = $this->connection()->errorInfo();
 
 		return (string) ( $info[2] ?? 'pdo_error' );
 	}

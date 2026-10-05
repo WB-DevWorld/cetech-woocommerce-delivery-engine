@@ -48,6 +48,18 @@ final class FakeWpdb {
 
 	public ?string $fail_next_update_column = null;
 
+	public bool $fail_next_close = false;
+
+	public int $close_count = 0;
+
+	public int $reconnect_count = 0;
+
+	private bool $connected = true;
+
+	private bool $quarantined = false;
+
+	private ?self $committed_reader = null;
+
 	/** @var array<string, list<array<string, mixed>>>|null */
 	private ?array $transaction_tables = null;
 
@@ -111,12 +123,65 @@ final class FakeWpdb {
 		return is_array( $rows ) ? array_values( $rows ) : [];
 	}
 
-	public function query( mixed $sql ): int|bool {
-		$this->record_sql( (string) $sql );
-		if ( $this->consume_sql_failure( (string) $sql ) ) {
+	/**
+	 * A second connection that sees committed rows only. An open transaction is invisible until commit.
+	 */
+	public function independent_connection(): self {
+		$reader                   = new self();
+		$reader->prefix           = $this->prefix;
+		$reader->tables           = unserialize( serialize( $this->tables ) );
+		$reader->auto_increment   = $this->auto_increment;
+		$reader->unique_indexes   = $this->unique_indexes;
+		$this->committed_reader   = $reader;
+
+		return $reader;
+	}
+
+	public function close(): bool {
+		$this->close_count++;
+		$this->sql_log[] = 'CLOSE';
+		if ( $this->fail_next_close ) {
+			$this->fail_next_close = false;
+			$this->last_error      = 'Simulated connection close failure';
+
 			return false;
 		}
-		$normalized = strtoupper( trim( (string) $sql ) );
+		if ( null !== $this->transaction_tables ) {
+			$this->tables                     = $this->transaction_tables;
+			$this->auto_increment             = $this->transaction_auto_increment ?? $this->auto_increment;
+			$this->insert_id                  = $this->transaction_insert_id;
+			$this->transaction_tables         = null;
+			$this->transaction_auto_increment = null;
+		}
+		$this->connected   = false;
+		$this->quarantined = false;
+
+		return true;
+	}
+
+	public function quarantine_failed_connection(): void {
+		$this->quarantined = true;
+		$this->last_error  = 'Connection disposal failed.';
+	}
+
+	public function query( mixed $sql ): int|bool {
+		$sql = (string) $sql;
+		if ( $this->quarantined ) {
+			$this->last_error = 'Connection disposal failed.';
+			$this->sql_log[]  = 'REJECTED ' . $sql;
+
+			return false;
+		}
+		if ( ! $this->connected ) {
+			$this->connected = true;
+			$this->reconnect_count++;
+			$this->sql_log[] = 'RECONNECT';
+		}
+		$this->record_sql( $sql );
+		if ( $this->consume_sql_failure( $sql ) ) {
+			return false;
+		}
+		$normalized = strtoupper( trim( $sql ) );
 
 		if ( preg_match( '/^DROP TABLE IF EXISTS `([^`]+)`\s*$/i', trim( (string) $sql ), $drop ) ) {
 			unset( $this->tables[ $drop[1] ], $this->unique_indexes[ $drop[1] ], $this->auto_increment[ $drop[1] ] );
@@ -125,6 +190,11 @@ final class FakeWpdb {
 		}
 
 		if ( 'START TRANSACTION' === $normalized ) {
+			if ( null !== $this->transaction_tables ) {
+				$this->publish_committed();
+				$this->transaction_tables         = null;
+				$this->transaction_auto_increment = null;
+			}
 			$this->transaction_tables         = unserialize( serialize( $this->tables ) );
 			$this->transaction_auto_increment = $this->auto_increment;
 			$this->transaction_insert_id      = $this->insert_id;
@@ -133,6 +203,7 @@ final class FakeWpdb {
 		}
 
 		if ( 'COMMIT' === $normalized ) {
+			$this->publish_committed();
 			$this->transaction_tables         = null;
 			$this->transaction_auto_increment = null;
 
@@ -160,6 +231,14 @@ final class FakeWpdb {
 		}
 
 		throw new \RuntimeException( 'Unsupported SQL: ' . (string) $sql );
+	}
+
+	private function publish_committed(): void {
+		if ( ! $this->committed_reader instanceof self ) {
+			return;
+		}
+		$this->committed_reader->tables         = unserialize( serialize( $this->tables ) );
+		$this->committed_reader->auto_increment = $this->auto_increment;
 	}
 
 	private function consume_sql_failure( string $sql ): bool {

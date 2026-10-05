@@ -16,6 +16,7 @@ use CetechDeliveryEngine\Domain\Enum\BulkJobStatus;
 use CetechDeliveryEngine\Domain\Enum\BulkOperationType;
 use CetechDeliveryEngine\Infrastructure\Persistence\BulkJobSchema;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbBulkJobRepository;
+use CetechDeliveryEngine\Infrastructure\Persistence\WpdbCanonicalLocationRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbDestinationRuleRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbDestinationZoneRepository;
 use CetechDeliveryEngine\Tests\Support\Cor006LogisticsStore;
@@ -268,6 +269,88 @@ final class BulkClaimFenceSqlTest extends TestCase {
 		);
 	}
 
+	/**
+	 * Injected ROLLBACK rejection is not a server rollback failure: the statement is not sent.
+	 * close() then kills that session. MariaDB rolls the session back. The following claim and
+	 * geography finalize_generation run in this same process after the exception, which is the
+	 * ActionScheduler_Abstract_QueueRunner catch-and-continue shape. The runner package is not
+	 * vendored here. This is not a scheduler liveness test.
+	 */
+	public function test_a_rejected_rollback_is_abandoned_before_the_next_callback(): void {
+		$seed = $this->seed_rule_import_job();
+		$this->pdo->exec( "INSERT INTO cor006_delivery_engine_destination_rules (zone_id, rule_type, rule_value, match_mode, priority) VALUES (1, 'country', 'NG', 'exact', 10)" );
+		$this->pdo->exec( "CREATE TRIGGER cor006_reject_rule_insert BEFORE INSERT ON cor006_delivery_engine_destination_rules FOR EACH ROW SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'rejected destination_rules insert'" );
+		$reader = $this->connect();
+		self::assertInstanceOf( RealMysqliWpdb::class, $reader );
+		$worker = $GLOBALS['wpdb'];
+		self::assertInstanceOf( RealMysqliWpdb::class, $worker );
+		$worker->reject_next_rollback = true;
+		$job = $this->repository->claim_job( $seed['job_id'], 'owner', 300 );
+		$items = $this->repository->claim_items( $seed['job_id'], 1, 'owner', 30 );
+		self::assertNotNull( $job );
+		self::assertCount( 1, $items );
+		$importer = new ConfigurationImporter(
+			new ArrayDeliveryOfferStore(),
+			new WpdbDestinationZoneRepository(),
+			new WpdbDestinationRuleRepository(),
+			new ArrayRateCardStore(),
+			new Cor006LogisticsStore(),
+			new Cor006PickupStore(),
+			new Cor006SupplierStore(),
+			new Cor006OriginStore()
+		);
+		$diagnostics = null;
+		try {
+			$this->repository->call_while_item_claimed(
+				$seed['item_id'],
+				'owner',
+				static function () use ( $importer ): array {
+					return $importer->apply_item(
+						'delivery_area_rules',
+						[
+							'zone_code'  => 'accra',
+							'rule_type'  => 'country',
+							'rule_value' => 'GH',
+							'match_mode' => 'exact',
+							'priority'   => 10,
+						],
+						ConfigImportConflictMode::Replace,
+						false,
+						false
+					);
+				}
+			);
+		} catch ( \RuntimeException $exception ) {
+			$diagnostics = $exception;
+		}
+
+		self::assertInstanceOf( \RuntimeException::class, $diagnostics );
+		self::assertStringContainsString( 'rejected destination_rules insert', $diagnostics->getMessage() );
+		self::assertStringContainsString( 'Rollback also failed.', $diagnostics->getMessage() );
+		self::assertStringContainsString( 'Simulated SQL failure: ROLLBACK', $diagnostics->getMessage() );
+		self::assertSame( [ 'NG' ], $reader->pdo()->query( 'SELECT rule_value FROM cor006_delivery_engine_destination_rules' )->fetchAll( \PDO::FETCH_COLUMN ) );
+		self::assertSame( 0, (int) $reader->pdo()->query( 'SELECT @@in_transaction' )->fetchColumn() );
+
+		$this->repository->claim_job( $seed['job_id'], 'next-worker', 300 );
+		try {
+			( new WpdbCanonicalLocationRepository() )->finalize_generation( 'containment-token' );
+		} catch ( \Throwable ) {
+		}
+
+		self::assertSame( [ 'NG' ], $reader->pdo()->query( 'SELECT rule_value FROM cor006_delivery_engine_destination_rules' )->fetchAll( \PDO::FETCH_COLUMN ) );
+		self::assertSame( 0, (int) $reader->pdo()->query( 'SELECT @@in_transaction' )->fetchColumn() );
+		$close_at = array_search( 'CLOSE', $worker->sql_log, true );
+		self::assertIsInt( $close_at );
+		self::assertGreaterThan( 0, $worker->reconnect_count );
+		$later_start = false;
+		foreach ( $worker->sql_log as $index => $sql ) {
+			if ( $index > $close_at && str_contains( $sql, 'START TRANSACTION' ) ) {
+				$later_start = true;
+			}
+		}
+		self::assertTrue( $later_start );
+	}
+
 	public function test_source_write_holds_the_claim_until_the_contender_times_out(): void {
 		$seed = $this->seed_observable_rate_job( false );
 		$owner = $this->start( 'worker-owner', $seed['job_id'], 'owner', false, [ 'CETECH_DE_COR006_PHASE' => 'inside_source' ] );
@@ -461,12 +544,16 @@ final class BulkClaimFenceSqlTest extends TestCase {
 		try {
 			$server = new \PDO( "mysql:host={$host};port={$port};charset=utf8mb4", $user, $pass, [ \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION ] );
 			$server->exec( 'CREATE DATABASE IF NOT EXISTS `' . str_replace( '`', '', $name ) . '`' );
-			$pdo = new \PDO( "mysql:host={$host};port={$port};dbname={$name};charset=utf8mb4", $user, $pass, [ \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION, \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC ] );
+			$dsn = "mysql:host={$host};port={$port};dbname={$name};charset=utf8mb4";
+		$pdo = new \PDO( $dsn, $user, $pass, [ \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION, \PDO::ATTR_DEFAULT_FETCH_MODE => \PDO::FETCH_ASSOC ] );
 		} catch ( \PDOException ) {
 			return null;
 		}
 
-		return new RealMysqliWpdb( $pdo, 'cor006_' );
+		$wpdb = new RealMysqliWpdb( $pdo, 'cor006_' );
+		$wpdb->remember_reconnect( $dsn, $user, $pass );
+
+		return $wpdb;
 	}
 
 	private function table_from_statement( string $statement ): string {

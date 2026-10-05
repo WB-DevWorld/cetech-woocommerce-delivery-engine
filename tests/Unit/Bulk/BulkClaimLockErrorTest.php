@@ -15,6 +15,7 @@ use CetechDeliveryEngine\Domain\Enum\BulkJobItemStatus;
 use CetechDeliveryEngine\Domain\Enum\BulkOperationType;
 use CetechDeliveryEngine\Infrastructure\Persistence\AbstractWpdbRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbBulkJobRepository;
+use CetechDeliveryEngine\Infrastructure\Persistence\WpdbCanonicalLocationRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbDestinationRuleRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbDestinationZoneRepository;
 use CetechDeliveryEngine\Tests\Support\Cor006LogisticsStore;
@@ -131,6 +132,7 @@ final class BulkClaimLockErrorTest extends TestCase {
 		$this->seed_rules( 'NG' );
 		$this->wpdb->fail_next_insert_table = 'wp_delivery_engine_destination_rules';
 		$this->wpdb->fail_sql_containing    = [ 'ROLLBACK' ];
+		$this->wpdb->fail_next_close        = true;
 		$importer = $this->rules_importer();
 		$returned = false;
 
@@ -215,6 +217,132 @@ final class BulkClaimLockErrorTest extends TestCase {
 		self::assertSame( $sql_before, count( $this->wpdb->sql_log ) );
 		self::assertSame( '', $this->rule_value() );
 		self::assertSame( [ 'NG' ], $this->snapshot_rule_values() );
+	}
+
+	/**
+	 * Same-process continuation after a callback exception, matching
+	 * ActionScheduler_Abstract_QueueRunner::process_action in woocommerce/action-scheduler
+	 * (trunk reviewed 2026-10-05): the runner catches the action exception and can run the
+	 * next due action in this PHP process. This repository does not vendor that runner.
+	 * The sequence here is the joined rules import, then claim_job, then
+	 * WpdbCanonicalLocationRepository::finalize_generation. It is not a scheduler liveness test.
+	 */
+	public function test_a_failed_joined_rollback_is_abandoned_before_the_next_callback(): void {
+		$this->seed_rules( 'NG' );
+		$reader = $this->wpdb->independent_connection();
+		$this->wpdb->fail_next_insert_table = 'wp_delivery_engine_destination_rules';
+		$this->wpdb->fail_sql_containing    = [ 'ROLLBACK' ];
+		$importer = $this->rules_importer();
+		$diagnostics = null;
+
+		try {
+			$this->repository->call_while_item_claimed(
+				1,
+				'owner',
+				static function () use ( $importer ): array {
+					return $importer->apply_item(
+						'delivery_area_rules',
+						[
+							'zone_code'  => 'accra',
+							'rule_type'  => 'country',
+							'rule_value' => 'GH',
+							'match_mode' => 'exact',
+							'priority'   => 10,
+						],
+						ConfigImportConflictMode::Replace,
+						false,
+						false
+					);
+				}
+			);
+		} catch ( \RuntimeException $exception ) {
+			$diagnostics = $exception;
+		}
+
+		self::assertInstanceOf( \RuntimeException::class, $diagnostics );
+		self::assertStringContainsString( 'Simulated insert failure', $diagnostics->getMessage() );
+		self::assertStringContainsString( 'Rollback also failed.', $diagnostics->getMessage() );
+		self::assertStringContainsString( 'ROLLBACK', $diagnostics->getMessage() );
+
+		try {
+			$this->repository->claim_job( 1, 'next-worker', 300 );
+		} catch ( \Throwable ) {
+			// The claim SQL may be unsupported by the double. It must still be attempted only after abandonment.
+		}
+		try {
+			( new WpdbCanonicalLocationRepository() )->finalize_generation( 'containment-token' );
+		} catch ( \Throwable ) {
+			// Geography may stop after its own START. That START must not commit the failed rules delete.
+		}
+
+		self::assertSame( [ 'NG' ], $this->reader_values( $reader ) );
+		$close_at = array_search( 'CLOSE', $this->wpdb->sql_log, true );
+		$later_start = $this->log_index_after( 'START TRANSACTION', is_int( $close_at ) ? $close_at : PHP_INT_MAX );
+		self::assertIsInt( $close_at, 'The failed connection must be closed before another callback reuses it.' );
+		self::assertNotFalse( $later_start, 'The geography transaction start must run on the replacement connection.' );
+		self::assertGreaterThan( $close_at, $later_start );
+		self::assertGreaterThan( 0, $this->wpdb->reconnect_count );
+	}
+
+	public function test_a_failed_connection_close_keeps_later_claim_and_geography_from_committing(): void {
+		$this->seed_rules( 'NG' );
+		$reader = $this->wpdb->independent_connection();
+		$this->wpdb->fail_next_insert_table = 'wp_delivery_engine_destination_rules';
+		$this->wpdb->fail_sql_containing    = [ 'ROLLBACK' ];
+		$this->wpdb->fail_next_close        = true;
+		$importer = $this->rules_importer();
+
+		try {
+			$this->repository->call_while_item_claimed(
+				1,
+				'owner',
+				static function () use ( $importer ): array {
+					return $importer->apply_item(
+						'delivery_area_rules',
+						[
+							'zone_code'  => 'accra',
+							'rule_type'  => 'country',
+							'rule_value' => 'GH',
+							'match_mode' => 'exact',
+							'priority'   => 10,
+						],
+						ConfigImportConflictMode::Replace,
+						false,
+						false
+					);
+				}
+			);
+			self::fail( 'A rejected rollback must still surface both diagnostics.' );
+		} catch ( \RuntimeException $exception ) {
+			self::assertStringContainsString( 'Simulated insert failure', $exception->getMessage() );
+			self::assertStringContainsString( 'Rollback also failed.', $exception->getMessage() );
+		}
+
+		$claim_ran = false;
+		try {
+			$this->repository->claim_job( 1, 'next-worker', 300 );
+			$claim_ran = true;
+		} catch ( \RuntimeException $exception ) {
+			self::assertStringContainsString( 'Rollback also failed.', $exception->getMessage() );
+		}
+		self::assertFalse( $claim_ran, 'A later claim must not write while connection disposal failed.' );
+		try {
+			( new WpdbCanonicalLocationRepository() )->finalize_generation( 'containment-token' );
+		} catch ( \Throwable ) {
+		}
+
+		self::assertSame( [ 'NG' ], $this->reader_values( $reader ) );
+		$starts_after_close = 0;
+		$seen_close = false;
+		foreach ( $this->wpdb->sql_log as $sql ) {
+			if ( 'CLOSE' === $sql ) {
+				$seen_close = true;
+			}
+			if ( $seen_close && 'START TRANSACTION' === $sql ) {
+				++$starts_after_close;
+			}
+		}
+		self::assertSame( 0, $starts_after_close );
 	}
 
 	public function test_a_joined_insert_failure_with_a_successful_rollback_restores_the_old_rule(): void {
@@ -340,6 +468,25 @@ final class BulkClaimLockErrorTest extends TestCase {
 		$row = $this->wpdb->get_row( 'SELECT * FROM `wp_delivery_engine_destination_rules` WHERE zone_id = 1', ARRAY_A );
 
 		return is_array( $row ) ? (string) ( $row['rule_value'] ?? '' ) : '';
+	}
+
+	/**
+	 * @return list<string>
+	 */
+	private function reader_values( FakeWpdb $reader ): array {
+		$row = $reader->get_row( 'SELECT * FROM `wp_delivery_engine_destination_rules` WHERE zone_id = 1', ARRAY_A );
+
+		return is_array( $row ) ? [ (string) ( $row['rule_value'] ?? '' ) ] : [];
+	}
+
+	private function log_index_after( string $needle, int $after ): int|false {
+		foreach ( $this->wpdb->sql_log as $index => $sql ) {
+			if ( $index > $after && str_contains( $sql, $needle ) ) {
+				return $index;
+			}
+		}
+
+		return false;
 	}
 
 	private function item_token(): ?string {
