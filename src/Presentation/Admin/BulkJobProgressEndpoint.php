@@ -29,6 +29,9 @@ final class BulkJobProgressEndpoint {
 		if ( ! $job ) {
 			wp_send_json_error( [ 'message' => 'unknown_job' ], 404 );
 		}
+		if ( ! ( new BulkJobAccess( $this->engine ) )->can_access( $job ) ) {
+			wp_send_json_error( [ 'message' => 'forbidden' ], 403 );
+		}
 
 		$advance = isset( $_POST['advance'] ) && '1' === (string) wp_unslash( (string) $_POST['advance'] );
 		if ( $advance ) {
