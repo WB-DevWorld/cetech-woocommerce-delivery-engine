@@ -20,7 +20,7 @@ PHP 8.5.0. Before the repair, `CatalogTargetIdentityTest` was 5 failures / 7 tes
 
 ## Review repair
 
-A nonempty unsupported value is rejected before normalization. An array such as `unsupported_filter => [900]` beside a real category is not dropped. Remove mode blocks only the requested member; inherited membership of a different member remains. PHP 8.5 `CatalogTargetIdentityTest`: 9 tests / 20 assertions, OK. Disposable MariaDB catalog proof: 4 tests / 24 assertions, OK. Product 308 inherits member 1 through a local Remove of member 10. Product 309 removes member 1 and is excluded.
+A nonempty unsupported value is rejected before normalization. An array such as `unsupported_filter => [900]` beside a real category is not dropped. Remove mode blocks only the requested member; inherited membership of a different member remains. PHP 8.5 `CatalogTargetIdentityTest` at that filter repair: 9 tests / 20 assertions, OK. The later authorized-detail case brings the same file to 10 tests / 24 assertions, OK. A stored invalid filter is shown as the job failure; the stored definition is not replaced and Apply is not offered. Disposable MariaDB catalog proof: 4 tests / 24 assertions, OK. Product 308 inherits member 1 through a local Remove of member 10. Product 309 removes member 1 and is excluded.
 
 ## Limits
 

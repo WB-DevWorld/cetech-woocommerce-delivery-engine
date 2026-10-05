@@ -475,6 +475,7 @@ final class FakeWpdb {
 	 * @return array{table: string, count: bool, where: array<string, mixed>, or_any: list<array{column: string, op: string, value: string}>, order: list<array{column: string, direction: string}>, limit: ?int, offset: int}
 	 */
 	private function parse_select( string $sql ): array {
+		$sql = preg_replace( '/\s+FOR\s+UPDATE\s*$/i', '', trim( $sql ) ) ?? trim( $sql );
 		if ( ! preg_match(
 			'/SELECT\s+(COUNT\(\*\)|\*|id|`id`)\s+FROM\s+`([^`]+)`\s+WHERE\s+(.+?)(?:\s+ORDER BY\s+(.+?))?(?:\s+LIMIT\s+(\d+)(?:\s+OFFSET\s+(\d+))?)?\s*$/is',
 			trim( $sql ),

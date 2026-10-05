@@ -7,6 +7,7 @@ namespace CetechDeliveryEngine\Tests\Integration;
 use CetechDeliveryEngine\Domain\Bulk\BulkJob;
 use CetechDeliveryEngine\Domain\Bulk\BulkJobItem;
 use CetechDeliveryEngine\Domain\Enum\BulkJobItemStatus;
+use CetechDeliveryEngine\Domain\Enum\BulkJobStatus;
 use CetechDeliveryEngine\Domain\Enum\BulkOperationType;
 use CetechDeliveryEngine\Infrastructure\Persistence\BulkJobSchema;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbBulkJobRepository;
@@ -144,21 +145,138 @@ final class BulkClaimFenceSqlTest extends TestCase {
 		self::assertNull( $this->repository->find_job( (int) $job->id )->claim_token );
 	}
 
+	public function test_worker_takeover_writes_the_source_once_and_keeps_the_successor_job(): void {
+		$seed = $this->seed_observable_rate_job( false );
+		$owner = $this->start( 'worker-owner', $seed['job_id'], 'owner', false, [ 'CETECH_DE_COR006_PHASE' => 'before_source' ] );
+		$successor = $this->start( 'worker-successor', $seed['job_id'], 'successor', false );
+		$owner_result = $this->finish( $owner );
+		$successor_result = $this->finish( $successor );
+		$job = $this->repository->find_job( $seed['job_id'] );
+		$item = $this->repository->list_items( $seed['job_id'], 10 )[0];
+		$owner_hash = (string) $this->pdo->query( "SELECT note FROM cor006_worker_gate WHERE name = 'a_paused'" )->fetchColumn();
+		$successor_hash = (string) $this->pdo->query( "SELECT note FROM cor006_worker_gate WHERE name = 'b_finished'" )->fetchColumn();
+
+		self::assertNotSame( $owner_result['pid'], $successor_result['pid'] );
+		self::assertNotSame( $owner_result['connection_id'], $successor_result['connection_id'] );
+		self::assertNull( $owner_result['error'] );
+		self::assertNull( $successor_result['error'] );
+		self::assertSame( 64, strlen( $owner_hash ) );
+		self::assertSame( 64, strlen( $successor_hash ) );
+		self::assertNotSame( $owner_hash, $successor_hash );
+		self::assertSame( '110.0000', (string) $this->pdo->query( 'SELECT base_amount FROM cor006_source_amount WHERE id = 1' )->fetchColumn() );
+		self::assertSame( BulkJobItemStatus::Changed, $item->status );
+		self::assertNull( $item->claim_token );
+		self::assertSame( 1, $job->processed_count );
+		self::assertSame( 1, $job->changed_count );
+		self::assertSame( BulkJobStatus::Completed, $job->status );
+		self::assertNull( $job->claim_token );
+	}
+
+	public function test_dry_run_takeover_does_not_credit_the_losing_worker(): void {
+		$seed = $this->seed_observable_rate_job( true );
+		$owner = $this->start( 'worker-owner', $seed['job_id'], 'owner', false, [ 'CETECH_DE_COR006_PHASE' => 'after_result' ] );
+		$successor = $this->start( 'worker-successor', $seed['job_id'], 'successor', false );
+		$owner_result = $this->finish( $owner );
+		$successor_result = $this->finish( $successor );
+		$job = $this->repository->find_job( $seed['job_id'] );
+
+		self::assertNotSame( $owner_result['pid'], $successor_result['pid'] );
+		self::assertNull( $owner_result['error'] );
+		self::assertNull( $successor_result['error'] );
+		self::assertSame( '100.0000', (string) $this->pdo->query( 'SELECT base_amount FROM cor006_source_amount WHERE id = 1' )->fetchColumn() );
+		self::assertSame( 1, $job->processed_count );
+		self::assertSame( 1, $job->changed_count );
+		self::assertSame( BulkJobStatus::Ready, $job->status );
+	}
+
+	public function test_source_write_holds_the_claim_until_the_contender_times_out(): void {
+		$seed = $this->seed_observable_rate_job( false );
+		$owner = $this->start( 'worker-owner', $seed['job_id'], 'owner', false, [ 'CETECH_DE_COR006_PHASE' => 'inside_source' ] );
+		$contender = $this->start(
+			'worker-contender',
+			$seed['job_id'],
+			'contender',
+			false,
+			[ 'CETECH_DE_COR006_ITEM_ID' => (string) $seed['item_id'] ]
+		);
+		$contender_result = $this->finish( $contender );
+		$owner_result = $this->finish( $owner );
+		$job = $this->repository->find_job( $seed['job_id'] );
+
+		self::assertNotSame( $owner_result['pid'], $contender_result['pid'] );
+		self::assertNotSame( $owner_result['connection_id'], $contender_result['connection_id'] );
+		self::assertFalse( $contender_result['wrote'] );
+		self::assertStringContainsString( 'Lock wait timeout', (string) $contender_result['error'] );
+		self::assertGreaterThan( 0.5, (float) $contender_result['elapsed'] );
+		self::assertSame( '110.0000', (string) $this->pdo->query( 'SELECT base_amount FROM cor006_source_amount WHERE id = 1' )->fetchColumn() );
+		self::assertSame( 1, $job->processed_count );
+		self::assertNull( $job->claim_token );
+	}
+
 	/**
+	 * @return array{job_id: int, item_id: int}
+	 */
+	private function seed_observable_rate_job( bool $dry_run ): array {
+		$this->pdo->exec( 'DROP TABLE IF EXISTS cor006_source_amount' );
+		$this->pdo->exec( 'DROP TABLE IF EXISTS cor006_worker_gate' );
+		$this->pdo->exec( 'CREATE TABLE cor006_source_amount (id int NOT NULL PRIMARY KEY, base_amount varchar(32) NOT NULL, internal_code varchar(64) NOT NULL, base_currency varchar(8) NOT NULL, status varchar(32) NOT NULL, priority int NOT NULL)' );
+		$this->pdo->exec( "INSERT INTO cor006_source_amount (id, base_amount, internal_code, base_currency, status, priority) VALUES (1, '100.0000', 'accra', 'GHS', 'active', 100)" );
+		$this->pdo->exec( "CREATE TABLE cor006_worker_gate (name varchar(32) NOT NULL PRIMARY KEY, state int NOT NULL, note varchar(64) NOT NULL DEFAULT '')" );
+		$this->pdo->exec( "INSERT INTO cor006_worker_gate (name, state) VALUES ('a_paused', 0), ('b_finished', 0)" );
+		$job = $this->repository->save_job(
+			BulkJob::create(
+				BulkOperationType::RateCardUpdate,
+				4,
+				[
+					'scope'            => 'selected_ids',
+					'selected_ids'     => [ 1 ],
+					'variation_policy' => 'preserve_overrides',
+				],
+				[
+					'amount_op'    => 'increase_fixed',
+					'amount_value' => '10',
+				],
+				$dry_run
+			)->with(
+				[
+					'status'                => $dry_run ? BulkJobStatus::Previewing : BulkJobStatus::Running,
+					'enumeration_complete'  => true,
+					'total_count'           => 1,
+					'enumerated_count'      => 1,
+				]
+			)
+		);
+		$items = $this->repository->insert_items(
+			[
+				BulkJobItem::pending( (int) $job->id, 'rate_card', 1, 'RC-1' ),
+			]
+		);
+
+		return [
+			'job_id'  => (int) $job->id,
+			'item_id' => (int) $items[0]->id,
+		];
+	}
+
+	/**
+	 * @param array<string, string> $extra
 	 * @return array{process: resource, result: string, output: string}
 	 */
-	private function start( string $mode, int $job_id, string $token, bool $barrier ): array {
+	private function start( string $mode, int $job_id, string $token, bool $barrier, array $extra = [] ): array {
 		$result = tempnam( sys_get_temp_dir(), 'cor006' );
 		$output = tempnam( sys_get_temp_dir(), 'cor006out' );
-		$env    = [
-			'CETECH_DE_COR006_MODE'    => $mode,
-			'CETECH_DE_COR006_RESULT'  => (string) $result,
-			'CETECH_DE_COR006_JOB_ID'  => (string) $job_id,
-			'CETECH_DE_COR006_TOKEN'   => $token,
-			'CETECH_DE_COR006_BARRIER' => $barrier ? '1' : '0',
-			'CETECH_DE_COR006_DB_PORT' => (string) ( getenv( 'CETECH_DE_COR006_DB_PORT' ) ?: 33079 ),
-			'SystemRoot'               => (string) getenv( 'SystemRoot' ),
-		];
+		$env    = array_merge(
+			[
+				'CETECH_DE_COR006_MODE'    => $mode,
+				'CETECH_DE_COR006_RESULT'  => (string) $result,
+				'CETECH_DE_COR006_JOB_ID'  => (string) $job_id,
+				'CETECH_DE_COR006_TOKEN'   => $token,
+				'CETECH_DE_COR006_BARRIER' => $barrier ? '1' : '0',
+				'CETECH_DE_COR006_DB_PORT' => (string) ( getenv( 'CETECH_DE_COR006_DB_PORT' ) ?: 33079 ),
+				'SystemRoot'               => (string) getenv( 'SystemRoot' ),
+			],
+			$extra
+		);
 		$command = escapeshellarg( PHP_BINARY ) . ' ' . escapeshellarg( dirname( __DIR__ ) . '/Integration/cor006-claim-worker.php' );
 		$process = proc_open( $command, [ 1 => [ 'file', (string) $output, 'w' ], 2 => [ 'file', (string) $output, 'a' ] ], $pipes, dirname( __DIR__, 2 ), $env );
 		self::assertIsResource( $process );

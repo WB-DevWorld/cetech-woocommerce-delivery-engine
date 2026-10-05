@@ -42,6 +42,12 @@ interface BulkJobRepositoryInterface {
 	 */
 	public function claim_items( int $job_id, int $limit, string $claim_token, int $claim_ttl_seconds = 300 ): array;
 
+	/**
+	 * Run a source write only while this token still owns the claimed item.
+	 * The lock covers the callback and is released before the method returns.
+	 */
+	public function call_while_item_claimed( int $item_id, string $token, callable $callback ): mixed;
+
 	public function save_item( BulkJobItem $item, ?bool &$applied = null ): BulkJobItem;
 
 	/**

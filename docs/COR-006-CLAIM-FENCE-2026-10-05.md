@@ -26,3 +26,19 @@ P07 is not implemented and was not executed. There is no reviewed joined-or-reco
 P08 is not implemented and was not executed. There is no approved backlog or liveness limit, so Action Scheduler qualification is not claimed. The count of prepared tests and the existing pending-action fixture are not that limit.
 
 In-memory fencing checks the same token rules in one process. It is not physical concurrency proof. The two-process result is the concurrency proof, and it covers one job claim plus the separate stale-save and item-claim processes.
+
+## Review repair
+
+The same terminal status is not treated as proof that the caller wrote the outcome. An identical replay returns the stored row and reports that this call did not apply a new outcome. A different result from the old token is `Stale bulk claim.` A release whose statement fails stays held and reports `Bulk job write failed.` A release whose token does not match returns false and leaves the owner in place. Those repository checks were 5 unit tests / 24 assertions and, with the earlier fence, 4 physical tests / 39 assertions. They do not by themselves prove the worker.
+
+The worker now keeps the tick token it claimed. Source read-modify-write runs only inside `call_while_item_claimed`, which locks the claimed item row for that token and releases the lock before the outcome and counters are saved. A result is credited only when that save reports the outcome was applied. Progress, finalization, rollback, requeue, and release are skipped when the stored job token is no longer the tick token. A stored invalid catalog filter still fails the job; authorized job detail shows that failure and does not rewrite the stored definition or offer Apply.
+
+PHP 8.5 Bulk unit directory after this repair: 158 tests / 902 assertions, OK, 2 existing deprecations. The three takeover tests in that count are in-process interleavings. They are not row locks.
+
+Physical MariaDB proof on `cetech_cor006_worker` through `phpunit.cor006-sql.xml`: 7 tests / 86 assertions, OK. The earlier 3 tests / 33 assertions and 4 tests / 39 assertions remain the historical fence and release results. The added proof uses two operating-system processes and two database connections, and it instantiates `BulkJobWorker` with `RateCardBulkMutator` against an observable amount row:
+
+- The first worker pauses after claiming and before the source write. The second worker expires that claim, applies +10 to 100, records the terminal item, and completes the job. The first worker then does not write. The amount is 110.0000, the processed and changed counts are 1, the job is completed, and both claim tokens are clear. The two owner token hashes differ.
+- The dry-run worker pauses after computing the result and before saving it. The successor completes the same item. The amount stays 100.0000 and the processed count stays 1. The losing worker is not credited again.
+- During the source write the first worker holds the item row. A second connection calls the same claim lock with another token and `innodb_lock_wait_timeout` of 1 second. That call waits, times out, and does not write. The amount is 110.0000 and the processed count is 1. This contender is the lock method the worker uses; it is not a second full worker tick. A fresh claim is not selected by item claim, so a second tick does not itself block on that row.
+
+The gap after the lock commits and before the outcome row is saved is still P07. It was not crashed and was not proved. P08, COR-005, and COR-007 were not implemented.

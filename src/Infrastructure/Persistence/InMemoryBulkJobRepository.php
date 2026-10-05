@@ -188,6 +188,15 @@ final class InMemoryBulkJobRepository implements BulkJobRepositoryInterface {
 		return $claimed;
 	}
 
+	public function call_while_item_claimed( int $item_id, string $token, callable $callback ): mixed {
+		$item = $this->items[ $item_id ] ?? null;
+		if ( ! $item instanceof BulkJobItem || BulkJobItemStatus::Claimed !== $item->status || $item->claim_token !== $token ) {
+			return null;
+		}
+
+		return $callback();
+	}
+
 	public function save_item( BulkJobItem $item, ?bool &$applied = null ): BulkJobItem {
 		$applied = false;
 		if ( null === $item->id ) {

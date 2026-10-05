@@ -196,6 +196,32 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 		return $claimed;
 	}
 
+	public function call_while_item_claimed( int $item_id, string $token, callable $callback ): mixed {
+		global $wpdb;
+		$table = TableNames::for( BulkJobSchema::ITEMS_SUFFIX );
+		$wpdb->query( 'START TRANSACTION' );
+		try {
+			$sql = "SELECT id FROM `{$table}` WHERE id = %d AND claim_token = %s AND status = %s LIMIT 1 FOR UPDATE";
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$locked = $wpdb->get_var( $wpdb->prepare( $sql, $item_id, $token, BulkJobItemStatus::Claimed->value ) );
+			if ( (int) $locked !== $item_id ) {
+				$wpdb->query( 'ROLLBACK' );
+
+				return null;
+			}
+			$result = $callback();
+			$committed = $wpdb->query( 'COMMIT' );
+			if ( false === $committed ) {
+				throw new \RuntimeException( 'Bulk item write failed.' );
+			}
+
+			return $result;
+		} catch ( \Throwable $exception ) {
+			$wpdb->query( 'ROLLBACK' );
+			throw $exception;
+		}
+	}
+
 	public function save_item( BulkJobItem $item, ?bool &$applied = null ): BulkJobItem {
 		global $wpdb;
 		$applied = false;

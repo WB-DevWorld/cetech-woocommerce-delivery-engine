@@ -31,6 +31,13 @@ final class BulkJobWorker {
 
 	public const CLAIM_TTL = 300;
 
+	/** @var null|callable(string):void */
+	private $qualification_boundary = null;
+
+	public function set_qualification_boundary( ?callable $boundary ): void {
+		$this->qualification_boundary = $boundary;
+	}
+
 	public function __construct(
 		private readonly BulkJobRepositoryInterface $jobs,
 		private readonly CatalogTargetQueryInterface $targets,
@@ -188,8 +195,10 @@ final class BulkJobWorker {
 		if ( $complete ) {
 			$job = $this->release_selection_manifest( $job );
 		}
-		$this->jobs->save_job( $job );
-		$this->requeue_if_needed( $job, $started );
+		$saved = $this->save_owned_job( $job, (string) $job->claim_token );
+		if ( $saved instanceof BulkJob ) {
+			$this->requeue_if_needed( $saved, $started );
+		}
 	}
 
 	/**
@@ -220,7 +229,7 @@ final class BulkJobWorker {
 	private function process_item_batch( BulkJob $job, string $token, float $started ): void {
 		$items = $this->jobs->claim_items( (int) $job->id, $job->batch_size, $token, self::CLAIM_TTL );
 		if ( [] === $items ) {
-			$this->finalize_if_idle( $job );
+			$this->finalize_if_idle( $job, $token );
 			return;
 		}
 
@@ -256,7 +265,20 @@ final class BulkJobWorker {
 				// Parent-only is the default product mutation; variations are separate targets.
 			}
 
-			$result = $this->process_claimed_item( $job, $item, $manifest, $definition );
+			$this->cross_boundary( 'before_source' );
+			$result = $this->jobs->call_while_item_claimed(
+				(int) $item->id,
+				$token,
+				function () use ( $job, $item, $manifest, $definition ): array {
+					$this->cross_boundary( 'inside_source' );
+
+					return $this->process_claimed_item( $job, $item, $manifest, $definition );
+				}
+			);
+			if ( ! is_array( $result ) ) {
+				continue;
+			}
+			$this->cross_boundary( 'after_result' );
 
 			$status = match ( $result['outcome'] ) {
 				'changed'   => BulkJobItemStatus::Changed,
@@ -298,11 +320,23 @@ final class BulkJobWorker {
 					'completed_at' => gmdate( 'Y-m-d H:i:s' ),
 				]
 			);
-			$this->jobs->save_item( $saved_item );
+			$applied = false;
+			try {
+				$this->jobs->save_item( $saved_item, $applied );
+			} catch ( \RuntimeException $exception ) {
+				if ( 'Stale bulk claim.' !== $exception->getMessage() ) {
+					throw $exception;
+				}
+				$applied = false;
+			}
+			if ( ! $applied ) {
+				continue;
+			}
 
 			$examples = $this->append_representative_example( $examples, $item, $result );
 		}
 
+		$this->cross_boundary( 'before_aggregate' );
 		$fresh = $this->jobs->find_job( (int) $job->id );
 		if ( ! $fresh instanceof BulkJob ) {
 			return;
@@ -324,8 +358,11 @@ final class BulkJobWorker {
 			$fresh->checkpoint_cursor,
 			$summary
 		);
-		$this->jobs->save_job( $fresh );
-		$this->finalize_if_idle( $fresh ) || $this->requeue_if_needed( $fresh, $started );
+		$saved = $this->save_owned_job( $fresh, $token );
+		if ( ! $saved instanceof BulkJob ) {
+			return;
+		}
+		$this->finalize_if_idle( $saved, $token ) || $this->requeue_if_needed( $saved, $started );
 	}
 
 	private function process_rollback_batch( BulkJob $job, string $token, float $started ): void {
@@ -337,7 +374,7 @@ final class BulkJobWorker {
 				$this->requeue_if_needed( $job, $started );
 				return;
 			}
-			$this->finalize_rollback( $job );
+			$this->finalize_rollback( $job, $token );
 			return;
 		}
 
@@ -350,30 +387,38 @@ final class BulkJobWorker {
 				break;
 			}
 			$parent = $item->parent_target_id;
+			$this->cross_boundary( 'before_source' );
 			try {
-				if ( 'rate_card' === $item->target_type ) {
-					if ( ! $this->rate_mutator instanceof RateCardBulkMutator ) {
-						$result = [
-							'outcome'       => 'rollback_failed',
-							'error_code'    => 'rate_processor_unavailable',
-							'error_summary' => 'Delivery Charge rollback is not available.',
-						];
-					} else {
-						$result = $this->rate_mutator->rollback(
+				$result = $this->jobs->call_while_item_claimed(
+					(int) $item->id,
+					$token,
+					function () use ( $item, $parent ): array {
+						$this->cross_boundary( 'inside_source' );
+						if ( 'rate_card' === $item->target_type ) {
+							if ( ! $this->rate_mutator instanceof RateCardBulkMutator ) {
+								return [
+									'outcome'       => 'rollback_failed',
+									'error_code'    => 'rate_processor_unavailable',
+									'error_summary' => 'Delivery Charge rollback is not available.',
+								];
+							}
+
+							return $this->rate_mutator->rollback(
+								$item->target_id,
+								$item->before_snapshot,
+								$item->after_fingerprint
+							);
+						}
+
+						return $this->mutator->rollback(
+							$item->target_type,
 							$item->target_id,
+							$parent,
 							$item->before_snapshot,
 							$item->after_fingerprint
 						);
 					}
-				} else {
-					$result = $this->mutator->rollback(
-						$item->target_type,
-						$item->target_id,
-						$parent,
-						$item->before_snapshot,
-						$item->after_fingerprint
-					);
-				}
+				);
 			} catch ( \Throwable ) {
 				$result = [
 					'outcome'       => 'rollback_failed',
@@ -381,11 +426,37 @@ final class BulkJobWorker {
 					'error_summary' => 'This item could not be restored.',
 				];
 			}
+			if ( ! is_array( $result ) ) {
+				continue;
+			}
+			$this->cross_boundary( 'after_result' );
 			$status = match ( $result['outcome'] ) {
 				'rolled_back'      => BulkJobItemStatus::RolledBack,
 				'rollback_skipped' => BulkJobItemStatus::RollbackSkipped,
 				default            => BulkJobItemStatus::RollbackFailed,
 			};
+			$applied = false;
+			try {
+				$this->jobs->save_item(
+					$item->with(
+						[
+							'status'        => $status,
+							'error_code'    => $result['error_code'],
+							'error_summary' => $result['error_summary'],
+							'completed_at' => gmdate( 'Y-m-d H:i:s' ),
+						]
+					),
+					$applied
+				);
+			} catch ( \RuntimeException $exception ) {
+				if ( 'Stale bulk claim.' !== $exception->getMessage() ) {
+					throw $exception;
+				}
+				$applied = false;
+			}
+			if ( ! $applied ) {
+				continue;
+			}
 			if ( BulkJobItemStatus::RolledBack === $status ) {
 				++$rolled;
 			} elseif ( BulkJobItemStatus::RollbackSkipped === $status ) {
@@ -393,20 +464,11 @@ final class BulkJobWorker {
 			} else {
 				++$failed;
 			}
-			$this->jobs->save_item(
-				$item->with(
-					[
-						'status'        => $status,
-						'error_code'    => $result['error_code'],
-						'error_summary' => $result['error_summary'],
-						'completed_at' => gmdate( 'Y-m-d H:i:s' ),
-					]
-				)
-			);
 		}
 
+		$this->cross_boundary( 'before_aggregate' );
 		$fresh = $this->jobs->find_job( (int) $job->id );
-		if ( $fresh instanceof BulkJob ) {
+		if ( $fresh instanceof BulkJob && $fresh->claim_token === $token ) {
 			$summary = $fresh->summary;
 			$summary['rollback_restored'] = (int) ( $summary['rollback_restored'] ?? 0 ) + $rolled;
 			$summary['rollback_skipped']  = (int) ( $summary['rollback_skipped'] ?? 0 ) + $skipped;
@@ -424,12 +486,21 @@ final class BulkJobWorker {
 				$fresh->checkpoint_cursor,
 				$summary
 			);
-			$this->jobs->save_job( $fresh );
-			$this->requeue_if_needed( $fresh, $started );
+			$saved = $this->save_owned_job( $fresh, $token );
+			if ( ! $saved instanceof BulkJob ) {
+				return;
+			}
+			$pending = $this->jobs->count_items( (int) $job->id, BulkJobItemStatus::Pending )
+				+ $this->jobs->count_items( (int) $job->id, BulkJobItemStatus::Claimed );
+			if ( 0 === $pending ) {
+				$this->finalize_rollback( $saved, $token );
+				return;
+			}
+			$this->requeue_if_needed( $saved, $started );
 		}
 	}
 
-	private function finalize_if_idle( BulkJob $job ): bool {
+	private function finalize_if_idle( BulkJob $job, string $token ): bool {
 		$pending = $this->jobs->count_items( (int) $job->id, BulkJobItemStatus::Pending );
 		$claimed = $this->jobs->count_items( (int) $job->id, BulkJobItemStatus::Claimed );
 		if ( $pending > 0 || $claimed > 0 || ! $job->enumeration_complete ) {
@@ -450,7 +521,10 @@ final class BulkJobWorker {
 			$job                           = $job->with( [ 'summary' => $summary ] );
 		}
 
-		$this->jobs->save_job( $job );
+		$saved = $this->save_owned_job( $job, $token );
+		if ( ! $saved instanceof BulkJob ) {
+			return false;
+		}
 		$this->queue->cancel_job_ticks( (int) $job->id );
 
 		return true;
@@ -460,23 +534,65 @@ final class BulkJobWorker {
 		do {
 			$pending = $this->jobs->list_items( (int) $job->id, 200, 0, BulkJobItemStatus::Pending );
 			foreach ( $pending as $item ) {
-				$this->jobs->save_item( $item->with( [ 'status' => BulkJobItemStatus::Cancelled ] ) );
+				try {
+					$this->jobs->save_item( $item->with( [ 'status' => BulkJobItemStatus::Cancelled ] ) );
+				} catch ( \RuntimeException $exception ) {
+					if ( 'Stale bulk claim.' !== $exception->getMessage() ) {
+						throw $exception;
+					}
+				}
 			}
 		} while ( [] !== $pending );
 
-		$job = $job->with_status( BulkJobStatus::Cancelled );
-		$this->jobs->save_job( $job );
-		$this->queue->cancel_job_ticks( (int) $job->id );
+		$saved = $this->save_owned_job( $job->with_status( BulkJobStatus::Cancelled ), (string) $job->claim_token );
+		if ( $saved instanceof BulkJob ) {
+			$this->queue->cancel_job_ticks( (int) $job->id );
+		}
 	}
 
-	private function finalize_rollback( BulkJob $job ): void {
-		$fresh   = $this->jobs->find_job( (int) $job->id ) ?? $job;
+	private function finalize_rollback( BulkJob $job, string $token ): void {
+		$fresh = $this->jobs->find_job( (int) $job->id );
+		if ( ! $fresh instanceof BulkJob || $fresh->claim_token !== $token ) {
+			return;
+		}
 		$summary = $fresh->summary;
 		$skipped = (int) ( $summary['rollback_skipped'] ?? 0 );
 		$failed  = (int) ( $summary['rollback_failed'] ?? 0 );
 		$status  = ( $skipped > 0 || $failed > 0 ) ? BulkJobStatus::PartiallyRolledBack : BulkJobStatus::RolledBack;
-		$this->jobs->save_job( $fresh->with_status( $status ) );
-		$this->queue->cancel_job_ticks( (int) $job->id );
+		$saved   = $this->save_owned_job( $fresh->with_status( $status ), $token );
+		if ( $saved instanceof BulkJob ) {
+			$this->queue->cancel_job_ticks( (int) $job->id );
+		}
+	}
+
+	/**
+	 * Persist progress only while this tick still owns the job.
+	 */
+	private function save_owned_job( BulkJob $job, string $token ): ?BulkJob {
+		if ( '' === $token ) {
+			return null;
+		}
+		$fresh = $this->jobs->find_job( (int) $job->id );
+		if ( ! $fresh instanceof BulkJob || $fresh->claim_token !== $token ) {
+			return null;
+		}
+		if ( $job->claim_token !== $token ) {
+			$job = $job->with_claim( $token, $fresh->claimed_at );
+		}
+		try {
+			return $this->jobs->save_job( $job );
+		} catch ( \RuntimeException $exception ) {
+			if ( 'Stale bulk claim.' === $exception->getMessage() ) {
+				return null;
+			}
+			throw $exception;
+		}
+	}
+
+	private function cross_boundary( string $phase ): void {
+		if ( null !== $this->qualification_boundary ) {
+			( $this->qualification_boundary )( $phase );
+		}
 	}
 
 	/**
