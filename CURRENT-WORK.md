@@ -4,6 +4,8 @@ Status: RC.12 IMMUTABLE — OPENING CORRECTIONS AUTHORIZED ON ISOLATED FIX BRANC
 
 ## 2026-10-05 — targeted native qualification continuation
 
+Native checkpoint: first candidate `7b94884` retained a failed variation-capability fixture precondition in PR CI `37304120794` (96 checks passed, one failed; later configuration/migration checks not run). The correction changes only the native fixture and evidence wording: grant/revoke the registered variation primitive while retaining native foreign-parent and production relationship denial. Production repairs are unchanged. Corrected-candidate execution remains pending until its exact-head CI and receipt are inspected.
+
 The owner again instructed continuation after the four repairs and draft PR #51 were handed off. This continues the same bounded validation queue with targeted native WordPress/WooCommerce/MariaDB checks for COR-001/002/003/010. It does not authorize the reserved business contracts, COR-004/006 implementation, human review substitution, merge, release or live-site operations.
 
 - Candidate: PR #51 head `08e6aa2ff53d22ac8e5c8c00a66c19a2b74d2b70`; protected master remains `637c02f182ca273b40819631d23ac8e0dcc4004f` at continuation start. Existing repair source remains unchanged by this qualification batch.

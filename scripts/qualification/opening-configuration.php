@@ -93,7 +93,14 @@ return static function ( callable $check ): void {
 			if ( ! $product_type instanceof WP_Post_Type ) {
 				throw new RuntimeException( 'WooCommerce product post type is not registered.' );
 			}
-			// Grant only native own-product primitives, plus the existing plugin gate.
+			$variation_type = get_post_type_object( 'product_variation' );
+			if ( ! $variation_type instanceof WP_Post_Type ) {
+				throw new RuntimeException( 'WooCommerce variation post type is not registered.' );
+			}
+			// Product/parent ownership uses mapped primitives. WooCommerce 11.1.2
+			// variations have map_meta_cap=false and require singular edit_product.
+			// This native primitive alone never authorizes the parent in our guard.
+			$user->add_cap( $variation_type->cap->edit_post );
 			$user->add_cap( $product_type->cap->edit_posts );
 			$user->add_cap( $product_type->cap->edit_published_posts );
 			$user->add_cap( $product_type->cap->edit_others_posts, false );
@@ -150,14 +157,39 @@ return static function ( callable $check ): void {
 			];
 		};
 		$cap_rows = $sql_rows( $wpdb->prepare( "SELECT user_id, meta_key, meta_value FROM `{$wpdb->usermeta}` WHERE user_id IN (%d, %d) AND meta_key = %s ORDER BY user_id", $owner_id, $foreign_id, $wpdb->prefix . 'capabilities' ) );
+		$product_type = get_post_type_object( 'product' );
+		$variation_type = get_post_type_object( 'product_variation' );
+		$matrix = [
+			'plugin_gate_allowed' => current_user_can( ScopedConfigurationAuthorization::CAPABILITY_PRODUCT ),
+			'owned_product_edit_allowed' => current_user_can( 'edit_post', $owned_product ),
+			'foreign_product_edit_denied' => ! current_user_can( 'edit_post', $foreign_product ),
+			'owned_parent_edit_allowed' => current_user_can( 'edit_post', $owned_parent ),
+			'foreign_parent_edit_denied' => ! current_user_can( 'edit_post', $foreign_parent ),
+			'owned_variation_native_primitive_allowed' => current_user_can( 'edit_post', $owned_variation ),
+			'foreign_variation_native_primitive_allowed' => current_user_can( 'edit_post', $foreign_variation ),
+			'own_authored_foreign_parent_variation_native_primitive_allowed' => current_user_can( 'edit_post', $own_authored_foreign_parent_variation ),
+			'global_gate_denied' => ! current_user_can( ScopedConfigurationAuthorization::CAPABILITY_GLOBAL ),
+			'two_persisted_capability_rows' => count( $cap_rows ) === 2,
+			'product_ownership_mapping_enabled' => true === $product_type->map_meta_cap,
+			'variation_primitive_mapping_observed' => false === $variation_type->map_meta_cap && 'edit_product' === $variation_type->cap->edit_post,
+		];
 		$check(
 			'NATIVE-COR002-NATIVE-META-CAP-MATRIX',
-			current_user_can( ScopedConfigurationAuthorization::CAPABILITY_PRODUCT )
-				&& current_user_can( 'edit_post', $owned_product ) && ! current_user_can( 'edit_post', $foreign_product )
-				&& current_user_can( 'edit_post', $owned_parent ) && current_user_can( 'edit_post', $owned_variation )
-				&& ! current_user_can( 'edit_post', $foreign_parent ) && ! current_user_can( 'edit_post', $foreign_variation )
-				&& ! current_user_can( ScopedConfigurationAuthorization::CAPABILITY_GLOBAL ) && count( $cap_rows ) === 2,
-			[ 'actor' => $owner_id, 'persisted_capability_rows' => $cap_rows, 'own_variation_mapped_caps' => map_meta_cap( 'edit_post', $owner_id, $owned_variation ), 'foreign_variation_mapped_caps' => map_meta_cap( 'edit_post', $owner_id, $foreign_variation ) ]
+			! in_array( false, $matrix, true ),
+			[
+				'actor' => $owner_id, 'conditions' => $matrix, 'persisted_capability_rows' => $cap_rows,
+				'post_type_metadata' => [
+					'product' => [ 'map_meta_cap' => $product_type->map_meta_cap, 'capabilities' => (array) $product_type->cap ],
+					'product_variation' => [ 'map_meta_cap' => $variation_type->map_meta_cap, 'capabilities' => (array) $variation_type->cap ],
+				],
+				'own_product_mapped_caps' => map_meta_cap( 'edit_post', $owner_id, $owned_product ),
+				'foreign_product_mapped_caps' => map_meta_cap( 'edit_post', $owner_id, $foreign_product ),
+				'own_parent_mapped_caps' => map_meta_cap( 'edit_post', $owner_id, $owned_parent ),
+				'foreign_parent_mapped_caps' => map_meta_cap( 'edit_post', $owner_id, $foreign_parent ),
+				'own_variation_mapped_caps' => map_meta_cap( 'edit_post', $owner_id, $owned_variation ),
+				'foreign_variation_mapped_caps' => map_meta_cap( 'edit_post', $owner_id, $foreign_variation ),
+				'limit' => 'Native Product/Parent ownership and a separate native Variation primitive; the production guard separately enforces parent access.',
+			]
 		);
 
 		$seed = static function ( ConfigurationScopeType $type, int $id, string $slice, int $priority, ?int $parent = null ) use ( $repository ): ScopedConfiguration {
@@ -174,7 +206,7 @@ return static function ( callable $check ): void {
 		$protected_before = $snapshot();
 		$check( 'NATIVE-COR002-PERSISTED-SCOPE-FIXTURES', count( $protected_before['fields'] ) >= 4 && count( $protected_before['collections'] ) >= 4 && $selected->scope->id > 0, [ 'rows' => $protected_before ] );
 
-		$deny = static function ( string $id, array $input, bool $allow_picker = false ) use ( $target_guard, $snapshot, $check ): void {
+		$deny = static function ( string $id, array $input, bool $allow_picker = false, ?string $expected_reason = null ) use ( $target_guard, $snapshot, $check ): void {
 			$before = $snapshot();
 			$denied = false;
 			$message = null;
@@ -185,14 +217,14 @@ return static function ( callable $check ): void {
 				$message = $exception->getMessage();
 			}
 			$after = $snapshot();
-			$check( 'NATIVE-COR002-' . $id, $denied && $before === $after, [ 'input' => $input, 'rejected' => $denied, 'reason' => $message, 'before' => $before, 'after' => $after, 'proof_level' => 'native guard denies before composed service call; no HTTP dispatch' ] );
+			$check( 'NATIVE-COR002-' . $id, $denied && $before === $after && ( null === $expected_reason || str_contains( (string) $message, $expected_reason ) ), [ 'input' => $input, 'rejected' => $denied, 'reason' => $message, 'expected_reason_contains' => $expected_reason, 'before' => $before, 'after' => $after, 'proof_level' => 'native guard denies before composed service call; no HTTP dispatch' ] );
 		};
 		$deny( 'FOREIGN-PRODUCT-DENIED', [ 'scope_type' => 'product', 'scope_id' => $foreign_product, 'slice_key' => 'in_store' ] );
-		$deny( 'FOREIGN-VARIATION-DENIED', [ 'scope_type' => 'variation', 'scope_id' => $foreign_variation, 'parent_product_id' => $foreign_parent, 'slice_key' => 'in_store' ] );
+		$deny( 'FOREIGN-VARIATION-DENIED', [ 'scope_type' => 'variation', 'scope_id' => $foreign_variation, 'parent_product_id' => $foreign_parent, 'slice_key' => 'in_store' ], false, 'permission to edit the parent product' );
 		$deny( 'WRONG-AUTHORIZED-PARENT-DENIED', [ 'scope_type' => 'variation', 'scope_id' => $owned_variation, 'parent_product_id' => $other_owned_parent, 'slice_key' => 'in_store' ] );
-		$deny( 'PARENT-AUTHORITY-DENIED', [ 'scope_type' => 'variation', 'scope_id' => $own_authored_foreign_parent_variation, 'parent_product_id' => $foreign_parent, 'slice_key' => 'in_store' ] );
+		$deny( 'PARENT-AUTHORITY-DENIED', [ 'scope_type' => 'variation', 'scope_id' => $own_authored_foreign_parent_variation, 'parent_product_id' => $foreign_parent, 'slice_key' => 'in_store' ], false, 'permission to edit the parent product' );
 		$deny( 'PARENT-BEARING-EMPTY-PICKER-DENIED', [ 'scope_type' => 'variation', 'parent_product_id' => $foreign_parent ], true );
-		$check( 'NATIVE-COR002-PARENT-NATIVE-PERMISSIONS', ! current_user_can( 'edit_post', $foreign_parent ), [ 'actor' => $owner_id, 'parent' => $foreign_parent, 'variation' => $own_authored_foreign_parent_variation, 'native_variation_edit_allowed' => current_user_can( 'edit_post', $own_authored_foreign_parent_variation ), 'native_parent_edit_allowed' => current_user_can( 'edit_post', $foreign_parent ), 'note' => 'Native variation mapping may itself require parent permission; no injected object authority.' ] );
+		$check( 'NATIVE-COR002-PARENT-NATIVE-PERMISSIONS', current_user_can( 'edit_post', $own_authored_foreign_parent_variation ) && ! current_user_can( 'edit_post', $foreign_parent ), [ 'actor' => $owner_id, 'parent' => $foreign_parent, 'variation' => $own_authored_foreign_parent_variation, 'native_variation_edit_allowed' => current_user_can( 'edit_post', $own_authored_foreign_parent_variation ), 'native_parent_edit_allowed' => current_user_can( 'edit_post', $foreign_parent ), 'note' => 'Variation native edit is permitted by its singular primitive; the production guard rejects the actual foreign parent explicitly.' ] );
 		$deny( 'EXPLICIT-GLOBAL-CAPABILITY-DENIED', [ 'scope_type' => 'global', 'scope_id' => 0 ] );
 		$missing_product = (int) $wpdb->get_var( "SELECT MAX(ID) FROM `{$wpdb->posts}`" ) + 10000;
 		$deny( 'MISSING-PRODUCT-DENIED', [ 'scope_type' => 'product', 'scope_id' => $missing_product ] );
@@ -267,6 +299,26 @@ return static function ( callable $check ): void {
 		$deny( 'CURRENT-OBJECT-CAPABILITY-REVOCATION-DENIED', $owned_input );
 		$principal->add_cap( $product_type->cap->edit_published_posts );
 		$select_user( $owner_id );
+
+		// Qualify native variation permission independently from parent ownership.
+		$variation_primitive = $variation_type->cap->edit_post;
+		$principal->remove_cap( $variation_primitive );
+		$select_user( $owner_id );
+		$variation_revoked_rows = $sql_rows( $wpdb->prepare( "SELECT user_id, meta_key, meta_value FROM `{$wpdb->usermeta}` WHERE user_id = %d AND meta_key = %s", $owner_id, $wpdb->prefix . 'capabilities' ) );
+		$variation_revoked_stored_caps = 1 === count( $variation_revoked_rows ) ? maybe_unserialize( $variation_revoked_rows[0]['meta_value'] ) : null;
+		$check(
+			'NATIVE-COR002-NATIVE-VARIATION-PRIMITIVE-REVOCATION',
+			current_user_can( ScopedConfigurationAuthorization::CAPABILITY_PRODUCT ) && current_user_can( 'edit_post', $owned_parent )
+				&& ! current_user_can( 'edit_post', $owned_variation ) && is_array( $variation_revoked_stored_caps ) && ! isset( $variation_revoked_stored_caps[ $variation_primitive ] ),
+			[ 'actor' => $owner_id, 'revoked_native_primitive' => $variation_primitive, 'plugin_gate_allowed' => current_user_can( ScopedConfigurationAuthorization::CAPABILITY_PRODUCT ), 'owned_parent_edit_allowed' => current_user_can( 'edit_post', $owned_parent ), 'owned_variation_edit_allowed' => current_user_can( 'edit_post', $owned_variation ), 'mapped_caps' => map_meta_cap( 'edit_post', $owner_id, $owned_variation ), 'persisted_capability_rows' => $variation_revoked_rows ]
+		);
+		$variation_input = [ 'scope_type' => 'variation', 'scope_id' => $owned_variation, 'parent_product_id' => $owned_parent, 'slice_key' => 'in_store' ];
+		$deny( 'OWNED-VARIATION-MISSING-NATIVE-PRIMITIVE-DENIED', $variation_input, false, 'permission to edit this item' );
+		$principal->add_cap( $variation_primitive );
+		$select_user( $owner_id );
+		$variation_positive_before = $snapshot();
+		$variation_positive = $target_guard->resolve( $variation_input );
+		$check( 'NATIVE-COR002-NATIVE-VARIATION-PRIMITIVE-RESTORED-POSITIVE', current_user_can( 'edit_post', $owned_variation ) && current_user_can( 'edit_post', $owned_parent ) && $variation_positive['scope_id'] === $owned_variation && $variation_positive['parent_product_id'] === $owned_parent && $variation_positive_before === $snapshot(), [ 'actor' => $owner_id, 'native_primitive_restored' => $variation_primitive, 'variation' => $owned_variation, 'parent' => $owned_parent, 'before' => $variation_positive_before, 'after' => $snapshot() ] );
 
 		// Exact native variation slice reset, with field/collection SQL deletion and siblings retained.
 		$before_reset = $snapshot();
