@@ -1,6 +1,24 @@
 # Current Work — Post-#32 repository truth synchronization
 
-Status: RC.12 IMMUTABLE — OPENING CORRECTIONS AUTHORIZED ON ISOLATED FIX BRANCH — UNMERGED — NOT RC.13
+Status: RC.12 IMMUTABLE — COR-004/COR-006 FOLLOW-ON ON ISOLATED FIX BRANCH — UNMERGED — NOT RC.13
+
+## 2026-10-05 — COR-004 then COR-006 catalog identity and worker fencing
+
+The owner authorized this bounded batch in the same run: implement COR-004, then COR-006 where its prerequisites allow, with a tested commit after each correction. This does not merge, release, deploy, or write the training site, orders, or payments. PR #51 remains the unmerged COR-001/002/003/010 candidate. This batch starts from that exact head and does not treat it as protected master.
+
+- Base candidate: `d5c8e2f3c467a7dc38637bb2cdc3e881fc1c24f8` on `fix/audit-opening-authority-migration`.
+- Protected master at start: `637c02f182ca273b40819631d23ac8e0dcc4004f`.
+- Branch / worktree: `fix/cor-004-006-catalog-worker` in an isolated worktree. The existing `fix/needs-attention-count-contract` checkout was not edited.
+- Integration editor: this Cursor WS3 session. Human workstream ownership is unchanged. No other active lease was present on this worktree.
+- Environment: disposable local PHP and a fresh MariaDB database whose name begins with `cetech_cor004_`. No training, Pilot, FLAIROC, production, or POS connection.
+- Exclusive file lease for COR-004: `src/Application/Bulk/Catalog/CatalogTargetFilters.php`, `CatalogFilterMatcher.php`, `WooCommerceCatalogTargetQuery.php`, `InMemoryCatalogTargetQuery.php`, new catalog identity tests, this checkpoint, and the COR-004 report. `BulkToolsPage.php` stays on the existing COR-001 admission path unless a caller change is required.
+- COR-006 file lease begins only after the COR-004 commit: `WpdbBulkJobRepository.php`, `BulkJobWorker.php`, `BulkJobRepositoryInterface.php`, and their in-memory adapter/tests. Schema changes are not authorized by this lease.
+- COR-005 scan/count policy, COR-006 P07 recovery architecture, and COR-006 P08 backlog limit remain outside this authorization until their own reviewed inputs exist.
+- COR-004 repair is in `docs/COR-004-CATALOG-TARGET-IDENTITY-2026-10-05.md`. PHP 8.5 Bulk unit suite: 147 tests / 849 assertions, OK, 2 existing deprecations. Disposable MariaDB catalog proof: 4 tests / 23 assertions, OK. The COR-004 commit is the tested checkpoint; COR-006 starts after it.
+
+## Earlier opening-corrections checkpoint
+
+Status preserved: RC.12 IMMUTABLE — OPENING CORRECTIONS AUTHORIZED ON ISOLATED FIX BRANCH — UNMERGED — NOT RC.13
 
 ## 2026-10-05 — authenticated HTTP opening qualification and Bulk notice repair
 

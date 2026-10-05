@@ -43,10 +43,13 @@ final class InMemoryCatalogTargetQuery implements CatalogTargetQueryInterface {
 	}
 
 	public function count( CatalogTargetDefinition $definition ): int {
+		CatalogTargetFilters::assert_supported( $definition->filters );
+
 		return count( $this->matching( $definition ) );
 	}
 
 	public function page_after( CatalogTargetDefinition $definition, int $after_id, int $limit ): array {
+		CatalogTargetFilters::assert_supported( $definition->filters );
 		$matches = $this->matching( $definition );
 		$page    = [];
 		foreach ( $matches as $target ) {

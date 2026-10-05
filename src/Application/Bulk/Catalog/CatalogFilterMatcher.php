@@ -40,15 +40,41 @@ final class CatalogFilterMatcher {
 			CatalogTargetFilters::EFFECTIVE_FULFILMENT => self::same_string( $attributes[ CatalogTargetFilters::EFFECTIVE_FULFILMENT ] ?? '', $wanted ),
 			CatalogTargetFilters::EXCEPTION_STATE => self::same_string( $attributes[ CatalogTargetFilters::EXCEPTION_STATE ] ?? CatalogTargetFilters::EXCEPTION_SITE_WIDE, $wanted ),
 			CatalogTargetFilters::VARIATION_STATE => self::same_string( $attributes[ CatalogTargetFilters::VARIATION_STATE ] ?? CatalogTargetFilters::VARIATION_INHERIT, $wanted ),
-			CatalogTargetFilters::DELIVERY_OPTION_ID => self::in_int_list( $attributes['delivery_option_ids'] ?? [], $wanted ) || self::same_int( $attributes[ CatalogTargetFilters::DELIVERY_OPTION_ID ] ?? 0, $wanted ),
+			CatalogTargetFilters::DELIVERY_OPTION_ID => self::configured_offer_matches( $attributes, $wanted ),
 			CatalogTargetFilters::LOGISTICS_PROFILE_ID => self::same_int( $attributes[ CatalogTargetFilters::LOGISTICS_PROFILE_ID ] ?? 0, $wanted ),
-			CatalogTargetFilters::PICKUP_LOCATION_ID => self::same_int( $attributes[ CatalogTargetFilters::PICKUP_LOCATION_ID ] ?? 0, $wanted ) || self::in_int_list( $attributes['pickup_location_ids'] ?? [], $wanted ) || ( (int) $wanted > 0 && ! empty( $attributes['in_store_pickup'] ) ),
+			CatalogTargetFilters::PICKUP_LOCATION_ID => self::same_int( $attributes[ CatalogTargetFilters::PICKUP_LOCATION_ID ] ?? 0, $wanted ) || self::in_int_list( $attributes['pickup_location_ids'] ?? [], $wanted ),
 			CatalogTargetFilters::SUPPLIER_ID => self::same_int( $attributes[ CatalogTargetFilters::SUPPLIER_ID ] ?? 0, $wanted ),
 			CatalogTargetFilters::ORIGIN_ID => self::same_int( $attributes[ CatalogTargetFilters::ORIGIN_ID ] ?? 0, $wanted ),
 			CatalogTargetFilters::MISSING_USABLE_RATE => ! empty( $wanted ) ? ! empty( $attributes[ CatalogTargetFilters::MISSING_USABLE_RATE ] ) : true,
 			CatalogTargetFilters::INVALID_EFFECTIVE => ! empty( $wanted ) ? ! empty( $attributes[ CatalogTargetFilters::INVALID_EFFECTIVE ] ) : true,
-			default => true,
+			default => false,
 		};
+	}
+
+	/**
+	 * Add and Replace include an exact member. Remove never counts as inclusion.
+	 * Inherit uses only the separately supplied inherited member list.
+	 *
+	 * @param array<string, mixed> $attributes
+	 */
+	private static function configured_offer_matches( array $attributes, mixed $wanted ): bool {
+		$mode    = strtolower( trim( (string) ( $attributes['delivery_option_mode'] ?? '' ) ) );
+		$members = $attributes['delivery_option_ids'] ?? [];
+		$exact   = self::in_int_list( $members, $wanted ) || self::same_int( $attributes[ CatalogTargetFilters::DELIVERY_OPTION_ID ] ?? 0, $wanted );
+		if ( 'remove' === $mode ) {
+			return false;
+		}
+		if ( 'inherit' === $mode ) {
+			return self::in_int_list( $attributes['inherited_delivery_option_ids'] ?? [], $wanted );
+		}
+		if ( 'add' === $mode ) {
+			return $exact || self::in_int_list( $attributes['inherited_delivery_option_ids'] ?? [], $wanted );
+		}
+		if ( 'replace' === $mode ) {
+			return $exact;
+		}
+
+		return $exact || self::in_int_list( $attributes['inherited_delivery_option_ids'] ?? [], $wanted );
 	}
 
 	private static function same_string( mixed $have, mixed $wanted ): bool {

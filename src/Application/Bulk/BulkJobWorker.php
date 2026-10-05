@@ -129,7 +129,19 @@ final class BulkJobWorker {
 			return;
 		}
 
-		$definition = CatalogTargetDefinition::from_array( $job->target_definition );
+		try {
+			$definition = CatalogTargetDefinition::from_array( $job->target_definition );
+		} catch ( \InvalidArgumentException $exception ) {
+			if ( 'Unsupported catalog filter.' !== $exception->getMessage() ) {
+				throw $exception;
+			}
+			$this->jobs->save_job(
+				$job->with_status( BulkJobStatus::Failed )->with_error( 'unsupported_catalog_filter', 'Unsupported catalog filter.' )
+			);
+			$this->queue->cancel_job_ticks( (int) $job->id );
+
+			return;
+		}
 		$after_id   = (int) $job->checkpoint_cursor;
 		$limit      = $job->batch_size;
 		$page       = $this->targets->page_after( $definition, $after_id, $limit );

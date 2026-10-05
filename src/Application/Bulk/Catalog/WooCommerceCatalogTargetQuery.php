@@ -12,7 +12,6 @@ use CetechDeliveryEngine\Domain\Configuration\EffectiveConfigurationRequest;
 use CetechDeliveryEngine\Domain\Enum\BulkTargetScope;
 use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
 use CetechDeliveryEngine\Domain\Enum\EffectiveFieldState;
-use CetechDeliveryEngine\Domain\Enum\FulfilmentAvailability;
 use CetechDeliveryEngine\Domain\Enum\ScalarConfigurationMode;
 use CetechDeliveryEngine\Infrastructure\Persistence\ScopedConfigurationSchema;
 use CetechDeliveryEngine\Infrastructure\Persistence\TableNames;
@@ -32,8 +31,13 @@ final class WooCommerceCatalogTargetQuery implements CatalogTargetQueryInterface
 	}
 
 	public function count( CatalogTargetDefinition $definition ): int {
+		CatalogTargetFilters::assert_supported( $definition->filters );
 		if ( BulkTargetScope::SelectedIds === $definition->scope ) {
-			return $definition->selected_count();
+			if ( $definition->selected_ids_materialized || [] === $definition->selected_ids || ! $this->wpdb_ready() ) {
+				return $definition->selected_count();
+			}
+
+			return $this->count_existing_selected( $definition );
 		}
 		if ( BulkTargetScope::MatchingFilters === $definition->scope && ! $definition->has_matching_criteria() ) {
 			return 0;
@@ -117,8 +121,13 @@ final class WooCommerceCatalogTargetQuery implements CatalogTargetQueryInterface
 	 * @return list<int>
 	 */
 	private function matching_ids( CatalogTargetDefinition $definition, int $after_id, int $limit ): array {
+		CatalogTargetFilters::assert_supported( $definition->filters );
 		if ( BulkTargetScope::SelectedIds === $definition->scope ) {
-			return CatalogTargetDefinition::page_sorted_ids( $definition->selected_ids, $after_id, $limit );
+			if ( $definition->selected_ids_materialized || [] === $definition->selected_ids || ! $this->wpdb_ready() ) {
+				return CatalogTargetDefinition::page_sorted_ids( $definition->selected_ids, $after_id, $limit );
+			}
+
+			return $this->existing_selected_ids( $definition, $after_id, $limit );
 		}
 
 		if ( BulkTargetScope::MatchingFilters === $definition->scope && ! $definition->has_matching_criteria() ) {
@@ -231,11 +240,14 @@ final class WooCommerceCatalogTargetQuery implements CatalogTargetQueryInterface
 			if ( $term_id <= 0 ) {
 				continue;
 			}
-			$alias   = 'tax_' . $filter_key;
-			$object  = $is_variation && 'product_shipping_class' !== $taxonomy ? 'p.post_parent' : 'p.ID';
-			$join   .= " INNER JOIN {$wpdb->term_relationships} {$alias} ON {$alias}.object_id = {$object} ";
-			$where  .= " AND {$alias}.term_taxonomy_id = %d";
-			$args[]  = $term_id;
+			$alias     = 'tax_' . $filter_key;
+			$tax_alias = $alias . '_tt';
+			$object    = $is_variation && 'product_shipping_class' !== $taxonomy ? 'p.post_parent' : 'p.ID';
+			$join     .= " INNER JOIN {$wpdb->term_relationships} {$alias} ON {$alias}.object_id = {$object} ";
+			$join     .= " INNER JOIN {$wpdb->term_taxonomy} {$tax_alias} ON {$tax_alias}.term_taxonomy_id = {$alias}.term_taxonomy_id ";
+			$where    .= " AND {$tax_alias}.taxonomy = %s AND {$tax_alias}.term_id = %d";
+			$args[]    = $taxonomy;
+			$args[]    = $term_id;
 		}
 
 		$scopes      = TableNames::for( ScopedConfigurationSchema::SCOPES_SUFFIX );
@@ -291,33 +303,20 @@ final class WooCommerceCatalogTargetQuery implements CatalogTargetQueryInterface
 
 		$offer_id = (int) ( $filters[ CatalogTargetFilters::DELIVERY_OPTION_ID ] ?? 0 );
 		if ( $offer_id > 0 ) {
-			$where .= " AND EXISTS (SELECT 1 FROM `{$scopes}` cs_of INNER JOIN `{$collections}` cc_of ON cc_of.scope_row_id = cs_of.id WHERE cs_of.scope_type = %s AND cs_of.scope_id = p.ID AND cs_of.slice_key = %s AND cs_of.status = 'active' AND cc_of.field_key = %s AND (cc_of.members_json = %s OR cc_of.members_json LIKE %s OR cc_of.members_json LIKE %s OR cc_of.members_json LIKE %s))";
-			$args[] = $scope_type;
-			$args[] = ConfigurationScope::DEFAULT_SLICE_KEY;
-			$args[] = ConfigurationFieldKey::DELIVERY_OFFER_IDS;
-			$args[] = '[' . $offer_id . ']';
-			$args[] = '[' . $offer_id . ',%';
-			$args[] = '%,' . $offer_id . ',%';
-			$args[] = '%,' . $offer_id . ']';
+			[ $offer_sql, $offer_args ] = $this->offer_membership_sql( $is_variation, $scopes, $collections, $scope_type, $offer_id );
+			$where                     .= $offer_sql;
+			foreach ( $offer_args as $arg ) {
+				$args[] = $arg;
+			}
 		}
 
 		$pickup = (int) ( $filters[ CatalogTargetFilters::PICKUP_LOCATION_ID ] ?? 0 );
 		if ( $pickup > 0 ) {
-			$pickups = TableNames::for( 'pickup_locations' );
-			$offers  = TableNames::for( 'delivery_offers' );
-			$where  .= " AND EXISTS (SELECT 1 FROM `{$pickups}` pl_f WHERE pl_f.id = %d) AND (";
-			$args[]  = $pickup;
-			[ $in_store_sql, $in_store_args ] = $this->configured_field_exists_sql( $scopes, $fields, $scope_type, ConfigurationFieldKey::FULFILMENT_AVAILABILITY, FulfilmentAvailability::InStore->value );
-			$where .= substr( $in_store_sql, 5 );
-			foreach ( $in_store_args as $arg ) {
+			[ $pickup_sql, $pickup_args ] = $this->configured_field_exists_sql( $scopes, $fields, $scope_type, ConfigurationFieldKey::PICKUP_LOCATION_ID, (string) $pickup );
+			$where                       .= $pickup_sql;
+			foreach ( $pickup_args as $arg ) {
 				$args[] = $arg;
 			}
-			$where .= " OR EXISTS (SELECT 1 FROM `{$scopes}` cs_pk INNER JOIN `{$collections}` cc_pk ON cc_pk.scope_row_id = cs_pk.id INNER JOIN `{$offers}` do_pk ON cc_pk.members_json LIKE CONCAT('%', do_pk.id, '%') WHERE cs_pk.scope_type = %s AND cs_pk.scope_id = p.ID AND cs_pk.slice_key = %s AND cs_pk.status = 'active' AND cc_pk.field_key = %s AND do_pk.route = %s)";
-			$args[] = $scope_type;
-			$args[] = ConfigurationScope::DEFAULT_SLICE_KEY;
-			$args[] = ConfigurationFieldKey::DELIVERY_OFFER_IDS;
-			$args[] = 'store_pickup';
-			$where .= ')';
 		}
 
 		$select = $count ? 'COUNT(DISTINCT p.ID)' : 'DISTINCT p.ID';
@@ -346,6 +345,136 @@ final class WooCommerceCatalogTargetQuery implements CatalogTargetQueryInterface
 				$value,
 			],
 		];
+	}
+
+	private function wpdb_ready(): bool {
+		global $wpdb;
+
+		return isset( $wpdb ) && is_object( $wpdb ) && isset( $wpdb->posts );
+	}
+
+	private function count_existing_selected( CatalogTargetDefinition $definition ): int {
+		[ $sql, $args ] = $this->selected_identity_sql( $definition, 0, 0, true );
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$count = $wpdb->get_var( $wpdb->prepare( $sql, ...$args ) );
+
+		return (int) $count;
+	}
+
+	/**
+	 * @return list<int>
+	 */
+	private function existing_selected_ids( CatalogTargetDefinition $definition, int $after_id, int $limit ): array {
+		[ $sql, $args ] = $this->selected_identity_sql( $definition, $after_id, $limit, false );
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$ids = $wpdb->get_col( $wpdb->prepare( $sql, ...$args ) );
+
+		return array_map( 'intval', is_array( $ids ) ? $ids : [] );
+	}
+
+	/**
+	 * @return array{0: string, 1: list<mixed>}
+	 */
+	private function selected_identity_sql( CatalogTargetDefinition $definition, int $after_id, int $limit, bool $count ): array {
+		global $wpdb;
+
+		$ids = [];
+		foreach ( $definition->selected_ids as $id ) {
+			$id = (int) $id;
+			if ( $id > 0 ) {
+				$ids[] = $id;
+			}
+		}
+		$ids = array_values( array_unique( $ids ) );
+		if ( [] === $ids ) {
+			return [ 'SELECT 0', [] ];
+		}
+
+		$is_variation = CatalogTargetDefinition::TARGET_VARIATION === $definition->target_type;
+		$type         = $is_variation ? 'product_variation' : 'product';
+		$in           = implode( ',', $ids );
+		$select       = $count ? 'COUNT(DISTINCT p.ID)' : 'DISTINCT p.ID';
+		$sql          = "SELECT {$select} FROM {$wpdb->posts} p WHERE p.post_type = %s AND p.post_status IN ('publish','private','draft') AND p.ID > %d AND p.ID IN ({$in})";
+		$args         = [ $type, $after_id ];
+		if ( ! $count ) {
+			$sql   .= ' ORDER BY p.ID ASC LIMIT %d';
+			$args[] = max( 1, min( 250, $limit ) );
+		}
+
+		return [ $sql, $args ];
+	}
+
+	/**
+	 * Add/Replace exact membership, or inherited Add/Replace when this scope does not Replace or Remove that member.
+	 *
+	 * @return array{0: string, 1: list<mixed>}
+	 */
+	private function offer_membership_sql( bool $is_variation, string $scopes, string $collections, string $scope_type, int $offer_id ): array {
+		$member = json_encode( $offer_id, JSON_THROW_ON_ERROR );
+		$slice  = ConfigurationScope::DEFAULT_SLICE_KEY;
+		$field  = ConfigurationFieldKey::DELIVERY_OFFER_IDS;
+		$args   = [ $scope_type, $slice, $field, $member, $scope_type, $slice, $field, $member ];
+		$local  = $this->offer_include_exists_sql( 'cs_of', 'cc_of', $scopes, $collections, 'p.ID' );
+		$block  = $this->offer_block_exists_sql( 'cs_blk', 'cc_blk', $scopes, $collections, 'p.ID' );
+		if ( $is_variation ) {
+			$inherited = '(' . $this->offer_include_exists_sql( 'cs_parent', 'cc_parent', $scopes, $collections, 'p.post_parent', true )
+				. ' OR (NOT ' . $this->offer_block_exists_sql( 'cs_pblk', 'cc_pblk', $scopes, $collections, 'p.post_parent', true )
+				. ' AND ' . $this->global_offer_include_sql( $scopes, $collections ) . '))';
+			array_push(
+				$args,
+				ConfigurationScopeType::Product->value,
+				$slice,
+				$field,
+				$member,
+				ConfigurationScopeType::Product->value,
+				$slice,
+				$field,
+				$member
+			);
+		} else {
+			$inherited = $this->global_offer_include_sql( $scopes, $collections );
+		}
+		$args[] = ConfigurationScopeType::Global->value;
+		$args[] = ConfigurationScope::GLOBAL_SCOPE_ID;
+		$args[] = $slice;
+		$args[] = $field;
+		$args[] = $member;
+
+		return [ ' AND (' . $local . ' OR (NOT ' . $block . ' AND ' . $inherited . '))', $args ];
+	}
+
+	private function global_offer_include_sql( string $scopes, string $collections ): string {
+		return 'EXISTS (SELECT 1 FROM `' . $scopes . '` cs_g INNER JOIN `' . $collections . '` cc_g ON cc_g.scope_row_id = cs_g.id'
+			. " WHERE cs_g.scope_type = %s AND cs_g.scope_id = %d AND cs_g.slice_key = %s AND cs_g.status = 'active'"
+			. " AND cc_g.field_key = %s AND cc_g.mode IN ('add','replace') AND " . $this->member_contains( 'cc_g.members_json' ) . ')';
+	}
+
+	private function offer_include_exists_sql( string $scope_alias, string $collection_alias, string $scopes, string $collections, string $scope_id_sql, bool $require_positive_parent = false ): string {
+		$parent = $require_positive_parent ? ' AND p.post_parent > 0' : '';
+
+		return 'EXISTS (SELECT 1 FROM `' . $scopes . '` ' . $scope_alias . ' INNER JOIN `' . $collections . '` ' . $collection_alias
+			. ' ON ' . $collection_alias . '.scope_row_id = ' . $scope_alias . '.id'
+			. ' WHERE ' . $scope_alias . '.scope_type = %s AND ' . $scope_alias . '.scope_id = ' . $scope_id_sql . $parent
+			. ' AND ' . $scope_alias . ".slice_key = %s AND " . $scope_alias . ".status = 'active'"
+			. ' AND ' . $collection_alias . ".field_key = %s AND " . $collection_alias . ".mode IN ('add','replace')"
+			. ' AND ' . $this->member_contains( $collection_alias . '.members_json' ) . ')';
+	}
+
+	private function offer_block_exists_sql( string $scope_alias, string $collection_alias, string $scopes, string $collections, string $scope_id_sql, bool $require_positive_parent = false ): string {
+		$parent = $require_positive_parent ? ' AND p.post_parent > 0' : '';
+
+		return 'EXISTS (SELECT 1 FROM `' . $scopes . '` ' . $scope_alias . ' INNER JOIN `' . $collections . '` ' . $collection_alias
+			. ' ON ' . $collection_alias . '.scope_row_id = ' . $scope_alias . '.id'
+			. ' WHERE ' . $scope_alias . '.scope_type = %s AND ' . $scope_alias . '.scope_id = ' . $scope_id_sql . $parent
+			. ' AND ' . $scope_alias . ".slice_key = %s AND " . $scope_alias . ".status = 'active'"
+			. ' AND ' . $collection_alias . '.field_key = %s AND (' . $collection_alias . ".mode = 'replace' OR ("
+			. $collection_alias . ".mode = 'remove' AND " . $this->member_contains( $collection_alias . '.members_json' ) . ')))';
+	}
+
+	private function member_contains( string $column ): string {
+		return 'JSON_VALID(' . $column . ") AND JSON_CONTAINS(" . $column . ", %s, '\$')";
 	}
 
 	private function passes_effective( CatalogTargetDefinition $definition, int $id ): bool {

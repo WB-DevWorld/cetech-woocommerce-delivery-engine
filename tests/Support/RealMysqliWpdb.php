@@ -15,6 +15,16 @@ final class RealMysqliWpdb {
 
 	public string $options = 'wp_options';
 
+	public string $posts = 'wp_posts';
+
+	public string $postmeta = 'wp_postmeta';
+
+	public string $terms = 'wp_terms';
+
+	public string $term_taxonomy = 'wp_term_taxonomy';
+
+	public string $term_relationships = 'wp_term_relationships';
+
 	public int $insert_id = 0;
 
 	public string $last_error = '';
@@ -27,9 +37,14 @@ final class RealMysqliWpdb {
 	private \PDO $pdo;
 
 	public function __construct( \PDO $pdo, string $prefix = 'wp_' ) {
-		$this->pdo     = $pdo;
-		$this->prefix  = $prefix;
-		$this->options = $prefix . 'options';
+		$this->pdo                = $pdo;
+		$this->prefix             = $prefix;
+		$this->options            = $prefix . 'options';
+		$this->posts              = $prefix . 'posts';
+		$this->postmeta           = $prefix . 'postmeta';
+		$this->terms              = $prefix . 'terms';
+		$this->term_taxonomy      = $prefix . 'term_taxonomy';
+		$this->term_relationships = $prefix . 'term_relationships';
 	}
 
 	public static function try_connect(): ?self {
