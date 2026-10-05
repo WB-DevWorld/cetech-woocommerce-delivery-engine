@@ -197,7 +197,7 @@ final class BulkJobWorker {
 		}
 		$saved = $this->save_owned_job( $job, (string) $job->claim_token );
 		if ( $saved instanceof BulkJob ) {
-			$this->requeue_if_needed( $saved, $started );
+			$this->requeue_if_needed( $saved, $started, (string) $saved->claim_token );
 		}
 	}
 
@@ -286,23 +286,8 @@ final class BulkJobWorker {
 				'skipped'   => BulkJobItemStatus::Skipped,
 				default     => BulkJobItemStatus::Failed,
 			};
-
 			if ( 'failed' === $result['outcome'] && ! empty( $result['warning'] ) ) {
 				$status = BulkJobItemStatus::Skipped;
-				++$warnings;
-				++$skipped;
-			} elseif ( BulkJobItemStatus::Changed === $status ) {
-				++$changed;
-				if ( ! empty( $result['warning'] ) ) {
-					++$warnings;
-				}
-			} elseif ( BulkJobItemStatus::Unchanged === $status || BulkJobItemStatus::Skipped === $status ) {
-				++$skipped;
-				if ( ! empty( $result['warning'] ) ) {
-					++$warnings;
-				}
-			} else {
-				++$failed;
 			}
 
 			$saved_item = $item->with(
@@ -331,6 +316,22 @@ final class BulkJobWorker {
 			}
 			if ( ! $applied ) {
 				continue;
+			}
+			if ( BulkJobItemStatus::Skipped === $status && 'failed' === $result['outcome'] && ! empty( $result['warning'] ) ) {
+				++$warnings;
+				++$skipped;
+			} elseif ( BulkJobItemStatus::Changed === $status ) {
+				++$changed;
+				if ( ! empty( $result['warning'] ) ) {
+					++$warnings;
+				}
+			} elseif ( BulkJobItemStatus::Unchanged === $status || BulkJobItemStatus::Skipped === $status ) {
+				++$skipped;
+				if ( ! empty( $result['warning'] ) ) {
+					++$warnings;
+				}
+			} else {
+				++$failed;
 			}
 
 			$examples = $this->append_representative_example( $examples, $item, $result );
@@ -362,7 +363,10 @@ final class BulkJobWorker {
 		if ( ! $saved instanceof BulkJob ) {
 			return;
 		}
-		$this->finalize_if_idle( $saved, $token ) || $this->requeue_if_needed( $saved, $started );
+		$this->cross_boundary( 'before_finalize' );
+		if ( ! $this->finalize_if_idle( $saved, $token ) ) {
+			$this->requeue_if_needed( $saved, $started, $token );
+		}
 	}
 
 	private function process_rollback_batch( BulkJob $job, string $token, float $started ): void {
@@ -371,7 +375,7 @@ final class BulkJobWorker {
 			$pending = $this->jobs->count_items( (int) $job->id, BulkJobItemStatus::Pending )
 				+ $this->jobs->count_items( (int) $job->id, BulkJobItemStatus::Claimed );
 			if ( $pending > 0 ) {
-				$this->requeue_if_needed( $job, $started );
+				$this->requeue_if_needed( $job, $started, $token );
 				return;
 			}
 			$this->finalize_rollback( $job, $token );
@@ -496,7 +500,7 @@ final class BulkJobWorker {
 				$this->finalize_rollback( $saved, $token );
 				return;
 			}
-			$this->requeue_if_needed( $saved, $started );
+			$this->requeue_if_needed( $saved, $started, $token );
 		}
 	}
 
@@ -627,8 +631,10 @@ final class BulkJobWorker {
 		return $examples;
 	}
 
-	private function requeue_if_needed( BulkJob $job, float $started ): void {
-		if ( $job->status->is_terminal() ) {
+	private function requeue_if_needed( BulkJob $job, float $started, string $token ): void {
+		$this->cross_boundary( 'before_requeue' );
+		$fresh = $this->jobs->find_job( (int) $job->id );
+		if ( ! $fresh instanceof BulkJob || $fresh->claim_token !== $token || $fresh->status->is_terminal() ) {
 			return;
 		}
 		$this->queue->enqueue_job_tick( (int) $job->id, $this->over_budget( $started ) ? 1 : 0 );

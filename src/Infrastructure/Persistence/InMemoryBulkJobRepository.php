@@ -29,6 +29,11 @@ final class InMemoryBulkJobRepository implements BulkJobRepositoryInterface {
 
 	private int $next_item_id = 1;
 
+	/**
+	 * Test seam: store the terminal row but report that this call applied nothing.
+	 */
+	public bool $treat_terminal_item_save_as_replay = false;
+
 	private int $next_recipe_id = 1;
 
 	public function save_job( BulkJob $job ): BulkJob {
@@ -219,6 +224,9 @@ final class InMemoryBulkJobRepository implements BulkJobRepositoryInterface {
 			throw new \RuntimeException( 'Stale bulk claim.' );
 		}
 		$applied = ! $current->same_outcome( $item );
+		if ( $this->treat_terminal_item_save_as_replay && BulkJobItemStatus::Claimed !== $item->status ) {
+			$applied = false;
+		}
 		if ( BulkJobItemStatus::Claimed !== $item->status ) {
 			$item = $item->with(
 				[

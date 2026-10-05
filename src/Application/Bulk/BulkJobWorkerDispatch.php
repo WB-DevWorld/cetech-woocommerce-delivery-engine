@@ -155,7 +155,7 @@ trait BulkJobWorkerDispatch {
 			$job->summary
 		);
 		$this->jobs->save_job( $job );
-		$this->requeue_if_needed( $job, $started );
+		$this->requeue_if_needed( $job, $started, (string) $job->claim_token );
 	}
 
 	private function enumerate_config( BulkJob $job, float $started ): void {
@@ -206,7 +206,7 @@ trait BulkJobWorkerDispatch {
 			$job->summary
 		);
 		$this->jobs->save_job( $job );
-		$this->requeue_if_needed( $job, $started );
+		$this->requeue_if_needed( $job, $started, (string) $job->claim_token );
 	}
 
 	private function enumerate_selected_ids( BulkJob $job, float $started, string $target_type ): void {
@@ -240,7 +240,7 @@ trait BulkJobWorkerDispatch {
 			$job = $this->release_selection_manifest( $job );
 		}
 		$this->jobs->save_job( $job );
-		$this->requeue_if_needed( $job, $started );
+		$this->requeue_if_needed( $job, $started, (string) $job->claim_token );
 	}
 
 	/**
