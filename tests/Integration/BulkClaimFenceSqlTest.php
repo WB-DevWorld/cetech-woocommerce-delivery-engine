@@ -351,6 +351,157 @@ final class BulkClaimFenceSqlTest extends TestCase {
 		self::assertTrue( $later_start );
 	}
 
+	/**
+	 * The joined importer replaces NG with GH. Outer COMMIT and ROLLBACK are rejected
+	 * before either statement is sent. close() then kills the session. Native WordPress
+	 * 6.8 query() returns false while ready is false, so this case does not reconnect.
+	 */
+	public function test_a_rejected_outer_commit_and_rollback_keeps_the_original_rule(): void {
+		$seed = $this->seed_rule_import_job();
+		$this->pdo->exec( "INSERT INTO cor006_delivery_engine_destination_rules (zone_id, rule_type, rule_value, match_mode, priority) VALUES (1, 'country', 'NG', 'exact', 10)" );
+		$reader = $this->connect();
+		self::assertInstanceOf( RealMysqliWpdb::class, $reader );
+		$worker = $GLOBALS['wpdb'];
+		self::assertInstanceOf( RealMysqliWpdb::class, $worker );
+		$worker->reject_next_commit          = true;
+		$worker->reject_next_rollback        = true;
+		$worker->native_close_stops_queries  = true;
+		$job = $this->repository->claim_job( $seed['job_id'], 'owner', 300 );
+		$items = $this->repository->claim_items( $seed['job_id'], 1, 'owner', 30 );
+		self::assertNotNull( $job );
+		self::assertCount( 1, $items );
+		$importer = new ConfigurationImporter(
+			new ArrayDeliveryOfferStore(),
+			new WpdbDestinationZoneRepository(),
+			new WpdbDestinationRuleRepository(),
+			new ArrayRateCardStore(),
+			new Cor006LogisticsStore(),
+			new Cor006PickupStore(),
+			new Cor006SupplierStore(),
+			new Cor006OriginStore()
+		);
+		$diagnostics = null;
+		try {
+			$this->repository->call_while_item_claimed(
+				$seed['item_id'],
+				'owner',
+				static function () use ( $importer ): array {
+					return $importer->apply_item(
+						'delivery_area_rules',
+						[
+							'zone_code'  => 'accra',
+							'rule_type'  => 'country',
+							'rule_value' => 'GH',
+							'match_mode' => 'exact',
+							'priority'   => 10,
+						],
+						ConfigImportConflictMode::Replace,
+						false,
+						false
+					);
+				}
+			);
+		} catch ( \RuntimeException $exception ) {
+			$diagnostics = $exception;
+		}
+
+		self::assertInstanceOf( \RuntimeException::class, $diagnostics );
+		self::assertStringContainsString( 'Simulated SQL failure: COMMIT', $diagnostics->getMessage() );
+		self::assertStringContainsString( 'Rollback also failed.', $diagnostics->getMessage() );
+		self::assertStringContainsString( 'Simulated SQL failure: ROLLBACK', $diagnostics->getMessage() );
+		self::assertSame( [ 'NG' ], $reader->pdo()->query( 'SELECT rule_value FROM cor006_delivery_engine_destination_rules' )->fetchAll( \PDO::FETCH_COLUMN ) );
+
+		try {
+			$this->repository->claim_job( $seed['job_id'], 'next-worker', 300 );
+		} catch ( \Throwable ) {
+		}
+		try {
+			( new WpdbCanonicalLocationRepository() )->finalize_generation( 'outer-cleanup-token' );
+		} catch ( \Throwable ) {
+		}
+
+		self::assertSame( [ 'NG' ], $reader->pdo()->query( 'SELECT rule_value FROM cor006_delivery_engine_destination_rules' )->fetchAll( \PDO::FETCH_COLUMN ) );
+		self::assertSame( 0, $worker->reconnect_count );
+		$close_at = array_search( 'CLOSE', $worker->sql_log, true );
+		self::assertIsInt( $close_at );
+		foreach ( array_slice( $worker->sql_log, $close_at + 1 ) as $sql ) {
+			self::assertDoesNotMatchRegularExpression( '/START TRANSACTION/i', $sql );
+		}
+	}
+
+	public function test_a_rejected_outer_commit_stays_uncommitted_when_close_fails(): void {
+		$seed = $this->seed_rule_import_job();
+		$this->pdo->exec( "INSERT INTO cor006_delivery_engine_destination_rules (zone_id, rule_type, rule_value, match_mode, priority) VALUES (1, 'country', 'NG', 'exact', 10)" );
+		$reader = $this->connect();
+		self::assertInstanceOf( RealMysqliWpdb::class, $reader );
+		$worker = $GLOBALS['wpdb'];
+		self::assertInstanceOf( RealMysqliWpdb::class, $worker );
+		$worker->reject_next_commit   = true;
+		$worker->reject_next_rollback = true;
+		$worker->fail_next_close      = true;
+		$job = $this->repository->claim_job( $seed['job_id'], 'owner', 300 );
+		$items = $this->repository->claim_items( $seed['job_id'], 1, 'owner', 30 );
+		self::assertNotNull( $job );
+		self::assertCount( 1, $items );
+		$importer = new ConfigurationImporter(
+			new ArrayDeliveryOfferStore(),
+			new WpdbDestinationZoneRepository(),
+			new WpdbDestinationRuleRepository(),
+			new ArrayRateCardStore(),
+			new Cor006LogisticsStore(),
+			new Cor006PickupStore(),
+			new Cor006SupplierStore(),
+			new Cor006OriginStore()
+		);
+		$escaped = false;
+		try {
+			$this->repository->call_while_item_claimed(
+				$seed['item_id'],
+				'owner',
+				static function () use ( $importer ): array {
+					return $importer->apply_item(
+						'delivery_area_rules',
+						[
+							'zone_code'  => 'accra',
+							'rule_type'  => 'country',
+							'rule_value' => 'GH',
+							'match_mode' => 'exact',
+							'priority'   => 10,
+						],
+						ConfigImportConflictMode::Replace,
+						false,
+						false
+					);
+				}
+			);
+		} catch ( \RuntimeException $exception ) {
+			$escaped = true;
+			self::assertStringContainsString( 'Simulated SQL failure: COMMIT', $exception->getMessage() );
+			self::assertStringContainsString( 'Simulated SQL failure: ROLLBACK', $exception->getMessage() );
+		}
+		self::assertTrue( $escaped );
+
+		$claim_ran = false;
+		try {
+			$this->repository->claim_job( $seed['job_id'], 'next-worker', 300 );
+			$claim_ran = true;
+		} catch ( \RuntimeException $exception ) {
+			self::assertStringContainsString( 'Rollback also failed.', $exception->getMessage() );
+		}
+		self::assertFalse( $claim_ran );
+		try {
+			( new WpdbCanonicalLocationRepository() )->finalize_generation( 'outer-cleanup-token' );
+		} catch ( \Throwable ) {
+		}
+
+		self::assertSame( [ 'NG' ], $reader->pdo()->query( 'SELECT rule_value FROM cor006_delivery_engine_destination_rules' )->fetchAll( \PDO::FETCH_COLUMN ) );
+		$close_at = array_search( 'CLOSE', $worker->sql_log, true );
+		self::assertIsInt( $close_at );
+		foreach ( array_slice( $worker->sql_log, $close_at + 1 ) as $sql ) {
+			self::assertDoesNotMatchRegularExpression( '/^\s*START TRANSACTION/i', $sql );
+		}
+	}
+
 	public function test_source_write_holds_the_claim_until_the_contender_times_out(): void {
 		$seed = $this->seed_observable_rate_job( false );
 		$owner = $this->start( 'worker-owner', $seed['job_id'], 'owner', false, [ 'CETECH_DE_COR006_PHASE' => 'inside_source' ] );

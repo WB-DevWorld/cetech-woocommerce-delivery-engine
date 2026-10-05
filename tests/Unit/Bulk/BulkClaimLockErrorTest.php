@@ -345,6 +345,111 @@ final class BulkClaimLockErrorTest extends TestCase {
 		self::assertSame( 0, $starts_after_close );
 	}
 
+	/**
+	 * Native WordPress 6.8 wpdb::close() sets ready false. wpdb::query() then returns false
+	 * before check_connection(). The test adapters reconnect; this case does not inherit that.
+	 */
+	public function test_a_rejected_outer_commit_and_rollback_is_abandoned_before_geography_starts(): void {
+		$this->seed_rules( 'NG' );
+		$reader = $this->wpdb->independent_connection();
+		$this->wpdb->fail_sql_containing         = [ 'COMMIT', 'ROLLBACK' ];
+		$this->wpdb->native_close_stops_queries  = true;
+		$importer = $this->rules_importer();
+		$diagnostics = null;
+
+		try {
+			$this->repository->call_while_item_claimed(
+				1,
+				'owner',
+				static function () use ( $importer ): array {
+					return $importer->apply_item(
+						'delivery_area_rules',
+						[
+							'zone_code'  => 'accra',
+							'rule_type'  => 'country',
+							'rule_value' => 'GH',
+							'match_mode' => 'exact',
+							'priority'   => 10,
+						],
+						ConfigImportConflictMode::Replace,
+						false,
+						false
+					);
+				}
+			);
+		} catch ( \RuntimeException $exception ) {
+			$diagnostics = $exception;
+		}
+
+		self::assertInstanceOf( \RuntimeException::class, $diagnostics );
+		self::assertStringContainsString( 'Simulated SQL failure: COMMIT', $diagnostics->getMessage() );
+		self::assertStringContainsString( 'Rollback also failed.', $diagnostics->getMessage() );
+		self::assertStringContainsString( 'Simulated SQL failure: ROLLBACK', $diagnostics->getMessage() );
+
+		try {
+			( new WpdbCanonicalLocationRepository() )->finalize_generation( 'outer-cleanup-token' );
+		} catch ( \Throwable ) {
+		}
+
+		self::assertSame( [ 'NG' ], $this->reader_values( $reader ) );
+		self::assertContains( 'CLOSE', $this->wpdb->sql_log );
+		self::assertSame( 0, $this->wpdb->reconnect_count );
+		self::assertNotContains( 'START TRANSACTION', $this->executed_sql_after_close() );
+	}
+
+	public function test_a_rejected_outer_commit_stays_quarantined_when_close_fails(): void {
+		$this->seed_rules( 'NG' );
+		$reader = $this->wpdb->independent_connection();
+		$this->wpdb->fail_sql_containing        = [ 'COMMIT', 'ROLLBACK' ];
+		$this->wpdb->fail_next_close            = true;
+		$this->wpdb->native_close_stops_queries = true;
+		$importer = $this->rules_importer();
+		$escaped  = false;
+
+		try {
+			$this->repository->call_while_item_claimed(
+				1,
+				'owner',
+				static function () use ( $importer ): array {
+					return $importer->apply_item(
+						'delivery_area_rules',
+						[
+							'zone_code'  => 'accra',
+							'rule_type'  => 'country',
+							'rule_value' => 'GH',
+							'match_mode' => 'exact',
+							'priority'   => 10,
+						],
+						ConfigImportConflictMode::Replace,
+						false,
+						false
+					);
+				}
+			);
+		} catch ( \RuntimeException $exception ) {
+			$escaped = true;
+			self::assertStringContainsString( 'Simulated SQL failure: COMMIT', $exception->getMessage() );
+			self::assertStringContainsString( 'Simulated SQL failure: ROLLBACK', $exception->getMessage() );
+		}
+		self::assertTrue( $escaped );
+
+		$claim_ran = false;
+		try {
+			$this->repository->claim_job( 1, 'next-worker', 300 );
+			$claim_ran = true;
+		} catch ( \RuntimeException $exception ) {
+			self::assertStringContainsString( 'Rollback also failed.', $exception->getMessage() );
+		}
+		self::assertFalse( $claim_ran );
+		try {
+			( new WpdbCanonicalLocationRepository() )->finalize_generation( 'outer-cleanup-token' );
+		} catch ( \Throwable ) {
+		}
+
+		self::assertSame( [ 'NG' ], $this->reader_values( $reader ) );
+		self::assertSame( [], $this->executed_sql_after_close() );
+	}
+
 	public function test_a_joined_insert_failure_with_a_successful_rollback_restores_the_old_rule(): void {
 		$this->seed_rules( 'NG' );
 		$this->wpdb->fail_next_insert_table = 'wp_delivery_engine_destination_rules';
@@ -477,6 +582,26 @@ final class BulkClaimLockErrorTest extends TestCase {
 		$row = $reader->get_row( 'SELECT * FROM `wp_delivery_engine_destination_rules` WHERE zone_id = 1', ARRAY_A );
 
 		return is_array( $row ) ? [ (string) ( $row['rule_value'] ?? '' ) ] : [];
+	}
+
+	/**
+	 * @return list<string>
+	 */
+	private function executed_sql_after_close(): array {
+		$executed = [];
+		$seen     = false;
+		foreach ( $this->wpdb->sql_log as $sql ) {
+			if ( 'CLOSE' === $sql ) {
+				$seen = true;
+				continue;
+			}
+			if ( ! $seen || str_starts_with( $sql, 'REJECTED ' ) || 'NOT READY' === $sql || 'RECONNECT' === $sql ) {
+				continue;
+			}
+			$executed[] = $sql;
+		}
+
+		return $executed;
 	}
 
 	private function log_index_after( string $needle, int $after ): int|false {

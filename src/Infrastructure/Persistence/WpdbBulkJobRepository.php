@@ -232,15 +232,26 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 
 			return $result;
 		} catch ( \Throwable $exception ) {
-			if ( self::$transaction_cleanup_failed ) {
-				$this->abandon_unresolved_connection();
+			if ( ! self::$transaction_cleanup_failed && $this->transaction_is_open() ) {
+				$this->rollback_owned_transaction();
+			}
+			if ( ! self::$transaction_cleanup_failed ) {
 				throw $exception;
 			}
-			$detail = $exception->getMessage();
-			if ( $this->transaction_is_open() && ! $this->rollback_owned_transaction() && ! str_contains( $detail, 'Rollback also failed.' ) ) {
-				throw new \RuntimeException( $detail . ' Rollback also failed.', 0, $exception );
+			$message = $exception->getMessage();
+			$cleanup = self::$transaction_cleanup_error;
+			if ( ! str_contains( $message, 'Rollback also failed.' ) ) {
+				$message .= ' Rollback also failed.';
 			}
-			throw $exception;
+			if ( '' !== $cleanup && ! str_contains( $message, $cleanup ) ) {
+				$message .= ' ' . $cleanup;
+			}
+			$this->abandon_unresolved_connection();
+			if ( $message === $exception->getMessage() ) {
+				throw $exception;
+			}
+
+			throw new \RuntimeException( $message, 0, $exception );
 		}
 	}
 

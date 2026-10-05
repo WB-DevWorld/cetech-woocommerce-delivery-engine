@@ -36,7 +36,17 @@ final class RealMysqliWpdb {
 
 	public bool $reject_next_rollback = false;
 
+	public bool $reject_next_commit = false;
+
 	public bool $fail_next_close = false;
+
+	/**
+	 * WordPress 6.8 wpdb::query() returns false when ready is false, before check_connection().
+	 * This adapter otherwise reconnects. The outer-cleanup proof sets this flag and does not reconnect.
+	 */
+	public bool $native_close_stops_queries = false;
+
+	public bool $ready = true;
 
 	public int $close_count = 0;
 
@@ -135,6 +145,9 @@ final class RealMysqliWpdb {
 		$this->pdo         = null;
 		$this->connected   = false;
 		$this->quarantined = false;
+		if ( $this->native_close_stops_queries ) {
+			$this->ready = false;
+		}
 
 		return true;
 	}
@@ -145,6 +158,9 @@ final class RealMysqliWpdb {
 	}
 
 	private function connection(): \PDO {
+		if ( $this->native_close_stops_queries && ! $this->ready ) {
+			throw new \RuntimeException( 'WordPress database error: queries are not ready after close.' );
+		}
 		if ( $this->quarantined ) {
 			throw new \RuntimeException( 'Connection disposal failed.' );
 		}
@@ -204,9 +220,22 @@ final class RealMysqliWpdb {
 
 	public function query( mixed $sql ): int|bool {
 		$sql = (string) $sql;
+		if ( $this->native_close_stops_queries && ! $this->ready ) {
+			$this->last_error = 'WordPress database error: queries are not ready after close.';
+			$this->log_sql( 'NOT READY' );
+
+			return false;
+		}
 		if ( $this->quarantined ) {
 			$this->last_error = 'Connection disposal failed.';
 			$this->log_sql( 'REJECTED ' . $sql );
+
+			return false;
+		}
+		if ( $this->reject_next_commit && preg_match( '/^\s*COMMIT\b/i', $sql ) ) {
+			$this->reject_next_commit = false;
+			$this->last_error         = 'Simulated SQL failure: COMMIT';
+			$this->log_sql( $sql );
 
 			return false;
 		}

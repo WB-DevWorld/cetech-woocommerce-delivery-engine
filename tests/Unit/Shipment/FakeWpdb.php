@@ -50,6 +50,14 @@ final class FakeWpdb {
 
 	public bool $fail_next_close = false;
 
+	/**
+	 * WordPress 6.8 wpdb::close() sets ready false, and query() returns false
+	 * before check_connection(). This does not reconnect.
+	 */
+	public bool $native_close_stops_queries = false;
+
+	public bool $ready = true;
+
 	public int $close_count = 0;
 
 	public int $reconnect_count = 0;
@@ -155,6 +163,9 @@ final class FakeWpdb {
 		}
 		$this->connected   = false;
 		$this->quarantined = false;
+		if ( $this->native_close_stops_queries ) {
+			$this->ready = false;
+		}
 
 		return true;
 	}
@@ -164,12 +175,26 @@ final class FakeWpdb {
 		$this->last_error  = 'Connection disposal failed.';
 	}
 
-	public function query( mixed $sql ): int|bool {
-		$sql = (string) $sql;
+	private function statement_is_blocked( string $sql ): bool {
+		if ( $this->native_close_stops_queries && ! $this->ready ) {
+			$this->last_error = 'WordPress database error: queries are not ready after close.';
+			$this->sql_log[]  = 'NOT READY';
+
+			return true;
+		}
 		if ( $this->quarantined ) {
 			$this->last_error = 'Connection disposal failed.';
 			$this->sql_log[]  = 'REJECTED ' . $sql;
 
+			return true;
+		}
+
+		return false;
+	}
+
+	public function query( mixed $sql ): int|bool {
+		$sql = (string) $sql;
+		if ( $this->statement_is_blocked( $sql ) ) {
 			return false;
 		}
 		if ( ! $this->connected ) {
@@ -399,6 +424,9 @@ final class FakeWpdb {
 	}
 
 	public function get_var( string $sql ) {
+		if ( $this->statement_is_blocked( $sql ) ) {
+			return null;
+		}
 		$this->record_sql( $sql );
 		if ( $this->consume_sql_failure( $sql ) ) {
 			return null;
@@ -462,6 +490,9 @@ final class FakeWpdb {
 	 * @return array<string, mixed>|null
 	 */
 	public function get_row( string $sql, $output = ARRAY_A ) {
+		if ( $this->statement_is_blocked( $sql ) ) {
+			return null;
+		}
 		unset( $output );
 		$this->record_sql( $sql );
 		$trimmed = trim( $sql );
@@ -505,6 +536,9 @@ final class FakeWpdb {
 	 */
 	public function get_results( string $sql, $output = ARRAY_A ) {
 		unset( $output );
+		if ( $this->statement_is_blocked( $sql ) ) {
+			return [];
+		}
 		$this->record_sql( $sql );
 
 		$grouped = $this->grouped_counts( $sql );
