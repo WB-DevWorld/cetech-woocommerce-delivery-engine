@@ -57,6 +57,7 @@ final class ScopedConfigurationCompletionSqlTest extends TestCase {
 	}
 
 	protected function tearDown(): void {
+		WpdbScopedConfigurationRepository::$before_global_option_publish = null;
 		AbstractWpdbRepository::reset_transaction_state();
 		unset( $GLOBALS['wpdb'] );
 		parent::tearDown();
@@ -270,6 +271,78 @@ final class ScopedConfigurationCompletionSqlTest extends TestCase {
 		self::assertSame( 2, (int) $this->reader->query( "SELECT COUNT(*) FROM cor007_delivery_engine_audit_log WHERE action = 'scoped_configuration_updated' AND new_value LIKE '%\"scope_id\":101%'" )->fetchColumn() );
 	}
 
+	public function test_an_older_global_publish_cannot_replace_a_newer_option(): void {
+		$service = $this->service();
+		$older_version = 0;
+		WpdbScopedConfigurationRepository::$before_global_option_publish = function () use ( &$older_version ): void {
+			$newer = $this->fresh_service()->save( $this->command( '8', 'newer-writer' ) );
+			self::assertTrue( $newer->success, implode( ' ', $newer->errors ) );
+			$older_version = $newer->version_after;
+		};
+		$older = $service->save( $this->command( '4', 'older-writer', 0 ) );
+		self::assertFalse( $older->success );
+		self::assertStringContainsString( 'could not be confirmed', implode( ' ', $older->errors ) );
+		$option = (string) $this->reader->query( "SELECT option_value FROM cor007_options WHERE option_name = 'cetech_de_global_configuration_version'" )->fetchColumn();
+		self::assertSame( (string) $older_version, $option );
+		self::assertNotSame( (string) $older->version_after, $option );
+		self::assertSame( '8', $this->priority( $this->reader ) );
+	}
+
+	public function test_replay_finds_a_token_buried_under_more_than_one_hundred_audits(): void {
+		$service = $this->service();
+		$saved   = $service->save( $this->command( '5', 'buried-token' ) );
+		self::assertTrue( $saved->success, implode( ' ', $saved->errors ) );
+		$audits = $this->audit_count( $this->reader );
+		$insert = $this->pdo->prepare( 'INSERT INTO cor007_delivery_engine_audit_log (actor_user_id, action, entity_type, entity_id, previous_value, new_value, site_context, created_at) VALUES (1, ?, ?, 1, NULL, ?, NULL, UTC_TIMESTAMP())' );
+		for ( $i = 0; $i < 101; $i++ ) {
+			$insert->execute( [ 'unrelated', 'note', '{"request_token":"other-' . $i . '"}' ] );
+		}
+		$again = $this->fresh_service()->save( $this->command( '5', 'buried-token' ) );
+		self::assertTrue( $again->success, implode( ' ', $again->errors ) );
+		self::assertTrue( $again->replayed );
+		self::assertSame( $audits + 101, $this->audit_count( $this->reader ) );
+		self::assertSame( '5', $this->priority( $this->reader ) );
+	}
+
+	public function test_the_same_resolver_reads_committed_settings_after_a_lost_acknowledgement(): void {
+		$repository = new WpdbScopedConfigurationRepository();
+		$resolver   = new EffectiveConfigurationResolver( $repository, new EffectiveConfigurationValidator(), new PassthroughFulfilmentConstraintService() );
+		$service    = new ScopedConfigurationAdminService(
+			$repository,
+			$resolver,
+			new ScopedConfigurationSubmissionParser(),
+			new ProductVariationScopeGuard(),
+			new EntityLabelResolver(),
+			new LegacyCategoryConfigurationInspector(),
+			new ConfigurationAuditLogger( new WpdbAuditLogRepository(), new Logger() )
+		);
+		$opened = $service->save( $this->command( '5', 'resolver-base' ) );
+		self::assertTrue( $opened->success, implode( ' ', $opened->errors ) );
+		self::assertSame( '5', $this->resolved_priority( $resolver ) );
+		$this->wpdb->native_close_stops_queries = true;
+		$this->wpdb->lose_next_commit_ack = true;
+		$lost = $service->save( $this->command( '9', 'resolver-lost', $opened->version_after ) );
+		self::assertFalse( $lost->success );
+		$retired = $this->wpdb;
+		$this->wpdb = $this->connect();
+		self::assertInstanceOf( RealMysqliWpdb::class, $this->wpdb );
+		$this->pdo = $this->wpdb->pdo();
+		$GLOBALS['wpdb'] = $this->wpdb;
+		self::assertFalse( $retired->query( 'SELECT 1' ) );
+		$replay = $service->save( $this->command( '9', 'resolver-lost', $opened->version_after ) );
+		self::assertTrue( $replay->success, implode( ' ', $replay->errors ) );
+		self::assertTrue( $replay->replayed );
+		self::assertSame( '9', $this->resolved_priority( $resolver ) );
+		self::assertSame( '9', $this->priority( $this->reader ) );
+	}
+
+	private function resolved_priority( EffectiveConfigurationResolver $resolver ): string {
+		$resolved = $resolver->resolve( new \CetechDeliveryEngine\Domain\Configuration\EffectiveConfigurationRequest( 1 ) );
+		$priority = $resolved->scalar( ConfigurationFieldKey::PRIORITY );
+
+		return null === $priority || null === $priority->value ? '' : (string) $priority->value;
+	}
+
 	private function service( ?callable $variation_checker = null ): ScopedConfigurationAdminService {
 		$repository = new WpdbScopedConfigurationRepository();
 
@@ -296,7 +369,11 @@ final class ScopedConfigurationCompletionSqlTest extends TestCase {
 		return $this->service();
 	}
 
-	private function command( string $priority, string $token ): ScopedConfigurationWriteCommand {
+	private function command( string $priority, string $token, ?int $expected_revision = null ): ScopedConfigurationWriteCommand {
+		if ( null === $expected_revision ) {
+			$expected_revision = (int) $this->pdo->query( "SELECT config_version FROM cor007_delivery_engine_configuration_scopes WHERE scope_type = 'global' AND scope_id = 0 AND slice_key = ''" )->fetchColumn();
+		}
+
 		return new ScopedConfigurationWriteCommand(
 			ConfigurationScopeType::Global,
 			0,
@@ -304,7 +381,7 @@ final class ScopedConfigurationCompletionSqlTest extends TestCase {
 			null,
 			$this->fields( $priority ),
 			false,
-			null,
+			$expected_revision,
 			$token
 		);
 	}
@@ -313,6 +390,12 @@ final class ScopedConfigurationCompletionSqlTest extends TestCase {
 	 * @param array<string, array<string, mixed>>|null $fields
 	 */
 	private function product_command( string $slice, string $priority, string $token, ?int $expected_revision = null, ?int $row_id = null, ?array $fields = null ): ScopedConfigurationWriteCommand {
+		if ( null === $expected_revision ) {
+			$statement = $this->pdo->prepare( "SELECT config_version FROM cor007_delivery_engine_configuration_scopes WHERE scope_type = 'product' AND scope_id = 101 AND slice_key = ?" );
+			$statement->execute( [ $slice ] );
+			$expected_revision = (int) $statement->fetchColumn();
+		}
+
 		return new ScopedConfigurationWriteCommand(
 			ConfigurationScopeType::Product,
 			101,
@@ -434,6 +517,8 @@ final class ScopedConfigurationCompletionSqlTest extends TestCase {
 		$this->pdo->exec( "CREATE TABLE `{$prefix}configuration_fields` (id bigint unsigned NOT NULL AUTO_INCREMENT, scope_row_id bigint unsigned NOT NULL, field_key varchar(64) NOT NULL, mode varchar(32) NOT NULL, value_type varchar(32) NOT NULL, value_text longtext, created_at datetime NOT NULL, updated_at datetime NOT NULL, PRIMARY KEY (id), UNIQUE KEY scope_field (scope_row_id, field_key)) ENGINE=InnoDB" );
 		$this->pdo->exec( "CREATE TABLE `{$prefix}configuration_collections` (id bigint unsigned NOT NULL AUTO_INCREMENT, scope_row_id bigint unsigned NOT NULL, field_key varchar(64) NOT NULL, mode varchar(32) NOT NULL, members_json longtext NOT NULL, created_at datetime NOT NULL, updated_at datetime NOT NULL, PRIMARY KEY (id), UNIQUE KEY scope_collection (scope_row_id, field_key)) ENGINE=InnoDB" );
 		$this->pdo->exec( "CREATE TABLE `{$prefix}audit_log` (id bigint unsigned NOT NULL AUTO_INCREMENT, actor_user_id bigint unsigned DEFAULT NULL, action varchar(64) NOT NULL, entity_type varchar(64) NOT NULL, entity_id bigint unsigned DEFAULT NULL, previous_value longtext, new_value longtext, site_context varchar(255) DEFAULT NULL, created_at datetime NOT NULL, PRIMARY KEY (id)) ENGINE=InnoDB" );
+		$this->pdo->exec( 'DROP TABLE IF EXISTS `cor007_options`' );
+		$this->pdo->exec( "CREATE TABLE `cor007_options` (option_id bigint unsigned NOT NULL AUTO_INCREMENT, option_name varchar(191) NOT NULL, option_value longtext NOT NULL, autoload varchar(20) NOT NULL DEFAULT 'off', PRIMARY KEY (option_id), UNIQUE KEY option_name (option_name)) ENGINE=InnoDB" );
 		$this->pdo->exec( "CREATE TRIGGER cor007_reject_field BEFORE INSERT ON `{$prefix}configuration_fields` FOR EACH ROW BEGIN IF NEW.value_text = '77' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'rejected field insert'; END IF; END" );
 		$this->pdo->exec( "CREATE TRIGGER cor007_reject_audit BEFORE INSERT ON `{$prefix}audit_log` FOR EACH ROW BEGIN IF NEW.new_value LIKE '%reject-audit%' THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'rejected audit append'; END IF; END" );
 		$this->pdo->exec( "CREATE TRIGGER cor007_reject_parent BEFORE UPDATE ON `{$prefix}configuration_scopes` FOR EACH ROW BEGIN IF @cor007_reject_parent = 1 AND NEW.config_version <> OLD.config_version THEN SIGNAL SQLSTATE '45000' SET MESSAGE_TEXT = 'rejected parent revision'; END IF; END" );

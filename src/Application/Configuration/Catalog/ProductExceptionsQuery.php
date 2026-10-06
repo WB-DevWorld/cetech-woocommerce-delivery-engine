@@ -41,7 +41,9 @@ final class ProductExceptionsQuery {
 	 *     currently_using: string,
 	 *     customized: list<string>,
 	 *     status: string,
-	 *     type_label: string
+	 *     type_label: string,
+	 *     config_version: int,
+	 *     scope_row_id: int
 	 * }>
 	 */
 	public function list( int $limit = 100, array $filters = [] ): array {
@@ -190,6 +192,8 @@ final class ProductExceptionsQuery {
 				: __( 'Product-specific delivery settings', 'cetech-woocommerce-delivery-engine' ),
 			'customized'      => $customized,
 			'status'          => $readiness->status_label,
+			'config_version'  => $scope->scope->config_version,
+			'scope_row_id'    => (int) ( $scope->scope->id ?? 0 ),
 		];
 	}
 

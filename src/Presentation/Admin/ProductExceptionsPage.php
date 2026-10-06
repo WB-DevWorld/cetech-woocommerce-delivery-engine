@@ -54,8 +54,17 @@ final class ProductExceptionsPage {
 		}
 		$type = $target['scope_type']->value;
 		try {
-			$ok = $this->admin_service->reset( $target['scope_type'], $target['scope_id'], $target['slice_key'], $target['parent_product_id'] );
+			$ok = $this->admin_service->reset(
+				$target['scope_type'],
+				$target['scope_id'],
+				$target['slice_key'],
+				$target['parent_product_id'],
+				isset( $_POST['expected_revision'] ) ? (int) wp_unslash( $_POST['expected_revision'] ) : null,
+				isset( $_POST['request_token'] ) ? sanitize_text_field( (string) wp_unslash( $_POST['request_token'] ) ) : null,
+				isset( $_POST['expected_scope_row_id'] ) ? (int) wp_unslash( $_POST['expected_scope_row_id'] ) : null
+			);
 		} catch ( \RuntimeException $exception ) {
+			\CetechDeliveryEngine\Infrastructure\Persistence\AbstractWpdbRepository::replace_closed_connection();
 			$this->action_handler->notices()->flash_error( $exception->getMessage() );
 			$this->action_handler->redirect( self::SLUG );
 		}
@@ -145,6 +154,9 @@ final class ProductExceptionsPage {
 			$reset .= '<input type="hidden" name="item_type" value="' . esc_attr( $item['type'] ) . '" />';
 			$reset .= '<input type="hidden" name="item_id" value="' . esc_attr( (string) $item['id'] ) . '" />';
 			$reset .= '<input type="hidden" name="slice_key" value="' . esc_attr( $item['slice_key'] ) . '" />';
+			$reset .= '<input type="hidden" name="expected_revision" value="' . esc_attr( (string) ( $item['config_version'] ?? 0 ) ) . '" />';
+			$reset .= '<input type="hidden" name="expected_scope_row_id" value="' . esc_attr( (string) ( $item['scope_row_id'] ?? 0 ) ) . '" />';
+			$reset .= '<input type="hidden" name="request_token" value="' . esc_attr( function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : bin2hex( random_bytes( 16 ) ) ) . '" />';
 			if ( null !== $item['parent_id'] ) {
 				$reset .= '<input type="hidden" name="parent_product_id" value="' . esc_attr( (string) $item['parent_id'] ) . '" />';
 			}

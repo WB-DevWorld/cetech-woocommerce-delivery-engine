@@ -24,6 +24,9 @@ use CetechDeliveryEngine\Domain\Enum\ScalarConfigurationMode;
  */
 final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepositoryInterface {
 
+	/** @var null|\Closure(): void */
+	public static ?\Closure $before_global_option_publish = null;
+
 	public function getGlobalConfiguration(): ?ScopedConfiguration {
 		return $this->findByScopeAndSlice(
 			ConfigurationScopeType::Global,
@@ -609,12 +612,81 @@ final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepo
 	}
 
 	private function sync_global_version_option( int $version ): bool {
-		$key     = ScopedConfigurationSchema::GLOBAL_VERSION_OPTION;
-		$current = get_option( $key, null );
-		if ( null !== $current && false !== $current && (string) $current === (string) $version ) {
+		$probe = self::$before_global_option_publish;
+		if ( null !== $probe ) {
+			self::$before_global_option_publish = null;
+			$probe();
+		}
+
+		global $wpdb;
+
+		$key   = ScopedConfigurationSchema::GLOBAL_VERSION_OPTION;
+		$table = is_object( $wpdb ) && isset( $wpdb->options ) ? (string) $wpdb->options : '';
+		if ( '' === $table || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'prepare' ) || ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'query' ) ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$durable = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM `{$table}` WHERE option_name = %s LIMIT 1", $key ) );
+		if ( is_string( $durable ) && '' !== $durable && (int) $durable > $version ) {
+			$this->refresh_option_cache( $key, (string) (int) $durable );
+
+			return false;
+		}
+		if ( (string) $durable === (string) $version ) {
+			$this->refresh_option_cache( $key, (string) $version );
+
+			return true;
+		}
+		if ( null === $durable || false === $durable || '' === (string) $durable ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$inserted = $wpdb->query( $wpdb->prepare( "INSERT INTO `{$table}` (option_name, option_value, autoload) VALUES (%s, %s, 'off')", $key, (string) $version ) );
+			if ( false === $inserted ) {
+				return false;
+			}
+			$this->refresh_option_cache( $key, (string) $version );
+
 			return true;
 		}
 
-		return false !== update_option( $key, $version, false );
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$updated = $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE `{$table}` SET option_value = %s WHERE option_name = %s AND CAST(option_value AS UNSIGNED) < %d",
+				(string) $version,
+				$key,
+				$version
+			)
+		);
+		if ( false === $updated ) {
+			$this->refresh_option_cache( $key, (string) $durable );
+
+			return false;
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$now = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM `{$table}` WHERE option_name = %s LIMIT 1", $key ) );
+		$this->refresh_option_cache( $key, (string) $now );
+
+		return (string) $now === (string) $version;
+	}
+
+	private function refresh_option_cache( string $key, string $value ): void {
+		if ( function_exists( 'wp_cache_delete' ) ) {
+			wp_cache_delete( $key, 'options' );
+		}
+		if ( ! function_exists( 'wp_cache_get' ) || ! function_exists( 'wp_cache_set' ) ) {
+			return;
+		}
+		$notoptions = wp_cache_get( 'notoptions', 'options' );
+		if ( is_array( $notoptions ) && array_key_exists( $key, $notoptions ) ) {
+			unset( $notoptions[ $key ] );
+			wp_cache_set( 'notoptions', $notoptions, 'options' );
+		}
+		$alloptions = wp_cache_get( 'alloptions', 'options' );
+		if ( is_array( $alloptions ) && array_key_exists( $key, $alloptions ) ) {
+			unset( $alloptions[ $key ] );
+			wp_cache_set( 'alloptions', $alloptions, 'options' );
+		}
+		wp_cache_set( $key, $value, 'options' );
 	}
 }

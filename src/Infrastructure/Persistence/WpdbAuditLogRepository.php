@@ -58,6 +58,22 @@ final class WpdbAuditLogRepository extends AbstractWpdbRepository implements Aud
 		return (int) $wpdb->insert_id;
 	}
 
+	public function findByRequestToken( string $request_token ): ?array {
+		$request_token = trim( $request_token );
+		if ( '' === $request_token ) {
+			return null;
+		}
+
+		global $wpdb;
+
+		$table = $this->table_name();
+		$sql   = "SELECT * FROM `{$table}` WHERE JSON_UNQUOTE(JSON_EXTRACT(new_value, '$.request_token')) = %s ORDER BY id DESC LIMIT 1";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$row = $wpdb->get_row( $wpdb->prepare( $sql, $request_token ), ARRAY_A );
+
+		return is_array( $row ) ? $row : null;
+	}
+
 	public function list( array $criteria = [] ): array {
 		global $wpdb;
 

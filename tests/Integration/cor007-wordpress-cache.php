@@ -33,6 +33,7 @@ use CetechDeliveryEngine\Domain\Configuration\EffectiveConfigurationRequest;
 use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentAvailability;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
+use CetechDeliveryEngine\Infrastructure\Persistence\AbstractWpdbRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\ScopedConfigurationSchema;
 use CetechDeliveryEngine\Infrastructure\Persistence\TableNames;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbAuditLogRepository;
@@ -189,6 +190,7 @@ function cor007_install(): void {
 			cor007_fail( 'Could not create a configuration table: ' . $wpdb->last_error );
 		}
 	}
+	$wpdb->query( $wpdb->prepare( "DELETE FROM `{$wpdb->options}` WHERE option_name = %s", ScopedConfigurationSchema::GLOBAL_VERSION_OPTION ) );
 	$audit = $prefix . 'audit_log';
 	$created_audit = $wpdb->query( "CREATE TABLE `{$audit}` (id bigint unsigned NOT NULL AUTO_INCREMENT, actor_user_id bigint unsigned DEFAULT NULL, action varchar(64) NOT NULL, entity_type varchar(64) NOT NULL, entity_id bigint unsigned DEFAULT NULL, previous_value longtext, new_value longtext, site_context varchar(255) DEFAULT NULL, created_at datetime NOT NULL, PRIMARY KEY (id)) ENGINE=InnoDB" );
 	if ( false === $created_audit ) {
@@ -253,7 +255,7 @@ $resolver->setAccessible( true );
 /** @var EffectiveConfigurationResolver $prewarmed */
 $prewarmed = $resolver->getValue( $service );
 
-$first = $service->save( cor007_command( '5', 'wp-base' ) );
+$first = $service->save( cor007_command( '5', 'wp-base', 0 ) );
 cor007_check( true === $first->success, 'First save failed: ' . implode( ' ', $first->errors ) );
 $published = (string) get_option( $key, '' );
 cor007_check( $published === (string) $first->version_after, 'Same-request get_option does not match the accepted revision.' );
@@ -304,6 +306,17 @@ $child = cor007_child();
 cor007_check( $before_fail === (string) $child['resolver_priority'], 'Fresh resolver showed a rejected change.' );
 cor007_check( (string) $child['get_option'] === (string) get_option( $key, '' ), 'Option cache disagreed between requests after a known failure.' );
 
+$autoload = (string) $wpdb->get_var( $wpdb->prepare( "SELECT autoload FROM `{$wpdb->options}` WHERE option_name = %s", $key ) );
+$retired  = $wpdb;
+$retired->close();
+cor007_check( false === $retired->query( 'SELECT 1' ), 'A closed connection still accepted a query.' );
+cor007_check( true === AbstractWpdbRepository::replace_closed_connection(), 'The closed connection was not replaced before recovery.' );
+global $wpdb;
+cor007_check( $wpdb !== $retired && false === $retired->ready, 'Recovery reused the closed connection.' );
+set_transient( 'cetech_de_cor007_recovery', [ 'error' => 'Save outcome could not be confirmed.', 'draft' => 'priority-9' ], 60 );
+$recovered = get_transient( 'cetech_de_cor007_recovery' );
+cor007_check( is_array( $recovered ) && 'Save outcome could not be confirmed.' === ( $recovered['error'] ?? '' ) && 'priority-9' === ( $recovered['draft'] ?? '' ), 'The useful error and editable draft did not survive the closed connection.' );
+
 cor007_emit(
 	[
 		'result'             => 'PASS',
@@ -313,6 +326,7 @@ cor007_emit(
 		'prefix'             => (string) $wpdb->prefix,
 		'object_cache_dropin'=> is_file( WP_CONTENT_DIR . '/object-cache.php' ),
 		'option'             => $key,
-		'autoload'           => 'no',
+		'autoload'           => $autoload,
+		'recovery'           => 'replaced-closed-connection',
 	]
 );

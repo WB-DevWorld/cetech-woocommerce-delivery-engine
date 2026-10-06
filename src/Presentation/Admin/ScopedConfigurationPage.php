@@ -16,6 +16,7 @@ use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsService;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
 use CetechDeliveryEngine\Domain\DeliveryOffer\DeliveryOfferRepositoryInterface;
 use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
+use CetechDeliveryEngine\Infrastructure\Persistence\AbstractWpdbRepository;
 use CetechDeliveryEngine\Domain\Enum\ProductTargetType;
 use CetechDeliveryEngine\Domain\FulfilmentProfile\FulfilmentProfileRegistry;
 
@@ -45,6 +46,13 @@ final class ScopedConfigurationPage {
 
 	/** @var array<string, mixed>|null */
 	private ?array $unsaved_draft = null;
+
+	/** @var array<string, mixed>|null */
+	private ?array $form_envelope = null;
+
+	private ?string $generated_save_token = null;
+
+	private ?string $generated_reset_token = null;
 
 	public function handle_actions(): void {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
@@ -132,6 +140,7 @@ final class ScopedConfigurationPage {
 			$variation_label,
 			$category_ids
 		);
+		$this->form_envelope = $this->retry_envelope( $model );
 
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
@@ -168,7 +177,7 @@ final class ScopedConfigurationPage {
 		}
 
 		if ( $customize && ConfigurationScopeType::Global !== $scope_type && null !== $this->offers ) {
-			( new StaffDeliveryCustomizeView( $this->offers ) )->render( $model );
+			( new StaffDeliveryCustomizeView( $this->offers ) )->render( $model, $this->form_envelope ?? [] );
 			AdminPageLayout::close_page();
 			return;
 		}
@@ -209,6 +218,7 @@ final class ScopedConfigurationPage {
 				isset( $_POST['expected_scope_row_id'] ) ? (int) wp_unslash( $_POST['expected_scope_row_id'] ) : null
 			);
 		} catch ( \RuntimeException $exception ) {
+			$this->retain_failed_draft( $scope_type_raw, $scope_id, $slice_key, $parent_id, [], isset( $_POST['expected_revision'] ) ? (int) wp_unslash( $_POST['expected_revision'] ) : null, isset( $_POST['expected_scope_row_id'] ) ? (int) wp_unslash( $_POST['expected_scope_row_id'] ) : null, isset( $_POST['request_token'] ) ? sanitize_text_field( (string) wp_unslash( $_POST['request_token'] ) ) : '', true );
 			$this->action_handler->notices()->flash_error( $exception->getMessage() );
 			$redirect = [
 				'scope_type' => $scope_type_raw,
@@ -232,6 +242,9 @@ final class ScopedConfigurationPage {
 			$redirect['parent_product_id'] = $parent_id;
 		}
 
+		if ( $ok ) {
+			delete_transient( $this->draft_key( $scope_type_raw, $scope_id, $slice_key, $parent_id ) );
+		}
 		if ( $ok && $this->admin_service->reset_was_replayed() ) {
 			$this->action_handler->notices()->flash_success(
 				__( 'This reset was already completed. The recorded settings were not changed again.', 'cetech-woocommerce-delivery-engine' )
@@ -320,28 +333,21 @@ final class ScopedConfigurationPage {
 		}
 
 		if ( ! $result->success ) {
-			set_transient(
-				$this->draft_key(),
-				[
-					'scope_type'        => $scope_type->value,
-					'scope_id'          => $scope_id,
-					'slice_key'         => $slice_key,
-					'parent_product_id' => $parent_product_id,
-					'fields'            => $raw_fields,
-					'request_token'     => $request_token,
-				],
-				15 * MINUTE_IN_SECONDS
-			);
+			$this->retain_failed_draft( $scope_type->value, $scope_id, $slice_key, $parent_product_id, $raw_fields, $expected_revision, $expected_row_id, (string) $request_token, false );
 			$this->action_handler->notices()->flash_error(
 				implode( ' ', $result->errors )
 			);
 			$this->action_handler->redirect( self::SLUG, $redirect );
 		}
-		delete_transient( $this->draft_key() );
+		delete_transient( $this->draft_key( $scope_type->value, $scope_id, $slice_key, $parent_product_id ) );
 
 		if ( $result->replayed ) {
 			$this->action_handler->notices()->flash_success(
 				__( 'This save was already completed. The recorded settings were not changed again.', 'cetech-woocommerce-delivery-engine' )
+			);
+		} elseif ( ! $result->version_changed ) {
+			$this->action_handler->notices()->flash_success(
+				__( 'No semantic changes detected. Configuration version unchanged.', 'cetech-woocommerce-delivery-engine' )
 			);
 		} elseif ( $customize ) {
 			$this->action_handler->notices()->flash_success(
@@ -354,10 +360,6 @@ final class ScopedConfigurationPage {
 					__( 'Scoped configuration saved. Version is now %d.', 'cetech-woocommerce-delivery-engine' ),
 					$result->version_after
 				)
-			);
-		} else {
-			$this->action_handler->notices()->flash_success(
-				__( 'No semantic changes detected. Configuration version unchanged.', 'cetech-woocommerce-delivery-engine' )
 			);
 		}
 
@@ -581,9 +583,7 @@ final class ScopedConfigurationPage {
 		echo '<input type="hidden" name="scope_type" value="' . esc_attr( $model->scope_type ) . '" />';
 		echo '<input type="hidden" name="scope_id" value="' . esc_attr( (string) $model->scope_id ) . '" />';
 		echo '<input type="hidden" name="slice_key" value="' . esc_attr( $model->slice_key ) . '" />';
-		echo '<input type="hidden" name="expected_revision" value="' . esc_attr( (string) $model->config_version ) . '" />';
-		echo '<input type="hidden" name="expected_scope_row_id" value="' . esc_attr( (string) (int) ( $model->technical_details['scope_row_id'] ?? 0 ) ) . '" />';
-		echo '<input type="hidden" name="request_token" value="' . esc_attr( $this->form_request_token() ) . '" />';
+		$this->guard_inputs( 'reset' );
 		if ( null !== $model->parent_product_id ) {
 			echo '<input type="hidden" name="parent_product_id" value="' . esc_attr( (string) $model->parent_product_id ) . '" />';
 		}
@@ -682,9 +682,7 @@ final class ScopedConfigurationPage {
 		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_SAVE ) . '" />';
 		echo '<input type="hidden" name="scope_type" value="' . esc_attr( $model->scope_type ) . '" />';
 		echo '<input type="hidden" name="scope_id" value="' . esc_attr( (string) $model->scope_id ) . '" />';
-		echo '<input type="hidden" name="expected_revision" value="' . esc_attr( (string) $model->config_version ) . '" />';
-		echo '<input type="hidden" name="expected_scope_row_id" value="' . esc_attr( (string) (int) ( $model->technical_details['scope_row_id'] ?? 0 ) ) . '" />';
-		echo '<input type="hidden" name="request_token" value="' . esc_attr( $this->form_request_token() ) . '" />';
+		$this->guard_inputs( 'save' );
 		if ( null !== $model->parent_product_id ) {
 			echo '<input type="hidden" name="parent_product_id" value="' . esc_attr( (string) $model->parent_product_id ) . '" />';
 		}
@@ -969,24 +967,100 @@ final class ScopedConfigurationPage {
 		return array_values( array_filter( array_map( 'intval', is_array( $ids ) ? $ids : [] ) ) );
 	}
 
-	private function draft_key(): string {
-		return 'cetech_de_scoped_draft_' . get_current_user_id();
+	private function draft_key( string $scope_type, int $scope_id, string $slice_key, ?int $parent_product_id ): string {
+		return 'cetech_de_scoped_draft_' . get_current_user_id() . '_' . sanitize_key( $scope_type ) . '_' . $scope_id . '_' . sanitize_key( $slice_key ) . '_' . ( null === $parent_product_id ? 'none' : (string) $parent_product_id );
 	}
 
-	private function form_request_token(): string {
-		$token = is_array( $this->unsaved_draft ) ? (string) ( $this->unsaved_draft['request_token'] ?? '' ) : '';
-		if ( '' !== $token ) {
-			return $token;
+	private function new_token(): string {
+		return function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : bin2hex( random_bytes( 16 ) );
+	}
+
+	private function guard_inputs( string $action ): void {
+		$envelope = $this->form_envelope ?? [];
+		$revision = (string) ( $envelope['expected_revision'] ?? 0 );
+		$row_id   = (string) ( $envelope['expected_scope_row_id'] ?? 0 );
+		$token    = 'reset' === $action ? (string) ( $envelope['reset_token'] ?? '' ) : (string) ( $envelope['save_token'] ?? '' );
+		echo '<input type="hidden" name="expected_revision" value="' . esc_attr( $revision ) . '" />';
+		echo '<input type="hidden" name="expected_scope_row_id" value="' . esc_attr( $row_id ) . '" />';
+		echo '<input type="hidden" name="request_token" value="' . esc_attr( $token ) . '" />';
+	}
+
+	/**
+	 * @param array<string, mixed> $fields
+	 */
+	private function retain_failed_draft( string $scope_type, int $scope_id, string $slice_key, ?int $parent_product_id, array $fields, ?int $expected_revision, ?int $expected_row_id, string $request_token, bool $reset ): void {
+		AbstractWpdbRepository::replace_closed_connection();
+		$key      = $this->draft_key( $scope_type, $scope_id, $slice_key, $parent_product_id );
+		$existing = get_transient( $key );
+		$existing = is_array( $existing ) ? $existing : [];
+		$save     = $reset ? (string) ( $existing['save_token'] ?? $this->new_token() ) : $request_token;
+		$reset_token = $reset ? $request_token : (string) ( $existing['reset_token'] ?? $this->new_token() );
+		if ( '' === $save ) {
+			$save = $this->new_token();
+		}
+		if ( '' === $reset_token || $reset_token === $save ) {
+			$reset_token = $this->new_token();
+		}
+		set_transient(
+			$key,
+			[
+				'scope_type'            => $scope_type,
+				'scope_id'              => $scope_id,
+				'slice_key'             => $slice_key,
+				'parent_product_id'     => $parent_product_id,
+				'fields'                => $fields,
+				'expected_revision'     => $expected_revision,
+				'expected_scope_row_id' => $expected_row_id,
+				'save_token'            => $save,
+				'reset_token'           => $reset_token,
+			],
+			15 * MINUTE_IN_SECONDS
+		);
+	}
+
+	/**
+	 * @param \CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationEditViewModel $model
+	 * @return array<string, mixed>
+	 */
+	private function retry_envelope( $model ): array {
+		$draft = $this->unsaved_draft;
+		if ( is_array( $draft ) && array_key_exists( 'expected_revision', $draft ) && null !== $draft['expected_revision'] ) {
+			$save  = (string) ( $draft['save_token'] ?? '' );
+			$reset = (string) ( $draft['reset_token'] ?? '' );
+			if ( '' === $save ) {
+				$save = $this->new_token();
+			}
+			if ( '' === $reset || $reset === $save ) {
+				$reset = $this->new_token();
+			}
+
+			return [
+				'expected_revision'     => (int) $draft['expected_revision'],
+				'expected_scope_row_id' => (int) ( $draft['expected_scope_row_id'] ?? 0 ),
+				'save_token'            => $save,
+				'reset_token'           => $reset,
+				'fields'                => is_array( $draft['fields'] ?? null ) ? $draft['fields'] : [],
+			];
+		}
+		if ( null === $this->generated_save_token ) {
+			$this->generated_save_token  = $this->new_token();
+			$this->generated_reset_token = $this->new_token();
 		}
 
-		return function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : bin2hex( random_bytes( 16 ) );
+		return [
+			'expected_revision'     => $model->config_version,
+			'expected_scope_row_id' => (int) ( $model->technical_details['scope_row_id'] ?? 0 ),
+			'save_token'            => (string) $this->generated_save_token,
+			'reset_token'           => (string) $this->generated_reset_token,
+			'fields'                => [],
+		];
 	}
 
 	/**
 	 * @return array<string, mixed>|null
 	 */
 	private function matching_draft( ConfigurationScopeType $scope_type, int $scope_id, string $slice_key, ?int $parent_product_id ): ?array {
-		$draft = get_transient( $this->draft_key() );
+		$draft = get_transient( $this->draft_key( $scope_type->value, $scope_id, $slice_key, $parent_product_id ) );
 		if ( ! is_array( $draft ) ) {
 			return null;
 		}

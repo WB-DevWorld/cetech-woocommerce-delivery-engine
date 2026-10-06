@@ -170,6 +170,7 @@ final class ScopedConfigurationAdminService {
 					return ScopedConfigurationWriteResult::failure( [ 'This request token does not match the saved operation.' ] );
 				}
 				$same_row = null !== $existing && $existing->scope->config_version === $recorded['version_after'];
+				$this->resolver->clearMemoization();
 				if ( $same_row && ConfigurationScopeType::Global === $command->scope_type && ! $this->repository->publishAcceptedRevision( $existing ) ) {
 					return ScopedConfigurationWriteResult::failure( [ 'Save outcome could not be confirmed.' ] );
 				}
@@ -184,6 +185,10 @@ final class ScopedConfigurationAdminService {
 					true
 				);
 			}
+		}
+
+		if ( null === $command->expected_revision ) {
+			return ScopedConfigurationWriteResult::failure( [ 'These settings are out of date. Reload the current settings and submit the draft again.' ] );
 		}
 
 		$scope = new ConfigurationScope(
@@ -306,9 +311,13 @@ final class ScopedConfigurationAdminService {
 					throw new \RuntimeException( 'This request token does not match the saved operation.' );
 				}
 				$this->reset_replayed = true;
+				$this->resolver->clearMemoization();
 
 				return true;
 			}
+		}
+		if ( null === $expected_revision ) {
+			throw new \RuntimeException( 'These settings are out of date. Reload the current settings and submit the draft again.' );
 		}
 		if ( null === $previous ) {
 			return false;
@@ -361,7 +370,11 @@ final class ScopedConfigurationAdminService {
 				}
 			);
 		} catch ( \RuntimeException $exception ) {
-			throw $this->completion_exception( $exception );
+			$mapped = $this->completion_exception( $exception );
+			if ( str_starts_with( $mapped->getMessage(), 'Save outcome could not be confirmed.' ) ) {
+				$this->resolver->clearMemoization();
+			}
+			throw $mapped;
 		}
 		if ( $deleted ) {
 			$this->resolver->clearMemoization();
@@ -409,7 +422,12 @@ final class ScopedConfigurationAdminService {
 	}
 
 	private function completion_failure( \RuntimeException $exception ): ScopedConfigurationWriteResult {
-		return ScopedConfigurationWriteResult::failure( [ $this->completion_exception( $exception )->getMessage() ] );
+		$mapped = $this->completion_exception( $exception );
+		if ( str_starts_with( $mapped->getMessage(), 'Save outcome could not be confirmed.' ) ) {
+			$this->resolver->clearMemoization();
+		}
+
+		return ScopedConfigurationWriteResult::failure( [ $mapped->getMessage() ] );
 	}
 
 	private function completion_exception( \RuntimeException $exception ): \RuntimeException {

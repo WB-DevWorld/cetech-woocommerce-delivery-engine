@@ -166,7 +166,8 @@ final class ScopedConfigurationAdminServiceTest extends TestCase {
 					ConfigurationFieldKey::FULFILMENT_AVAILABILITY => [ 'mode' => 'inherit' ],
 					ConfigurationFieldKey::DELIVERY_OFFER_IDS => [ 'mode' => 'add', 'members' => [ '3' ] ],
 				],
-				true
+				true,
+				0
 			)
 		);
 
@@ -213,7 +214,7 @@ final class ScopedConfigurationAdminServiceTest extends TestCase {
 	public function test_collection_replace_empty_and_variation_mutations(): void {
 		$this->save_global_baseline();
 
-		$this->service->save(
+		$product = $this->service->save(
 			new ScopedConfigurationWriteCommand(
 				ConfigurationScopeType::Product,
 				101,
@@ -228,7 +229,8 @@ final class ScopedConfigurationAdminServiceTest extends TestCase {
 					ConfigurationFieldKey::PRIORITY => [ 'mode' => 'inherit' ],
 					ConfigurationFieldKey::DELIVERY_OFFER_IDS => [ 'mode' => 'add', 'members' => [ '4' ] ],
 				],
-				true
+				true,
+				0
 			)
 		);
 
@@ -247,7 +249,8 @@ final class ScopedConfigurationAdminServiceTest extends TestCase {
 					ConfigurationFieldKey::PRIORITY => [ 'mode' => 'inherit' ],
 					ConfigurationFieldKey::DELIVERY_OFFER_IDS => [ 'mode' => 'remove', 'members' => [ '2' ] ],
 				],
-				true
+				true,
+				0
 			)
 		);
 
@@ -280,7 +283,8 @@ final class ScopedConfigurationAdminServiceTest extends TestCase {
 					ConfigurationFieldKey::PRIORITY => [ 'mode' => 'inherit' ],
 					ConfigurationFieldKey::DELIVERY_OFFER_IDS => [ 'mode' => 'replace', 'members' => [] ],
 				],
-				true
+				true,
+				$product->version_after
 			)
 		);
 
@@ -294,7 +298,7 @@ final class ScopedConfigurationAdminServiceTest extends TestCase {
 	}
 
 	public function test_identical_save_no_version_or_audit_noise(): void {
-		$this->save_global_baseline();
+		$opened = $this->save_global_baseline();
 		$fields = $this->global_all_fields_payload();
 
 		$first = $this->service->save(
@@ -303,7 +307,9 @@ final class ScopedConfigurationAdminServiceTest extends TestCase {
 				0,
 				'',
 				null,
-				$fields
+				$fields,
+				false,
+				$opened
 			)
 		);
 		self::assertTrue( $first->success );
@@ -316,7 +322,9 @@ final class ScopedConfigurationAdminServiceTest extends TestCase {
 				0,
 				'',
 				null,
-				$fields
+				$fields,
+				false,
+				$version
 			)
 		);
 
@@ -353,7 +361,8 @@ final class ScopedConfigurationAdminServiceTest extends TestCase {
 					ConfigurationFieldKey::ORIGIN_ID => [ 'mode' => 'inherit' ],
 					ConfigurationFieldKey::DELIVERY_OFFER_IDS => [ 'mode' => 'inherit' ],
 				],
-				true
+				true,
+				0
 			)
 		);
 
@@ -393,7 +402,8 @@ final class ScopedConfigurationAdminServiceTest extends TestCase {
 					ConfigurationFieldKey::PRIORITY => [ 'mode' => 'inherit' ],
 					ConfigurationFieldKey::DELIVERY_OFFER_IDS => [ 'mode' => 'inherit' ],
 				],
-				true
+				true,
+				0
 			)
 		);
 
@@ -455,17 +465,21 @@ final class ScopedConfigurationAdminServiceTest extends TestCase {
 		];
 	}
 
-	private function save_global_baseline(): void {
+	private function save_global_baseline(): int {
 		$result = $this->service->save(
 			new ScopedConfigurationWriteCommand(
 				ConfigurationScopeType::Global,
 				0,
 				'',
 				null,
-				$this->global_all_fields_payload()
+				$this->global_all_fields_payload(),
+				false,
+				0
 			)
 		);
 
 		self::assertTrue( $result->success, implode( '; ', $result->errors ) );
+
+		return $result->version_after;
 	}
 }

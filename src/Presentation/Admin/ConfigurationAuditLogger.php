@@ -86,7 +86,10 @@ final class ConfigurationAuditLogger implements ConfigurationChangeAuditorInterf
 			return null;
 		}
 
-		foreach ( $this->audit_log_repository->list( [ 'limit' => 100 ] ) as $row ) {
+		$rows = method_exists( $this->audit_log_repository, 'findByRequestToken' )
+			? array_filter( [ $this->audit_log_repository->findByRequestToken( $request_token ) ] )
+			: $this->audit_log_repository->list( [ 'limit' => 100 ] );
+		foreach ( $rows as $row ) {
 			$new = $this->decode_audit_value( $row['new_value'] ?? null );
 			if ( ! is_array( $new ) || (string) ( $new['request_token'] ?? '' ) !== $request_token ) {
 				continue;

@@ -39,10 +39,10 @@ final class ScopedConfigurationCompletionTest extends TestCase {
 			}
 		};
 		$service = $this->service( $repository, $audit );
-		$first   = $service->save( $this->command( '5' ) );
+		$first   = $service->save( $this->command( '5', null, 0 ) );
 		self::assertTrue( $first->success, implode( ' ', $first->errors ) );
 
-		$second = $service->save( $this->command( '9' ) );
+		$second = $service->save( $this->command( '9', null, $first->version_after ) );
 
 		self::assertFalse( $second->success );
 		self::assertStringContainsString( 'Settings were not saved.', implode( ' ', $second->errors ) );
@@ -56,7 +56,7 @@ final class ScopedConfigurationCompletionTest extends TestCase {
 		$repository = new InMemoryScopedConfigurationRepository();
 		$audit      = new RecordingConfigurationAuditLogger();
 		$service    = $this->service( $repository, $audit );
-		$first      = $service->save( $this->command( '5' ) );
+		$first      = $service->save( $this->command( '5', null, 0 ) );
 		self::assertTrue( $first->success, implode( ' ', $first->errors ) );
 
 		$stale = $service->save( $this->command( '9', null, 0 ) );
@@ -71,7 +71,7 @@ final class ScopedConfigurationCompletionTest extends TestCase {
 		$repository = new InMemoryScopedConfigurationRepository();
 		$audit      = new RecordingConfigurationAuditLogger();
 		$service    = $this->service( $repository, $audit );
-		$first      = $service->save( $this->command( '5', 'accepted-request' ) );
+		$first      = $service->save( $this->command( '5', 'accepted-request', 0 ) );
 		self::assertTrue( $first->success, implode( ' ', $first->errors ) );
 
 		$mismatch = $service->save( $this->command( '9', 'accepted-request', $first->version_before ) );
@@ -93,7 +93,7 @@ final class ScopedConfigurationCompletionTest extends TestCase {
 		$repository = new InMemoryScopedConfigurationRepository();
 		$audit      = new RecordingConfigurationAuditLogger();
 		$service    = $this->service( $repository, $audit );
-		$first      = $service->save( $this->command( '5', 'baseline' ) );
+		$first      = $service->save( $this->command( '5', 'baseline', 0 ) );
 		self::assertTrue( $first->success, implode( ' ', $first->errors ) );
 		$rejecting = new class() implements ConfigurationChangeAuditorInterface {
 			public int $calls = 0;

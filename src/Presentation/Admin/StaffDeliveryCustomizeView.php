@@ -23,7 +23,14 @@ final class StaffDeliveryCustomizeView {
 	) {
 	}
 
-	public function render( ScopedConfigurationEditViewModel $model ): void {
+	/** @var array<string, mixed> */
+	private array $envelope = [];
+
+	/**
+	 * @param array<string, mixed> $envelope
+	 */
+	public function render( ScopedConfigurationEditViewModel $model, array $envelope = [] ): void {
+		$this->envelope = $envelope;
 		$is_variation = 'variation' === $model->scope_type;
 		$name         = $is_variation
 			? ( $model->variation_label ?: $model->product_label ?: __( 'this variation', 'cetech-woocommerce-delivery-engine' ) )
@@ -60,6 +67,7 @@ final class StaffDeliveryCustomizeView {
 		echo '<input type="hidden" name="scope_id" value="' . esc_attr( (string) $model->scope_id ) . '" />';
 		echo '<input type="hidden" name="slice_key" value="' . esc_attr( $model->slice_key ) . '" />';
 		echo '<input type="hidden" name="customize" value="1" />';
+		$this->guard_inputs( $model, 'save' );
 		if ( null !== $model->parent_product_id ) {
 			echo '<input type="hidden" name="parent_product_id" value="' . esc_attr( (string) $model->parent_product_id ) . '" />';
 		}
@@ -111,6 +119,7 @@ final class StaffDeliveryCustomizeView {
 		echo '<input type="hidden" name="scope_id" value="' . esc_attr( (string) $model->scope_id ) . '" />';
 		echo '<input type="hidden" name="slice_key" value="' . esc_attr( $model->slice_key ) . '" />';
 		echo '<input type="hidden" name="customize" value="1" />';
+		$this->guard_inputs( $model, 'reset' );
 		if ( null !== $model->parent_product_id ) {
 			echo '<input type="hidden" name="parent_product_id" value="' . esc_attr( (string) $model->parent_product_id ) . '" />';
 		}
@@ -137,7 +146,9 @@ final class StaffDeliveryCustomizeView {
 		}
 
 		$inherited = $this->display_scalar( $field, $field->inherited_value ?? $field->effective_value );
-		$current   = 'override' === $field->current_mode ? 'override' : 'inherit';
+		$draft     = $this->draft_field( $field_key );
+		$current   = is_array( $draft ) && isset( $draft['mode'] ) ? (string) $draft['mode'] : $field->current_mode;
+		$current   = 'override' === $current ? 'override' : 'inherit';
 		$inherit_label = $is_variation
 			? sprintf(
 				/* translators: %s inherited value */
@@ -159,14 +170,18 @@ final class StaffDeliveryCustomizeView {
 		echo esc_html( $override_label ) . '</label></p>';
 		echo '<div class="cetech-de-customize-override">';
 		if ( $free_text ) {
-			$value = is_scalar( $field->configured_value ) && 'override' === $field->current_mode
-				? (string) $field->configured_value
-				: ( is_scalar( $field->effective_value ) ? (string) $field->effective_value : '' );
+			$value = is_array( $draft ) && isset( $draft['value'] )
+				? (string) $draft['value']
+				: ( is_scalar( $field->configured_value ) && 'override' === $field->current_mode
+					? (string) $field->configured_value
+					: ( is_scalar( $field->effective_value ) ? (string) $field->effective_value : '' ) );
 			echo '<p><input type="text" class="regular-text" name="fields[' . esc_attr( $field_key ) . '][value]" value="' . esc_attr( $value ) . '" placeholder="10–14 business days" /></p>';
 		} else {
-			$selected = is_scalar( $field->configured_value ) && 'override' === $field->current_mode
-				? (string) $field->configured_value
-				: ( is_scalar( $field->effective_value ) ? (string) $field->effective_value : '' );
+			$selected = is_array( $draft ) && isset( $draft['value'] )
+				? (string) $draft['value']
+				: ( is_scalar( $field->configured_value ) && 'override' === $field->current_mode
+					? (string) $field->configured_value
+					: ( is_scalar( $field->effective_value ) ? (string) $field->effective_value : '' ) );
 			echo '<p><select name="fields[' . esc_attr( $field_key ) . '][value]"' . ( ConfigurationFieldKey::FULFILMENT_AVAILABILITY === $field_key ? ' data-cetech-de-fulfilment-select' : '' ) . '>';
 			foreach ( $field->enum_options ?? [] as $value => $label ) {
 				echo '<option value="' . esc_attr( (string) $value ) . '"' . selected( $selected, (string) $value, false ) . '>' . esc_html( $label ) . '</option>';
@@ -286,6 +301,27 @@ final class StaffDeliveryCustomizeView {
 			echo '</label></p>';
 		}
 		echo '</div></fieldset>';
+	}
+
+	private function guard_inputs( ScopedConfigurationEditViewModel $model, string $action ): void {
+		$revision = array_key_exists( 'expected_revision', $this->envelope ) ? (string) $this->envelope['expected_revision'] : (string) $model->config_version;
+		$row_id   = array_key_exists( 'expected_scope_row_id', $this->envelope ) ? (string) $this->envelope['expected_scope_row_id'] : (string) (int) ( $model->technical_details['scope_row_id'] ?? 0 );
+		$token    = 'reset' === $action ? (string) ( $this->envelope['reset_token'] ?? '' ) : (string) ( $this->envelope['save_token'] ?? '' );
+		echo '<input type="hidden" name="expected_revision" value="' . esc_attr( $revision ) . '" />';
+		echo '<input type="hidden" name="expected_scope_row_id" value="' . esc_attr( $row_id ) . '" />';
+		echo '<input type="hidden" name="request_token" value="' . esc_attr( $token ) . '" />';
+	}
+
+	/**
+	 * @return array<string, mixed>|null
+	 */
+	private function draft_field( string $field_key ): ?array {
+		$fields = $this->envelope['fields'] ?? null;
+		if ( ! is_array( $fields ) || ! isset( $fields[ $field_key ] ) || ! is_array( $fields[ $field_key ] ) ) {
+			return null;
+		}
+
+		return $fields[ $field_key ];
 	}
 
 	private function field( ScopedConfigurationEditViewModel $model, string $field_key ): ?FieldEditViewModel {

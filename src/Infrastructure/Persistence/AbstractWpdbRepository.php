@@ -233,6 +233,34 @@ abstract class AbstractWpdbRepository {
 		return $result;
 	}
 
+	/**
+	 * Open a new WordPress connection after an unresolved close.
+	 *
+	 * The retired object stays closed. Callers must not send the draft or the
+	 * acknowledgement error through that object.
+	 */
+	public static function replace_closed_connection(): bool {
+		global $wpdb;
+
+		if ( ! is_object( $wpdb ) || ! property_exists( $wpdb, 'ready' ) || true === $wpdb->ready ) {
+			return false;
+		}
+		if ( ! class_exists( \wpdb::class, false ) || ! defined( 'DB_USER' ) || ! defined( 'DB_PASSWORD' ) || ! defined( 'DB_NAME' ) || ! defined( 'DB_HOST' ) ) {
+			return false;
+		}
+
+		$retired = $wpdb;
+		$prefix  = isset( $retired->prefix ) && is_string( $retired->prefix ) && '' !== $retired->prefix
+			? $retired->prefix
+			: (string) ( $GLOBALS['table_prefix'] ?? 'wp_' );
+		$wpdb    = new \wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
+		if ( method_exists( $wpdb, 'set_prefix' ) ) {
+			$wpdb->set_prefix( $prefix );
+		}
+
+		return $retired !== $wpdb && false === $retired->ready && '' !== (string) ( $wpdb->options ?? '' );
+	}
+
 	private static function close_unresolved_connection(): void {
 		global $wpdb;
 

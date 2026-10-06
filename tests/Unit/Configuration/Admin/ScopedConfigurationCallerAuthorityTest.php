@@ -163,8 +163,10 @@ final class ScopedConfigurationCallerAuthorityTest extends TestCase {
 
 	public function test_correct_parent_reset_removes_only_selected_slice_and_audits_once(): void {
 		$default = $this->seed( ConfigurationScopeType::Variation, 202, '', 5, 201 );
-		$this->seed( ConfigurationScopeType::Variation, 202, 'in_store', 6, 201 );
+		$slice   = $this->seed( ConfigurationScopeType::Variation, 202, 'in_store', 6, 201 );
 		$_POST = $this->post( ScopedConfigurationPage::ACTION_RESET, 'variation', 202, 'in_store', 201 );
+		$_POST['expected_revision'] = (string) $slice->scope->config_version;
+		$_POST['expected_scope_row_id'] = (string) $slice->scope->id;
 		$this->redirect( fn () => $this->page->handle_actions() );
 		self::assertNull( $this->repository->findByScopeAndSlice( ConfigurationScopeType::Variation, 202, 'in_store' ) );
 		self::assertSame( $default, $this->repository->findByScopeAndSlice( ConfigurationScopeType::Variation, 202, '' ) );
@@ -214,7 +216,7 @@ final class ScopedConfigurationCallerAuthorityTest extends TestCase {
 	}
 
 	public function test_exception_query_form_and_action_roundtrip_the_represented_slice(): void {
-		$this->seed( ConfigurationScopeType::Variation, 202, 'in_store', 6, 201 );
+		$slice = $this->seed( ConfigurationScopeType::Variation, 202, 'in_store', 6, 201 );
 		$default = $this->seed( ConfigurationScopeType::Variation, 202, '', 5, 201 );
 		$rows = $this->query->list();
 		self::assertSame( 'in_store', $rows[0]['slice_key'] );
@@ -222,7 +224,10 @@ final class ScopedConfigurationCallerAuthorityTest extends TestCase {
 		self::assertStringContainsString( 'slice_key=in_store', $html );
 		self::assertStringContainsString( 'name="slice_key" value="in_store"', $html );
 		self::assertStringContainsString( 'name="parent_product_id" value="201"', $html );
-		$_POST = [ 'cetech_de_action' => 'cetech_de_reset_exception', 'cetech_de_nonce' => 'test-nonce-cetech_de_reset_exception', 'item_type' => 'variation', 'item_id' => '202', 'slice_key' => 'in_store', 'parent_product_id' => '201' ];
+		self::assertStringContainsString( 'name="expected_revision" value="' . (string) $slice->scope->config_version . '"', $html );
+		self::assertStringContainsString( 'name="expected_scope_row_id" value="' . (string) $slice->scope->id . '"', $html );
+		self::assertStringContainsString( 'name="request_token"', $html );
+		$_POST = [ 'cetech_de_action' => 'cetech_de_reset_exception', 'cetech_de_nonce' => 'test-nonce-cetech_de_reset_exception', 'item_type' => 'variation', 'item_id' => '202', 'slice_key' => 'in_store', 'parent_product_id' => '201', 'expected_revision' => (string) $slice->scope->config_version, 'expected_scope_row_id' => (string) $slice->scope->id, 'request_token' => 'exception-reset' ];
 		$this->redirect( fn () => $this->exceptions->handle_actions() );
 		self::assertNull( $this->repository->findByScopeAndSlice( ConfigurationScopeType::Variation, 202, 'in_store' ) );
 		self::assertSame( $default, $this->repository->findByScopeAndSlice( ConfigurationScopeType::Variation, 202, '' ) );
@@ -241,12 +246,74 @@ final class ScopedConfigurationCallerAuthorityTest extends TestCase {
 		self::assertSame( $foreign, $this->repository->findByScopeAndSlice( ConfigurationScopeType::Product, 102, 'in_store' ) );
 	}
 
+	public function test_rendered_forms_keep_the_opened_revision_and_distinct_tokens(): void {
+		$scope = $this->seed( ConfigurationScopeType::Product, 101, '', 5 );
+		$_GET  = [ 'scope_type' => 'product', 'scope_id' => '101' ];
+		$html  = $this->html( $this->page );
+		self::assertStringContainsString( 'name="expected_revision" value="' . (string) $scope->scope->config_version . '"', $html );
+		self::assertStringContainsString( 'name="expected_scope_row_id" value="' . (string) $scope->scope->id . '"', $html );
+		preg_match_all( '/name="request_token" value="([^"]+)"/', $html, $tokens );
+		self::assertGreaterThanOrEqual( 2, count( $tokens[1] ) );
+		self::assertNotSame( $tokens[1][0], $tokens[1][1] );
+
+		$_POST = $this->post( ScopedConfigurationPage::ACTION_SAVE, 'product', 101 );
+		$_POST['expected_revision']     = '0';
+		$_POST['expected_scope_row_id'] = (string) $scope->scope->id;
+		$_POST['request_token']         = $tokens[1][0];
+		$this->redirect( fn () => $this->page->handle_actions() );
+		self::assertSame( 5, $this->repository->findByScopeAndSlice( ConfigurationScopeType::Product, 101, '' )?->scalars[ ConfigurationFieldKey::PRIORITY ]->value );
+		$draft = get_transient( 'cetech_de_scoped_draft_7_product_101__none' );
+		self::assertIsArray( $draft );
+		self::assertSame( 0, $draft['expected_revision'] );
+		self::assertSame( (int) $scope->scope->id, $draft['expected_scope_row_id'] );
+
+		$_POST = $this->post( ScopedConfigurationPage::ACTION_SAVE, 'product', 201 );
+		$this->redirect( fn () => $this->page->handle_actions() );
+		self::assertSame( $draft, get_transient( 'cetech_de_scoped_draft_7_product_101__none' ) );
+	}
+
+	public function test_customize_no_change_uses_the_unchanged_version_notice(): void {
+		$_POST = $this->post( ScopedConfigurationPage::ACTION_SAVE, 'product', 101 );
+		$_POST['customize'] = '1';
+		$this->redirect( fn () => $this->page->handle_actions() );
+		$saved = $this->repository->findByScopeAndSlice( ConfigurationScopeType::Product, 101, '' );
+		self::assertNotNull( $saved );
+		$_POST['expected_revision']     = (string) $saved->scope->config_version;
+		$_POST['expected_scope_row_id'] = (string) $saved->scope->id;
+		$_POST['request_token']         = 'customize-same';
+		$this->redirect( fn () => $this->page->handle_actions() );
+		$notice = get_transient( 'cetech_de_admin_notice_7' );
+		self::assertIsArray( $notice );
+		self::assertSame( 'No semantic changes detected. Configuration version unchanged.', $notice['message'] );
+	}
+
+	public function test_failed_global_publication_retries_the_original_row_identity(): void {
+		$GLOBALS['cetech_de_test_caps'][ ScopedConfigurationAuthorization::CAPABILITY_GLOBAL ] = true;
+		$this->repository->refuse_publications = 1;
+		$_POST = $this->post( ScopedConfigurationPage::ACTION_SAVE, 'global', 0 );
+		$_POST['request_token'] = 'global-create';
+		$this->redirect( fn () => $this->page->handle_actions() );
+		$stored = $this->repository->getGlobalConfiguration();
+		self::assertNotNull( $stored );
+		self::assertGreaterThan( 0, (int) $stored->scope->id );
+		$_GET  = [ 'scope_type' => 'global' ];
+		$html  = $this->html( $this->page );
+		self::assertStringContainsString( 'name="expected_scope_row_id" value="0"', $html );
+		self::assertStringContainsString( 'name="request_token" value="global-create"', $html );
+		$writes = $this->repository->getWriteCalls();
+		$_POST['expected_revision']     = '0';
+		$_POST['expected_scope_row_id'] = '0';
+		$this->redirect( fn () => $this->page->handle_actions() );
+		self::assertSame( $writes, $this->repository->getWriteCalls() );
+		self::assertSame( (int) $stored->scope->id, (int) $this->repository->getGlobalConfiguration()?->scope->id );
+	}
+
 	private function seed( ConfigurationScopeType $type, int $id, string $slice, int $priority, ?int $parent = null ): ScopedConfiguration {
 		return $this->repository->saveScopedConfiguration( new ScopedConfiguration( new ConfigurationScope( null, $type, $id, $slice, $parent, RecordStatus::Active, 1, ConfigurationSource::Native, null ), [ ConfigurationFieldKey::PRIORITY => ScalarFieldInstruction::override( ConfigurationFieldKey::PRIORITY, $priority ) ] ) );
 	}
 
 	private function post( string $action, string $type, mixed $id, string $slice = '', ?int $parent = null ): array {
-		return [ 'cetech_de_action' => $action, 'cetech_de_nonce' => 'test-nonce-' . $action, 'scope_type' => $type, 'scope_id' => $id, 'slice_key' => $slice, 'parent_product_id' => $parent, 'fields' => [ ConfigurationFieldKey::PRIORITY => [ 'mode' => 'override', 'value' => '9' ] ] ];
+		return [ 'cetech_de_action' => $action, 'cetech_de_nonce' => 'test-nonce-' . $action, 'scope_type' => $type, 'scope_id' => $id, 'slice_key' => $slice, 'parent_product_id' => $parent, 'expected_revision' => '0', 'expected_scope_row_id' => '0', 'request_token' => 'caller-' . $action . '-' . ( is_scalar( $id ) ? (string) $id : 'malformed' ), 'fields' => [ ConfigurationFieldKey::PRIORITY => [ 'mode' => 'override', 'value' => '9' ] ] ];
 	}
 
 	private function redirect( callable $callback ): void {

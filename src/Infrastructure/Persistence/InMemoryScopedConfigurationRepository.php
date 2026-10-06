@@ -146,7 +146,17 @@ final class InMemoryScopedConfigurationRepository implements ScopedConfiguration
 		}
 	}
 
+	public int $refuse_publications = 0;
+
 	public function publishAcceptedRevision( ScopedConfiguration $configuration ): bool {
+		if ( $this->refuse_publications > 0 ) {
+			--$this->refuse_publications;
+			if ( ConfigurationScopeType::Global === $configuration->scope->scope_type ) {
+				$this->global_version = $configuration->scope->config_version;
+			}
+
+			return false;
+		}
 		if ( ConfigurationScopeType::Global === $configuration->scope->scope_type ) {
 			$this->global_version = $configuration->scope->config_version;
 		}
