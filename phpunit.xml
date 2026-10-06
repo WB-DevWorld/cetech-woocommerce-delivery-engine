@@ -26,6 +26,7 @@
             <group>cor006-real-db</group>
             <group>cor007-real-db</group>
             <group>cor005-real-db</group>
+            <group>operation-store-real-db</group>
         </exclude>
     </groups>
 </phpunit>

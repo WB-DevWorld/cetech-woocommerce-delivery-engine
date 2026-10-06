@@ -34,6 +34,9 @@ final class FakeWpdb {
 	/** @var array<string, list<array<string, mixed>>> */
 	private array $tables = [];
 
+	/** DDL metadata for lifecycle fixtures, parsed from their actual CREATE text. */
+	private array $table_metadata = [];
+
 	/** @var array<string, list<list<string>>> */
 	private array $unique_indexes = [];
 
@@ -93,7 +96,36 @@ final class FakeWpdb {
 	}
 
 	public function get_charset_collate(): string {
-		return 'DEFAULT CHARSET=utf8mb4';
+		return 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
+	}
+
+	public function register_table_definition( string $sql ): void {
+		if ( ! preg_match( '/CREATE TABLE\s+`?([a-z0-9_]+)`?\s*\((.*)\)\s*ENGINE=([a-z0-9_]+)/is', $sql, $parts ) ) {
+			return;
+		}
+		$table = $parts[1];
+		$this->register_table( $table );
+		preg_match( '/\bCOLLATE(?:=|\s+)([a-z0-9_]+)\s*;?\s*$/i', $sql, $collation );
+		$site_collation = $collation[1] ?? 'utf8mb4_unicode_ci';
+		$columns = [];
+		$indexes = [];
+		foreach ( explode( "\n", $parts[2] ) as $line ) {
+			$line = rtrim( trim( $line ), ',' );
+			if ( preg_match( '/^(PRIMARY KEY|UNIQUE KEY|KEY)\s+(?:(\w+)\s*)?\(([^)]+)\)$/i', $line, $index ) ) {
+				$name = 'PRIMARY KEY' === $index[1] ? 'PRIMARY' : $index[2];
+				foreach ( explode( ',', $index[3] ) as $position => $column ) {
+					$indexes[] = [ 'Key_name' => $name, 'Seq_in_index' => $position + 1, 'Non_unique' => 'KEY' === $index[1] ? 1 : 0, 'Sub_part' => null, 'Index_type' => 'BTREE', 'Collation' => 'A', 'Column_name' => trim( $column ) ];
+				}
+				continue;
+			}
+			if ( ! preg_match( '/^(\w+)\s+(\w+(?:\(\d+\))?(?:\s+unsigned)?)\s+(.*)$/i', $line, $column ) ) {
+				continue;
+			}
+			preg_match( '/\bDEFAULT\s+(\d+)/i', $column[3], $default );
+			preg_match( '/\bCOLLATE\s+(\w+)/i', $column[3], $specific_collation );
+			$columns[] = [ 'Field' => $column[1], 'Type' => strtolower( $column[2] ), 'Null' => str_contains( $column[3], 'NOT NULL' ) ? 'NO' : 'YES', 'Default' => $default[1] ?? null, 'Extra' => str_contains( $column[3], 'AUTO_INCREMENT' ) ? 'auto_increment' : '', 'Collation' => preg_match( '/^(?:char|varchar|longtext)/i', $column[2] ) ? ( $specific_collation[1] ?? $site_collation ) : null ];
+		}
+		$this->table_metadata[ $table ] = [ 'status' => [ 'Name' => $table, 'Engine' => $parts[3], 'Collation' => $site_collation ], 'columns' => $columns, 'indexes' => $indexes ];
 	}
 
 	public function esc_like( string $text ): string {
@@ -497,6 +529,27 @@ final class FakeWpdb {
 		$this->record_sql( $sql );
 		$trimmed = trim( $sql );
 
+		if ( preg_match( '/^SHOW TABLE STATUS WHERE Name = \'([^\']+)\'$/i', $trimmed, $metadata ) ) {
+			return $this->table_metadata[ $metadata[1] ]['status'] ?? null;
+		}
+		if ( preg_match( '/^SELECT option_value FROM `[^`]+options` WHERE option_name = \'([^\']+)\' LIMIT 1$/i', $trimmed, $option ) ) {
+			$value = $GLOBALS['cetech_de_test_options'][ $option[1] ] ?? null;
+			return null === $value ? null : [ 'option_value' => is_array( $value ) ? serialize( $value ) : (string) $value ];
+		}
+		if ( preg_match( '/^SELECT MAX\(id\) AS ceiling FROM `([^`]+)`$/i', $trimmed, $ceiling ) ) {
+			$ids = array_column( $this->tables[ $ceiling[1] ] ?? [], 'id' );
+			return [ 'ceiling' => [] === $ids ? null : max( $ids ) ];
+		}
+		if ( preg_match( '/^SELECT 1 AS present FROM `([^`]+)` LIMIT 1$/i', $trimmed, $present ) ) {
+			return empty( $this->tables[ $present[1] ] ) ? null : [ 'present' => 1 ];
+		}
+		if ( preg_match( '/^SELECT id FROM `([^`]+)` WHERE OCTET_LENGTH\(`([^`]+)`\) > 16384 LIMIT 1$/i', $trimmed, $budget ) ) {
+			foreach ( $this->tables[ $budget[1] ] ?? [] as $row ) {
+				if ( strlen( (string) ( $row[ $budget[2] ] ?? '' ) ) > 16384 ) { return [ 'id' => $row['id'] ]; }
+			}
+			return null;
+		}
+
 		if ( preg_match( '/^SHOW COLUMNS FROM `([^`]+)` LIKE \'((?:\\\\\'|[^\'])*)\'\s*$/i', $trimmed, $column ) ) {
 			$table = $column[1];
 			$name  = stripcslashes( $column[2] );
@@ -540,6 +593,12 @@ final class FakeWpdb {
 			return [];
 		}
 		$this->record_sql( $sql );
+		if ( preg_match( '/^SHOW FULL COLUMNS FROM `([^`]+)`$/i', trim( $sql ), $metadata ) ) {
+			return $this->table_metadata[ $metadata[1] ]['columns'] ?? [];
+		}
+		if ( preg_match( '/^SHOW INDEX FROM `([^`]+)`$/i', trim( $sql ), $metadata ) ) {
+			return $this->table_metadata[ $metadata[1] ]['indexes'] ?? [];
+		}
 
 		$grouped = $this->grouped_counts( $sql );
 

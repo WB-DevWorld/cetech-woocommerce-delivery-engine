@@ -217,6 +217,12 @@ final class PluginLifecycleQualificationTest extends TestCase {
 
 	public function test_delete_data_uninstall_drops_plugin_tables_and_keeps_order_meta_and_foreign_options(): void {
 		Activator::activate();
+		$operation_sentinels = [];
+		foreach ( [ 'operation_records', 'operation_changes' ] as $suffix ) {
+			$table = 'wp_delivery_engine_' . $suffix;
+			$operation_sentinels[ $table ] = [ 'id' => 7, 'record_format' => 99, 'preservation_sentinel' => 'unknown-history-must-remain' ];
+			$GLOBALS['wpdb']->insert( $table, $operation_sentinels[ $table ] );
+		}
 		update_option( Uninstaller::DELETE_DATA_OPTION, 1, false );
 		update_option( 'cetech_de_sitewide_defaults', [ 'setup_completed' => true ], false );
 		update_option( '_cetech_de_delivery_snapshot', 'order-meta-retained', false );
@@ -225,7 +231,11 @@ final class PluginLifecycleQualificationTest extends TestCase {
 
 		Uninstaller::uninstall();
 
-		self::assertSame( 0, LifecycleHarness::table_count() );
+		self::assertSame( 2, LifecycleHarness::table_count() );
+		self::assertSame( array_keys( $operation_sentinels ), $GLOBALS['wpdb']->table_names() );
+		foreach ( $operation_sentinels as $table => $sentinel ) {
+			self::assertSame( [ $sentinel ], $GLOBALS['wpdb']->table_rows( $table ), 'Explicit uninstall preserves operation history, including an unknown format.' );
+		}
 		self::assertNull( get_option( SchemaVersion::OPTION_NAME, null ) );
 		self::assertNull( get_option( 'cetech_de_sitewide_defaults', null ) );
 		self::assertNull( get_option( FeatureFlags::OPTION_PREFIX . 'enable_shipment_records', null ) );

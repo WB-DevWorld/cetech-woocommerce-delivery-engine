@@ -12,17 +12,17 @@ use PHPUnit\Framework\TestCase;
 
 final class SchemaV6InspectionTest extends TestCase {
 
-	public function test_schema_target_is_six(): void {
-		self::assertSame( '6', SchemaVersion::TARGET );
-		self::assertSame( '6', SchemaVersion::target() );
+	public function test_current_schema_target_is_seven(): void {
+		self::assertSame( '7', SchemaVersion::TARGET );
+		self::assertSame( '7', SchemaVersion::target() );
 	}
 
-	public function test_plugin_version_is_attention_count_dev_identity(): void {
+	public function test_plugin_version_is_operation_storage_dev_identity(): void {
 		$plugin_root = dirname( __DIR__, 3 );
 		$header      = (string) file_get_contents( $plugin_root . '/cetech-woocommerce-delivery-engine.php' );
 
-		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.attention-count\\.1'\s*\)/", $header );
-		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.attention-count\\.1\s*$/m', $header );
+		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.wave1-operation-storage\\.1'\s*\)/", $header );
+		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.wave1-operation-storage\\.1\s*$/m', $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.shipment-order-read.1' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.address-ux.3' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.address-ux.2' )", $header );

@@ -54,3 +54,21 @@ if ( $executed < $min_executed ) {
 	fwrite( STDERR, "too few real MariaDB tests executed on PHP 8.5\n" );
 	exit( 1 );
 }
+
+// A green geography lane cannot substitute for the required native operation
+// class. Keep the count separate so skipped new proofs fail this job.
+$required_class = $argv[3] ?? '';
+if ( '' !== $required_class ) {
+	$class_minimum = isset( $argv[4] ) ? (int) $argv[4] : 1;
+	$class_executed = 0;
+	foreach ( $xml->xpath( '//testcase' ) ?: [] as $case ) {
+		if ( $required_class === (string) $case['class'] && ! isset( $case->skipped ) && ! isset( $case->failure ) && ! isset( $case->error ) ) {
+			++$class_executed;
+		}
+	}
+	echo "required_real_db_class={$required_class} executed={$class_executed} minimum={$class_minimum}\n";
+	if ( $class_executed < $class_minimum ) {
+		fwrite( STDERR, "too few required operation-store MariaDB proofs executed\n" );
+		exit( 1 );
+	}
+}
