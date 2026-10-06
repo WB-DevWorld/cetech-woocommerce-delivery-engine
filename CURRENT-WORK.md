@@ -1,6 +1,16 @@
-# Current Work — Opening corrections integrated; shared-contract planning next
+# Current Work — Wave 1 contract packet for review
 
-Status: RC.12 IMMUTABLE — OPENING CORRECTIONS OWNER-ACCEPTED AND MERGED — POST-MERGE CI SUCCESS
+Status: OPENING CORRECTIONS MERGED — WAVE 1 PLANNING PACKET PROPOSED — RC.12 IMMUTABLE
+
+## 2026-10-06 — Owner-authorized Wave 1 planning continuation
+
+At 17:48 UTC the owner instructed continuation after the completed repair/integration handoff. This authorizes the next reviewable Issue #48 shared-contract plan and finite implementation list. Current master is `d38b704b2bf152d80e2d84731c15718417f1a885`, tree `84f86c6842e246fba841c80cbc24fa2b0d390717`; final-master run `37504554658`, attempt 1, passed all eight jobs, including the executed Required Gates check. Earlier repair reviews stay closed.
+
+Codex is sole editor for `docs/product/WAVE1-CONTRACT-PLAN-2026-10-06.md`, its traceability CSV and this checkpoint. Three read-only AI reviews cover rules/requests, snapshots/data/flags and requirements/audit. Only the owner and AI agents are working. Scope is the live Issue #48 five-package planning contract, with all 39 primary frozen IDs and explicit cross-cutting applicability; historical extra draft packages remain separate. The 372-ID registry and release scope are unchanged.
+
+The packet is proposed, not an implemented or owner-accepted runtime contract. W1-C01 is the recommended first schema-neutral implementation after packet acceptance and specific authorization. Later additive storage, expiry budgets, family policy and reserved business/placement/deletion contracts remain explicit dependencies. Existing scoped replay, V1/V2 reads and historical truth are preserved. No runtime, database, live site or deployment mutation is part of this planning task.
+
+Three independent bounded closure reviews passed for planning publication; their wording clarifications are incorporated. Local product-control-plane and exact traceability validation passed: 39 primary plus 19 explicit cross-cutting rows, all matching frozen requirement text/conformance. Proposed T01–T21 acceptance cases are not reported as executed tests. Publication uses a separate documentation planning branch/draft PR; its fresh CI must bind to its own candidate, separately from baseline master evidence.
 
 ## 2026-10-06 — Owner-accepted opening-correction integration
 
