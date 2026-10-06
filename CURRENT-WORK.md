@@ -1,6 +1,20 @@
-# Current Work — Post-#32 repository truth synchronization
+# Current Work — Opening corrections integrated; shared-contract planning next
 
-Status: RC.12 IMMUTABLE — PR #53 TECHNICAL REPAIRS COMPLETE — PR #55 CI QUALIFICATION IN PROGRESS — UNMERGED
+Status: RC.12 IMMUTABLE — OPENING CORRECTIONS OWNER-ACCEPTED AND MERGED — POST-MERGE CI SUCCESS
+
+## 2026-10-06 — Owner-accepted opening-correction integration
+
+At 17:18 UTC the owner instructed continuation after the exact qualified PR #55 candidate was presented for integration acceptance. PR #55 was merged through the normal protected-branch path, preserving the correction history. The functional baseline is master `7add0bf3ca66f73982797c0362fb33983da975a2`, tree `958efc0ab3fd7ad22ee6cc90e9372bfccbb69d1f`, with parents `637c02f182ca273b40819631d23ac8e0dcc4004f` and reviewed head `c133f04243a2f53082347c48a8ca134cc4c5791a`. This checkpoint supersedes the earlier unmerged/draft holds for repository integration; historical failures and diagnostic limitations remain recorded below.
+
+PR #51 was automatically recorded as merged through ancestry. PR #52 and PR #53 were closed as fully included in PR #55, not separately merged. Their original heads and branches remain: `d5c8e2f3c467a7dc38637bb2cdc3e881fc1c24f8`, `1d62967b6559ee8390ddd8f787cc58ce2729c005`, and `89d8d3466f3636989bc44d004d3a52579c10776f`. Each is a verified ancestor of the merged baseline.
+
+Candidate PR CI `37500871628` and push CI `37500861793`, both attempt 1, passed all eight jobs. Actual merged-master CI [37502749839](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/actions/runs/37502749839), attempt 1, also passed all eight jobs, including the substantive Required Gates check. Independently downloaded receipts on both the candidate and the actual merge passed native 207 and authenticated HTTP 66 unique cases, plus the separate Store API smoke. Merged-head artifact IDs are native `11430586976`, HTTP `11429754206` and smoke `11430327291`; archive/member fingerprints and full provenance are in [PR #55](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/55). Qualification uses PHP 8.5.11, WordPress 7.1.2, WooCommerce 11.1.2 and MariaDB 11.4.13 with OPcache active and JIT disabled only on the two disposable CI web listeners. Production PHP remains 494 files, installed map `48242148bc1fcada1275cb96553ea7d6e4efc3814ee4cc8f5886ed9ee11a8238`. The targeted `cor005-real-db` 2 tests / 19 assertions and `cor007-real-db` 12 / 105 remain separate earlier local proofs, excluded from ordinary MariaDB CI.
+
+The opening repairs are integrated. Issue #54 retains the original JIT-enabled runtime, exact upstream attribution and separate historical timeout questions; the demonstrated CI profile does not certify that original runtime. RC.12, schema 6 and previously recorded training-package evidence are unchanged. This merge does not constitute a new release or live-site installation.
+
+Codex is sole editor for the necessary integration closeout: this file, `docs/STATUS_CURRENT.md`, `docs/product/REALIGNMENT-PLAN.md` and `docs/product/RELEASE-SCOPE.md`. Agents review read-only. The closeout corrects stale live-status statements while preserving historical release and failed-run evidence. Later documentation-only commits may advance master without changing the functional baseline or installed source map.
+
+Next product task: prepare Issue #48's Wave 1 shared-contract planning package—policy/rule lifecycle, common errors/correlation/idempotency, snapshot evolution, retention/emergency controls and explainability/audit context—with frozen Requirement-ID traceability and a bounded implementation breakdown. Wider compatibility and release qualification remain a separate preparation track. Completed COR-005/COR-007 reviews are not reopened without a changed candidate or a new failure.
 
 ## 2026-10-06 — Owner-authorized CI listener mitigation
 

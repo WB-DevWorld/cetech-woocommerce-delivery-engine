@@ -1,6 +1,8 @@
 # CETECH Delivery Standalone Realignment Plan
 
-Status: owner-approved on 2026-09-19. **Execution note updated 2026-09-22:** the geography pre-wave has since closed, PR #24 is merged, RC.12 is published/immutable, and post-RC.12 corrections through Issue #32 are merged. The dependency waves remain the approved Stable-1.0 plan, but none is automatically authorized merely because the pre-wave is complete. Current live authorization is Issue #45 repository/docs cleanup only.
+Status: owner-approved on 2026-09-19. **Execution note updated 2026-10-06:** the geography pre-wave and RC.12 publication are complete. The approved bounded repairs for COR-001–007 and COR-010 are owner-accepted and merged through PR #55 at functional master baseline `7add0bf3ca66f73982797c0362fb33983da975a2`, tree `958efc0ab3fd7ad22ee6cc90e9372bfccbb69d1f`; post-merge CI `37502749839` passed all eight jobs. RC.12 remains immutable. The 2026-09-22 Issue #45 cleanup-only note is superseded by this completed integration.
+
+The next development task is Issue #48's Wave 1 shared-contract planning and bounded implementation breakdown. The accepted dependency waves and frozen Requirement IDs remain unchanged. Completed opening repairs are a protected foundation, not completion of the later quote, promise, policy, label or interface capabilities. Wider production compatibility and release qualification are separate from this integration. See `CURRENT-WORK.md` and `docs/STATUS_CURRENT.md` for live evidence and the explicit JIT-disabled disposable CI profile.
 
 ## 1. Geography-stream decision — historical gate now complete
 
@@ -250,7 +252,9 @@ After approval, publish under `docs/product/`:
 
 Complement rather than delete `docs/AUTHORITY.md`, governance, status, release and historical stage documents. Update `readme.txt`, `CURRENT-WORK.md`, and `docs/STATUS_CURRENT.md` at appropriate release checkpoints. Mark historical design files as historical/superseded and link forward; do not rewrite history to appear linear.
 
-## 7. Exact owner sequence
+## 7. Historical owner sequence and current position
+
+The sequence below records the September predecessor decisions. Steps 1–5 and the RC.12 release-candidate part of step 6 are complete; PR #24 is merged, not draft. The controlled Pilot has not started. The current development position is Wave 1 planning under Issue #48, after the merged opening-correction foundation. Retain the historical sequence as rationale rather than treating its old branch states as current instructions.
 
 1. Keep RC.11 immutable and PR #24 Draft.
 2. **Completed 2026-09-19:** accept the audit, freeze product truth, resolve the six decisions, and approve the realignment plan.
