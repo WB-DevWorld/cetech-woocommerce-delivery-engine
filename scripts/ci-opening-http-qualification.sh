@@ -33,6 +33,10 @@ export CETECH_DE_HTTP_PRIVATE_DIR="$PRIVATE"
 export CETECH_DE_HTTP_NATIVE_RECEIPT="$WORK/opening-qualification-results.json"
 export CETECH_DE_HTTP_PROBE_TOKEN="$(php -r 'echo bin2hex(random_bytes(24));')"
 PHP_EXECUTABLE="$(command -v php)"
+CRASH_DIAGNOSTIC="${CETECH_DE_HTTP_CRASH_DIAGNOSTIC:-0}"
+CORE_PATTERN_CHANGED=0
+CORE_PATTERN_ORIGINAL=""
+LISTENER_CORE_PID=""
 WP=("$PHP_EXECUTABLE" "$WORK/wp-cli.phar" --allow-root --path="$SITE" --require="$ROOT/scripts/qualification/admin-context.php")
 IMPORT_BRIDGE="$ROOT/scripts/qualification/opening-http-fixture.php"
 CONFIG_BRIDGE="$ROOT/scripts/qualification/opening-http-configuration-fixture.php"
@@ -64,26 +68,21 @@ finish_http_fixture() {
     local result=$?
     trap - EXIT
     set +e
-    # On a driver failure, try only the identity-tracked fixture cleanup. The
-    # completely fresh CI database/site remains the partial-init fallback.
-    if [[ -f "$CONFIG_STATE" && -f "$CONFIG_BRIDGE" ]]; then
-        "${WP[@]}" eval-file "$CONFIG_BRIDGE" cleanupconfig "$CONFIG_STATE" "$PRIVATE/config-trap-cleanup.json" >"$PRIVATE/config-cleanup-command.log" 2>&1
-        if [[ "$?" != "0" ]]; then ROW_CLEANUP=0; fi
-    fi
-    if [[ -f "$IMPORT_STATE" ]]; then
-        "${WP[@]}" eval-file "$IMPORT_BRIDGE" cleanup "$IMPORT_STATE" "$PRIVATE/import-trap-cleanup.json" >"$PRIVATE/import-cleanup-command.log" 2>&1
-        if [[ "$?" != "0" ]]; then ROW_CLEANUP=0; fi
-    fi
     local listener_exit="absent"
     local listener_signal=""
+    local listener_wait_exit="absent"
+    local listener_wait_signal=""
+    local listener_cleanup_term=0
     if [[ -n "${SERVER_PID:-}" ]]; then
         if kill -0 "$SERVER_PID" 2>/dev/null; then
             listener_exit="running"
         else
             wait "$SERVER_PID" 2>/dev/null
             listener_exit="$?"
+            listener_wait_exit="$listener_exit"
             if [[ "$listener_exit" -gt 128 ]]; then
                 listener_signal="$(( listener_exit - 128 ))"
+                listener_wait_signal="$listener_signal"
             fi
             SERVER_PID=""
         fi
@@ -92,10 +91,44 @@ finish_http_fixture() {
     if [[ -n "$SERVER_PID" ]]; then
         if kill -0 "$SERVER_PID" 2>/dev/null; then
             kill "$SERVER_PID" 2>/dev/null
-            if [[ "$?" != "0" ]]; then server_stopped=0; fi
+            if [[ "$?" != "0" ]]; then server_stopped=0; else listener_cleanup_term=1; fi
         fi
         wait "$SERVER_PID" 2>/dev/null
+        listener_wait_exit="$?"
+        if [[ "$listener_wait_exit" -gt 128 ]]; then listener_wait_signal="$(( listener_wait_exit - 128 ))"; fi
         if kill -0 "$SERVER_PID" 2>/dev/null; then server_stopped=0; fi
+    fi
+    # Wait/stop the owned listener before reading its core, so dump completion
+    # precedes GDB. Arguments and memory remain in the private directory.
+    local crash_status="not_requested"
+    if [[ "$CRASH_DIAGNOSTIC" == "1" ]]; then
+        crash_status="no_listener_core"
+        if [[ -n "$LISTENER_CORE_PID" && -f "$PRIVATE/core.$LISTENER_CORE_PID" && ! -L "$PRIVATE/core.$LISTENER_CORE_PID" ]]; then
+            crash_status="debugger_failed"
+            CETECH_DE_HTTP_STACK_OUTPUT="$PRIVATE/native-stack.json" \
+                timeout 20s gdb -nx -batch \
+                -iex 'set auto-load off' -iex 'set debuginfod enabled off' \
+                -iex 'set print frame-arguments none' \
+                -ex "source $ROOT/scripts/qualification/opening-http-native-stack.py" \
+                "$PHP_EXECUTABLE" "$PRIVATE/core.$LISTENER_CORE_PID" \
+                >"$PRIVATE/native-debugger.log" 2>&1
+            if [[ "$?" == "0" && -f "$PRIVATE/native-stack.json" ]]; then crash_status="collected"; fi
+        fi
+    fi
+    local core_pattern_restored=1
+    if [[ "$CORE_PATTERN_CHANGED" == "1" ]]; then
+        printf '%s\n' "$CORE_PATTERN_ORIGINAL" | sudo -n tee /proc/sys/kernel/core_pattern >"$PRIVATE/core-restore.log" 2>&1
+        if [[ "$?" != "0" ]]; then core_pattern_restored=0; result=1; fi
+    fi
+    # Stop the listener and restore core handling before database cleanup can
+    # wait on any fixture locks. Touch only identity-tracked fixture rows.
+    if [[ -f "$CONFIG_STATE" && -f "$CONFIG_BRIDGE" ]]; then
+        "${WP[@]}" eval-file "$CONFIG_BRIDGE" cleanupconfig "$CONFIG_STATE" "$PRIVATE/config-trap-cleanup.json" >"$PRIVATE/config-cleanup-command.log" 2>&1
+        if [[ "$?" != "0" ]]; then ROW_CLEANUP=0; fi
+    fi
+    if [[ -f "$IMPORT_STATE" ]]; then
+        "${WP[@]}" eval-file "$IMPORT_BRIDGE" cleanup "$IMPORT_STATE" "$PRIVATE/import-trap-cleanup.json" >"$PRIVATE/import-cleanup-command.log" 2>&1
+        if [[ "$?" != "0" ]]; then ROW_CLEANUP=0; fi
     fi
     if [[ "$MU_CREATED" == "1" && -f "$MU" ]]; then
         if cmp -s "$ROOT/scripts/qualification/opening-http-mu.php" "$MU"; then
@@ -132,7 +165,7 @@ PY
     local diagnostic_log="$PRIVATE/import-prepare-command.log"
     if [[ "$QUALIFICATION_STAGE" == "origin_preflight" ]]; then diagnostic_log="$PRIVATE/origin-preflight-command.log"; fi
     if [[ "$QUALIFICATION_STAGE" == "http_driver" || "$QUALIFICATION_STAGE" == "complete" ]]; then diagnostic_log="$PRIVATE/php-server.log"; fi
-    python3 - "$RECEIPT" "$diagnostic_log" "$QUALIFICATION_STAGE" "$PRIVATE/origin-preflight-output.json" "$listener_exit" "$listener_signal" "$PRIVATE/php-server.log" "$db_connect" "$db_wait_ms" <<'PY'
+    python3 - "$RECEIPT" "$diagnostic_log" "$QUALIFICATION_STAGE" "$PRIVATE/origin-preflight-output.json" "$listener_exit" "$listener_signal" "$PRIVATE/php-server.log" "$db_connect" "$db_wait_ms" "$PRIVATE/native-stack.json" "$crash_status" "$core_pattern_restored" "$PRIVATE/runtime.json" "$listener_wait_exit" "$listener_wait_signal" "$listener_cleanup_term" <<'PY'
 import hashlib, json, re, sys
 from pathlib import Path
 receipt = Path(sys.argv[1])
@@ -178,7 +211,7 @@ if "Call to undefined method " in text:
     codes.append("PHP_UNDEFINED_METHOD")
 if "must be the very first statement" in text:
     codes.append("PHP_STRICT_TYPES_POSITION")
-if "Segmentation fault" in text or sys.argv[6] == "11":
+if "Segmentation fault" in text or sys.argv[6] == "11" or sys.argv[15] == "11":
     codes.append("PHP_SERVER_SIGSEGV")
 classes = [name for name in ("RuntimeException", "Error", "TypeError", "ParseError", "ValueError", "JsonException", "Exception") if re.search(r"Uncaught\s+" + name + r"(?:\s|:)", text)]
 report["fixture_diagnostic"] = {
@@ -190,11 +223,38 @@ report["fixture_diagnostic"] = {
     "raw_output_retained": False,
     "listener_exit_before_cleanup": sys.argv[5] if len(sys.argv) > 5 else "absent",
     "listener_signal_before_cleanup": sys.argv[6] or None if len(sys.argv) > 6 else None,
+    "owned_listener_wait_exit": sys.argv[14],
+    "owned_listener_wait_signal": sys.argv[15] or None,
+    "listener_cleanup_requested_sigterm": sys.argv[16] == "1",
     "server_log_present": server_log.is_file(),
     "server_log_sha256": hashlib.sha256(server_log.read_bytes()).hexdigest() if server_log.is_file() else None,
     "database_connect_before_cleanup": sys.argv[8] if len(sys.argv) > 8 and sys.argv[8] in ("connected", "unanswered", "absent") else "absent",
     "database_connect_wait_ms": int(sys.argv[9]) if len(sys.argv) > 9 and sys.argv[9].isdigit() else None,
 }
+report["native_crash_diagnostic"] = {
+    "capture_status": sys.argv[11], "kernel_core_pattern_restored": sys.argv[12] == "1",
+    "raw_core_or_debugger_output_retained": False, "frames": [],
+    "limits": "Symbols narrow native execution location; they do not establish a product defect. Prior failure did not record an INI fingerprint.",
+}
+stack_path = Path(sys.argv[10])
+if stack_path.is_file():
+    try:
+        stack = json.loads(stack_path.read_text(encoding="utf-8"))
+        if stack.get("format") == "cetech-opening-native-stack-v1":
+            frames = []
+            for frame in stack.get("frames", [])[:32]:
+                symbol = frame.get("symbol")
+                module = frame.get("module")
+                frames.append({"depth": len(frames),
+                    "symbol": symbol if isinstance(symbol, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_:.$~]{0,159}", symbol) else None,
+                    "module": module if isinstance(module, str) and re.fullmatch(r"[A-Za-z0-9_.+-]{1,100}", module) else None})
+            report["native_crash_diagnostic"]["frames"] = frames
+            report["native_crash_diagnostic"]["capture_status"] = stack.get("status") if stack.get("status") in ("symbols_captured", "symbols_unavailable", "partial_symbols", "debugger_unavailable") else "unreadable"
+    except (OSError, ValueError, TypeError):
+        report["native_crash_diagnostic"]["capture_status"] = "unreadable"
+runtime_path = Path(sys.argv[13])
+if runtime_path.is_file():
+    report["diagnostic_runtime"] = json.loads(runtime_path.read_text(encoding="utf-8"))
 origin_path = Path(sys.argv[4])
 if origin_path.is_file():
     try:
@@ -249,6 +309,20 @@ PY
     exit "$result"
 }
 trap finish_http_fixture EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+if [[ "$CRASH_DIAGNOSTIC" == "1" ]]; then
+    if [[ "${GITHUB_ACTIONS:-}" != "true" || ! -x "$(command -v gdb)" ]]; then
+        echo "BLOCKED: native crash capture requires the disposable GitHub runner and gdb" >&2
+        exit 1
+    fi
+    CORE_PATTERN_ORIGINAL="$(cat /proc/sys/kernel/core_pattern)"
+    # Mark restoration required before attempting the privileged mutation.
+    CORE_PATTERN_CHANGED=1
+    printf '%s\n' "$PRIVATE/core.%p" | sudo -n tee /proc/sys/kernel/core_pattern >"$PRIVATE/core-setup.log" 2>&1
+    ulimit -c unlimited
+fi
 
 QUALIFICATION_STAGE="origin_preflight"
 "${WP[@]}" eval-file "$ROOT/scripts/qualification/opening-http-origin-preflight.php" "$PRIVATE/origin-preflight-output.json" >"$PRIVATE/origin-preflight-command.log" 2>&1
@@ -272,6 +346,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
 PY
 "$PHP_EXECUTABLE" -S 127.0.0.1:8085 -t "$SITE" >"$PRIVATE/php-server.log" 2>&1 &
 SERVER_PID=$!
+LISTENER_CORE_PID="$SERVER_PID"
 SERVER_STARTED=1
 QUALIFICATION_STAGE="listener_readiness"
 python3 - "$SERVER_PID" "$IMPORT_STATE" <<'PY'
@@ -303,8 +378,13 @@ for _ in range(30):
         request = Request(state["base_url"] + "/?cetech_opening_http_probe=1", headers={"X-CETECH-Opening-Probe": token})
         with opener.open(request, timeout=1) as response:
             payload = json.loads(response.read(8193))
+        runtime = payload.pop("diagnostic_runtime", None)
         if payload != expected:
             raise SystemExit("HTTP qualification listener identity did not match the owned disposable site")
+        if os.environ.get("CETECH_DE_HTTP_CRASH_DIAGNOSTIC") == "1":
+            if not isinstance(runtime, dict) or runtime.get("sapi") != "cli-server" or runtime.get("php_version") != "8.5.11":
+                raise SystemExit("HTTP diagnostic listener runtime differs from the recorded crash environment")
+            Path(os.environ["CETECH_DE_HTTP_PRIVATE_DIR"], "runtime.json").write_text(json.dumps(runtime) + "\n", encoding="utf-8")
         os.kill(pid, 0)
         break
     except (OSError, ValueError):

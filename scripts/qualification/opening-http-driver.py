@@ -242,7 +242,7 @@ class HttpClient:
         self.ordinal += 1
         method = "POST" if fields is not None else "GET"
         started = time.monotonic()
-        phase = "connect"
+        phase = "pre_response_headers"
         REQUEST_OBSERVATION = {
             "ordinal": self.ordinal,
             "method": method,

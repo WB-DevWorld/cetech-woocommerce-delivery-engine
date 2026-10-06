@@ -182,7 +182,7 @@ jobs:
     timeout-minutes: 30
     services:
       mariadb:
-        image: mariadb:11.4
+        image: mariadb:11.4.13
         env:
           MARIADB_ROOT_PASSWORD: wordpress
           MARIADB_DATABASE: wordpress
@@ -197,14 +197,21 @@ jobs:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.5'
+          php-version: '8.5.11'
           tools: composer:v2
           coverage: none
           extensions: mysqli, pdo_mysql, zip, mbstring, intl, xml, curl, gd, soap, bcmath
+      - name: Verify crash diagnostic output boundary
+        run: python3 scripts/qualification/test-opening-http-native-stack.py
+      - name: Install native crash debugger for the disposable HTTP listener
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq gdb
       - name: WordPress bootstrap, WooCommerce, HPOS, Store API, upgrade from RC.12
         env:
           CETECH_DE_NATIVE_OPENING_QUALIFICATION: '1'
           CETECH_DE_HTTP_OPENING_QUALIFICATION: '1'
+          CETECH_DE_HTTP_CRASH_DIAGNOSTIC: '1'
+          CETECH_DE_WP_VERSION: '7.1.2'
+          CETECH_DE_WOO_VERSION: '11.1.2'
           CETECH_DE_QUALIFICATION_CANDIDATE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
           CETECH_DE_WP_DB_HOST: 127.0.0.1
           CETECH_DE_WP_DB_PORT: 3306

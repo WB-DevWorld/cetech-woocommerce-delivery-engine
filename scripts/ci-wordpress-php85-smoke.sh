@@ -14,6 +14,8 @@ DB_NAME_CLEAN="${CETECH_DE_WP_DB_CLEAN:-cetech_wp_clean}"
 DB_NAME_UPGRADE="${CETECH_DE_WP_DB_UPGRADE:-cetech_wp_upgrade}"
 NATIVE_OPENING_ENABLED="${CETECH_DE_NATIVE_OPENING_QUALIFICATION:-0}"
 HTTP_OPENING_ENABLED="${CETECH_DE_HTTP_OPENING_QUALIFICATION:-0}"
+WP_VERSION="${CETECH_DE_WP_VERSION:-latest}"
+WOO_VERSION="${CETECH_DE_WOO_VERSION:-}"
 RC12_ZIP_URL="${CETECH_DE_RC12_ZIP_URL:-https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/releases/download/v1.0.0-rc.12/cetech-woocommerce-delivery-engine-1.0.0-rc.12.zip}"
 PHP_MAJOR_MINOR="$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')"
 
@@ -43,7 +45,15 @@ curl -sSLo "$WORK/wp-cli.phar" https://raw.githubusercontent.com/wp-cli/builds/g
 php "$WORK/wp-cli.phar" --info >/dev/null
 WP=(php "$WORK/wp-cli.phar" --allow-root)
 
-curl -sSLo "$WORK/wordpress.tar.gz" https://wordpress.org/latest.tar.gz
+if [[ "$WP_VERSION" != "latest" && ! "$WP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+	echo "BLOCKED: unsupported diagnostic WordPress version" >&2; exit 1
+fi
+if [[ -n "$WOO_VERSION" && ! "$WOO_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+	echo "BLOCKED: unsupported diagnostic WooCommerce version" >&2; exit 1
+fi
+WP_ARCHIVE="https://wordpress.org/latest.tar.gz"
+if [[ "$WP_VERSION" != "latest" ]]; then WP_ARCHIVE="https://wordpress.org/wordpress-${WP_VERSION}.tar.gz"; fi
+curl -fsSLo "$WORK/wordpress.tar.gz" "$WP_ARCHIVE"
 mkdir -p "$WORK/src"
 tar -xzf "$WORK/wordpress.tar.gz" -C "$WORK/src"
 WP_SRC="$WORK/src/wordpress"
@@ -96,7 +106,9 @@ install_site() {
 		--admin_password="admin" \
 		--admin_email="qa@example.com" \
 		--skip-email
-	"${WP[@]}" plugin install woocommerce --activate --path="$dest"
+	local woo_version_args=()
+	if [[ -n "$WOO_VERSION" ]]; then woo_version_args=("--version=$WOO_VERSION"); fi
+	"${WP[@]}" plugin install woocommerce "${woo_version_args[@]}" --activate --path="$dest"
 	# WooCommerce 11 removed FeaturesController::change_feature_is_enabled().
 	# Prefer the current WP-CLI command, then fall back to remaining controller APIs / options.
 	"${WP[@]}" wc hpos enable --user=1 --path="$dest" || true

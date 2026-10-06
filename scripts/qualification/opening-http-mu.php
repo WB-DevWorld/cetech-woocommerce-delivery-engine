@@ -71,7 +71,7 @@ if (!defined('WP_CLI') || !WP_CLI) {
         http_response_code(200);
         header('Content-Type: application/json; charset=utf-8');
         header('Cache-Control: no-store');
-        echo json_encode([
+        $listener_identity = [
             'format' => 'cetech-opening-http-owned-listener-v1',
             'probe_sha256' => hash('sha256', $expected),
             'site_path_sha256' => hash('sha256', (string) realpath(ABSPATH)),
@@ -79,7 +79,28 @@ if (!defined('WP_CLI') || !WP_CLI) {
             'source_head' => (string) getenv('CETECH_DE_QUALIFICATION_HEAD'),
             'candidate_head' => (string) getenv('CETECH_DE_QUALIFICATION_CANDIDATE_HEAD'),
             'source_tree' => (string) getenv('CETECH_DE_QUALIFICATION_TREE'),
-        ], JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        ];
+        if ('1' === getenv('CETECH_DE_HTTP_CRASH_DIAGNOSTIC')) {
+            $all_ini = ini_get_all(null, false);
+            ksort($all_ini);
+            $safe_ini = [];
+            foreach (['memory_limit', 'max_execution_time', 'opcache.enable', 'opcache.enable_cli', 'opcache.jit', 'opcache.jit_buffer_size', 'opcache.optimization_level', 'opcache.protect_memory'] as $name) {
+                $safe_ini[$name] = ini_get($name);
+            }
+            $extensions = [];
+            foreach (get_loaded_extensions() as $name) {
+                $extensions[$name] = phpversion($name);
+            }
+            ksort($extensions);
+            $listener_identity['diagnostic_runtime'] = [
+                'sapi' => PHP_SAPI, 'php_version' => PHP_VERSION,
+                'php_binary_sha256' => hash_file('sha256', PHP_BINARY),
+                'extensions' => $extensions, 'safe_ini' => $safe_ini,
+                'full_ini_sha256' => hash('sha256', json_encode($all_ini, JSON_THROW_ON_ERROR)),
+                'historical_ini_comparison_available' => false,
+            ];
+        }
+        echo json_encode($listener_identity, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
         exit;
     }
 }
