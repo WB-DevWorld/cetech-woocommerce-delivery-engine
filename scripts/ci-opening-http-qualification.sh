@@ -74,6 +74,20 @@ finish_http_fixture() {
         "${WP[@]}" eval-file "$IMPORT_BRIDGE" cleanup "$IMPORT_STATE" "$PRIVATE/import-trap-cleanup.json" >"$PRIVATE/import-cleanup-command.log" 2>&1
         if [[ "$?" != "0" ]]; then ROW_CLEANUP=0; fi
     fi
+    local listener_exit="absent"
+    local listener_signal=""
+    if [[ -n "${SERVER_PID:-}" ]]; then
+        if kill -0 "$SERVER_PID" 2>/dev/null; then
+            listener_exit="running"
+        else
+            wait "$SERVER_PID" 2>/dev/null
+            listener_exit="$?"
+            if [[ "$listener_exit" -gt 128 ]]; then
+                listener_signal="$(( listener_exit - 128 ))"
+            fi
+            SERVER_PID=""
+        fi
+    fi
     local server_stopped=1
     if [[ -n "$SERVER_PID" ]]; then
         if kill -0 "$SERVER_PID" 2>/dev/null; then
@@ -96,11 +110,13 @@ finish_http_fixture() {
     # private and are deleted immediately below, including on early failures.
     local diagnostic_log="$PRIVATE/import-prepare-command.log"
     if [[ "$QUALIFICATION_STAGE" == "origin_preflight" ]]; then diagnostic_log="$PRIVATE/origin-preflight-command.log"; fi
-    python3 - "$RECEIPT" "$diagnostic_log" "$QUALIFICATION_STAGE" "$PRIVATE/origin-preflight-output.json" <<'PY'
+    if [[ "$QUALIFICATION_STAGE" == "http_driver" || "$QUALIFICATION_STAGE" == "complete" ]]; then diagnostic_log="$PRIVATE/php-server.log"; fi
+    python3 - "$RECEIPT" "$diagnostic_log" "$QUALIFICATION_STAGE" "$PRIVATE/origin-preflight-output.json" "$listener_exit" "$listener_signal" "$PRIVATE/php-server.log" <<'PY'
 import hashlib, json, re, sys
 from pathlib import Path
 receipt = Path(sys.argv[1])
 log = Path(sys.argv[2])
+server_log = Path(sys.argv[7]) if len(sys.argv) > 7 else Path("")
 try:
     report = json.loads(receipt.read_text(encoding="utf-8"))
 except (OSError, ValueError):
@@ -141,6 +157,8 @@ if "Call to undefined method " in text:
     codes.append("PHP_UNDEFINED_METHOD")
 if "must be the very first statement" in text:
     codes.append("PHP_STRICT_TYPES_POSITION")
+if "Segmentation fault" in text or sys.argv[6] == "11":
+    codes.append("PHP_SERVER_SIGSEGV")
 classes = [name for name in ("RuntimeException", "Error", "TypeError", "ParseError", "ValueError", "JsonException", "Exception") if re.search(r"Uncaught\s+" + name + r"(?:\s|:)", text)]
 report["fixture_diagnostic"] = {
     "stage": sys.argv[3] if sys.argv[3] in ("allocated", "origin_preflight", "mu_copy", "import_prepare", "listener_preflight", "listener_readiness", "http_driver", "complete") else "unknown_stage",
@@ -149,6 +167,10 @@ report["fixture_diagnostic"] = {
     "allowlisted_error_codes": sorted(set(codes)),
     "allowlisted_error_classes": classes,
     "raw_output_retained": False,
+    "listener_exit_before_cleanup": sys.argv[5] if len(sys.argv) > 5 else "absent",
+    "listener_signal_before_cleanup": sys.argv[6] or None if len(sys.argv) > 6 else None,
+    "server_log_present": server_log.is_file(),
+    "server_log_sha256": hashlib.sha256(server_log.read_bytes()).hexdigest() if server_log.is_file() else None,
 }
 origin_path = Path(sys.argv[4])
 if origin_path.is_file():
