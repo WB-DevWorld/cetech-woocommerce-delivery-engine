@@ -123,7 +123,26 @@ return static function ( callable $check ): void {
 		update_option( Uninstaller::DELETE_DATA_OPTION, 1, false );
 		if ( 1 !== (int) get_option( Uninstaller::DELETE_DATA_OPTION ) ) { throw new RuntimeException( 'Native lifecycle explicit policy was not stored.' ); }
 		Uninstaller::uninstall();
-		$check( 'NATIVE-C03-EXPLICIT-UNINSTALL-PRESERVES-PAIR', $before === $pair() && false === get_option( SchemaVersion::OPTION_NAME, false ) );
+		$after_explicit = $pair();
+		$schema_read = get_option( SchemaVersion::OPTION_NAME, false );
+		$schema_row = OperationProofDatabase::row( $physical, "SELECT option_value FROM `{$prefix}options` WHERE option_name='cetech_de_db_version' LIMIT 1" );
+		$policy_row = OperationProofDatabase::row( $physical, "SELECT option_value FROM `{$prefix}options` WHERE option_name='cetech_de_delete_data_on_uninstall' LIMIT 1" );
+		$schema_cache_found = false;
+		$schema_cached = wp_cache_get( SchemaVersion::OPTION_NAME, 'options', false, $schema_cache_found );
+		$diagnostics_gone = 0 === (int) OperationProofDatabase::scalar( $physical, "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='{$diagnostics}'" );
+		$check( 'NATIVE-C03-EXPLICIT-UNINSTALL-PRESERVES-PAIR', $before === $after_explicit && null === $schema_row && false === $schema_read, [
+			'record_bytes_unchanged' => $before[0] === $after_explicit[0],
+			'event_bytes_unchanged' => $before[1] === $after_explicit[1],
+			'resource_unchanged' => $before[2] === $after_explicit[2],
+			'schema_deleted_in_database' => null === $schema_row,
+			'schema_read_reports_absent' => false === $schema_read,
+			'schema_read_is_original_value' => '7' === $schema_read,
+			'schema_cache_found' => $schema_cache_found,
+			'schema_cache_is_original_value' => '7' === $schema_cached,
+			'delete_policy_deleted_in_database' => null === $policy_row,
+			'legacy_diagnostic_table_deleted' => $diagnostics_gone,
+			'isolated_native_connection_still_selected' => $GLOBALS['wpdb'] === $fixture_db && $fixture_db->prefix === $prefix,
+		] );
 
 		// An exact uninstall.php copy has no vendor directory: this executes the
 		// genuine fallback branch, even though this native process has other classes.
