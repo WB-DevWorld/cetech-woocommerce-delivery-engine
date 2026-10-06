@@ -68,6 +68,24 @@ final class OrderDeliverySnapshotIntegrity {
 			return self::STATUS_MALFORMED;
 		}
 
+		$status = $read->snapshot->quote_status;
+		if ( ! in_array( $status, [ 'success', 'not_applicable', 'failure', 'quoted' ], true ) ) {
+			return self::STATUS_PARTIAL;
+		}
+		$amount = $read->snapshot->package_total_delivery_amount;
+		if ( null !== $amount && ! OrderDeliverySnapshotJson::is_decimal_amount( $amount ) ) {
+			return self::STATUS_PARTIAL;
+		}
+		foreach ( $read->snapshot->groups as $group ) {
+			if ( ! $group instanceof OrderDeliveryGroupSnapshot
+				|| ( null !== $group->package_total_delivery_amount && ! OrderDeliverySnapshotJson::is_decimal_amount( $group->package_total_delivery_amount ) ) ) {
+				return self::STATUS_PARTIAL;
+			}
+		}
+		if ( in_array( $status, [ 'success', 'quoted' ], true ) && null === $amount ) {
+			return self::STATUS_QUOTE_MISSING;
+		}
+
 		return self::STATUS_PRESENT_VALID;
 	}
 
@@ -107,6 +125,10 @@ final class OrderDeliverySnapshotIntegrity {
 	}
 
 	private function classify_line_snapshot( OrderDeliveryLineSnapshot $snapshot ): string {
+		if ( null !== $snapshot->quoted_amount && ! OrderDeliverySnapshotJson::is_decimal_amount( $snapshot->quoted_amount ) ) {
+			return self::STATUS_PARTIAL;
+		}
+
 		if ( OrderDeliverySnapshot::QUOTE_STATUS_SELECTION_ONLY === $snapshot->quote_status ) {
 			if ( null !== $snapshot->delivery_offer_id && $snapshot->delivery_offer_id > 0 ) {
 				return self::STATUS_QUOTE_MISSING;
