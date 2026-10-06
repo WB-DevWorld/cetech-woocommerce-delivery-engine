@@ -49,6 +49,45 @@ final class InMemoryCatalogTargetQuery implements CatalogTargetQueryInterface {
 		$this->attributes[ $id ] = $attributes;
 	}
 
+	public function set_parent( int $variation_id, int $parent_id ): void {
+		$this->variation_parents[ $variation_id ] = $parent_id;
+		$current = $this->by_key[ CatalogTargetDefinition::TARGET_VARIATION . ':' . $variation_id ] ?? null;
+		if ( ! $current instanceof CatalogTarget ) {
+			return;
+		}
+		$this->replace_target(
+			new CatalogTarget( $current->type, $current->id, $current->external_key, $parent_id, $current->label )
+		);
+	}
+
+	public function set_sku( string $type, int $id, string $sku ): void {
+		$this->skus_by_id[ $id ] = $sku;
+		$current = $this->by_key[ $type . ':' . $id ] ?? null;
+		if ( ! $current instanceof CatalogTarget ) {
+			return;
+		}
+		$this->replace_target( new CatalogTarget( $current->type, $current->id, $sku, $current->parent_id, $current->label ) );
+	}
+
+	public function remove( string $type, int $id ): void {
+		unset( $this->by_key[ $type . ':' . $id ], $this->variation_parents[ $id ], $this->skus_by_id[ $id ], $this->attributes[ $id ] );
+		$this->targets = array_values(
+			array_filter(
+				$this->targets,
+				static fn ( CatalogTarget $target ): bool => ! ( $target->type === $type && $target->id === $id )
+			)
+		);
+	}
+
+	private function replace_target( CatalogTarget $target ): void {
+		$this->by_key[ $target->type . ':' . $target->id ] = $target;
+		foreach ( $this->targets as $index => $current ) {
+			if ( $current->type === $target->type && $current->id === $target->id ) {
+				$this->targets[ $index ] = $target;
+			}
+		}
+	}
+
 	public function count( CatalogTargetDefinition $definition ): int {
 		CatalogTargetFilters::assert_supported( $definition->filters );
 

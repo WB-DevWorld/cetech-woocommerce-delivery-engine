@@ -86,4 +86,13 @@ interface BulkJobRepositoryInterface {
 	 * @return list<BulkRecipe>
 	 */
 	public function list_recipes( int $limit = 50 ): array;
+
+	/**
+	 * Run one preparation checkpoint. A thrown exception restores the previous job and items.
+	 *
+	 * @template T
+	 * @param callable(): T $work
+	 * @return T
+	 */
+	public function completeOwnedUnit( callable $work ): mixed;
 }

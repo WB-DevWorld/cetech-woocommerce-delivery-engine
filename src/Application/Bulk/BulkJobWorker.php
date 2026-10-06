@@ -185,10 +185,6 @@ final class BulkJobWorker {
 			);
 		}
 
-		if ( [] !== $items ) {
-			$this->jobs->insert_items( $items );
-		}
-
 		$enumerated = $job->enumerated_count + count( $items );
 		$complete   = $page['exhausted'];
 		$cursor     = $page['scanned'] > 0 ? (string) $page['cursor'] : (string) $after_id;
@@ -213,10 +209,27 @@ final class BulkJobWorker {
 		if ( $complete ) {
 			$job = $this->release_selection_manifest( $job );
 		}
-		$saved = $this->save_owned_job( $job, (string) $job->claim_token );
-		if ( $saved instanceof BulkJob ) {
-			$this->requeue_if_needed( $saved, $started, (string) $saved->claim_token );
+		try {
+			$saved = $this->jobs->completeOwnedUnit(
+				function () use ( $items, $job ): BulkJob {
+					if ( [] !== $items ) {
+						$this->jobs->insert_items( $items );
+					}
+					$saved = $this->save_owned_job( $job, (string) $job->claim_token );
+					if ( ! $saved instanceof BulkJob ) {
+						throw new \RuntimeException( 'Preparation checkpoint was not saved.' );
+					}
+
+					return $saved;
+				}
+			);
+		} catch ( \RuntimeException $exception ) {
+			if ( 'Preparation checkpoint was not saved.' === $exception->getMessage() ) {
+				return;
+			}
+			throw $exception;
 		}
+		$this->requeue_if_needed( $saved, $started, (string) $saved->claim_token );
 	}
 
 	/**

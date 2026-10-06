@@ -62,7 +62,8 @@ final class CatalogScopeMutator {
 		int $target_id,
 		?int $parent_product_id,
 		CatalogActionManifest $manifest,
-		bool $dry_run
+		bool $dry_run,
+		?string $expected_precondition = null
 	): array {
 		$scope_type = CatalogTargetDefinition::TARGET_VARIATION === $target_type
 			? ConfigurationScopeType::Variation
@@ -80,6 +81,18 @@ final class CatalogScopeMutator {
 
 		$before_snapshot = $this->snapshot( $existing );
 		$precondition    = $existing instanceof ScopedConfiguration ? $existing->fingerprint() : '';
+		if ( ! $dry_run && null !== $expected_precondition && $expected_precondition !== $precondition ) {
+			return [
+				'outcome'                  => 'skipped',
+				'error_code'               => 'stale_target',
+				'error_summary'            => 'This product changed after the approved preview.',
+				'warning'                  => false,
+				'before_snapshot'          => $before_snapshot,
+				'precondition_fingerprint' => $precondition,
+				'after_fingerprint'        => '',
+				'result'                   => [ 'stale' => true ],
+			];
+		}
 
 		try {
 			$candidate = $this->build_candidate( $scope_type, $target_id, $parent_product_id, $existing, $manifest );

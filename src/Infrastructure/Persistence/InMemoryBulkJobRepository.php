@@ -34,9 +34,19 @@ final class InMemoryBulkJobRepository implements BulkJobRepositoryInterface {
 	 */
 	public bool $treat_terminal_item_save_as_replay = false;
 
+	/**
+	 * Test seam: refuse the next preparation checkpoint writes.
+	 */
+	public int $refuse_preparation_checkpoints = 0;
+
 	private int $next_recipe_id = 1;
 
 	public function save_job( BulkJob $job ): BulkJob {
+		$preparation = is_array( $job->summary['preparation'] ?? null ) ? $job->summary['preparation'] : [];
+		if ( $this->refuse_preparation_checkpoints > 0 && array_key_exists( 'high_water', $preparation ) ) {
+			--$this->refuse_preparation_checkpoints;
+			throw new \RuntimeException( 'Bulk job write failed.' );
+		}
 		if ( null === $job->id ) {
 			$id      = $this->next_job_id++;
 			$saved   = $job->with_id( $id, BulkJob::display_code_for_id( $id ) );
@@ -135,13 +145,35 @@ final class InMemoryBulkJobRepository implements BulkJobRepositoryInterface {
 		return array_slice( $matches, $offset, $per_page );
 	}
 
+	public function completeOwnedUnit( callable $work ): mixed {
+		$jobs      = $this->jobs;
+		$items     = $this->items;
+		$recipes   = $this->recipes;
+		$next_job  = $this->next_job_id;
+		$next_item = $this->next_item_id;
+		$next_recipe = $this->next_recipe_id;
+		try {
+			return $work();
+		} catch ( \Throwable $exception ) {
+			$this->jobs           = $jobs;
+			$this->items          = $items;
+			$this->recipes        = $recipes;
+			$this->next_job_id    = $next_job;
+			$this->next_item_id   = $next_item;
+			$this->next_recipe_id = $next_recipe;
+			throw $exception;
+		}
+	}
+
 	public function insert_items( array $items ): array {
 		$saved = [];
 		foreach ( $items as $item ) {
 			if ( ! $item instanceof BulkJobItem ) {
 				continue;
 			}
-			$existing = $this->find_item( $item->job_id, $item->target_type, $item->target_id, $item->external_key );
+			$existing = $item->target_id > 0
+				? $this->find_item_by_target( $item->job_id, $item->target_type, $item->target_id )
+				: $this->find_item( $item->job_id, $item->target_type, $item->target_id, $item->external_key );
 			if ( null !== $existing ) {
 				$saved[] = $existing;
 				continue;
@@ -295,6 +327,16 @@ final class InMemoryBulkJobRepository implements BulkJobRepositoryInterface {
 		}
 
 		return $count;
+	}
+
+	private function find_item_by_target( int $job_id, string $target_type, int $target_id ): ?BulkJobItem {
+		foreach ( $this->items as $item ) {
+			if ( $item->job_id === $job_id && $item->target_type === $target_type && $item->target_id === $target_id ) {
+				return $item;
+			}
+		}
+
+		return null;
 	}
 
 	public function find_item( int $job_id, string $target_type, int $target_id, string $external_key = '' ): ?BulkJobItem {

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Tests\Unit\Bulk;
 
+use CetechDeliveryEngine\Application\Bulk\BulkJobEngine;
 use CetechDeliveryEngine\Application\Bulk\BulkJobWorker;
 use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogScopeMutator;
 use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogTarget;
@@ -16,10 +17,18 @@ use CetechDeliveryEngine\Application\Bulk\Queue\InMemoryBoundedQueue;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationValidator;
 use CetechDeliveryEngine\Domain\Bulk\BulkJob;
 use CetechDeliveryEngine\Domain\Bulk\BulkJobItem;
+use CetechDeliveryEngine\Domain\Configuration\CollectionFieldInstruction;
+use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey;
+use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
+use CetechDeliveryEngine\Domain\Configuration\ScalarFieldInstruction;
+use CetechDeliveryEngine\Domain\Configuration\ScopedConfiguration;
 use CetechDeliveryEngine\Domain\Enum\BulkJobItemStatus;
 use CetechDeliveryEngine\Domain\Enum\BulkJobStatus;
 use CetechDeliveryEngine\Domain\Enum\BulkOperationType;
 use CetechDeliveryEngine\Domain\Enum\BulkTargetScope;
+use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
+use CetechDeliveryEngine\Domain\Enum\ConfigurationSource;
+use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Infrastructure\Persistence\InMemoryBulkJobRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\InMemoryScopedConfigurationRepository;
 use PHPUnit\Framework\TestCase;
@@ -250,14 +259,211 @@ final class CatalogScanProgressTest extends TestCase {
 		self::assertTrue( $saved->enumeration_complete );
 	}
 
-	private function worker( InMemoryBulkJobRepository $jobs, CatalogTargetQueryInterface $query ): BulkJobWorker {
+	public function test_apply_rejects_a_variation_whose_parent_changed_after_preview(): void {
+		$query = new InMemoryCatalogTargetQuery();
+		$query->add( new CatalogTarget( 'variation', 20, 'oak', 10 ) );
+		$jobs    = new InMemoryBulkJobRepository();
+		$scopes  = new InMemoryScopedConfigurationRepository();
+		$worker  = $this->worker( $jobs, $query, $scopes );
+		$job     = $jobs->save_job( $this->variation_job( [ 20 ] ) );
+		$ready   = $this->finish( $worker, $jobs, (int) $job->id, 5 );
+		$item    = $jobs->find_item( (int) $job->id, 'variation', 20, 'oak' );
+		self::assertInstanceOf( BulkJobItem::class, $item );
+		self::assertSame( 10, $item->parent_target_id );
+		self::assertSame( 1, $ready->total_count );
+
+		$query->set_parent( 20, 11 );
+		$engine = new BulkJobEngine( $jobs, new InMemoryBoundedQueue(), $worker );
+		$engine->apply( (int) $job->id, 4 );
+		$worker->tick( (int) $job->id );
+		$after = $jobs->find_item( (int) $job->id, 'variation', 20, 'oak' );
+
+		self::assertInstanceOf( BulkJobItem::class, $after );
+		self::assertSame( 'stale_target', $after->error_code );
+		self::assertSame( 1, $jobs->find_job( (int) $job->id )?->total_count );
+		self::assertNull( $scopes->findByScopeAndSlice( ConfigurationScopeType::Variation, 20, '' ) );
+	}
+
+	public function test_apply_keeps_a_scope_edited_after_the_reset_preview(): void {
+		$query = new InMemoryCatalogTargetQuery();
+		$query->add( new CatalogTarget( 'product', 8, 'kept' ), [ CatalogTargetFilters::PRODUCT_TYPE => 'simple' ] );
+		$jobs   = new InMemoryBulkJobRepository();
+		$scopes = new InMemoryScopedConfigurationRepository();
+		$scopes->saveScopedConfiguration( $this->product_scope( 8, 12 ) );
+		$worker = $this->worker( $jobs, $query, $scopes );
+		$job    = $jobs->save_job(
+			BulkJob::create(
+				BulkOperationType::CatalogUpdate,
+				4,
+				[
+					'scope'       => BulkTargetScope::MatchingFilters->value,
+					'target_type' => 'product',
+					'filters'     => [ CatalogTargetFilters::PRODUCT_TYPE => 'simple' ],
+				],
+				[ 'reset_entire_scope' => true, 'field_actions' => [] ],
+				true,
+				25
+			)
+		);
+		$this->finish( $worker, $jobs, (int) $job->id, 5 );
+		$scopes->saveScopedConfiguration( $this->product_scope( 8, 33 ) );
+		$engine = new BulkJobEngine( $jobs, new InMemoryBoundedQueue(), $worker );
+		$engine->apply( (int) $job->id, 4 );
+		$worker->tick( (int) $job->id );
+
+		$kept = $scopes->findByScopeAndSlice( ConfigurationScopeType::Product, 8, '' );
+		self::assertInstanceOf( ScopedConfiguration::class, $kept );
+		self::assertSame( 33, $kept->scalars[ ConfigurationFieldKey::SUPPLIER_ID ]->value );
+		self::assertSame( 'stale_target', $jobs->find_item( (int) $job->id, 'product', 8, 'kept' )?->error_code );
+		self::assertSame( 1, $jobs->find_job( (int) $job->id )?->total_count );
+	}
+
+	public function test_a_refused_page_checkpoint_rolls_back_and_a_later_sku_change_does_not_duplicate(): void {
+		$query = new InMemoryCatalogTargetQuery();
+		$query->add( new CatalogTarget( 'product', 1, 'old' ), [ CatalogTargetFilters::PRODUCT_TYPE => 'simple' ] );
+		$query->add( new CatalogTarget( 'product', 2, 'two' ), [ CatalogTargetFilters::PRODUCT_TYPE => 'simple' ] );
+		$jobs   = new InMemoryBulkJobRepository();
+		$jobs->refuse_preparation_checkpoints = 1;
+		$worker = $this->worker( $jobs, $query );
+		$job    = $jobs->save_job( $this->filter_job( [ CatalogTargetFilters::PRODUCT_TYPE => 'simple' ], 1 ) );
+		try {
+			$worker->tick( (int) $job->id );
+			self::fail( 'The refused checkpoint must surface the write failure.' );
+		} catch ( \RuntimeException $exception ) {
+			self::assertSame( 'Bulk job write failed.', $exception->getMessage() );
+		}
+		self::assertSame( 0, $jobs->count_items( (int) $job->id ) );
+		self::assertArrayNotHasKey( 'high_water', $jobs->find_job( (int) $job->id )?->summary['preparation'] ?? [] );
+
+		$jobs->refuse_preparation_checkpoints = 0;
+		$worker->tick( (int) $job->id );
+		$mid = $jobs->find_job( (int) $job->id );
+		self::assertNotNull( $mid );
+		self::assertSame( 2, (int) $mid->summary['preparation']['high_water'] );
+		self::assertSame( 1, $jobs->count_items( (int) $job->id ) );
+		$jobs->insert_items( [ BulkJobItem::pending( (int) $job->id, 'product', 1, 'new' ) ] );
+		self::assertSame( 1, $this->items_for( $jobs, (int) $job->id, 1 ) );
+		$query->set_sku( 'product', 1, 'new' );
+		$query->set_attributes( 1, [ CatalogTargetFilters::PRODUCT_TYPE => 'grouped' ] );
+		$query->add( new CatalogTarget( 'product', 3, 'later' ), [ CatalogTargetFilters::PRODUCT_TYPE => 'simple' ] );
+		$saved = $this->finish( $worker, $jobs, (int) $job->id, 5 );
+
+		self::assertSame( 2, (int) $saved->summary['preparation']['high_water'] );
+		self::assertSame( 2, $saved->total_count );
+		self::assertSame( 1, $this->items_for( $jobs, (int) $job->id, 1 ) );
+		self::assertInstanceOf( BulkJobItem::class, $jobs->find_item( (int) $job->id, 'product', 1, 'old' ) );
+		self::assertNull( $jobs->find_item( (int) $job->id, 'product', 1, 'new' ) );
+		self::assertNull( $jobs->find_item( (int) $job->id, 'product', 3, 'later' ) );
+	}
+
+	public function test_a_disappeared_selected_candidate_is_not_replaced(): void {
+		$query = new InMemoryCatalogTargetQuery();
+		$query->add( new CatalogTarget( 'product', 2, 'gone' ) );
+		$query->add( new CatalogTarget( 'product', 3, 'kept' ) );
+		$query->remove( 'product', 2 );
+		$jobs   = new InMemoryBulkJobRepository();
+		$worker = $this->worker( $jobs, $query );
+		$job    = $jobs->save_job(
+			BulkJob::create(
+				BulkOperationType::CatalogUpdate,
+				4,
+				[
+					'scope'        => BulkTargetScope::SelectedIds->value,
+					'selected_ids' => [ 2, 3 ],
+					'target_type'  => 'product',
+				],
+				[ 'field_actions' => [] ],
+				true,
+				25
+			)
+		);
+		$saved = $this->finish( $worker, $jobs, (int) $job->id, 5 );
+
+		self::assertSame( 1, $saved->total_count );
+		self::assertNull( $jobs->find_item( (int) $job->id, 'product', 2, 'gone' ) );
+		self::assertInstanceOf( BulkJobItem::class, $jobs->find_item( (int) $job->id, 'product', 3, 'kept' ) );
+	}
+
+	public function test_a_completed_empty_manifest_does_not_gain_a_later_match(): void {
+		$query = new InMemoryCatalogTargetQuery();
+		$query->add( new CatalogTarget( 'product', 4, 'grouped' ), [ CatalogTargetFilters::PRODUCT_TYPE => 'grouped' ] );
+		$jobs   = new InMemoryBulkJobRepository();
+		$worker = $this->worker( $jobs, $query );
+		$job    = $jobs->save_job( $this->filter_job( [ CatalogTargetFilters::PRODUCT_TYPE => 'simple' ], 25 ) );
+		$ready  = $this->finish( $worker, $jobs, (int) $job->id, 5 );
+		self::assertSame( BulkJobStatus::Ready, $ready->status );
+		self::assertSame( 0, $ready->total_count );
+		$query->add( new CatalogTarget( 'product', 5, 'later' ), [ CatalogTargetFilters::PRODUCT_TYPE => 'simple' ] );
+		$engine = new BulkJobEngine( $jobs, new InMemoryBoundedQueue(), $worker );
+		$engine->apply( (int) $job->id, 4 );
+		$worker->tick( (int) $job->id );
+
+		self::assertSame( 0, $jobs->find_job( (int) $job->id )?->total_count );
+		self::assertNull( $jobs->find_item( (int) $job->id, 'product', 5, 'later' ) );
+	}
+
+	public function test_an_ordinary_incomplete_preview_cannot_apply(): void {
+		$query = new InMemoryCatalogTargetQuery();
+		$query->add( new CatalogTarget( 'product', 1, 'one' ), [ CatalogTargetFilters::PRODUCT_TYPE => 'simple' ] );
+		$query->add( new CatalogTarget( 'product', 2, 'two' ), [ CatalogTargetFilters::PRODUCT_TYPE => 'simple' ] );
+		$jobs   = new InMemoryBulkJobRepository();
+		$worker = $this->worker( $jobs, $query );
+		$job    = $jobs->save_job( $this->filter_job( [ CatalogTargetFilters::PRODUCT_TYPE => 'simple' ], 1 ) );
+		$worker->tick( (int) $job->id );
+		$partial = $jobs->find_job( (int) $job->id );
+		self::assertNotNull( $partial );
+		self::assertFalse( $partial->enumeration_complete );
+		$engine = new BulkJobEngine( $jobs, new InMemoryBoundedQueue(), $worker );
+
+		$this->expectException( \InvalidArgumentException::class );
+		$engine->apply( (int) $job->id, 4 );
+	}
+
+	private function worker( InMemoryBulkJobRepository $jobs, CatalogTargetQueryInterface $query, ?InMemoryScopedConfigurationRepository $scopes = null ): BulkJobWorker {
 		return new BulkJobWorker(
 			$jobs,
 			$query,
-			new CatalogScopeMutator( new InMemoryScopedConfigurationRepository(), new EffectiveConfigurationValidator() ),
+			new CatalogScopeMutator( $scopes ?? new InMemoryScopedConfigurationRepository(), new EffectiveConfigurationValidator() ),
 			new InMemoryBoundedQueue(),
 			30
 		);
+	}
+
+	/**
+	 * @param list<int> $ids
+	 */
+	private function variation_job( array $ids ): BulkJob {
+		return BulkJob::create(
+			BulkOperationType::CatalogUpdate,
+			4,
+			[
+				'scope'        => BulkTargetScope::SelectedIds->value,
+				'selected_ids' => $ids,
+				'target_type'  => CatalogTargetDefinition::TARGET_VARIATION,
+			],
+			[ 'field_actions' => [] ],
+			true,
+			25
+		);
+	}
+
+	private function product_scope( int $product_id, int $supplier_id ): ScopedConfiguration {
+		return new ScopedConfiguration(
+			new ConfigurationScope( null, ConfigurationScopeType::Product, $product_id, '', null, RecordStatus::Active, 1, ConfigurationSource::Native, null ),
+			[ ConfigurationFieldKey::SUPPLIER_ID => ScalarFieldInstruction::override( ConfigurationFieldKey::SUPPLIER_ID, $supplier_id ) ],
+			[ ConfigurationFieldKey::DELIVERY_OFFER_IDS => CollectionFieldInstruction::inherit( ConfigurationFieldKey::DELIVERY_OFFER_IDS ) ]
+		);
+	}
+
+	private function items_for( InMemoryBulkJobRepository $jobs, int $job_id, int $target_id ): int {
+		$count = 0;
+		foreach ( $jobs->list_items( $job_id, 50 ) as $item ) {
+			if ( $item->target_id === $target_id ) {
+				++$count;
+			}
+		}
+
+		return $count;
 	}
 
 	/**

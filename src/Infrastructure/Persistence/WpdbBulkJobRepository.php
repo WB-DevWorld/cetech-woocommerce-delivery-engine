@@ -140,6 +140,10 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 		return $jobs;
 	}
 
+	public function completeOwnedUnit( callable $work ): mixed {
+		return AbstractWpdbRepository::run_shared_unit( $work );
+	}
+
 	public function insert_items( array $items ): array {
 		$this->throw_if_transaction_unresolved();
 		$saved = [];
@@ -147,7 +151,9 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 			if ( ! $item instanceof BulkJobItem ) {
 				continue;
 			}
-			$existing = $this->find_item( $item->job_id, $item->target_type, $item->target_id, $item->external_key );
+			$existing = $item->target_id > 0
+				? $this->find_item_by_target( $item->job_id, $item->target_type, $item->target_id )
+				: $this->find_item( $item->job_id, $item->target_type, $item->target_id, $item->external_key );
 			if ( null !== $existing ) {
 				$saved[] = $existing;
 				continue;
@@ -365,6 +371,16 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 		$sql = "SELECT COUNT(*) FROM `{$table}` WHERE job_id = %d";
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
 		return (int) $wpdb->get_var( $wpdb->prepare( $sql, $job_id ) );
+	}
+
+	private function find_item_by_target( int $job_id, string $target_type, int $target_id ): ?BulkJobItem {
+		global $wpdb;
+		$table = TableNames::for( BulkJobSchema::ITEMS_SUFFIX );
+		$sql   = "SELECT * FROM `{$table}` WHERE job_id = %d AND target_type = %s AND target_id = %d ORDER BY id ASC LIMIT 1";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$row = $wpdb->get_row( $wpdb->prepare( $sql, $job_id, $target_type, $target_id ), ARRAY_A );
+
+		return is_array( $row ) ? $this->hydrate_item( $row ) : null;
 	}
 
 	public function find_item( int $job_id, string $target_type, int $target_id, string $external_key = '' ): ?BulkJobItem {

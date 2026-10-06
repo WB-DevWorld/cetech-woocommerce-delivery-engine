@@ -97,20 +97,23 @@ trait BulkJobWorkerDispatch {
 			}
 		}
 
-		if ( CatalogTargetDefinition::TARGET_VARIATION === $item->target_type && null === $parent ) {
-			$parent = $this->targets->parent_product_id( $target_id );
-		}
-
 		$dry_run = $job->dry_run;
-		if ( BulkOperationType::CatalogUpdate === $job->operation_type && ! $dry_run ) {
+		if ( CatalogTargetDefinition::TARGET_VARIATION === $item->target_type ) {
+			$current_parent = $this->targets->parent_product_id( $target_id );
 			if (
-				CatalogTargetDefinition::TARGET_VARIATION === $item->target_type
+				! $dry_run
 				&& null !== $item->parent_target_id
 				&& $item->parent_target_id > 0
-				&& $parent !== $item->parent_target_id
+				&& $current_parent !== $item->parent_target_id
 			) {
 				return $this->stale_target( 'This variation no longer belongs to the approved parent.' );
 			}
+			if ( null !== $current_parent ) {
+				$parent = $current_parent;
+			}
+		}
+
+		if ( BulkOperationType::CatalogUpdate === $job->operation_type && ! $dry_run ) {
 			$decision = $this->targets->membership( $definition, $target_id );
 			if ( 'accepted' !== $decision ) {
 				return $this->stale_target(
@@ -126,7 +129,8 @@ trait BulkJobWorkerDispatch {
 			$target_id,
 			$parent,
 			$item_manifest,
-			$dry_run
+			$dry_run,
+			( BulkOperationType::CatalogUpdate === $job->operation_type && ! $dry_run ) ? $item->precondition_fingerprint : null
 		);
 	}
 

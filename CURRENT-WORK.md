@@ -1,6 +1,16 @@
 # Current Work — Post-#32 repository truth synchronization
 
-Status: RC.12 IMMUTABLE — COR-005 AND COR-007 CHECKPOINTS ON ISOLATED FIX BRANCH — UNMERGED — NOT RC.13
+Status: RC.12 IMMUTABLE — PR #53 REPAIRS IN PROGRESS — UNMERGED — NOT RC.13
+
+## 2026-10-06 — PR #53 review repairs
+
+The owner confirmed that only the owner and AI agents are working. That instruction governs this repair. The visible save, reset, and recovery review in this session is a technical review by the agent. It is not an acceptance by Ben or Emmanuel. Historical human ownership stays recorded and is not reassigned. No merge, release, deployment, or live-site write is authorized.
+
+Historical checkpoints stay `b4776c0194dffdaea3b2ac3a48b829acb68e8a28` for COR-005 and `f7054338d9956c33a0fa50f84aa239e4f3dae90d` for COR-007. The follow-up repairs C1–C3 first, then S1–S3 and U1–U3. P07 and P08 stay outside. PR #52's branch stays unchanged.
+
+- Integration editor: this Cursor WS3 session.
+- COR-005 repair lease: bulk worker and dispatch, catalog mutator, bulk job repositories, the in-memory catalog query test seams, and the scan tests. No schema.
+- COR-005 repair proof, PHP 8.5.0: before the repair, variation reparent Apply left `error_code` null, a post-preview edit was reported `no_valid_delivery_path`, and a refused checkpoint left 1 item. After the repair, `tests/Unit/Bulk` is 186 tests / 1070 assertions, OK, 2 existing deprecations. That includes the indexed 40,001 walk. The disappeared-candidate, completed-empty-manifest, and incomplete-Apply cases passed before this repair and still pass. The earlier full-list lookup remains no verdict.
 
 ## 2026-10-06 — COR-007 local completion, after the COR-005 checkpoint
 
