@@ -39,7 +39,7 @@ if ($opening_http_native_path !== realpath($opening_http_work) . '/opening-quali
 }
 $opening_http_native = json_decode((string) file_get_contents($opening_http_native_path), true, 512, JSON_THROW_ON_ERROR);
 $opening_http_native_sources = $opening_http_native['installed_php_sources'] ?? null;
-if (!is_array($opening_http_native_sources) || 494 !== count($opening_http_native_sources)) {
+if (!is_array($opening_http_native_sources) || [] === $opening_http_native_sources) {
     throw new RuntimeException('HTTP_ORIGIN_PREFLIGHT_NATIVE_IDENTITY');
 }
 ksort($opening_http_native_sources, SORT_STRING);

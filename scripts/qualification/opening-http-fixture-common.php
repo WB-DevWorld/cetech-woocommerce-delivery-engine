@@ -122,9 +122,11 @@ function opening_http_identity(): array {
     }
     ksort($installed, SORT_STRING);
     $hash = opening_http_hash($installed);
+    // Candidate growth is allowed only when every installed path/hash still
+    // equals the same-run native receipt; a historic file count is not identity.
     if (
         'PASS' !== ($native['status'] ?? null)
-        || 494 !== count($installed)
+        || [] === $installed
         || $installed !== ($native['installed_php_sources'] ?? null)
         || $hash !== ($native['installed_php_sources_hash'] ?? null)
         || (string) getenv('CETECH_DE_QUALIFICATION_HEAD') !== ($native['source_head'] ?? null)

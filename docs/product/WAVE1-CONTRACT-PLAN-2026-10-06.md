@@ -1,6 +1,6 @@
 # Wave 1 shared contracts — review and implementation plan
 
-Status: **PROPOSED FOR OWNER REVIEW — WAVE1-PLAN-1**. This is the five-package planning deliverable for [Issue #48](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/48), not a claim that these future contracts are implemented or accepted. The 372 frozen Requirement IDs, their historical conformance classifications and `STABLE-1.0-SCOPE-1` are unchanged.
+Status: **OWNER ACCEPTED — WAVE1-PLAN-1; W1-C01 AUTHORIZED**. On 2026-10-06 at 18:09 UTC the owner instructed: “Approve WAVE1-PLAN-1 and implement W1-C01.” Reviewed planning PR #57 was merged as `e688655c34efcd37eb30b95c26abc5b6e3f20567`, tree `90668822f2e3ce136e4a2fc4a2f6907f97970007`. The packet is the accepted contract baseline for [Issue #48](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/48). Only C01 is now authorized for implementation; accepted future rules are not claims of implemented runtime behavior. The 372 frozen Requirement IDs, their historical conformance classifications and `STABLE-1.0-SCOPE-1` are unchanged.
 
 ## What this delivers
 
@@ -22,7 +22,7 @@ Only the owner and AI agents are working. Codex is packet author/integration edi
 
 ## Decision summary
 
-All choices in this table are **proposed**, except the existing protections explicitly identified as preserved.
+The owner accepted the proposed D01–D12 contract baseline. Later operation-specific storage, adoption and activation decisions remain dependencies; the preserved existing protections continue to apply.
 
 | Decision | Proposed contract | Boundary |
 |---|---|---|
@@ -164,9 +164,9 @@ This planning change and W1-C01/W1-C02 are **schema-neutral**. Existing schema s
 
 Before additive persistence: specify exact tables/indexes and transaction owner; prove two-connection uniqueness/visibility; add a forward, repeatable migration and readiness checks; preserve unrelated/site-owned rows; prove refusal/failure/retry truth using the accepted migration framework. A failed migration blocks only its dependent new feature and does not publish a false schema success. Rollback means disable the new writer and preserve new/old data; do not describe a destructive table drop as safe rollback. Restore old-reader compatibility or block rollback once new mandatory snapshot versions exist. Every approved persistent class receives a retention entry before activation.
 
-## Proposed acceptance matrix — not executed yet
+## Acceptance matrix — C01 local execution, later cases planned
 
-These are meaningful future proofs, not tests added or passed by this planning PR. Existing unit/SQL/WordPress evidence is preserved separately.
+The planning PR did not execute these future cases. Owner-authorized C01 now implements T01–T04 with 102 contract tests / 366 assertions passing on local PHP 8.3.6, plus the complete existing suite (1637 tests / 10214 assertions / 1 skip). Candidate CI/native/HTTP proof is recorded against the implementation PR's actual head, separately from local execution. T05–T21 remain future acceptance cases; earlier SQL/WordPress evidence stays separate.
 
 | Case | Required proof | Checkpoint |
 |---|---|---|
@@ -196,7 +196,7 @@ Existing preservation sources: configuration completion/caller-authority/version
 
 ## Seven implementation checkpoints
 
-All are **PROPOSED / NOT STARTED**. Dependencies serialize central edits; independent fixture/review work can proceed in parallel after contracts freeze. New paths are prospective file reservations, not files already present. Runtime source authority remains the accepted baseline until an implementation is approved.
+W1-C01 is **IMPLEMENTED / CANDIDATE QUALIFICATION**, tracked by [Issue #58](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/58). C02–C07 remain **NOT STARTED** with their listed dependencies. Dependencies serialize central edits; independent fixture/review work can proceed in parallel after contracts freeze. New paths below are reservations; completion is recorded against each actual candidate.
 
 | Unit | Concrete output and reuse | Dependency / schema / central lease | Acceptance |
 |---|---|---|---|
@@ -216,4 +216,4 @@ The packet recommends D01–D12 and W1-C01 as the first schema-neutral implement
 
 Reserved business contracts remain separate: quote/group tariff/tax/promotion economics; source-independent destination/handoff; WP floor/embed transition; inactive/invalid recovery COR-012; portability COR-021; placement guard COR-029; protected-delete retention COR-030; global reset Issue #50; COR-008/009 atomic/fencing boundaries; P07/P08. COR-005/COR-007 are already accepted and implemented; they are not unanswered choices in this packet. These reservations can block their dependent future adapters, not schema-neutral C01.
 
-[Issue #48](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/48) says: “Stop after the planning/contract-freeze package is reviewable.” The packet is that concrete reviewable result. Owner acceptance should identify `WAVE1-PLAN-1` and the allowed next unit, preferably W1-C01. Until then the planning PR stays draft, Issue #48 remains open, and no runtime implementation branch is created. Once accepted, record the decision and execute the selected finite unit without repeating completed repair reviews.
+[Issue #48](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/48) originally stopped at a reviewable planning package. The owner's explicit 2026-10-06 acceptance satisfies that boundary and authorizes W1-C01. PR #57 is merged; Issue #48 remains open for the wider contract work and Issue #58 tracks the selected finite unit. Execute C01 without repeating completed repair reviews; do not treat its primitive checkpoint as completion or authorization of all later adopters.

@@ -305,19 +305,35 @@ PY
     local private_removed=0
     if [[ ! -e "$PRIVATE" ]]; then private_removed=1; fi
     if [[ "$server_stopped" != "1" || "$MU_REMOVED" != "1" || "$private_removed" != "1" || "$ROW_CLEANUP" != "1" ]]; then result=1; fi
-    python3 - "$RECEIPT" "$result" "$SERVER_STARTED" "$LISTENER_ATTESTED" "$server_stopped" "$MU_REMOVED" "$private_removed" "$ROW_CLEANUP" <<'PY'
-import json, sys
+    python3 - "$RECEIPT" "$result" "$SERVER_STARTED" "$LISTENER_ATTESTED" "$server_stopped" "$MU_REMOVED" "$private_removed" "$ROW_CLEANUP" "$WORK/opening-qualification-results.json" <<'PY'
+import hashlib, json, sys
 from pathlib import Path
 path = Path(sys.argv[1])
 try:
     report = json.loads(path.read_text(encoding="utf-8"))
 except (OSError, ValueError):
     report = {"format": "cetech-opening-http-qualification-v1", "status": "FAIL", "cases": []}
-result, started, attested, stopped, mu_removed, private_removed, tracked_cleanup = map(int, sys.argv[2:])
+result, started, attested, stopped, mu_removed, private_removed, tracked_cleanup = map(int, sys.argv[2:9])
 cases = report.setdefault("cases", [])
 origin = report.get("fixture_origin_preflight", {})
 after = origin.get("after", {})
-origin_verified = origin.get("status") == "PASS" and origin.get("same_run_native_pass_before_mutations") is True and origin.get("installed_php_source_files") == 494 and all(after.get(layer, {}).get(option, {}).get("exact_expected") is True for layer in ("physical", "native") for option in ("home", "siteurl"))
+try:
+    native = json.loads(Path(sys.argv[9]).read_text(encoding="utf-8"))
+except (OSError, ValueError):
+    native = {}
+sources = native.get("installed_php_sources", {})
+identity = origin.get("identity", {})
+source_identity_verified = (
+    native.get("status") == "PASS"
+    and isinstance(sources, dict) and bool(sources)
+    and sources == report.get("installed_php_sources")
+    and type(origin.get("installed_php_source_files")) is int
+    and origin["installed_php_source_files"] == len(sources)
+    and native.get("installed_php_sources_hash") == hashlib.sha256(json.dumps(sources, sort_keys=True, separators=(",", ":")).encode("utf-8")).hexdigest()
+    and native.get("installed_php_sources_hash") == report.get("installed_php_sources_hash") == identity.get("installed_php_sources_hash")
+    and all(native.get(key) == report.get(key) == identity.get(key) and bool(native.get(key)) for key in ("source_head", "candidate_head", "source_tree"))
+)
+origin_verified = origin.get("status") == "PASS" and origin.get("same_run_native_pass_before_mutations") is True and source_identity_verified and all(after.get(layer, {}).get(option, {}).get("exact_expected") is True for layer in ("physical", "native") for option in ("home", "siteurl"))
 new_cases = [
     ("HTTP-FIXTURE-EXACT-LOOPBACK-ORIGIN", origin_verified, {"same_run_native_pass_before_mutations": origin.get("same_run_native_pass_before_mutations") is True, "physical_and_native_home_siteurl_exact": origin_verified, "origin": "http://127.0.0.1:8085", "source_map_files": origin.get("installed_php_source_files")}),
     ("HTTP-FIXTURE-OWNED-LISTENER-ATTESTED", started == 1 and attested == 1, {"loopback": "127.0.0.1:8085", "actual_docroot": "exact third fresh native site", "pid_liveness_and_header_token": attested == 1}),
