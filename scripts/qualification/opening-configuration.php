@@ -265,7 +265,7 @@ return static function ( callable $check ): void {
 
 		$before_save = $snapshot();
 		$target = $target_guard->resolve( $owned_input );
-		$saved = $service->save( new ScopedConfigurationWriteCommand( $target['scope_type'], $target['scope_id'], $target['slice_key'], $target['parent_product_id'], [ ConfigurationFieldKey::PRIORITY => [ 'mode' => 'override', 'value' => '9' ] ] ) );
+		$saved = $service->save( new ScopedConfigurationWriteCommand( $target['scope_type'], $target['scope_id'], $target['slice_key'], $target['parent_product_id'], [ ConfigurationFieldKey::PRIORITY => [ 'mode' => 'override', 'value' => '9' ] ], false, 0, null, 0 ) );
 		$after_save = $snapshot();
 		$reloaded = $repository->findByScopeAndSlice( ConfigurationScopeType::Product, $owned_product, '' );
 		$check(
@@ -323,7 +323,7 @@ return static function ( callable $check ): void {
 		// Exact native variation slice reset, with field/collection SQL deletion and siblings retained.
 		$before_reset = $snapshot();
 		$reset_target = $target_guard->resolve( [ 'scope_type' => 'variation', 'scope_id' => $owned_variation, 'parent_product_id' => $owned_parent, 'slice_key' => 'in_store' ] );
-		$reset = $service->reset( $reset_target['scope_type'], $reset_target['scope_id'], $reset_target['slice_key'], $reset_target['parent_product_id'] );
+		$reset = $service->reset( $reset_target['scope_type'], $reset_target['scope_id'], $reset_target['slice_key'], $reset_target['parent_product_id'], $selected->scope->config_version, null, $selected->scope->id );
 		$after_reset = $snapshot();
 		$selected_row_id = (int) $selected->scope->id;
 		$selected_fields_after = $sql_rows( $wpdb->prepare( "SELECT * FROM `{$fields_table}` WHERE scope_row_id = %d ORDER BY id", $selected_row_id ) );

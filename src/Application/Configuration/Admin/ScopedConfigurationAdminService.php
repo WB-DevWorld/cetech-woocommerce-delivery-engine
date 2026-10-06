@@ -316,11 +316,11 @@ final class ScopedConfigurationAdminService {
 				return true;
 			}
 		}
-		if ( null === $expected_revision ) {
-			throw new \RuntimeException( 'These settings are out of date. Reload the current settings and submit the draft again.' );
-		}
 		if ( null === $previous ) {
 			return false;
+		}
+		if ( null === $expected_revision ) {
+			throw new \RuntimeException( 'These settings are out of date. Reload the current settings and submit the draft again.' );
 		}
 		try {
 			$deleted = $this->repository->completeLocalUnit(
