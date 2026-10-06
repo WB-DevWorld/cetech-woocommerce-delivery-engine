@@ -285,7 +285,29 @@ return static function ( callable $check ): void {
 			$table = TableNames::for( 'audit_log' ); $main_db->query( "DELETE FROM `{$table}` WHERE entity_type='configuration_scope' AND entity_id IN ({$ids})" );
 		}
 		$orders_gone = true; foreach ( $orders as $order_id ) { $orders_gone = $orders_gone && false === wc_get_order( $order_id ); }
-		$products_gone = true; foreach ( $products as $product_id ) { $products_gone = $products_gone && false === wc_get_product( $product_id ); }
+		// Woo 11.1.2's factory can return an instance-cache object before a
+		// datastore read, and wc_get_product's unavailable contract is null|false.
+		// Establish physical deletion first; refreshing only our fixture IDs must
+		// never turn a retained post or retained product meta into a cleanup PASS.
+		$product_lookup_before_refresh = [ 'false' => 0, 'null' => 0, 'product' => 0, 'other' => 0 ];
+		foreach ( $products as $product_id ) {
+			$lookup = wc_get_product( $product_id );
+			$type = false === $lookup ? 'false' : ( null === $lookup ? 'null' : ( $lookup instanceof WC_Product ? 'product' : 'other' ) );
+			++$product_lookup_before_refresh[ $type ];
+		}
+		$product_ids = implode( ',', array_map( 'intval', $products ) );
+		$product_posts_gone = '' === $product_ids || [] === $sql_rows( "SELECT ID FROM `{$main_db->posts}` WHERE ID IN ({$product_ids})" );
+		$product_meta_gone = '' === $product_ids || [] === $sql_rows( "SELECT meta_id FROM `{$main_db->postmeta}` WHERE post_id IN ({$product_ids})" );
+		foreach ( $products as $product_id ) {
+			clean_post_cache( $product_id );
+			WC_Cache_Helper::invalidate_cache_group( 'product_' . $product_id );
+			if ( \Automattic\WooCommerce\Utilities\FeaturesUtil::feature_is_enabled( 'product_instance_caching' ) ) {
+				wc_get_container()->get( \Automattic\WooCommerce\Internal\Caches\ProductCache::class )->remove( $product_id );
+			}
+		}
+		$products_unavailable = true;
+		foreach ( $products as $product_id ) { $lookup = wc_get_product( $product_id ); $products_unavailable = $products_unavailable && ( false === $lookup || null === $lookup ); }
+		$products_gone = $product_posts_gone && $product_meta_gone && $products_unavailable;
 		$items_gone = true; if ( [] !== $items ) { $ids = implode( ',', array_map( 'intval', $items ) ); $items_gone = [] === $sql_rows( "SELECT meta_id FROM `{$item_meta_table}` WHERE order_item_id IN ({$ids})" ); }
 		$protected_meta_gone = [ [], [] ] === $physical();
 		$config_gone = true;
@@ -298,6 +320,6 @@ return static function ( callable $check ): void {
 		$tables_gone = true; foreach ( $migration_tables as $table ) { $tables_gone = $tables_gone && null === $main_db->get_var( $main_db->prepare( 'SHOW TABLES LIKE %s', $main_db->esc_like( $table ) ) ); }
 		wp_set_current_user( 0 ); wp_set_current_user( $old_user );
 		$cleanup_ok = $orders_gone && $products_gone && $items_gone && $protected_meta_gone && $config_gone && $tables_gone && $wpdb === $main_db && $old_user === get_current_user_id() && $options_before === $sql_rows( $main_db->prepare( "SELECT option_name,option_value,autoload FROM `{$main_db->options}` WHERE option_name IN (%s,%s) ORDER BY option_name", 'cetech_de_db_version', 'cetech_de_last_migration_status' ) );
-		$check( 'NATIVE-C05-FIXTURE-CLEANUP-AND-CONTEXT-RESTORED', $cleanup_ok, [ 'orders_removed' => $orders_gone, 'products_removed' => $products_gone, 'item_meta_removed' => $items_gone, 'protected_meta_removed' => $protected_meta_gone, 'fixture_configuration_and_audits_removed' => $config_gone, 'owned_migration_tables_removed' => $tables_gone, 'native_context_restored' => $wpdb === $main_db && $old_user === get_current_user_id() ] );
+		$check( 'NATIVE-C05-FIXTURE-CLEANUP-AND-CONTEXT-RESTORED', $cleanup_ok, [ 'orders_removed' => $orders_gone, 'products_removed' => $products_gone, 'product_posts_removed' => $product_posts_gone, 'product_meta_removed' => $product_meta_gone, 'product_lookup_before_cache_refresh' => $product_lookup_before_refresh, 'refreshed_products_unavailable' => $products_unavailable, 'item_meta_removed' => $items_gone, 'protected_meta_removed' => $protected_meta_gone, 'fixture_configuration_and_audits_removed' => $config_gone, 'owned_migration_tables_removed' => $tables_gone, 'native_context_restored' => $wpdb === $main_db && $old_user === get_current_user_id() ] );
 	}
 };

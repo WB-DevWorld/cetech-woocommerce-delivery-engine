@@ -99,6 +99,14 @@ All counts above are local PHP8.3.6. Fresh PHP8.3/8.4/8.5, required MariaDB113 a
 
 The only finite reviewer finding was a native fixture that supplied invented V2 identities and incomplete address shapes. It was corrected to use the existing production address/context/group constructors, preserving strict facts and raw-meta assertions. This was a fixture correction, not a product red result. No source blocker remains.
 
+## First published native qualification
+
+Candidate `ecdc8c3d881705892d1d4fea5ad5ed1664711fbe`, tree `f4b32b643146babaa8d0e72e23e381eed7b454fa`, run 37545158085 attempt1 is retained as failed qualification. Its receipt has 298 recorded unique cases: 297 PASS and one FAIL, with the final schema-restored case not reached. All 29 substantive C05 cases passed; its cleanup case reported only `products_removed=false`. Order, item/protected metadata, configuration/audit, owned migration-table and context cleanup booleans were true. HTTP did not execute.
+
+Independently downloaded native artifact 11449789658 is 52,497 ZIP bytes, SHA-256 `f71fa6a7ac67ed3f4ed1459134850211f906e136f6ff10e2fa1c0b023d3d0741`; its JSON member is 922,322 bytes, SHA-256 `b403e1d95c1a1a009a5893877fe8b6e9424c314397b41361eed6454efd52fc3c`. This failed execution is not a complete native or HTTP pass. The product sources stay fixed while the fixture cleanup discrepancy is diagnosed; the corrected fixture requires a fresh exact-candidate run.
+
+The grounded fixture correction retains the complete cleanup assertion. WooCommerce 11.1.2 declares `wc_get_product()` as returning a product, `null`, or `false`, and its factory can return an instance-cache object before a datastore read. The old receipt did not distinguish these outcomes and did not prove physical product-row absence. The corrected fixture requires zero owned product IDs in both posts and postmeta, clears only those fixtures' WordPress/Woo product caches, and requires a fresh lookup to be `null` or `false`. Fixed pre-refresh return-type counters establish the observed distinction on the next run. No production code, runtime setting, case ID, or test-product deletion behavior is changed. Local PHP8.3.6 lint and whitespace checks pass; fresh native execution remains required.
+
 ## Concrete T12–T14 mapping
 
 | Accepted case | Actual sources and assertions |
