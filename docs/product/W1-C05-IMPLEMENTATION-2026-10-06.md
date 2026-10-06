@@ -1,6 +1,8 @@
 # W1-C05 historical snapshot readers and optional extensions
 
-Status: **OWNER-AUTHORIZED / IMPLEMENTED; INTEGRATION PENDING**.
+Status: **OWNER APPROVED / INTEGRATED**.
+
+At2026-10-06 23:27:34UTC the owner approved integration. Qualified PR#71 head `d330dd40b45fac94dc98a22caa1af2836a41ef04` merged unchanged as `8b038743a3b67fa8aab2e4a7fcc0c92abbb6c4c5`, identical tree `48fce27af7cfb22f9685295e44c406786d33084c`; Issue#70 completed. Candidate run37545681669 and actual-master run37546745795 attempt1 independently passed all eight jobs/native299/finalHTTP66/smoke/PHP2144/12826/1skip/JS102 and exact575-file source map `44c4d52b2c48f5ab78eefa112d564ea2a53cb64ba2cfc251959674a332872a34`. SQL is separately113/2891 on the candidate,113/2892 on actual merge, with2deprecations/0skips and classes43+44. All archive/member fingerprints are separately retained in PR#71. Historical pending statements below describe the frozen implementation before publication; this integration annotation supersedes them. C06 design is now specifically authorized in Issue#72 and its separate proposal.
 
 At 2026-10-06 22:54:53 UTC the owner instructed: “Approve W1-C04 for integration and implement W1-C05.” [Issue #70](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/70) tracks this checkpoint under #48. Branch: `ws3/wave1-c05-snapshot-reader`.
 
