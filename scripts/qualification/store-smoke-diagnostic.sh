@@ -21,6 +21,18 @@ start_store_smoke_listener() {
     trap 'finish_store_smoke_listener "$?" exit' EXIT
     trap 'exit 130' INT
     trap 'exit 143' TERM
+    STORE_SMOKE_LISTENER_ARGS=()
+    case "${CETECH_DE_HTTP_JIT_COMPARISON:-}" in
+        '') ;;
+        disable)
+            if [[ "${GITHUB_ACTIONS:-}" != "true" || "${GITHUB_EVENT_NAME:-}" != "push" || "${GITHUB_REF_NAME:-}" != "fix/pr55-jit-disable-comparison" || "$STORE_SMOKE_CRASH" != "1" ]]; then
+                echo "BLOCKED: JIT comparison requires its explicit disposable diagnostic branch" >&2
+                return 1
+            fi
+            STORE_SMOKE_LISTENER_ARGS=(-d opcache.jit=disable)
+            ;;
+        *) echo "BLOCKED: unsupported JIT comparison" >&2; return 1 ;;
+    esac
     if [[ "$STORE_SMOKE_CRASH" == "1" ]]; then
         if [[ "${GITHUB_ACTIONS:-}" != "true" || "$DB_HOST" != "127.0.0.1" || ! -x "$(command -v gdb)" ]]; then
             echo "BLOCKED: Store API native capture requires the disposable loopback GitHub runner and gdb" >&2
@@ -41,11 +53,15 @@ PY
         STORE_SMOKE_CORE_ORIGINAL="$(cat /proc/sys/kernel/core_pattern)"
         STORE_SMOKE_CORE_CHANGED=1
         printf '%s\n' "$STORE_SMOKE_PRIVATE/core.%p" | sudo -n tee /proc/sys/kernel/core_pattern >"$STORE_SMOKE_PRIVATE/core-setup.log" 2>&1
-        ulimit -c unlimited
     fi
     STORE_SMOKE_STAGE="listener_start"
     # Same executable, INI and listener arguments as the original smoke.
-    "$STORE_SMOKE_PHP" -S 127.0.0.1:8085 -t "$CLEAN" >"$STORE_SMOKE_PRIVATE/php-server.log" 2>&1 &
+    if [[ "$STORE_SMOKE_CRASH" == "1" ]]; then
+        # Core limits apply only to the owned listener, never later WP-CLI.
+        (ulimit -c unlimited; exec "$STORE_SMOKE_PHP" "${STORE_SMOKE_LISTENER_ARGS[@]}" -S 127.0.0.1:8085 -t "$CLEAN") >"$STORE_SMOKE_PRIVATE/php-server.log" 2>&1 &
+    else
+        "$STORE_SMOKE_PHP" "${STORE_SMOKE_LISTENER_ARGS[@]}" -S 127.0.0.1:8085 -t "$CLEAN" >"$STORE_SMOKE_PRIVATE/php-server.log" 2>&1 &
+    fi
     STORE_SMOKE_PID=$!
     STORE_SMOKE_CORE_PID="$STORE_SMOKE_PID"
 }

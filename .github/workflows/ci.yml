@@ -249,6 +249,52 @@ jobs:
           path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-qualification-results.json
           if-no-files-found: warn
 
+      # One explicit paired runtime comparison. Baseline failure remains a
+      # failed job; this never replaces the Required Gates dependency result.
+      - name: Controlled JIT-disabled listener comparison
+        if: ${{ always() && github.event_name == 'push' && github.ref_name == 'fix/pr55-jit-disable-comparison' }}
+        env:
+          CETECH_DE_WP_WORK: ${{ runner.temp }}/cetech-de-php85-wp-jit-disable
+          CETECH_DE_WP_DB_CLEAN: cetech_wp_jit_disable_clean
+          CETECH_DE_WP_DB_UPGRADE: cetech_wp_jit_disable_upgrade
+          CETECH_DE_NATIVE_OPENING_QUALIFICATION: '1'
+          CETECH_DE_HTTP_OPENING_QUALIFICATION: '1'
+          CETECH_DE_HTTP_CRASH_DIAGNOSTIC: '1'
+          CETECH_DE_HTTP_JIT_COMPARISON: disable
+          CETECH_DE_HTTP_EXPECT_BINARY_SHA256: '7dda44e554d086c1c4f441796fc19f11f46055c0a276dad66181f6c11566e46a'
+          CETECH_DE_HTTP_EXPECT_INI_SHA256: 'a0e4940c0a48d65a50eca849f62d052a7e3e4727a720308c65d7d9dfc840adaf'
+          CETECH_DE_HTTP_EXPECT_EXTENSIONS_SHA256: '5f6a8290cb266b26630ec6a72299175906d3aeba788610acd3783d36c8cc0ac3'
+          CETECH_DE_WP_VERSION: '7.1.2'
+          CETECH_DE_WOO_VERSION: '11.1.2'
+          CETECH_DE_QUALIFICATION_CANDIDATE_HEAD: ${{ github.sha }}
+          CETECH_DE_WP_DB_HOST: 127.0.0.1
+          CETECH_DE_WP_DB_PORT: 3306
+          CETECH_DE_WP_DB_USER: root
+          CETECH_DE_WP_DB_PASSWORD: wordpress
+        shell: bash
+        run: bash scripts/ci-wordpress-php85-smoke.sh
+      - name: Retain separate JIT-disabled smoke diagnostic
+        if: ${{ always() && github.event_name == 'push' && github.ref_name == 'fix/pr55-jit-disable-comparison' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-smoke-diagnostic-jit-disable
+          path: ${{ runner.temp }}/cetech-de-php85-wp-jit-disable/store-smoke-diagnostic.json
+          if-no-files-found: warn
+      - name: Retain separate JIT-disabled native companion
+        if: ${{ always() && github.event_name == 'push' && github.ref_name == 'fix/pr55-jit-disable-comparison' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-native-qualification-jit-disable
+          path: ${{ runner.temp }}/cetech-de-php85-wp-jit-disable/opening-qualification-results.json
+          if-no-files-found: warn
+      - name: Retain separate JIT-disabled authenticated HTTP comparison
+        if: ${{ always() && github.event_name == 'push' && github.ref_name == 'fix/pr55-jit-disable-comparison' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-http-qualification-jit-disable
+          path: ${{ runner.temp }}/cetech-de-php85-wp-jit-disable/opening-http-qualification-results.json
+          if-no-files-found: warn
+
   javascript-tests:
     name: JavaScript / Vitest
     runs-on: ubuntu-latest

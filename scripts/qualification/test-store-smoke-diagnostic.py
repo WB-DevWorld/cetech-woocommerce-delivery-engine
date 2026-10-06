@@ -64,7 +64,7 @@ class ListenerLifecycleTest(unittest.TestCase):
             binaries = work / "bin"
             binaries.mkdir()
             php = binaries / "php"
-            php_code = "import time;time.sleep(30)"
+            php_code = 'import os,time;from pathlib import Path;Path(os.environ["TEST_WORK"],"listener-ready").write_text(str(os.getpid()));time.sleep(30)'
             if crash:
                 php_code = "import os,signal;"
                 if diagnostic:
@@ -138,9 +138,16 @@ STORE_SMOKE_STAGE=store_api_cart
 exit 52
 '''
             else:
-                script += 'STORE_SMOKE_STAGE=complete\nfinish_store_smoke_listener 0\n'
+                script += '''for attempt in {1..500}; do
+    if [[ -f "$WORK/listener-ready" ]]; then break; fi
+    sleep 0.01
+done
+if [[ ! -f "$WORK/listener-ready" ]]; then exit 1; fi
+STORE_SMOKE_STAGE=complete
+finish_store_smoke_listener 0
+'''
             if diagnostic:
-                script = 'ulimit() { :; }\n' + script
+                script = 'ulimit() { printf "%s\\n" "$BASHPID" >> "$TEST_WORK/core-limit-processes.log"; }\n' + script
             env = {**os.environ, "PATH": str(binaries) + os.pathsep + os.environ["PATH"],
                    "TEST_ROOT": str(ROOT), "TEST_WORK": str(work), "CETECH_DE_HTTP_CRASH_DIAGNOSTIC": "1" if diagnostic else "0",
                    "TEST_INTERRUPT": "1" if interrupt else "0",
@@ -158,6 +165,7 @@ exit 52
                 self.assertEqual(mutations[0], str(work / "store-smoke-private/core.%p"))
                 self.assertEqual(mutations[1], "fixture_core_pattern")
                 self.assertEqual(len(mutations), 2)
+                self.assertEqual((work / "core-limit-processes.log").read_text().splitlines(), [str(pid)])
                 self.assertEqual(report["native_crash_diagnostic"]["capture_status"], "collected")
                 self.assertNotIn("PRIVATE", json.dumps(report))
             else:

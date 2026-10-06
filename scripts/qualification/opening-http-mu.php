@@ -83,6 +83,8 @@ if (!defined('WP_CLI') || !WP_CLI) {
         if ('1' === getenv('CETECH_DE_HTTP_CRASH_DIAGNOSTIC')) {
             $all_ini = ini_get_all(null, false);
             ksort($all_ini);
+            $jit1235_ini = $all_ini;
+            $jit1235_ini['opcache.jit'] = '1235';
             $safe_ini = [];
             foreach (['memory_limit', 'max_execution_time', 'opcache.enable', 'opcache.enable_cli', 'opcache.jit', 'opcache.jit_buffer_size', 'opcache.optimization_level', 'opcache.protect_memory'] as $name) {
                 $safe_ini[$name] = ini_get($name);
@@ -115,6 +117,7 @@ if (!defined('WP_CLI') || !WP_CLI) {
                 'php_binary_sha256' => hash_file('sha256', PHP_BINARY),
                 'extensions' => $extensions, 'safe_ini' => $safe_ini,
                 'full_ini_sha256' => hash('sha256', json_encode($all_ini, JSON_THROW_ON_ERROR)),
+                'full_ini_jit1235_sha256' => hash('sha256', json_encode($jit1235_ini, JSON_THROW_ON_ERROR)),
                 'historical_ini_comparison_available' => false,
                 'opcache_state_at_existing_probe' => $opcache_state,
             ];

@@ -34,6 +34,18 @@ export CETECH_DE_HTTP_NATIVE_RECEIPT="$WORK/opening-qualification-results.json"
 export CETECH_DE_HTTP_PROBE_TOKEN="$(php -r 'echo bin2hex(random_bytes(24));')"
 PHP_EXECUTABLE="$(readlink -f "$(command -v php)")"
 CRASH_DIAGNOSTIC="${CETECH_DE_HTTP_CRASH_DIAGNOSTIC:-0}"
+LISTENER_ARGS=()
+case "${CETECH_DE_HTTP_JIT_COMPARISON:-}" in
+    '') ;;
+    disable)
+        if [[ "${GITHUB_ACTIONS:-}" != "true" || "${GITHUB_EVENT_NAME:-}" != "push" || "${GITHUB_REF_NAME:-}" != "fix/pr55-jit-disable-comparison" || "$CRASH_DIAGNOSTIC" != "1" ]]; then
+            echo "BLOCKED: JIT comparison requires its explicit disposable diagnostic branch" >&2
+            exit 1
+        fi
+        LISTENER_ARGS=(-d opcache.jit=disable)
+        ;;
+    *) echo "BLOCKED: unsupported JIT comparison" >&2; exit 1 ;;
+esac
 CORE_PATTERN_CHANGED=0
 CORE_PATTERN_ORIGINAL=""
 LISTENER_CORE_PID=""
@@ -401,7 +413,7 @@ with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:
     except OSError as failure:
         raise SystemExit("BLOCKED: qualification port 8085 is already occupied") from failure
 PY
-"$PHP_EXECUTABLE" -S 127.0.0.1:8085 -t "$SITE" >"$PRIVATE/php-server.log" 2>&1 &
+"$PHP_EXECUTABLE" "${LISTENER_ARGS[@]}" -S 127.0.0.1:8085 -t "$SITE" >"$PRIVATE/php-server.log" 2>&1 &
 SERVER_PID=$!
 LISTENER_CORE_PID="$SERVER_PID"
 SERVER_STARTED=1
@@ -447,6 +459,14 @@ for _ in range(30):
                 "ini": (runtime.get("full_ini_sha256"), os.environ.get("CETECH_DE_HTTP_EXPECT_INI_SHA256")),
                 "extensions": (extensions_hash, os.environ.get("CETECH_DE_HTTP_EXPECT_EXTENSIONS_SHA256")),
             }
+            if os.environ.get("CETECH_DE_HTTP_JIT_COMPARISON") == "disable":
+                opcache_state = runtime.get("opcache_state_at_existing_probe", {})
+                jit = opcache_state.get("jit", {})
+                if runtime.get("safe_ini", {}).get("opcache.jit") != "disable" or opcache_state.get("opcache_enabled") is not True or jit.get("enabled") is not False or jit.get("on") is not False:
+                    raise SystemExit("JIT comparison did not retain OPcache and disable JIT in the actual listener")
+                del comparisons["ini"]
+                comparisons["ini_except_opcache_jit"] = (runtime.get("full_ini_jit1235_sha256"), os.environ.get("CETECH_DE_HTTP_EXPECT_INI_SHA256"))
+                runtime["diagnostic_comparison"] = {"setting": "opcache.jit", "control": "1235", "observed": "disable", "qualifies_original_runtime": False}
             runtime["extensions_sha256"] = extensions_hash
             runtime["comparison_to_56855ba"] = {key: actual == expected_hash for key, (actual, expected_hash) in comparisons.items() if expected_hash}
             Path(os.environ["CETECH_DE_HTTP_PRIVATE_DIR"], "runtime.json").write_text(json.dumps(runtime) + "\n", encoding="utf-8")
