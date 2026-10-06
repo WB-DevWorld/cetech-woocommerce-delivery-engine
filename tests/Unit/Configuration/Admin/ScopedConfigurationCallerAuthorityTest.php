@@ -20,6 +20,7 @@ use CetechDeliveryEngine\Application\Configuration\PassthroughFulfilmentConstrai
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsService;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultsSettings;
 use CetechDeliveryEngine\Core\Requirements;
+use CetechDeliveryEngine\Domain\Configuration\CollectionFieldInstruction;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
 use CetechDeliveryEngine\Domain\Configuration\ScopedConfiguration;
@@ -80,15 +81,15 @@ final class ScopedConfigurationCallerAuthorityTest extends TestCase {
 		$target = new ProductTargetResolver( new Requirements() );
 		$authorization = new ScopedConfigurationAuthorization();
 		$this->audit = new RecordingConfigurationAuditLogger();
-		$admin = new ScopedConfigurationAdminService( $this->repository, $resolver, new ScopedConfigurationSubmissionParser(), new ProductVariationScopeGuard( $target ), new EntityLabelResolver(), new LegacyCategoryConfigurationInspector(), $this->audit );
+		$offers  = new InMemoryDeliveryOfferRepository();
+		$offers->seed( 1, [ 'route' => DeliveryRoute::LocalDelivery->value, 'public_label' => 'Local Van', 'internal_name' => 'Local Van' ] );
+		$offers->seed( 2, [ 'route' => DeliveryRoute::Air->value, 'public_label' => 'Air Freight', 'internal_name' => 'Air Freight' ] );
+		$admin = new ScopedConfigurationAdminService( $this->repository, $resolver, new ScopedConfigurationSubmissionParser(), new ProductVariationScopeGuard( $target ), new EntityLabelResolver( $offers ), new LegacyCategoryConfigurationInspector(), $this->audit );
 		$catalog = new InMemoryCatalogIndex( [ 101 => [ 'label' => 'Owned Lamp', 'type' => 'simple' ], 102 => [ 'label' => 'Foreign Lamp', 'type' => 'simple' ], 201 => [ 'label' => 'Owned Chair', 'type' => 'variable', 'variations' => [ 202 => 'Oak Chair' ] ] ] );
 		$settings = new SiteWideDefaultsSettings();
 		$classifier = new CatalogInheritanceClassifier( $this->repository, $catalog, $resolver, $settings );
 		$defaults = new SiteWideDefaultsService( $this->repository, $settings, $classifier, $resolver, $catalog );
 		$actions = new AdminActionHandler( new AdminNoticeService() );
-		$offers  = new InMemoryDeliveryOfferRepository();
-		$offers->seed( 1, [ 'route' => DeliveryRoute::LocalDelivery->value, 'public_label' => 'Local Van', 'internal_name' => 'Local Van' ] );
-		$offers->seed( 2, [ 'route' => DeliveryRoute::Air->value, 'public_label' => 'Air Freight', 'internal_name' => 'Air Freight' ] );
 		$this->page = new ScopedConfigurationPage( $admin, $target, $actions, $authorization, $defaults, $offers );
 		$this->query = new ProductExceptionsQuery( $this->repository, $catalog, $classifier, $settings, new OperationalReadinessAssessor( $resolver ) );
 		$this->exceptions = new ProductExceptionsPage( $this->query, $defaults, $actions, $target, $authorization, $admin );
@@ -317,6 +318,115 @@ final class ScopedConfigurationCallerAuthorityTest extends TestCase {
 		self::assertStringContainsString( 'name="expected_revision" value="' . (string) $scope->scope->config_version . '"', $html );
 		self::assertStringContainsString( 'These unsaved values now apply to the current saved revision.', $html );
 		self::assertStringNotContainsString( 'value="customize-stale"', $html );
+	}
+
+	public function test_an_omitted_member_list_stays_empty_on_customize_and_the_general_editor(): void {
+		$this->repository->saveScopedConfiguration( new ScopedConfiguration(
+			new ConfigurationScope( null, ConfigurationScopeType::Product, 101, '', null, RecordStatus::Active, 1, ConfigurationSource::Native, null ),
+			[ ConfigurationFieldKey::PRIORITY => ScalarFieldInstruction::override( ConfigurationFieldKey::PRIORITY, 5 ) ],
+			[ ConfigurationFieldKey::DELIVERY_OFFER_IDS => CollectionFieldInstruction::replace( ConfigurationFieldKey::DELIVERY_OFFER_IDS, [ 1 ] ) ]
+		) );
+		$_POST = $this->post( ScopedConfigurationPage::ACTION_SAVE, 'product', 101 );
+		$_POST['customize']     = '1';
+		$_POST['request_token'] = 'empty-options';
+		$_POST['fields']        = [
+			ConfigurationFieldKey::DELIVERY_OFFER_IDS => [ 'mode' => 'replace' ],
+		];
+		$this->redirect( fn () => $this->page->handle_actions() );
+		$_GET = [ 'scope_type' => 'product', 'scope_id' => '101', 'customize' => '1' ];
+		$html = $this->html( $this->page );
+		self::assertStringContainsString( 'value="replace" checked="checked"', $html );
+		self::assertDoesNotMatchRegularExpression( '/value="1"[^>]*checked="checked"/', $html );
+		self::assertStringContainsString( 'These unsaved values now apply to the current saved revision.', $html );
+		preg_match( '/name="request_token" value="([^"]+)"/', $html, $token );
+		preg_match( '/name="expected_revision" value="([^"]+)"/', $html, $revision );
+		preg_match( '/name="expected_scope_row_id" value="([^"]+)"/', $html, $row );
+		$_POST['expected_revision']     = $revision[1];
+		$_POST['expected_scope_row_id'] = $row[1];
+		$_POST['request_token']         = $token[1];
+		unset( $_POST['fields'][ ConfigurationFieldKey::DELIVERY_OFFER_IDS ]['members'] );
+		$this->redirect( fn () => $this->page->handle_actions() );
+		$saved = $this->repository->findByScopeAndSlice( ConfigurationScopeType::Product, 101, '' );
+		self::assertSame( [], $saved?->collections[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ]->members );
+		$audits = count( $this->audit->calls );
+		$_POST['fields'][ ConfigurationFieldKey::DELIVERY_OFFER_IDS ]['members'] = [];
+		$this->redirect( fn () => $this->page->handle_actions() );
+		self::assertSame( $audits, count( $this->audit->calls ) );
+		self::assertSame( [], $this->repository->findByScopeAndSlice( ConfigurationScopeType::Product, 101, '' )?->collections[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ]->members );
+
+		$GLOBALS['cetech_de_test_caps'][ ScopedConfigurationAuthorization::CAPABILITY_GLOBAL ] = true;
+		$this->repository->saveScopedConfiguration( new ScopedConfiguration(
+			new ConfigurationScope( null, ConfigurationScopeType::Global, 0, '', null, RecordStatus::Active, 1, ConfigurationSource::Native, null ),
+			[],
+			[ ConfigurationFieldKey::DELIVERY_OFFER_IDS => CollectionFieldInstruction::replace( ConfigurationFieldKey::DELIVERY_OFFER_IDS, [ 1 ] ) ]
+		) );
+		$_POST = $this->post( ScopedConfigurationPage::ACTION_SAVE, 'global', 0 );
+		$_POST['request_token'] = 'global-empty-options';
+		$_POST['fields']        = [
+			ConfigurationFieldKey::DELIVERY_OFFER_IDS => [ 'mode' => 'replace' ],
+		];
+		$this->redirect( fn () => $this->page->handle_actions() );
+		$_GET  = [ 'scope_type' => 'global' ];
+		$editor = $this->html( $this->page );
+		self::assertMatchesRegularExpression( '/value="replace"\s+checked="checked"/', $editor );
+		self::assertDoesNotMatchRegularExpression( '/name="fields\[delivery_offer_ids\]\[members\]\[\]" value="1"[^>]*checked="checked"/', $editor );
+		self::assertStringContainsString( 'name="fields[delivery_offer_ids][members][]" value="1"', $editor );
+	}
+
+	public function test_replaying_a_reset_does_not_claim_a_recreated_scope_was_removed(): void {
+		$product = $this->seed( ConfigurationScopeType::Product, 101, '', 5 );
+		$_POST   = [
+			'cetech_de_action'       => 'cetech_de_reset_exception',
+			'cetech_de_nonce'        => 'test-nonce-cetech_de_reset_exception',
+			'item_type'              => 'product',
+			'item_id'                => '101',
+			'slice_key'              => '',
+			'expected_revision'      => (string) $product->scope->config_version,
+			'expected_scope_row_id'  => (string) $product->scope->id,
+			'request_token'          => 'product-reset-replay',
+		];
+		$this->redirect( fn () => $this->exceptions->handle_actions() );
+		self::assertNull( $this->repository->findByScopeAndSlice( ConfigurationScopeType::Product, 101, '' ) );
+		$recreated = $this->seed( ConfigurationScopeType::Product, 101, '', 8 );
+		$audits    = count( $this->audit->calls );
+		$this->redirect( fn () => $this->exceptions->handle_actions() );
+		$kept = $this->repository->findByScopeAndSlice( ConfigurationScopeType::Product, 101, '' );
+		self::assertSame( (int) $recreated->scope->id, (int) $kept?->scope->id );
+		self::assertSame( (int) $recreated->scope->config_version, (int) $kept?->scope->config_version );
+		self::assertSame( 8, $kept?->scalars[ ConfigurationFieldKey::PRIORITY ]->value );
+		self::assertSame( $audits, count( $this->audit->calls ) );
+		self::assertSame( 'This reset was already completed. The recorded settings were not changed again.', get_transient( 'cetech_de_admin_notice_7' )['message'] );
+		self::assertStringNotContainsString( 'Site-wide Defaults', (string) get_transient( 'cetech_de_admin_notice_7' )['message'] );
+
+		$variation = $this->seed( ConfigurationScopeType::Variation, 202, 'in_store', 6, 201 );
+		$_POST     = [
+			'cetech_de_action'      => 'cetech_de_reset_exception',
+			'cetech_de_nonce'       => 'test-nonce-cetech_de_reset_exception',
+			'item_type'             => 'variation',
+			'item_id'               => '202',
+			'slice_key'             => 'in_store',
+			'parent_product_id'     => '201',
+			'expected_revision'     => (string) $variation->scope->config_version,
+			'expected_scope_row_id' => (string) $variation->scope->id,
+			'request_token'         => 'variation-reset-replay',
+		];
+		$this->redirect( fn () => $this->exceptions->handle_actions() );
+		$recreated_variation = $this->seed( ConfigurationScopeType::Variation, 202, 'in_store', 4, 201 );
+		$audits              = count( $this->audit->calls );
+		$this->redirect( fn () => $this->exceptions->handle_actions() );
+		$kept_variation = $this->repository->findByScopeAndSlice( ConfigurationScopeType::Variation, 202, 'in_store' );
+		self::assertSame( (int) $recreated_variation->scope->id, (int) $kept_variation?->scope->id );
+		self::assertSame( 4, $kept_variation?->scalars[ ConfigurationFieldKey::PRIORITY ]->value );
+		self::assertSame( $audits, count( $this->audit->calls ) );
+		self::assertSame( 'This reset was already completed. The recorded settings were not changed again.', get_transient( 'cetech_de_admin_notice_7' )['message'] );
+		self::assertStringNotContainsString( 'product settings', (string) get_transient( 'cetech_de_admin_notice_7' )['message'] );
+
+		$this->repository->deleteScope( ConfigurationScopeType::Variation, 202, 'in_store' );
+		$removed = count( $this->audit->calls );
+		$this->redirect( fn () => $this->exceptions->handle_actions() );
+		self::assertSame( $removed, count( $this->audit->calls ) );
+		self::assertNull( $this->repository->findByScopeAndSlice( ConfigurationScopeType::Variation, 202, 'in_store' ) );
+		self::assertSame( 'Nothing was reset. The item may already be using inherited settings.', get_transient( 'cetech_de_admin_notice_7' )['message'] );
 	}
 
 	public function test_known_stale_reload_adopts_the_current_revision_without_refreshing_an_uncertain_retry(): void {

@@ -299,6 +299,9 @@ final class ScopedConfigurationPage {
 					$members = [];
 				}
 				$entry['members'] = array_map( static fn ( $m ): string => sanitize_text_field( (string) $m ), $members );
+			} elseif ( in_array( $mode, [ 'add', 'remove', 'replace' ], true ) ) {
+				// An unchecked collection submits no members key. That is an empty list, not "keep the saved members".
+				$entry['members'] = [];
 			}
 
 			$raw_fields[ $field_key ] = $entry;

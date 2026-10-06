@@ -69,7 +69,11 @@ final class ProductExceptionsPage {
 			$this->action_handler->redirect( self::SLUG );
 		}
 
-		if ( $ok ) {
+		if ( $this->admin_service->reset_was_replayed() && $ok ) {
+			$this->action_handler->notices()->flash_success(
+				__( 'This reset was already completed. The recorded settings were not changed again.', 'cetech-woocommerce-delivery-engine' )
+			);
+		} elseif ( $ok ) {
 			$this->action_handler->notices()->flash_success(
 				'variation' === $type
 					? __( 'This variation now uses the product settings again.', 'cetech-woocommerce-delivery-engine' )

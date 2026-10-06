@@ -142,7 +142,8 @@ final class ScopedConfigurationAdminService {
 			return ScopedConfigurationWriteResult::failure( [ 'Invalid slice key.' ] );
 		}
 
-		$parsed = $this->parser->parse( $command->scope_type, $command->raw_fields );
+		$raw_fields = $this->canonical_submitted_fields( $command->raw_fields );
+		$parsed     = $this->parser->parse( $command->scope_type, $raw_fields );
 		if ( ! $parsed['ok'] ) {
 			return ScopedConfigurationWriteResult::failure( $parsed['errors'] );
 		}
@@ -162,7 +163,7 @@ final class ScopedConfigurationAdminService {
 		$version_before = $existing?->scope->config_version ?? 0;
 		$previous_snapshot = null !== $existing ? $this->instruction_snapshot( $existing ) : null;
 		$request_token = is_string( $command->request_token ) ? trim( $command->request_token ) : '';
-		$intent_hash   = $this->request_intent_hash( 'scoped_configuration_updated', $command->scope_type, $scope_id, $slice_key, $command->parent_product_id, $command->expected_scope_row_id, $command->raw_fields );
+		$intent_hash   = $this->request_intent_hash( 'scoped_configuration_updated', $command->scope_type, $scope_id, $slice_key, $command->parent_product_id, $command->expected_scope_row_id, $raw_fields );
 		if ( '' !== $request_token && null !== $this->audit_logger ) {
 			$recorded = $this->audit_logger->recorded_completion( $request_token );
 			if ( null !== $recorded ) {
@@ -399,6 +400,26 @@ final class ScopedConfigurationAdminService {
 	/**
 	 * @param array<string, mixed> $payload
 	 */
+	/**
+	 * A browser omits an unchecked collection. That is the same intent as an explicit empty member list.
+	 *
+	 * @param array<string, mixed> $fields
+	 * @return array<string, mixed>
+	 */
+	private function canonical_submitted_fields( array $fields ): array {
+		foreach ( $fields as $key => $payload ) {
+			if ( ! is_array( $payload ) ) {
+				continue;
+			}
+			$mode = isset( $payload['mode'] ) ? (string) $payload['mode'] : '';
+			if ( in_array( $mode, [ 'add', 'remove', 'replace' ], true ) && ! array_key_exists( 'members', $payload ) ) {
+				$fields[ $key ]['members'] = [];
+			}
+		}
+
+		return $fields;
+	}
+
 	private function request_intent_hash( string $action, ConfigurationScopeType $scope_type, int $scope_id, string $slice_key, ?int $parent_product_id, ?int $scope_row_id, array $payload ): string {
 		$fields = $payload;
 		ksort( $fields );
