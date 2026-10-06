@@ -12,9 +12,9 @@ final class SchemaVersion {
 	public const OPTION_NAME = 'cetech_de_db_version';
 
 	/**
-	 * Target schema version for the current plugin tree (additive operation storage).
+	 * Target schema version for the current plugin tree (additive rule lifecycle).
 	 */
-	public const TARGET = '7';
+	public const TARGET = '8';
 
 	/**
 	 * Legacy foundation schema version before configuration tables existed.

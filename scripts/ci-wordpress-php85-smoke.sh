@@ -165,13 +165,17 @@ if ( ! $active ) {
 	fwrite( STDERR, "plugin not active\n" );
 	exit( 1 );
 }
-$expected_schema = 'rc12_before_upgrade' === $label ? '6' : '7';
+$expected_schema = 'rc12_before_upgrade' === $label ? '6' : '8';
 if ( $expected_schema !== $schema ) {
 	fwrite( STDERR, "schema does not match this installation's expected version\n" );
 	exit( 1 );
 }
-if ( '7' === $expected_schema && ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\OperationStoreReadiness() )->get_status()['ready'] ) {
-	fwrite( STDERR, "schema-7 operation storage is not verified ready\n" );
+if ( '8' === $expected_schema && ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\OperationStoreReadiness() )->get_status()['ready'] ) {
+	fwrite( STDERR, "retained operation storage is not verified ready\n" );
+	exit( 1 );
+}
+if ( '8' === $expected_schema && ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\RuleLifecycleReadiness() )->get_status()['ready'] ) {
+	fwrite( STDERR, "schema-8 rule lifecycle storage is not verified ready\n" );
 	exit( 1 );
 }
 if ( count( $tables ) < 10 ) {

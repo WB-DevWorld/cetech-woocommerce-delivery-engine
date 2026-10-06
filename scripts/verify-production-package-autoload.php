@@ -56,6 +56,23 @@ if ( ! str_contains( $health_source, 'namespace CetechDeliveryEngine\\Applicatio
 require_once $autoload;
 
 $required_classes = [
+	'CetechDeliveryEngine\\Application\\RuleLifecycle\\RuleLifecycleService',
+	'CetechDeliveryEngine\\Application\\RuleLifecycle\\RuleLifecycleOperationProfile',
+	'CetechDeliveryEngine\\Application\\RuleLifecycle\\RuleLifecycleReadService',
+	'CetechDeliveryEngine\\Application\\RuleLifecycle\\RuleImpactPreviewService',
+	'CetechDeliveryEngine\\Application\\RuleLifecycle\\RuleActivationService',
+	'CetechDeliveryEngine\\Domain\\RuleLifecycle\\RuleLifecycleCommand',
+	'CetechDeliveryEngine\\Domain\\RuleLifecycle\\RuleFamilyRegistry',
+	'CetechDeliveryEngine\\Domain\\RuleLifecycle\\RuleFamilyGuard',
+	'CetechDeliveryEngine\\Domain\\RuleLifecycle\\LogicalRule',
+	'CetechDeliveryEngine\\Domain\\RuleLifecycle\\RuleVersion',
+	'CetechDeliveryEngine\\Domain\\RuleLifecycle\\RuleSnapshot',
+	'CetechDeliveryEngine\\Domain\\RuleLifecycle\\RuleLifecycleEvaluator',
+	'CetechDeliveryEngine\\Domain\\RuleLifecycle\\RuleDecision',
+	'CetechDeliveryEngine\\Domain\\RuleLifecycle\\RuleImpactPreview',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\RuleLifecycleSchema',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\RuleLifecycleReadiness',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\WpdbRuleLifecycleRepository',
 	'CetechDeliveryEngine\\Application\\Operation\\OperationCoordinator',
 	'CetechDeliveryEngine\\Domain\\Operation\\OperationProfileRegistry',
 	'CetechDeliveryEngine\\Infrastructure\\Persistence\\OperationStoreReadiness',
@@ -299,6 +316,7 @@ $is_schema5_release = str_contains( $header_source, '1.0.0-dev.bulk' )
 	|| str_contains( $header_source, '1.0.0-dev.pdp-price' )
 	|| str_contains( $header_source, '1.0.0-rc.11' );
 
+$is_schema8_release = str_contains( $header_source, '1.0.0-dev.wave1-rule-lifecycle' );
 $is_schema7_release = str_contains( $header_source, '1.0.0-dev.wave1-operation-storage' );
 $is_schema6_release = str_contains( $header_source, '1.0.0-dev.geo' )
 	|| str_contains( $header_source, '1.0.0-rc.12' )
@@ -311,7 +329,21 @@ $is_schema6_release = str_contains( $header_source, '1.0.0-dev.geo' )
 $target = 'unknown';
 if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 	$target = ( new ReflectionClass( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) )->getConstant( 'TARGET' );
-	if ( $is_schema7_release ) {
+	if ( $is_schema8_release ) {
+		if ( '8' !== $target ) {
+			$failures[] = 'SchemaVersion::TARGET must be 8 for this schema-8 package.';
+		}
+		foreach ( [ 'rule_family_guards', 'logical_rules', 'rule_versions' ] as $suffix ) {
+			if ( ! str_contains( implode( "\n", \CetechDeliveryEngine\Infrastructure\Persistence\RuleLifecycleSchema::create_table_statements( 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' ) ), $suffix ) ) {
+				$failures[] = 'Missing schema-8 rule lifecycle table definition.';
+			}
+		}
+		foreach ( [ 'operation_records', 'operation_changes' ] as $suffix ) {
+			if ( ! str_contains( implode( "\n", \CetechDeliveryEngine\Infrastructure\Persistence\OperationStoreSchema::create_table_statements( 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' ) ), $suffix ) ) {
+				$failures[] = 'Missing retained schema-7 operation table definition.';
+			}
+		}
+	} elseif ( $is_schema7_release ) {
 		if ( '7' !== $target ) {
 			$failures[] = 'SchemaVersion::TARGET must be 7 for this schema-7 package.';
 		}
@@ -334,9 +366,9 @@ if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 }
 
 $bulk_js = $package_root . '/assets/admin/bulk-tools.js';
-if ( ( $is_schema5_release || $is_schema6_release || $is_schema7_release ) && ! is_readable( $bulk_js ) ) {
+if ( ( $is_schema5_release || $is_schema6_release || $is_schema7_release || $is_schema8_release ) && ! is_readable( $bulk_js ) ) {
 	$failures[] = 'Missing assets/admin/bulk-tools.js';
-} elseif ( is_readable( $bulk_js ) && ( $is_schema5_release || $is_schema6_release || $is_schema7_release ) ) {
+} elseif ( is_readable( $bulk_js ) && ( $is_schema5_release || $is_schema6_release || $is_schema7_release || $is_schema8_release ) ) {
 	$bulk_js_source = (string) file_get_contents( $bulk_js );
 	if ( ! str_contains( $bulk_js_source, "body.set('advance', '1')" ) ) {
 		$failures[] = 'bulk-tools.js missing bounded AJAX continue (advance=1).';
@@ -459,6 +491,23 @@ if ( ! is_readable( $classmap_file ) ) {
 		$failures[] = 'Composer classmap is not an array.';
 	} else {
 		$required_map = [
+			'CetechDeliveryEngine\\Application\\RuleLifecycle\\RuleLifecycleService' => 'src/Application/RuleLifecycle/RuleLifecycleService.php',
+			'CetechDeliveryEngine\\Application\\RuleLifecycle\\RuleLifecycleOperationProfile' => 'src/Application/RuleLifecycle/RuleLifecycleOperationProfile.php',
+			'CetechDeliveryEngine\\Application\\RuleLifecycle\\RuleLifecycleReadService' => 'src/Application/RuleLifecycle/RuleLifecycleReadService.php',
+			'CetechDeliveryEngine\\Application\\RuleLifecycle\\RuleImpactPreviewService' => 'src/Application/RuleLifecycle/RuleImpactPreviewService.php',
+			'CetechDeliveryEngine\\Application\\RuleLifecycle\\RuleActivationService' => 'src/Application/RuleLifecycle/RuleActivationService.php',
+			'CetechDeliveryEngine\\Domain\\RuleLifecycle\\RuleLifecycleCommand' => 'src/Domain/RuleLifecycle/RuleLifecycleCommand.php',
+			'CetechDeliveryEngine\\Domain\\RuleLifecycle\\RuleFamilyRegistry' => 'src/Domain/RuleLifecycle/RuleFamilyRegistry.php',
+			'CetechDeliveryEngine\\Domain\\RuleLifecycle\\RuleFamilyGuard' => 'src/Domain/RuleLifecycle/RuleFamilyGuard.php',
+			'CetechDeliveryEngine\\Domain\\RuleLifecycle\\LogicalRule' => 'src/Domain/RuleLifecycle/LogicalRule.php',
+			'CetechDeliveryEngine\\Domain\\RuleLifecycle\\RuleVersion' => 'src/Domain/RuleLifecycle/RuleVersion.php',
+			'CetechDeliveryEngine\\Domain\\RuleLifecycle\\RuleSnapshot' => 'src/Domain/RuleLifecycle/RuleSnapshot.php',
+			'CetechDeliveryEngine\\Domain\\RuleLifecycle\\RuleLifecycleEvaluator' => 'src/Domain/RuleLifecycle/RuleLifecycleEvaluator.php',
+			'CetechDeliveryEngine\\Domain\\RuleLifecycle\\RuleDecision' => 'src/Domain/RuleLifecycle/RuleDecision.php',
+			'CetechDeliveryEngine\\Domain\\RuleLifecycle\\RuleImpactPreview' => 'src/Domain/RuleLifecycle/RuleImpactPreview.php',
+			'CetechDeliveryEngine\\Infrastructure\\Persistence\\RuleLifecycleSchema' => 'src/Infrastructure/Persistence/RuleLifecycleSchema.php',
+			'CetechDeliveryEngine\\Infrastructure\\Persistence\\RuleLifecycleReadiness' => 'src/Infrastructure/Persistence/RuleLifecycleReadiness.php',
+			'CetechDeliveryEngine\\Infrastructure\\Persistence\\WpdbRuleLifecycleRepository' => 'src/Infrastructure/Persistence/WpdbRuleLifecycleRepository.php',
 			'CetechDeliveryEngine\\Application\\Runtime\\VariationRelationshipInspectorInterface' => 'src/Application/Runtime/VariationRelationshipInspectorInterface.php',
 			'CetechDeliveryEngine\\Application\\Runtime\\WooCommerceVariationRelationshipInspector' => 'src/Application/Runtime/WooCommerceVariationRelationshipInspector.php',
 			'CetechDeliveryEngine\\Core\\Versioning\\VerifiableMigrationInterface' => 'src/Core/Versioning/VerifiableMigrationInterface.php',
