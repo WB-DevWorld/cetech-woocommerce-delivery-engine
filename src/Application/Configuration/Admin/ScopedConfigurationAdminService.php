@@ -43,6 +43,12 @@ final class ScopedConfigurationAdminService {
 	) {
 	}
 
+	private bool $reset_replayed = false;
+
+	public function reset_was_replayed(): bool {
+		return $this->reset_replayed;
+	}
+
 	public function load_edit_model(
 		ConfigurationScopeType $scope_type,
 		int $scope_id,
@@ -136,14 +142,14 @@ final class ScopedConfigurationAdminService {
 			return ScopedConfigurationWriteResult::failure( [ 'Invalid slice key.' ] );
 		}
 
-		$parsed = $this->parser->parse( $command->scope_type, $command->raw_fields );
+		$raw_fields = $this->canonical_submitted_fields( $command->raw_fields );
+		$parsed     = $this->parser->parse( $command->scope_type, $raw_fields );
 		if ( ! $parsed['ok'] ) {
 			return ScopedConfigurationWriteResult::failure( $parsed['errors'] );
 		}
 
-		$existing = ConfigurationScopeType::Global === $command->scope_type
-			? $this->repository->ensureGlobalScope()
-			: $this->repository->findByScopeAndSlice( $command->scope_type, $command->scope_id, $slice_key );
+		$scope_id = ConfigurationScopeType::Global === $command->scope_type ? ConfigurationScope::GLOBAL_SCOPE_ID : $command->scope_id;
+		$existing = $this->repository->findByScopeAndSlice( $command->scope_type, $scope_id, $slice_key );
 
 		if ( null === $existing && ConfigurationScopeType::Global !== $command->scope_type && ! $command->create_slice_if_missing ) {
 			$existing_slices = $this->repository->findByScope( $command->scope_type, $command->scope_id );
@@ -156,6 +162,35 @@ final class ScopedConfigurationAdminService {
 
 		$version_before = $existing?->scope->config_version ?? 0;
 		$previous_snapshot = null !== $existing ? $this->instruction_snapshot( $existing ) : null;
+		$request_token = is_string( $command->request_token ) ? trim( $command->request_token ) : '';
+		$intent_hash   = $this->request_intent_hash( 'scoped_configuration_updated', $command->scope_type, $scope_id, $slice_key, $command->parent_product_id, $command->expected_scope_row_id, $raw_fields );
+		if ( '' !== $request_token && null !== $this->audit_logger ) {
+			$recorded = $this->audit_logger->recorded_completion( $request_token );
+			if ( null !== $recorded ) {
+				if ( ( $recorded['intent_hash'] ?? '' ) !== $intent_hash || ( $recorded['action'] ?? '' ) !== 'scoped_configuration_updated' ) {
+					return ScopedConfigurationWriteResult::failure( [ 'This request token does not match the saved operation.' ] );
+				}
+				$same_row = null !== $existing && $existing->scope->config_version === $recorded['version_after'];
+				$this->resolver->clearMemoization();
+				if ( $same_row && ConfigurationScopeType::Global === $command->scope_type && ! $this->repository->publishAcceptedRevision( $existing ) ) {
+					return ScopedConfigurationWriteResult::failure( [ 'Save outcome could not be confirmed.' ] );
+				}
+
+				return ScopedConfigurationWriteResult::success(
+					$same_row ? $existing : null,
+					false,
+					$recorded['version_before'],
+					$recorded['version_after'],
+					true,
+					[],
+					true
+				);
+			}
+		}
+
+		if ( null === $command->expected_revision ) {
+			return ScopedConfigurationWriteResult::failure( [ 'These settings are out of date. Reload the current settings and submit the draft again.' ] );
+		}
 
 		$scope = new ConfigurationScope(
 			$existing?->scope->id,
@@ -177,41 +212,67 @@ final class ScopedConfigurationAdminService {
 			$parsed['collections']
 		);
 
-		$saved            = $this->repository->saveScopedConfiguration( $candidate );
-		$version_after    = $saved->scope->config_version;
-		$version_changed  = $version_after !== $version_before && ( null !== $existing || [] !== $parsed['scalars'] || [] !== $parsed['collections'] );
+		try {
+			$saved = $this->repository->completeLocalUnit(
+				function () use ( $candidate, $existing, $version_before, $previous_snapshot, $command, $slice_key, $request_token, $intent_hash, $scope_id ): ScopedConfiguration {
+					$locked = $this->repository->lockScopeIdentity( $command->scope_type, $scope_id, $slice_key );
+					$this->assert_locked_editor( $command, $locked );
+					$saved           = $this->repository->saveScopedConfiguration( $candidate, false );
+					$version_after   = $saved->scope->config_version;
+					$version_changed = null === $existing || $saved->fingerprint() !== $existing->fingerprint();
+					if ( ! $version_changed ) {
+						return $saved;
+					}
 
-		// New empty scope still creates version 1; treat as changed only when instructions or version moved.
-		if ( null === $existing ) {
-			$version_changed = true;
-		} else {
-			$version_changed = $saved->fingerprint() !== ( $existing->fingerprint() ) || $version_after !== $version_before;
-			// Repository returns identical object without version bump for identical writes.
-			if ( $saved->fingerprint() === $existing->fingerprint() ) {
-				$version_changed = false;
-				$version_after   = $version_before;
+					if ( null === $this->audit_logger ) {
+						throw new \RuntimeException( 'Settings were not saved. The authoritative audit is not available.' );
+					}
+
+					$audit_summary = $this->build_audit_summary(
+						$command->scope_type,
+						$command->scope_id,
+						$slice_key,
+						$previous_snapshot,
+						$this->instruction_snapshot( $saved ),
+						$version_before,
+						$version_after
+					);
+					if ( '' !== $request_token ) {
+						$audit_summary['new']['request_token'] = $request_token;
+						$audit_summary['new']['intent_hash']   = $intent_hash;
+					}
+					$recorded = $this->audit_logger->log(
+						'scoped_configuration_updated',
+						'configuration_scope',
+						(int) ( $saved->scope->id ?? 0 ),
+						$audit_summary['previous'],
+						$audit_summary['new']
+					);
+					if ( ! $recorded ) {
+						throw new \RuntimeException( 'Settings were not saved. The authoritative audit was rejected.' );
+					}
+
+					return $saved;
+				}
+			);
+		} catch ( \CetechDeliveryEngine\Domain\Configuration\InvalidConfigurationException $exception ) {
+			if ( str_contains( $exception->getMessage(), 'Duplicate' ) ) {
+				return ScopedConfigurationWriteResult::failure( [ 'These settings are out of date. Reload the current settings and submit the draft again.' ] );
 			}
+
+			return ScopedConfigurationWriteResult::failure( [ 'Settings were not saved. ' . $exception->getMessage() ] );
+		} catch ( \RuntimeException $exception ) {
+			return $this->completion_failure( $exception );
 		}
 
-		$audit_summary = $this->build_audit_summary(
-			$command->scope_type,
-			$command->scope_id,
-			$slice_key,
-			$previous_snapshot,
-			$this->instruction_snapshot( $saved ),
-			$version_before,
-			$version_after
-		);
-
-		$audit_recorded = false;
-		if ( $version_changed && null !== $this->audit_logger ) {
-			$audit_recorded = $this->audit_logger->log(
-				'scoped_configuration_updated',
-				'configuration_scope',
-				(int) ( $saved->scope->id ?? 0 ),
-				$audit_summary['previous'],
-				$audit_summary['new']
-			);
+		$this->resolver->clearMemoization();
+		if ( ConfigurationScopeType::Global === $command->scope_type && ! $this->repository->publishAcceptedRevision( $saved ) ) {
+			return ScopedConfigurationWriteResult::failure( [ 'Save outcome could not be confirmed.' ] );
+		}
+		$version_after   = $saved->scope->config_version;
+		$version_changed = null === $existing || $saved->fingerprint() !== $existing->fingerprint();
+		if ( ! $version_changed ) {
+			$version_after = $version_before;
 		}
 
 		return ScopedConfigurationWriteResult::success(
@@ -219,9 +280,184 @@ final class ScopedConfigurationAdminService {
 			$version_changed,
 			$version_before,
 			$version_after,
-			$audit_recorded,
-			$audit_summary
+			$version_changed && null !== $this->audit_logger,
+			[]
 		);
+	}
+
+	/**
+	 * Remove exactly one scope slice and append its ordinary mutation audit.
+	 * Caller must first validate its current capability, nonce and object access.
+	 */
+	public function reset( ConfigurationScopeType $scope_type, int $scope_id, string $slice_key, ?int $parent_product_id = null, ?int $expected_revision = null, ?string $request_token = null, ?int $expected_scope_row_id = null ): bool {
+		$errors = $this->scope_guard->validate( $scope_type, $scope_id, $parent_product_id );
+		if ( ConfigurationScopeType::Global === $scope_type || ! $this->is_valid_slice_key( $slice_key ) || [] !== $errors ) {
+			throw new \InvalidArgumentException( 'Invalid configuration reset target. ' . implode( ' ', $errors ) );
+		}
+		if ( ConfigurationScopeType::Variation === $scope_type && null !== $this->variation_relationship_checker ) {
+			$error = $this->scope_guard->assert_variation_belongs_to_parent( $scope_id, (int) $parent_product_id, $this->variation_relationship_checker );
+			if ( null !== $error ) {
+				throw new \InvalidArgumentException( $error );
+			}
+		}
+
+		$this->reset_replayed = false;
+		$previous = $this->repository->findByScopeAndSlice( $scope_type, $scope_id, $slice_key );
+		$token = is_string( $request_token ) ? trim( $request_token ) : '';
+		$intent_hash = $this->request_intent_hash( 'scoped_configuration_reset', $scope_type, $scope_id, $slice_key, $parent_product_id, $expected_scope_row_id ?? $previous?->scope->id, [] );
+		if ( '' !== $token && null !== $this->audit_logger ) {
+			$recorded = $this->audit_logger->recorded_completion( $token );
+			if ( null !== $recorded ) {
+				if ( ( $recorded['intent_hash'] ?? '' ) !== $intent_hash || ( $recorded['action'] ?? '' ) !== 'scoped_configuration_reset' ) {
+					throw new \RuntimeException( 'This request token does not match the saved operation.' );
+				}
+				$this->reset_replayed = true;
+				$this->resolver->clearMemoization();
+
+				return null !== $previous;
+			}
+		}
+		if ( null === $previous ) {
+			return false;
+		}
+		if ( null === $expected_revision ) {
+			throw new \RuntimeException( 'These settings are out of date. Reload the current settings and submit the draft again.' );
+		}
+		try {
+			$deleted = $this->repository->completeLocalUnit(
+				function () use ( $scope_type, $scope_id, $slice_key, $parent_product_id, $previous, $expected_revision, $expected_scope_row_id, $token, $intent_hash ): bool {
+					$locked = $this->repository->lockScopeIdentity( $scope_type, $scope_id, $slice_key );
+					if ( null !== $expected_scope_row_id && $expected_scope_row_id > 0 && ( null === $locked || $locked['id'] !== $expected_scope_row_id ) ) {
+						throw new \RuntimeException( 'These settings are out of date. Reload the current settings and submit the draft again.' );
+					}
+					if ( null !== $expected_revision && ( null === $locked || $expected_revision !== $locked['version'] ) ) {
+						throw new \RuntimeException( 'These settings are out of date. Reload the current settings and submit the draft again.' );
+					}
+					if ( ! $this->repository->deleteScope( $scope_type, $scope_id, $slice_key ) ) {
+						throw new \RuntimeException( 'Settings were not saved. The selected settings could not be removed.' );
+					}
+					if ( null === $this->audit_logger ) {
+						throw new \RuntimeException( 'Settings were not saved. The authoritative audit is not available.' );
+					}
+					$recorded = $this->audit_logger->log(
+						'scoped_configuration_reset',
+						'configuration_scope',
+						(int) ( $previous->scope->id ?? 0 ),
+						array_merge( $this->instruction_snapshot( $previous ), [
+							'scope_type' => $scope_type->value,
+							'scope_id' => $scope_id,
+							'slice_key' => $slice_key,
+							'parent_product_id' => $parent_product_id,
+							'config_version' => $previous->scope->config_version,
+						] ),
+						array_filter(
+							[
+								'scope_type' => $scope_type->value,
+								'scope_id' => $scope_id,
+								'slice_key' => $slice_key,
+								'parent_product_id' => $parent_product_id,
+								'inherits' => true,
+								'request_token' => '' !== $token ? $token : null,
+								'intent_hash' => '' !== $token ? $intent_hash : null,
+							],
+							static fn ( $value ): bool => null !== $value
+						)
+					);
+					if ( ! $recorded ) {
+						throw new \RuntimeException( 'Settings were not saved. The authoritative audit was rejected.' );
+					}
+
+					return true;
+				}
+			);
+		} catch ( \RuntimeException $exception ) {
+			$mapped = $this->completion_exception( $exception );
+			if ( str_starts_with( $mapped->getMessage(), 'Save outcome could not be confirmed.' ) ) {
+				$this->resolver->clearMemoization();
+			}
+			throw $mapped;
+		}
+		if ( $deleted ) {
+			$this->resolver->clearMemoization();
+		}
+
+		return $deleted;
+	}
+
+	/**
+	 * @param array{id: int, version: int}|null $locked
+	 */
+	private function assert_locked_editor( ScopedConfigurationWriteCommand $command, ?array $locked ): void {
+		$message = 'These settings are out of date. Reload the current settings and submit the draft again.';
+		if ( null !== $command->expected_scope_row_id && $command->expected_scope_row_id > 0 && ( null === $locked || $locked['id'] !== $command->expected_scope_row_id ) ) {
+			throw new \RuntimeException( $message );
+		}
+		if ( null !== $command->expected_revision && $command->expected_revision !== ( null === $locked ? 0 : $locked['version'] ) ) {
+			throw new \RuntimeException( $message );
+		}
+	}
+
+	/**
+	 * @param array<string, mixed> $payload
+	 */
+	/**
+	 * A browser omits an unchecked collection. That is the same intent as an explicit empty member list.
+	 *
+	 * @param array<string, mixed> $fields
+	 * @return array<string, mixed>
+	 */
+	private function canonical_submitted_fields( array $fields ): array {
+		foreach ( $fields as $key => $payload ) {
+			if ( ! is_array( $payload ) ) {
+				continue;
+			}
+			$mode = isset( $payload['mode'] ) ? (string) $payload['mode'] : '';
+			if ( in_array( $mode, [ 'add', 'remove', 'replace' ], true ) && ! array_key_exists( 'members', $payload ) ) {
+				$fields[ $key ]['members'] = [];
+			}
+		}
+
+		return $fields;
+	}
+
+	private function request_intent_hash( string $action, ConfigurationScopeType $scope_type, int $scope_id, string $slice_key, ?int $parent_product_id, ?int $scope_row_id, array $payload ): string {
+		$fields = $payload;
+		ksort( $fields );
+		$encoded = wp_json_encode(
+			[
+				'action'            => $action,
+				'actor_user_id'     => function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0,
+				'scope_type'        => $scope_type->value,
+				'scope_id'          => $scope_id,
+				'slice_key'         => $slice_key,
+				'parent_product_id' => $parent_product_id,
+				'scope_row_id'      => $scope_row_id,
+				'fields'            => $fields,
+			]
+		);
+		if ( ! is_string( $encoded ) ) {
+			throw new \RuntimeException( 'Settings were not saved. The request could not be encoded.' );
+		}
+
+		return hash( 'sha256', $encoded );
+	}
+
+	private function completion_failure( \RuntimeException $exception ): ScopedConfigurationWriteResult {
+		$mapped = $this->completion_exception( $exception );
+		if ( str_starts_with( $mapped->getMessage(), 'Save outcome could not be confirmed.' ) ) {
+			$this->resolver->clearMemoization();
+		}
+
+		return ScopedConfigurationWriteResult::failure( [ $mapped->getMessage() ] );
+	}
+
+	private function completion_exception( \RuntimeException $exception ): \RuntimeException {
+		$message = $exception->getMessage();
+		if ( str_starts_with( $message, 'Save outcome could not be confirmed.' ) || str_starts_with( $message, 'Settings were not saved.' ) ) {
+			return $exception;
+		}
+
+		return new \RuntimeException( 'Settings were not saved. ' . $message, 0, $exception );
 	}
 
 	/**

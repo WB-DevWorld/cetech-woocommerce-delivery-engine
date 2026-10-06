@@ -128,7 +128,55 @@ final class InMemoryScopedConfigurationRepository implements ScopedConfiguration
 		return $matches;
 	}
 
-	public function saveScopedConfiguration( ScopedConfiguration $configuration ): ScopedConfiguration {
+	public function completeLocalUnit( callable $work ): mixed {
+		$by_id    = $this->by_id;
+		$next_id  = $this->next_id;
+		$version  = $this->global_version;
+		$writes   = $this->write_calls;
+		$counts   = $this->call_counts;
+		try {
+			return $work();
+		} catch ( \Throwable $exception ) {
+			$this->by_id          = $by_id;
+			$this->next_id        = $next_id;
+			$this->global_version = $version;
+			$this->write_calls    = $writes;
+			$this->call_counts    = $counts;
+			throw $exception;
+		}
+	}
+
+	public int $refuse_publications = 0;
+
+	public function publishAcceptedRevision( ScopedConfiguration $configuration ): bool {
+		if ( $this->refuse_publications > 0 ) {
+			--$this->refuse_publications;
+			if ( ConfigurationScopeType::Global === $configuration->scope->scope_type ) {
+				$this->global_version = $configuration->scope->config_version;
+			}
+
+			return false;
+		}
+		if ( ConfigurationScopeType::Global === $configuration->scope->scope_type ) {
+			$this->global_version = $configuration->scope->config_version;
+		}
+
+		return true;
+	}
+
+	public function lockScopeIdentity( ConfigurationScopeType $scope_type, int $scope_id, string $slice_key ): ?array {
+		$found = $this->findByScopeAndSlice( $scope_type, $scope_id, $slice_key );
+		if ( null === $found || null === $found->scope->id ) {
+			return null;
+		}
+
+		return [
+			'id'      => (int) $found->scope->id,
+			'version' => $found->scope->config_version,
+		];
+	}
+
+	public function saveScopedConfiguration( ScopedConfiguration $configuration, bool $publish_revision = true ): ScopedConfiguration {
 		$this->increment_call_count( __FUNCTION__ );
 		++$this->write_calls;
 

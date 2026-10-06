@@ -34,13 +34,16 @@ final class ProductExceptionsQuery {
 	 *     id: int,
 	 *     type: string,
 	 *     parent_id: int|null,
+	 *     slice_key: string,
 	 *     label: string,
 	 *     url: string,
 	 *     fulfilment: string,
 	 *     currently_using: string,
 	 *     customized: list<string>,
 	 *     status: string,
-	 *     type_label: string
+	 *     type_label: string,
+	 *     config_version: int,
+	 *     scope_row_id: int
 	 * }>
 	 */
 	public function list( int $limit = 100, array $filters = [] ): array {
@@ -178,6 +181,7 @@ final class ProductExceptionsQuery {
 			'id'              => $id,
 			'type'            => $type,
 			'parent_id'       => $parent_id,
+			'slice_key'       => $scope->scope->slice_key,
 			'label'           => $label,
 			'url'             => $this->catalog->product_edit_url( $parent_id ?? $id ),
 			'fulfilment'      => $profile?->label ?? 'Site-wide default',
@@ -188,6 +192,8 @@ final class ProductExceptionsQuery {
 				: __( 'Product-specific delivery settings', 'cetech-woocommerce-delivery-engine' ),
 			'customized'      => $customized,
 			'status'          => $readiness->status_label,
+			'config_version'  => $scope->scope->config_version,
+			'scope_row_id'    => (int) ( $scope->scope->id ?? 0 ),
 		];
 	}
 

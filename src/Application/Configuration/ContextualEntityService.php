@@ -16,6 +16,7 @@ use CetechDeliveryEngine\Domain\RateCard\RateCardRepositoryInterface;
 use CetechDeliveryEngine\Domain\Zone\DestinationRuleRepositoryInterface;
 use CetechDeliveryEngine\Domain\Zone\DestinationZoneRepositoryInterface;
 use CetechDeliveryEngine\Presentation\Admin\AdminFormHelper;
+use CetechDeliveryEngine\Presentation\Admin\AdminPageAccess;
 use CetechDeliveryEngine\Presentation\Admin\Validation\DeliveryOfferValidator;
 use CetechDeliveryEngine\Presentation\Admin\Validation\DestinationRuleValidator;
 use CetechDeliveryEngine\Presentation\Admin\Validation\DestinationZoneValidator;
@@ -220,6 +221,8 @@ final class ContextualEntityService {
 			if ( isset( $areas[0]['id'] ) ) {
 				$zone_id = (int) $areas[0]['id'];
 			} else {
+				// Creating a default area is a separate entity write from managing charges.
+				AdminPageAccess::require_capability( 'manage_delivery_zones' );
 				$created = $this->create_delivery_area(
 					[
 						'name'    => 'Default delivery area',

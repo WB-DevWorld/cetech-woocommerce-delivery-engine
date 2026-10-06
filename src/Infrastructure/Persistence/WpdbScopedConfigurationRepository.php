@@ -24,6 +24,9 @@ use CetechDeliveryEngine\Domain\Enum\ScalarConfigurationMode;
  */
 final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepositoryInterface {
 
+	/** @var null|\Closure(): void */
+	public static ?\Closure $before_global_option_publish = null;
+
 	public function getGlobalConfiguration(): ?ScopedConfiguration {
 		return $this->findByScopeAndSlice(
 			ConfigurationScopeType::Global,
@@ -126,7 +129,40 @@ final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepo
 		return $results;
 	}
 
-	public function saveScopedConfiguration( ScopedConfiguration $configuration ): ScopedConfiguration {
+	public function completeLocalUnit( callable $work ): mixed {
+		return AbstractWpdbRepository::run_shared_unit( $work );
+	}
+
+	public function publishAcceptedRevision( ScopedConfiguration $configuration ): bool {
+		if ( ConfigurationScopeType::Global !== $configuration->scope->scope_type ) {
+			return true;
+		}
+
+		return $this->sync_global_version_option( $configuration->scope->config_version );
+	}
+
+	public function lockScopeIdentity( ConfigurationScopeType $scope_type, int $scope_id, string $slice_key ): ?array {
+		global $wpdb;
+
+		$table = TableNames::for( ScopedConfigurationSchema::SCOPES_SUFFIX );
+		$sql   = "SELECT id, config_version FROM `{$table}` WHERE scope_type = %s AND scope_id = %d AND slice_key = %s LIMIT 1 FOR UPDATE";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$row = $wpdb->get_row( $wpdb->prepare( $sql, $scope_type->value, $scope_id, $slice_key ), ARRAY_A );
+		if ( ! is_array( $row ) ) {
+			if ( '' !== trim( (string) $wpdb->last_error ) ) {
+				throw new InvalidConfigurationException( 'Failed to lock configuration scope. ' . trim( (string) $wpdb->last_error ) );
+			}
+
+			return null;
+		}
+
+		return [
+			'id'      => (int) $row['id'],
+			'version' => (int) $row['config_version'],
+		];
+	}
+
+	public function saveScopedConfiguration( ScopedConfiguration $configuration, bool $publish_revision = true ): ScopedConfiguration {
 		$scope = $configuration->scope;
 
 		$this->assert_valid_scope_identity( $scope );
@@ -170,7 +206,7 @@ final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepo
 				throw new InvalidConfigurationException( 'Failed to reload scoped configuration after update.' );
 			}
 
-			if ( ConfigurationScopeType::Global === $scope->scope_type ) {
+			if ( $publish_revision && ConfigurationScopeType::Global === $scope->scope_type ) {
 				$this->sync_global_version_option( $saved->scope->config_version );
 			}
 
@@ -186,7 +222,7 @@ final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepo
 			throw new InvalidConfigurationException( 'Failed to reload scoped configuration after insert.' );
 		}
 
-		if ( ConfigurationScopeType::Global === $scope->scope_type ) {
+		if ( $publish_revision && ConfigurationScopeType::Global === $scope->scope_type ) {
 			$this->sync_global_version_option( $saved->scope->config_version );
 		}
 
@@ -393,7 +429,8 @@ final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepo
 		);
 
 		if ( false === $inserted ) {
-			throw new InvalidConfigurationException( 'Failed to insert configuration scope.' );
+			$detail = trim( (string) $wpdb->last_error );
+			throw new InvalidConfigurationException( 'Failed to insert configuration scope. ' . $detail );
 		}
 
 		return (int) $wpdb->insert_id;
@@ -444,9 +481,12 @@ final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepo
 		$collections = TableNames::for( ScopedConfigurationSchema::COLLECTIONS_SUFFIX );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->delete( $fields, [ 'scope_row_id' => $scope_row_id ], [ '%d' ] );
+		$deleted_fields = $wpdb->delete( $fields, [ 'scope_row_id' => $scope_row_id ], [ '%d' ] );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->delete( $collections, [ 'scope_row_id' => $scope_row_id ], [ '%d' ] );
+		$deleted_collections = $wpdb->delete( $collections, [ 'scope_row_id' => $scope_row_id ], [ '%d' ] );
+		if ( AbstractWpdbRepository::shared_transaction_is_open() && ( false === $deleted_fields || false === $deleted_collections ) ) {
+			throw new InvalidConfigurationException( 'Failed to remove the previous configuration instructions. ' . trim( (string) $wpdb->last_error ) );
+		}
 	}
 
 	private function insert_scalar( int $scope_row_id, ScalarFieldInstruction $instruction ): void {
@@ -571,7 +611,82 @@ final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepo
 		}
 	}
 
-	private function sync_global_version_option( int $version ): void {
-		update_option( ScopedConfigurationSchema::GLOBAL_VERSION_OPTION, $version, false );
+	private function sync_global_version_option( int $version ): bool {
+		$probe = self::$before_global_option_publish;
+		if ( null !== $probe ) {
+			self::$before_global_option_publish = null;
+			$probe();
+		}
+
+		global $wpdb;
+
+		$key   = ScopedConfigurationSchema::GLOBAL_VERSION_OPTION;
+		$table = is_object( $wpdb ) && isset( $wpdb->options ) ? (string) $wpdb->options : '';
+		if ( '' === $table || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'prepare' ) || ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'query' ) ) {
+			return false;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$durable = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM `{$table}` WHERE option_name = %s LIMIT 1", $key ) );
+		if ( is_string( $durable ) && '' !== $durable && (int) $durable > $version ) {
+			$this->refresh_option_cache( $key, (string) (int) $durable );
+
+			return false;
+		}
+		if ( (string) $durable === (string) $version ) {
+			$this->refresh_option_cache( $key, (string) $version );
+
+			return true;
+		}
+		if ( null === $durable || false === $durable || '' === (string) $durable ) {
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$inserted = $wpdb->query( $wpdb->prepare( "INSERT INTO `{$table}` (option_name, option_value, autoload) VALUES (%s, %s, 'off')", $key, (string) $version ) );
+			if ( false === $inserted ) {
+				return false;
+			}
+			$this->refresh_option_cache( $key, (string) $version );
+
+			return true;
+		}
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$updated = $wpdb->query(
+			$wpdb->prepare(
+				"UPDATE `{$table}` SET option_value = %s WHERE option_name = %s AND CAST(option_value AS UNSIGNED) < %d",
+				(string) $version,
+				$key,
+				$version
+			)
+		);
+		if ( false === $updated ) {
+			$this->refresh_option_cache( $key, (string) $durable );
+
+			return false;
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$now = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM `{$table}` WHERE option_name = %s LIMIT 1", $key ) );
+		$this->refresh_option_cache( $key, (string) $now );
+
+		return (string) $now === (string) $version;
+	}
+
+	private function refresh_option_cache( string $key, string $value ): void {
+		if ( function_exists( 'wp_cache_delete' ) ) {
+			wp_cache_delete( $key, 'options' );
+		}
+		if ( ! function_exists( 'wp_cache_get' ) || ! function_exists( 'wp_cache_set' ) ) {
+			return;
+		}
+		$notoptions = wp_cache_get( 'notoptions', 'options' );
+		if ( is_array( $notoptions ) && array_key_exists( $key, $notoptions ) ) {
+			unset( $notoptions[ $key ] );
+			wp_cache_set( 'notoptions', $notoptions, 'options' );
+		}
+		$alloptions = wp_cache_get( 'alloptions', 'options' );
+		if ( is_array( $alloptions ) && array_key_exists( $key, $alloptions ) ) {
+			unset( $alloptions[ $key ] );
+			wp_cache_set( 'alloptions', $alloptions, 'options' );
+		}
+		wp_cache_set( $key, $value, 'options' );
 	}
 }

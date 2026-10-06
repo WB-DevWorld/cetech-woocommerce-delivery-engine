@@ -39,12 +39,17 @@ final class WpdbDestinationRuleRepository extends AbstractWpdbRepository impleme
 	public function replaceForZone( int $zone_id, array $rules ): bool {
 		global $wpdb;
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->query( 'START TRANSACTION' );
+		$this->throw_if_transaction_unresolved();
+		$joined = $this->transaction_is_open();
+		if ( ! $joined && ! $this->open_owned_transaction() ) {
+			return false;
+		}
+
+		self::probe_transaction( 'after_transaction_open' );
 
 		if ( ! $this->deleteByZoneId( $zone_id ) ) {
-			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-			$wpdb->query( 'ROLLBACK' );
+			$this->remember_transaction_cause( trim( (string) $wpdb->last_error ) );
+			$this->rollback_owned_transaction();
 
 			return false;
 		}
@@ -53,15 +58,21 @@ final class WpdbDestinationRuleRepository extends AbstractWpdbRepository impleme
 
 		foreach ( $rules as $rule ) {
 			if ( ! $this->insert_rule_row( $zone_id, $rule, $now ) ) {
-				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-				$wpdb->query( 'ROLLBACK' );
+				$this->remember_transaction_cause( trim( (string) $wpdb->last_error ) );
+				$this->rollback_owned_transaction();
 
 				return false;
 			}
 		}
 
-		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->query( 'COMMIT' );
+		if ( $joined ) {
+			return true;
+		}
+		if ( ! $this->commit_owned_transaction() ) {
+			$this->rollback_owned_transaction();
+
+			return false;
+		}
 
 		return true;
 	}

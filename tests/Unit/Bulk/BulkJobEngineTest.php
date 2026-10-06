@@ -526,12 +526,21 @@ final class BulkJobEngineTest extends TestCase {
 		$this->drain();
 		$item = $this->jobs->find_item( (int) $job->id, 'product', 70, 'SKU-70' );
 		self::assertNotNull( $item );
+		if ( BulkJobItemStatus::Pending !== $item->status ) {
+			$item = $this->jobs->save_item( $item->with( [ 'status' => BulkJobItemStatus::Pending ] ) );
+		}
+		$claimed = $this->jobs->claim_items( (int) $job->id, 10, 'dead-worker', 300 );
+		$match   = null;
+		foreach ( $claimed as $row ) {
+			if ( 70 === $row->target_id ) {
+				$match = $row;
+			}
+		}
+		self::assertNotNull( $match );
 		$this->jobs->save_item(
-			$item->with(
+			$match->with(
 				[
-					'status'     => BulkJobItemStatus::Claimed,
 					'claimed_at' => '2000-01-01 00:00:00',
-					'claim_token'=> 'dead-worker',
 				]
 			)
 		);

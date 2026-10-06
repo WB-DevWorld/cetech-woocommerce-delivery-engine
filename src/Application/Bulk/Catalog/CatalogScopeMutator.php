@@ -36,6 +36,24 @@ use CetechDeliveryEngine\Domain\Enum\ScalarConfigurationMode;
  */
 final class CatalogScopeMutator {
 
+	/**
+	 * Test seam. Runs once after the locked precondition matches and before the write.
+	 */
+	public static ?\Closure $during_locked_resolution = null;
+
+	/**
+	 * Test seam. Runs once inside the claimed transaction, after membership has
+	 * opened its read view and before the scope lock.
+	 */
+	public static ?\Closure $before_scope_lock = null;
+
+	private bool $holding_scope_lock = false;
+
+	private bool $scope_identity_locked = false;
+
+	/** @var array{id: int, version: int}|null */
+	private ?array $locked_scope_identity = null;
+
 	public function __construct(
 		private readonly ScopedConfigurationRepositoryInterface $scopes,
 		private readonly EffectiveConfigurationValidator $validator,
@@ -62,7 +80,8 @@ final class CatalogScopeMutator {
 		int $target_id,
 		?int $parent_product_id,
 		CatalogActionManifest $manifest,
-		bool $dry_run
+		bool $dry_run,
+		?string $expected_precondition = null
 	): array {
 		$scope_type = CatalogTargetDefinition::TARGET_VARIATION === $target_type
 			? ConfigurationScopeType::Variation
@@ -70,6 +89,29 @@ final class CatalogScopeMutator {
 
 		if ( ConfigurationScopeType::Variation === $scope_type && ( null === $parent_product_id || $parent_product_id <= 0 ) ) {
 			return $this->fail( 'missing_parent', 'Variation configuration requires a parent product.', [], '' );
+		}
+
+		if ( ! $dry_run && ! $this->holding_scope_lock ) {
+			$this->holding_scope_lock = true;
+			try {
+				return $this->scopes->completeLocalUnit(
+					function () use ( $target_type, $target_id, $parent_product_id, $manifest, $dry_run, $expected_precondition, $scope_type ): array {
+						$probe = self::$before_scope_lock;
+						self::$before_scope_lock = null;
+						if ( $probe instanceof \Closure ) {
+							$probe();
+						}
+						$this->locked_scope_identity = $this->scopes->lockScopeIdentity( $scope_type, $target_id, ConfigurationScope::DEFAULT_SLICE_KEY );
+						$this->scope_identity_locked = true;
+
+						return $this->process( $target_type, $target_id, $parent_product_id, $manifest, $dry_run, $expected_precondition );
+					}
+				);
+			} finally {
+				$this->holding_scope_lock     = false;
+				$this->scope_identity_locked  = false;
+				$this->locked_scope_identity  = null;
+			}
 		}
 
 		$existing = $this->scopes->findByScopeAndSlice(
@@ -80,6 +122,38 @@ final class CatalogScopeMutator {
 
 		$before_snapshot = $this->snapshot( $existing );
 		$precondition    = $existing instanceof ScopedConfiguration ? $existing->fingerprint() : '';
+		if ( ! $dry_run && $this->scope_identity_locked && $this->locked_identity_diverges( $existing ) ) {
+			return [
+				'outcome'                  => 'skipped',
+				'error_code'               => 'stale_target',
+				'error_summary'            => 'This product changed after the approved preview.',
+				'warning'                  => false,
+				'before_snapshot'          => $before_snapshot,
+				'precondition_fingerprint' => $precondition,
+				'after_fingerprint'        => '',
+				'result'                   => [ 'stale' => true ],
+			];
+		}
+		if ( ! $dry_run && null !== $expected_precondition && $expected_precondition !== $precondition ) {
+			return [
+				'outcome'                  => 'skipped',
+				'error_code'               => 'stale_target',
+				'error_summary'            => 'This product changed after the approved preview.',
+				'warning'                  => false,
+				'before_snapshot'          => $before_snapshot,
+				'precondition_fingerprint' => $precondition,
+				'after_fingerprint'        => '',
+				'result'                   => [ 'stale' => true ],
+			];
+		}
+
+		if ( ! $dry_run ) {
+			$probe = self::$during_locked_resolution;
+			self::$during_locked_resolution = null;
+			if ( $probe instanceof \Closure ) {
+				$probe();
+			}
+		}
 
 		try {
 			$candidate = $this->build_candidate( $scope_type, $target_id, $parent_product_id, $existing, $manifest );
@@ -613,6 +687,19 @@ final class CatalogScopeMutator {
 			'conflict_code'    => 'unsupported_field_action',
 			'conflict_summary' => sprintf( 'Action %s is not valid for field %s.', $action->action, $action->field_key ),
 		];
+	}
+
+	private function locked_identity_diverges( ?ScopedConfiguration $existing ): bool {
+		$locked = $this->locked_scope_identity;
+		if ( null === $locked ) {
+			return $existing instanceof ScopedConfiguration;
+		}
+		if ( ! $existing instanceof ScopedConfiguration || null === $existing->scope->id ) {
+			return true;
+		}
+
+		return (int) $existing->scope->id !== (int) $locked['id']
+			|| (int) $existing->scope->config_version !== (int) $locked['version'];
 	}
 
 	private function resolve_candidate(

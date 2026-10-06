@@ -101,6 +101,26 @@ describe('Bulk Tools job preview polling presentation', () => {
 		expect(cancel.querySelector('button').disabled).toBe(true);
 	});
 
+	it('shows scanned candidates instead of a finished ratio while preparation is incomplete', () => {
+		const status = document.querySelector('[data-cetech-de-job-id]');
+
+		window.cetechDeBulkCatalog.applyJobPoll(status, {
+			status: 'previewing',
+			status_label: 'Preparing preview',
+			processed: 0,
+			total: 0,
+			preparation_state: 'incomplete',
+			scanned: 400,
+			effective: 1,
+			show_cancel: true,
+			allows_apply: false,
+			terminal: false
+		});
+
+		expect(status.textContent).toBe('Preparing preview · scanned 400 · targets so far 1');
+		expect(status.textContent).not.toContain('0 / 0');
+	});
+
 	it('keeps cancel remaining available while a job is running', () => {
 		const status = document.querySelector('[data-cetech-de-job-id]');
 		const cancel = document.querySelector('[data-cetech-de-cancel-remaining]');

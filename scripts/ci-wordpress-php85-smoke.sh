@@ -12,11 +12,25 @@ DB_USER="${CETECH_DE_WP_DB_USER:-root}"
 DB_PASSWORD="${CETECH_DE_WP_DB_PASSWORD:-wordpress}"
 DB_NAME_CLEAN="${CETECH_DE_WP_DB_CLEAN:-cetech_wp_clean}"
 DB_NAME_UPGRADE="${CETECH_DE_WP_DB_UPGRADE:-cetech_wp_upgrade}"
+NATIVE_OPENING_ENABLED="${CETECH_DE_NATIVE_OPENING_QUALIFICATION:-0}"
+HTTP_OPENING_ENABLED="${CETECH_DE_HTTP_OPENING_QUALIFICATION:-0}"
+WP_VERSION="${CETECH_DE_WP_VERSION:-latest}"
+WOO_VERSION="${CETECH_DE_WOO_VERSION:-}"
 RC12_ZIP_URL="${CETECH_DE_RC12_ZIP_URL:-https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/releases/download/v1.0.0-rc.12/cetech-woocommerce-delivery-engine-1.0.0-rc.12.zip}"
 PHP_MAJOR_MINOR="$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')"
 
 if [[ "$PHP_MAJOR_MINOR" != "8.5" ]]; then
 	echo "BLOCKED: this smoke must run on PHP 8.5, found $(php -r 'echo PHP_VERSION;')" >&2
+	exit 1
+fi
+
+if [[ "$NATIVE_OPENING_ENABLED" == "1" && "$DB_HOST" != "127.0.0.1" ]]; then
+	echo "BLOCKED: targeted native checks require the disposable loopback database service" >&2
+	exit 1
+fi
+
+if [[ "$HTTP_OPENING_ENABLED" == "1" && "$NATIVE_OPENING_ENABLED" != "1" ]]; then
+	echo "BLOCKED: HTTP qualification requires preceding native qualification" >&2
 	exit 1
 fi
 
@@ -31,7 +45,15 @@ curl -sSLo "$WORK/wp-cli.phar" https://raw.githubusercontent.com/wp-cli/builds/g
 php "$WORK/wp-cli.phar" --info >/dev/null
 WP=(php "$WORK/wp-cli.phar" --allow-root)
 
-curl -sSLo "$WORK/wordpress.tar.gz" https://wordpress.org/latest.tar.gz
+if [[ "$WP_VERSION" != "latest" && ! "$WP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+	echo "BLOCKED: unsupported diagnostic WordPress version" >&2; exit 1
+fi
+if [[ -n "$WOO_VERSION" && ! "$WOO_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+	echo "BLOCKED: unsupported diagnostic WooCommerce version" >&2; exit 1
+fi
+WP_ARCHIVE="https://wordpress.org/latest.tar.gz"
+if [[ "$WP_VERSION" != "latest" ]]; then WP_ARCHIVE="https://wordpress.org/wordpress-${WP_VERSION}.tar.gz"; fi
+curl -fsSLo "$WORK/wordpress.tar.gz" "$WP_ARCHIVE"
 mkdir -p "$WORK/src"
 tar -xzf "$WORK/wordpress.tar.gz" -C "$WORK/src"
 WP_SRC="$WORK/src/wordpress"
@@ -84,7 +106,9 @@ install_site() {
 		--admin_password="admin" \
 		--admin_email="qa@example.com" \
 		--skip-email
-	"${WP[@]}" plugin install woocommerce --activate --path="$dest"
+	local woo_version_args=()
+	if [[ -n "$WOO_VERSION" ]]; then woo_version_args=("--version=$WOO_VERSION"); fi
+	"${WP[@]}" plugin install woocommerce "${woo_version_args[@]}" --activate --path="$dest"
 	# WooCommerce 11 removed FeaturesController::change_feature_is_enabled().
 	# Prefer the current WP-CLI command, then fall back to remaining controller APIs / options.
 	"${WP[@]}" wc hpos enable --user=1 --path="$dest" || true
@@ -172,11 +196,12 @@ copy_plugin "$CLEAN" "$PLUGIN_STAGE"
 inspect_engine "$CLEAN" "clean"
 
 STORE_JSON="$WORK/store-cart.json"
-php -S 127.0.0.1:8085 -t "$CLEAN" >"$WORK/php-server.log" 2>&1 &
-SERVER_PID=$!
-trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+source "$ROOT/scripts/qualification/store-smoke-diagnostic.sh"
+start_store_smoke_listener
 sleep 2
+STORE_SMOKE_STAGE="store_api_cart"
 curl -fsS "http://127.0.0.1:8085/?rest_route=/wc/store/v1/cart" -o "$STORE_JSON"
+STORE_SMOKE_STAGE="cart_payload"
 php -r '
 	$json = json_decode((string) file_get_contents($argv[1]), true);
 	if ( ! is_array($json) || ! array_key_exists("items", $json) ) {
@@ -185,6 +210,7 @@ php -r '
 	}
 	echo "store_api=cart_ok\n";
 ' "$STORE_JSON"
+STORE_SMOKE_STAGE="classic_pages"
 "${WP[@]}" eval --path="$CLEAN" '
 	$checkout = get_option( "woocommerce_checkout_page_id" );
 	$cart = get_option( "woocommerce_cart_page_id" );
@@ -196,6 +222,7 @@ php -r '
 '
 
 DEBUG_LOG="$CLEAN/wp-content/debug.log"
+STORE_SMOKE_STAGE="debug_log"
 if [[ -f "$DEBUG_LOG" ]] && grep -E 'PHP (Fatal|Parse) error' "$DEBUG_LOG" | grep -Ei 'cetech|delivery.engine' >/dev/null; then
 	echo "Delivery Engine PHP fatal found in debug.log" >&2
 	grep -E 'PHP (Fatal|Parse) error' "$DEBUG_LOG" >&2 || true
@@ -203,8 +230,8 @@ if [[ -f "$DEBUG_LOG" ]] && grep -E 'PHP (Fatal|Parse) error' "$DEBUG_LOG" | gre
 fi
 echo "debug_log=no_delivery_engine_fatal"
 
-kill "$SERVER_PID" 2>/dev/null || true
-trap - EXIT
+STORE_SMOKE_STAGE="complete"
+finish_store_smoke_listener 0
 
 echo "Downloading immutable RC.12 ZIP for upgrade verification"
 curl -fsSL "$RC12_ZIP_URL" -o "$WORK/rc12.zip"
@@ -239,3 +266,30 @@ if [[ "$SENTINEL" != "keep_me" ]]; then
 fi
 
 echo "wordpress_woocommerce_php85_smoke=PASS"
+
+# Targeted opening checks get their own database/site, never the clean/upgrade sites.
+if [[ "$NATIVE_OPENING_ENABLED" != "1" ]]; then
+	echo "opening_native_qualification=NOT_REQUESTED"
+	exit 0
+fi
+DB_NAME_QUALIFICATION="cetech_wp_opening_qualification_$(php -r 'echo bin2hex(random_bytes(6));')"
+# Plain CREATE fails on a collision; no populated fixture database is reused.
+mysql_admin "CREATE DATABASE \`${DB_NAME_QUALIFICATION}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
+NATIVE="$WORK/opening-qualification"
+install_site "$NATIVE" "$DB_NAME_QUALIFICATION"
+"${WP[@]}" config set DISABLE_WP_CRON true --raw --path="$NATIVE"
+copy_plugin "$NATIVE" "$PLUGIN_STAGE"
+inspect_engine "$NATIVE" "opening_qualification"
+"${WP[@]}" option update cetech_opening_qualification_disposable 1 --path="$NATIVE"
+export CETECH_DE_QUALIFICATION_HEAD="$(git -C "$ROOT" rev-parse HEAD)"
+export CETECH_DE_QUALIFICATION_CANDIDATE_HEAD="${CETECH_DE_QUALIFICATION_CANDIDATE_HEAD:-$CETECH_DE_QUALIFICATION_HEAD}"
+export CETECH_DE_QUALIFICATION_TREE="$(git -C "$ROOT" rev-parse HEAD^{tree})"
+"${WP[@]}" --require="$ROOT/scripts/qualification/admin-context.php" \
+	eval-file "$ROOT/scripts/qualification/opening-runner.php" \
+	"$WORK/opening-qualification-results.json" --path="$NATIVE"
+
+if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
+	bash "$ROOT/scripts/ci-opening-http-qualification.sh" "$WORK" "$NATIVE"
+else
+	echo "opening_http_qualification=NOT_REQUESTED"
+fi

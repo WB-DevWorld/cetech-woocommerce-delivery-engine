@@ -20,4 +20,9 @@ interface ConfigurationChangeAuditorInterface {
 		?array $previous = null,
 		?array $new = null
 	): bool;
+
+	/**
+	 * @return array{version_before: int, version_after: int, intent_hash: string, action: string}|null
+	 */
+	public function recorded_completion( string $request_token ): ?array;
 }

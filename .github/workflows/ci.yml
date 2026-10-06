@@ -182,7 +182,7 @@ jobs:
     timeout-minutes: 30
     services:
       mariadb:
-        image: mariadb:11.4
+        image: mariadb:11.4.13
         env:
           MARIADB_ROOT_PASSWORD: wordpress
           MARIADB_DATABASE: wordpress
@@ -197,18 +197,59 @@ jobs:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.5'
+          php-version: '8.5.11'
           tools: composer:v2
           coverage: none
           extensions: mysqli, pdo_mysql, zip, mbstring, intl, xml, curl, gd, soap, bcmath
+        env:
+          debug: 'true'
+      - name: Verify crash diagnostic output boundary
+        run: |
+          python3 scripts/qualification/test-opening-http-native-stack.py
+          python3 scripts/qualification/test-store-smoke-diagnostic.py
+      - name: Install native crash debugger for the disposable HTTP listener
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq gdb
       - name: WordPress bootstrap, WooCommerce, HPOS, Store API, upgrade from RC.12
         env:
+          CETECH_DE_NATIVE_OPENING_QUALIFICATION: '1'
+          CETECH_DE_HTTP_OPENING_QUALIFICATION: '1'
+          CETECH_DE_HTTP_CRASH_DIAGNOSTIC: '1'
+          CETECH_DE_HTTP_EXPECT_BINARY_SHA256: '7dda44e554d086c1c4f441796fc19f11f46055c0a276dad66181f6c11566e46a'
+          CETECH_DE_HTTP_LISTENER_JIT: disable
+          CETECH_DE_HTTP_EXPECT_INI_SHA256: '18468a95951fe17444a8e0341c577edba8e28b0e31a33a0892a32d91ce7d973a'
+          CETECH_DE_HTTP_EXPECT_ORIGINAL_INI_SHA256: 'a0e4940c0a48d65a50eca849f62d052a7e3e4727a720308c65d7d9dfc840adaf'
+          CETECH_DE_HTTP_EXPECT_EXTENSIONS_SHA256: '5f6a8290cb266b26630ec6a72299175906d3aeba788610acd3783d36c8cc0ac3'
+          CETECH_DE_WP_VERSION: '7.1.2'
+          CETECH_DE_WOO_VERSION: '11.1.2'
+          CETECH_DE_QUALIFICATION_CANDIDATE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
           CETECH_DE_WP_DB_HOST: 127.0.0.1
           CETECH_DE_WP_DB_PORT: 3306
           CETECH_DE_WP_DB_USER: root
           CETECH_DE_WP_DB_PASSWORD: wordpress
         shell: bash
         run: bash scripts/ci-wordpress-php85-smoke.sh
+      - name: Retain separate Store API smoke diagnostic receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-smoke-diagnostic
+          path: ${{ runner.temp }}/cetech-de-php85-wp/store-smoke-diagnostic.json
+          if-no-files-found: warn
+      - name: Retain targeted native opening qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-native-qualification
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-qualification-results.json
+          if-no-files-found: warn
+
+      - name: Retain authenticated HTTP opening qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-http-qualification
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-qualification-results.json
+          if-no-files-found: warn
 
   javascript-tests:
     name: JavaScript / Vitest

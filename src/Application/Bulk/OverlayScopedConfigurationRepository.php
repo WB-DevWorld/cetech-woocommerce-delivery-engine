@@ -96,7 +96,26 @@ final class OverlayScopedConfigurationRepository implements ScopedConfigurationR
 		return $filtered;
 	}
 
-	public function saveScopedConfiguration( ScopedConfiguration $configuration ): ScopedConfiguration {
+	public function completeLocalUnit( callable $work ): mixed {
+		return $work();
+	}
+
+	public function publishAcceptedRevision( ScopedConfiguration $configuration ): bool {
+		return true;
+	}
+
+	public function lockScopeIdentity( ConfigurationScopeType $scope_type, int $scope_id, string $slice_key ): ?array {
+		if ( $this->matches_identity( $scope_type, $scope_id, $slice_key ) && $this->overlay instanceof ScopedConfiguration && null !== $this->overlay->scope->id ) {
+			return [
+				'id'      => (int) $this->overlay->scope->id,
+				'version' => $this->overlay->scope->config_version,
+			];
+		}
+
+		return $this->inner->lockScopeIdentity( $scope_type, $scope_id, $slice_key );
+	}
+
+	public function saveScopedConfiguration( ScopedConfiguration $configuration, bool $publish_revision = true ): ScopedConfiguration {
 		throw new \LogicException( 'Dry-run overlay repository cannot persist configuration.' );
 	}
 

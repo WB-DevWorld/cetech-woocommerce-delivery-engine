@@ -108,8 +108,19 @@ if ( ! function_exists( 'wp_strip_all_tags' ) ) {
 	}
 }
 
+// UI fixtures do not prove native WordPress escaping behavior.
+if ( ! function_exists( 'esc_js' ) ) {
+	function esc_js( string $text ): string {
+		return addslashes( $text );
+	}
+}
+
 if ( ! function_exists( 'current_user_can' ) ) {
 	function current_user_can( string $capability, mixed ...$args ): bool {
+		if ( 'edit_post' === $capability && isset( $args[0] ) && isset( $GLOBALS['cetech_de_test_edit_posts'] ) ) {
+			return (bool) ( $GLOBALS['cetech_de_test_edit_posts'][ (int) $args[0] ] ?? false );
+		}
+
 		if ( 'edit_user' === $capability && isset( $args[0] ) ) {
 			$target = (int) $args[0];
 			$map    = $GLOBALS['cetech_de_test_edit_users'] ?? null;

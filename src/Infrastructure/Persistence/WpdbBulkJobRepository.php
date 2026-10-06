@@ -20,6 +20,7 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 
 	public function save_job( BulkJob $job ): BulkJob {
 		global $wpdb;
+		$this->throw_if_transaction_unresolved();
 		$row = $this->job_to_row( $job );
 		if ( null === $job->id ) {
 			$id = $this->insert_row( $row['data'], $row['formats'] );
@@ -36,10 +37,22 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 			return $saved;
 		}
 
-		$this->update_row( $job->id, $row['data'], $row['formats'] );
-		$saved = $this->find_job( $job->id );
+		$updated = $this->query_fenced_job( $job, $row['data'] );
+		if ( false === $updated ) {
+			throw new \RuntimeException( 'Bulk job write failed.' );
+		}
+		$saved = $this->find_job( (int) $job->id );
+		if ( ! $saved instanceof BulkJob ) {
+			throw new \RuntimeException( 'Bulk job write failed.' );
+		}
+		if ( (string) $saved->claim_token !== (string) $job->claim_token ) {
+			throw new \RuntimeException( 'Stale bulk claim.' );
+		}
+		if ( 0 === $updated && ! $this->job_values_match( $saved, $job ) ) {
+			throw new \RuntimeException( 'Bulk job write failed.' );
+		}
 
-		return $saved instanceof BulkJob ? $saved : $job;
+		return $saved;
 	}
 
 	public function find_job( int $id ): ?BulkJob {
@@ -127,13 +140,20 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 		return $jobs;
 	}
 
+	public function completeOwnedUnit( callable $work ): mixed {
+		return AbstractWpdbRepository::run_shared_unit( $work );
+	}
+
 	public function insert_items( array $items ): array {
+		$this->throw_if_transaction_unresolved();
 		$saved = [];
 		foreach ( $items as $item ) {
 			if ( ! $item instanceof BulkJobItem ) {
 				continue;
 			}
-			$existing = $this->find_item( $item->job_id, $item->target_type, $item->target_id, $item->external_key );
+			$existing = $item->target_id > 0
+				? $this->find_item_by_target( $item->job_id, $item->target_type, $item->target_id )
+				: $this->find_item( $item->job_id, $item->target_type, $item->target_id, $item->external_key );
 			if ( null !== $existing ) {
 				$saved[] = $existing;
 				continue;
@@ -146,6 +166,7 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 
 	public function claim_items( int $job_id, int $limit, string $claim_token, int $claim_ttl_seconds = 300 ): array {
 		global $wpdb;
+		$this->throw_if_transaction_unresolved();
 		$table   = TableNames::for( BulkJobSchema::ITEMS_SUFFIX );
 		$limit   = max( 1, min( 100, $limit ) );
 		$expired = gmdate( 'Y-m-d H:i:s', time() - $claim_ttl_seconds );
@@ -157,53 +178,142 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 		);
 		$claimed = [];
 		foreach ( is_array( $rows ) ? $rows : [] as $row ) {
-			$item = $this->hydrate_item( $row );
-			$ok   = $wpdb->update(
-				$table,
-				[
-					'status'        => BulkJobItemStatus::Claimed->value,
-					'claim_token'   => $claim_token,
-					'claimed_at'    => gmdate( 'Y-m-d H:i:s' ),
-					'attempt_count' => $item->attempt_count + 1,
-					'updated_at'    => gmdate( 'Y-m-d H:i:s' ),
-				],
-				[
-					'id'     => $item->id,
-					'status' => $item->status->value,
-				],
-				[ '%s', '%s', '%s', '%d', '%s' ],
-				[ '%d', '%s' ]
-			);
-			if ( false === $ok || 0 === $ok ) {
+			$item  = $this->hydrate_item( $row );
+			$where = 'id = %d AND status = %s';
+			$args  = [ (int) $item->id, $item->status->value ];
+			if ( BulkJobItemStatus::Claimed === $item->status ) {
+				$where .= ' AND claim_token = %s AND claimed_at = %s';
+				$args[] = (string) $item->claim_token;
+				$args[] = (string) $item->claimed_at;
+			}
+			$now = gmdate( 'Y-m-d H:i:s' );
+			$sql = "UPDATE `{$table}` SET status = %s, claim_token = %s, claimed_at = %s, attempt_count = %d, updated_at = %s WHERE {$where}";
+			$ok = $wpdb->query( $wpdb->prepare( $sql, BulkJobItemStatus::Claimed->value, $claim_token, $now, $item->attempt_count + 1, $now, ...$args ) );
+			if ( false === $ok ) {
+				throw new \RuntimeException( 'Bulk item write failed.' );
+			}
+			if ( ! is_int( $ok ) || $ok < 1 ) {
 				continue;
 			}
-			$claimed[] = $item->with(
-				[
-					'status'        => BulkJobItemStatus::Claimed,
-					'claim_token'   => $claim_token,
-					'claimed_at'    => gmdate( 'Y-m-d H:i:s' ),
-					'attempt_count' => $item->attempt_count + 1,
-				]
-			);
+			$fresh = $this->find_item_by_id( (int) $item->id );
+			if ( ! $fresh instanceof BulkJobItem || $fresh->claim_token !== $claim_token ) {
+				continue;
+			}
+			$claimed[] = $fresh;
 		}
 
 		return $claimed;
 	}
 
-	public function save_item( BulkJobItem $item ): BulkJobItem {
+	public function call_while_item_claimed( int $item_id, string $token, callable $callback ): mixed {
 		global $wpdb;
+		$table = TableNames::for( BulkJobSchema::ITEMS_SUFFIX );
+		if ( ! $this->open_owned_transaction() ) {
+			$this->throw_if_transaction_unresolved();
+			$detail = trim( (string) $wpdb->last_error );
+			throw new \RuntimeException( 'Bulk item write failed.' . ( '' !== $detail ? ' ' . $detail : '' ) );
+		}
+		try {
+			$sql = "SELECT id FROM `{$table}` WHERE id = %d AND claim_token = %s AND status = %s LIMIT 1 FOR UPDATE";
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$locked     = $wpdb->get_var( $wpdb->prepare( $sql, $item_id, $token, BulkJobItemStatus::Claimed->value ) );
+			$read_error = trim( (string) $wpdb->last_error );
+			if ( '' !== $read_error ) {
+				throw new \RuntimeException( 'Bulk item write failed. ' . $read_error );
+			}
+			if ( (int) $locked !== $item_id ) {
+				if ( ! $this->rollback_owned_transaction() ) {
+					$this->throw_if_transaction_unresolved();
+					throw new \RuntimeException( 'Bulk item write failed.' );
+				}
+
+				return null;
+			}
+			$result = $callback();
+			$this->throw_if_transaction_unresolved();
+			if ( ! $this->commit_owned_transaction() ) {
+				$detail = trim( (string) $wpdb->last_error );
+				throw new \RuntimeException( 'Bulk item write failed.' . ( '' !== $detail ? ' ' . $detail : '' ) );
+			}
+
+			return $result;
+		} catch ( \Throwable $exception ) {
+			if ( ! self::$transaction_cleanup_failed && $this->transaction_is_open() ) {
+				$this->rollback_owned_transaction();
+			}
+			if ( ! self::$transaction_cleanup_failed ) {
+				throw $exception;
+			}
+			$message = $exception->getMessage();
+			$cleanup = self::$transaction_cleanup_error;
+			if ( ! str_contains( $message, 'Rollback also failed.' ) ) {
+				$message .= ' Rollback also failed.';
+			}
+			if ( '' !== $cleanup && ! str_contains( $message, $cleanup ) ) {
+				$message .= ' ' . $cleanup;
+			}
+			$this->abandon_unresolved_connection();
+			if ( $message === $exception->getMessage() ) {
+				throw $exception;
+			}
+
+			throw new \RuntimeException( $message, 0, $exception );
+		}
+	}
+
+	public function save_item( BulkJobItem $item, ?bool &$applied = null ): BulkJobItem {
+		global $wpdb;
+		$this->throw_if_transaction_unresolved();
+		$applied = false;
 		$table = TableNames::for( BulkJobSchema::ITEMS_SUFFIX );
 		$data  = $this->item_to_row( $item );
 		if ( null === $item->id ) {
-			$wpdb->insert( $table, $data['data'], $data['formats'] );
-			$id = (int) $wpdb->insert_id;
-			$saved = $this->hydrate_item( array_merge( $data['data'], [ 'id' => $id ] ) );
+			$inserted = $wpdb->insert( $table, $data['data'], $data['formats'] );
+			if ( false === $inserted ) {
+				$existing = $this->find_item( $item->job_id, $item->target_type, $item->target_id, $item->external_key );
+				if ( $existing instanceof BulkJobItem ) {
+					return $existing;
+				}
+				throw new \RuntimeException( 'Bulk item write failed.' );
+			}
+			$applied = true;
+			$id    = (int) $wpdb->insert_id;
+			$saved = $this->find_item_by_id( $id );
+			if ( ! $saved instanceof BulkJobItem || (int) $saved->id !== $id ) {
+				throw new \RuntimeException( 'Bulk item write failed.' );
+			}
 
 			return $saved;
 		}
-		$wpdb->update( $table, $data['data'], [ 'id' => $item->id ], $data['formats'], [ '%d' ] );
 
-		return $item;
+		$stored = $data['data'];
+		if ( BulkJobItemStatus::Claimed !== $item->status ) {
+			$stored['claim_token'] = null;
+			$stored['claimed_at']  = null;
+		}
+		$updated = $this->query_fenced_item( $table, $item, $stored );
+		if ( false === $updated ) {
+			throw new \RuntimeException( 'Bulk item write failed.' );
+		}
+		$saved = $this->find_item_by_id( (int) $item->id );
+		if ( ! $saved instanceof BulkJobItem ) {
+			throw new \RuntimeException( 'Bulk item write failed.' );
+		}
+		if ( null !== $saved->claim_token && $saved->claim_token !== $item->claim_token ) {
+			throw new \RuntimeException( 'Stale bulk claim.' );
+		}
+		if ( $updated > 0 ) {
+			$applied = true;
+
+			return $saved;
+		}
+		if ( $saved->same_outcome( $item ) ) {
+			return $saved;
+		}
+		if ( null === $item->claim_token || '' === $item->claim_token || $saved->claim_token === $item->claim_token ) {
+			throw new \RuntimeException( 'Bulk item write failed.' );
+		}
+		throw new \RuntimeException( 'Stale bulk claim.' );
 	}
 
 	public function list_items( int $job_id, int $limit = 50, int $after_id = 0, ?BulkJobItemStatus $status = null ): array {
@@ -263,6 +373,16 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 		return (int) $wpdb->get_var( $wpdb->prepare( $sql, $job_id ) );
 	}
 
+	private function find_item_by_target( int $job_id, string $target_type, int $target_id ): ?BulkJobItem {
+		global $wpdb;
+		$table = TableNames::for( BulkJobSchema::ITEMS_SUFFIX );
+		$sql   = "SELECT * FROM `{$table}` WHERE job_id = %d AND target_type = %s AND target_id = %d ORDER BY id ASC LIMIT 1";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$row = $wpdb->get_row( $wpdb->prepare( $sql, $job_id, $target_type, $target_id ), ARRAY_A );
+
+		return is_array( $row ) ? $this->hydrate_item( $row ) : null;
+	}
+
 	public function find_item( int $job_id, string $target_type, int $target_id, string $external_key = '' ): ?BulkJobItem {
 		global $wpdb;
 		$table = TableNames::for( BulkJobSchema::ITEMS_SUFFIX );
@@ -275,6 +395,7 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 
 	public function reset_item_statuses( int $job_id, array $from_statuses, BulkJobItemStatus $to ): int {
 		global $wpdb;
+		$this->throw_if_transaction_unresolved();
 		$table = TableNames::for( BulkJobSchema::ITEMS_SUFFIX );
 		$codes = [];
 		foreach ( $from_statuses as $status ) {
@@ -296,43 +417,39 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 
 	public function claim_job( int $job_id, string $claim_token, int $claim_ttl_seconds = 300 ): ?BulkJob {
 		global $wpdb;
-		$job = $this->find_job( $job_id );
-		if ( ! $job instanceof BulkJob ) {
-			return null;
+		$this->throw_if_transaction_unresolved();
+		$now     = gmdate( 'Y-m-d H:i:s' );
+		$expired = gmdate( 'Y-m-d H:i:s', time() - max( 1, $claim_ttl_seconds ) );
+		$sql     = 'UPDATE `' . $this->table_name() . '` SET claim_token = %s, claimed_at = %s, updated_at = %s WHERE id = %d AND (claim_token IS NULL OR claim_token = %s OR claimed_at IS NULL OR claimed_at < %s)';
+		$updated = $wpdb->query( $wpdb->prepare( $sql, $claim_token, $now, $now, $job_id, $claim_token, $expired ) );
+		if ( false === $updated ) {
+			throw new \RuntimeException( 'Bulk job write failed.' );
 		}
-		$expired = null === $job->claimed_at || strtotime( (string) $job->claimed_at ) < ( time() - $claim_ttl_seconds );
-		if ( null !== $job->claim_token && $job->claim_token !== $claim_token && ! $expired ) {
-			return null;
-		}
-		$table = $this->table_name();
-		$wpdb->update(
-			$table,
-			[
-				'claim_token' => $claim_token,
-				'claimed_at'  => gmdate( 'Y-m-d H:i:s' ),
-				'updated_at'  => gmdate( 'Y-m-d H:i:s' ),
-			],
-			[ 'id' => $job_id ],
-			[ '%s', '%s', '%s' ],
-			[ '%d' ]
-		);
+		$saved = $this->find_job( $job_id );
 
-		return $this->find_job( $job_id );
+		return $saved instanceof BulkJob && $saved->claim_token === $claim_token ? $saved : null;
 	}
 
-	public function release_job_claim( int $job_id, string $claim_token ): void {
+	public function release_job_claim( int $job_id, string $claim_token ): bool {
 		global $wpdb;
-		$wpdb->query(
+		$this->throw_if_transaction_unresolved();
+		$updated = $wpdb->query(
 			$wpdb->prepare(
 				'UPDATE `' . $this->table_name() . '` SET claim_token = NULL, claimed_at = NULL WHERE id = %d AND claim_token = %s',
 				$job_id,
 				$claim_token
 			)
 		);
+		if ( false === $updated ) {
+			throw new \RuntimeException( 'Bulk job write failed.' );
+		}
+
+		return $updated > 0;
 	}
 
 	public function save_recipe( BulkRecipe $recipe ): BulkRecipe {
 		global $wpdb;
+		$this->throw_if_transaction_unresolved();
 		$table = TableNames::for( BulkJobSchema::RECIPES_SUFFIX );
 		$data  = [
 			'recipe_code'             => $recipe->recipe_code,
@@ -413,6 +530,89 @@ final class WpdbBulkJobRepository extends AbstractWpdbRepository implements Bulk
 			isset( $row['completed_at'] ) ? (string) $row['completed_at'] : null,
 			isset( $row['updated_at'] ) ? (string) $row['updated_at'] : null
 		);
+	}
+
+	/**
+	 * @param array<string, mixed> $data
+	 */
+	private function query_fenced_job( BulkJob $job, array $data ): int|false {
+		global $wpdb;
+		[ $assignments, $args ] = $this->assignment_sql( $data );
+		$sql                    = 'UPDATE `' . $this->table_name() . '` SET ' . $assignments . ' WHERE id = %d';
+		$args[]                 = (int) $job->id;
+		if ( null === $job->claim_token || '' === $job->claim_token ) {
+			$sql .= ' AND claim_token IS NULL';
+		} else {
+			$sql   .= ' AND claim_token = %s';
+			$args[] = $job->claim_token;
+		}
+		$updated = $wpdb->query( $wpdb->prepare( $sql, ...$args ) );
+
+		return is_int( $updated ) ? $updated : false;
+	}
+
+	private function job_values_match( BulkJob $saved, BulkJob $submitted ): bool {
+		return $saved->status === $submitted->status
+			&& $saved->processed_count === $submitted->processed_count
+			&& $saved->changed_count === $submitted->changed_count
+			&& $saved->skipped_count === $submitted->skipped_count
+			&& $saved->failed_count === $submitted->failed_count
+			&& $saved->warning_count === $submitted->warning_count
+			&& $saved->total_count === $submitted->total_count
+			&& $saved->enumerated_count === $submitted->enumerated_count
+			&& $saved->enumeration_complete === $submitted->enumeration_complete
+			&& $saved->checkpoint_cursor === $submitted->checkpoint_cursor
+			&& (string) $saved->error_code === (string) $submitted->error_code;
+	}
+
+	/**
+	 * @param array<string, mixed> $data
+	 */
+	private function query_fenced_item( string $table, BulkJobItem $item, array $data ): int|false {
+		global $wpdb;
+		[ $assignments, $args ] = $this->assignment_sql( $data );
+		$sql                    = 'UPDATE `' . $table . '` SET ' . $assignments . ' WHERE id = %d';
+		$args[]                 = (int) $item->id;
+		if ( null === $item->claim_token || '' === $item->claim_token ) {
+			$sql .= ' AND claim_token IS NULL';
+		} else {
+			$sql   .= ' AND claim_token = %s';
+			$args[] = $item->claim_token;
+		}
+		$updated = $wpdb->query( $wpdb->prepare( $sql, ...$args ) );
+
+		return is_int( $updated ) ? $updated : false;
+	}
+
+	private function find_item_by_id( int $id ): ?BulkJobItem {
+		global $wpdb;
+		if ( $id <= 0 ) {
+			return null;
+		}
+		$table = TableNames::for( BulkJobSchema::ITEMS_SUFFIX );
+		$row   = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM `{$table}` WHERE id = %d LIMIT 1", $id ), ARRAY_A );
+
+		return is_array( $row ) ? $this->hydrate_item( $row ) : null;
+	}
+
+	/**
+	 * @param array<string, mixed> $data
+	 * @return array{0: string, 1: list<mixed>}
+	 */
+	private function assignment_sql( array $data ): array {
+		$parts = [];
+		$args  = [];
+		foreach ( $data as $column => $value ) {
+			$column = (string) $column;
+			if ( null === $value ) {
+				$parts[] = '`' . $column . '` = NULL';
+				continue;
+			}
+			$parts[] = '`' . $column . '` = %s';
+			$args[]  = is_bool( $value ) ? ( $value ? '1' : '0' ) : $value;
+		}
+
+		return [ implode( ', ', $parts ), $args ];
 	}
 
 	/**

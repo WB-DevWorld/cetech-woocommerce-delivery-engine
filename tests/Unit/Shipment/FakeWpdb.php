@@ -17,6 +17,9 @@ final class FakeWpdb {
 
 	public string $last_error = '';
 
+	/** @var list<string> */
+	public array $fail_sql_containing = [];
+
 	public int $query_count = 0;
 
 	public int $id_only_updates = 0;
@@ -44,6 +47,26 @@ final class FakeWpdb {
 	public ?string $fail_next_update_table = null;
 
 	public ?string $fail_next_update_column = null;
+
+	public bool $fail_next_close = false;
+
+	/**
+	 * WordPress 6.8 wpdb::close() sets ready false, and query() returns false
+	 * before check_connection(). This does not reconnect.
+	 */
+	public bool $native_close_stops_queries = false;
+
+	public bool $ready = true;
+
+	public int $close_count = 0;
+
+	public int $reconnect_count = 0;
+
+	private bool $connected = true;
+
+	private bool $quarantined = false;
+
+	private ?self $committed_reader = null;
 
 	/** @var array<string, list<array<string, mixed>>>|null */
 	private ?array $transaction_tables = null;
@@ -94,9 +117,96 @@ final class FakeWpdb {
 		return array_keys( $this->tables );
 	}
 
+	/**
+	 * Rows captured when the current transaction opened. Empty when no transaction is open.
+	 *
+	 * @return list<array<string, mixed>>
+	 */
+	public function transaction_snapshot( string $table ): array {
+		if ( ! is_array( $this->transaction_tables ) ) {
+			return [];
+		}
+		$rows = $this->transaction_tables[ $table ] ?? [];
+
+		return is_array( $rows ) ? array_values( $rows ) : [];
+	}
+
+	/**
+	 * A second connection that sees committed rows only. An open transaction is invisible until commit.
+	 */
+	public function independent_connection(): self {
+		$reader                   = new self();
+		$reader->prefix           = $this->prefix;
+		$reader->tables           = unserialize( serialize( $this->tables ) );
+		$reader->auto_increment   = $this->auto_increment;
+		$reader->unique_indexes   = $this->unique_indexes;
+		$this->committed_reader   = $reader;
+
+		return $reader;
+	}
+
+	public function close(): bool {
+		$this->close_count++;
+		$this->sql_log[] = 'CLOSE';
+		if ( $this->fail_next_close ) {
+			$this->fail_next_close = false;
+			$this->last_error      = 'Simulated connection close failure';
+
+			return false;
+		}
+		if ( null !== $this->transaction_tables ) {
+			$this->tables                     = $this->transaction_tables;
+			$this->auto_increment             = $this->transaction_auto_increment ?? $this->auto_increment;
+			$this->insert_id                  = $this->transaction_insert_id;
+			$this->transaction_tables         = null;
+			$this->transaction_auto_increment = null;
+		}
+		$this->connected   = false;
+		$this->quarantined = false;
+		if ( $this->native_close_stops_queries ) {
+			$this->ready = false;
+		}
+
+		return true;
+	}
+
+	public function quarantine_failed_connection(): void {
+		$this->quarantined = true;
+		$this->last_error  = 'Connection disposal failed.';
+	}
+
+	private function statement_is_blocked( string $sql ): bool {
+		if ( $this->native_close_stops_queries && ! $this->ready ) {
+			$this->last_error = 'WordPress database error: queries are not ready after close.';
+			$this->sql_log[]  = 'NOT READY';
+
+			return true;
+		}
+		if ( $this->quarantined ) {
+			$this->last_error = 'Connection disposal failed.';
+			$this->sql_log[]  = 'REJECTED ' . $sql;
+
+			return true;
+		}
+
+		return false;
+	}
+
 	public function query( mixed $sql ): int|bool {
-		$this->record_sql( (string) $sql );
-		$normalized = strtoupper( trim( (string) $sql ) );
+		$sql = (string) $sql;
+		if ( $this->statement_is_blocked( $sql ) ) {
+			return false;
+		}
+		if ( ! $this->connected ) {
+			$this->connected = true;
+			$this->reconnect_count++;
+			$this->sql_log[] = 'RECONNECT';
+		}
+		$this->record_sql( $sql );
+		if ( $this->consume_sql_failure( $sql ) ) {
+			return false;
+		}
+		$normalized = strtoupper( trim( $sql ) );
 
 		if ( preg_match( '/^DROP TABLE IF EXISTS `([^`]+)`\s*$/i', trim( (string) $sql ), $drop ) ) {
 			unset( $this->tables[ $drop[1] ], $this->unique_indexes[ $drop[1] ], $this->auto_increment[ $drop[1] ] );
@@ -105,6 +215,11 @@ final class FakeWpdb {
 		}
 
 		if ( 'START TRANSACTION' === $normalized ) {
+			if ( null !== $this->transaction_tables ) {
+				$this->publish_committed();
+				$this->transaction_tables         = null;
+				$this->transaction_auto_increment = null;
+			}
 			$this->transaction_tables         = unserialize( serialize( $this->tables ) );
 			$this->transaction_auto_increment = $this->auto_increment;
 			$this->transaction_insert_id      = $this->insert_id;
@@ -113,6 +228,7 @@ final class FakeWpdb {
 		}
 
 		if ( 'COMMIT' === $normalized ) {
+			$this->publish_committed();
 			$this->transaction_tables         = null;
 			$this->transaction_auto_increment = null;
 
@@ -140,6 +256,28 @@ final class FakeWpdb {
 		}
 
 		throw new \RuntimeException( 'Unsupported SQL: ' . (string) $sql );
+	}
+
+	private function publish_committed(): void {
+		if ( ! $this->committed_reader instanceof self ) {
+			return;
+		}
+		$this->committed_reader->tables         = unserialize( serialize( $this->tables ) );
+		$this->committed_reader->auto_increment = $this->auto_increment;
+	}
+
+	private function consume_sql_failure( string $sql ): bool {
+		foreach ( $this->fail_sql_containing as $index => $needle ) {
+			if ( '' !== $needle && str_contains( $sql, $needle ) ) {
+				unset( $this->fail_sql_containing[ $index ] );
+				$this->fail_sql_containing = array_values( $this->fail_sql_containing );
+				$this->last_error          = 'Simulated SQL failure: ' . $needle;
+
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	public function prepare( string $query, mixed ...$args ): string {
@@ -286,7 +424,14 @@ final class FakeWpdb {
 	}
 
 	public function get_var( string $sql ) {
+		if ( $this->statement_is_blocked( $sql ) ) {
+			return null;
+		}
 		$this->record_sql( $sql );
+		if ( $this->consume_sql_failure( $sql ) ) {
+			return null;
+		}
+		$this->last_error = '';
 		$trimmed = trim( $sql );
 
 		if ( preg_match( '/^SHOW TABLES LIKE \'((?:\\\\\'|[^\'])*)\'\s*$/i', $trimmed, $like ) ) {
@@ -345,6 +490,9 @@ final class FakeWpdb {
 	 * @return array<string, mixed>|null
 	 */
 	public function get_row( string $sql, $output = ARRAY_A ) {
+		if ( $this->statement_is_blocked( $sql ) ) {
+			return null;
+		}
 		unset( $output );
 		$this->record_sql( $sql );
 		$trimmed = trim( $sql );
@@ -388,6 +536,9 @@ final class FakeWpdb {
 	 */
 	public function get_results( string $sql, $output = ARRAY_A ) {
 		unset( $output );
+		if ( $this->statement_is_blocked( $sql ) ) {
+			return [];
+		}
 		$this->record_sql( $sql );
 
 		$grouped = $this->grouped_counts( $sql );
@@ -475,6 +626,7 @@ final class FakeWpdb {
 	 * @return array{table: string, count: bool, where: array<string, mixed>, or_any: list<array{column: string, op: string, value: string}>, order: list<array{column: string, direction: string}>, limit: ?int, offset: int}
 	 */
 	private function parse_select( string $sql ): array {
+		$sql = preg_replace( '/\s+FOR\s+UPDATE\s*$/i', '', trim( $sql ) ) ?? trim( $sql );
 		if ( ! preg_match(
 			'/SELECT\s+(COUNT\(\*\)|\*|id|`id`)\s+FROM\s+`([^`]+)`\s+WHERE\s+(.+?)(?:\s+ORDER BY\s+(.+?))?(?:\s+LIMIT\s+(\d+)(?:\s+OFFSET\s+(\d+))?)?\s*$/is',
 			trim( $sql ),
@@ -1232,8 +1384,21 @@ final class FakeWpdb {
 		if ( preg_match( '/^`?([a-z0-9_]+)`?\s*=\s*(\d+)$/i', $clause, $matches ) ) {
 			return (string) ( $row[ $matches[1] ] ?? '' ) === (string) $matches[2];
 		}
+		if ( preg_match( '/^`?([a-z0-9_]+)`?\s+IS\s+NULL$/i', $clause, $matches ) ) {
+			$value = $row[ $matches[1] ] ?? null;
+
+			return null === $value || '' === $value;
+		}
+		if ( preg_match( '/^`?([a-z0-9_]+)`?\s+IS\s+NOT\s+NULL$/i', $clause, $matches ) ) {
+			$value = $row[ $matches[1] ] ?? null;
+
+			return null !== $value && '' !== $value;
+		}
 		if ( preg_match( '/^`?([a-z0-9_]+)`?\s*<\s*(\d+)$/i', $clause, $matches ) ) {
 			return (int) ( $row[ $matches[1] ] ?? 0 ) < (int) $matches[2];
+		}
+		if ( preg_match( '/^`?([a-z0-9_]+)`?\s*<\s*\'((?:\\\\\'|[^\'])*)\'$/i', $clause, $matches ) ) {
+			return (string) ( $row[ $matches[1] ] ?? '' ) < stripcslashes( $matches[2] );
 		}
 		if ( preg_match( '/^`?([a-z0-9_]+)`?\s*>\s*(\d+)$/i', $clause, $matches ) ) {
 			return (int) ( $row[ $matches[1] ] ?? 0 ) > (int) $matches[2];

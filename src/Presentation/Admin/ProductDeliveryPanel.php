@@ -184,6 +184,9 @@ final class ProductDeliveryPanel {
 			echo '<input type="hidden" name="scope_type" value="' . esc_attr( $scope_type->value ) . '" />';
 			echo '<input type="hidden" name="scope_id" value="' . esc_attr( (string) $scope_id ) . '" />';
 			echo '<input type="hidden" name="slice_key" value="' . esc_attr( ConfigurationScope::DEFAULT_SLICE_KEY ) . '" />';
+			echo '<input type="hidden" name="expected_revision" value="' . esc_attr( (string) $model->config_version ) . '" />';
+			echo '<input type="hidden" name="expected_scope_row_id" value="' . esc_attr( (string) (int) ( $model->technical_details['scope_row_id'] ?? 0 ) ) . '" />';
+			echo '<input type="hidden" name="request_token" value="' . esc_attr( function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : bin2hex( random_bytes( 16 ) ) ) . '" />';
 			if ( null !== $parent_id ) {
 				echo '<input type="hidden" name="parent_product_id" value="' . esc_attr( (string) $parent_id ) . '" />';
 			}

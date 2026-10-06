@@ -100,6 +100,7 @@ final class BulkToolsPage {
 		if ( $this->action_handler->verify_post( self::ACTION_APPLY, self::ACTION_APPLY, 'manage_product_delivery_rules', self::SLUG ) ) {
 			$job_id = isset( $_POST['job_id'] ) ? absint( wp_unslash( (string) $_POST['job_id'] ) ) : 0;
 			try {
+				$this->require_authorized_job( $job_id );
 				$job = $this->engine->apply( $job_id, get_current_user_id() );
 				$this->action_handler->notices()->flash_success(
 					sprintf(
@@ -116,14 +117,20 @@ final class BulkToolsPage {
 		}
 		if ( $this->action_handler->verify_post( self::ACTION_CANCEL, self::ACTION_CANCEL, 'manage_product_delivery_rules', self::SLUG ) ) {
 			$job_id = isset( $_POST['job_id'] ) ? absint( wp_unslash( (string) $_POST['job_id'] ) ) : 0;
-			$this->engine->cancel( $job_id );
-			$this->action_handler->notices()->flash_success( __( 'Remaining work was cancelled. Completed items were not reversed.', 'cetech-woocommerce-delivery-engine' ) );
+			try {
+				$this->require_authorized_job( $job_id );
+				$this->engine->cancel( $job_id );
+				$this->action_handler->notices()->flash_success( __( 'Remaining work was cancelled. Completed items were not reversed.', 'cetech-woocommerce-delivery-engine' ) );
+			} catch ( \Throwable $exception ) {
+				$this->action_handler->notices()->flash_error( $exception->getMessage() );
+			}
 			$this->action_handler->redirect( self::SLUG, [ 'job' => (string) $job_id, 'tab' => 'jobs' ] );
 			return;
 		}
 		if ( $this->action_handler->verify_post( self::ACTION_ROLLBACK, self::ACTION_ROLLBACK, 'manage_product_delivery_rules', self::SLUG ) ) {
 			$job_id = isset( $_POST['job_id'] ) ? absint( wp_unslash( (string) $_POST['job_id'] ) ) : 0;
 			try {
+				$this->require_authorized_job( $job_id );
 				$child = $this->engine->rollback( $job_id, get_current_user_id() );
 				$this->action_handler->notices()->flash_success(
 					sprintf(
@@ -142,6 +149,7 @@ final class BulkToolsPage {
 		if ( $this->action_handler->verify_post( self::ACTION_CONTINUE, self::ACTION_CONTINUE, 'manage_product_delivery_rules', self::SLUG ) ) {
 			$job_id = isset( $_POST['job_id'] ) ? absint( wp_unslash( (string) $_POST['job_id'] ) ) : 0;
 			try {
+				$this->require_authorized_job( $job_id );
 				$job = $this->engine->continue_job( $job_id );
 				$this->action_handler->notices()->flash_success(
 					sprintf(
@@ -183,6 +191,7 @@ final class BulkToolsPage {
 
 	public function render(): void {
 		AdminPageAccess::require_capability( 'manage_product_delivery_rules' );
+		$this->action_handler->notices()->render_notices();
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( (string) $_GET['tab'] ) ) : 'catalog';
 		AdminPageLayout::open_page( 'cetech-de-bulk-tools' );
@@ -215,6 +224,16 @@ final class BulkToolsPage {
 		echo '</div>';
 
 		AdminPageLayout::close_page();
+	}
+
+	private function require_authorized_job( int $job_id ): BulkJob {
+		$job = $this->engine->find( $job_id );
+		if ( ! $job instanceof BulkJob ) {
+			throw new \InvalidArgumentException( 'Unknown bulk job.' );
+		}
+		( new BulkJobAccess( $this->engine ) )->require_action_access( $job );
+
+		return $job;
 	}
 
 	/**
@@ -483,15 +502,11 @@ final class BulkToolsPage {
 
 		$total_jobs = $this->jobs->count_jobs();
 		$page       = BulkAdminListPreferences::current_page( 'paged' );
-		$jobs       = $this->jobs->list_jobs_page( $page, $per_page );
+		$access     = new BulkJobAccess( $this->engine );
+		$jobs       = array_values( array_filter( $this->jobs->list_jobs_page( $page, $per_page ), [ $access, 'can_access' ] ) );
 		AdminPageLayout::open_content_panel(
 			__( 'Recent jobs', 'cetech-woocommerce-delivery-engine' ),
-			sprintf(
-				/* translators: 1: job count, 2: rows per page */
-				__( 'Showing a page of %2$d jobs. Total jobs: %1$d. Change the page size in Screen Options.', 'cetech-woocommerce-delivery-engine' ),
-				$total_jobs,
-				$per_page
-			)
+			__( 'Showing jobs you are permitted to access on this page. Change the page size in Screen Options.', 'cetech-woocommerce-delivery-engine' )
 		);
 		if ( [] === $jobs ) {
 			$catalog_url = add_query_arg( [ 'page' => self::SLUG, 'tab' => 'catalog' ], admin_url( 'admin.php' ) );
@@ -530,7 +545,23 @@ final class BulkToolsPage {
 		AdminPageLayout::close_content_panel();
 	}
 
+	private function display_target_definition( BulkJob $job ): ?CatalogTargetDefinition {
+		try {
+			return CatalogTargetDefinition::from_array( $job->target_definition );
+		} catch ( \InvalidArgumentException $exception ) {
+			if ( 'Unsupported catalog filter.' !== $exception->getMessage() ) {
+				throw $exception;
+			}
+
+			return null;
+		}
+	}
+
 	private function render_job_detail( BulkJob $job, int $per_page ): void {
+		if ( ! ( new BulkJobAccess( $this->engine ) )->can_access( $job ) ) {
+			echo '<div class="notice notice-error inline"><p>' . esc_html__( 'You do not have permission to access this bulk job.', 'cetech-woocommerce-delivery-engine' ) . '</p></div>';
+			return;
+		}
 		$heading = BulkJobAdminCopy::job_result_heading( $job );
 		$phase   = BulkJobAdminCopy::copy_phase( $job );
 		AdminPageLayout::open_content_panel(
@@ -554,14 +585,27 @@ final class BulkToolsPage {
 		}
 		$payload = BulkJobAdminCopy::progress_payload( $job );
 		$state   = BulkJobRunnerState::from_job( $job );
-		echo '<p class="cetech-de-bulk-job-status" role="status" aria-live="polite" data-cetech-de-job-id="' . esc_attr( (string) $job->id ) . '" data-cetech-de-coherent="' . esc_attr( ! empty( $payload['coherent'] ) ? '1' : '0' ) . '">' . esc_html(
-			sprintf(
-				'%s · %d / %d',
+		$progress_text = 'incomplete' === ( $payload['preparation_state'] ?? '' )
+			? sprintf(
+				/* translators: 1: status label, 2: scanned candidate count, 3: accepted targets so far */
+				__( '%1$s · scanned %2$d · targets so far %3$d', 'cetech-woocommerce-delivery-engine' ),
 				$payload['status_label'],
-				$job->processed_count,
-				$job->total_count
+				(int) ( $payload['scanned'] ?? 0 ),
+				(int) ( $payload['effective'] ?? 0 )
 			)
-		) . '</p>';
+			: ( 'failed' === ( $payload['preparation_state'] ?? '' )
+				? sprintf(
+					/* translators: %s: status label */
+					__( '%s · preparation failed', 'cetech-woocommerce-delivery-engine' ),
+					$payload['status_label']
+				)
+				: sprintf(
+					'%s · %d / %d',
+					$payload['status_label'],
+					$job->processed_count,
+					$job->total_count
+				) );
+		echo '<p class="cetech-de-bulk-job-status" role="status" aria-live="polite" data-cetech-de-job-id="' . esc_attr( (string) $job->id ) . '" data-cetech-de-coherent="' . esc_attr( ! empty( $payload['coherent'] ) ? '1' : '0' ) . '">' . esc_html( $progress_text ) . '</p>';
 
 		echo '<div class="notice notice-info inline cetech-de-bulk-notice cetech-de-bulk-waiting-notice" role="status"' . ( $state->waiting_for_runner ? '' : ' hidden' ) . '><p>' . esc_html( BulkJobAdminCopy::waiting_notice() ) . '</p></div>';
 
@@ -575,8 +619,12 @@ final class BulkToolsPage {
 		}
 		AdminPageLayout::render_summary_stats( $stats );
 
-		$definition = CatalogTargetDefinition::from_array( $job->target_definition );
-		echo '<p class="cetech-de-bulk-variation-note">' . esc_html( BulkJobAdminCopy::variation_policy_notice( $definition->variation_policy, $phase ) ) . '</p>';
+		$definition = $this->display_target_definition( $job );
+		if ( $definition instanceof CatalogTargetDefinition ) {
+			echo '<p class="cetech-de-bulk-variation-note">' . esc_html( BulkJobAdminCopy::variation_policy_notice( $definition->variation_policy, $phase ) ) . '</p>';
+		} else {
+			echo '<div class="notice notice-error inline"><p>' . esc_html( (string) ( $job->error_summary ?: 'Unsupported catalog filter.' ) ) . '</p></div>';
+		}
 
 		echo '<div class="cetech-de-bulk-actions">';
 		echo '<div class="cetech-de-bulk-actions-primary">';
@@ -645,7 +693,7 @@ final class BulkToolsPage {
 		$labels      = BulkJobTargetLabelResolver::for_page( $items );
 		$manifest    = CatalogActionManifest::from_array( $job->action_manifest );
 		$results     = new BulkJobItemResultPresenter( $this->catalog_choices->delivery_options() );
-		$definition  = CatalogTargetDefinition::from_array( $job->target_definition );
+		$definition  = $this->display_target_definition( $job );
 
 		AdminPageLayout::open_content_panel(
 			__( 'Job items', 'cetech-woocommerce-delivery-engine' ),
@@ -684,7 +732,7 @@ final class BulkToolsPage {
 				if ( 'variation' !== $item->target_type && in_array( $item->target_type, [ 'product', '' ], true ) ) {
 					$counts = $labels->variation_counts( $item->target_id );
 					$note   = BulkJobAdminCopy::variation_inherit_count_note( $counts['inherit'], $counts['override'], $phase );
-					if ( '' !== $note && BulkVariationPolicy::PreserveOverrides === $definition->variation_policy ) {
+					if ( '' !== $note && $definition instanceof CatalogTargetDefinition && BulkVariationPolicy::PreserveOverrides === $definition->variation_policy ) {
 						echo '<span class="cetech-de-bulk-target-secondary">' . esc_html( $note ) . '</span>';
 					}
 				}
@@ -935,6 +983,10 @@ final class BulkToolsPage {
 		try {
 			ImportPackageGuard::assert_json_size( $json );
 			$package = ConfigurationPackage::from_json( $json );
+			$include_private_sources = current_user_can( 'manage_private_sources' );
+			if ( ! $include_private_sources ) {
+				$package = $package->without_private_sources();
+			}
 			$mode    = sanitize_key( (string) ( $_POST['conflict_mode'] ?? ConfigImportConflictMode::SkipConflicts->value ) );
 			$job     = $this->engine->create_preview(
 				BulkOperationType::ConfigImport,
@@ -943,7 +995,7 @@ final class BulkToolsPage {
 				[
 					'package'                 => $package->to_array(),
 					'conflict_mode'           => $mode,
-					'include_private_sources' => current_user_can( 'manage_private_sources' ),
+					'include_private_sources' => $include_private_sources,
 				]
 			);
 			$this->redirect_job( $job->id, $job->job_code, $job->error_code );

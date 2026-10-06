@@ -42,7 +42,13 @@ interface BulkJobRepositoryInterface {
 	 */
 	public function claim_items( int $job_id, int $limit, string $claim_token, int $claim_ttl_seconds = 300 ): array;
 
-	public function save_item( BulkJobItem $item ): BulkJobItem;
+	/**
+	 * Run a source write only while this token still owns the claimed item.
+	 * The lock covers the callback and is released before the method returns.
+	 */
+	public function call_while_item_claimed( int $item_id, string $token, callable $callback ): mixed;
+
+	public function save_item( BulkJobItem $item, ?bool &$applied = null ): BulkJobItem;
 
 	/**
 	 * @return list<BulkJobItem>
@@ -70,7 +76,7 @@ interface BulkJobRepositoryInterface {
 	 */
 	public function claim_job( int $job_id, string $claim_token, int $claim_ttl_seconds = 300 ): ?BulkJob;
 
-	public function release_job_claim( int $job_id, string $claim_token ): void;
+	public function release_job_claim( int $job_id, string $claim_token ): bool;
 
 	public function save_recipe( BulkRecipe $recipe ): BulkRecipe;
 
@@ -80,4 +86,13 @@ interface BulkJobRepositoryInterface {
 	 * @return list<BulkRecipe>
 	 */
 	public function list_recipes( int $limit = 50 ): array;
+
+	/**
+	 * Run one preparation checkpoint. A thrown exception restores the previous job and items.
+	 *
+	 * @template T
+	 * @param callable(): T $work
+	 * @return T
+	 */
+	public function completeOwnedUnit( callable $work ): mixed;
 }

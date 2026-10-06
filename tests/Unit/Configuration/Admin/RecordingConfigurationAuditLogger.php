@@ -44,4 +44,23 @@ final class RecordingConfigurationAuditLogger implements ConfigurationChangeAudi
 
 		return true;
 	}
+
+	public function recorded_completion( string $request_token ): ?array {
+		foreach ( array_reverse( $this->calls ) as $call ) {
+			$new = $call['new'];
+			if ( ! is_array( $new ) || (string) ( $new['request_token'] ?? '' ) !== $request_token ) {
+				continue;
+			}
+			$previous = $call['previous'];
+
+			return [
+				'version_before' => (int) ( is_array( $previous ) ? ( $previous['config_version'] ?? 0 ) : 0 ),
+				'version_after'  => (int) ( $new['config_version'] ?? 0 ),
+				'intent_hash'    => (string) ( $new['intent_hash'] ?? '' ),
+				'action'         => (string) $call['action'],
+			];
+		}
+
+		return null;
+	}
 }

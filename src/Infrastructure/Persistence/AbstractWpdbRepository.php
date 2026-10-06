@@ -13,6 +13,304 @@ abstract class AbstractWpdbRepository {
 
 	protected const SAVE_NOT_IMPLEMENTED_MESSAGE = 'Repository save() is not implemented until Phase 2B CRUD.';
 
+	protected static int $transaction_depth = 0;
+
+	protected static bool $transaction_cleanup_failed = false;
+
+	protected static string $transaction_cause = '';
+
+	protected static string $transaction_cleanup_error = '';
+
+	/** @var null|callable(string):void */
+	private static $qualification_probe = null;
+
+	public static function set_qualification_probe( ?callable $probe ): void {
+		self::$qualification_probe = $probe;
+	}
+
+	public static function reset_transaction_state(): void {
+		self::$transaction_depth          = 0;
+		self::$transaction_cleanup_failed = false;
+		self::$transaction_cause          = '';
+		self::$transaction_cleanup_error  = '';
+		self::$qualification_probe        = null;
+	}
+
+	protected static function probe_transaction( string $phase ): void {
+		if ( null !== self::$qualification_probe ) {
+			( self::$qualification_probe )( $phase );
+		}
+	}
+
+	protected function transaction_is_open(): bool {
+		return self::$transaction_depth > 0;
+	}
+
+	protected function open_owned_transaction(): bool {
+		global $wpdb;
+
+		if ( self::$transaction_cleanup_failed ) {
+			return false;
+		}
+		if ( self::$transaction_depth > 0 ) {
+			++self::$transaction_depth;
+
+			return true;
+		}
+		$started = $wpdb->query( 'START TRANSACTION' );
+		if ( false === $started ) {
+			return false;
+		}
+		self::$transaction_depth = 1;
+
+		return true;
+	}
+
+	protected function commit_owned_transaction(): bool {
+		global $wpdb;
+
+		if ( self::$transaction_cleanup_failed ) {
+			return false;
+		}
+		if ( self::$transaction_depth > 1 ) {
+			--self::$transaction_depth;
+
+			return true;
+		}
+		if ( 1 !== self::$transaction_depth ) {
+			return true;
+		}
+		$committed = $wpdb->query( 'COMMIT' );
+		if ( false === $committed ) {
+			return false;
+		}
+		self::$transaction_depth = 0;
+
+		return true;
+	}
+
+	protected function remember_transaction_cause( string $cause ): void {
+		self::$transaction_cause = trim( $cause );
+	}
+
+	protected function throw_if_transaction_unresolved(): void {
+		if ( ! self::$transaction_cleanup_failed ) {
+			return;
+		}
+
+		throw new \RuntimeException( $this->unresolved_transaction_message() );
+	}
+
+	/**
+	 * End the shared session before another callback can start a transaction on it.
+	 * Metadata is cleared only after close succeeds. A failed close stays unresolved
+	 * and the handle is quarantined so a later START cannot implicit-commit.
+	 */
+	protected function abandon_unresolved_connection(): void {
+		global $wpdb;
+
+		if ( ! self::$transaction_cleanup_failed || ! is_object( $wpdb ) ) {
+			return;
+		}
+		$closed = method_exists( $wpdb, 'close' ) && true === $wpdb->close();
+		if ( $closed ) {
+			self::$transaction_depth          = 0;
+			self::$transaction_cleanup_failed = false;
+			self::$transaction_cause          = '';
+			self::$transaction_cleanup_error  = '';
+
+			return;
+		}
+		if ( method_exists( $wpdb, 'quarantine_failed_connection' ) ) {
+			$wpdb->quarantine_failed_connection();
+		}
+		if ( property_exists( $wpdb, 'dbh' ) ) {
+			$wpdb->dbh = null;
+		}
+		if ( property_exists( $wpdb, 'ready' ) ) {
+			$wpdb->ready = false;
+		}
+		if ( property_exists( $wpdb, 'has_connected' ) ) {
+			$wpdb->has_connected = false;
+		}
+	}
+
+	protected function unresolved_transaction_message(): string {
+		$cause   = self::$transaction_cause;
+		$cleanup = self::$transaction_cleanup_error;
+		$message = 'Bulk item write failed.';
+		if ( '' !== $cause ) {
+			$message .= ' ' . $cause;
+		}
+		$message .= ' Rollback also failed.';
+		if ( '' !== $cleanup && ! str_contains( $message, $cleanup ) ) {
+			$message .= ' ' . $cleanup;
+		}
+
+		return $message;
+	}
+
+	public static function shared_transaction_is_open(): bool {
+		return self::$transaction_depth > 0;
+	}
+
+	/**
+	 * One local completion boundary shared with any later statement on this connection.
+	 * A known failure rolls back only when this call opened the transaction.
+	 * A rejected commit is left unresolved and is not described as a rollback.
+	 *
+	 * @template T
+	 * @param callable(): T $work
+	 * @return T
+	 */
+	public static function run_shared_unit( callable $work ): mixed {
+		global $wpdb;
+
+		if ( self::$transaction_cleanup_failed ) {
+			throw new \RuntimeException( 'Save outcome could not be confirmed.' );
+		}
+
+		$owned = 0 === self::$transaction_depth;
+		if ( $owned ) {
+			$started = is_object( $wpdb ) ? $wpdb->query( 'START TRANSACTION' ) : false;
+			if ( false === $started ) {
+				$detail = is_object( $wpdb ) ? trim( (string) $wpdb->last_error ) : 'The database connection is not ready.';
+				throw new \RuntimeException( 'Settings were not saved. ' . $detail );
+			}
+			self::$transaction_depth = 1;
+		} else {
+			++self::$transaction_depth;
+		}
+
+		try {
+			$result = $work();
+		} catch ( \Throwable $exception ) {
+			if ( ! $owned ) {
+				throw $exception;
+			}
+			$rolled = is_object( $wpdb ) && false !== $wpdb->query( 'ROLLBACK' );
+			if ( ! $rolled ) {
+				self::$transaction_cleanup_failed = true;
+				self::$transaction_cause         = $exception->getMessage();
+				self::$transaction_cleanup_error = is_object( $wpdb ) ? trim( (string) $wpdb->last_error ) : '';
+				self::close_unresolved_connection();
+				throw new \RuntimeException( 'Save outcome could not be confirmed.' );
+			}
+			self::$transaction_depth = 0;
+			throw $exception;
+		}
+
+		if ( ! $owned ) {
+			--self::$transaction_depth;
+
+			return $result;
+		}
+
+		self::probe_transaction( 'before_owned_commit' );
+		$committed = is_object( $wpdb ) && false !== $wpdb->query( 'COMMIT' );
+		if ( ! $committed ) {
+			$sent = is_object( $wpdb ) && method_exists( $wpdb, 'commit_was_sent' ) ? (bool) $wpdb->commit_was_sent() : true;
+			if ( ! $sent ) {
+				$rolled = is_object( $wpdb ) && false !== $wpdb->query( 'ROLLBACK' );
+				if ( ! $rolled ) {
+					self::$transaction_cleanup_failed = true;
+					self::$transaction_cause         = 'COMMIT';
+					self::$transaction_cleanup_error = is_object( $wpdb ) ? trim( (string) $wpdb->last_error ) : '';
+					self::close_unresolved_connection();
+					throw new \RuntimeException( 'Save outcome could not be confirmed.' );
+				}
+				self::$transaction_depth = 0;
+				throw new \RuntimeException( 'Settings were not saved. The commit was not sent.' );
+			}
+			self::$transaction_cleanup_failed = true;
+			self::$transaction_cause         = 'COMMIT';
+			self::$transaction_cleanup_error = is_object( $wpdb ) ? trim( (string) $wpdb->last_error ) : '';
+			self::close_unresolved_connection();
+			throw new \RuntimeException( 'Save outcome could not be confirmed.' );
+		}
+		self::$transaction_depth = 0;
+
+		return $result;
+	}
+
+	/**
+	 * Open a new WordPress connection after an unresolved close.
+	 *
+	 * The retired object stays closed. Callers must not send the draft or the
+	 * acknowledgement error through that object.
+	 */
+	public static function replace_closed_connection(): bool {
+		global $wpdb;
+
+		if ( ! is_object( $wpdb ) || ! property_exists( $wpdb, 'ready' ) || true === $wpdb->ready ) {
+			return false;
+		}
+		if ( ! class_exists( \wpdb::class, false ) || ! defined( 'DB_USER' ) || ! defined( 'DB_PASSWORD' ) || ! defined( 'DB_NAME' ) || ! defined( 'DB_HOST' ) ) {
+			return false;
+		}
+
+		$retired = $wpdb;
+		$prefix  = isset( $retired->prefix ) && is_string( $retired->prefix ) && '' !== $retired->prefix
+			? $retired->prefix
+			: (string) ( $GLOBALS['table_prefix'] ?? 'wp_' );
+		$wpdb    = new \wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST );
+		if ( method_exists( $wpdb, 'set_prefix' ) ) {
+			$wpdb->set_prefix( $prefix );
+		}
+
+		return $retired !== $wpdb && false === $retired->ready && '' !== (string) ( $wpdb->options ?? '' );
+	}
+
+	private static function close_unresolved_connection(): void {
+		global $wpdb;
+
+		if ( ! is_object( $wpdb ) ) {
+			return;
+		}
+		$closed = method_exists( $wpdb, 'close' ) && true === $wpdb->close();
+		if ( $closed ) {
+			self::$transaction_depth          = 0;
+			self::$transaction_cleanup_failed = false;
+			self::$transaction_cause          = '';
+			self::$transaction_cleanup_error  = '';
+
+			return;
+		}
+		if ( method_exists( $wpdb, 'quarantine_failed_connection' ) ) {
+			$wpdb->quarantine_failed_connection();
+		}
+		if ( property_exists( $wpdb, 'dbh' ) ) {
+			$wpdb->dbh = null;
+		}
+		if ( property_exists( $wpdb, 'ready' ) ) {
+			$wpdb->ready = false;
+		}
+		if ( property_exists( $wpdb, 'has_connected' ) ) {
+			$wpdb->has_connected = false;
+		}
+	}
+
+	protected function rollback_owned_transaction(): bool {
+		global $wpdb;
+
+		if ( self::$transaction_depth < 1 ) {
+			return ! self::$transaction_cleanup_failed;
+		}
+		$rolled = $wpdb->query( 'ROLLBACK' );
+		if ( false === $rolled ) {
+			self::$transaction_cleanup_failed = true;
+			self::$transaction_cleanup_error  = trim( (string) $wpdb->last_error );
+
+			return false;
+		}
+		self::$transaction_depth          = 0;
+		self::$transaction_cleanup_failed = false;
+		self::$transaction_cause          = '';
+		self::$transaction_cleanup_error  = '';
+
+		return true;
+	}
+
 	abstract protected function table_suffix(): string;
 
 	protected function throw_save_not_implemented(): never {

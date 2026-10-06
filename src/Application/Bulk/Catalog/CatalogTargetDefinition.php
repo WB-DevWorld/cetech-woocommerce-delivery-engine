@@ -154,6 +154,19 @@ final class CatalogTargetDefinition {
 		return BulkTargetScope::EntireCatalog === $this->scope && ! $this->entire_catalog_confirmed;
 	}
 
+	/**
+	 * @param list<CatalogTarget> $accepted
+	 * @return array{accepted: list<CatalogTarget>, cursor: int, scanned: int, exhausted: bool}
+	 */
+	public static function candidate_page( array $accepted, int $cursor, int $scanned, bool $exhausted ): array {
+		return [
+			'accepted'  => $accepted,
+			'cursor'    => $cursor,
+			'scanned'   => $scanned,
+			'exhausted' => $exhausted,
+		];
+	}
+
 	public function has_matching_criteria(): bool {
 		if ( [] !== $this->skus ) {
 			return true;

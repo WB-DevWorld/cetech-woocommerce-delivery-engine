@@ -64,6 +64,48 @@ final class CatalogTargetFilters {
 	}
 
 	/**
+	 * @return list<string>
+	 */
+	public static function supported_keys(): array {
+		return [
+			self::PRODUCT_TYPE,
+			self::STOCK_STATUS,
+			self::SHIPPING_CLASS_ID,
+			self::CATEGORY_ID,
+			self::TAG_ID,
+			self::SEARCH,
+			self::CONFIGURED_FULFILMENT,
+			self::EFFECTIVE_FULFILMENT,
+			self::EXCEPTION_STATE,
+			self::VARIATION_STATE,
+			self::DELIVERY_OPTION_ID,
+			self::LOGISTICS_PROFILE_ID,
+			self::PICKUP_LOCATION_ID,
+			self::SUPPLIER_ID,
+			self::ORIGIN_ID,
+			self::MISSING_USABLE_RATE,
+			self::INVALID_EFFECTIVE,
+		];
+	}
+
+	/**
+	 * @param array<string, mixed> $filters
+	 */
+	public static function assert_supported( array $filters ): void {
+		$unsupported = [];
+		foreach ( $filters as $key => $value ) {
+			unset( $value );
+			$key = (string) $key;
+			if ( ! in_array( $key, self::supported_keys(), true ) ) {
+				$unsupported[] = $key;
+			}
+		}
+		if ( [] !== $unsupported ) {
+			throw new \InvalidArgumentException( 'Unsupported catalog filter.' );
+		}
+	}
+
+	/**
 	 * @param array<string, mixed> $filters
 	 *
 	 * @return array<string, mixed>
@@ -72,28 +114,52 @@ final class CatalogTargetFilters {
 		$clean = [];
 		foreach ( $filters as $key => $value ) {
 			$key = (string) $key;
-			if ( in_array( $key, [ self::MISSING_USABLE_RATE, self::INVALID_EFFECTIVE ], true ) ) {
-				if ( true === $value || 1 === $value || '1' === $value || 'true' === $value ) {
-					$clean[ $key ] = true;
+			if ( ! in_array( $key, self::supported_keys(), true ) ) {
+				if ( self::criterion_is_present( $value ) ) {
+					throw new \InvalidArgumentException( 'Unsupported catalog filter.' );
 				}
 				continue;
 			}
-			if ( is_int( $value ) || ( is_string( $value ) && ctype_digit( $value ) ) ) {
-				$int = (int) $value;
-				if ( $int > 0 ) {
-					$clean[ $key ] = $int;
-				}
+			$kept = self::kept_value( $key, $value );
+			if ( null === $kept ) {
 				continue;
 			}
-			if ( is_string( $value ) ) {
-				$value = trim( $value );
-				if ( '' !== $value ) {
-					$clean[ $key ] = $value;
-				}
-			}
+			$clean[ $key ] = $kept;
 		}
 
 		return $clean;
+	}
+
+	private static function criterion_is_present( mixed $value ): bool {
+		if ( is_array( $value ) ) {
+			return [] !== $value;
+		}
+		if ( null === $value || false === $value || '' === $value || 0 === $value || '0' === $value ) {
+			return false;
+		}
+
+		return true;
+	}
+
+	private static function kept_value( string $key, mixed $value ): mixed {
+		if ( in_array( $key, [ self::MISSING_USABLE_RATE, self::INVALID_EFFECTIVE ], true ) || ! in_array( $key, self::supported_keys(), true ) ) {
+			if ( true === $value || 1 === $value || '1' === $value || 'true' === $value ) {
+				return true;
+			}
+			if ( in_array( $key, [ self::MISSING_USABLE_RATE, self::INVALID_EFFECTIVE ], true ) ) {
+				return null;
+			}
+		}
+		if ( is_int( $value ) || ( is_string( $value ) && ctype_digit( $value ) ) ) {
+			$int = (int) $value;
+			return $int > 0 ? $int : null;
+		}
+		if ( is_string( $value ) ) {
+			$value = trim( $value );
+			return '' !== $value ? $value : null;
+		}
+
+		return null;
 	}
 
 	/**

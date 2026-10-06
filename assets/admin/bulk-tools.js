@@ -129,7 +129,13 @@
 			return false;
 		}
 		var label = data.status_label || data.status || '';
-		statusEl.textContent = label + ' · ' + data.processed + ' / ' + data.total;
+		if (data.preparation_state === 'incomplete') {
+			statusEl.textContent = label + ' · scanned ' + (data.scanned || 0) + ' · targets so far ' + (data.effective || 0);
+		} else if (data.preparation_state === 'failed') {
+			statusEl.textContent = label + ' · preparation failed';
+		} else {
+			statusEl.textContent = label + ' · ' + data.processed + ' / ' + data.total;
+		}
 		var cancel = document.querySelector('[data-cetech-de-cancel-remaining]');
 		if (cancel) {
 			var hideCancel = data.show_cancel === false;
