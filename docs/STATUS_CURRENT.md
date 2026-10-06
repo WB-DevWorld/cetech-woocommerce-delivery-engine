@@ -1,21 +1,33 @@
 # CETECH Delivery Engine — Current Status
 
-Last reconciled: 2026-09-22 after PR #43 / Issue #32 closeout. Protected `master` baseline before repository-truth PR #46 is `88c9ec09f3cfabf73b83780c0c37d397e9acdad6`; PR #46 carries the synchronization and its merge commit becomes the newer head; post-merge CI run `35766468276` SUCCESS. Training is running the physically verified `1.0.0-dev.attention-count.1` package, schema `6`. RC.12 remains the immutable published release candidate; RC.13 does not exist; Pilot, FLAIROC production promotion, production, and POS remain unchanged. Issue #45 is documentation/control-plane cleanup only.
+Last reconciled: 2026-10-06 after owner-accepted opening-correction integration through PR #55. Functional master baseline: `7add0bf3ca66f73982797c0362fb33983da975a2`, tree `958efc0ab3fd7ad22ee6cc90e9372bfccbb69d1f`; post-merge CI `37502749839`, attempt 1, SUCCESS across all eight jobs. Later documentation-only commits may advance master without changing that functional baseline. RC.12 remains the immutable published release candidate, schema `6`. The last recorded physical training package is `1.0.0-dev.attention-count.1`; training was not reread or changed by this integration. No newer release or deployment is claimed. Issue #48 is the next shared-contract planning surface; the earlier Issue #45 cleanup-only execution note is historical.
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
 - Default/canonical development branch: protected `master`
-- Protected `master` baseline before PR #46: `88c9ec09f3cfabf73b83780c0c37d397e9acdad6` (PR #43 merged; Issue #32 closed; post-merge CI `35766468276` SUCCESS). After PR #46 merges, use its merge commit as the newer master head.
+- Owner-accepted functional `master` baseline: `7add0bf3ca66f73982797c0362fb33983da975a2` (PR #55 merged; post-merge CI `37502749839` SUCCESS).
+- Historical repository-truth baseline before PR #46: `88c9ec09f3cfabf73b83780c0c37d397e9acdad6` (PR #43 / Issue #32; CI `35766468276` SUCCESS). Pre-opening-correction master was `637c02f182ca273b40819631d23ac8e0dcc4004f`.
 - RC.12 publication merge on `master`: `78594ad8962868683726373f58f4a8b1b48e4d0e` (PR #27 / `release/rc12` onto `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`).
 - Later documentation commits on `master` are **not** the RC.12 tag source.
 - Repository visibility: public during GitHub Free branch/ruleset protection use.
 - Composer license declaration remains `proprietary`; public visibility is not an open-source license grant.
 
+## Opening corrections — integrated, not a release
+
+- [PR #55](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/55) integrates the approved bounded repairs for COR-001–007 and COR-010, including catalog scan/Apply and scoped-save repairs. Reviewed candidate: `c133f04243a2f53082347c48a8ca134cc4c5791a`; its tree is identical to the functional merge tree above. COR-006 P07 crash recovery and P08 backlog/liveness, COR-008/009 and reserved business/security contracts remain separate work.
+- PR #51 is merged through ancestry; PR #52 and PR #53 are closed as fully included through PR #55. Original checkpoint heads and branches are retained. `CURRENT-WORK.md` records owner acceptance and exact ancestry.
+- Candidate CI `37500871628` and `37500861793` passed all eight jobs on attempt 1. The actual merged-master run `37502749839` also passed all eight jobs on attempt 1. Independently downloaded candidate and merged-head receipts each verified 207 native and 66 authenticated HTTP unique PASS cases, required assertions, cleanup and the physical installed-source map; the separate Store API smoke also passed.
+- Qualification runtime: PHP 8.5.11 / WordPress 7.1.2 / WooCommerce 11.1.2 / MariaDB 11.4.13; HPOS active, schema 6. The two disposable CI web listeners retain OPcache and disable JIT. This explicit CI profile is qualified; it does not certify the original JIT-1235 profile or redefine commercial PHP support.
+- Production PHP: 494 files; installed map `48242148bc1fcada1275cb96553ea7d6e4efc3814ee4cc8f5886ed9ee11a8238`. Historical RC.12 package counts below belong to that immutable package.
+- Ordinary CI MariaDB coverage is separate from earlier local targeted groups `cor005-real-db` (2 tests / 19 assertions) and `cor007-real-db` (12 / 105), which remain excluded from that job.
+- [Issue #54](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/54) retains exact upstream JIT-defect attribution, qualification of the original runtime and the separate historical timeout. Real cores locate the fault in PHP JIT scheduling; the CI-only mitigation is integrated. Historical failed receipts remain failed evidence.
+- Next development task: [Issue #48](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/48), Wave 1 shared-contract planning and implementation breakdown. Wider compatibility and release qualification remain separate from completion of these repairs.
+
 ## PHP runtime policy
 - Canonical policy: `docs/PHP-RUNTIME-POLICY.md`. Realignment evidence: `docs/PHP-85-CI-REALIGNMENT.md`.
 - **Supported / certified range today:** PHP 8.3, 8.4, and 8.5.x.
 - **Minimum supported PHP:** 8.3. Plugin header, Composer, and activation guard are `>=8.3`. This is the WordPress + WooCommerce recommended floor, not the oldest version those products can still boot.
-- **Recommended production PHP:** latest qualified stable release. **Currently qualified latest stable:** PHP 8.5.x (latest stable patch at deployment; 8.5.10 as of 21 September 2026).
+- **Recommended production PHP:** latest qualified stable release under the canonical policy. The 21 September policy checkpoint recorded PHP 8.5.10; opening-correction CI now explicitly exercises PHP 8.5.11 in the profile above. A CI patch pin is not a new production-runtime certification.
 - **CI:** PHP 8.3 Minimum Supported (blocking); PHP 8.4 Compatibility; **PHP 8.5 CETECH Production Target (blocking)** plus MariaDB and WordPress/WooCommerce jobs. PHP 8.1 and 8.2 must not have support lanes.
 - PHP 8.6 pre-release must not be used as a production target. A later stable PHP line is added only after WordPress, WooCommerce, Delivery Engine, and CETECH stack qualification.
 - PHP 8.1 and PHP 8.2 are **not** supported and must not be advertised.
@@ -63,7 +75,7 @@ Last reconciled: 2026-09-22 after PR #43 / Issue #32 closeout. Protected `master
 - Bytes: `1,848,319`.
 - SHA-256: `2027e5941916dff0302d7e2e545de5a2fd027f0c8f1615d97e3991dcfc5fdcb3`.
 - Training physical QA: PASS; canonical aggregate / Overview / menu badge = `8 / 8 / 8`.
-- Training currently runs `1.0.0-dev.attention-count.1`; this is qualification evidence, not RC.13 or production promotion.
+- Last recorded training runtime: `1.0.0-dev.attention-count.1`; this historical physical qualification is not RC.13, production promotion or a fresh live-site observation.
 - Evidence: `docs/POST-RC12-NEEDS-ATTENTION-COUNT.md`.
 
 ## Post-RC.12 merged — Issue #31 (not a release)
@@ -96,7 +108,7 @@ Last reconciled: 2026-09-22 after PR #43 / Issue #32 closeout. Protected `master
 - SHA-256: `5f17abeaedbb078055963d98cd5992fadf9ed7ec2c8d7f5f1d785a294129265d`
 - Frozen `.2` ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.address-ux.2.zip` (`1,837,972` bytes, SHA-256 `e914efc0ee73132efffab6899cf9627ac3d01ecf6b579f190b3050cdd43e117f`)
 - Frozen predecessor ZIP (do not overwrite): `cetech-woocommerce-delivery-engine-1.0.0-dev.address-ux.1.zip` (`1,832,223` bytes, SHA-256 `2a28798140fafaa7d7b4e20bc4e3878fd1949f7014af854b002960a3ae1120fe`)
-- CLOSED / COMPLETED. Not RC.13. Training currently `1.0.0-dev.address-ux.3`.
+- CLOSED / COMPLETED. Not RC.13. Training at this issue's closeout used `1.0.0-dev.address-ux.3`; later recorded qualification advanced to `1.0.0-dev.attention-count.1`.
 - Evidence: `docs/POST-RC12-CART-CHECKOUT-ADDRESS-UX.md`
 
 ## Post-RC.12 merged — Issue #38 (not a release)
@@ -242,7 +254,7 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - Issue #18 owner QA used WordPress 7.1 / WooCommerce 11.0.1 in its isolated lab.
 - RC.11 package clean-install/upgrade smoke used isolated GitHub Actions WordPress/WooCommerce containers; WooCommerce 11.1.0 was installed during the successful run.
 - RC.12 isolated qualification used WordPress `php8.2-apache` + WooCommerce `11.0.1` in Compose project `cetech-rc12-qual`. That isolated lab is historical provenance, not a FLAIROC or production claim, and is **not** the CETECH PHP 8.5 production target. Current isolated QA Compose is `docker/php85-qa/` (`wordpress:php8.5-apache` + MariaDB 11.4).
-- Training site `https://training.cetechbpa.com`: RC.12 installed, schema 6, training-site qualification **PASS**. That is **not** Stable-1.0 certification.
+- Historical RC.12 training installation: schema 6, qualification **PASS**. Later recorded training evidence is `1.0.0-dev.attention-count.1`; neither record certifies the merged opening-correction source on that live site.
 - FLAIROC: **NOT DEPLOYED**.
 - Production: **NOT DEPLOYED**.
 - CETECH Pilot: **NOT STARTED**. This tag/prerelease is not Pilot authorization.
@@ -258,7 +270,7 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - `PRODUCT-TRUTH-BASELINE-1` was accepted by the owner on 2026-09-19 with six decisions resolved in `docs/product/DECISION-CONFLICT-REGISTER.md`. Decision 7 (21 September 2026, superseded) incorrectly retained PHP 8.1 as a commercial floor. Decision 8 records the owner correction: supported/certified PHP 8.3–8.5.x, minimum 8.3, CETECH production 8.5.x.
 - The approved 372-Requirement registry and companion artifacts live under `docs/product/`; `docs/AUTHORITY.md` defines which artifact governs each class of truth.
 - Stable 1.0 scope is frozen as `STABLE-1.0-SCOPE-1`. This product baseline is not a claim that missing capabilities are implemented or that Stable 1.0 has shipped.
-- Product-control-plane publication PR #25 is merged to protected master `6ee4cef088f0bda2633d4b8e37abf3e37634426b` and is now an ancestor of current master `78594ad8962868683726373f58f4a8b1b48e4d0e`.
+- Product-control-plane publication PR #25 merged at `6ee4cef088f0bda2633d4b8e37abf3e37634426b`; it is an ancestor of immutable RC.12 source `78594ad8962868683726373f58f4a8b1b48e4d0e` and the newer functional baseline above.
 - Frozen Requirement IDs must not be renumbered. RC.12 promotion does not change product-registry classifications.
 
 ## Completed forensic / release-control work
@@ -285,11 +297,12 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - Lamp default selection UX.
 - Optional Blocks totals evidence polish.
 
-## Current documentation stream
-- Branch `docs/rc12-training-realignment` realigns `docs/training/` for RC.12 Location Packs, Coverage Groups, review-required coverage, and the recommended setup order.
+## Documentation and next development task
+- The opening-integration closeout reconciles current work, status and product execution notes only. The historical `docs/rc12-training-realignment` stream describes RC.12 training material; it is not the current repair task.
 - Later documentation commits on `master` are **not** the RC.12 tag source and must not receive the `v1.0.0-rc.12` tag.
-- Training site `https://training.cetechbpa.com` currently runs RC.12 / schema 6. Training-site qualification: **PASS**. Do not mutate the live training site from this docs stream. Training-site qualification is **not** Stable-1.0 certification.
+- Training's last recorded physical package is `1.0.0-dev.attention-count.1`, schema 6. This repository closeout did not query or change the site; earlier training qualification is not Stable-1.0 certification.
 - CETECH Pilot: **NOT STARTED**. FLAIROC: **NOT DEPLOYED**. Production: **NOT DEPLOYED**.
+- Issue #48's next output is a reviewable Wave 1 contract package: policy lifecycle; common errors/correlation/idempotency; snapshot evolution; retention/emergency controls; shared explainability/audit context. Include requirement traceability, compatibility and failure tests, and bounded implementation issues before runtime work.
 
 ## Remaining separate work
 1. Create the controlled CETECH production Pilot only after a separate owner authorization; this tag/prerelease is not that authorization.

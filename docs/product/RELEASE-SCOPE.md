@@ -2,7 +2,9 @@
 
 Status: owner-approved `STABLE-1.0-SCOPE-1`. It does not declare RC.11, RC.12, any post-RC.12 development build, or any future build to be Stable 1.0.
 
-**Current execution note — 2026-09-22:** Sections 1–2 below record the pre-RC.12 gates that existed when this scope was frozen. Those geography/RC.12 gates are now complete: Issue #23/PR #24 closed, RC.12 published and immutable, and post-RC.12 fixes through Issue #32 are merged on protected master. CETECH Pilot remains not started. The Stable-1.0 capability requirements in Section 3 and later remain authoritative unless separately amended by the owner.
+**Current execution note — 2026-10-06:** Sections 1–2 below record the historical pre-RC.12 gates; the geography/RC.12 predecessor gates are complete. The approved bounded repairs for COR-001–007 and COR-010 are owner-accepted and integrated through PR #55 at functional master baseline `7add0bf3ca66f73982797c0362fb33983da975a2`, tree `958efc0ab3fd7ad22ee6cc90e9372bfccbb69d1f`; actual post-merge CI `37502749839` passed all eight jobs. This development integration is not a new release or Stable 1.0 certification. RC.12 remains immutable, schema remains 6, and CETECH Pilot remains not started.
+
+The next development package is Issue #48's Wave 1 shared-contract planning and implementation breakdown. Wider compatibility, physical package qualification and release decisions remain separate. The selected JIT-disabled disposable CI profile and historical runtime limitations are recorded in `docs/STATUS_CURRENT.md`. The frozen Stable-1.0 capability requirements in Section 3 and later are unchanged by this execution-note reconciliation.
 
 ## Executive boundary
 
