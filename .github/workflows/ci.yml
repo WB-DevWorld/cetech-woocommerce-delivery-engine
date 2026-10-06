@@ -252,9 +252,11 @@ jobs:
       # One explicit paired runtime comparison. Baseline failure remains a
       # failed job; this never replaces the Required Gates dependency result.
       - name: Controlled JIT-disabled listener comparison
+        id: jit-comparison
         if: ${{ always() && github.event_name == 'push' && github.ref_name == 'fix/pr55-jit-disable-comparison' }}
         env:
-          CETECH_DE_WP_WORK: ${{ runner.temp }}/cetech-de-php85-wp-jit-disable
+          # Preserve literal site paths: WordPress sets error_log from ABSPATH.
+          CETECH_DE_WP_WORK: ${{ runner.temp }}/cetech-de-php85-wp
           CETECH_DE_WP_DB_CLEAN: cetech_wp_jit_disable_clean
           CETECH_DE_WP_DB_UPGRADE: cetech_wp_jit_disable_upgrade
           CETECH_DE_NATIVE_OPENING_QUALIFICATION: '1'
@@ -272,27 +274,67 @@ jobs:
           CETECH_DE_WP_DB_USER: root
           CETECH_DE_WP_DB_PASSWORD: wordpress
         shell: bash
-        run: bash scripts/ci-wordpress-php85-smoke.sh
+        run: |
+          python3 - <<'PY'
+          import json, os, shutil
+          from pathlib import Path
+
+          work = Path(os.environ['CETECH_DE_WP_WORK'])
+          archive = Path(os.environ['RUNNER_TEMP']) / 'cetech-de-jit-control-receipts'
+          archive.mkdir(mode=0o700)
+          names = ('store-smoke-diagnostic.json', 'opening-qualification-results.json',
+                   'opening-http-qualification-results.json')
+          for name in names:
+              source = work / name
+              if source.is_file() and not source.is_symlink():
+                  shutil.copyfile(source, archive / name)
+
+          def require(value, message):
+              if value is not True:
+                  raise SystemExit('BLOCKED: ' + message)
+
+          smoke_path = archive / names[0]
+          require(smoke_path.is_file(), 'baseline listener cleanup receipt is missing')
+          smoke = json.loads(smoke_path.read_text())
+          require(smoke.get('listener', {}).get('stopped_and_waited'), 'baseline smoke listener was not reaped')
+          for field in ('kernel_core_pattern_restored', 'private_files_removed'):
+              require(smoke.get('cleanup', {}).get(field), 'baseline smoke cleanup is incomplete')
+          http_path = archive / names[2]
+          if http_path.is_file():
+              http = json.loads(http_path.read_text())
+              for field in ('listener_stopped', 'fixture_mu_removed', 'private_files_removed',
+                            'tracked_cleanup_command_success'):
+                  require(http.get('fixture_lifecycle', {}).get(field), 'baseline HTTP cleanup is incomplete')
+              require(http.get('native_crash_diagnostic', {}).get('kernel_core_pattern_restored'),
+                      'baseline HTTP core handling was not restored')
+          for name in ('store-smoke-private', 'opening-http-private'):
+              require(not (work / name).exists(), 'baseline private diagnostics remain')
+          for name in names:
+              (work / name).unlink(missing_ok=True)
+          print('Baseline receipts preserved; owned listener cleanup verified.')
+          PY
+          echo 'prepared=true' >> "$GITHUB_OUTPUT"
+          bash scripts/ci-wordpress-php85-smoke.sh
       - name: Retain separate JIT-disabled smoke diagnostic
-        if: ${{ always() && github.event_name == 'push' && github.ref_name == 'fix/pr55-jit-disable-comparison' }}
+        if: ${{ always() && steps.jit-comparison.outputs.prepared == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: store-smoke-diagnostic-jit-disable
-          path: ${{ runner.temp }}/cetech-de-php85-wp-jit-disable/store-smoke-diagnostic.json
+          path: ${{ runner.temp }}/cetech-de-php85-wp/store-smoke-diagnostic.json
           if-no-files-found: warn
       - name: Retain separate JIT-disabled native companion
-        if: ${{ always() && github.event_name == 'push' && github.ref_name == 'fix/pr55-jit-disable-comparison' }}
+        if: ${{ always() && steps.jit-comparison.outputs.prepared == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: opening-native-qualification-jit-disable
-          path: ${{ runner.temp }}/cetech-de-php85-wp-jit-disable/opening-qualification-results.json
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-qualification-results.json
           if-no-files-found: warn
       - name: Retain separate JIT-disabled authenticated HTTP comparison
-        if: ${{ always() && github.event_name == 'push' && github.ref_name == 'fix/pr55-jit-disable-comparison' }}
+        if: ${{ always() && steps.jit-comparison.outputs.prepared == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: opening-http-qualification-jit-disable
-          path: ${{ runner.temp }}/cetech-de-php85-wp-jit-disable/opening-http-qualification-results.json
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-qualification-results.json
           if-no-files-found: warn
 
   javascript-tests:
