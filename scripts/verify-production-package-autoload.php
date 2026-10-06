@@ -56,6 +56,11 @@ if ( ! str_contains( $health_source, 'namespace CetechDeliveryEngine\\Applicatio
 require_once $autoload;
 
 $required_classes = [
+	'CetechDeliveryEngine\\Application\\Operation\\OperationCoordinator',
+	'CetechDeliveryEngine\\Domain\\Operation\\OperationProfileRegistry',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\OperationStoreReadiness',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\WpdbOperationRecordRepository',
+	'CetechDeliveryEngine\\Infrastructure\\WordPress\\OperationConnectionFactory',
 	'CetechDeliveryEngine\\Application\\Diagnostics\\ConfigurationHealthChecker',
 	'CetechDeliveryEngine\\Bootstrap\\Plugin',
 	'CetechDeliveryEngine\\Bootstrap\\ServiceContainer',
@@ -294,6 +299,7 @@ $is_schema5_release = str_contains( $header_source, '1.0.0-dev.bulk' )
 	|| str_contains( $header_source, '1.0.0-dev.pdp-price' )
 	|| str_contains( $header_source, '1.0.0-rc.11' );
 
+$is_schema7_release = str_contains( $header_source, '1.0.0-dev.wave1-operation-storage' );
 $is_schema6_release = str_contains( $header_source, '1.0.0-dev.geo' )
 	|| str_contains( $header_source, '1.0.0-rc.12' )
 	|| str_contains( $header_source, '1.0.0-dev.checkout-mdest' )
@@ -305,7 +311,16 @@ $is_schema6_release = str_contains( $header_source, '1.0.0-dev.geo' )
 $target = 'unknown';
 if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 	$target = ( new ReflectionClass( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) )->getConstant( 'TARGET' );
-	if ( $is_schema6_release ) {
+	if ( $is_schema7_release ) {
+		if ( '7' !== $target ) {
+			$failures[] = 'SchemaVersion::TARGET must be 7 for this schema-7 package.';
+		}
+		foreach ( [ 'operation_records', 'operation_changes' ] as $suffix ) {
+			if ( ! str_contains( implode( "\n", \CetechDeliveryEngine\Infrastructure\Persistence\OperationStoreSchema::create_table_statements( 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' ) ), $suffix ) ) {
+				$failures[] = 'Missing schema-7 operation table definition.';
+			}
+		}
+	} elseif ( $is_schema6_release ) {
 		if ( '6' !== $target ) {
 			$failures[] = 'SchemaVersion::TARGET must be 6 for this schema-6 package.';
 		}
@@ -319,9 +334,9 @@ if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 }
 
 $bulk_js = $package_root . '/assets/admin/bulk-tools.js';
-if ( ( $is_schema5_release || $is_schema6_release ) && ! is_readable( $bulk_js ) ) {
+if ( ( $is_schema5_release || $is_schema6_release || $is_schema7_release ) && ! is_readable( $bulk_js ) ) {
 	$failures[] = 'Missing assets/admin/bulk-tools.js';
-} elseif ( is_readable( $bulk_js ) && ( $is_schema5_release || $is_schema6_release ) ) {
+} elseif ( is_readable( $bulk_js ) && ( $is_schema5_release || $is_schema6_release || $is_schema7_release ) ) {
 	$bulk_js_source = (string) file_get_contents( $bulk_js );
 	if ( ! str_contains( $bulk_js_source, "body.set('advance', '1')" ) ) {
 		$failures[] = 'bulk-tools.js missing bounded AJAX continue (advance=1).';

@@ -383,8 +383,8 @@ final class OrderDeliverySnapshotPersisterStoreApiTest extends TestCase {
 		self::assertSame( '', $item->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT, true ) );
 	}
 
-	public function test_schema_target_remains_five(): void {
-		self::assertSame( '6', SchemaVersion::TARGET );
+	public function test_current_schema_target_is_seven(): void {
+		self::assertSame( '7', SchemaVersion::TARGET );
 	}
 
 	public function test_two_same_product_lines_with_different_destinations_keep_correct_v2_snapshots(): void {

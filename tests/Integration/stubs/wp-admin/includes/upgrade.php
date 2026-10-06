@@ -19,6 +19,9 @@ if ( ! function_exists( 'dbDelta' ) ) {
 		}
 
 		foreach ( $queries as $sql ) {
+			if ( is_object( $wpdb ) && method_exists( $wpdb, 'register_table_definition' ) ) {
+				$wpdb->register_table_definition( (string) $sql );
+			}
 			if ( preg_match( '/CREATE TABLE\s+(?:IF NOT EXISTS\s+)?`?([a-z0-9_]+)`?/i', (string) $sql, $matches ) ) {
 				if ( is_object( $wpdb ) && method_exists( $wpdb, 'register_table' ) ) {
 					$wpdb->register_table( $matches[1] );
