@@ -342,7 +342,7 @@ final class BlocksPerItemCustomerUxTest extends TestCase {
 	}
 
 	public function test_current_schema_target_is_seven(): void {
-		self::assertSame( '7', \CetechDeliveryEngine\Core\Versioning\SchemaVersion::TARGET );
+		self::assertSame( '8', \CetechDeliveryEngine\Core\Versioning\SchemaVersion::TARGET );
 	}
 
 	/**

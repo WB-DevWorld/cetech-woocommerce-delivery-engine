@@ -122,7 +122,7 @@ jobs:
         run: bash scripts/ci-stage-production-tree.sh "${RUNNER_TEMP}/cetech-de-prod-tree"
 
   php85-mariadb:
-    name: PHP 8.5 MariaDB Geography/Operation Store/Migrations
+    name: PHP 8.5 MariaDB Geography/Operations/Rule Lifecycle/Migrations
     runs-on: ubuntu-latest
     timeout-minutes: 25
     services:
@@ -165,7 +165,7 @@ jobs:
             }
             echo "mariadb_preflight=ok\n";
           '
-      - name: Real MariaDB / geography / operation-store / migration proofs
+      - name: Real MariaDB / geography / operation-store / rule-lifecycle / migration proofs
         env:
           CETECH_DE_REAL_DB_HOST: 127.0.0.1
           CETECH_DE_REAL_DB_PORT: 3306
@@ -178,6 +178,8 @@ jobs:
             --log-junit "${RUNNER_TEMP}/cetech-de-real-db.junit.xml"
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
             'CetechDeliveryEngine\Tests\Integration\Operation\OperationStoreRealDatabaseTest' 43
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+            'CetechDeliveryEngine\Tests\Integration\RuleLifecycle\RuleLifecycleRealDatabaseTest' 44
 
   php85-wordpress:
     name: PHP 8.5 WordPress/WooCommerce

@@ -123,7 +123,7 @@ final class FakeWpdb {
 			}
 			preg_match( '/\bDEFAULT\s+(\d+)/i', $column[3], $default );
 			preg_match( '/\bCOLLATE\s+(\w+)/i', $column[3], $specific_collation );
-			$columns[] = [ 'Field' => $column[1], 'Type' => strtolower( $column[2] ), 'Null' => str_contains( $column[3], 'NOT NULL' ) ? 'NO' : 'YES', 'Default' => $default[1] ?? null, 'Extra' => str_contains( $column[3], 'AUTO_INCREMENT' ) ? 'auto_increment' : '', 'Collation' => preg_match( '/^(?:char|varchar|longtext)/i', $column[2] ) ? ( $specific_collation[1] ?? $site_collation ) : null ];
+			$columns[] = [ 'Field' => $column[1], 'Type' => strtolower( $column[2] ), 'Null' => str_contains( $column[3], 'NOT NULL' ) ? 'NO' : 'YES', 'Default' => $default[1] ?? null, 'Extra' => str_contains( $column[3], 'AUTO_INCREMENT' ) ? 'auto_increment' : '', 'Collation' => preg_match( '/^(?:char|varchar|(?:long)?text)/i', $column[2] ) ? ( $specific_collation[1] ?? $site_collation ) : null ];
 		}
 		$this->table_metadata[ $table ] = [ 'status' => [ 'Name' => $table, 'Engine' => $parts[3], 'Collation' => $site_collation ], 'columns' => $columns, 'indexes' => $indexes ];
 	}

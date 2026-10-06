@@ -31,7 +31,7 @@ return static function ( callable $check ): void {
 	foreach ( [ 'OperationProofCommand', 'OperationProofDatabase', 'OperationProofProfile', 'OperationProofTransport' ] as $fixture ) {
 		require_once $root . '/tests/Support/Operation/' . $fixture . '.php';
 	}
-	$check( 'NATIVE-C03-ACTUAL-SCHEMA-SEVEN-READY', '7' === (string) get_option( 'cetech_de_db_version' ) && ( new OperationStoreReadiness() )->get_status()['ready'] );
+	$check( 'NATIVE-C03-ACTUAL-SCHEMA-SEVEN-READY', version_compare( (string) get_option( 'cetech_de_db_version' ), '7', '>=' ) && ( new OperationStoreReadiness() )->get_status()['ready'] );
 	$global_id = (int) $wpdb->get_var( 'SELECT CONNECTION_ID()' );
 	$native = ( new OperationConnectionFactory() )->open();
 	try {

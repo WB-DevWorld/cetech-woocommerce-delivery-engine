@@ -71,7 +71,9 @@ return static function ( callable $check ): void {
 	}
 	$legacy_six = require dirname( __DIR__, 2 ) . '/database/migrations/20260917120000_create_geography_coverage_tables.php';
 	$check( 'NATIVE-COR010-schema-target-preserved', '6' === $legacy_six->get_version(), [ 'historical_schema_version' => $legacy_six->get_version() ] );
-	$check( 'NATIVE-C03-schema-seven-target', '7' === SchemaVersion::target(), [ 'schema_target' => SchemaVersion::target(), 'historical_cor010_fixture_versions' => 'unchanged' ] );
+	$legacy_seven = require dirname( __DIR__, 2 ) . '/database/migrations/20261006191156_create_operation_tables.php';
+	$check( 'NATIVE-C03-schema-seven-target', '7' === $legacy_seven->get_version(), [ 'historical_schema_version' => $legacy_seven->get_version(), 'historical_cor010_fixture_versions' => 'unchanged' ] );
+	$check( 'NATIVE-C04-schema-eight-target', '8' === SchemaVersion::target(), [ 'schema_target' => SchemaVersion::target() ] );
 	$keys = [ SchemaVersion::OPTION_NAME, MigrationStatus::OPTION_NAME ];
 	$raw_row = static function ( string $key ) use ( $wpdb ): ?array {
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT option_id,option_name,option_value,autoload FROM {$wpdb->options} WHERE option_name=%s", $key ), ARRAY_A );
