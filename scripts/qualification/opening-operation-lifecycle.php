@@ -70,6 +70,11 @@ return static function ( callable $check ): void {
 		}
 		$installed = true;
 		OperationProofDatabase::install( $physical, $prefix );
+		// Real WordPress has autoloaded options. Without one, wp_load_alloptions()
+		// falls back to every row, including off rows whose deletion only clears
+		// their individual cache entry. Keep this isolated fixture on the normal path.
+		OperationProofDatabase::execute( $physical, "INSERT INTO `{$prefix}options` (option_name, option_value, autoload) VALUES ('operation_fixture_autoload_marker','1','on')" );
+		$fixture_autoload_present = 1 === (int) OperationProofDatabase::scalar( $physical, "SELECT COUNT(*) FROM `{$prefix}options` WHERE option_name='operation_fixture_autoload_marker' AND option_value='1' AND autoload='on'" );
 		$fixture_roles = [
 			'administrator' => [ 'name' => 'Administrator', 'capabilities' => [ 'manage_options' => true, 'view_delivery_engine' => true ] ],
 			'shop_manager' => [ 'name' => 'Shop Manager', 'capabilities' => [ 'view_delivery_engine' => true ] ],
@@ -90,7 +95,7 @@ return static function ( callable $check ): void {
 			];
 		};
 		$before = $pair();
-		$check( 'NATIVE-C03-LIFECYCLE-ACCEPTED-PAIR-SEEDED', 'accepted' === $accepted->outcome->state && null !== $before[0] && null !== $before[1] && 'accepted' === $before[0]['state'] && (int) $before[0]['audit_id'] === (int) $before[1]['id'] && 1 === $profile->mutation_calls );
+		$check( 'NATIVE-C03-LIFECYCLE-ACCEPTED-PAIR-SEEDED', $fixture_autoload_present && 'accepted' === $accepted->outcome->state && null !== $before[0] && null !== $before[1] && 'accepted' === $before[0]['state'] && (int) $before[0]['audit_id'] === (int) $before[1]['id'] && 1 === $profile->mutation_calls, [ 'fixture_autoload_present' => $fixture_autoload_present ] );
 
 		$disabled = ( new OperationCoordinator( new OperationProfileRegistry(), $factory ) )->attempt( $identity, $payload, RequestContext::create() );
 		$check( 'NATIVE-C03-WRITER-DISABLE-ROLLBACK-PRESERVES-PAIR', 'unsupported_contract' === $disabled->outcome->error?->code && $before === $pair() );
@@ -129,6 +134,7 @@ return static function ( callable $check ): void {
 		$policy_row = OperationProofDatabase::row( $physical, "SELECT option_value FROM `{$prefix}options` WHERE option_name='cetech_de_delete_data_on_uninstall' LIMIT 1" );
 		$schema_cache_found = false;
 		$schema_cached = wp_cache_get( SchemaVersion::OPTION_NAME, 'options', false, $schema_cache_found );
+		$fixture_alloptions = wp_cache_get( 'alloptions', 'options' );
 		$diagnostics_gone = 0 === (int) OperationProofDatabase::scalar( $physical, "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='{$diagnostics}'" );
 		$check( 'NATIVE-C03-EXPLICIT-UNINSTALL-PRESERVES-PAIR', $before === $after_explicit && null === $schema_row && false === $schema_read, [
 			'record_bytes_unchanged' => $before[0] === $after_explicit[0],
@@ -139,6 +145,8 @@ return static function ( callable $check ): void {
 			'schema_read_is_original_value' => '7' === $schema_read,
 			'schema_cache_found' => $schema_cache_found,
 			'schema_cache_is_original_value' => '7' === $schema_cached,
+			'fixture_autoload_marker_cached' => is_array( $fixture_alloptions ) && '1' === ( $fixture_alloptions['operation_fixture_autoload_marker'] ?? null ),
+			'schema_in_alloptions_cache' => is_array( $fixture_alloptions ) && array_key_exists( SchemaVersion::OPTION_NAME, $fixture_alloptions ),
 			'delete_policy_deleted_in_database' => null === $policy_row,
 			'legacy_diagnostic_table_deleted' => $diagnostics_gone,
 			'isolated_native_connection_still_selected' => $GLOBALS['wpdb'] === $fixture_db && $fixture_db->prefix === $prefix,

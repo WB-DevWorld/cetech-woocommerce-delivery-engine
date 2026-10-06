@@ -452,7 +452,13 @@ final class CoordinatorFixtureFactory implements OperationConnectionFactory {
 		}
 		$session = new CoordinatorFixtureSession( $this ); $this->sessions[] = $session; return $session;
 	}
-	public function inspection(): \PDO { return new \PDO( 'sqlite:' . $this->path, null, null, [ \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION ] ); }
+	public function inspection(): \PDO {
+		$dsn = 'sqlite:' . $this->path;
+		$options = [ \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION ];
+		return method_exists( \PDO::class, 'connect' )
+			? \PDO::connect( $dsn, null, null, $options )
+			: new \PDO( $dsn, null, null, $options );
+	}
 }
 
 final class CoordinatorFixtureSession implements OperationSession {
@@ -462,7 +468,12 @@ final class CoordinatorFixtureSession implements OperationSession {
 	private bool $ambient;
 	public function __construct( private readonly CoordinatorFixtureFactory $factory ) {
 		$this->pdo = $factory->inspection();
-		$this->pdo->sqliteCreateFunction( 'UTC_NOW', static fn(): string => '2026-10-06 20:00:00.000001' );
+		$clock = static fn(): string => '2026-10-06 20:00:00.000001';
+		if ( method_exists( $this->pdo, 'createFunction' ) ) {
+			$this->pdo->createFunction( 'UTC_NOW', $clock );
+		} else {
+			$this->pdo->sqliteCreateFunction( 'UTC_NOW', $clock );
+		}
 		$this->ambient = $factory->ambient;
 	}
 	public function site_id(): int { return $this->factory->site; }
