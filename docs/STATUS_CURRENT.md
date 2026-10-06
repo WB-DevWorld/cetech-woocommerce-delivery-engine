@@ -1,13 +1,13 @@
 # CETECH Delivery Engine — Current Status
 
-Current Wave 1 work: owner accepted `WAVE1-PLAN-1` and authorized **W1-C01 only** on 2026-10-06 at 18:09 UTC. Planning PR #57 is merged as `e688655c34efcd37eb30b95c26abc5b6e3f20567`, tree `90668822f2e3ce136e4a2fc4a2f6907f97970007`. [Issue #58](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/58) tracks the internal contract primitives and T01–T04 model tests. These types have no existing checkout/save adapter or durable production operation store. Schema remains 6. Candidate publication/CI and the finite closure evidence are recorded in `CURRENT-WORK.md` and the implementation PR; the opening-correction counts below describe their earlier baseline.
+Current Wave 1 work: owner accepted `WAVE1-PLAN-1`, then explicitly approved W1-C01 integration and authorized **W1-C02** on 2026-10-06 at 18:38 UTC. Unchanged qualified [PR #59](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/59) is merged as `1f8d0bcf0a0cc98204e78fb17a0543da1839cdd1`, tree `c5299207930534e0a6f9818dff0b79431abbbd14`; actual merged-master CI `37512958872`, attempt 1, passed all eight jobs, independently downloaded native 207 / HTTP 66 and Store API smoke, with the exact 500-file Git-tree map. [Issue #60](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/60) tracks implemented C02 safe explanation projections, bounded trace/provenance and read-only existing-source adapters (T05–T06). These types have no existing checkout/save/logger/audit adopter or durable generic operation store. Schema remains 6. Exact-candidate qualification and finite closure evidence are recorded in `CURRENT-WORK.md` and the implementation PR; older counts below describe their historical baselines.
 
 Last reconciled: 2026-10-06 after owner-accepted opening-correction integration through PR #55. Functional master baseline: `7add0bf3ca66f73982797c0362fb33983da975a2`, tree `958efc0ab3fd7ad22ee6cc90e9372bfccbb69d1f`; post-merge CI `37502749839`, attempt 1, SUCCESS across all eight jobs. Later documentation-only commits may advance master without changing that functional baseline. RC.12 remains the immutable published release candidate, schema `6`. The last recorded physical training package is `1.0.0-dev.attention-count.1`; training was not reread or changed by this integration. No newer release or deployment is claimed. Issue #48 is the next shared-contract planning surface; the earlier Issue #45 cleanup-only execution note is historical.
 
 ## Canonical repository
 - Organization repository: `WB-DevWorld/cetech-woocommerce-delivery-engine`
 - Default/canonical development branch: protected `master`
-- Owner-accepted functional `master` baseline: `7add0bf3ca66f73982797c0362fb33983da975a2` (PR #55 merged; post-merge CI `37502749839` SUCCESS).
+- Owner-accepted current `master` baseline: `1f8d0bcf0a0cc98204e78fb17a0543da1839cdd1` (C01 PR #59 merged; actual-master CI `37512958872` SUCCESS). Opening-repair functional merge `7add0bf3ca66f73982797c0362fb33983da975a2` remains included historical evidence.
 - Historical repository-truth baseline before PR #46: `88c9ec09f3cfabf73b83780c0c37d397e9acdad6` (PR #43 / Issue #32; CI `35766468276` SUCCESS). Pre-opening-correction master was `637c02f182ca273b40819631d23ac8e0dcc4004f`.
 - RC.12 publication merge on `master`: `78594ad8962868683726373f58f4a8b1b48e4d0e` (PR #27 / `release/rc12` onto `3d786ba6440a5f6f850d736bda0da5a5f5236c1f`).
 - Later documentation commits on `master` are **not** the RC.12 tag source.
@@ -23,7 +23,7 @@ Last reconciled: 2026-10-06 after owner-accepted opening-correction integration 
 - Production PHP: 494 files; installed map `48242148bc1fcada1275cb96553ea7d6e4efc3814ee4cc8f5886ed9ee11a8238`. Historical RC.12 package counts below belong to that immutable package.
 - Ordinary CI MariaDB coverage is separate from earlier local targeted groups `cor005-real-db` (2 tests / 19 assertions) and `cor007-real-db` (12 / 105), which remain excluded from that job.
 - [Issue #54](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/54) retains exact upstream JIT-defect attribution, qualification of the original runtime and the separate historical timeout. Real cores locate the fault in PHP JIT scheduling; the CI-only mitigation is integrated. Historical failed receipts remain failed evidence.
-- Current development task: [Issue #58](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/58), owner-authorized W1-C01 under the accepted Issue #48 packet. C02–C07 remain not started with their listed dependencies. Wider compatibility and release qualification remain separate from completion of the opening repairs.
+- Current development task: [Issue #60](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/60), owner-authorized W1-C02 under the accepted Issue #48 packet. C01 is integrated; C02 is implemented and qualifying. C03–C07 remain not started with their listed dependencies. Wider compatibility and release qualification remain separate from completion of the opening repairs.
 
 ## PHP runtime policy
 - Canonical policy: `docs/PHP-RUNTIME-POLICY.md`. Realignment evidence: `docs/PHP-85-CI-REALIGNMENT.md`.
@@ -304,7 +304,7 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - Later documentation commits on `master` are **not** the RC.12 tag source and must not receive the `v1.0.0-rc.12` tag.
 - Training's last recorded physical package is `1.0.0-dev.attention-count.1`, schema 6. This repository closeout did not query or change the site; earlier training qualification is not Stable-1.0 certification.
 - CETECH Pilot: **NOT STARTED**. FLAIROC: **NOT DEPLOYED**. Production: **NOT DEPLOYED**.
-- Issue #48's Wave 1 contract package was reviewed and owner accepted as `WAVE1-PLAN-1`. The selected next output is W1-C01's internal primitives and bounded tests; later rule/history/cleanup/adoption units retain their explicit dependencies.
+- Issue #48's Wave 1 contract package was reviewed and owner accepted as `WAVE1-PLAN-1`. C01's primitives/model tests are integrated; the selected current output is C02's safe explanation contracts and bounded adapters. Later durable operation/rule/history/cleanup/adoption units retain their explicit dependencies.
 
 ## Remaining separate work
 1. Create the controlled CETECH production Pilot only after a separate owner authorization; this tag/prerelease is not that authorization.
