@@ -288,6 +288,23 @@ final class ScopedConfigurationCompletionSqlTest extends TestCase {
 		self::assertSame( '8', $this->priority( $this->reader ) );
 	}
 
+	public function test_a_fresh_process_replays_a_token_buried_under_more_than_one_hundred_audits(): void {
+		$service = $this->service();
+		$saved   = $service->save( $this->product_command( '', '5', 'process-buried', 0 ) );
+		self::assertTrue( $saved->success, implode( ' ', $saved->errors ) );
+		$insert = $this->pdo->prepare( 'INSERT INTO cor007_delivery_engine_audit_log (actor_user_id, action, entity_type, entity_id, previous_value, new_value, site_context, created_at) VALUES (1, ?, ?, 1, NULL, ?, NULL, UTC_TIMESTAMP())' );
+		for ( $i = 0; $i < 101; $i++ ) {
+			$insert->execute( [ 'unrelated', 'note', '{"request_token":"process-other-' . $i . '"}' ] );
+		}
+		$audits = $this->audit_count( $this->reader );
+		$again  = $this->finish_process( $this->spawn_save( '5', 'process-buried', (int) $saved->version_after ) );
+
+		self::assertTrue( $again['success'], implode( ' ', $again['errors'] ?? [] ) );
+		self::assertTrue( $again['replayed'] );
+		self::assertSame( $audits, $this->audit_count( $this->reader ) );
+		self::assertSame( '5', $this->slice_priority( $this->reader, '' ) );
+	}
+
 	public function test_replay_finds_a_token_buried_under_more_than_one_hundred_audits(): void {
 		$service = $this->service();
 		$saved   = $service->save( $this->command( '5', 'buried-token' ) );

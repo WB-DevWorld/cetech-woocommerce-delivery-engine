@@ -16,6 +16,10 @@ if ( ! is_string( $load ) || ! is_file( $load ) ) {
 	exit( 2 );
 }
 
+if ( isset( $argv[1] ) && in_array( $argv[1], [ 'page', 'render' ], true ) && ! defined( 'WP_ADMIN' ) ) {
+	define( 'WP_ADMIN', true );
+}
+
 require $load;
 require $root . '/vendor/autoload.php';
 
@@ -38,7 +42,14 @@ use CetechDeliveryEngine\Infrastructure\Persistence\ScopedConfigurationSchema;
 use CetechDeliveryEngine\Infrastructure\Persistence\TableNames;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbAuditLogRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbScopedConfigurationRepository;
+use CetechDeliveryEngine\Core\Capabilities\Capabilities;
+use CetechDeliveryEngine\Core\Requirements;
+use CetechDeliveryEngine\Presentation\Admin\AdminActionHandler;
+use CetechDeliveryEngine\Presentation\Admin\AdminNoticeService;
 use CetechDeliveryEngine\Presentation\Admin\ConfigurationAuditLogger;
+use CetechDeliveryEngine\Presentation\Admin\ProductTargetResolver;
+use CetechDeliveryEngine\Presentation\Admin\ScopedConfigurationPage;
+use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationAuthorization;
 use CetechDeliveryEngine\Support\Logger;
 
 /**
@@ -232,9 +243,142 @@ function cor007_child(): array {
 	return $decoded;
 }
 
+/**
+ * @return array<string, mixed>
+ */
+function cor007_spawn( string $mode, array $env, string $output ): array {
+	$command = escapeshellarg( PHP_BINARY ) . ' -d extension=mysqli ' . escapeshellarg( __FILE__ ) . ' ' . $mode;
+	$process = proc_open(
+		$command,
+		[ 1 => [ 'file', $output, 'w' ], 2 => [ 'file', $output, 'a' ] ],
+		$pipes,
+		dirname( __DIR__, 2 ),
+		$env
+	);
+	if ( ! is_resource( $process ) ) {
+		cor007_fail( 'Could not start the ' . $mode . ' WordPress process.' );
+	}
+	$exit = proc_close( $process );
+	$raw  = (string) file_get_contents( $output );
+
+	return [ 'exit' => $exit, 'raw' => $raw ];
+}
+
+function cor007_replay_child(): never {
+	$service = cor007_service();
+	$result  = $service->save( cor007_command( (string) getenv( 'CETECH_DE_COR007_PRIORITY' ), (string) getenv( 'CETECH_DE_COR007_TOKEN' ), (int) getenv( 'CETECH_DE_COR007_EXPECTED' ) ) );
+	cor007_emit(
+		[
+			'success'  => $result->success,
+			'replayed' => $result->replayed,
+			'errors'   => $result->errors,
+			'audits'   => cor007_audit_count(),
+			'priority' => cor007_durable_priority(),
+		]
+	);
+}
+
+function cor007_page_child(): never {
+	cor007_act_as_admin();
+	$out = (string) getenv( 'CETECH_DE_COR007_PAGE_OUT' );
+	if ( '' === $out ) {
+		cor007_fail( 'The page process needs an output path.' );
+	}
+	global $wpdb;
+	$retired = new Cor007LostAckWpdb( $wpdb );
+	$wpdb    = $retired;
+	$retired->lose_next_commit = true;
+	register_shutdown_function(
+		static function () use ( $retired, $out ): void {
+			global $wpdb;
+			file_put_contents(
+				$out,
+				wp_json_encode(
+					[
+						'retired_ready'    => $retired->ready,
+						'retired_query'    => $retired->query( 'SELECT 1' ),
+						'replaced'         => $wpdb !== $retired && '' !== (string) ( $wpdb->options ?? '' ),
+						'user_id'          => get_current_user_id(),
+					]
+				)
+			);
+		}
+	);
+	$scopes  = TableNames::for( ScopedConfigurationSchema::SCOPES_SUFFIX );
+	$version = (int) $wpdb->get_var( "SELECT config_version FROM `{$scopes}` WHERE scope_type = 'global' AND scope_id = 0 AND slice_key = ''" );
+	$row_id  = (int) $wpdb->get_var( "SELECT id FROM `{$scopes}` WHERE scope_type = 'global' AND scope_id = 0 AND slice_key = ''" );
+	$_POST   = [
+		'cetech_de_action'       => ScopedConfigurationPage::ACTION_SAVE,
+		'cetech_de_nonce'        => wp_create_nonce( ScopedConfigurationPage::ACTION_SAVE ),
+		'scope_type'             => 'global',
+		'scope_id'               => '0',
+		'slice_key'              => '',
+		'expected_revision'      => (string) $version,
+		'expected_scope_row_id'  => (string) $row_id,
+		'request_token'          => 'page-lost-ack',
+		'fields'                 => cor007_fields( '4' ),
+	];
+	cor007_page()->handle_actions();
+	cor007_fail( 'The page handler returned without redirecting.' );
+}
+
+function cor007_render_child(): never {
+	cor007_act_as_admin();
+	require_once ABSPATH . 'wp-admin/includes/template.php';
+	$_GET = [ 'scope_type' => 'global' ];
+	$out   = (string) getenv( 'CETECH_DE_COR007_RENDER_OUT' );
+	$draft = get_transient( 'cetech_de_scoped_draft_' . get_current_user_id() . '_global_0__none' );
+	file_put_contents(
+		$out . '.draft',
+		(string) wp_json_encode(
+			[
+				'user'      => get_current_user_id(),
+				'authority' => is_array( $draft ) ? ( $draft['authority'] ?? null ) : null,
+				'token'     => is_array( $draft ) ? ( $draft['save_token'] ?? null ) : null,
+			]
+		)
+	);
+	$level = ob_get_level();
+	ob_start();
+	cor007_page()->render();
+	$html = '';
+	while ( ob_get_level() > $level ) {
+		$html = (string) ob_get_clean() . $html;
+	}
+	file_put_contents( $out, $html );
+	cor007_emit( [ 'rendered' => true, 'bytes' => strlen( $html ) ] );
+}
+
+function cor007_act_as_admin(): void {
+	$users = get_users( [ 'role' => 'administrator', 'number' => 1 ] );
+	if ( [] === $users ) {
+		cor007_fail( 'The disposable site has no administrator.' );
+	}
+	$users[0]->add_cap( Capabilities::SITE_WIDE );
+	wp_set_current_user( (int) $users[0]->ID );
+}
+
+function cor007_page(): ScopedConfigurationPage {
+	return new ScopedConfigurationPage(
+		cor007_service(),
+		new ProductTargetResolver( new Requirements() ),
+		new AdminActionHandler( new AdminNoticeService() ),
+		new ScopedConfigurationAuthorization()
+	);
+}
+
 $mode = $argv[1] ?? 'prove';
 if ( 'observe' === $mode ) {
 	cor007_emit( cor007_observe() );
+}
+if ( 'replay' === $mode ) {
+	cor007_replay_child();
+}
+if ( 'page' === $mode ) {
+	cor007_page_child();
+}
+if ( 'render' === $mode ) {
+	cor007_render_child();
 }
 
 cor007_install();
@@ -306,6 +450,56 @@ $child = cor007_child();
 cor007_check( $before_fail === (string) $child['resolver_priority'], 'Fresh resolver showed a rejected change.' );
 cor007_check( (string) $child['get_option'] === (string) get_option( $key, '' ), 'Option cache disagreed between requests after a known failure.' );
 
+$buried_audits = cor007_audit_count();
+for ( $i = 0; $i < 101; $i++ ) {
+	$wpdb->query( $wpdb->prepare( 'INSERT INTO `' . TableNames::for( 'audit_log' ) . '` (actor_user_id, action, entity_type, entity_id, previous_value, new_value, site_context, created_at) VALUES (1, %s, %s, 1, NULL, %s, NULL, UTC_TIMESTAMP())', 'unrelated', 'note', '{"request_token":"wp-other-' . $i . '"}' ) );
+}
+$replay_out = (string) tempnam( sys_get_temp_dir(), 'cor007replay' );
+$replay     = cor007_spawn(
+	'replay',
+	[
+		'CETECH_DE_WP_LOAD'            => (string) getenv( 'CETECH_DE_WP_LOAD' ),
+		'CETECH_DE_COR007_PRIORITY'    => '9',
+		'CETECH_DE_COR007_TOKEN'       => 'wp-option-fail',
+		'CETECH_DE_COR007_EXPECTED'    => (string) $first->version_after,
+	],
+	$replay_out
+);
+$replay_json = json_decode( trim( $replay['raw'] ), true );
+@unlink( $replay_out );
+cor007_check( is_array( $replay_json ) && true === $replay_json['replayed'], 'A fresh process did not replay the buried token: ' . $replay['raw'] );
+cor007_check( cor007_audit_count() === $buried_audits + 101, 'The fresh-process replay appended another audit.' );
+
+$page_out   = (string) tempnam( sys_get_temp_dir(), 'cor007page' );
+$render_out = (string) tempnam( sys_get_temp_dir(), 'cor007html' );
+cor007_spawn(
+	'page',
+	[
+		'CETECH_DE_WP_LOAD'       => (string) getenv( 'CETECH_DE_WP_LOAD' ),
+		'CETECH_DE_COR007_PAGE_OUT'=> $page_out,
+	],
+	$page_out . '.log'
+);
+$page_json = json_decode( (string) file_get_contents( $page_out ), true );
+cor007_check( is_array( $page_json ) && false === $page_json['retired_ready'] && false === $page_json['retired_query'] && true === $page_json['replaced'], 'The page handler did not replace the closed connection: ' . (string) file_get_contents( $page_out . '.log' ) );
+$render = cor007_spawn(
+	'render',
+	[
+		'CETECH_DE_WP_LOAD'         => (string) getenv( 'CETECH_DE_WP_LOAD' ),
+		'CETECH_DE_COR007_RENDER_OUT'=> $render_out,
+	],
+	$render_out . '.log'
+);
+$html = (string) file_get_contents( $render_out );
+preg_match_all( '/name="request_token" value="([^"]*)"/', $html, $rendered_tokens );
+cor007_check( str_contains( $html, 'value="page-lost-ack"' ), 'The rerendered page did not keep the unconfirmed token. Draft ' . (string) @file_get_contents( $render_out . '.draft' ) . ' rendered ' . implode( ',', $rendered_tokens[1] ?? [] ) . ' bytes ' . (string) strlen( $html ) );
+cor007_check( str_contains( $html, 'value="4"' ), 'The rerendered page did not keep the unsaved priority.' );
+cor007_check( str_contains( $html, 'could not be confirmed' ), 'The rerendered page did not show the lost-acknowledgement error.' );
+@unlink( $page_out );
+@unlink( $page_out . '.log' );
+@unlink( $render_out );
+@unlink( $render_out . '.log' );
+
 $autoload = (string) $wpdb->get_var( $wpdb->prepare( "SELECT autoload FROM `{$wpdb->options}` WHERE option_name = %s", $key ) );
 $retired  = $wpdb;
 $retired->close();
@@ -327,6 +521,67 @@ cor007_emit(
 		'object_cache_dropin'=> is_file( WP_CONTENT_DIR . '/object-cache.php' ),
 		'option'             => $key,
 		'autoload'           => $autoload,
-		'recovery'           => 'replaced-closed-connection',
+		'recovery'           => 'helper-cache',
+		'page_handler'       => 'replaced-closed-connection',
 	]
 );
+
+/**
+ * Sends COMMIT, then reports failure and stays closed. The native wpdb object is the inner connection.
+ */
+final class Cor007LostAckWpdb {
+
+	public bool $ready = true;
+
+	public bool $lose_next_commit = false;
+
+	private bool $commit_sent = false;
+
+	public function __construct( private \wpdb $inner ) {
+	}
+
+	public function query( string $query ) {
+		if ( ! $this->ready ) {
+			return false;
+		}
+		if ( $this->lose_next_commit && str_starts_with( ltrim( $query ), 'COMMIT' ) ) {
+			$this->lose_next_commit = false;
+			$this->inner->query( $query );
+			$this->commit_sent = true;
+
+			return false;
+		}
+
+		return $this->inner->query( $query );
+	}
+
+	public function commit_was_sent(): bool {
+		return $this->commit_sent;
+	}
+
+	public function close(): bool {
+		$this->ready = false;
+		$this->inner->close();
+
+		return true;
+	}
+
+	public function __get( string $name ): mixed {
+		return $this->inner->$name;
+	}
+
+	public function __set( string $name, mixed $value ): void {
+		$this->inner->$name = $value;
+	}
+
+	public function __isset( string $name ): bool {
+		return isset( $this->inner->$name );
+	}
+
+	/**
+	 * @param list<mixed> $arguments
+	 */
+	public function __call( string $name, array $arguments ): mixed {
+		return $this->inner->$name( ...$arguments );
+	}
+}

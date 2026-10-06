@@ -177,11 +177,13 @@ final class ScopedConfigurationPage {
 		}
 
 		if ( $customize && ConfigurationScopeType::Global !== $scope_type && null !== $this->offers ) {
+			$this->render_current_authority_notice();
 			( new StaffDeliveryCustomizeView( $this->offers ) )->render( $model, $this->form_envelope ?? [] );
 			AdminPageLayout::close_page();
 			return;
 		}
 
+		$this->render_current_authority_notice();
 		$this->render_context_summary( $model );
 		if ( ! $customize && $this->render_simplified_scope_intro( $model ) ) {
 			AdminPageLayout::close_page();
@@ -218,7 +220,7 @@ final class ScopedConfigurationPage {
 				isset( $_POST['expected_scope_row_id'] ) ? (int) wp_unslash( $_POST['expected_scope_row_id'] ) : null
 			);
 		} catch ( \RuntimeException $exception ) {
-			$this->retain_failed_draft( $scope_type_raw, $scope_id, $slice_key, $parent_id, [], isset( $_POST['expected_revision'] ) ? (int) wp_unslash( $_POST['expected_revision'] ) : null, isset( $_POST['expected_scope_row_id'] ) ? (int) wp_unslash( $_POST['expected_scope_row_id'] ) : null, isset( $_POST['request_token'] ) ? sanitize_text_field( (string) wp_unslash( $_POST['request_token'] ) ) : '', true );
+			$this->retain_failed_draft( $scope_type_raw, $scope_id, $slice_key, $parent_id, [], isset( $_POST['expected_revision'] ) ? (int) wp_unslash( $_POST['expected_revision'] ) : null, isset( $_POST['expected_scope_row_id'] ) ? (int) wp_unslash( $_POST['expected_scope_row_id'] ) : null, isset( $_POST['request_token'] ) ? sanitize_text_field( (string) wp_unslash( $_POST['request_token'] ) ) : '', true, str_contains( $exception->getMessage(), 'out of date' ) );
 			$this->action_handler->notices()->flash_error( $exception->getMessage() );
 			$redirect = [
 				'scope_type' => $scope_type_raw,
@@ -333,7 +335,7 @@ final class ScopedConfigurationPage {
 		}
 
 		if ( ! $result->success ) {
-			$this->retain_failed_draft( $scope_type->value, $scope_id, $slice_key, $parent_product_id, $raw_fields, $expected_revision, $expected_row_id, (string) $request_token, false );
+			$this->retain_failed_draft( $scope_type->value, $scope_id, $slice_key, $parent_product_id, $raw_fields, $expected_revision, $expected_row_id, (string) $request_token, false, $this->is_known_stale( $result->errors ) );
 			$this->action_handler->notices()->flash_error(
 				implode( ' ', $result->errors )
 			);
@@ -988,7 +990,7 @@ final class ScopedConfigurationPage {
 	/**
 	 * @param array<string, mixed> $fields
 	 */
-	private function retain_failed_draft( string $scope_type, int $scope_id, string $slice_key, ?int $parent_product_id, array $fields, ?int $expected_revision, ?int $expected_row_id, string $request_token, bool $reset ): void {
+	private function retain_failed_draft( string $scope_type, int $scope_id, string $slice_key, ?int $parent_product_id, array $fields, ?int $expected_revision, ?int $expected_row_id, string $request_token, bool $reset, bool $known_stale = false ): void {
 		AbstractWpdbRepository::replace_closed_connection();
 		$key      = $this->draft_key( $scope_type, $scope_id, $slice_key, $parent_product_id );
 		$existing = get_transient( $key );
@@ -1013,6 +1015,7 @@ final class ScopedConfigurationPage {
 				'expected_scope_row_id' => $expected_row_id,
 				'save_token'            => $save,
 				'reset_token'           => $reset_token,
+				'authority'             => $known_stale ? 'current' : 'submitted',
 			],
 			15 * MINUTE_IN_SECONDS
 		);
@@ -1022,8 +1025,44 @@ final class ScopedConfigurationPage {
 	 * @param \CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationEditViewModel $model
 	 * @return array<string, mixed>
 	 */
+	private function render_current_authority_notice(): void {
+		if ( ! is_array( $this->form_envelope ) || 'current' !== (string) ( $this->form_envelope['authority'] ?? '' ) ) {
+			return;
+		}
+
+		echo '<p class="cetech-de-current-authority">' . esc_html__( 'These unsaved values now apply to the current saved revision. Submit again to keep them.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+	}
+
+	/**
+	 * @param list<string> $errors
+	 */
+	private function is_known_stale( array $errors ): bool {
+		foreach ( $errors as $error ) {
+			if ( str_contains( $error, 'out of date' ) ) {
+				return true;
+			}
+		}
+
+		return false;
+	}
+
 	private function retry_envelope( $model ): array {
 		$draft = $this->unsaved_draft;
+		if ( is_array( $draft ) && 'current' === (string) ( $draft['authority'] ?? '' ) ) {
+			if ( null === $this->generated_save_token ) {
+				$this->generated_save_token  = $this->new_token();
+				$this->generated_reset_token = $this->new_token();
+			}
+
+			return [
+				'expected_revision'     => $model->config_version,
+				'expected_scope_row_id' => (int) ( $model->technical_details['scope_row_id'] ?? 0 ),
+				'save_token'            => (string) $this->generated_save_token,
+				'reset_token'           => (string) $this->generated_reset_token,
+				'fields'                => is_array( $draft['fields'] ?? null ) ? $draft['fields'] : [],
+				'authority'             => 'current',
+			];
+		}
 		if ( is_array( $draft ) && array_key_exists( 'expected_revision', $draft ) && null !== $draft['expected_revision'] ) {
 			$save  = (string) ( $draft['save_token'] ?? '' );
 			$reset = (string) ( $draft['reset_token'] ?? '' );

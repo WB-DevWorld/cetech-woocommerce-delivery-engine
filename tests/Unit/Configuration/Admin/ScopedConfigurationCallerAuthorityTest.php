@@ -25,6 +25,9 @@ use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
 use CetechDeliveryEngine\Domain\Configuration\ScopedConfiguration;
 use CetechDeliveryEngine\Domain\Configuration\ScalarFieldInstruction;
 use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
+use CetechDeliveryEngine\Domain\Enum\DeliveryRoute;
+use CetechDeliveryEngine\Domain\Enum\FulfilmentAvailability;
+use CetechDeliveryEngine\Tests\Unit\Runtime\InMemoryDeliveryOfferRepository;
 use CetechDeliveryEngine\Domain\Enum\ConfigurationSource;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Domain\FulfilmentProfile\FulfilmentProfileRegistry;
@@ -83,7 +86,10 @@ final class ScopedConfigurationCallerAuthorityTest extends TestCase {
 		$classifier = new CatalogInheritanceClassifier( $this->repository, $catalog, $resolver, $settings );
 		$defaults = new SiteWideDefaultsService( $this->repository, $settings, $classifier, $resolver, $catalog );
 		$actions = new AdminActionHandler( new AdminNoticeService() );
-		$this->page = new ScopedConfigurationPage( $admin, $target, $actions, $authorization, $defaults );
+		$offers  = new InMemoryDeliveryOfferRepository();
+		$offers->seed( 1, [ 'route' => DeliveryRoute::LocalDelivery->value, 'public_label' => 'Local Van', 'internal_name' => 'Local Van' ] );
+		$offers->seed( 2, [ 'route' => DeliveryRoute::Air->value, 'public_label' => 'Air Freight', 'internal_name' => 'Air Freight' ] );
+		$this->page = new ScopedConfigurationPage( $admin, $target, $actions, $authorization, $defaults, $offers );
 		$this->query = new ProductExceptionsQuery( $this->repository, $catalog, $classifier, $settings, new OperationalReadinessAssessor( $resolver ) );
 		$this->exceptions = new ProductExceptionsPage( $this->query, $defaults, $actions, $target, $authorization, $admin );
 	}
@@ -285,6 +291,69 @@ final class ScopedConfigurationCallerAuthorityTest extends TestCase {
 		$notice = get_transient( 'cetech_de_admin_notice_7' );
 		self::assertIsArray( $notice );
 		self::assertSame( 'No semantic changes detected. Configuration version unchanged.', $notice['message'] );
+	}
+
+	public function test_customize_rerender_keeps_pickup_disable_and_an_empty_option_replacement(): void {
+		$scope = $this->seed( ConfigurationScopeType::Product, 101, '', 5 );
+		$_POST = $this->post( ScopedConfigurationPage::ACTION_SAVE, 'product', 101 );
+		$_POST['customize']     = '1';
+		$_POST['request_token'] = 'customize-stale';
+		$_POST['fields']        = [
+			ConfigurationFieldKey::PICKUP_LOCATION_ID      => [ 'mode' => 'disable', 'value' => '9' ],
+			ConfigurationFieldKey::DELIVERY_OFFER_IDS      => [ 'mode' => 'replace', 'members' => [] ],
+			ConfigurationFieldKey::FULFILMENT_AVAILABILITY => [ 'mode' => 'override', 'value' => FulfilmentAvailability::InStore->value ],
+		];
+		$this->redirect( fn () => $this->page->handle_actions() );
+		self::assertSame( 5, $this->repository->findByScopeAndSlice( ConfigurationScopeType::Product, 101, '' )?->scalars[ ConfigurationFieldKey::PRIORITY ]->value );
+
+		$_GET  = [ 'scope_type' => 'product', 'scope_id' => '101', 'customize' => '1' ];
+		$html  = $this->html( $this->page );
+		self::assertStringContainsString( 'value="disable" checked="checked"', $html );
+		self::assertStringContainsString( 'value="replace" checked="checked"', $html );
+		self::assertStringNotContainsString( 'value="1" checked=', $html );
+		self::assertStringNotContainsString( 'value="2" checked=', $html );
+		self::assertMatchesRegularExpression( '/cetech-de-compatible-option" hidden[^>]*>.*Air Freight/s', $html );
+		self::assertMatchesRegularExpression( '/cetech-de-compatible-option" data-profiles="[^"]*"[^>]*>.*Local Van/s', $html );
+		self::assertStringContainsString( 'name="expected_revision" value="' . (string) $scope->scope->config_version . '"', $html );
+		self::assertStringContainsString( 'These unsaved values now apply to the current saved revision.', $html );
+		self::assertStringNotContainsString( 'value="customize-stale"', $html );
+	}
+
+	public function test_known_stale_reload_adopts_the_current_revision_without_refreshing_an_uncertain_retry(): void {
+		$scope = $this->seed( ConfigurationScopeType::Product, 101, '', 5 );
+		$_POST = $this->post( ScopedConfigurationPage::ACTION_SAVE, 'product', 101 );
+		$_POST['expected_revision']     = (string) $scope->scope->config_version;
+		$_POST['expected_scope_row_id'] = (string) $scope->scope->id;
+		$_POST['request_token']         = 'accepted-edit';
+		$this->redirect( fn () => $this->page->handle_actions() );
+		$current = $this->repository->findByScopeAndSlice( ConfigurationScopeType::Product, 101, '' );
+		self::assertNotNull( $current );
+
+		$_POST['expected_revision']     = (string) $scope->scope->config_version;
+		$_POST['expected_scope_row_id'] = (string) $scope->scope->id;
+		$_POST['request_token']         = 'stale-form';
+		$_POST['fields'][ ConfigurationFieldKey::ESTIMATED_DELIVERY ] = [ 'mode' => 'override', 'value' => '4 days' ];
+		$this->redirect( fn () => $this->page->handle_actions() );
+		self::assertSame( 9, $current->scalars[ ConfigurationFieldKey::PRIORITY ]->value );
+
+		$_GET = [ 'scope_type' => 'product', 'scope_id' => '101' ];
+		$html = $this->html( $this->page );
+		self::assertStringContainsString( 'name="expected_revision" value="' . (string) $current->scope->config_version . '"', $html );
+		self::assertStringContainsString( 'name="expected_scope_row_id" value="' . (string) $current->scope->id . '"', $html );
+		self::assertStringContainsString( 'value="4 days"', $html );
+		self::assertStringNotContainsString( 'value="stale-form"', $html );
+		self::assertStringContainsString( 'These unsaved values now apply to the current saved revision.', $html );
+
+		$GLOBALS['cetech_de_test_caps'][ ScopedConfigurationAuthorization::CAPABILITY_GLOBAL ] = true;
+		$this->repository->refuse_publications = 1;
+		$_POST = $this->post( ScopedConfigurationPage::ACTION_SAVE, 'global', 0 );
+		$_POST['request_token'] = 'global-create';
+		$this->redirect( fn () => $this->page->handle_actions() );
+		$_GET  = [ 'scope_type' => 'global' ];
+		$retry = $this->html( $this->page );
+		self::assertStringContainsString( 'name="expected_scope_row_id" value="0"', $retry );
+		self::assertStringContainsString( 'name="request_token" value="global-create"', $retry );
+		self::assertStringNotContainsString( 'These unsaved values now apply to the current saved revision.', $retry );
 	}
 
 	public function test_failed_global_publication_retries_the_original_row_identity(): void {

@@ -202,7 +202,8 @@ final class StaffDeliveryCustomizeView {
 		}
 
 		$inherited = $this->display_scalar( $field, $field->inherited_value ?? $field->effective_value );
-		$current   = $field->current_mode;
+		$draft     = $this->draft_field( ConfigurationFieldKey::PICKUP_LOCATION_ID );
+		$current   = is_array( $draft ) && isset( $draft['mode'] ) ? (string) $draft['mode'] : $field->current_mode;
 		if ( ! in_array( $current, [ 'inherit', 'override', 'disable' ], true ) ) {
 			$current = 'inherit';
 		}
@@ -227,9 +228,11 @@ final class StaffDeliveryCustomizeView {
 		echo '<p><label><input type="radio" name="fields[' . esc_attr( ConfigurationFieldKey::PICKUP_LOCATION_ID ) . '][mode]" value="disable"' . checked( $current, 'disable', false ) . ' /> ';
 		echo esc_html__( 'Turn off Store Pickup for this product', 'cetech-woocommerce-delivery-engine' ) . '</label></p>';
 		echo '<div class="cetech-de-customize-override">';
-		$selected = is_scalar( $field->configured_value ) && 'override' === $field->current_mode
-			? (string) $field->configured_value
-			: ( is_scalar( $field->effective_value ) ? (string) $field->effective_value : '' );
+		$selected = is_array( $draft ) && array_key_exists( 'value', $draft )
+			? (string) $draft['value']
+			: ( is_scalar( $field->configured_value ) && 'override' === $field->current_mode
+				? (string) $field->configured_value
+				: ( is_scalar( $field->effective_value ) ? (string) $field->effective_value : '' ) );
 		echo '<p><select name="fields[' . esc_attr( ConfigurationFieldKey::PICKUP_LOCATION_ID ) . '][value]">';
 		echo '<option value="">' . esc_html__( 'Select a Pickup Location', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		foreach ( $field->selector_options ?? [] as $value => $label ) {
@@ -252,7 +255,9 @@ final class StaffDeliveryCustomizeView {
 		}
 
 		$inherited = $this->member_labels( $field, $field->inherited_members !== [] ? $field->inherited_members : $field->effective_members );
-		$current   = in_array( $field->current_mode, [ 'add', 'remove', 'replace' ], true ) ? $field->current_mode : 'inherit';
+		$draft     = $this->draft_field( ConfigurationFieldKey::DELIVERY_OFFER_IDS );
+		$current   = is_array( $draft ) && isset( $draft['mode'] ) ? (string) $draft['mode'] : $field->current_mode;
+		$current   = in_array( $current, [ 'add', 'remove', 'replace' ], true ) ? $current : 'inherit';
 		$inherit_label = $is_variation
 			? sprintf(
 				/* translators: %s inherited options */
@@ -277,7 +282,9 @@ final class StaffDeliveryCustomizeView {
 		echo esc_html__( 'Remove options', 'cetech-woocommerce-delivery-engine' ) . '</label></p>';
 
 		$all_offers = $this->offers->list( [ 'limit' => 200 ] );
-		$selected   = 'inherit' === $current ? $field->effective_members : $field->configured_members;
+		$selected   = is_array( $draft ) && isset( $draft['members'] ) && is_array( $draft['members'] )
+			? array_map( static fn ( $member ): int => (int) $member, $draft['members'] )
+			: ( 'inherit' === $current ? $field->effective_members : $field->configured_members );
 		echo '<div class="cetech-de-customize-override cetech-de-compatible-options">';
 		foreach ( $all_offers as $offer ) {
 			$id    = (int) ( $offer['id'] ?? 0 );
@@ -336,7 +343,10 @@ final class StaffDeliveryCustomizeView {
 
 	private function effective_profile( ScopedConfigurationEditViewModel $model ): ?FulfilmentProfile {
 		$field = $this->field( $model, ConfigurationFieldKey::FULFILMENT_AVAILABILITY );
-		$value = is_scalar( $field?->effective_value ) ? (string) $field->effective_value : '';
+		$draft = $this->draft_field( ConfigurationFieldKey::FULFILMENT_AVAILABILITY );
+		$value = is_array( $draft ) && isset( $draft['value'] ) && '' !== (string) $draft['value']
+			? (string) $draft['value']
+			: ( is_scalar( $field?->effective_value ) ? (string) $field->effective_value : '' );
 
 		return FulfilmentProfileRegistry::get( $value );
 	}
