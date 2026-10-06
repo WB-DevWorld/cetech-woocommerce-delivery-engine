@@ -1,5 +1,7 @@
 # CETECH Delivery Engine — Current Status
 
+Current Wave 1 work: owner accepted `WAVE1-PLAN-1` and authorized **W1-C01 only** on 2026-10-06 at 18:09 UTC. Planning PR #57 is merged as `e688655c34efcd37eb30b95c26abc5b6e3f20567`, tree `90668822f2e3ce136e4a2fc4a2f6907f97970007`. [Issue #58](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/58) tracks the internal contract primitives and T01–T04 model tests. These types have no existing checkout/save adapter or durable production operation store. Schema remains 6. Candidate publication/CI and the finite closure evidence are recorded in `CURRENT-WORK.md` and the implementation PR; the opening-correction counts below describe their earlier baseline.
+
 Last reconciled: 2026-10-06 after owner-accepted opening-correction integration through PR #55. Functional master baseline: `7add0bf3ca66f73982797c0362fb33983da975a2`, tree `958efc0ab3fd7ad22ee6cc90e9372bfccbb69d1f`; post-merge CI `37502749839`, attempt 1, SUCCESS across all eight jobs. Later documentation-only commits may advance master without changing that functional baseline. RC.12 remains the immutable published release candidate, schema `6`. The last recorded physical training package is `1.0.0-dev.attention-count.1`; training was not reread or changed by this integration. No newer release or deployment is claimed. Issue #48 is the next shared-contract planning surface; the earlier Issue #45 cleanup-only execution note is historical.
 
 ## Canonical repository
@@ -21,7 +23,7 @@ Last reconciled: 2026-10-06 after owner-accepted opening-correction integration 
 - Production PHP: 494 files; installed map `48242148bc1fcada1275cb96553ea7d6e4efc3814ee4cc8f5886ed9ee11a8238`. Historical RC.12 package counts below belong to that immutable package.
 - Ordinary CI MariaDB coverage is separate from earlier local targeted groups `cor005-real-db` (2 tests / 19 assertions) and `cor007-real-db` (12 / 105), which remain excluded from that job.
 - [Issue #54](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/54) retains exact upstream JIT-defect attribution, qualification of the original runtime and the separate historical timeout. Real cores locate the fault in PHP JIT scheduling; the CI-only mitigation is integrated. Historical failed receipts remain failed evidence.
-- Next development task: [Issue #48](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/48), Wave 1 shared-contract planning and implementation breakdown. Wider compatibility and release qualification remain separate from completion of these repairs.
+- Current development task: [Issue #58](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/58), owner-authorized W1-C01 under the accepted Issue #48 packet. C02–C07 remain not started with their listed dependencies. Wider compatibility and release qualification remain separate from completion of the opening repairs.
 
 ## PHP runtime policy
 - Canonical policy: `docs/PHP-RUNTIME-POLICY.md`. Realignment evidence: `docs/PHP-85-CI-REALIGNMENT.md`.
@@ -302,7 +304,7 @@ Accepted behavior includes authoritative customer-facing PDP delivery prices, qu
 - Later documentation commits on `master` are **not** the RC.12 tag source and must not receive the `v1.0.0-rc.12` tag.
 - Training's last recorded physical package is `1.0.0-dev.attention-count.1`, schema 6. This repository closeout did not query or change the site; earlier training qualification is not Stable-1.0 certification.
 - CETECH Pilot: **NOT STARTED**. FLAIROC: **NOT DEPLOYED**. Production: **NOT DEPLOYED**.
-- Issue #48's next output is a reviewable Wave 1 contract package: policy lifecycle; common errors/correlation/idempotency; snapshot evolution; retention/emergency controls; shared explainability/audit context. Include requirement traceability, compatibility and failure tests, and bounded implementation issues before runtime work.
+- Issue #48's Wave 1 contract package was reviewed and owner accepted as `WAVE1-PLAN-1`. The selected next output is W1-C01's internal primitives and bounded tests; later rule/history/cleanup/adoption units retain their explicit dependencies.
 
 ## Remaining separate work
 1. Create the controlled CETECH production Pilot only after a separate owner authorization; this tag/prerelease is not that authorization.

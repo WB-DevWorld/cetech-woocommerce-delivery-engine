@@ -1,6 +1,22 @@
-# Current Work — Wave 1 contract packet for review
+# Current Work — W1-C01 internal contract implementation
 
-Status: OPENING CORRECTIONS MERGED — WAVE 1 PLANNING PACKET PROPOSED — RC.12 IMMUTABLE
+Status: WAVE1-PLAN-1 OWNER ACCEPTED — W1-C01 IMPLEMENTED / CANDIDATE QUALIFICATION — RC.12 IMMUTABLE
+
+## 2026-10-06 — Owner accepted WAVE1-PLAN-1 and authorized W1-C01
+
+At 18:09 UTC the owner instructed: “Approve WAVE1-PLAN-1 and implement W1-C01.” The unchanged reviewed planning PR #57 was accepted and merged through the normal protected path as `e688655c34efcd37eb30b95c26abc5b6e3f20567`, tree `90668822f2e3ce136e4a2fc4a2f6907f97970007`. Planning-head PR CI `37508229232` and push CI `37508223391`, attempt 1, passed all eight jobs. That is planning evidence, not execution of C01's new cases. [Issue #58](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/58) is the bounded C01 child of Issue #48.
+
+Only W1-C01 implementation is authorized: internal catalog/error/request/outcome/identity/intent types and T01–T04 test fixtures. Existing scoped saves and checkout are not adapters for these types yet. The operation model is in-memory test evidence, not durable production deduplication. Schema remains 6. Later units keep their storage, adoption and operation-specific decisions.
+
+Codex is sole integration editor. Exclusive parallel file leases: catalog/context agent owns new `ContractCatalog.php`, `RequestContext.php` and their two tests; intent/identity agent owns new `CanonicalIntent.php`, `OperationIdentity.php` and their two tests; root owns new `ContractError.php`, `OperationOutcome.php` and error/outcome/model tests. All production types are under `src/Domain/Contracts/`; model/fixtures are under `tests/Unit/Contracts/`. The reviewer has a narrow lease on `scripts/qualification/opening-http-fixture-common.php`, `scripts/qualification/opening-http-origin-preflight.php` and `scripts/ci-opening-http-qualification.sh` to replace historical hardcoded source count 494 with exact-candidate map binding. Root independently reviews those harness edits. Head/tree/hash validation, listener profile and timeout stay intact. Root records owner acceptance here and in the plan; agents do not mutate remote state.
+
+Completion requires meaningful new cases, independent closure review and fresh exact-candidate required CI including native/HTTP qualification. Production PHP count deliberately increases with the new types; 494 is the historical opening baseline, not a global cap. Existing COR-005/COR-007 SQL results remain separately identified and are not new C01 proofs.
+
+C01 implementation adds six internal, dependency-free production types: explicit classification/deprecation catalog; safe error envelope version 1; per-attempt request/correlation context; distinct completion facts; private authority/site/principal/operation/target/token namespace; and bounded typed semantic-intent fingerprint. Omitted/null/false/zero/empty/list order distinctions are preserved; operation-specific equivalence stays with its validator, so current scoped-save hashing is untouched. Errors carry fixed machine/message/recovery vocabulary and schema-allowlisted values; caller-owned PHP references are detached. The test-only operation model authorizes before lookup/disclosure, reserves before effects, rejects changed intent, reconciles uncertain results and retains accepted mutation truth while publication is pending.
+
+Finite independent closure review passed after two concrete defects were fixed: validated error arrays retained external PHP references; publication reconciliation could erase a known accepted mutation. Negative fixtures now cover both. Local supported PHP 8.3.6 / PHPUnit 10.5.66: Contracts **102 tests / 366 assertions, PASS**; complete configured suite **1637 tests / 10214 assertions / 1 skip, PASS**. The local runtime was extracted into a disposable workspace; its initial subprocess extension configuration was repaired before the complete passing run. Production package classmap/autoload/boot checks passed with optimized no-dev autoload; dependency installation itself is left to fresh CI. Production lint **500 files / 0 failures**. Product control plane and shell/eight embedded Python syntax checks passed; the harness reviewer separately passed eight candidate-map mismatch fixtures. Candidate source map is **500 files**, SHA-256 `94932185772025aaf420f89ce3bf314648d0ec6c4f447dd703fcbb58398872ca`.
+
+Publication uses a separate C01 implementation branch/PR. Its body records actual head/tree, exact-head CI and downloaded qualification receipts after they complete; local counts are not substituted for CI. The 372-ID registry/release scope, existing adapters, schema, listener profile and timeout remain unchanged. C02 explanation/projection contracts are the next dependent checkpoint, not started by C01.
 
 ## 2026-10-06 — Owner-authorized Wave 1 planning continuation
 
