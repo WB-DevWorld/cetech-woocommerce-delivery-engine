@@ -124,10 +124,19 @@ export TEST_PARENT_PID="$BASHPID"
 source "$ROOT/scripts/qualification/store-smoke-diagnostic.sh"
 start_store_smoke_listener
 printf '%s' "$STORE_SMOKE_PID" > "$WORK/owned.pid"
-sleep 0.15
 '''
             if crash:
-                script += 'STORE_SMOKE_STAGE=store_api_cart\nexit 52\n'
+                # On Linux a signaled child can still be present while its
+                # kernel teardown finishes. Observe exit instead of sampling
+                # a fixed delay and racing the trap's intentional SIGTERM.
+                script += '''for attempt in {1..500}; do
+    if ! kill -0 "$STORE_SMOKE_PID" 2>/dev/null; then break; fi
+    sleep 0.01
+done
+if kill -0 "$STORE_SMOKE_PID" 2>/dev/null; then exit 1; fi
+STORE_SMOKE_STAGE=store_api_cart
+exit 52
+'''
             else:
                 script += 'STORE_SMOKE_STAGE=complete\nfinish_store_smoke_listener 0\n'
             if diagnostic:
@@ -136,7 +145,7 @@ sleep 0.15
                    "TEST_ROOT": str(ROOT), "TEST_WORK": str(work), "CETECH_DE_HTTP_CRASH_DIAGNOSTIC": "1" if diagnostic else "0",
                    "TEST_INTERRUPT": "1" if interrupt else "0",
                    "GITHUB_ACTIONS": "true"}
-            run = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True, timeout=5)
+            run = subprocess.run(["bash", "-c", script], env=env, capture_output=True, text=True, timeout=10)
             report = json.loads((work / "store-smoke-diagnostic.json").read_text())
             self.assertTrue((work / "owned.pid").exists(), "Listener did not start: " + run.stderr + run.stdout + json.dumps(report))
             pid = int((work / "owned.pid").read_text())
