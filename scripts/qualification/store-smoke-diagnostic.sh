@@ -22,16 +22,16 @@ start_store_smoke_listener() {
     trap 'exit 130' INT
     trap 'exit 143' TERM
     STORE_SMOKE_LISTENER_ARGS=()
-    case "${CETECH_DE_HTTP_JIT_COMPARISON:-}" in
+    case "${CETECH_DE_HTTP_LISTENER_JIT:-}" in
         '') ;;
         disable)
-            if [[ "${GITHUB_ACTIONS:-}" != "true" || "${GITHUB_EVENT_NAME:-}" != "push" || "${GITHUB_REF_NAME:-}" != "fix/pr55-jit-disable-comparison" || "$STORE_SMOKE_CRASH" != "1" ]]; then
-                echo "BLOCKED: JIT comparison requires its explicit disposable diagnostic branch" >&2
+            if [[ "${GITHUB_ACTIONS:-}" != "true" || "$DB_HOST" != "127.0.0.1" || "${CETECH_DE_NATIVE_OPENING_QUALIFICATION:-}" != "1" || "${CETECH_DE_HTTP_OPENING_QUALIFICATION:-}" != "1" || "$STORE_SMOKE_CRASH" != "1" ]]; then
+                echo "BLOCKED: listener JIT policy requires the disposable CI qualification fixture" >&2
                 return 1
             fi
             STORE_SMOKE_LISTENER_ARGS=(-d opcache.jit=disable)
             ;;
-        *) echo "BLOCKED: unsupported JIT comparison" >&2; return 1 ;;
+        *) echo "BLOCKED: unsupported listener JIT policy" >&2; return 1 ;;
     esac
     if [[ "$STORE_SMOKE_CRASH" == "1" ]]; then
         if [[ "${GITHUB_ACTIONS:-}" != "true" || "$DB_HOST" != "127.0.0.1" || ! -x "$(command -v gdb)" ]]; then

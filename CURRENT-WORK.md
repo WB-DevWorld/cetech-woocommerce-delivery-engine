@@ -1,6 +1,16 @@
 # Current Work — Post-#32 repository truth synchronization
 
-Status: RC.12 IMMUTABLE — PR #53 REPAIRS IN PROGRESS — UNMERGED — NOT RC.13
+Status: RC.12 IMMUTABLE — PR #53 TECHNICAL REPAIRS COMPLETE — PR #55 CI QUALIFICATION IN PROGRESS — UNMERGED
+
+## 2026-10-06 — Owner-authorized CI listener mitigation
+
+The owner instructed continuation at 16:59 UTC and requested plain-English progress with each review and next task. The completed COR-005/COR-007 repairs remain on PR #53 head `89d8d3466f3636989bc44d004d3a52579c10776f`; the integration candidate starts from PR #55 head `85800c5590c44ac9ad916baa86d772e1be276392`, tree `ded6207abd760e4fa0e904afe61c4737a4877e0e`. Only the owner and AI agents are working. Codex is sole integration editor, with leases for the WordPress CI job, existing smoke/HTTP listener scripts and focused tests, and this checkpoint. Agents review read-only.
+
+Real owned listener cores now locate the crash in PHP 8.5.11 JIT compilation: `ir_fix_bb_order` at `ir_gcm.c:955`, followed by `ir_schedule` and `zend_jit_ir_compile`, in runs 37496806674 and 37496802810. Exact GH-23991 attribution remains unconfirmed. On the same runner, binary, extension map and literal site paths, with fresh separate databases, run 37496802810's controlled JIT-disabled comparison completed native 207 and authenticated HTTP 66 unique PASS cases, with cleanup. Actual OPcache remained active and JIT enabled/on were false. Actual full INI hash `18468a95951fe17444a8e0341c577edba8e28b0e31a33a0892a32d91ce7d973a`, normalized by changing only JIT back to 1235, exactly matches the original `a0e4940c0a48d65a50eca849f62d052a7e3e4727a720308c65d7d9dfc840adaf`. The separate batch timeout remains unexplained.
+
+This continuation adopts `opcache.jit=disable` only for the two owned disposable CI web listeners. OPcache remains active. PHP 8.5.11, WordPress 7.1.2, WooCommerce 11.1.2, MariaDB 11.4.13, binary and extension fingerprints, actual and original-normalized INI pins, authentication, 207/66 assertions, cleanup, the 20-second HTTP bound and all eight required gates are retained. Native CLI helpers retain their configuration. The completed temporary comparison steps are removed from future workflow execution; their commits, failed baselines, rejected first experiment and immutable receipts remain historical evidence. New receipts name the JIT-disabled CI profile and do not certify the original JIT-enabled runtime.
+
+Fresh ordinary candidate CI and downloaded receipts are required before reporting this mitigation qualified. No production plugin source or dependency version is changed. This supersedes the earlier observational task's prohibition on changing JIT for this CI-only continuation; it does not redefine the commercial PHP support/deployment policy or automatically waive the crash hold. Broader compatibility qualification and integration acceptance remain separate. No merge, release, tag, schema, deployment, or live-site action is authorized by this checkpoint.
 
 ## 2026-10-06 — Owner-authorized crash diagnostic continuation
 
