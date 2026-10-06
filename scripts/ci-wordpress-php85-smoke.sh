@@ -196,11 +196,12 @@ copy_plugin "$CLEAN" "$PLUGIN_STAGE"
 inspect_engine "$CLEAN" "clean"
 
 STORE_JSON="$WORK/store-cart.json"
-php -S 127.0.0.1:8085 -t "$CLEAN" >"$WORK/php-server.log" 2>&1 &
-SERVER_PID=$!
-trap 'kill "$SERVER_PID" 2>/dev/null || true' EXIT
+source "$ROOT/scripts/qualification/store-smoke-diagnostic.sh"
+start_store_smoke_listener
 sleep 2
+STORE_SMOKE_STAGE="store_api_cart"
 curl -fsS "http://127.0.0.1:8085/?rest_route=/wc/store/v1/cart" -o "$STORE_JSON"
+STORE_SMOKE_STAGE="cart_payload"
 php -r '
 	$json = json_decode((string) file_get_contents($argv[1]), true);
 	if ( ! is_array($json) || ! array_key_exists("items", $json) ) {
@@ -209,6 +210,7 @@ php -r '
 	}
 	echo "store_api=cart_ok\n";
 ' "$STORE_JSON"
+STORE_SMOKE_STAGE="classic_pages"
 "${WP[@]}" eval --path="$CLEAN" '
 	$checkout = get_option( "woocommerce_checkout_page_id" );
 	$cart = get_option( "woocommerce_cart_page_id" );
@@ -220,6 +222,7 @@ php -r '
 '
 
 DEBUG_LOG="$CLEAN/wp-content/debug.log"
+STORE_SMOKE_STAGE="debug_log"
 if [[ -f "$DEBUG_LOG" ]] && grep -E 'PHP (Fatal|Parse) error' "$DEBUG_LOG" | grep -Ei 'cetech|delivery.engine' >/dev/null; then
 	echo "Delivery Engine PHP fatal found in debug.log" >&2
 	grep -E 'PHP (Fatal|Parse) error' "$DEBUG_LOG" >&2 || true
@@ -227,9 +230,8 @@ if [[ -f "$DEBUG_LOG" ]] && grep -E 'PHP (Fatal|Parse) error' "$DEBUG_LOG" | gre
 fi
 echo "debug_log=no_delivery_engine_fatal"
 
-kill "$SERVER_PID" 2>/dev/null || true
-wait "$SERVER_PID" 2>/dev/null || true
-trap - EXIT
+STORE_SMOKE_STAGE="complete"
+finish_store_smoke_listener 0
 
 echo "Downloading immutable RC.12 ZIP for upgrade verification"
 curl -fsSL "$RC12_ZIP_URL" -o "$WORK/rc12.zip"

@@ -204,7 +204,9 @@ jobs:
         env:
           debug: 'true'
       - name: Verify crash diagnostic output boundary
-        run: python3 scripts/qualification/test-opening-http-native-stack.py
+        run: |
+          python3 scripts/qualification/test-opening-http-native-stack.py
+          python3 scripts/qualification/test-store-smoke-diagnostic.py
       - name: Install native crash debugger for the disposable HTTP listener
         run: sudo apt-get update -qq && sudo apt-get install -y -qq gdb
       - name: WordPress bootstrap, WooCommerce, HPOS, Store API, upgrade from RC.12
@@ -224,6 +226,13 @@ jobs:
           CETECH_DE_WP_DB_PASSWORD: wordpress
         shell: bash
         run: bash scripts/ci-wordpress-php85-smoke.sh
+      - name: Retain separate Store API smoke diagnostic receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: store-smoke-diagnostic
+          path: ${{ runner.temp }}/cetech-de-php85-wp/store-smoke-diagnostic.json
+          if-no-files-found: warn
       - name: Retain targeted native opening qualification receipt
         if: always()
         uses: actions/upload-artifact@v4
