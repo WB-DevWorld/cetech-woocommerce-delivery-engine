@@ -333,7 +333,8 @@ final class CatalogScanProgressTest extends TestCase {
 			self::assertSame( 'Bulk job write failed.', $exception->getMessage() );
 		}
 		self::assertSame( 0, $jobs->count_items( (int) $job->id ) );
-		self::assertArrayNotHasKey( 'high_water', $jobs->find_job( (int) $job->id )?->summary['preparation'] ?? [] );
+		self::assertSame( 2, (int) ( $jobs->find_job( (int) $job->id )?->summary['preparation']['high_water'] ?? 0 ) );
+		$query->add( new CatalogTarget( 'product', 3, 'later' ), [ CatalogTargetFilters::PRODUCT_TYPE => 'simple' ] );
 
 		$jobs->refuse_preparation_checkpoints = 0;
 		$worker->tick( (int) $job->id );
@@ -345,7 +346,6 @@ final class CatalogScanProgressTest extends TestCase {
 		self::assertSame( 1, $this->items_for( $jobs, (int) $job->id, 1 ) );
 		$query->set_sku( 'product', 1, 'new' );
 		$query->set_attributes( 1, [ CatalogTargetFilters::PRODUCT_TYPE => 'grouped' ] );
-		$query->add( new CatalogTarget( 'product', 3, 'later' ), [ CatalogTargetFilters::PRODUCT_TYPE => 'simple' ] );
 		$saved = $this->finish( $worker, $jobs, (int) $job->id, 5 );
 
 		self::assertSame( 2, (int) $saved->summary['preparation']['high_water'] );

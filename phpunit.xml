@@ -25,6 +25,7 @@
             <group>cor004-real-db</group>
             <group>cor006-real-db</group>
             <group>cor007-real-db</group>
+            <group>cor005-real-db</group>
         </exclude>
     </groups>
 </phpunit>

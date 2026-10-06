@@ -2,6 +2,13 @@
 
 Status: RC.12 IMMUTABLE — PR #53 REPAIRS IN PROGRESS — UNMERGED — NOT RC.13
 
+## 2026-10-06 — PR #53 repaired-head review
+
+The owner confirmed again that only the owner and AI agents are working. This pass repairs the remaining published review on head `8ad78c50326402a0bb14db05e2b45cc3b2628f0a`. It is a technical review by the agent. It is not acceptance by Ben or Emmanuel. Historical ownership stays recorded. No merge, release, deployment, live-site write, tag change, schema, ledger, or outbox. P07 and P08 stay outside. COR-005 completes and is committed before COR-007.
+
+- COR-005 lease: hold the exact target-scope lock from the precondition read through the source write, and persist the original catalog ceiling before scanning. The item claim fence and bounded connection disposal stay. No schema and no new production PHP file.
+- COR-007 lease, after that checkpoint: customize pickup, delivery-option, and profile drafts; an explicit current-authority resubmission for a known stale failure; the original envelope for an uncertain retry. No schema and no new production PHP file.
+
 ## 2026-10-06 — PR #53 review repairs
 
 The owner confirmed that only the owner and AI agents are working. That instruction governs this repair. The visible save, reset, and recovery review in this session is a technical review by the agent. It is not an acceptance by Ben or Emmanuel. Historical human ownership stays recorded and is not reassigned. No merge, release, deployment, or live-site write is authorized.

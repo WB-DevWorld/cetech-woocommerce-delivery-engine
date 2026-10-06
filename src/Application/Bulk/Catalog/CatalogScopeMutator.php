@@ -36,6 +36,13 @@ use CetechDeliveryEngine\Domain\Enum\ScalarConfigurationMode;
  */
 final class CatalogScopeMutator {
 
+	/**
+	 * Test seam. Runs once after the locked precondition matches and before the write.
+	 */
+	public static ?\Closure $during_locked_resolution = null;
+
+	private bool $holding_scope_lock = false;
+
 	public function __construct(
 		private readonly ScopedConfigurationRepositoryInterface $scopes,
 		private readonly EffectiveConfigurationValidator $validator,
@@ -73,6 +80,21 @@ final class CatalogScopeMutator {
 			return $this->fail( 'missing_parent', 'Variation configuration requires a parent product.', [], '' );
 		}
 
+		if ( ! $dry_run && ! $this->holding_scope_lock ) {
+			$this->holding_scope_lock = true;
+			try {
+				return $this->scopes->completeLocalUnit(
+					function () use ( $target_type, $target_id, $parent_product_id, $manifest, $dry_run, $expected_precondition, $scope_type ): array {
+						$this->scopes->lockScopeIdentity( $scope_type, $target_id, ConfigurationScope::DEFAULT_SLICE_KEY );
+
+						return $this->process( $target_type, $target_id, $parent_product_id, $manifest, $dry_run, $expected_precondition );
+					}
+				);
+			} finally {
+				$this->holding_scope_lock = false;
+			}
+		}
+
 		$existing = $this->scopes->findByScopeAndSlice(
 			$scope_type,
 			$target_id,
@@ -92,6 +114,14 @@ final class CatalogScopeMutator {
 				'after_fingerprint'        => '',
 				'result'                   => [ 'stale' => true ],
 			];
+		}
+
+		if ( ! $dry_run ) {
+			$probe = self::$during_locked_resolution;
+			self::$during_locked_resolution = null;
+			if ( $probe instanceof \Closure ) {
+				$probe();
+			}
 		}
 
 		try {

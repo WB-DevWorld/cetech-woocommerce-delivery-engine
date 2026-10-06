@@ -43,7 +43,8 @@ final class InMemoryBulkJobRepository implements BulkJobRepositoryInterface {
 
 	public function save_job( BulkJob $job ): BulkJob {
 		$preparation = is_array( $job->summary['preparation'] ?? null ) ? $job->summary['preparation'] : [];
-		if ( $this->refuse_preparation_checkpoints > 0 && array_key_exists( 'high_water', $preparation ) ) {
+		$scanned = (int) ( $preparation['scanned'] ?? 0 );
+		if ( $this->refuse_preparation_checkpoints > 0 && array_key_exists( 'high_water', $preparation ) && $scanned > 0 ) {
 			--$this->refuse_preparation_checkpoints;
 			throw new \RuntimeException( 'Bulk job write failed.' );
 		}

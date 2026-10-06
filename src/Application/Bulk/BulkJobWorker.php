@@ -161,9 +161,29 @@ final class BulkJobWorker {
 
 				return;
 			}
-			$prep['state']         = 'incomplete';
+			$prep['state']          = 'incomplete';
 			$summary['preparation'] = $prep;
 			$job                    = $job->with( [ 'summary' => $summary ] );
+			try {
+				$saved = $this->jobs->completeOwnedUnit(
+					function () use ( $job ): BulkJob {
+						$saved = $this->save_owned_job( $job, (string) $job->claim_token );
+						if ( ! $saved instanceof BulkJob ) {
+							throw new \RuntimeException( 'Preparation checkpoint was not saved.' );
+						}
+
+						return $saved;
+					}
+				);
+			} catch ( \RuntimeException $exception ) {
+				if ( 'Preparation checkpoint was not saved.' === $exception->getMessage() ) {
+					return;
+				}
+				throw $exception;
+			}
+			$job     = $saved;
+			$summary = $job->summary;
+			$prep    = is_array( $summary['preparation'] ?? null ) ? $summary['preparation'] : [];
 		}
 		$high_water = (int) $prep['high_water'];
 		try {
