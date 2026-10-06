@@ -20,7 +20,10 @@ final class ScopedConfigurationWriteCommand {
 		public readonly string $slice_key,
 		public readonly ?int $parent_product_id,
 		public readonly array $raw_fields,
-		public readonly bool $create_slice_if_missing = false
+		public readonly bool $create_slice_if_missing = false,
+		public readonly ?int $expected_revision = null,
+		public readonly ?string $request_token = null,
+		public readonly ?int $expected_scope_row_id = null
 	) {
 	}
 }

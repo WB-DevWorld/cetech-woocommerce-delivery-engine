@@ -53,7 +53,12 @@ final class ProductExceptionsPage {
 			$this->action_handler->redirect( self::SLUG );
 		}
 		$type = $target['scope_type']->value;
-		$ok = $this->admin_service->reset( $target['scope_type'], $target['scope_id'], $target['slice_key'], $target['parent_product_id'] );
+		try {
+			$ok = $this->admin_service->reset( $target['scope_type'], $target['scope_id'], $target['slice_key'], $target['parent_product_id'] );
+		} catch ( \RuntimeException $exception ) {
+			$this->action_handler->notices()->flash_error( $exception->getMessage() );
+			$this->action_handler->redirect( self::SLUG );
+		}
 
 		if ( $ok ) {
 			$this->action_handler->notices()->flash_success(

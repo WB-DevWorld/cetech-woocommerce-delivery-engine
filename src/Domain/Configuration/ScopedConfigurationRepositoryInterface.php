@@ -34,7 +34,25 @@ interface ScopedConfigurationRepositoryInterface {
 	 *
 	 * Identical semantic content does not increment config_version.
 	 */
-	public function saveScopedConfiguration( ScopedConfiguration $configuration ): ScopedConfiguration;
+	public function saveScopedConfiguration( ScopedConfiguration $configuration, bool $publish_revision = true ): ScopedConfiguration;
+
+	/**
+	 * Run one local completion. A thrown exception restores the last accepted scoped state.
+	 *
+	 * @template T
+	 * @param callable(): T $work
+	 * @return T
+	 */
+	public function completeLocalUnit( callable $work ): mixed;
+
+	public function publishAcceptedRevision( ScopedConfiguration $configuration ): bool;
+
+	/**
+	 * Lock the scope row when a transaction is open. Null means the scope is absent.
+	 *
+	 * @return array{id: int, version: int}|null
+	 */
+	public function lockScopeIdentity( ConfigurationScopeType $scope_type, int $scope_id, string $slice_key ): ?array;
 
 	/**
 	 * Remove all field/collection instructions for a non-global scope and delete the scope row.

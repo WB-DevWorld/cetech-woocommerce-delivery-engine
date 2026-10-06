@@ -23,7 +23,8 @@ final class ScopedConfigurationWriteResult {
 		public readonly int $version_before = 0,
 		public readonly int $version_after = 0,
 		public readonly bool $audit_recorded = false,
-		public readonly array $audit_summary = []
+		public readonly array $audit_summary = [],
+		public readonly bool $replayed = false
 	) {
 	}
 
@@ -38,12 +39,13 @@ final class ScopedConfigurationWriteResult {
 	 * @param array<string, mixed> $audit_summary
 	 */
 	public static function success(
-		ScopedConfiguration $saved,
+		?ScopedConfiguration $saved,
 		bool $version_changed,
 		int $version_before,
 		int $version_after,
 		bool $audit_recorded,
-		array $audit_summary = []
+		array $audit_summary = [],
+		bool $replayed = false
 	): self {
 		return new self(
 			true,
@@ -53,7 +55,8 @@ final class ScopedConfigurationWriteResult {
 			$version_before,
 			$version_after,
 			$audit_recorded,
-			$audit_summary
+			$audit_summary,
+			$replayed
 		);
 	}
 }

@@ -26,6 +26,25 @@ After the repair, `tests/Unit/Bulk/CatalogScanProgressTest.php` walks 40,001 in-
 
 `tests/Unit/Bulk` is 180 tests / 1031 assertions, OK, with 2 existing deprecations. Disposable MariaDB `cetech_cor004_catalog` (`phpunit.cor004-sql.xml`) is 5 tests / 30 assertions, OK, including 30 rejected stock rows and one later in-stock row. The container was stopped afterward. Local PHP 8.5 full suite is 1518 tests / 9694 assertions, 1 skip, 14 existing deprecations, OK. That assertion count is local and is not the CI count. The console printed `The system cannot find the path specified.` once and the suite still exited 0. JavaScript is 8 files / 102 tests, OK. Production lint is 494 files / 0 failures.
 
+## Discriminator map
+
+These map the approved cases onto tests that already passed. No extra cases were added only to raise counts.
+
+| Approved case | Existing proof | Outstanding |
+| --- | --- | --- |
+| Interrupt and resume through rejected pages, unique accepted IDs, truthful scanned count | `CatalogScanProgressTest::test_a_late_match_survives_more_than_40000_rejected_candidates` and `test_resume_after_rejected_pages_does_not_accept_twice` | A crash between the source commit and `save_item` remains P07 and was not tested. |
+| Change before evaluation versus a recorded rejection behind the cursor | `test_resume_after_rejected_pages_does_not_accept_twice` changes product 1 to simple after the cursor has passed it. It is not accepted. | |
+| Lower-ID backfill ahead of the cursor, and IDs above H | `test_lower_id_backfill_is_included_only_ahead_of_the_cursor` accepts ID 4 and excludes ID 11. High water stays 10. | |
+| Selected IDs stay that set | `test_selected_ids_do_not_gain_an_unlisted_product` | Exact variation-parent identity during the scan is not asserted in this file. |
+| Failed evaluation is not a completed zero-target job | `test_a_failed_scan_is_not_a_completed_zero_target_job` | A completed empty manifest that must not broaden the request has no dedicated assertion in this file. |
+| Approved target that later changes, and a later nonmember | `test_a_product_that_matches_after_preparation_is_not_applied` returns `stale_target` and does not add product 9. The manifest total stays 1. | A candidate that disappears during the scan is not a separate case. |
+| Rejected SQL rows still advance the cursor | `CatalogTargetIdentitySqlTest::test_scan_keeps_the_candidate_cursor_through_rejected_rows` on disposable MariaDB | |
+| Progress has no exact percentage | `tests/js/bulk-tools-catalog.test.js` expects `Preparing preview · scanned 400 · targets so far 1` | |
+| Revoked permission denies Apply | `BulkJobAdminAuthorizationTest::test_revoked_stored_private_inclusion_denies_apply` | A wrong-principal case was not added to the scan file. |
+| Incomplete preparation does not Apply | The worker processes items only when `enumeration_complete` is true. The failed-scan test stays out of Ready. | There is no separate assertion that a non-failed incomplete job refuses Apply. |
+
+The earlier full-list lookup that stopped after about two minutes is not in this table. PHPUnit printed no result for that run. The completed indexed run is the 7 tests / 51 assertions above.
+
 ## Limits
 
 This does not prove a WordPress product catalog, Action Scheduler liveness, or a crash between a source commit and `save_item`. Those remain outside this checkpoint. PHP 8.3 and 8.4 are not installed in this checkout. CI on this head is not claimed here.

@@ -43,6 +43,9 @@ final class ScopedConfigurationPage {
 	) {
 	}
 
+	/** @var array<string, mixed>|null */
+	private ?array $unsaved_draft = null;
+
 	public function handle_actions(): void {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing
 		if ( ! isset( $_POST['cetech_de_action'] ) || ! is_string( $_POST['cetech_de_action'] ) ) {
@@ -117,6 +120,8 @@ final class ScopedConfigurationPage {
 				$category_ids  = $this->resolve_product_category_ids( $parent_product_id );
 			}
 		}
+
+		$this->unsaved_draft = $this->matching_draft( $scope_type, $scope_id, $slice_key, $parent_product_id );
 
 		$model = $this->admin_service->load_edit_model(
 			$scope_type,
@@ -193,7 +198,29 @@ final class ScopedConfigurationPage {
 			$this->action_handler->notices()->flash_error( __( 'Global settings cannot be reset here.', 'cetech-woocommerce-delivery-engine' ) );
 			$this->action_handler->redirect( self::SLUG );
 		}
-		$ok = $this->admin_service->reset( $target['scope_type'], $scope_id, $slice_key, $parent_id );
+		try {
+			$ok = $this->admin_service->reset(
+				$target['scope_type'],
+				$scope_id,
+				$slice_key,
+				$parent_id,
+				isset( $_POST['expected_revision'] ) ? (int) wp_unslash( $_POST['expected_revision'] ) : null,
+				isset( $_POST['request_token'] ) ? sanitize_text_field( (string) wp_unslash( $_POST['request_token'] ) ) : null,
+				isset( $_POST['expected_scope_row_id'] ) ? (int) wp_unslash( $_POST['expected_scope_row_id'] ) : null
+			);
+		} catch ( \RuntimeException $exception ) {
+			$this->action_handler->notices()->flash_error( $exception->getMessage() );
+			$redirect = [
+				'scope_type' => $scope_type_raw,
+				'scope_id'   => $scope_id,
+				'slice_key'  => $slice_key,
+				'customize'  => 1,
+			];
+			if ( null !== $parent_id ) {
+				$redirect['parent_product_id'] = $parent_id;
+			}
+			$this->action_handler->redirect( self::SLUG, $redirect );
+		}
 
 		$redirect = [
 			'scope_type' => $scope_type_raw,
@@ -205,11 +232,17 @@ final class ScopedConfigurationPage {
 			$redirect['parent_product_id'] = $parent_id;
 		}
 
-		$this->action_handler->notices()->flash_success(
-			$ok
-				? __( 'Custom delivery settings were removed. Inheritance has been restored.', 'cetech-woocommerce-delivery-engine' )
-				: __( 'There were no custom delivery settings to remove.', 'cetech-woocommerce-delivery-engine' )
-		);
+		if ( $ok && $this->admin_service->reset_was_replayed() ) {
+			$this->action_handler->notices()->flash_success(
+				__( 'This reset was already completed. The recorded settings were not changed again.', 'cetech-woocommerce-delivery-engine' )
+			);
+		} else {
+			$this->action_handler->notices()->flash_success(
+				$ok
+					? __( 'Custom delivery settings were removed. Inheritance has been restored.', 'cetech-woocommerce-delivery-engine' )
+					: __( 'There were no custom delivery settings to remove.', 'cetech-woocommerce-delivery-engine' )
+			);
+		}
 		$this->action_handler->redirect( self::SLUG, $redirect );
 	}
 
@@ -256,6 +289,9 @@ final class ScopedConfigurationPage {
 			$raw_fields[ $field_key ] = $entry;
 		}
 
+		$expected_revision = isset( $_POST['expected_revision'] ) ? (int) wp_unslash( $_POST['expected_revision'] ) : null;
+		$request_token     = isset( $_POST['request_token'] ) ? sanitize_text_field( (string) wp_unslash( $_POST['request_token'] ) ) : null;
+		$expected_row_id   = isset( $_POST['expected_scope_row_id'] ) ? (int) wp_unslash( $_POST['expected_scope_row_id'] ) : null;
 		$result = $this->admin_service->save(
 			new ScopedConfigurationWriteCommand(
 				$scope_type,
@@ -263,7 +299,10 @@ final class ScopedConfigurationPage {
 				$slice_key,
 				$parent_product_id,
 				$raw_fields,
-				$create_slice || ConfigurationScopeType::Global === $scope_type || ConfigurationScope::DEFAULT_SLICE_KEY === $slice_key
+				$create_slice || ConfigurationScopeType::Global === $scope_type || ConfigurationScope::DEFAULT_SLICE_KEY === $slice_key,
+				$expected_revision,
+				$request_token,
+				$expected_row_id
 			)
 		);
 
@@ -281,13 +320,30 @@ final class ScopedConfigurationPage {
 		}
 
 		if ( ! $result->success ) {
+			set_transient(
+				$this->draft_key(),
+				[
+					'scope_type'        => $scope_type->value,
+					'scope_id'          => $scope_id,
+					'slice_key'         => $slice_key,
+					'parent_product_id' => $parent_product_id,
+					'fields'            => $raw_fields,
+					'request_token'     => $request_token,
+				],
+				15 * MINUTE_IN_SECONDS
+			);
 			$this->action_handler->notices()->flash_error(
 				implode( ' ', $result->errors )
 			);
 			$this->action_handler->redirect( self::SLUG, $redirect );
 		}
+		delete_transient( $this->draft_key() );
 
-		if ( $customize ) {
+		if ( $result->replayed ) {
+			$this->action_handler->notices()->flash_success(
+				__( 'This save was already completed. The recorded settings were not changed again.', 'cetech-woocommerce-delivery-engine' )
+			);
+		} elseif ( $customize ) {
 			$this->action_handler->notices()->flash_success(
 				__( 'Delivery settings saved.', 'cetech-woocommerce-delivery-engine' )
 			);
@@ -525,6 +581,9 @@ final class ScopedConfigurationPage {
 		echo '<input type="hidden" name="scope_type" value="' . esc_attr( $model->scope_type ) . '" />';
 		echo '<input type="hidden" name="scope_id" value="' . esc_attr( (string) $model->scope_id ) . '" />';
 		echo '<input type="hidden" name="slice_key" value="' . esc_attr( $model->slice_key ) . '" />';
+		echo '<input type="hidden" name="expected_revision" value="' . esc_attr( (string) $model->config_version ) . '" />';
+		echo '<input type="hidden" name="expected_scope_row_id" value="' . esc_attr( (string) (int) ( $model->technical_details['scope_row_id'] ?? 0 ) ) . '" />';
+		echo '<input type="hidden" name="request_token" value="' . esc_attr( $this->form_request_token() ) . '" />';
 		if ( null !== $model->parent_product_id ) {
 			echo '<input type="hidden" name="parent_product_id" value="' . esc_attr( (string) $model->parent_product_id ) . '" />';
 		}
@@ -623,6 +682,9 @@ final class ScopedConfigurationPage {
 		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION_SAVE ) . '" />';
 		echo '<input type="hidden" name="scope_type" value="' . esc_attr( $model->scope_type ) . '" />';
 		echo '<input type="hidden" name="scope_id" value="' . esc_attr( (string) $model->scope_id ) . '" />';
+		echo '<input type="hidden" name="expected_revision" value="' . esc_attr( (string) $model->config_version ) . '" />';
+		echo '<input type="hidden" name="expected_scope_row_id" value="' . esc_attr( (string) (int) ( $model->technical_details['scope_row_id'] ?? 0 ) ) . '" />';
+		echo '<input type="hidden" name="request_token" value="' . esc_attr( $this->form_request_token() ) . '" />';
 		if ( null !== $model->parent_product_id ) {
 			echo '<input type="hidden" name="parent_product_id" value="' . esc_attr( (string) $model->parent_product_id ) . '" />';
 		}
@@ -735,7 +797,10 @@ final class ScopedConfigurationPage {
 			$mode_labels = $field->mode_labels;
 		}
 
-		$selected_mode = '' === $field->current_mode && $field->is_global_root ? 'not_configured' : $field->current_mode;
+		$draft_field   = $this->draft_field( $field->field_key );
+		$selected_mode = is_array( $draft_field ) && isset( $draft_field['mode'] )
+			? (string) $draft_field['mode']
+			: ( '' === $field->current_mode && $field->is_global_root ? 'not_configured' : $field->current_mode );
 
 		foreach ( $modes as $mode ) {
 			$input_id = $field_id . '_mode_' . $mode;
@@ -804,9 +869,12 @@ final class ScopedConfigurationPage {
 		echo '<div class="cetech-de-mode-panel" data-show-for="override">';
 		echo '<label for="' . esc_attr( $value_id ) . '">' . esc_html__( 'Value to use here', 'cetech-woocommerce-delivery-engine' ) . '</label> ';
 
-		$current = is_scalar( $field->configured_value ) || null === $field->configured_value
-			? (string) ( $field->configured_value ?? '' )
-			: '';
+		$draft_field = $this->draft_field( $field->field_key );
+		$current = is_array( $draft_field ) && isset( $draft_field['value'] )
+			? (string) $draft_field['value']
+			: ( is_scalar( $field->configured_value ) || null === $field->configured_value
+				? (string) ( $field->configured_value ?? '' )
+				: '' );
 
 		if ( is_array( $field->enum_options ) ) {
 			echo '<select id="' . esc_attr( $value_id ) . '" name="fields[' . esc_attr( $field->field_key ) . '][value]" aria-describedby="' . esc_attr( $field_id . '_desc' ) . '">';
@@ -853,10 +921,15 @@ final class ScopedConfigurationPage {
 		echo '<p class="description">' . esc_html__( '“Add to inherited options” keeps the inherited list and adds more. “Remove from inherited options” keeps the inherited list minus the ones you select. “Use only these options” replaces the inherited list. An empty list means no delivery options for this setup.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 
 		$members_name = 'fields[' . $field->field_key . '][members][]';
+		$draft_field  = $this->draft_field( $field->field_key );
+		$draft_members = is_array( $draft_field ) && isset( $draft_field['members'] ) && is_array( $draft_field['members'] )
+			? $draft_field['members']
+			: null;
 		if ( is_array( $field->selector_options ) ) {
 			echo '<fieldset><legend>' . esc_html__( 'Members', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
 			foreach ( $field->selector_options as $id => $label ) {
-				$checked = in_array( (int) $id, array_map( 'intval', $field->configured_members ), true );
+				$member_ids = null !== $draft_members ? $draft_members : $field->configured_members;
+				$checked = in_array( (int) $id, array_map( 'intval', $member_ids ), true );
 				printf(
 					'<label style="display:block;"><input type="checkbox" name="%1$s" value="%2$s" %3$s /> %4$s</label>',
 					esc_attr( $members_name ),
@@ -867,7 +940,7 @@ final class ScopedConfigurationPage {
 			}
 			echo '</fieldset>';
 		} else {
-			$value = implode( ', ', array_map( 'strval', $field->configured_members ) );
+			$value = implode( ', ', array_map( 'strval', null !== $draft_members ? $draft_members : $field->configured_members ) );
 			printf(
 				'<label for="%1$s">%2$s</label> <input type="text" class="regular-text" id="%1$s" name="fields[%3$s][members]" value="%4$s" />',
 				esc_attr( $field_id . '_members' ),
@@ -894,5 +967,49 @@ final class ScopedConfigurationPage {
 
 		$ids = $product->get_category_ids();
 		return array_values( array_filter( array_map( 'intval', is_array( $ids ) ? $ids : [] ) ) );
+	}
+
+	private function draft_key(): string {
+		return 'cetech_de_scoped_draft_' . get_current_user_id();
+	}
+
+	private function form_request_token(): string {
+		$token = is_array( $this->unsaved_draft ) ? (string) ( $this->unsaved_draft['request_token'] ?? '' ) : '';
+		if ( '' !== $token ) {
+			return $token;
+		}
+
+		return function_exists( 'wp_generate_uuid4' ) ? wp_generate_uuid4() : bin2hex( random_bytes( 16 ) );
+	}
+
+	/**
+	 * @return array<string, mixed>|null
+	 */
+	private function matching_draft( ConfigurationScopeType $scope_type, int $scope_id, string $slice_key, ?int $parent_product_id ): ?array {
+		$draft = get_transient( $this->draft_key() );
+		if ( ! is_array( $draft ) ) {
+			return null;
+		}
+		if ( (string) ( $draft['scope_type'] ?? '' ) !== $scope_type->value || (int) ( $draft['scope_id'] ?? 0 ) !== $scope_id || (string) ( $draft['slice_key'] ?? '' ) !== $slice_key ) {
+			return null;
+		}
+		$draft_parent = $draft['parent_product_id'] ?? null;
+		if ( ( null === $parent_product_id ? null : (int) $parent_product_id ) !== ( null === $draft_parent || '' === $draft_parent ? null : (int) $draft_parent ) ) {
+			return null;
+		}
+
+		return $draft;
+	}
+
+	/**
+	 * @return array<string, mixed>|null
+	 */
+	private function draft_field( string $field_key ): ?array {
+		$fields = is_array( $this->unsaved_draft ) ? ( $this->unsaved_draft['fields'] ?? null ) : null;
+		if ( ! is_array( $fields ) || ! isset( $fields[ $field_key ] ) || ! is_array( $fields[ $field_key ] ) ) {
+			return null;
+		}
+
+		return $fields[ $field_key ];
 	}
 }

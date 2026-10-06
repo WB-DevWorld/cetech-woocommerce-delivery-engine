@@ -38,6 +38,10 @@ final class RealMysqliWpdb {
 
 	public bool $reject_next_commit = false;
 
+	public bool $lose_next_commit_ack = false;
+
+	public bool $last_commit_was_sent = true;
+
 	public bool $fail_next_close = false;
 
 	/**
@@ -218,6 +222,10 @@ final class RealMysqliWpdb {
 		);
 	}
 
+	public function commit_was_sent(): bool {
+		return $this->last_commit_was_sent;
+	}
+
 	public function query( mixed $sql ): int|bool {
 		$sql = (string) $sql;
 		if ( $this->native_close_stops_queries && ! $this->ready ) {
@@ -233,9 +241,25 @@ final class RealMysqliWpdb {
 			return false;
 		}
 		if ( $this->reject_next_commit && preg_match( '/^\s*COMMIT\b/i', $sql ) ) {
-			$this->reject_next_commit = false;
-			$this->last_error         = 'Simulated SQL failure: COMMIT';
+			$this->reject_next_commit    = false;
+			$this->last_commit_was_sent  = false;
+			$this->last_error            = 'Simulated SQL failure: COMMIT';
 			$this->log_sql( $sql );
+
+			return false;
+		}
+		if ( $this->lose_next_commit_ack && preg_match( '/^\s*COMMIT\b/i', $sql ) ) {
+			$this->lose_next_commit_ack = false;
+			$this->last_commit_was_sent = true;
+			$this->log_sql( $sql );
+			try {
+				$this->connection()->exec( $sql );
+			} catch ( \PDOException $exception ) {
+				$this->last_error = $exception->getMessage();
+
+				return false;
+			}
+			$this->last_error = 'Simulated lost COMMIT acknowledgement';
 
 			return false;
 		}

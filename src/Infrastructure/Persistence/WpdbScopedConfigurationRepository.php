@@ -126,7 +126,40 @@ final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepo
 		return $results;
 	}
 
-	public function saveScopedConfiguration( ScopedConfiguration $configuration ): ScopedConfiguration {
+	public function completeLocalUnit( callable $work ): mixed {
+		return AbstractWpdbRepository::run_shared_unit( $work );
+	}
+
+	public function publishAcceptedRevision( ScopedConfiguration $configuration ): bool {
+		if ( ConfigurationScopeType::Global !== $configuration->scope->scope_type ) {
+			return true;
+		}
+
+		return $this->sync_global_version_option( $configuration->scope->config_version );
+	}
+
+	public function lockScopeIdentity( ConfigurationScopeType $scope_type, int $scope_id, string $slice_key ): ?array {
+		global $wpdb;
+
+		$table = TableNames::for( ScopedConfigurationSchema::SCOPES_SUFFIX );
+		$sql   = "SELECT id, config_version FROM `{$table}` WHERE scope_type = %s AND scope_id = %d AND slice_key = %s LIMIT 1 FOR UPDATE";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$row = $wpdb->get_row( $wpdb->prepare( $sql, $scope_type->value, $scope_id, $slice_key ), ARRAY_A );
+		if ( ! is_array( $row ) ) {
+			if ( '' !== trim( (string) $wpdb->last_error ) ) {
+				throw new InvalidConfigurationException( 'Failed to lock configuration scope. ' . trim( (string) $wpdb->last_error ) );
+			}
+
+			return null;
+		}
+
+		return [
+			'id'      => (int) $row['id'],
+			'version' => (int) $row['config_version'],
+		];
+	}
+
+	public function saveScopedConfiguration( ScopedConfiguration $configuration, bool $publish_revision = true ): ScopedConfiguration {
 		$scope = $configuration->scope;
 
 		$this->assert_valid_scope_identity( $scope );
@@ -170,7 +203,7 @@ final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepo
 				throw new InvalidConfigurationException( 'Failed to reload scoped configuration after update.' );
 			}
 
-			if ( ConfigurationScopeType::Global === $scope->scope_type ) {
+			if ( $publish_revision && ConfigurationScopeType::Global === $scope->scope_type ) {
 				$this->sync_global_version_option( $saved->scope->config_version );
 			}
 
@@ -186,7 +219,7 @@ final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepo
 			throw new InvalidConfigurationException( 'Failed to reload scoped configuration after insert.' );
 		}
 
-		if ( ConfigurationScopeType::Global === $scope->scope_type ) {
+		if ( $publish_revision && ConfigurationScopeType::Global === $scope->scope_type ) {
 			$this->sync_global_version_option( $saved->scope->config_version );
 		}
 
@@ -393,7 +426,8 @@ final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepo
 		);
 
 		if ( false === $inserted ) {
-			throw new InvalidConfigurationException( 'Failed to insert configuration scope.' );
+			$detail = trim( (string) $wpdb->last_error );
+			throw new InvalidConfigurationException( 'Failed to insert configuration scope. ' . $detail );
 		}
 
 		return (int) $wpdb->insert_id;
@@ -444,9 +478,12 @@ final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepo
 		$collections = TableNames::for( ScopedConfigurationSchema::COLLECTIONS_SUFFIX );
 
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->delete( $fields, [ 'scope_row_id' => $scope_row_id ], [ '%d' ] );
+		$deleted_fields = $wpdb->delete( $fields, [ 'scope_row_id' => $scope_row_id ], [ '%d' ] );
 		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
-		$wpdb->delete( $collections, [ 'scope_row_id' => $scope_row_id ], [ '%d' ] );
+		$deleted_collections = $wpdb->delete( $collections, [ 'scope_row_id' => $scope_row_id ], [ '%d' ] );
+		if ( AbstractWpdbRepository::shared_transaction_is_open() && ( false === $deleted_fields || false === $deleted_collections ) ) {
+			throw new InvalidConfigurationException( 'Failed to remove the previous configuration instructions. ' . trim( (string) $wpdb->last_error ) );
+		}
 	}
 
 	private function insert_scalar( int $scope_row_id, ScalarFieldInstruction $instruction ): void {
@@ -571,7 +608,13 @@ final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepo
 		}
 	}
 
-	private function sync_global_version_option( int $version ): void {
-		update_option( ScopedConfigurationSchema::GLOBAL_VERSION_OPTION, $version, false );
+	private function sync_global_version_option( int $version ): bool {
+		$key     = ScopedConfigurationSchema::GLOBAL_VERSION_OPTION;
+		$current = get_option( $key, null );
+		if ( null !== $current && false !== $current && (string) $current === (string) $version ) {
+			return true;
+		}
+
+		return false !== update_option( $key, $version, false );
 	}
 }

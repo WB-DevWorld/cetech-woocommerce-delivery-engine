@@ -1,6 +1,15 @@
 # Current Work — Post-#32 repository truth synchronization
 
-Status: RC.12 IMMUTABLE — COR-005 CHECKPOINT ON ISOLATED FIX BRANCH — COR-007 NEXT — UNMERGED — NOT RC.13
+Status: RC.12 IMMUTABLE — COR-005 AND COR-007 CHECKPOINTS ON ISOLATED FIX BRANCH — UNMERGED — NOT RC.13
+
+## 2026-10-06 — COR-007 local completion, after the COR-005 checkpoint
+
+COR-005 remains the earlier commit on `fix/cor-005-007-scan-save`. This section is the COR-007 checkpoint only. P07 and P08 stay unapproved. This does not merge, release, deploy, or write a live site. WS1 has not reviewed the visible copy.
+
+- Integration editor: this Cursor WS3 session. Human ownership is unchanged.
+- File lease: scoped configuration repository, service, audit logger, write command and result, the admin page and product-exceptions caller, and the COR-007 tests and report. No schema, ledger, or outbox. No new production PHP file. Installed production PHP remains 494 files.
+- Environment: local PHP 8.5.0. Disposable MariaDB `cetech_cor004_cor007`, prefix `cor007_`, on `127.0.0.1:33079` in container `cetech-cor004-mariadb` (mariadb:11.4). Disposable WordPress 7.1.2 in a temporary site, database `cetech_cor004_wp007`, prefix `cor007_`, default `WP_Object_Cache`, no `object-cache.php`. mysqli was loaded with `-d extension=mysqli` because it is not enabled in `C:\tools\php85\php.ini`. The WordPress proof loads `wp-load.php` and does not load `tests/bootstrap.php`.
+- The SQL proof is group `cor007-real-db` and is excluded from default `phpunit.xml`. The WordPress script is outside PHPUnit and outside default CI.
 
 ## 2026-10-06 — COR-005 catalog scan, then COR-007 after this checkpoint
 
