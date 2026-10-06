@@ -2,6 +2,16 @@
 
 Status: RC.12 IMMUTABLE — PR #53 REPAIRS IN PROGRESS — UNMERGED — NOT RC.13
 
+## 2026-10-06 — Owner-authorized crash diagnostic continuation
+
+The owner said proceed after the diagnostic hold on published candidate `02d2af9cd34f519bc2d144eae792cae9e9060d55`, tree `20620c22f037cbe87a4b379c96202a43f1a25c0b`. Run `37467834146` passed native 207 and the full authenticated HTTP receipt's 66 unique cases on attempts 1 and 2; neither symbol-enabled run crashed. Attempt 2 reran WordPress and its required gate and retained the six default job successes from attempt 1. These passes do not explain the earlier SIGSEGV. PR #53 remains draft and held. Only the owner and AI agents are working; no Ben/Emmanuel acceptance is implied.
+
+Codex remains sole integration editor. Leases: existing diagnostic shell, GDB output reader and boundary tests, fixture ownership probe, this checkpoint and evidence. Read-only agents reviewed debugger gaps and exact PHP runtime behavior. No production source, schema, P07/P08, dependency, gate weakening, merge, release, tag, deployment or live-site action.
+
+One fresh observational experiment retains the plain owned listener, authenticated sequence, 20-second client bound and baseline executable/INI/extension fingerprints. GDB must first prove that the exact resolved PHP executable has matching separate debug build IDs, a full Zend function symbol and execute-data type metadata. An explicitly synthetic, separate PHP CLI SIGSEGV then verifies owned-core decoding and main-executable Zend frames; it never touches the site or counts as product reproduction. Both raw cores/debugger logs stay private and are deleted. Kernel core handling is restored on every exit.
+
+The previous reader used `solib_name`, which returns no module for the main executable. The next reader includes main-executable mapping and safe source basename/line metadata; null frames remain unknown. The existing owned-listener probe now projects only OPcache/JIT booleans and counters from `opcache_get_status(false)`, never script paths or configuration arrays. PHP's `opcache.enable_cli=0` does not establish cli-server JIT state. No JIT setting is changed in this observational experiment. Eleven local Python output-boundary tests, shell syntax and all eight embedded Python blocks pass; this workspace has no PHP/GDB, so real debugger validation and qualification are pending and must bind to the resulting candidate. The earlier green run is historical.
+
 ## 2026-10-06 — PR #53 artifact reconciliation and native crash localization
 
 Diagnostic checkpoint `56855baf9798e582aad2e93c53f71c8dd72854dc`, tree `09d1c48734415b5735b3997732820ada6a64a5e3`, run `37466900485` attempt 1 reproduced a listener SIGSEGV on request 21, GET Product Exceptions, pre-response-header, 670 ms. Native passed 207 unique cases; HTTP recorded 57 unique PASS cases including cleanup but failed overall (`RemoteDisconnected`). GDB inspected the exact owned-PID core and emitted 12 frames with no usable symbols; kernel restoration and private cleanup passed. This does not locate the crash. No product repair was made.

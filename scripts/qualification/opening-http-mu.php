@@ -92,12 +92,31 @@ if (!defined('WP_CLI') || !WP_CLI) {
                 $extensions[$name] = phpversion($name);
             }
             ksort($extensions);
+            // Read the actual web-listener state. Never include cached-script
+            // paths or the configuration array in the public receipt.
+            $opcache = function_exists('opcache_get_status') ? opcache_get_status(false) : false;
+            $opcache_state = ['status_available' => is_array($opcache)];
+            if (is_array($opcache)) {
+                foreach (['opcache_enabled', 'cache_full', 'restart_pending', 'restart_in_progress'] as $key) {
+                    $opcache_state[$key] = isset($opcache[$key]) ? (bool) $opcache[$key] : null;
+                }
+                foreach (['num_cached_scripts', 'hits', 'misses'] as $key) {
+                    $opcache_state['statistics'][$key] = isset($opcache['opcache_statistics'][$key]) ? (int) $opcache['opcache_statistics'][$key] : null;
+                }
+                foreach (['enabled', 'on'] as $key) {
+                    $opcache_state['jit'][$key] = isset($opcache['jit'][$key]) ? (bool) $opcache['jit'][$key] : null;
+                }
+                foreach (['kind', 'opt_level', 'opt_flags', 'buffer_size', 'buffer_free'] as $key) {
+                    $opcache_state['jit'][$key] = isset($opcache['jit'][$key]) ? (int) $opcache['jit'][$key] : null;
+                }
+            }
             $listener_identity['diagnostic_runtime'] = [
                 'sapi' => PHP_SAPI, 'php_version' => PHP_VERSION,
                 'php_binary_sha256' => hash_file('sha256', PHP_BINARY),
                 'extensions' => $extensions, 'safe_ini' => $safe_ini,
                 'full_ini_sha256' => hash('sha256', json_encode($all_ini, JSON_THROW_ON_ERROR)),
                 'historical_ini_comparison_available' => false,
+                'opcache_state_at_existing_probe' => $opcache_state,
             ];
         }
         echo json_encode($listener_identity, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);

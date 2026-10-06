@@ -32,7 +32,7 @@ export CETECH_DE_HTTP_WORK_PATH="$WORK"
 export CETECH_DE_HTTP_PRIVATE_DIR="$PRIVATE"
 export CETECH_DE_HTTP_NATIVE_RECEIPT="$WORK/opening-qualification-results.json"
 export CETECH_DE_HTTP_PROBE_TOKEN="$(php -r 'echo bin2hex(random_bytes(24));')"
-PHP_EXECUTABLE="$(command -v php)"
+PHP_EXECUTABLE="$(readlink -f "$(command -v php)")"
 CRASH_DIAGNOSTIC="${CETECH_DE_HTTP_CRASH_DIAGNOSTIC:-0}"
 CORE_PATTERN_CHANGED=0
 CORE_PATTERN_ORIGINAL=""
@@ -105,7 +105,7 @@ finish_http_fixture() {
         crash_status="no_listener_core"
         if [[ -n "$LISTENER_CORE_PID" && -f "$PRIVATE/core.$LISTENER_CORE_PID" && ! -L "$PRIVATE/core.$LISTENER_CORE_PID" ]]; then
             crash_status="debugger_failed"
-            CETECH_DE_HTTP_STACK_OUTPUT="$PRIVATE/native-stack.json" \
+            CETECH_DE_HTTP_STACK_OUTPUT="$PRIVATE/native-stack.json" CETECH_DE_HTTP_DEBUG_EXECUTABLE="$PHP_EXECUTABLE" \
                 timeout 20s gdb -nx -batch \
                 -iex 'set auto-load off' -iex 'set debuginfod enabled off' \
                 -iex 'set print frame-arguments none' \
@@ -165,7 +165,7 @@ PY
     local diagnostic_log="$PRIVATE/import-prepare-command.log"
     if [[ "$QUALIFICATION_STAGE" == "origin_preflight" ]]; then diagnostic_log="$PRIVATE/origin-preflight-command.log"; fi
     if [[ "$QUALIFICATION_STAGE" == "http_driver" || "$QUALIFICATION_STAGE" == "complete" ]]; then diagnostic_log="$PRIVATE/php-server.log"; fi
-    python3 - "$RECEIPT" "$diagnostic_log" "$QUALIFICATION_STAGE" "$PRIVATE/origin-preflight-output.json" "$listener_exit" "$listener_signal" "$PRIVATE/php-server.log" "$db_connect" "$db_wait_ms" "$PRIVATE/native-stack.json" "$crash_status" "$core_pattern_restored" "$PRIVATE/runtime.json" "$listener_wait_exit" "$listener_wait_signal" "$listener_cleanup_term" <<'PY'
+    python3 - "$RECEIPT" "$diagnostic_log" "$QUALIFICATION_STAGE" "$PRIVATE/origin-preflight-output.json" "$listener_exit" "$listener_signal" "$PRIVATE/php-server.log" "$db_connect" "$db_wait_ms" "$PRIVATE/native-stack.json" "$crash_status" "$core_pattern_restored" "$PRIVATE/runtime.json" "$listener_wait_exit" "$listener_wait_signal" "$listener_cleanup_term" "$PRIVATE/debugger-preflight.json" "$PRIVATE/synthetic-stack.json" <<'PY'
 import hashlib, json, re, sys
 from pathlib import Path
 receipt = Path(sys.argv[1])
@@ -215,7 +215,7 @@ if "Segmentation fault" in text or sys.argv[6] == "11" or sys.argv[15] == "11":
     codes.append("PHP_SERVER_SIGSEGV")
 classes = [name for name in ("RuntimeException", "Error", "TypeError", "ParseError", "ValueError", "JsonException", "Exception") if re.search(r"Uncaught\s+" + name + r"(?:\s|:)", text)]
 report["fixture_diagnostic"] = {
-    "stage": sys.argv[3] if sys.argv[3] in ("allocated", "origin_preflight", "mu_copy", "import_prepare", "listener_preflight", "listener_readiness", "http_driver", "complete") else "unknown_stage",
+    "stage": sys.argv[3] if sys.argv[3] in ("allocated", "debugger_preflight", "synthetic_core_validation", "origin_preflight", "mu_copy", "import_prepare", "listener_preflight", "listener_readiness", "http_driver", "complete") else "unknown_stage",
     "command_log_present": log.is_file(),
     "command_log_sha256": hashlib.sha256(raw).hexdigest() if raw else None,
     "allowlisted_error_codes": sorted(set(codes)),
@@ -236,22 +236,43 @@ report["native_crash_diagnostic"] = {
     "raw_core_or_debugger_output_retained": False, "frames": [],
     "limits": "Symbols narrow native execution location; they do not establish a product defect. Prior failure did not record an INI fingerprint.",
 }
-stack_path = Path(sys.argv[10])
-if stack_path.is_file():
+def safe_stack(path):
     try:
-        stack = json.loads(stack_path.read_text(encoding="utf-8"))
-        if stack.get("format") == "cetech-opening-native-stack-v1":
+        stack = json.loads(path.read_text(encoding="utf-8"))
+        if stack.get("format") == "cetech-opening-native-stack-v2":
             frames = []
             for frame in stack.get("frames", [])[:32]:
                 symbol = frame.get("symbol")
                 module = frame.get("module")
+                source = frame.get("source_file")
+                line = frame.get("source_line")
                 frames.append({"depth": len(frames),
                     "symbol": symbol if isinstance(symbol, str) and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_:.$~]{0,159}", symbol) else None,
-                    "module": module if isinstance(module, str) and re.fullmatch(r"[A-Za-z0-9_.+-]{1,100}", module) else None})
-            report["native_crash_diagnostic"]["frames"] = frames
-            report["native_crash_diagnostic"]["capture_status"] = stack.get("status") if stack.get("status") in ("symbols_captured", "symbols_unavailable", "partial_symbols", "debugger_unavailable") else "unreadable"
+                    "module": module if isinstance(module, str) and re.fullmatch(r"[A-Za-z0-9_.+-]{1,100}", module) else None,
+                    "mapping_known": frame.get("mapping_known") is True,
+                    "source_file": source if isinstance(source, str) and re.fullmatch(r"[A-Za-z0-9_.+-]{1,100}", source) else None,
+                    "source_line": line if type(line) is int and 0 < line <= 1000000 else None})
+            validation = stack.get("symbol_validation", {})
+            safe_validation = {key: validation.get(key) is True for key in ("exact_executable_loaded", "zend_execute_full_symbol", "zend_execute_data_type")}
+            safe_validation["status"] = validation.get("status") if validation.get("status") in ("PASS", "FAIL") else "FAIL"
+            for key in ("executable_build_id", "matching_separate_debug_build_id"):
+                value = validation.get(key)
+                safe_validation[key] = value if isinstance(value, str) and re.fullmatch(r"[a-f0-9]{16,128}", value) else None
+            value = validation.get("executable_module")
+            safe_validation["executable_module"] = value if isinstance(value, str) and re.fullmatch(r"[A-Za-z0-9_.+-]{1,100}", value) else None
+            return {"frames": frames, "symbol_validation": safe_validation,
+                    "capture_status": stack.get("status") if stack.get("status") in ("symbols_captured", "symbols_unavailable", "partial_symbols", "debugger_unavailable", "preflight_pass", "preflight_fail") else "unreadable"}
     except (OSError, ValueError, TypeError):
-        report["native_crash_diagnostic"]["capture_status"] = "unreadable"
+        pass
+    return {"capture_status": "unreadable", "frames": []}
+stack_path = Path(sys.argv[10])
+if stack_path.is_file():
+    report["native_crash_diagnostic"].update(safe_stack(stack_path))
+for key, argument in (("debugger_preflight", 17), ("synthetic_core_validation", 18)):
+    path = Path(sys.argv[argument])
+    if path.is_file():
+        report["native_crash_diagnostic"][key] = safe_stack(path)
+report["native_crash_diagnostic"]["synthetic_validation_is_product_reproduction"] = False
 runtime_path = Path(sys.argv[13])
 if runtime_path.is_file():
     report["diagnostic_runtime"] = json.loads(runtime_path.read_text(encoding="utf-8"))
@@ -317,11 +338,47 @@ if [[ "$CRASH_DIAGNOSTIC" == "1" ]]; then
         echo "BLOCKED: native crash capture requires the disposable GitHub runner and gdb" >&2
         exit 1
     fi
+    QUALIFICATION_STAGE="debugger_preflight"
+    CETECH_DE_HTTP_STACK_OUTPUT="$PRIVATE/debugger-preflight.json" CETECH_DE_HTTP_DEBUG_EXECUTABLE="$PHP_EXECUTABLE" CETECH_DE_HTTP_DEBUG_MODE=preflight \
+        timeout 20s gdb -nx -batch -iex 'set auto-load off' -iex 'set debuginfod enabled off' \
+        -ex "source $ROOT/scripts/qualification/opening-http-native-stack.py" "$PHP_EXECUTABLE" \
+        >"$PRIVATE/debugger-preflight.log" 2>&1
+    python3 - "$PRIVATE/debugger-preflight.json" <<'PY'
+import json, sys
+from pathlib import Path
+report = json.loads(Path(sys.argv[1]).read_text())
+if report.get("status") != "preflight_pass" or report.get("symbol_validation", {}).get("status") != "PASS":
+    raise SystemExit("BLOCKED: GDB did not load matching PHP debug files and full Zend metadata")
+PY
     CORE_PATTERN_ORIGINAL="$(cat /proc/sys/kernel/core_pattern)"
     # Mark restoration required before attempting the privileged mutation.
     CORE_PATTERN_CHANGED=1
     printf '%s\n' "$PRIVATE/core.%p" | sudo -n tee /proc/sys/kernel/core_pattern >"$PRIVATE/core-setup.log" 2>&1
     ulimit -c unlimited
+    # Separate CLI process: prove this executable's owned core can be decoded
+    # before the real listener starts. This is not a product reproduction.
+    QUALIFICATION_STAGE="synthetic_core_validation"
+    "$PHP_EXECUTABLE" -r 'posix_kill(getmypid(), 11);' >"$PRIVATE/synthetic-command.log" 2>&1 &
+    SYNTHETIC_PID=$!
+    synthetic_exit=0
+    wait "$SYNTHETIC_PID" 2>>"$PRIVATE/synthetic-command.log" || synthetic_exit=$?
+    if [[ "$synthetic_exit" != "139" || ! -f "$PRIVATE/core.$SYNTHETIC_PID" || -L "$PRIVATE/core.$SYNTHETIC_PID" ]]; then
+        echo "BLOCKED: synthetic owned PHP core was not produced" >&2
+        exit 1
+    fi
+    CETECH_DE_HTTP_STACK_OUTPUT="$PRIVATE/synthetic-stack.json" CETECH_DE_HTTP_DEBUG_EXECUTABLE="$PHP_EXECUTABLE" \
+        timeout 20s gdb -nx -batch -iex 'set auto-load off' -iex 'set debuginfod enabled off' \
+        -iex 'set print frame-arguments none' -ex "source $ROOT/scripts/qualification/opening-http-native-stack.py" \
+        "$PHP_EXECUTABLE" "$PRIVATE/core.$SYNTHETIC_PID" >"$PRIVATE/synthetic-debugger.log" 2>&1
+    python3 - "$PRIVATE/synthetic-stack.json" <<'PY'
+import json, sys
+from pathlib import Path
+report = json.loads(Path(sys.argv[1]).read_text())
+validation = report.get("symbol_validation", {})
+if validation.get("status") != "PASS" or not any(frame.get("module") == validation.get("executable_module") and frame.get("symbol") in ("zend_execute", "execute_ex") for frame in report.get("frames", [])):
+    raise SystemExit("BLOCKED: synthetic PHP core did not resolve a Zend frame in the exact executable")
+PY
+    rm "$PRIVATE/core.$SYNTHETIC_PID"
 fi
 
 QUALIFICATION_STAGE="origin_preflight"
