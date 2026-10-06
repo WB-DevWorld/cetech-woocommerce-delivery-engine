@@ -149,13 +149,33 @@ final class BulkJobWorker {
 
 			return;
 		}
-		$after_id   = (int) $job->checkpoint_cursor;
-		$limit      = $job->batch_size;
-		$page       = $this->targets->page_after( $definition, $after_id, $limit );
+		$after_id = (int) $job->checkpoint_cursor;
+		$limit    = $job->batch_size;
+		$summary  = $job->summary;
+		$prep     = is_array( $summary['preparation'] ?? null ) ? $summary['preparation'] : [];
+		if ( ! array_key_exists( 'high_water', $prep ) ) {
+			try {
+				$prep['high_water'] = $this->targets->catalog_ceiling( $definition );
+			} catch ( \Throwable $exception ) {
+				$this->fail_preparation( $job, $exception );
+
+				return;
+			}
+			$prep['state']         = 'incomplete';
+			$summary['preparation'] = $prep;
+			$job                    = $job->with( [ 'summary' => $summary ] );
+		}
+		$high_water = (int) $prep['high_water'];
+		try {
+			$page = $this->targets->scan_page( $definition, $after_id, $limit, $high_water );
+		} catch ( \Throwable $exception ) {
+			$this->fail_preparation( $job, $exception );
+
+			return;
+		}
 
 		$items = [];
-		$last  = $after_id;
-		foreach ( $page as $target ) {
+		foreach ( $page['accepted'] as $target ) {
 			$items[] = BulkJobItem::pending(
 				(int) $job->id,
 				$target->type,
@@ -163,7 +183,6 @@ final class BulkJobWorker {
 				$target->external_key,
 				$target->parent_id
 			);
-			$last = $target->id;
 		}
 
 		if ( [] !== $items ) {
@@ -171,14 +190,13 @@ final class BulkJobWorker {
 		}
 
 		$enumerated = $job->enumerated_count + count( $items );
-		$complete   = count( $page ) < $limit;
-		$total      = $complete ? $enumerated : max( $job->total_count, $enumerated );
-
-		if ( $complete && 0 === $job->total_count ) {
-			$total = $enumerated;
-		} elseif ( ! $complete && 0 === $job->total_count ) {
-			$total = $this->safe_count( $definition, $enumerated );
-		}
+		$complete   = $page['exhausted'];
+		$cursor     = $page['scanned'] > 0 ? (string) $page['cursor'] : (string) $after_id;
+		$prep['scanned']    = (int) ( $prep['scanned'] ?? 0 ) + $page['scanned'];
+		$prep['effective']  = $enumerated;
+		$prep['state']      = $complete ? 'complete' : 'incomplete';
+		$summary['preparation'] = $prep;
+		$total                  = $enumerated;
 
 		$job = $job->with_progress(
 			$total,
@@ -189,8 +207,8 @@ final class BulkJobWorker {
 			$job->failed_count,
 			$job->warning_count,
 			$complete,
-			(string) $last,
-			$job->summary
+			$cursor,
+			$summary
 		);
 		if ( $complete ) {
 			$job = $this->release_selection_manifest( $job );
@@ -216,6 +234,22 @@ final class BulkJobWorker {
 				'target_definition' => $definition->after_materialization()->to_array(),
 			]
 		);
+	}
+
+	private function fail_preparation( BulkJob $job, \Throwable $exception ): void {
+		$summary = $job->summary;
+		$prep    = is_array( $summary['preparation'] ?? null ) ? $summary['preparation'] : [];
+		$prep['state']          = 'failed';
+		$summary['preparation'] = $prep;
+		$this->jobs->save_job(
+			$job->with_status( BulkJobStatus::Failed )->with_error( 'catalog_scan_failed', $exception->getMessage() )->with(
+				[
+					'summary'              => $summary,
+					'enumeration_complete' => false,
+				]
+			)
+		);
+		$this->queue->cancel_job_ticks( (int) $job->id );
 	}
 
 	private function safe_count( CatalogTargetDefinition $definition, int $fallback ): int {

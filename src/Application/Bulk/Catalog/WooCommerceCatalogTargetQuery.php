@@ -117,6 +117,183 @@ final class WooCommerceCatalogTargetQuery implements CatalogTargetQueryInterface
 		return $id > 0 ? $id : null;
 	}
 
+	public function catalog_ceiling( CatalogTargetDefinition $definition ): int {
+		CatalogTargetFilters::assert_supported( $definition->filters );
+		if ( BulkTargetScope::SelectedIds === $definition->scope ) {
+			return [] === $definition->selected_ids ? 0 : max( $definition->selected_ids );
+		}
+		if ( ! $this->wpdb_ready() ) {
+			throw new \RuntimeException( 'Catalog scan failed. The database connection is not ready.' );
+		}
+		global $wpdb;
+		$is_variation = CatalogTargetDefinition::TARGET_VARIATION === $definition->target_type;
+		$type         = $is_variation ? 'product_variation' : 'product';
+		$sql          = "SELECT MAX(p.ID) FROM {$wpdb->posts} p WHERE p.post_type = %s AND p.post_status IN ('publish','private','draft')";
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$max = $wpdb->get_var( $wpdb->prepare( $sql, $type ) );
+		$this->throw_if_query_failed();
+
+		return max( 0, (int) $max );
+	}
+
+	public function scan_page( CatalogTargetDefinition $definition, int $after_id, int $limit, int $high_water ): array {
+		CatalogTargetFilters::assert_supported( $definition->filters );
+		$limit = max( 1, min( 250, $limit ) );
+		if ( BulkTargetScope::SelectedIds === $definition->scope ) {
+			return $this->scan_selected_page( $definition, $after_id, $limit, $high_water );
+		}
+		if ( ! $this->wpdb_ready() ) {
+			throw new \RuntimeException( 'Catalog scan failed. The database connection is not ready.' );
+		}
+
+		$candidates = $this->checked_ids( ...$this->candidate_identity_sql( $definition, $after_id, $limit, $high_water ) );
+		$accepted_ids = $this->accept_candidate_ids( $definition, $candidates );
+		$accepted     = [];
+		foreach ( $candidates as $id ) {
+			if ( ! in_array( $id, $accepted_ids, true ) ) {
+				continue;
+			}
+			$accepted[] = new CatalogTarget(
+				$definition->target_type,
+				$id,
+				$this->sku_for( $definition->target_type, $id ),
+				CatalogTargetDefinition::TARGET_VARIATION === $definition->target_type ? $this->parent_product_id( $id ) : null
+			);
+		}
+		$cursor = [] === $candidates ? $after_id : (int) $candidates[ count( $candidates ) - 1 ];
+
+		return CatalogTargetDefinition::candidate_page( $accepted, $cursor, count( $candidates ), count( $candidates ) < $limit );
+	}
+
+	public function membership( CatalogTargetDefinition $definition, int $target_id ): string {
+		CatalogTargetFilters::assert_supported( $definition->filters );
+		if ( $target_id <= 0 ) {
+			return 'unavailable';
+		}
+		if ( BulkTargetScope::SelectedIds === $definition->scope && ! $definition->selected_ids_materialized && ! in_array( $target_id, $definition->selected_ids, true ) ) {
+			return 'rejected';
+		}
+		if ( ! $this->wpdb_ready() ) {
+			throw new \RuntimeException( 'Catalog scan failed. The database connection is not ready.' );
+		}
+		$present = $this->checked_ids( ...$this->candidate_identity_sql( $definition, $target_id - 1, 1, $target_id ) );
+		if ( ! in_array( $target_id, $present, true ) ) {
+			return 'unavailable';
+		}
+		$accepted = $this->accept_candidate_ids( $definition, [ $target_id ] );
+
+		return in_array( $target_id, $accepted, true ) ? 'accepted' : 'rejected';
+	}
+
+	/**
+	 * @return array{0: string, 1: list<mixed>}
+	 */
+	private function candidate_identity_sql( CatalogTargetDefinition $definition, int $after_id, int $limit, int $high_water ): array {
+		global $wpdb;
+		$is_variation = CatalogTargetDefinition::TARGET_VARIATION === $definition->target_type;
+		$type         = $is_variation ? 'product_variation' : 'product';
+		$sql          = "SELECT p.ID FROM {$wpdb->posts} p WHERE p.post_type = %s AND p.post_status IN ('publish','private','draft') AND p.ID > %d AND p.ID <= %d ORDER BY p.ID ASC LIMIT %d";
+
+		return [ $sql, [ $type, $after_id, $high_water, max( 1, $limit ) ] ];
+	}
+
+	/**
+	 * @param list<int> $ids
+	 * @return list<int>
+	 */
+	private function accept_candidate_ids( CatalogTargetDefinition $definition, array $ids ): array {
+		if ( [] === $ids ) {
+			return [];
+		}
+		if ( BulkTargetScope::MatchingFilters === $definition->scope && ! $definition->has_matching_criteria() ) {
+			return [];
+		}
+		if ( BulkTargetScope::SelectedIds === $definition->scope ) {
+			return $ids;
+		}
+		[ $sql, $args ] = $this->id_sql( $definition, 0, count( $ids ), false );
+		$in             = implode( ',', array_map( 'intval', $ids ) );
+		$sql            = (string) preg_replace( '/ ORDER BY p\.ID ASC LIMIT %d$/', " AND p.ID IN ({$in}) ORDER BY p.ID ASC LIMIT %d", $sql );
+		$matched        = $this->checked_ids( $sql, $args );
+		if ( ! CatalogTargetFilters::requires_effective_eval( $definition->filters ) ) {
+			return $matched;
+		}
+		$kept = [];
+		foreach ( $matched as $id ) {
+			if ( $this->passes_effective( $definition, $id, true ) ) {
+				$kept[] = $id;
+			}
+		}
+
+		return $kept;
+	}
+
+	private function scan_selected_page( CatalogTargetDefinition $definition, int $after_id, int $limit, int $high_water ): array {
+		$ids = [];
+		foreach ( $definition->selected_ids as $id ) {
+			$id = (int) $id;
+			if ( $id > $after_id && $id <= $high_water ) {
+				$ids[] = $id;
+			}
+		}
+		sort( $ids, SORT_NUMERIC );
+		$slice = array_slice( $ids, 0, $limit );
+		$present = [] === $slice || ! $this->wpdb_ready()
+			? []
+			: $this->checked_ids( ...$this->selected_presence_sql( $definition, $slice ) );
+		$accepted = [];
+		$cursor   = $after_id;
+		foreach ( $slice as $id ) {
+			$cursor = $id;
+			if ( ! in_array( $id, $present, true ) ) {
+				continue;
+			}
+			$accepted[] = new CatalogTarget(
+				$definition->target_type,
+				$id,
+				$this->sku_for( $definition->target_type, $id ),
+				CatalogTargetDefinition::TARGET_VARIATION === $definition->target_type ? $this->parent_product_id( $id ) : null
+			);
+		}
+
+		return CatalogTargetDefinition::candidate_page( $accepted, $cursor, count( $slice ), count( $ids ) <= $limit );
+	}
+
+	/**
+	 * @param list<int> $ids
+	 * @return array{0: string, 1: list<mixed>}
+	 */
+	private function selected_presence_sql( CatalogTargetDefinition $definition, array $ids ): array {
+		global $wpdb;
+		$is_variation = CatalogTargetDefinition::TARGET_VARIATION === $definition->target_type;
+		$type         = $is_variation ? 'product_variation' : 'product';
+		$in           = implode( ',', array_map( 'intval', $ids ) );
+		$sql          = "SELECT p.ID FROM {$wpdb->posts} p WHERE p.post_type = %s AND p.post_status IN ('publish','private','draft') AND p.ID IN ({$in})";
+
+		return [ $sql, [ $type ] ];
+	}
+
+	/**
+	 * @param list<mixed> $args
+	 * @return list<int>
+	 */
+	private function checked_ids( string $sql, array $args ): array {
+		global $wpdb;
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.NotPrepared
+		$ids = $wpdb->get_col( $wpdb->prepare( $sql, ...$args ) );
+		$this->throw_if_query_failed();
+
+		return array_map( 'intval', is_array( $ids ) ? $ids : [] );
+	}
+
+	private function throw_if_query_failed(): void {
+		global $wpdb;
+		$error = trim( (string) ( $wpdb->last_error ?? '' ) );
+		if ( '' !== $error ) {
+			throw new \RuntimeException( 'Catalog scan failed. ' . $error );
+		}
+	}
+
 	/**
 	 * @return list<int>
 	 */
@@ -146,9 +323,7 @@ final class WooCommerceCatalogTargetQuery implements CatalogTargetQueryInterface
 
 		$collected = [];
 		$cursor    = $after_id;
-		$guard     = 0;
-		while ( count( $collected ) < $limit && $guard < 400 ) {
-			++$guard;
+		while ( count( $collected ) < $limit ) {
 			$candidates = $this->sql_ids( $definition, $cursor, self::SQL_CANDIDATE_PAGE );
 			if ( [] === $candidates ) {
 				break;
@@ -477,7 +652,7 @@ final class WooCommerceCatalogTargetQuery implements CatalogTargetQueryInterface
 		return 'JSON_VALID(' . $column . ") AND JSON_CONTAINS(" . $column . ", %s, '\$')";
 	}
 
-	private function passes_effective( CatalogTargetDefinition $definition, int $id ): bool {
+	private function passes_effective( CatalogTargetDefinition $definition, int $id, bool $strict = false ): bool {
 		if ( ! $this->resolver instanceof EffectiveConfigurationResolver ) {
 			return true;
 		}
@@ -491,7 +666,11 @@ final class WooCommerceCatalogTargetQuery implements CatalogTargetQueryInterface
 			$config = $this->resolver->resolve(
 				new EffectiveConfigurationRequest( $product_id, $variation_id, ConfigurationScope::DEFAULT_SLICE_KEY, $parent )
 			);
-		} catch ( \Throwable ) {
+		} catch ( \Throwable $exception ) {
+			if ( $strict ) {
+				throw new \RuntimeException( 'Catalog scan failed. ' . $exception->getMessage(), 0, $exception );
+			}
+
 			return false;
 		}
 

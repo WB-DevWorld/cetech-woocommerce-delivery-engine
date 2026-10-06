@@ -585,14 +585,27 @@ final class BulkToolsPage {
 		}
 		$payload = BulkJobAdminCopy::progress_payload( $job );
 		$state   = BulkJobRunnerState::from_job( $job );
-		echo '<p class="cetech-de-bulk-job-status" role="status" aria-live="polite" data-cetech-de-job-id="' . esc_attr( (string) $job->id ) . '" data-cetech-de-coherent="' . esc_attr( ! empty( $payload['coherent'] ) ? '1' : '0' ) . '">' . esc_html(
-			sprintf(
-				'%s · %d / %d',
+		$progress_text = 'incomplete' === ( $payload['preparation_state'] ?? '' )
+			? sprintf(
+				/* translators: 1: status label, 2: scanned candidate count, 3: accepted targets so far */
+				__( '%1$s · scanned %2$d · targets so far %3$d', 'cetech-woocommerce-delivery-engine' ),
 				$payload['status_label'],
-				$job->processed_count,
-				$job->total_count
+				(int) ( $payload['scanned'] ?? 0 ),
+				(int) ( $payload['effective'] ?? 0 )
 			)
-		) . '</p>';
+			: ( 'failed' === ( $payload['preparation_state'] ?? '' )
+				? sprintf(
+					/* translators: %s: status label */
+					__( '%s · preparation failed', 'cetech-woocommerce-delivery-engine' ),
+					$payload['status_label']
+				)
+				: sprintf(
+					'%s · %d / %d',
+					$payload['status_label'],
+					$job->processed_count,
+					$job->total_count
+				) );
+		echo '<p class="cetech-de-bulk-job-status" role="status" aria-live="polite" data-cetech-de-job-id="' . esc_attr( (string) $job->id ) . '" data-cetech-de-coherent="' . esc_attr( ! empty( $payload['coherent'] ) ? '1' : '0' ) . '">' . esc_html( $progress_text ) . '</p>';
 
 		echo '<div class="notice notice-info inline cetech-de-bulk-notice cetech-de-bulk-waiting-notice" role="status"' . ( $state->waiting_for_runner ? '' : ' hidden' ) . '><p>' . esc_html( BulkJobAdminCopy::waiting_notice() ) . '</p></div>';
 

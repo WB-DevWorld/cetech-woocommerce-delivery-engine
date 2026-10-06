@@ -102,6 +102,24 @@ trait BulkJobWorkerDispatch {
 		}
 
 		$dry_run = $job->dry_run;
+		if ( BulkOperationType::CatalogUpdate === $job->operation_type && ! $dry_run ) {
+			if (
+				CatalogTargetDefinition::TARGET_VARIATION === $item->target_type
+				&& null !== $item->parent_target_id
+				&& $item->parent_target_id > 0
+				&& $parent !== $item->parent_target_id
+			) {
+				return $this->stale_target( 'This variation no longer belongs to the approved parent.' );
+			}
+			$decision = $this->targets->membership( $definition, $target_id );
+			if ( 'accepted' !== $decision ) {
+				return $this->stale_target(
+					'unavailable' === $decision
+						? 'This product is no longer available.'
+						: 'This product no longer matches the approved preview.'
+				);
+			}
+		}
 
 		return $this->mutator->process(
 			$item->target_type,
@@ -246,6 +264,22 @@ trait BulkJobWorkerDispatch {
 	/**
 	 * @return array<string, mixed>
 	 */
+	/**
+	 * @return array<string, mixed>
+	 */
+	private function stale_target( string $summary ): array {
+		return [
+			'outcome'                  => 'skipped',
+			'error_code'               => 'stale_target',
+			'error_summary'            => $summary,
+			'warning'                  => false,
+			'before_snapshot'          => [],
+			'precondition_fingerprint' => '',
+			'after_fingerprint'        => '',
+			'result'                   => [ 'stale' => true ],
+		];
+	}
+
 	private function missing_processor( string $code, string $summary ): array {
 		return [
 			'outcome'                  => 'failed',

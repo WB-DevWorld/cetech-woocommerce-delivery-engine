@@ -20,7 +20,13 @@ final class InMemoryCatalogTargetQuery implements CatalogTargetQueryInterface {
 		private array $variation_parents = [],
 		private array $attributes = []
 	) {
+		foreach ( $this->targets as $target ) {
+			$this->by_key[ $target->type . ':' . $target->id ] = $target;
+		}
 	}
+
+	/** @var array<string, CatalogTarget> */
+	private array $by_key = [];
 
 	public function add( CatalogTarget $target, array $attributes = [] ): void {
 		$this->targets[] = $target;
@@ -33,6 +39,7 @@ final class InMemoryCatalogTargetQuery implements CatalogTargetQueryInterface {
 		if ( [] !== $attributes ) {
 			$this->attributes[ $target->id ] = $attributes;
 		}
+		$this->by_key[ $target->type . ':' . $target->id ] = $target;
 	}
 
 	/**
@@ -81,6 +88,95 @@ final class InMemoryCatalogTargetQuery implements CatalogTargetQueryInterface {
 		}
 
 		return null;
+	}
+
+	public function catalog_ceiling( CatalogTargetDefinition $definition ): int {
+		CatalogTargetFilters::assert_supported( $definition->filters );
+		if ( BulkTargetScope::SelectedIds === $definition->scope ) {
+			return [] === $definition->selected_ids ? 0 : max( $definition->selected_ids );
+		}
+		$max = 0;
+		foreach ( $this->targets as $target ) {
+			if ( $target->type === $definition->target_type ) {
+				$max = max( $max, $target->id );
+			}
+		}
+
+		return $max;
+	}
+
+	public function scan_page( CatalogTargetDefinition $definition, int $after_id, int $limit, int $high_water ): array {
+		CatalogTargetFilters::assert_supported( $definition->filters );
+		$limit = max( 1, $limit );
+		$ids   = $this->candidate_ids( $definition, $after_id, $high_water );
+		$slice = array_slice( $ids, 0, $limit );
+		$accepted = [];
+		$cursor   = $after_id;
+		foreach ( $slice as $id ) {
+			$cursor = $id;
+			if ( 'accepted' !== $this->membership( $definition, $id ) ) {
+				continue;
+			}
+			$target = $this->target_by_id( $definition->target_type, $id );
+			if ( $target instanceof CatalogTarget ) {
+				$accepted[] = $target;
+			}
+		}
+
+		return CatalogTargetDefinition::candidate_page( $accepted, $cursor, count( $slice ), count( $ids ) <= $limit );
+	}
+
+	public function membership( CatalogTargetDefinition $definition, int $target_id ): string {
+		CatalogTargetFilters::assert_supported( $definition->filters );
+		$target = $this->target_by_id( $definition->target_type, $target_id );
+		if ( BulkTargetScope::SelectedIds === $definition->scope ) {
+			if ( ! $definition->selected_ids_materialized && ! in_array( $target_id, $definition->selected_ids, true ) ) {
+				return 'rejected';
+			}
+
+			return $target instanceof CatalogTarget ? 'accepted' : 'unavailable';
+		}
+		if ( ! $target instanceof CatalogTarget ) {
+			return 'unavailable';
+		}
+
+		return $this->passes_definition( $target, $definition ) ? 'accepted' : 'rejected';
+	}
+
+	private function target_by_id( string $type, int $id ): ?CatalogTarget {
+		return $this->by_key[ $type . ':' . $id ] ?? null;
+	}
+
+	/**
+	 * @return list<int>
+	 */
+	private function candidate_ids( CatalogTargetDefinition $definition, int $after_id, int $high_water ): array {
+		if ( BulkTargetScope::SelectedIds === $definition->scope ) {
+			$ids = [];
+			foreach ( $definition->selected_ids as $id ) {
+				$id = (int) $id;
+				if ( $id > $after_id && $id <= $high_water ) {
+					$ids[] = $id;
+				}
+			}
+			sort( $ids, SORT_NUMERIC );
+
+			return $ids;
+		}
+
+		$ids = [];
+		foreach ( $this->targets as $target ) {
+			if ( $target->type !== $definition->target_type ) {
+				continue;
+			}
+			if ( $target->id <= $after_id || $target->id > $high_water ) {
+				continue;
+			}
+			$ids[] = $target->id;
+		}
+		sort( $ids, SORT_NUMERIC );
+
+		return $ids;
 	}
 
 	/**

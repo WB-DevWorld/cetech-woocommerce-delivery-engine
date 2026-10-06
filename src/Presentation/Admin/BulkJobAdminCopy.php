@@ -85,11 +85,17 @@ final class BulkJobAdminCopy {
 		$terminal  = ( $job->status->is_terminal() || $job->status->allows_apply() ) && $coherent
 			&& BulkJobRunnerState::PHASE_FINALIZING !== $state->phase;
 
+		$preparation = is_array( $job->summary['preparation'] ?? null ) ? $job->summary['preparation'] : [];
+		$preparation_state = (string) ( $preparation['state'] ?? '' );
+
 		return [
 			'code'                => $job->job_code,
 			'status'              => $job->status->value,
 			'status_label'        => self::public_status_label( $job ),
 			'total'               => $job->total_count,
+			'preparation_state'   => $preparation_state,
+			'scanned'             => (int) ( $preparation['scanned'] ?? 0 ),
+			'effective'           => (int) ( $preparation['effective'] ?? $job->enumerated_count ),
 			'processed'           => $job->processed_count,
 			'changed'             => $job->changed_count,
 			'skipped'             => $job->skipped_count,

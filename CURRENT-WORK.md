@@ -1,6 +1,19 @@
 # Current Work — Post-#32 repository truth synchronization
 
-Status: RC.12 IMMUTABLE — COR-004/COR-006 FOLLOW-ON ON ISOLATED FIX BRANCH — UNMERGED — NOT RC.13
+Status: RC.12 IMMUTABLE — COR-005 CHECKPOINT ON ISOLATED FIX BRANCH — COR-007 NEXT — UNMERGED — NOT RC.13
+
+## 2026-10-06 — COR-005 catalog scan, then COR-007 after this checkpoint
+
+The owner approved COR-005 and COR-007 as proposed. Implementation is sequential. This checkpoint is COR-005 only. COR-007 starts after this commit. P07 recovery architecture and P08 backlog/liveness limit stay unapproved. This does not merge, release, deploy, or write a live site.
+
+- Approved COR-005 membership: preparation fixes the normalized target, action, variation policy, and a finite catalog ceiling H. Selected IDs stay that set. Filter and Entire Catalog walk only the requested object type inside H. H bounds the scan. It does not freeze product facts or create one catalog snapshot. Apply stays unavailable until enumeration and dry-run succeed and the exact manifest is approved. An empty completed manifest is a no-target result and cannot broaden the request. Apply uses only approved identities. A later filter, action, or variation-policy change needs new preparation and approval.
+- Approved COR-005 observation: each candidate is judged on facts at its first recorded eligibility decision. Decisions persist across resume. A failed evaluation with no recorded decision may retry against later facts, visibly. The candidate cursor and accepted IDs are separate. Rejected pages still advance the cursor. IDs above H are excluded. An edit before evaluation uses updated facts. An edit after a recorded decision keeps that decision. A later match behind the cursor is not added. A disappeared product is unavailable and is not replaced. A lower-ID backfill is included only when first encountered ahead of the persisted cursor. An approved target that later changes is rechecked and returned stale without rewriting the manifest. A nonmember that matches after preparation is not added by Apply. Authorization stays COR-001. COR-004 exact filter identity stays.
+- Approved COR-005 counts: scanned identities with a recorded decision, accepted targets so far, and preparation state incomplete, complete, or failed. At completion the effective total is the unique approved manifest, not the SQL prefilter count. An interruption, work budget, empty or short accepted page, or failed query is not completion. The progress line does not show an exact percentage against an unproved denominator. An incomplete scan is never a completed zero-target job.
+- Branch: `fix/cor-005-007-scan-save`, from PR #52 head `1d62967b6559ee8390ddd8f787cc58ce2729c005`. The existing `fix/cor-004-006-catalog-worker` branch and the `fix/needs-attention-count-contract` checkout were not edited.
+- Integration editor: this Cursor WS3 session. Human ownership is unchanged. No other active lease was present on this worktree.
+- Environment: local PHP 8.5.0 and disposable MariaDB `cetech_cor004_catalog` on `127.0.0.1:33079`. The container `cetech-cor004-mariadb` was stopped after the SQL proof. No training, Pilot, FLAIROC, production, or live-site connection.
+- File lease for this checkpoint: catalog query and definition files, `BulkJobWorker.php`, `BulkJobWorkerDispatch.php`, `BulkJobAdminCopy.php`, `BulkToolsPage.php`, `assets/admin/bulk-tools.js`, the scan tests, this checkpoint, and `docs/COR-005-SCAN-PROGRESS-2026-10-06.md`. No schema. Preparation state is stored in the existing job summary and `checkpoint_cursor`. No new production PHP file. Installed production PHP remains 494 files.
+- COR-007 is approved and is the next batch on this same branch after this commit. Its file lease begins then: scoped configuration persistence, service, audit, command, result, and the callers required for the local completion boundary. P07 and P08 remain outside both leases.
 
 ## 2026-10-05 — COR-004 then COR-006 catalog identity and worker fencing
 

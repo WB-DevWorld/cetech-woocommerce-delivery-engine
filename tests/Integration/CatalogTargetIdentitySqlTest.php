@@ -119,6 +119,47 @@ final class CatalogTargetIdentitySqlTest extends TestCase {
 		$this->assert_unchanged();
 	}
 
+	public function test_scan_keeps_the_candidate_cursor_through_rejected_rows(): void {
+		$prefix = 'cor004_';
+		for ( $id = 5001; $id <= 5030; ++$id ) {
+			$this->pdo->exec( "INSERT INTO `{$prefix}posts` (ID, post_type, post_status, post_title) VALUES ({$id}, 'product', 'publish', 'Rejected {$id}')" );
+			$this->pdo->exec( "INSERT INTO `{$prefix}postmeta` (post_id, meta_key, meta_value) VALUES ({$id}, '_stock_status', 'outofstock')" );
+		}
+		$this->pdo->exec( "INSERT INTO `{$prefix}posts` (ID, post_type, post_status, post_title) VALUES (5031, 'product', 'publish', 'Late match')" );
+		$this->pdo->exec( "INSERT INTO `{$prefix}postmeta` (post_id, meta_key, meta_value) VALUES (5031, '_stock_status', 'instock')" );
+		$query = new WooCommerceCatalogTargetQuery();
+		$definition = new CatalogTargetDefinition(
+			BulkTargetScope::MatchingFilters,
+			[],
+			[ CatalogTargetFilters::STOCK_STATUS => 'instock' ],
+			[],
+			\CetechDeliveryEngine\Domain\Enum\BulkVariationPolicy::PreserveOverrides,
+			false,
+			CatalogTargetDefinition::TARGET_PRODUCT
+		);
+		$high = $query->catalog_ceiling( $definition );
+		$cursor = 5000;
+		$accepted = [];
+		$scanned = 0;
+		$guard = 0;
+		do {
+			$page = $query->scan_page( $definition, $cursor, 10, $high );
+			$scanned += $page['scanned'];
+			$cursor = $page['cursor'];
+			foreach ( $page['accepted'] as $target ) {
+				if ( $target->id >= 5001 ) {
+					$accepted[] = $target->id;
+				}
+			}
+			++$guard;
+		} while ( ! $page['exhausted'] && $cursor < 5031 && $guard < 20 );
+
+		self::assertGreaterThan( 5030, $high );
+		self::assertSame( [ 5031 ], $accepted );
+		self::assertGreaterThanOrEqual( 31, $scanned );
+		self::assertGreaterThanOrEqual( 5031, $cursor );
+	}
+
 	private function connect(): ?RealMysqliWpdb {
 		if ( ! class_exists( \PDO::class ) || ! in_array( 'mysql', \PDO::getAvailableDrivers(), true ) ) {
 			return null;
