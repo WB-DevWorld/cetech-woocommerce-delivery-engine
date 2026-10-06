@@ -2,6 +2,13 @@
 
 Status: RC.12 IMMUTABLE — PR #53 REPAIRS IN PROGRESS — UNMERGED — NOT RC.13
 
+## 2026-10-06 — PR #53 head 33cd6a0 review
+
+The owner confirmed again that only the owner and AI agents are working. This pass repairs the published review on head `33cd6a0104da5d81c00bc1122206c268aa0b1fea`. It is a technical review by the agent. It is not acceptance by Ben or Emmanuel. Historical ownership stays recorded. No merge, release, deployment, live-site write, tag change, schema, ledger, or outbox. P07 and P08 stay outside. COR-005 completes and is committed before COR-007.
+
+- COR-005 lease: compare the locked current scope identity with the transaction's hydrated snapshot, and refuse the write when they diverge. The item claim fence and the post-lock exclusion proof stay. No schema and no new production PHP file.
+- COR-005 proof, PHP 8.5.0: `tests/Unit/Bulk` is 186 tests / 1070 assertions, OK, 2 existing deprecations, including the 40,001 walk. SQL group `cor005-real-db`: 2 tests / 19 assertions. MariaDB `11.4.13`, session isolation `REPEATABLE-READ`, global `innodb_snapshot_isolation=0`. The worker's membership read opens the snapshot; a second connection then commits supplier 99. Apply returns `stale_target`, keeps the approved fingerprint, and leaves row identity, revision, and supplier 99 in place. The earlier lock-wait proof still keeps supplier 33 on the original row. That group is excluded from default `phpunit.xml`.
+
 ## 2026-10-06 — PR #53 repaired-head review
 
 The owner confirmed again that only the owner and AI agents are working. This pass repairs the remaining published review on head `8ad78c50326402a0bb14db05e2b45cc3b2628f0a`. It is a technical review by the agent. It is not acceptance by Ben or Emmanuel. Historical ownership stays recorded. No merge, release, deployment, live-site write, tag change, schema, ledger, or outbox. P07 and P08 stay outside. COR-005 completes and is committed before COR-007.
