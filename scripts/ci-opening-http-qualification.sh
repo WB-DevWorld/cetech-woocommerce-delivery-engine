@@ -384,7 +384,17 @@ for _ in range(30):
         if os.environ.get("CETECH_DE_HTTP_CRASH_DIAGNOSTIC") == "1":
             if not isinstance(runtime, dict) or runtime.get("sapi") != "cli-server" or runtime.get("php_version") != "8.5.11":
                 raise SystemExit("HTTP diagnostic listener runtime differs from the recorded crash environment")
+            extensions_hash = hashlib.sha256(json.dumps(runtime.get("extensions", {}), sort_keys=True, separators=(",", ":")).encode()).hexdigest()
+            comparisons = {
+                "binary": (runtime.get("php_binary_sha256"), os.environ.get("CETECH_DE_HTTP_EXPECT_BINARY_SHA256")),
+                "ini": (runtime.get("full_ini_sha256"), os.environ.get("CETECH_DE_HTTP_EXPECT_INI_SHA256")),
+                "extensions": (extensions_hash, os.environ.get("CETECH_DE_HTTP_EXPECT_EXTENSIONS_SHA256")),
+            }
+            runtime["extensions_sha256"] = extensions_hash
+            runtime["comparison_to_56855ba"] = {key: actual == expected_hash for key, (actual, expected_hash) in comparisons.items() if expected_hash}
             Path(os.environ["CETECH_DE_HTTP_PRIVATE_DIR"], "runtime.json").write_text(json.dumps(runtime) + "\n", encoding="utf-8")
+            if any(actual != expected_hash for actual, expected_hash in comparisons.values() if expected_hash):
+                raise SystemExit("HTTP diagnostic runtime fingerprint changed; refusing to treat this as the same-runtime experiment")
         os.kill(pid, 0)
         break
     except (OSError, ValueError):

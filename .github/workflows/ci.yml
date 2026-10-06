@@ -201,6 +201,8 @@ jobs:
           tools: composer:v2
           coverage: none
           extensions: mysqli, pdo_mysql, zip, mbstring, intl, xml, curl, gd, soap, bcmath
+        env:
+          debug: 'true'
       - name: Verify crash diagnostic output boundary
         run: python3 scripts/qualification/test-opening-http-native-stack.py
       - name: Install native crash debugger for the disposable HTTP listener
@@ -210,6 +212,9 @@ jobs:
           CETECH_DE_NATIVE_OPENING_QUALIFICATION: '1'
           CETECH_DE_HTTP_OPENING_QUALIFICATION: '1'
           CETECH_DE_HTTP_CRASH_DIAGNOSTIC: '1'
+          CETECH_DE_HTTP_EXPECT_BINARY_SHA256: '7dda44e554d086c1c4f441796fc19f11f46055c0a276dad66181f6c11566e46a'
+          CETECH_DE_HTTP_EXPECT_INI_SHA256: 'a0e4940c0a48d65a50eca849f62d052a7e3e4727a720308c65d7d9dfc840adaf'
+          CETECH_DE_HTTP_EXPECT_EXTENSIONS_SHA256: '5f6a8290cb266b26630ec6a72299175906d3aeba788610acd3783d36c8cc0ac3'
           CETECH_DE_WP_VERSION: '7.1.2'
           CETECH_DE_WOO_VERSION: '11.1.2'
           CETECH_DE_QUALIFICATION_CANDIDATE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
