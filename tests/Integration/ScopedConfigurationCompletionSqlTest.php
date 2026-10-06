@@ -215,7 +215,7 @@ final class ScopedConfigurationCompletionSqlTest extends TestCase {
 		self::assertTrue( $service->reset( ConfigurationScopeType::Product, 101, 'in_store', null, (int) $row['config_version'], 'reset-slice', (int) $row['id'] ) );
 		self::assertNull( $this->slice_priority( $this->reader, 'in_store' ) );
 		$after_reset = $this->audit_count( $this->reader );
-		self::assertTrue( $service->reset( ConfigurationScopeType::Product, 101, 'in_store', null, (int) $row['config_version'], 'reset-slice', (int) $row['id'] ) );
+		self::assertFalse( $service->reset( ConfigurationScopeType::Product, 101, 'in_store', null, (int) $row['config_version'], 'reset-slice', (int) $row['id'] ) );
 		self::assertTrue( $service->reset_was_replayed() );
 		self::assertSame( $after_reset, $this->audit_count( $this->reader ) );
 		try {

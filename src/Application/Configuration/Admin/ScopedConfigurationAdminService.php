@@ -313,7 +313,7 @@ final class ScopedConfigurationAdminService {
 				$this->reset_replayed = true;
 				$this->resolver->clearMemoization();
 
-				return true;
+				return null !== $previous;
 			}
 		}
 		if ( null === $previous ) {
