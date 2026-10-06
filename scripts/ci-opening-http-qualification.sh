@@ -105,13 +105,34 @@ finish_http_fixture() {
     elif [[ "$MU_CREATED" == "0" ]]; then
         MU_REMOVED=1
     fi
+    local db_connect="absent"
+    local db_wait_ms=""
+    if [[ -n "${CETECH_DE_WP_DB_PORT:-}" ]]; then
+        local db_probe=""
+        db_probe="$(python3 - <<'PY'
+import os, socket, time
+port = int(os.environ.get("CETECH_DE_WP_DB_PORT", "0") or "0")
+started = time.monotonic()
+result = "unanswered"
+if port > 0:
+    try:
+        with socket.create_connection(("127.0.0.1", port), 2):
+            result = "connected"
+    except OSError:
+        result = "unanswered"
+print(result + " " + str(int((time.monotonic() - started) * 1000)))
+PY
+)"
+        db_connect="${db_probe%% *}"
+        db_wait_ms="${db_probe##* }"
+    fi
     # Retain only an allowlisted diagnostic code/class and a one-way log hash.
     # Raw WP-CLI/bootstrap output, paths, SQL, credentials and payloads stay
     # private and are deleted immediately below, including on early failures.
     local diagnostic_log="$PRIVATE/import-prepare-command.log"
     if [[ "$QUALIFICATION_STAGE" == "origin_preflight" ]]; then diagnostic_log="$PRIVATE/origin-preflight-command.log"; fi
     if [[ "$QUALIFICATION_STAGE" == "http_driver" || "$QUALIFICATION_STAGE" == "complete" ]]; then diagnostic_log="$PRIVATE/php-server.log"; fi
-    python3 - "$RECEIPT" "$diagnostic_log" "$QUALIFICATION_STAGE" "$PRIVATE/origin-preflight-output.json" "$listener_exit" "$listener_signal" "$PRIVATE/php-server.log" <<'PY'
+    python3 - "$RECEIPT" "$diagnostic_log" "$QUALIFICATION_STAGE" "$PRIVATE/origin-preflight-output.json" "$listener_exit" "$listener_signal" "$PRIVATE/php-server.log" "$db_connect" "$db_wait_ms" <<'PY'
 import hashlib, json, re, sys
 from pathlib import Path
 receipt = Path(sys.argv[1])
@@ -171,6 +192,8 @@ report["fixture_diagnostic"] = {
     "listener_signal_before_cleanup": sys.argv[6] or None if len(sys.argv) > 6 else None,
     "server_log_present": server_log.is_file(),
     "server_log_sha256": hashlib.sha256(server_log.read_bytes()).hexdigest() if server_log.is_file() else None,
+    "database_connect_before_cleanup": sys.argv[8] if len(sys.argv) > 8 and sys.argv[8] in ("connected", "unanswered", "absent") else "absent",
+    "database_connect_wait_ms": int(sys.argv[9]) if len(sys.argv) > 9 and sys.argv[9].isdigit() else None,
 }
 origin_path = Path(sys.argv[4])
 if origin_path.is_file():

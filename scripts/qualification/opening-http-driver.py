@@ -16,10 +16,12 @@ import json
 import os
 from pathlib import Path
 import re
+import socket
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, urlencode, urljoin, urlsplit, urlunsplit
 from urllib.request import build_opener, HTTPCookieProcessor, HTTPRedirectHandler, ProxyHandler, Request
 
@@ -172,12 +174,28 @@ class Response:
     body: bytes
     headers: dict[str, str]
     url: str
+    ordinal: int = 0
+    method: str = ""
+    elapsed_ms: int = 0
+    headers_ms: int = 0
+    body_ms: int = 0
 
     def page(self) -> Page:
         return Page(self.body.decode("utf-8", "replace"))
 
     def evidence(self) -> dict:
-        evidence = {"status": self.status, "route": redacted_route(self.url), "body_sha256": hashlib.sha256(self.body).hexdigest(), "body_bytes": len(self.body)}
+        evidence = {
+            "ordinal": self.ordinal,
+            "method": self.method,
+            "status": self.status,
+            "route": redacted_route(self.url),
+            "elapsed_ms": self.elapsed_ms,
+            "headers_ms": self.headers_ms,
+            "body_ms": self.body_ms,
+            "phase": "body",
+            "body_sha256": hashlib.sha256(self.body).hexdigest(),
+            "body_bytes": len(self.body),
+        }
         if "location" in self.headers:
             evidence["location"] = redacted_route(self.headers["location"])
         return evidence
@@ -186,6 +204,9 @@ class Response:
 class NoRedirect(HTTPRedirectHandler):
     def redirect_request(self, request, fp, code, msg, headers, newurl):
         return None
+
+
+REQUEST_OBSERVATION: dict = {}
 
 
 class HttpClient:
@@ -197,6 +218,8 @@ class HttpClient:
         self.origin = (parts.scheme, parts.hostname, parts.port)
         self.cookies = http.cookiejar.CookieJar()
         self.opener = build_opener(ProxyHandler({}), HTTPCookieProcessor(self.cookies), NoRedirect())
+        self.ordinal = 0
+        self.started = time.monotonic()
 
     def resolve(self, url: str) -> str:
         resolved = urljoin(self.base_url + "/", url)
@@ -206,6 +229,7 @@ class HttpClient:
         return resolved
 
     def request(self, url: str, fields: dict | None = None, extra_headers: dict | None = None) -> Response:
+        global REQUEST_OBSERVATION
         target = self.resolve(url)
         data = urlencode(fields).encode("utf-8") if fields is not None else None
         headers = {"User-Agent": "CETECH-Opening-HTTP-Qualification/1", "Accept": "text/html,application/json"}
@@ -215,15 +239,40 @@ class HttpClient:
             headers["Origin"] = self.base_url
             headers["Referer"] = target
         request = Request(target, data=data, headers=headers)
+        self.ordinal += 1
+        method = "POST" if fields is not None else "GET"
+        started = time.monotonic()
+        phase = "connect"
+        REQUEST_OBSERVATION = {
+            "ordinal": self.ordinal,
+            "method": method,
+            "route": redacted_route(target),
+            "phase": phase,
+            "elapsed_ms": 0,
+            "monotonic_ms": int((started - self.started) * 1000),
+        }
         try:
-            response = self.opener.open(request, timeout=20)
-        except HTTPError as error:
-            response = error
-        with response:
-            body = response.read(2 * 1024 * 1024 + 1)
+            try:
+                response = self.opener.open(request, timeout=20)
+            except HTTPError as error:
+                response = error
+            phase = "headers"
+            headers_ms = int((time.monotonic() - started) * 1000)
+            REQUEST_OBSERVATION["phase"] = phase
+            REQUEST_OBSERVATION["elapsed_ms"] = headers_ms
+            with response:
+                body = response.read(2 * 1024 * 1024 + 1)
             if len(body) > 2 * 1024 * 1024:
                 raise RuntimeError("Qualification response exceeded bounded size")
-            return Response(response.code, body, {key.lower(): value for key, value in response.headers.items()}, target)
+            elapsed_ms = int((time.monotonic() - started) * 1000)
+            REQUEST_OBSERVATION["phase"] = "body"
+            REQUEST_OBSERVATION["elapsed_ms"] = elapsed_ms
+            return Response(response.code, body, {key.lower(): value for key, value in response.headers.items()}, target, self.ordinal, method, elapsed_ms, headers_ms, max(0, elapsed_ms - headers_ms))
+        except (TimeoutError, socket.timeout, URLError, OSError) as error:
+            REQUEST_OBSERVATION["phase"] = phase
+            REQUEST_OBSERVATION["elapsed_ms"] = int((time.monotonic() - started) * 1000)
+            REQUEST_OBSERVATION["error_class"] = type(error).__name__
+            raise
 
     def get(self, url: str, headers: dict | None = None) -> Response:
         return self.request(url, extra_headers=headers)
@@ -480,6 +529,9 @@ def main() -> int:
             module.run_configuration(HttpClient(configuration_state["base_url"]), configuration_state, configuration_bridge, recorder, Page, login)
     except Exception as failure:
         error = type(failure).__name__ + ": HTTP qualification failed; inspect recorded case status and private runner logs"
+        if REQUEST_OBSERVATION:
+            recorder.report["request_observation"] = {key: value for key, value in REQUEST_OBSERVATION.items() if key in ("ordinal", "method", "route", "phase", "elapsed_ms", "monotonic_ms", "error_class")}
+            recorder.write()
     finally:
         if prepared or bridge.state_path.is_file():
             try:

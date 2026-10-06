@@ -184,8 +184,7 @@ def run_configuration(client, state, bridge, recorder, Page, login):
                    {"actor": state["user_id"], "authority": authority,
                     "limit": "Native variation primitive does not grant parent edit authority."})
 
-    login(client, state, target_url, recorder, prefix + "LOGIN-")
-    response = client.get(target_url)
+    response = login(client, state, target_url, recorder, prefix + "LOGIN-")
     form = form_for(response, save_action)
     required = {"cetech_de_action": save_action, **{key: value for key, value in target.items() if key != "customize"}}
     recorder.check(prefix + "RENDERED-EXACT-SLICE-SAVE-FORM",
