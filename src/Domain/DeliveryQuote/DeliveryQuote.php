@@ -91,6 +91,13 @@ final readonly class DeliveryQuote implements \JsonSerializable {
 	private function supported_terms(): bool {
 		if ( null === $this->original_terms ) { return false; }
 		foreach ( $this->original_terms->private_facts()['groups'] as $group ) {
+			if ( 'legacy_fixed_base_v1' === $this->original_header->profile() ) {
+				if ( $group['provider'] !== [ 'code' => 'legacy_fixed_base_v1', 'version' => 1 ]
+					|| 'none' !== $group['promotion']['state'] || $group['promotion']['provider'] !== [ 'code' => 'native_no_delivery_promotion_v1', 'version' => 1 ]
+					|| 'unavailable' !== $group['cost']['state'] || 'not_recorded' !== $group['route']['state']
+					|| 'recorded' !== $group['native_tax_receipt']['state'] || 'recorded' !== $group['native_money_receipt']['state'] ) { return false; }
+				continue;
+			}
 			if ( $group['provider'] !== [ 'code' => 'fixture_v1', 'version' => 1 ] ) { return false; }
 			foreach ( [ 'promotion', 'cost', 'route' ] as $section ) {
 				if ( isset( $group[$section]['provider'] ) && ( 1 !== $group[$section]['provider']['version'] || ! in_array( $group[$section]['provider']['code'], [ 'fixture_v1', 'fixture_none_v1', 'fixture_cost_v1', 'fixture_route_v1' ], true ) ) ) { return false; }

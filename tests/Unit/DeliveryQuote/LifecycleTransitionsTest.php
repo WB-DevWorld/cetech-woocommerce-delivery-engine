@@ -18,6 +18,27 @@ use PHPUnit\Framework\TestCase;
 require_once dirname( __DIR__, 2 ) . '/Support/DeliveryQuote/QuoteFixtures.php';
 
 final class LifecycleTransitionsTest extends TestCase {
+	public function test_finite_legacy_profile_can_be_accepted_without_admitting_unknown_providers(): void {
+		$context = QuoteFixtures::context(); $facts = QuoteFixtures::terms()->private_facts();
+		$facts['groups'][0]['provider'] = [ 'code' => 'legacy_fixed_base_v1', 'version' => 1 ];
+		$facts['groups'][0]['promotion']['provider'] = [ 'code' => 'native_no_delivery_promotion_v1', 'version' => 1 ];
+		$terms = QuoteTerms::from_array( $facts ); $id = \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteId::generate();
+		$header = QuoteHeader::issue( $id, QuoteFixtures::owner(), $context, $terms, QuoteFixtures::time(), [ 'issue' => QuoteFixtures::digest( 'issue' ), 'accept' => QuoteFixtures::digest( 'accept' ), 'invalidate' => QuoteFixtures::digest( 'invalidate' ) ], 'legacy_fixed_base_v1', 1, QuoteFixtures::reference( $id ) );
+		$quote = DeliveryQuote::issue( $header, $context, $terms );
+		self::assertNull( $quote->reason_at( QuoteFixtures::time(), $context ) );
+		self::assertSame( 'accepted', $quote->accept( QuoteFixtures::owner(), QuoteFixtures::reference( $id ), $context, QuoteFixtures::time(), 1, $header->body_digest(), $header->expires_at() )->state() );
+		foreach ( [ [ 'code' => 'legacy_fixed_base_v1', 'version' => 2 ], [ 'code' => 'unknown_price_provider', 'version' => 1 ] ] as $provider ) {
+			$changed = $facts; $changed['groups'][0]['provider'] = $provider;
+			$other_terms = QuoteTerms::from_array( $changed );
+			$other_header = QuoteHeader::issue( $id, QuoteFixtures::owner(), $context, $other_terms, QuoteFixtures::time(), $header->namespace_hashes(), 'legacy_fixed_base_v1', 1, QuoteFixtures::reference( $id ) );
+			self::assertSame( 'quote_unavailable', DeliveryQuote::issue( $other_header, $context, $other_terms )->reason_at( QuoteFixtures::time(), $context ) );
+		}
+		$changed = $facts; $changed['groups'][0]['promotion']['provider'] = [ 'code' => 'fixture_none_v1', 'version' => 1 ];
+		$other_terms = QuoteTerms::from_array( $changed );
+		$other_header = QuoteHeader::issue( $id, QuoteFixtures::owner(), $context, $other_terms, QuoteFixtures::time(), $header->namespace_hashes(), 'legacy_fixed_base_v1', 1, QuoteFixtures::reference( $id ) );
+		self::assertSame( 'quote_unavailable', DeliveryQuote::issue( $other_header, $context, $other_terms )->reason_at( QuoteFixtures::time(), $context ) );
+	}
+
 	public function test_typed_unknown_current_evidence_does_not_fabricate_invalidation(): void {
 		$quote = QuoteFixtures::issue(); $base = QuoteFixtures::context()->private_facts(); $variants = [];
 		$facts = $base; $facts['lines'][0]['inventory']['status'] = 'unknown'; $variants[] = $facts;

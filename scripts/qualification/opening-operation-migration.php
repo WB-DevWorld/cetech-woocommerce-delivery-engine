@@ -113,11 +113,11 @@ return static function ( callable $check ): void {
 		if ( null !== $filter ) { remove_filter( 'query', $filter ); }
 		$wpdb = $original;
 		foreach ( $owned as $table ) { OperationProofDatabase::execute( $physical, "DROP TABLE IF EXISTS `{$table}`" ); }
-		if ( $isolated instanceof wpdb ) { $isolated->close(); }
+		if ( $isolated instanceof wpdb ) { remove_filter( 'query', [ $isolated, 'remove_placeholder_escape' ], 0 ); $isolated->close(); }
 		$physical->close();
 	}
 	$check( 'NATIVE-C03-DBDELTA-LEGACY-SCHEMA-SENTINELS-PRESERVED', $wpdb === $original && $before_main === $snapshot_main(),
 		[ 'legacy_tables_checked' => count( $before_main ) - 1, 'bounded_rows_per_table' => 100, 'schema_options_written' => false ] );
 	$remaining = $original->get_var( $original->prepare( 'SHOW TABLES LIKE %s', $original->esc_like( $prefix ) . '%' ) );
-	$check( 'NATIVE-C03-DBDELTA-OWNED-TABLES-CLEANED', null === $remaining && '' === $original->last_error && $wpdb === $original );
+	$check( 'NATIVE-C03-DBDELTA-OWNED-TABLES-CLEANED', null === $remaining && '' === $original->last_error && $wpdb === $original && false === has_filter( 'query', [ $isolated, 'remove_placeholder_escape' ] ) );
 };

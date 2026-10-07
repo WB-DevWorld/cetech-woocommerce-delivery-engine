@@ -174,11 +174,11 @@ return static function ( callable $check ): void {
 		$order->delete( true ); delete_option( $foreign_option );
 		$sentinels_cleaned = false === wc_get_order( $order_id ) && false === get_option( $foreign_option, false );
 		foreach ( $owned as $table ) { OperationProofDatabase::execute( $physical, "DROP TABLE IF EXISTS `{$table}`" ); }
-		if ( $isolated instanceof wpdb ) { $isolated->close(); }
+		if ( $isolated instanceof wpdb ) { remove_filter( 'query', [ $isolated, 'remove_placeholder_escape' ], 0 ); $isolated->close(); }
 		$physical->close();
 	}
 	$check( 'NATIVE-C04-DBDELTA-LEGACY-SCHEMA-SENTINELS-PRESERVED', $wpdb === $original && $main_preserved,
 		[ 'legacy_and_operation_tables_checked' => count( $before_main ) - 3, 'bounded_rows_per_table' => 100, 'foreign_option_and_order_meta_preserved' => $main_preserved, 'schema_options_written' => false ] );
 	$remaining = $original->get_var( $original->prepare( 'SHOW TABLES LIKE %s', $original->esc_like( $prefix ) . '%' ) );
-	$check( 'NATIVE-C04-DBDELTA-OWNED-TABLES-CLEANED', null === $remaining && '' === $original->last_error && $wpdb === $original && $sentinels_cleaned );
+	$check( 'NATIVE-C04-DBDELTA-OWNED-TABLES-CLEANED', null === $remaining && '' === $original->last_error && $wpdb === $original && $sentinels_cleaned && false === has_filter( 'query', [ $isolated, 'remove_placeholder_escape' ] ) );
 };

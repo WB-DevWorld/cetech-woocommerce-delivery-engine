@@ -1,0 +1,104 @@
+<?php
+
+declare(strict_types=1);
+namespace CetechDeliveryEngine\Tests\Unit\DeliveryQuote;
+use PHPUnit\Framework\Attributes\DataProvider;
+use PHPUnit\Framework\TestCase;
+/** Isolated PHP fake-native shapes prove the pure fence; actual Woo is a separate native qualification. */
+final class NativeBindingTest extends TestCase {
+ #[DataProvider('changes')]
+ public function test_pure_binding_detects_native_reference_state_and_option_callback_changes(string $change):void {
+  [$status,$stdout,$stderr]=$this->probe($change);
+  self::assertSame(0,$status,self::diagnostic($stdout,$stderr));self::assertSame('PASS',$stdout);self::assertSame(0,strlen($stderr),'Isolated child wrote unexpected diagnostics.');
+ }
+ public function test_isolated_child_failure_reports_only_finite_phase_and_error_class():void {
+  [$status,$stdout,$stderr]=$this->probe('probe_throw');
+  self::assertSame(86,$status);self::assertSame(['status'=>'FAIL','phase'=>'binding','error_class'=>'RuntimeException'],json_decode($stdout,true));self::assertSame(0,strlen($stderr));self::assertStringNotContainsString('private-child-sentinel',$stdout);
+ }
+ /** @return array{int,string,string} Raw stderr stays private and is never included in a PHPUnit failure. */
+ private function probe(string $change):array {
+  $autoload=dirname(__DIR__,3).'/vendor/autoload.php';
+  $code= <<<'CODE'
+$phase='bootstrap';$reported=false;
+register_shutdown_function(static function()use(&$phase,&$reported):void{$error=error_get_last();if(!$reported&&null!==$error&&in_array($error['type'],[E_ERROR,E_PARSE,E_CORE_ERROR,E_COMPILE_ERROR,E_USER_ERROR,E_RECOVERABLE_ERROR],true)){$reported=true;echo json_encode(['status'=>'FAIL','phase'=>$phase,'error_class'=>'EngineFatalError']);}});
+try{
+require $argv[1];
+$phase='setup';
+class WC_Shipping {protected static $_instance; public array $packages=[];public static function install(object $o):void{self::$_instance=$o;}}
+class WC_Shipping_Method {public string $id='';public array $supports=[];}
+class WC_Shipping_Rate {public function __construct(private string $id){}public function get_id():string{return $this->id;}}
+class WC_Product {public array $data=[];public array $changes=[];}
+class WC_Cart_Session {protected object $cart;public static int $calls=0;public function __construct(object $cart){$this->cart=$cart;}public function set_cart(object $cart):void{$this->cart=$cart;}public function set_session():never{++self::$calls;throw new LogicException('Native callback must not execute.');}}
+class WP_Hook {public array $callbacks=[];}
+class WC_Deprecated_Filter_Hooks {protected array $deprecated_hooks=['woocommerce_product_get_tax_class'=>'woocommerce_product_tax_class'];public static int $calls=0;public function maybe_handle_deprecated_hook():never{++self::$calls;throw new LogicException('Native callback must not execute.');}public function remap(string $target):void{$this->deprecated_hooks['woocommerce_product_get_tax_class']=$target;}}
+eval('namespace Automattic\\WooCommerce\\Blocks\\Shipping; class ShippingController {public static int $calls=0;public function filter_shipping_packages():never{++self::$calls;throw new \\LogicException("Native callback must not execute.");}public function remove_shipping_if_no_address():never{++self::$calls;throw new \\LogicException("Native callback must not execute.");}public function register_local_pickup_method():never{++self::$calls;throw new \\LogicException("Native callback must not execute.");}public function filter_taxable_address():never{++self::$calls;throw new \\LogicException("Native callback must not execute.");}}');
+function has_filter(string $hook):int|false{return isset($GLOBALS['wp_filter'][$hook])?0:false;}
+$shipping=new WC_Shipping();WC_Shipping::install($shipping);
+$cart=(object)['cart_contents'=>[],'totals'=>['shipping_total'=>'1'],'shipping_methods'=>[],'cart_context'=>'shortcode'];
+$wc=(object)['cart'=>$cart,'customer'=>(object)['data'=>[]],'session'=>(object)['_data'=>[]],'countries'=>(object)[]];
+$GLOBALS['woocommerce']=$wc;$GLOBALS['blog_id']=1;$GLOBALS['current_user']=(object)['ID'=>0];$GLOBALS['wp_filter']=[];
+$source=new CetechDeliveryEngine\Application\DeliveryQuote\QuoteNativeWooSource();
+foreach(['wc'=>$wc,'objects'=>[$cart,$wc->customer,$wc->session,$shipping],'site'=>1,'user'=>0,'option_names'=>['woocommerce_currency','woocommerce_shipping_cost_requires_address']] as $name=>$value){(new ReflectionProperty($source,$name))->setValue($source,$value);}
+$phase='hooks';
+if(str_starts_with($argv[2],'chosen_')){$m=new ReflectionMethod($source,'chosen_methods_match');$selected=[new WC_Shipping_Rate('delivery_engine_selected_offer:1:fixture')];$chosen=match($argv[2]){'chosen_same'=>['delivery_engine_selected_offer:1:fixture'],'chosen_pickup'=>['pickup_location:1'],'chosen_missing'=>[],'chosen_extra'=>['delivery_engine_selected_offer:1:fixture','delivery_engine_selected_offer:2:other'],'chosen_wrong_type'=>[1],'chosen_wrong_index'=>[1=>'delivery_engine_selected_offer:1:fixture']};if($m->invoke(null,$selected,$chosen)!==($argv[2]==='chosen_same')){echo 'SELECTED-SESSION-MISSED';exit(13);}echo 'PASS';exit(0);}
+if(str_starts_with($argv[2],'managed_method_')){$method=(new ReflectionClass(CetechDeliveryEngine\Infrastructure\WooCommerce\Shipping\SelectedOfferShippingMethod::class))->newInstanceWithoutConstructor();$method->id='delivery_engine_selected_offer';$method->supports=['shipping-zones','instance-settings'];$managed=new ReflectionMethod($source,'managed_delivery_method');if(!$managed->invoke(null,$method)){echo 'MANAGED-METHOD-DENIED';exit(14);}(new ReflectionProperty($source,'objects'))->setValue($source,[$cart,$wc->customer,$wc->session,$shipping,$method]);}
+if(str_starts_with($argv[2],'shipping_controller_')){$controller=new Automattic\WooCommerce\Blocks\Shipping\ShippingController();foreach([['woocommerce_shipping_packages','filter_shipping_packages',10],['woocommerce_shipping_packages','remove_shipping_if_no_address',11],['woocommerce_local_pickup_methods','register_local_pickup_method',10],['woocommerce_customer_taxable_address','filter_taxable_address',10]] as [$hook,$method,$priority]){$h=$GLOBALS['wp_filter'][$hook]??new WP_Hook();$h->callbacks[$priority][]= ['function'=>[$controller,$method],'accepted_args'=>1];$GLOBALS['wp_filter'][$hook]=$h;}$retained=[];if(!(new ReflectionMethod($source,'hooks_supported'))->invokeArgs(null,[[],&$retained])){echo 'SHIPPING-CONTROLLER-DENIED';exit(11);}(new ReflectionProperty($source,'hook_objects'))->setValue($source,$retained);unset($controller,$h,$retained);}
+if(str_starts_with($argv[2],'cart_session_')){$cart_session=new WC_Cart_Session($cart);$h=new WP_Hook();$h->callbacks=[1000=>[['function'=>[$cart_session,'set_session'],'accepted_args'=>1]]];$GLOBALS['wp_filter']['woocommerce_after_calculate_totals']=$h;$retained=[];if(!(new ReflectionMethod($source,'hooks_supported'))->invokeArgs(null,[[],&$retained])){echo 'CART-SESSION-DENIED';exit(12);}(new ReflectionProperty($source,'hook_objects'))->setValue($source,$retained);unset($cart_session,$h,$retained);}
+if(str_starts_with($argv[2],'tax_bridge_')){$bridge=new WC_Deprecated_Filter_Hooks();$h=new WP_Hook();$h->callbacks=[-1000=>[['function'=>[$bridge,'maybe_handle_deprecated_hook'],'accepted_args'=>8]]];$GLOBALS['wp_filter']['woocommerce_product_get_tax_class']=$h;$retained=[];if(!(new ReflectionMethod($source,'hooks_supported'))->invokeArgs(null,[[],&$retained])){echo 'TAX-BRIDGE-DENIED';exit(9);}(new ReflectionProperty($source,'hook_objects'))->setValue($source,$retained);unset($bridge,$h,$retained);}
+if($argv[2]==='retained_decorator'){$h=new WP_Hook();$runtime=(new ReflectionClass(CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime::class))->newInstanceWithoutConstructor();$h->callbacks=[PHP_INT_MAX=>[['function'=>[$runtime,'decorate_packages'],'accepted_args'=>1]]];$GLOBALS['wp_filter']['woocommerce_cart_shipping_packages']=$h;if(!(new ReflectionMethod($source,'hooks_supported'))->invoke(null,[])){echo 'RETAINED-DECORATOR-DENIED';exit(8);}}
+if($argv[2]==='core_label_same'){$h=new WP_Hook();$h->callbacks=[10=>[['function'=>'sanitize_text_field','accepted_args'=>1]]];$GLOBALS['wp_filter']['woocommerce_shipping_rate_label']=$h;if(!(new ReflectionMethod($source,'hooks_supported'))->invoke(null,[])){echo 'CORE-LABEL-DENIED';exit(6);}}
+$phase='binding';if($argv[2]==='probe_throw'){throw new RuntimeException('private-child-sentinel');}
+$m=new ReflectionMethod($source,'raw_binding');$digest=$m->invoke($source);(new ReflectionProperty($source,'binding'))->setValue($source,$digest);
+$phase='baseline';
+if(!$source->unchanged()){echo 'BASELINE-FAIL';exit(2);}
+if(in_array($argv[2],['core_label_same','retained_decorator','tax_bridge_same','shipping_controller_same','cart_session_same','managed_method_same'],true)){if(!$source->unchanged()||WC_Deprecated_Filter_Hooks::$calls!==0||WC_Cart_Session::$calls!==0||Automattic\WooCommerce\Blocks\Shipping\ShippingController::$calls!==0){echo 'CORE-LABEL-FENCE-DENIED';exit(7);}echo 'PASS';exit(0);}
+$phase='mutation';switch($argv[2]){
+case 'cart':$wc->cart=clone $cart;break;
+case 'customer':$wc->customer=clone $wc->customer;break;
+case 'session':$wc->session=clone $wc->session;break;
+case 'shipping':WC_Shipping::install(new WC_Shipping());break;
+case 'shipping_controller_replacement':$GLOBALS['wp_filter']['woocommerce_shipping_packages']->callbacks[10][0]['function'][0]=new Automattic\WooCommerce\Blocks\Shipping\ShippingController();break;
+case 'shipping_controller_subclass':$GLOBALS['wp_filter']['woocommerce_shipping_packages']->callbacks[10][0]['function'][0]=new class extends Automattic\WooCommerce\Blocks\Shipping\ShippingController {};break;
+case 'shipping_controller_static':$GLOBALS['wp_filter']['woocommerce_shipping_packages']->callbacks[10][0]['function'][0]=Automattic\WooCommerce\Blocks\Shipping\ShippingController::class;break;
+case 'shipping_controller_priority':$GLOBALS['wp_filter']['woocommerce_shipping_packages']->callbacks[12]=$GLOBALS['wp_filter']['woocommerce_shipping_packages']->callbacks[11];unset($GLOBALS['wp_filter']['woocommerce_shipping_packages']->callbacks[11]);break;
+case 'shipping_controller_args':$GLOBALS['wp_filter']['woocommerce_shipping_packages']->callbacks[10][0]['accepted_args']=2;break;
+case 'shipping_controller_context':$cart->cart_context='store-api';break;
+case 'shipping_controller_option':$h=new WP_Hook();$h->callbacks=[0=>[['function'=>'foreign_shipping_visibility','accepted_args'=>1]]];$GLOBALS['wp_filter']['option_woocommerce_shipping_cost_requires_address']=$h;break;
+case 'shipping_controller_supports_filter':$h=new WP_Hook();$h->callbacks=[0=>[['function'=>'foreign_pickup_support','accepted_args'=>3]]];$GLOBALS['wp_filter']['woocommerce_shipping_method_supports']=$h;break;
+case 'cart_session_cart':$GLOBALS['wp_filter']['woocommerce_after_calculate_totals']->callbacks[1000][0]['function'][0]->set_cart(clone $cart);break;
+case 'cart_session_replacement':$GLOBALS['wp_filter']['woocommerce_after_calculate_totals']->callbacks[1000][0]['function'][0]=new WC_Cart_Session($cart);break;
+case 'cart_session_subclass':$GLOBALS['wp_filter']['woocommerce_after_calculate_totals']->callbacks[1000][0]['function'][0]=new class($cart) extends WC_Cart_Session {};break;
+case 'cart_session_static':$GLOBALS['wp_filter']['woocommerce_after_calculate_totals']->callbacks[1000][0]['function'][0]=WC_Cart_Session::class;break;
+case 'cart_session_args':$GLOBALS['wp_filter']['woocommerce_after_calculate_totals']->callbacks[1000][0]['accepted_args']=2;break;
+case 'managed_method_pickup':$method->supports[]='local-pickup';if($managed->invoke(null,$method)){echo 'PICKUP-SUPPORT-MISSED';exit(15);}break;
+case 'managed_method_id':$method->id='pickup_location';if($managed->invoke(null,$method)){echo 'PICKUP-ID-MISSED';exit(15);}break;
+case 'tax_bridge_mapping':$GLOBALS['wp_filter']['woocommerce_product_get_tax_class']->callbacks[-1000][0]['function'][0]->remap('foreign_tax_class');break;
+case 'tax_bridge_oldhook':$h=new WP_Hook();$h->callbacks=[0=>[['function'=>'foreign_tax_class','accepted_args'=>1]]];$GLOBALS['wp_filter']['woocommerce_product_tax_class']=$h;break;
+case 'tax_bridge_replacement':$GLOBALS['wp_filter']=[];$bridge=new WC_Deprecated_Filter_Hooks();$h=new WP_Hook();$h->callbacks=[-1000=>[['function'=>[$bridge,'maybe_handle_deprecated_hook'],'accepted_args'=>8]]];$GLOBALS['wp_filter']['woocommerce_product_get_tax_class']=$h;unset($bridge,$h);break;
+case 'tax_bridge_subclass':$bridge=new class extends WC_Deprecated_Filter_Hooks {};$GLOBALS['wp_filter']['woocommerce_product_get_tax_class']->callbacks[-1000][0]['function'][0]=$bridge;break;
+case 'tax_bridge_priority':$GLOBALS['wp_filter']['woocommerce_product_get_tax_class']->callbacks=[-999=>$GLOBALS['wp_filter']['woocommerce_product_get_tax_class']->callbacks[-1000]];break;
+case 'tax_bridge_args':$GLOBALS['wp_filter']['woocommerce_product_get_tax_class']->callbacks[-1000][0]['accepted_args']=7;break;
+case 'tax_bridge_args_bool':$GLOBALS['wp_filter']['woocommerce_product_get_tax_class']->callbacks[-1000][0]['accepted_args']=true;break;
+case 'core_label_foreign':case 'core_label_priority':case 'core_label_args':case 'core_label_args_bool':
+$h=new WP_Hook();$h->callbacks=[($argv[2]==='core_label_priority'?11:10)=>[['function'=>($argv[2]==='core_label_foreign'?'foreign_label':'sanitize_text_field'),'accepted_args'=>($argv[2]==='core_label_args'?2:($argv[2]==='core_label_args_bool'?true:1))]]];$GLOBALS['wp_filter']['woocommerce_shipping_rate_label']=$h;if((new ReflectionMethod($source,'hooks_supported'))->invoke(null,[])){echo 'ALTERED-CORE-CALLBACK-MISSED';exit(5);}break;
+case 'option_filter_zero':
+case 'option_filter':$h=new WP_Hook();$h->callbacks=[10=>[['function'=>'foreign_money_callback']]];$GLOBALS['wp_filter']['option_woocommerce_currency']=$h;break;
+case 'total':$cart->totals['shipping_total']='2';break;
+case 'cycle':$a=[];$a['self']=&$a;$cart->totals=$a;break;
+case 'supported_cycle':$p=new WC_Product();$p->data['self']=$p;$cart->cart_contents=['line'=>['data'=>$p]];break;
+case 'large':$cart->totals=array_fill(0,5000,'x');break;
+}
+if($argv[2]==='option_filter_zero'){if((new ReflectionMethod($source,'hooks_supported'))->invoke(null,['woocommerce_currency'])){echo 'ZERO-PRIORITY-MISSED';exit(4);}}
+$phase='assertion';if((str_starts_with($argv[2],'tax_bridge_')&&$argv[2]!=='tax_bridge_replacement')||(str_starts_with($argv[2],'shipping_controller_')&&$argv[2]!=='shipping_controller_context')||(str_starts_with($argv[2],'cart_session_')&&$argv[2]!=='cart_session_replacement')){if((new ReflectionMethod($source,'hooks_supported'))->invoke(null,['woocommerce_shipping_cost_requires_address'])){echo 'ALTERED-NATIVE-HELPER-MISSED';exit(10);}}if($source->unchanged()||WC_Deprecated_Filter_Hooks::$calls!==0||WC_Cart_Session::$calls!==0||Automattic\WooCommerce\Blocks\Shipping\ShippingController::$calls!==0){echo 'MUTATION-MISSED';exit(3);}$phase='complete';echo 'PASS';
+}catch(Throwable $error){$reported=true;$class=get_class($error);if(!in_array($class,['ArgumentCountError','TypeError','ReflectionException','RuntimeException','LogicException','Error'],true)){$class='OtherThrowable';}echo json_encode(['status'=>'FAIL','phase'=>$phase,'error_class'=>$class]);exit(86);}
+CODE;
+  $pipes=[];$process=proc_open([PHP_BINARY,'-d','memory_limit=32M','-d','display_errors=0','-d','log_errors=0','-r',$code,$autoload,$change],[0=>['pipe','r'],1=>['pipe','w'],2=>['pipe','w']],$pipes);
+  self::assertIsResource($process);fclose($pipes[0]);$stdout=stream_get_contents($pipes[1]);$stderr=stream_get_contents($pipes[2]);fclose($pipes[1]);fclose($pipes[2]);$status=proc_close($process);return [$status,$stdout,$stderr];
+ }
+ private static function diagnostic(string $stdout,string $stderr):string {
+  $facts=json_decode($stdout,true);$phases=['bootstrap','setup','hooks','binding','baseline','mutation','assertion','complete'];$classes=['ArgumentCountError','TypeError','ReflectionException','RuntimeException','LogicException','Error','OtherThrowable','EngineFatalError'];
+  if(is_array($facts)&&array_keys($facts)===['status','phase','error_class']&&$facts['status']==='FAIL'&&in_array($facts['phase'],$phases,true)&&in_array($facts['error_class'],$classes,true)){return 'Isolated native binding probe failed: '.$facts['phase'].' / '.$facts['error_class'].'.';}
+  $predicate=in_array($stdout,['RETAINED-DECORATOR-DENIED','CORE-LABEL-DENIED','TAX-BRIDGE-DENIED','SHIPPING-CONTROLLER-DENIED','CART-SESSION-DENIED','SELECTED-SESSION-MISSED','MANAGED-METHOD-DENIED','PICKUP-SUPPORT-MISSED','PICKUP-ID-MISSED','BASELINE-FAIL','CORE-LABEL-FENCE-DENIED','ALTERED-CORE-CALLBACK-MISSED','ALTERED-TAX-BRIDGE-MISSED','ALTERED-NATIVE-HELPER-MISSED','ZERO-PRIORITY-MISSED','MUTATION-MISSED'],true)?$stdout:'protocol_unavailable';return 'Isolated native binding probe did not finish: '.$predicate.'; stderr_present='.(strlen($stderr)>0?'true':'false').'.';
+ }
+ public static function changes():array{return array_map(static fn(string $kind):array=>[$kind],['cart','customer','session','shipping','option_filter','option_filter_zero','retained_decorator','core_label_same','core_label_foreign','core_label_priority','core_label_args','core_label_args_bool','total','cycle','supported_cycle','large','tax_bridge_same','tax_bridge_mapping','tax_bridge_oldhook','tax_bridge_replacement','tax_bridge_subclass','tax_bridge_priority','tax_bridge_args','tax_bridge_args_bool','shipping_controller_same','shipping_controller_replacement','shipping_controller_subclass','shipping_controller_static','shipping_controller_priority','shipping_controller_args','shipping_controller_context','shipping_controller_option','shipping_controller_supports_filter','cart_session_same','cart_session_cart','cart_session_replacement','cart_session_subclass','cart_session_static','cart_session_args','chosen_same','chosen_pickup','chosen_missing','chosen_extra','chosen_wrong_type','chosen_wrong_index','managed_method_same','managed_method_pickup','managed_method_id']);}
+}

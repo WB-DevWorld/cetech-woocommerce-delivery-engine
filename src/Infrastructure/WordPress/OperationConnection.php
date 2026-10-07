@@ -130,7 +130,7 @@ final class OperationConnection implements OperationSession {
 
 	/** @param list<string> $table_names */
 	public function validate_tables( array $table_names ): bool {
-		if ( ! $this->guard_owner() || ! array_is_list( $table_names ) || [] === $table_names || count( $table_names ) > 16 ) {
+		if ( ! $this->guard_owner() || ! array_is_list( $table_names ) || [] === $table_names || count( $table_names ) > 32 ) {
 			return false;
 		}
 		foreach ( $table_names as $table ) {
@@ -138,6 +138,9 @@ final class OperationConnection implements OperationSession {
 				return false;
 			}
 		}
+		// Q04 adds finite product, native tax/session and price-source participants.
+		// The ceiling applies to the entire owned unit, including later declarations.
+		if ( count( array_unique( [ ...array_keys( $this->tables ), ...$table_names ] ) ) > 32 ) { return false; }
 		foreach ( array_unique( $table_names ) as $table ) {
 			// Acquire and hold the actual participant's metadata lock before
 			// checking engine. A later DDL conversion cannot invalidate this unit.
@@ -256,13 +259,13 @@ final class OperationConnection implements OperationSession {
 		if ( 1 === preg_match( '/`?[a-zA-Z0-9_]+`?\s*\.\s*`?[a-zA-Z_][a-zA-Z0-9_]*`?\s*\(/', $sql ) ) {
 			return false;
 		}
-		// The C07 current read pins the verified native options unique key.
+		// C07 and Q04 pin only their reviewed native unique/range keys.
 		// This exact SQL clause is syntax, not a callable named INDEX. Other
 		// index expressions and every unknown function remain refused.
-		$sql = str_replace( ' FORCE INDEX (`option_name`)', '', $sql );
+		$sql = str_replace( [ ' FORCE INDEX (`option_name`)', ' FORCE INDEX (`quote_candidate_range`)' ], '', $sql );
 		preg_match_all( '/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/', $sql, $calls );
 		foreach ( $calls[1] as $call ) {
-			if ( ! in_array( strtoupper( $call ), [ 'COUNT', 'MIN', 'MAX', 'SUM', 'AVG', 'COALESCE', 'IFNULL', 'CAST', 'CONVERT', 'DATABASE', 'CONNECTION_ID', 'NOW', 'UTC_TIMESTAMP', 'OCTET_LENGTH', 'LENGTH', 'CHAR_LENGTH', 'IN', 'VALUES', 'WHERE', 'AND', 'OR', 'NOT' ], true ) ) {
+			if ( ! in_array( strtoupper( $call ), [ 'COUNT', 'MIN', 'MAX', 'SUM', 'AVG', 'COALESCE', 'IFNULL', 'CAST', 'CONVERT', 'DATABASE', 'CONNECTION_ID', 'NOW', 'UTC_TIMESTAMP', 'OCTET_LENGTH', 'LENGTH', 'CHAR_LENGTH', 'LEFT', 'IN', 'VALUES', 'WHERE', 'AND', 'OR', 'NOT' ], true ) ) {
 				return false;
 			}
 		}

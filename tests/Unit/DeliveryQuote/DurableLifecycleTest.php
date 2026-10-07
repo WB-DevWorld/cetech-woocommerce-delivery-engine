@@ -80,6 +80,34 @@ final class DurableLifecycleTest extends TestCase {
 		$ran = false; $this->f->on_retire = function() use ( &$ran ): void { $ran = true; $this->f->authorized = false; }; $read = $s->current( QuoteFixtures::owner(), $r->command->reference(), QuoteFixtures::context(), RequestContext::create() );
 		self::assertTrue( $ran ); self::assertFalse( $this->f->authorized ); self::assertSame( 'unavailable', $read->status ); self::assertNull( $read->quote );
 	}
+	public function test_failed_current_evidence_hides_private_quote_without_mutating_history(): void {
+		$r = $this->issue(); $s = $this->f->service(); $reference = $r->command->reference();
+		$baseline = $s->current( QuoteFixtures::owner(), $reference, QuoteFixtures::context(), RequestContext::create() ); self::assertSame( 'ready', $baseline->status ); self::assertNotNull( $baseline->quote );
+		$quote = $this->f->pdo->query( 'SELECT * FROM durable_delivery_engine_delivery_quotes' )->fetchAll( \PDO::FETCH_ASSOC ); $records = $this->f->pdo->query( 'SELECT * FROM durable_delivery_engine_operation_records' )->fetchAll( \PDO::FETCH_ASSOC ); $events = $this->f->pdo->query( 'SELECT * FROM durable_delivery_engine_operation_changes' )->fetchAll( \PDO::FETCH_ASSOC );
+		foreach ( [ [ false, QuoteFixtures::context(), false ], [ false, QuoteFixtures::context(), true ], [ true, null, false ], [ true, $this->inventory( 'unknown' ), false ] ] as [ $guard_ok, $current, $paused ] ) {
+			$this->f->guard_ok = $guard_ok; $this->f->paused = $paused; $this->f->statements = []; $read = $s->current( QuoteFixtures::owner(), $reference, $current, RequestContext::create() );
+			self::assertSame( 'unavailable', $read->status ); self::assertNull( $read->quote ); self::assertSame( 'quote_unavailable', $read->reason );
+			self::assertSame( $quote, $this->f->pdo->query( 'SELECT * FROM durable_delivery_engine_delivery_quotes' )->fetchAll( \PDO::FETCH_ASSOC ) ); self::assertSame( $records, $this->f->pdo->query( 'SELECT * FROM durable_delivery_engine_operation_records' )->fetchAll( \PDO::FETCH_ASSOC ) ); self::assertSame( $events, $this->f->pdo->query( 'SELECT * FROM durable_delivery_engine_operation_changes' )->fetchAll( \PDO::FETCH_ASSOC ) );
+			self::assertSame( [], array_values( array_filter( $this->f->statements, static fn( string $sql ): bool => 1 === preg_match( '/\A(?:INSERT|UPDATE|DELETE) /', $sql ) ) ) ); self::assertSame( 1, $this->f->captures );
+			foreach ( $this->f->sessions as $session ) { self::assertTrue( $session->is_retired() ); }
+		}
+	}
+	public function test_valid_current_evidence_preserves_pause_and_expiry_reasons(): void {
+		$r = $this->issue(); $s = $this->f->service(); $this->f->paused = true;
+		$paused = $s->current( QuoteFixtures::owner(), $r->command->reference(), QuoteFixtures::context(), RequestContext::create() ); self::assertSame( 'ready', $paused->status ); self::assertNotNull( $paused->quote ); self::assertSame( 'checkout_suspended', $paused->reason );
+		$this->f->paused = false; $this->f->utc = '2026-10-07 05:05:00.000000'; $expired = $s->current( QuoteFixtures::owner(), $r->command->reference(), QuoteFixtures::context(), RequestContext::create() ); self::assertSame( 'ready', $expired->status ); self::assertNotNull( $expired->quote ); self::assertSame( 'quote_expired', $expired->reason ); self::assertSame( 'issued', $expired->quote->state() ); self::assertSame( 1, $this->f->count( 'operation_changes' ) );
+		$this->f->utc = '2026-10-07 05:00:01.000000'; $current = $this->inventory( 'ineligible' ); $this->f->pdo->exec( "UPDATE durable_fence SET context_digest='" . $current->digest() . "'" ); $changed = $s->current( QuoteFixtures::owner(), $r->command->reference(), $current, RequestContext::create() ); self::assertSame( 'ready', $changed->status ); self::assertNotNull( $changed->quote ); self::assertSame( 'quote_invalidated', $changed->reason ); self::assertSame( 'issued', $changed->quote->state() ); self::assertSame( $r->quote->row()['private_body_json'], $changed->quote->row()['private_body_json'] ); self::assertSame( 1, $this->f->count( 'operation_changes' ) );
+	}
+	public function test_failed_current_evidence_preserves_original_issue_and_accepted_replay_receipts(): void {
+		$s = $this->f->service(); $command = $this->command(); $issued = $s->issue( $command, QuoteAdmissionAttempt::generate(), RequestContext::create() ); $reference = $issued->command->reference();
+		$this->f->utc = '2026-10-07 05:00:01.000000'; $accepted = $s->accept( QuoteFixtures::owner(), $reference, $issued->quote->header(), QuoteFixtures::context(), RequestContext::create() ); self::assertSame( 'accepted', $accepted->attempt->outcome->state );
+		$body = $accepted->quote->row()['private_body_json']; $this->f->guard_ok = false;
+		$issue_replay = $s->issue( $command, QuoteAdmissionAttempt::generate(), RequestContext::create() ); $accept_replay = $s->accept( QuoteFixtures::owner(), $reference, $issued->quote->header(), QuoteFixtures::context(), RequestContext::create() ); $reconciled = $s->reconcile( $accepted->command, RequestContext::create() );
+		foreach ( [ [ $issue_replay, $issued ], [ $accept_replay, $accepted ], [ $reconciled, $accepted ] ] as [ $result, $original ] ) {
+			self::assertSame( 'accepted', $result->attempt->outcome->state ); self::assertSame( $original->attempt->completion->to_json(), $result->attempt->completion->to_json() ); self::assertSame( 'quote_unavailable', $result->reason ); self::assertNotNull( $result->quote ); self::assertSame( 'accepted', $result->quote->state() ); self::assertSame( $body, $result->quote->row()['private_body_json'] );
+		}
+		self::assertTrue( $issue_replay->attempt->replayed ); self::assertTrue( $accept_replay->attempt->replayed ); self::assertSame( 1, $this->f->captures ); self::assertSame( 2, $this->f->count( 'operation_changes' ) ); self::assertSame( 2, $this->f->count( 'operation_records' ) );
+	}
 	public function test_original_handle_and_command_hidden_if_revoked_during_post_commit_load_release(): void {
 		$this->f->on_retire = function(): void { if ( $this->f->count( 'operation_records' ) === 1 && 'published' === $this->f->pdo->query( 'SELECT publication_state FROM durable_delivery_engine_operation_records' )->fetchColumn() && $this->f->opens >= 4 ) { $this->f->authorized = false; } };
 		$r = $this->issue(); self::assertSame( 1, $this->f->count( 'delivery_quotes' ) ); self::assertSame( 'unconfirmed', $r->attempt->outcome->state ); self::assertNull( $r->command ); self::assertNull( $r->quote ); self::assertNull( $r->attempt->completion );

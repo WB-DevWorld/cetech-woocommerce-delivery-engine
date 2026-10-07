@@ -49,7 +49,7 @@ final class QuoteOperationProfile implements OperationProfile {
 	public function transactional_tables( OperationSession $session ): array {
 		$this->control->assert_ready( $session, $session->site_id() );
 		$additional = $this->evidence?->tables( $session ) ?? [];
-		if ( ! array_is_list( $additional ) || count( $additional ) > 16 ) { throw new OperationStorageException(); }
+		if ( ! array_is_list( $additional ) || count( $additional ) > 27 ) { throw new OperationStorageException(); }
 		foreach ( $additional as $table ) { if ( ! is_string( $table ) || strlen( $table ) > 64 || 1 !== preg_match( '/\A[a-zA-Z0-9_]+\z/D', $table ) || ! str_starts_with( $table, $session->table_prefix() ) ) { throw new OperationStorageException(); } }
 		sort( $additional, SORT_STRING ); return array_values( array_unique( [ $this->control->options_table( $session ), ...$additional, ...DeliveryQuoteSchema::tables( $session->table_prefix() ) ] ) );
 	}

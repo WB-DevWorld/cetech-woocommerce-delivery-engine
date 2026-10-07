@@ -275,7 +275,7 @@ return static function ( callable $check, ?callable $lifecycle_probe = null ): v
 		if ( null !== $lifecycle_probe ) { $lifecycle_probe( $physical, static fn (): array => [ $historical( $base1 ), $historical( $base2 ) ] ); }
 	} finally {
 		$wpdb = $main_db;
-		if ( $isolated instanceof wpdb ) { $isolated->close(); }
+		if ( $isolated instanceof wpdb ) { remove_filter( 'query', [ $isolated, 'remove_placeholder_escape' ], 0 ); $isolated->close(); if ( false !== has_filter( 'query', [ $isolated, 'remove_placeholder_escape' ] ) ) { throw new RuntimeException( 'Native snapshot fixture callback cleanup failed.' ); } }
 		foreach ( $migration_tables as $table ) { if ( 1 !== preg_match( '/\Aop_proof_[a-zA-Z0-9_]+_delivery_engine_(rule_family_guards|logical_rules|rule_versions)\z/D', $table ) ) { throw new RuntimeException( 'Refusing foreign snapshot migration cleanup.' ); } $main_db->query( "DROP TABLE IF EXISTS `{$table}`" ); }
 		foreach ( $orders as $order_id ) { $order = new WC_Order( $order_id ); $order->delete( true ); }
 		foreach ( array_reverse( $products ) as $product_id ) { $product = wc_get_product( $product_id ); if ( $product instanceof WC_Product ) { $product->delete( true ); } }
