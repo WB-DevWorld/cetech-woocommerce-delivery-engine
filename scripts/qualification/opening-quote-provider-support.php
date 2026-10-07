@@ -87,6 +87,52 @@ final class CetechNativeQuoteProviderFixture {
 	private static function shipping( ?WC_Shipping $replacement = null ): WC_Shipping { $property = new ReflectionProperty( WC_Shipping::class, '_instance' ); $current = WC()->shipping(); if ( null !== $replacement ) { $property->setValue( null, $replacement ); } return $current; }
 	public function cleanup_stage(): string { return $this->cleanup_stage; }
 	public static function term_count_nested_callback_count(): int { $count = 0; foreach ( ( $GLOBALS['wp_filter']['woocommerce_change_term_counts']->callbacks ?? [] ) as $callbacks ) { $count += count( $callbacks ); } return $count; }
+	/** Publish only a verified installed native refusal line; every other trace fact is private. */
+	public static function native_refusal_line( Throwable $error ): ?int {
+		try {
+			$source = new ReflectionClass( QuoteNativeWooSource::class ); $file = $source->getFileName(); $start = $source->getStartLine(); $end = $source->getEndLine();
+			if ( ! is_string( $file ) || ! is_int( $start ) || ! is_int( $end ) || $start < 1 || $end < $start ) { return null; }
+			foreach ( array_slice( $error->getTrace(), 0, 16 ) as $frame ) {
+				if ( QuoteNativeWooSource::class === ( $frame['class'] ?? null ) && 'refuse' === ( $frame['function'] ?? null ) && $file === ( $frame['file'] ?? null ) && is_int( $frame['line'] ?? null ) && $frame['line'] >= $start && $frame['line'] <= $end ) { return $frame['line']; }
+			}
+		} catch ( Throwable ) { return null; }
+		return null;
+	}
+	private static function callable_identity_hash( mixed $fn ): string {
+		$identity = [ get_debug_type( $fn ) ];
+		if ( is_string( $fn ) ) { $identity[] = $fn; }
+		elseif ( is_object( $fn ) ) { $identity[] = get_class( $fn ); $identity[] = spl_object_id( $fn ); }
+		elseif ( is_array( $fn ) && array_is_list( $fn ) && 2 === count( $fn ) ) { $identity[] = is_object( $fn[0] ) ? [ get_class( $fn[0] ), spl_object_id( $fn[0] ) ] : get_debug_type( $fn[0] ); $identity[] = is_string( $fn[1] ) ? $fn[1] : get_debug_type( $fn[1] ); }
+		return hash( 'sha256', json_encode( $identity, JSON_THROW_ON_ERROR ) );
+	}
+	/** Read-only probes of the exact production guards; no callback is invoked. */
+	public function preparation_probes(): array {
+		$out = [ 'source_binding_probe_ok' => false, 'source_binding_probe_error_class' => null, 'native_hooks_options_supported' => false, 'native_hooks_probe_error_class' => null, 'native_hook_tuples' => [], 'native_option_callback_count' => 0 ];
+		try { $binding = CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceLocalBinding::capture(); $out['source_binding_probe_ok'] = $binding->unchanged(); } catch ( Throwable $error ) { $out['source_binding_probe_error_class'] = get_class( $error ); }
+		$names = [ ...QuoteNativeWooSource::OPTIONS, 'woocommerce_' . SelectedOfferShippingMethod::METHOD_ID . '_' . $this->shipping_instance . '_settings' ];
+		foreach ( [ 'pre_option', 'default_option' ] as $hook ) { foreach ( ( $GLOBALS['wp_filter'][$hook]->callbacks ?? [] ) as $callbacks ) { $out['native_option_callback_count'] += count( $callbacks ); } }
+		foreach ( $names as $name ) { foreach ( [ 'pre_option_', 'option_', 'default_option_' ] as $prefix ) { foreach ( ( $GLOBALS['wp_filter'][$prefix . $name]->callbacks ?? [] ) as $callbacks ) { $out['native_option_callback_count'] += count( $callbacks ); } } }
+		try {
+			$method = new ReflectionMethod( QuoteNativeWooSource::class, 'hooks_supported' ); $out['native_hooks_options_supported'] = $method->invoke( null, $names );
+			$facts = ( new ReflectionMethod( QuoteNativeWooSource::class, 'hook_facts' ) )->invoke( null );
+			$known = [
+				[ 'woocommerce_cart_shipping_packages', 'CetechDeliveryEngine\\Application\\Shipping\\ShippingPackageBuilder::filter_packages', 20, 1, 'delivery_shipping_packages' ],
+				[ 'woocommerce_cart_shipping_packages', 'CetechDeliveryEngine\\Integrations\\EmergencyControl\\EmergencyControlRuntime::decorate_packages', PHP_INT_MAX, 1, 'emergency_package_decoration' ],
+				[ 'woocommerce_shipping_methods', 'CetechDeliveryEngine\\Application\\Shipping\\SelectedOfferShippingIntegration::register_shipping_method', 10, 1, 'delivery_shipping_methods' ],
+				[ 'woocommerce_package_rates', 'CetechDeliveryEngine\\Application\\Shipping\\SelectedOfferShippingIntegration::filter_managed_package_rates', 100, 2, 'delivery_managed_rates' ],
+				[ 'woocommerce_package_rates', 'CetechDeliveryEngine\\Integrations\\EmergencyControl\\EmergencyCheckoutHooks::package_rates', PHP_INT_MAX, 2, 'emergency_package_rates' ],
+				[ 'woocommerce_before_calculate_totals', 'CetechDeliveryEngine\\Application\\Cart\\CartDeliverySelectionReconciler::reconcile_cart', 5, 1, 'delivery_selection_reconciliation' ],
+				[ 'woocommerce_shipping_rate_label', 'sanitize_text_field', 10, 1, 'wp_native_shipping_label_sanitizer' ],
+				[ 'woocommerce_product_get_tax_class', 'WC_Deprecated_Filter_Hooks::maybe_handle_deprecated_hook', -1000, 8, 'woo_native_tax_class_adapter' ],
+			];
+			foreach ( $facts as $hook => $items ) { foreach ( $items as $item ) { $key = $item['function'] ?? ( ( $item['class'] ?? '' ) . '::' . ( $item['method'] ?? '' ) ); $code = 'unknown'; foreach ( $known as [ $known_hook, $known_key, $priority, $args, $known_code ] ) { if ( [ $hook, $key, $item['priority'], $item['accepted_args'] ] === [ $known_hook, $known_key, $priority, $args ] ) { $code = $known_code; break; } } $out['native_hook_tuples'][] = [ 'hook' => $hook, 'priority' => $item['priority'], 'accepted_args' => $item['accepted_args'], 'callback_code' => $code, 'unknown_identity_hash' => 'unknown' === $code ? hash( 'sha256', json_encode( $item, JSON_THROW_ON_ERROR ) ) : null ]; } }
+		} catch ( Throwable $error ) { $out['native_hooks_probe_error_class'] = get_class( $error ); }
+		$cart = WC()->cart; $customer = WC()->customer; $session = WC()->session;
+		$out['native_cart_exact'] = is_object( $cart ) && WC_Cart::class === get_class( $cart ); $out['native_customer_exact'] = is_object( $customer ) && WC_Customer::class === get_class( $customer ); $out['native_session_exact'] = is_object( $session ) && WC_Session_Handler::class === get_class( $session );
+		$out['native_shipping_calculated'] = null; $out['native_precondition_probe_error_class'] = null;
+		if ( $out['native_hooks_options_supported'] && $out['native_cart_exact'] ) { try { $out['native_shipping_calculated'] = $cart->has_calculated_shipping(); } catch ( Throwable $error ) { $out['native_precondition_probe_error_class'] = get_class( $error ); } }
+		return $out;
+	}
 	/** Fixed native callback codes only; never emit arbitrary callback names or paths. */
 	public static function source_hook_diagnostics( array $hooks ): array {
 		$rows = [];
@@ -99,7 +145,7 @@ final class CetechNativeQuoteProviderFixture {
 			elseif ( 'woocommerce_product_get_price' === $hook && is_array( $fn ) && array_is_list( $fn ) && 2 === count( $fn ) && is_object( $fn[0] ) && 'Automattic\\WooCommerce\\Internal\\ScheduledSalePriceReconciler' === get_class( $fn[0] ) && 'reconcile_price' === $fn[1] ) { $code = 'woo_native_scheduled_sale_price'; }
 			elseif ( in_array( $hook, [ 'woocommerce_product_get_stock_quantity', 'woocommerce_product_get_price' ], true ) && is_array( $fn ) && array_is_list( $fn ) && 2 === count( $fn ) && is_object( $fn[0] ) && 'WC_Deprecated_Filter_Hooks' === get_class( $fn[0] ) && 'maybe_handle_deprecated_hook' === $fn[1] ) { $code = 'woo_native_deprecated_filter_adapter'; $old_hook = 'woocommerce_product_get_stock_quantity' === $hook ? 'woocommerce_get_stock_quantity' : 'woocommerce_get_price'; $legacy = false !== has_filter( $old_hook ); $legacy_count = 0; foreach ( ( $GLOBALS['wp_filter'][$old_hook]->callbacks ?? [] ) as $old_callbacks ) { $legacy_count += count( $old_callbacks ); } }
 			elseif ( 'woocommerce_stock_amount' === $hook && 'intval' === $fn ) { $code = 'native_integer_stock'; }
-			$rows[] = [ 'hook' => $hook, 'priority' => (int) $priority, 'accepted_args' => is_int( $callback['accepted_args'] ?? null ) ? $callback['accepted_args'] : null, 'callback_code' => $code, 'legacy_target_registered' => $legacy, 'legacy_target_callback_count' => $legacy_count ];
+			$rows[] = [ 'hook' => $hook, 'priority' => (int) $priority, 'accepted_args' => is_int( $callback['accepted_args'] ?? null ) ? $callback['accepted_args'] : null, 'callback_code' => $code, 'legacy_target_registered' => $legacy, 'legacy_target_callback_count' => $legacy_count, 'unknown_identity_hash' => 'unknown' === $code ? self::callable_identity_hash( $fn ) : null ];
 		} } }
 		return $rows;
 	}

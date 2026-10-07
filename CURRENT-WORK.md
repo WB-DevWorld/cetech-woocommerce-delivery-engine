@@ -18,6 +18,8 @@ The next bounded successor also corrects source-established qualification owners
 
 Native-default successorab7d7ccee/treeda348960 failedCI37599055617 attempt1 despite all3PHP2992/18101/1skip, SQL291/6037/all7minima, JS/controls and691/1092lintpassing. Native335unique=334PASS/1FAIL/107missing, HTTPnotrun; all8Q04cleanupfacts nowPASS. Exactdiagnostics identify two further pinnedWoo11.1.2 callbacks: wc_change_term_counts10/2 and ScheduledSalePriceReconciler::reconcile_price99/2. The latter changes Woo-owned merchandise view prices but preserves price-empty versus nonempty, the only price predicate in Q04inventory. The next finite correction accepts exactnativeidentities, fences the term helper's nestedhook empty, and retains completephysicalsource/currentnativeguards; it adds no restriction on ordinary Woo product sales. Historical third receipts/fingerprints remain preserved in the Q04record/PR90.
 
+Fourthnativecheckpoint8d38f621/tree4b9c4bd6 passedall3PHP2996/18111/skip1, butfirstcapturestillrefused in37601229701. All8sourcecallbacktuples,nestedcount0 andrealmerchandise20stored/15view proofs passed; all8cleanupfacts passed. Zero observedfactory source/native counters do not exclude globalnativewpdbreads, owner/control checks, transactionsetup orschemaqueries. Earlier attributions of the exactfirstrefusal to sourcecallbackpresence were not phase-proved; those genuine compatibility corrections remain separately regression-supported. Nextcandidateisfinitefixturediagnosticonly until theactual source step/refusal line is recorded; no guessed production correction.
+
 # Historical Q03 immutable freeze
 
 # Current Work — W2-Q03 durable internal quote lifecycle
