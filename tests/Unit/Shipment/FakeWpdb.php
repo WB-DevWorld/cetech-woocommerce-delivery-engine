@@ -100,7 +100,7 @@ final class FakeWpdb {
 	}
 
 	public function register_table_definition( string $sql ): void {
-		if ( ! preg_match( '/CREATE TABLE\s+`?([a-z0-9_]+)`?\s*\((.*)\)\s*ENGINE=([a-z0-9_]+)/is', $sql, $parts ) ) {
+		if ( ! preg_match( '/CREATE TABLE\s+`?([a-z0-9_]+)`?\s*\((.*)\)\s*(?:ENGINE=([a-z0-9_]+))?/is', $sql, $parts ) ) {
 			return;
 		}
 		$table = $parts[1];
@@ -118,14 +118,15 @@ final class FakeWpdb {
 				}
 				continue;
 			}
-			if ( ! preg_match( '/^(\w+)\s+(\w+(?:\(\d+\))?(?:\s+unsigned)?)\s+(.*)$/i', $line, $column ) ) {
+			if ( ! preg_match( '/^(\w+)\s+(\w+(?:\([0-9,]+\))?(?:\s+unsigned)?)\s+(.*)$/i', $line, $column ) ) {
 				continue;
 			}
-			preg_match( '/\bDEFAULT\s+(\d+)/i', $column[3], $default );
+			preg_match( "/\\bDEFAULT\\s+(?:'([^']*)'|([0-9.]+)|NULL)/i", $column[3], $default );
+			$default_value = isset( $default[2] ) && '' !== $default[2] ? $default[2] : ( isset( $default[1] ) ? $default[1] : null );
 			preg_match( '/\bCOLLATE\s+(\w+)/i', $column[3], $specific_collation );
-			$columns[] = [ 'Field' => $column[1], 'Type' => strtolower( $column[2] ), 'Null' => str_contains( $column[3], 'NOT NULL' ) ? 'NO' : 'YES', 'Default' => $default[1] ?? null, 'Extra' => str_contains( $column[3], 'AUTO_INCREMENT' ) ? 'auto_increment' : '', 'Collation' => preg_match( '/^(?:char|varchar|(?:long)?text)/i', $column[2] ) ? ( $specific_collation[1] ?? $site_collation ) : null ];
+			$columns[] = [ 'Field' => $column[1], 'Type' => strtolower( $column[2] ), 'Null' => str_contains( $column[3], 'NOT NULL' ) ? 'NO' : 'YES', 'Default' => $default_value, 'Extra' => str_contains( $column[3], 'AUTO_INCREMENT' ) ? 'auto_increment' : '', 'Collation' => preg_match( '/^(?:char|varchar|(?:long)?text)/i', $column[2] ) ? ( $specific_collation[1] ?? $site_collation ) : null ];
 		}
-		$this->table_metadata[ $table ] = [ 'status' => [ 'Name' => $table, 'Engine' => $parts[3], 'Collation' => $site_collation ], 'columns' => $columns, 'indexes' => $indexes ];
+		$this->table_metadata[ $table ] = [ 'status' => [ 'Name' => $table, 'Engine' => $parts[3] ?? 'InnoDB', 'Collation' => $site_collation ], 'columns' => $columns, 'indexes' => $indexes ];
 	}
 
 	public function esc_like( string $text ): string {
@@ -239,6 +240,13 @@ final class FakeWpdb {
 			return false;
 		}
 		$normalized = strtoupper( trim( $sql ) );
+		if ( preg_match( '/^ALTER TABLE `([^`]+)` ADD (?:KEY|INDEX) (\w+) \(([^)]+)\);?$/i', trim( $sql ), $added ) ) {
+			if ( ! isset( $this->table_metadata[ $added[1] ] ) ) { $this->last_error = 'Missing fixture table'; return false; }
+			foreach ( explode( ',', $added[3] ) as $position => $column ) {
+				$this->table_metadata[ $added[1] ]['indexes'][] = [ 'Key_name' => $added[2], 'Seq_in_index' => $position + 1, 'Non_unique' => 1, 'Sub_part' => null, 'Index_type' => 'BTREE', 'Collation' => 'A', 'Column_name' => trim( $column, " `" ) ];
+			}
+			return 0;
+		}
 
 		if ( preg_match( '/^DROP TABLE IF EXISTS `([^`]+)`\s*$/i', trim( (string) $sql ), $drop ) ) {
 			unset( $this->tables[ $drop[1] ], $this->unique_indexes[ $drop[1] ], $this->auto_increment[ $drop[1] ] );
@@ -593,6 +601,9 @@ final class FakeWpdb {
 			return [];
 		}
 		$this->record_sql( $sql );
+		if ( preg_match( '/^SHOW INDEX FROM `([^`]+)` WHERE Key_name = \'([^\']+)\'$/i', trim( $sql ), $metadata ) ) {
+			return array_values( array_filter( $this->table_metadata[ $metadata[1] ]['indexes'] ?? [], static fn ( array $index ): bool => $index['Key_name'] === $metadata[2] ) );
+		}
 		if ( preg_match( '/^SHOW FULL COLUMNS FROM `([^`]+)`$/i', trim( $sql ), $metadata ) ) {
 			return $this->table_metadata[ $metadata[1] ]['columns'] ?? [];
 		}

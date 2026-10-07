@@ -7,6 +7,9 @@ namespace CetechDeliveryEngine\Tests\Unit\DataLifecycle;
 use CetechDeliveryEngine\Bootstrap\DataLifecycleBootstrap;
 use CetechDeliveryEngine\Bootstrap\DataLifecycleManifest;
 use CetechDeliveryEngine\Bootstrap\DataLifecycleUninstallExecutor;
+use CetechDeliveryEngine\Domain\DataLifecycle\DataLifecycleProgress;
+use CetechDeliveryEngine\Domain\DataLifecycle\DataLifecycleRegistry;
+use CetechDeliveryEngine\Domain\DataLifecycle\DataLifecycleContinuation;
 use CetechDeliveryEngine\Domain\Operation\OperationCommitResult;
 use CetechDeliveryEngine\Tests\Support\DataLifecycle\UninstallExecutorFixture;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -69,6 +72,25 @@ final class UninstallExecutorTest extends TestCase {
 		self::assertSame( [ 'incomplete', 'active_cleanup', false ], [ $result['status'], $result['code'], $result['intent_cleared'] ] );
 		self::assertSame( $before[DataLifecycleManifest::COORDINATOR_OPTION], $f->rows[DataLifecycleManifest::COORDINATOR_OPTION] );
 		self::assertSame( $p->counts(), $result['counts'] ); self::assertSame( 0, $f->batches ); self::assertSame( 0, $f->capability_calls );
+	}
+
+	public function test_checkpoint_from_another_inventory_is_preserved_without_policy_takeover(): void {
+		$f = new UninstallExecutorFixture();
+		$other_policy = hash( 'sha256', 'fixture-original32-inventory' );
+		self::assertNotSame( $other_policy, DataLifecycleRegistry::standard()->policy_digest() );
+		$checkpoint = DataLifecycleProgress::initial( 1, $other_policy, 'uninstall_cache', UninstallExecutorFixture::NOW, 5000 );
+		$f->put( DataLifecycleManifest::COORDINATOR_OPTION, $checkpoint->to_json() );
+		$before = $f->rows;
+		$refused_batch = $f->cleanup()->batch( 1, DataLifecycleContinuation::checkpoint( $checkpoint ) );
+		self::assertSame( [ 'refused', 'policy_changed' ], [ $refused_batch->status, $refused_batch->reason ] );
+		$result = DataLifecycleUninstallExecutor::run( $f->cleanup(), $f );
+		// The existing read path retires before checking its policy and reports
+		// an unknown outcome. Q02 retains that disposition and all saved bytes.
+		self::assertSame( [ 'outcome_unknown', 'outcome_unknown', false, false ], [ $result['status'], $result['code'], $result['permissions_removed'], $result['intent_cleared'] ] );
+		foreach ( [ DataLifecycleManifest::COORDINATOR_OPTION, DataLifecycleManifest::UNINSTALL_INTENT, DataLifecycleManifest::CAPABILITIES_MARKER, 'proof_user_roles', 'cetech_de_sitewide_defaults' ] as $name ) {
+			self::assertSame( $before[$name], $f->rows[$name] );
+		}
+		self::assertSame( 0, $f->batches ); self::assertSame( 0, $f->role_writes ); self::assertSame( 0, $f->capability_calls );
 	}
 
 	public function test_uninstall_runs_only_one_bounded_batch_before_returning_incomplete(): void {
@@ -212,14 +234,18 @@ final class UninstallExecutorTest extends TestCase {
 		self::assertArrayNotHasKey( DataLifecycleManifest::CAPABILITIES_MARKER, $f->rows ); self::assertArrayNotHasKey( DataLifecycleManifest::UNINSTALL_INTENT, $f->rows );
 		self::assertSame( [ 'intent_publication_pending', 'completed' ], array_column( $f->status_values, 'code' ) );
 		self::assertSame( 'on', $f->rows['proof_user_roles']['autoload'] ); self::assertSame( 1, $f->role_writes ); self::assertSame( 1, $f->role_refreshes ); self::assertSame( 0, $f->capability_calls );
-		foreach ( $f->statements as [ $sql ] ) { self::assertStringNotContainsString( 'DROP ', $sql ); self::assertStringNotContainsString( 'TRUNCATE ', $sql ); }
+		foreach ( $f->statements as [ $sql ] ) {
+			self::assertStringNotContainsString( 'DROP ', $sql ); self::assertStringNotContainsString( 'TRUNCATE ', $sql );
+			// Unit transport allowlist only: physical quote preservation is a separate native/SQL proof.
+			foreach ( DataLifecycleManifest::QUOTE_TABLE_SUFFIXES as $suffix ) { self::assertStringNotContainsString( $suffix, $sql ); }
+		}
 	}
 
 	public function test_fixed_standalone_closure_loads_without_composer_woo_or_wordpress_runtime(): void {
 		$root = dirname( __DIR__, 3 );
 		$code = 'require ' . var_export( $root . '/src/Bootstrap/DataLifecycleBootstrap.php', true ) . '; '
-			. '$b=\\CetechDeliveryEngine\\Bootstrap\\DataLifecycleBootstrap::class; echo json_encode([$b::load(),class_exists("WC_Order",false),function_exists("get_option"),class_exists("Composer\\\\Autoload\\\\ClassLoader",false),class_exists("CetechDeliveryEngine\\\\Bootstrap\\\\DataLifecycleUninstallExecutor",false)],JSON_THROW_ON_ERROR);';
-		self::assertSame( [ true, false, false, false, true ], $this->fresh_process( $code ) );
+			. '$b=\\CetechDeliveryEngine\\Bootstrap\\DataLifecycleBootstrap::class; echo json_encode([$b::load(),class_exists("WC_Order",false),function_exists("get_option"),class_exists("Composer\\\\Autoload\\\\ClassLoader",false),class_exists("CetechDeliveryEngine\\\\Bootstrap\\\\DataLifecycleUninstallExecutor",false),count(\\CetechDeliveryEngine\\Bootstrap\\DataLifecycleManifest::QUOTE_TABLE_SUFFIXES),class_exists("CetechDeliveryEngine\\\\Infrastructure\\\\Persistence\\\\DeliveryQuoteSchema",false)],JSON_THROW_ON_ERROR);';
+		self::assertSame( [ true, false, false, false, true, 3, false ], $this->fresh_process( $code ) );
 		self::assertSame( 0, ( new \ReflectionMethod( DataLifecycleBootstrap::class, 'load' ) )->getNumberOfParameters() );
 		self::assertCount( count( array_unique( DataLifecycleBootstrap::FILES ) ), DataLifecycleBootstrap::FILES );
 	}

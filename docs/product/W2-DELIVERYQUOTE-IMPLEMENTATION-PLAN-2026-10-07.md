@@ -4,6 +4,8 @@ Status: **OWNER-APPROVED 2026-10-07 05:01:14 UTC / IMPLEMENTATIONS NOT EXECUTED 
 
 Q01 execution is recorded separately in the [internal-contract checkpoint](W2-Q01-INTERNAL-CONTRACT-2026-10-07.md). The NOT_EXECUTED wording and48-case table below describe the approved design packet at approval; they are not a current assertion that Q01 unit proofs have never run. Later physical/durable/native obligations remain unexecuted by Q01.
 
+Q01 is owner-approved and integrated through PR #84 as `090a0ad535ee8faac59d2763333d762cb89ef0d0`. Q02 storage/readiness is authorized by the 2026-10-07 05:40:20 UTC instruction and tracked in Issue #85. The named rate index maps the proposed currency dimension to the retained table’s actual `base_currency` field; see the design’s explicit source-alignment note. Current Q02 executed proof is recorded in its separate checkpoint rather than rewriting this approval-time case table.
+
 ## Checkpoints and exit conditions
 
 | Checkpoint | Deliverable / change boundary | Evidence and decision at exit |
