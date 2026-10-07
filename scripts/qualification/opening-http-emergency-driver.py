@@ -51,12 +51,30 @@ def run_emergency(client, state, bridge, recorder, Page, login):
         bridge.call("trackemergency", fields["request_token"])
         return client.post(item.destination, fields)
 
-    def fixture(mode="inspect", fields=None):
+    def fixture(mode="inspect", fields=None, diagnostic=None):
         response = client.request("/?cetech_c07_fixture=" + mode, fields, private_headers)
+        if diagnostic is not None:
+            observe_preparation_response(diagnostic, response)
         value = json.loads(response.body)
+        if diagnostic is not None and isinstance(value, dict):
+            code = value.get("data", {}).get("code") if isinstance(value.get("data"), dict) else None
+            diagnostic["fixture_error_code"] = code if code in {"fixture_forbidden", "fixture_mode", "fixture_nonce", "fixture_scenario", "fixture_transition"} else "none" if code is None else "other"
+            count = value.get("data", {}).get("count") if isinstance(value.get("data"), dict) else None
+            if isinstance(count, (int, float)) and not isinstance(count, bool) and 0 <= count <= 201 and int(count) == count:
+                diagnostic["cart_count"] = int(count)
         if response.status != 200 or value.get("success") is not True:
             raise RuntimeError("C07 private native cart fixture refused preparation")
         return value["data"], response
+
+    def observe_preparation_response(diagnostic, response):
+        diagnostic["status"] = response.status
+        media_type = response.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+        diagnostic["content_type"] = "json" if media_type == "application/json" else "html" if media_type == "text/html" else "absent" if not media_type else "other"
+        try:
+            json.loads(response.body)
+            diagnostic["body_is_json"] = True
+        except (ValueError, UnicodeDecodeError):
+            diagnostic["body_is_json"] = False
 
     def seed(scenario):
         bridge.call("resumeemergency")
@@ -80,23 +98,54 @@ def run_emergency(client, state, bridge, recorder, Page, login):
                 fields["shipping_method[" + str(index) + "]"] = rates[0]["id"]
         return fields
 
-    def classic(scenario, arm=None, pause=False, flags_off=False):
-        bridge.call("classicpageemergency")
-        prepared = seed(scenario)
-        rendered = client.get(state["classic_url"])
-        fields = checkout_fields(rendered.page(), prepared)
-        if arm:
-            bridge.call(arm)
-        if pause:
-            bridge.call("pauseemergency")
-        if flags_off:
-            bridge.call("disableflagsemergency")
-        before = snapshot()
-        response = client.post("/?wc-ajax=checkout", fields)
-        after = snapshot()
-        if flags_off:
-            bridge.call("restoreflagsemergency")
-        return prepared, rendered, response, json.loads(response.body), before, after
+    def classic(scenario, required_case, arm=None, pause=False, flags_off=False):
+        diagnostic = {"stage": "bridge_classic_page", "status": None, "content_type": "absent", "body_is_json": False,
+                      "fixture_error_code": "none", "cart_count": None, "form_count": None, "checkout_nonce_form_count": None,
+                      "required_case_incomplete": True}
+        try:
+            bridge.call("classicpageemergency")
+            diagnostic["stage"] = "bridge_resume"
+            bridge.call("resumeemergency")
+            diagnostic["stage"] = "inspect"
+            current, _ = fixture(diagnostic=diagnostic)
+            diagnostic["stage"] = "seed"
+            prepared, _ = fixture("seed", {"nonce": current["nonce"], "scenario": scenario}, diagnostic)
+            diagnostic["stage"] = "render"
+            rendered = client.get(state["classic_url"])
+            observe_preparation_response(diagnostic, rendered)
+            diagnostic["stage"] = "forms"
+            page = rendered.page()
+            diagnostic["form_count"] = min(len(page.forms), 201)
+            diagnostic["checkout_nonce_form_count"] = min(sum("woocommerce-process-checkout-nonce" in item.fields for item in page.forms), 201)
+            fields = checkout_fields(page, prepared)
+            if arm:
+                diagnostic["stage"] = "bridge_arm"
+                bridge.call(arm)
+            if pause:
+                diagnostic["stage"] = "bridge_pause"
+                bridge.call("pauseemergency")
+            if flags_off:
+                diagnostic["stage"] = "bridge_flags"
+                bridge.call("disableflagsemergency")
+            diagnostic["stage"] = "snapshot_before"
+            before = snapshot()
+            diagnostic["stage"] = "post"
+            response = client.post("/?wc-ajax=checkout", fields)
+            observe_preparation_response(diagnostic, response)
+            diagnostic["stage"] = "snapshot_after"
+            after = snapshot()
+            if flags_off:
+                diagnostic["stage"] = "bridge_restore_flags"
+                bridge.call("restoreflagsemergency")
+            diagnostic["stage"] = "checkout_json"
+            return prepared, rendered, response, json.loads(response.body), before, after
+        except Exception as error:
+            diagnostic["error_class"] = type(error).__name__ if type(error).__name__ in {"RuntimeError", "ValueError", "KeyError", "TypeError", "JSONDecodeError", "UnicodeDecodeError", "TimeoutError"} else "OtherError"
+            try:
+                recorder.check(prefix + required_case, False, diagnostic)
+            except RuntimeError as recorded:
+                raise error from recorded
+            raise
 
     def blocked(case, data):
         prepared, rendered, response, result, before, after = data
@@ -147,17 +196,17 @@ def run_emergency(client, state, bridge, recorder, Page, login):
     recorder.check(prefix + "SAME-STATE-NO-MATERIAL-AUDIT", unchanged(before, after)
                    and "Nothing changed" in follow(response).page().text, evidence(before, after, response))
 
-    blocked("CLASSIC-AFTER-RENDER-PAUSE-NO-PAYMENT", classic("managed", pause=True))
-    blocked("CLASSIC-FINAL-AFTER-VALIDATION-PAUSE-NO-PAYMENT", classic("managed", arm="armclassicemergency"))
+    blocked("CLASSIC-AFTER-RENDER-PAUSE-NO-PAYMENT", classic("managed", "CLASSIC-AFTER-RENDER-PAUSE-NO-PAYMENT", pause=True))
+    blocked("CLASSIC-FINAL-AFTER-VALIDATION-PAUSE-NO-PAYMENT", classic("managed", "CLASSIC-FINAL-AFTER-VALIDATION-PAUSE-NO-PAYMENT", arm="armclassicemergency"))
     recorder.check(prefix + "CLASSIC-LATE-TRANSITION-BARRIER-ACTUALLY-TRIGGERED", snapshot()["barrier"].get("triggered") is True and snapshot()["barrier"].get("phase") == "classic_after_validation")
-    blocked("CLASSIC-FREE-PICKUP-PAUSE-NO-FREE-ADMISSION", classic("pickup", arm="armclassicemergency"))
-    blocked("CLASSIC-MIXED-OWNERSHIP-ALL-OR-NONE", classic("mixed", pause=True))
-    blocked("CLASSIC-INACTIVE-FLAGS-DO-NOT-CAUSE-NATIVE-FALLBACK", classic("managed", pause=True, flags_off=True))
-    ordinary = classic("unmanaged", pause=True)
+    blocked("CLASSIC-FREE-PICKUP-PAUSE-NO-FREE-ADMISSION", classic("pickup", "CLASSIC-FREE-PICKUP-PAUSE-NO-FREE-ADMISSION", arm="armclassicemergency"))
+    blocked("CLASSIC-MIXED-OWNERSHIP-ALL-OR-NONE", classic("mixed", "CLASSIC-MIXED-OWNERSHIP-ALL-OR-NONE", pause=True))
+    blocked("CLASSIC-INACTIVE-FLAGS-DO-NOT-CAUSE-NATIVE-FALLBACK", classic("managed", "CLASSIC-INACTIVE-FLAGS-DO-NOT-CAUSE-NATIVE-FALLBACK", pause=True, flags_off=True))
+    ordinary = classic("unmanaged", "CLASSIC-UNMANAGED-CHECKOUT-UNAFFECTED", pause=True)
     recorder.check(prefix + "CLASSIC-UNMANAGED-CHECKOUT-UNAFFECTED", ordinary[3].get("result") == "success"
                    and ordinary[5]["gateway_count"] == ordinary[4]["gateway_count"] + 1,
                    evidence(ordinary[4], ordinary[5], ordinary[2]))
-    emptied = classic("managed", arm="armemptyemergency")
+    emptied = classic("managed", "CLASSIC-EMPTY-CART-FINAL-OWNERSHIP-LATCH", arm="armemptyemergency")
     recorder.check(prefix + "CLASSIC-EMPTY-CART-FINAL-OWNERSHIP-LATCH", emptied[3].get("result") == "success"
                    and emptied[5]["gateway_count"] == emptied[4]["gateway_count"] + 1
                    and emptied[5]["barrier"].get("triggered") is True,
