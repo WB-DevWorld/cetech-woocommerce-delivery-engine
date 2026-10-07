@@ -171,8 +171,27 @@ return static function ( callable $check, ?array $history = null ): void {
 		if ( ! is_int( $own_action ) || $own_action < 1 || ! is_int( $foreign_action ) || $foreign_action < 1 ) { throw new RuntimeException( 'Native C06 action sentinels were not stored.' ); }
 		$fixture->execute( "UPDATE `{$action_table}` SET status='in-progress' WHERE action_id={$own_action}" );
 		$action_before = $fixture->rows( "SELECT * FROM `{$action_table}` WHERE action_id IN ({$own_action},{$foreign_action}) ORDER BY action_id" );
+		$pre_deactivation = [
+			'domain_matches_original_before' => $domain_before === $fixture->domain_rows(),
+			'controls_match_original_before' => $options_before === $fixture->preserved_options(),
+			'roles_match_original_before' => $roles_before === $fixture->option( $fixture->prefix . 'user_roles' ),
+			'notice_physically_present_before' => null !== $fixture->option( '_transient_' . DataLifecycleManifest::ACTIVATION_NOTICE ),
+			'notice_timeout_physically_present_before' => null !== $fixture->option( '_transient_timeout_' . DataLifecycleManifest::ACTIVATION_NOTICE ),
+		];
+		$alloptions_before_deactivation = wp_cache_get( 'alloptions', 'options' );
+		$pre_deactivation['notice_in_alloptions_before'] = is_array( $alloptions_before_deactivation ) && array_key_exists( '_transient_' . DataLifecycleManifest::ACTIVATION_NOTICE, $alloptions_before_deactivation );
 		Deactivator::deactivate();
-		$check( 'NATIVE-C06-DEACTIVATION-PRESERVES-DOMAIN-CONTROL-ROLES', $domain_before === $fixture->domain_rows() && $options_before === $fixture->preserved_options() && $roles_before === $fixture->option( $fixture->prefix . 'user_roles' ) && false === get_transient( DataLifecycleManifest::ACTIVATION_NOTICE ) );
+		$post_deactivation = [
+			'domain_matches_original_after' => $domain_before === $fixture->domain_rows(),
+			'controls_match_original_after' => $options_before === $fixture->preserved_options(),
+			'roles_match_original_after' => $roles_before === $fixture->option( $fixture->prefix . 'user_roles' ),
+			'notice_native_read_absent_after' => false === get_transient( DataLifecycleManifest::ACTIVATION_NOTICE ),
+			'notice_physically_absent_after' => null === $fixture->option( '_transient_' . DataLifecycleManifest::ACTIVATION_NOTICE ),
+			'notice_timeout_physically_absent_after' => null === $fixture->option( '_transient_timeout_' . DataLifecycleManifest::ACTIVATION_NOTICE ),
+		];
+		$alloptions_after_deactivation = wp_cache_get( 'alloptions', 'options' );
+		$post_deactivation['notice_in_alloptions_after'] = is_array( $alloptions_after_deactivation ) && array_key_exists( '_transient_' . DataLifecycleManifest::ACTIVATION_NOTICE, $alloptions_after_deactivation );
+		$check( 'NATIVE-C06-DEACTIVATION-PRESERVES-DOMAIN-CONTROL-ROLES', $post_deactivation['domain_matches_original_after'] && $post_deactivation['controls_match_original_after'] && $post_deactivation['roles_match_original_after'] && $post_deactivation['notice_native_read_absent_after'], $pre_deactivation + $post_deactivation );
 		$check( 'NATIVE-C06-OWN-DISPATCH-STOP-SHARED-AS-ROWS-PRESERVED', $action_before === $fixture->rows( "SELECT * FROM `{$action_table}` WHERE action_id IN ({$own_action},{$foreign_action}) ORDER BY action_id" ) && false === has_action( DataLifecycleManifest::CLEANUP_HOOK, [ $scheduler, 'tick' ] ) && 77 === has_action( DataLifecycleManifest::CLEANUP_HOOK, $foreign_callback ), [ 'pending_rows_retained' => true, 'atomic_cancellation_claimed' => false ] );
 		Uninstaller::uninstall();
 		$check( 'NATIVE-C06-DEFAULT-UNINSTALL-PRESERVES-DATA-AND-ROLE-PERMISSIONS', $domain_before === $fixture->domain_rows() && $options_before === $fixture->preserved_options() && $roles_before === $fixture->option( $fixture->prefix . 'user_roles' ) );
