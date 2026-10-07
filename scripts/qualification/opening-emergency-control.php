@@ -39,7 +39,32 @@ return static function ( callable $check, ?array $history = null ): void {
 		$read = $service->read( $site );
 		$check( 'NATIVE-C07-DEFAULT-CACHE-NATIVE-READY-READ', $read->available && null !== $read->state && $read->state->site_id === $site && WP_Object_Cache::class === get_class( $GLOBALS['wp_object_cache'] ), [ 'native_default_object_cache' => true, 'no_object_cache_dropin' => ! file_exists( WP_CONTENT_DIR . '/object-cache.php' ) ] );
 		$managed = $fixture->order(); $legacy = $fixture->order( legacy: true ); $missing = $fixture->order( missing: true ); $pickup = $fixture->order( 'pickup' ); $ordinary = $fixture->order( 'unmanaged' ); $paid = $fixture->order(); $paid->set_date_paid( time() ); $paid->set_status( 'processing' ); $paid->save();
-		$check( 'NATIVE-C07-AUTHORITATIVE-MANAGED-UNMANAGED-PRODUCTS', EmergencyOwnership::Managed === $classifier->product( $fixture->state['managed_product_id'] ) && EmergencyOwnership::Managed === $classifier->product( $fixture->state['pickup_product_id'] ) && EmergencyOwnership::Unmanaged === $classifier->product( $fixture->state['unmanaged_product_id'] ) );
+		$product_ownership = []; foreach ( [ 'managed', 'pickup', 'unmanaged' ] as $kind ) { $product_ownership[$kind] = $classifier->product( $fixture->state[$kind . '_product_id'] ); }
+		// The assertion remains exact; diagnostics disclose only finite classifications,
+		// identity booleans and bounded source counts, never rule/configuration payloads.
+		$source_summary = static function ( callable $load, int $product_id ): array {
+			try {
+				$runtime = $load(); $result = $runtime->result; $category_candidates = 0; $product_candidates = 0;
+				foreach ( $result->candidate_hierarchy as $candidate ) { if ( is_array( $candidate ) ) { $category_candidates += 'category' === ( $candidate['target_type'] ?? null ) ? 1 : 0; $product_candidates += 'product' === ( $candidate['target_type'] ?? null ) ? 1 : 0; } }
+				$counts = [ 'matched' => count( $result->matched_rules ), 'chosen' => count( $result->chosen_rules ), 'skipped' => count( $result->skipped_rules ), 'category_candidates' => $category_candidates, 'product_candidates' => $product_candidates ];
+				$limited = false; foreach ( $counts as &$count ) { $limited = $limited || $count > 200; $count = min( 201, $count ); } unset( $count );
+				return [ 'returned' => true, 'source' => in_array( $runtime->source, [ 'legacy', 'ecr' ], true ) ? $runtime->source : 'other', 'success' => $result->success, 'input_identity_matches' => 'product' === $result->input_target_type && $product_id === $result->input_target_id, 'contract_supported' => '1' === $result->contract_version, 'error_present' => null !== $result->error, 'counts' => $counts, 'count_limit_exceeded' => $limited, 'exception_kind' => 'none' ];
+			} catch ( Throwable $error ) { return [ 'returned' => false, 'exception_kind' => $error instanceof TypeError ? 'type_error' : ( $error instanceof LogicException ? 'logic_error' : ( $error instanceof RuntimeException ? 'runtime_error' : 'other_error' ) ) ]; }
+		};
+		$ownership_diagnostics = []; $physical_probe = new CetechDeliveryEngine\Application\EmergencyControl\WpdbEmergencyConfigurationOwnershipProbe();
+		foreach ( [ 'managed', 'pickup', 'unmanaged' ] as $kind ) {
+			$product_id = $fixture->state[$kind . '_product_id']; $native_product = wc_get_product( $product_id );
+			$ownership_diagnostics[$kind] = [
+				'classification' => $product_ownership[$kind]->value,
+				'physical_scope_classification' => $physical_probe->ownership( $product_id, null )->value,
+				'native_product_exists' => $native_product instanceof WC_Product,
+				'native_identity_matches' => $native_product instanceof WC_Product && $product_id === $native_product->get_id(),
+				'native_product_type' => ! $native_product instanceof WC_Product ? 'unavailable' : ( $native_product->is_type( 'simple' ) ? 'simple' : ( $native_product->is_type( 'variable' ) ? 'variable' : ( $native_product->is_type( 'variation' ) ? 'variation' : 'other' ) ) ),
+				'legacy' => $source_summary( static fn () => ( new CetechDeliveryEngine\Application\Runtime\LegacyProductDeliveryConfigurationSource( $container->get( CetechDeliveryEngine\Application\ProductRule\ProductDeliveryRuleResolver::class ) ) )->resolve( 'product', $product_id ), $product_id ),
+				'ecr' => $source_summary( static fn () => ( new CetechDeliveryEngine\Application\Runtime\EcrProductDeliveryConfigurationSource( $container->get( CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver::class ), $container->get( CetechDeliveryEngine\Application\Runtime\EcrToRuntimeConfigurationAdapter::class ), $container->get( CetechDeliveryEngine\Application\Runtime\VariationRelationshipInspectorInterface::class ) ) )->resolve( 'product', $product_id ), $product_id ),
+			];
+		}
+		$check( 'NATIVE-C07-AUTHORITATIVE-MANAGED-UNMANAGED-PRODUCTS', EmergencyOwnership::Managed === $product_ownership['managed'] && EmergencyOwnership::Managed === $product_ownership['pickup'] && EmergencyOwnership::Unmanaged === $product_ownership['unmanaged'], $ownership_diagnostics );
 		$check( 'NATIVE-C07-NEW-LEGACY-MISSING-ORDER-OWNERSHIP', EmergencyOwnership::Managed === $classifier->order( $managed ) && EmergencyOwnership::Managed === $classifier->order( $legacy ) && EmergencyOwnership::Managed === $classifier->order( $missing ) && EmergencyOwnership::Unmanaged === $classifier->order( $ordinary ) );
 		$before = CetechOpeningEmergencyFixture::order_bytes( $fixture->state['orders'] );
 		$paused = $fixture->transition( 'checkout_suspended', 'incident_pause' );

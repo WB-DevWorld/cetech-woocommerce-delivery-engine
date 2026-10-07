@@ -24,6 +24,10 @@ First implementation candidate `00a37dfeb8c846836bb8694fbedade0c2a29b3ec`, tree 
 
 The narrow fixture successor corrects that suffix, verifies its fixed manifest/array baseline before enumeration, retains original failure truth and restores the native principal even when cleanup refuses. PHP lint and four-table manifest assertions passed. No production source, schema, runtime, timeout, expected380/98case sets or acceptance assertion changes; a fresh complete exact-candidate run is required.
 
+Corrected candidate `39d3b53713ffc6c0f2cdc456db025f60ff805155`, tree `1e864cdf9aa84dcedd5b49e3cd6d9101d96a85fe`, PR run37559131958 attempt1: six jobs PASS, WordPress and substantive Required Gates FAIL. Native345PASS/1FAIL/346unique,34required IDs missing; both C07 cleanup cases and all43 C06 cases passed. The failed `NATIVE-C07-AUTHORITATIVE-MANAGED-UNMANAGED-PRODUCTS` compound assertion recorded no individual values, so its cause is unknown. HTTP was unexecuted. Native11455124900 ZIP56066/SHA25636dfca7137e8fe707a9e7268bf18cc7e149c9950eaf5e314a6ebcc3d4ed744c4; JSON939004/SHA2569e8ae8b3bde3e00257c1472f6e5445b3ae8ba665bd1d90cfe9e9f1efa783e0bb. Smoke11455469598 PASS+cleanup, ZIP1012/SHA256d5623ef3642cd9b605c1fcfc552d8c017d1bc6308dac148af4e6d950db2b3d16; JSON1704/SHA256b30dd6c3da851c8bfef77cddff8b092afd564b4afd36a3e692193f3823d45aba. All615 actual source hashes, runtime, synthetic tree and required SQL43+44+30+30 match. Historical failed receipts remain failed.
+
+The next narrow diagnostic evaluates those same three ownership results once and records finite classifications, source/probe readiness and counts beside the unchanged strict assertion. No product correction is inferred from the compound failure. Expected case IDs/counts, production map, runtime and timeout remain unchanged; a fresh actual native execution is required to identify the failing constituent.
+
 # Current Work — W1-C07 emergency-control design
 
 Status: **WAVE1-PLAN-1 ACCEPTED — C01–C06 INTEGRATED — W1-C07 DESIGN AUTHORIZED / PROPOSED — RC.12 IMMUTABLE**
