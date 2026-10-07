@@ -121,6 +121,10 @@ def native_failure_observation(value):
     booleans = ("prepare_entered", "prepare_returned", "evidence_called", "evidence_returned", "native_chosen_cache_present", "native_totals_cache_present", "native_shipping_cache_present")
     counters = ("source_reads", "quote_writes", "budget_writes")
     keys = ("observation", "prepare_error_class", "prepare_refusal_site", "prepare_refusal_line", "native_shipping_debug_enabled", *booleans, *counters)
+    if isinstance(value, dict) and "current_evidence_followup" in value:
+        if not current_evidence_followup(value["current_evidence_followup"]) or value.get("evidence_called") is not True or value.get("evidence_returned") is not False:
+            return False
+        value = {key: fact for key, fact in value.items() if key != "current_evidence_followup"}
     if isinstance(value, dict) and "source_registration_probe" in value:
         if not source_registration_probe(value["source_registration_probe"]) or value.get("prepare_refusal_site") != "source_local_binding":
             return False
@@ -158,6 +162,22 @@ def source_registration_probe(value):
     if any(not integer(value[key], 0, 256) for key in ("native_query_tuple_count", "pre_get_posts_callback_count")):
         return False
     return value["native_query_tuple_count"] <= value["pre_get_posts_callback_count"] and (value["native_query_singleton_present"] or value["native_query_tuple_count"] == 0) and (value["native_query_tuple_count"] == 1 or value["capture_without_exact_tuple"] is None)
+
+
+def current_evidence_followup(value):
+    stages = ("input_ready", "environment_same_draft", "environment_matches_original", "environment_authorized", "control_observed", "cached_shipping_restored", "preparation_matches_original", "source_captured", "source_bound", "packages_restored", "native_captured", "native_bound", "context_digest_matches", "source_applicable", "native_unchanged", "source_local_unchanged", "final_same_draft", "final_authorized", "control_confirmed")
+    counters = ("source_read_delta", "quote_write_delta", "budget_write_delta")
+    keys = ("observation", "failed_stage", "error_class", "refusal_site", "refusal_line", *stages, *counters)
+    if not exact(value, keys) or value["observation"] != "followup_readonly_not_original_timing" or not choice(value["failed_stage"], {None, *stages}):
+        return False
+    if not choice(value["error_class"], {None, "RuntimeException", "InvalidArgumentException", "Error"}) or not choice(value["refusal_site"], {None, "native_environment", "native_shipping", "native_preparation", "legacy_source", "source_local_binding", "native_context", "native_receipt", "source_snapshot"}):
+        return False
+    if value["refusal_site"] is None:
+        if value["refusal_line"] is not None:
+            return False
+    elif value["error_class"] is None or not integer(value["refusal_line"], 1, 100000):
+        return False
+    return all(value[key] is None or type(value[key]) is bool for key in stages) and all(integer(value[key], 0, 1000000) for key in counters)
 
 
 def run_quote_cart(client, state, bridge, recorder, Page, login):

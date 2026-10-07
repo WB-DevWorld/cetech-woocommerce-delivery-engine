@@ -35,6 +35,21 @@ def child_helpers(expression):
 
 
 class QuoteCartProtocol(unittest.TestCase):
+    def test_current_evidence_followup_is_separate_finite_and_refused_on_success(self):
+        stages = ("input_ready", "environment_same_draft", "environment_matches_original", "environment_authorized", "control_observed", "cached_shipping_restored", "preparation_matches_original", "source_captured", "source_bound", "packages_restored", "native_captured", "native_bound", "context_digest_matches", "source_applicable", "native_unchanged", "source_local_unchanged", "final_same_draft", "final_authorized", "control_confirmed")
+        followup = dict.fromkeys(stages)
+        followup.update(observation="followup_readonly_not_original_timing", failed_stage="environment_same_draft", error_class=None, refusal_site=None, refusal_line=None, input_ready=True, environment_same_draft=False, source_read_delta=17, quote_write_delta=0, budget_write_delta=0)
+        original = {"observation": "original_native_attempt", "prepare_entered": False, "prepare_returned": False, "prepare_error_class": None, "prepare_refusal_site": None, "prepare_refusal_line": None, "evidence_called": True, "evidence_returned": False, "native_shipping_debug_enabled": None, "native_chosen_cache_present": True, "native_totals_cache_present": True, "native_shipping_cache_present": True, "source_reads": 0, "quote_writes": 0, "budget_writes": 4}
+        facts = dict(original, current_evidence_followup=followup)
+        self.assertTrue(DRIVER.native_failure_observation(facts)); self.assertEqual(0, facts["source_reads"]); self.assertEqual(original, {key: value for key, value in facts.items() if key != "current_evidence_followup"})
+        for key, value in (("observation", "original_native_attempt"), ("failed_stage", "PRIVATE-COOKIE"), ("error_class", "PRIVATE-CLASS"), ("refusal_site", "PRIVATE-CLASS"), ("refusal_line", 51), ("input_ready", 1), ("source_read_delta", True), ("quote_write_delta", -1), ("budget_write_delta", 1000001)):
+            with self.subTest(key=key, value=value):
+                bad = copy.deepcopy(facts); bad["current_evidence_followup"][key] = value
+                self.assertFalse(DRIVER.native_failure_observation(bad))
+        bad = copy.deepcopy(facts); bad["current_evidence_followup"]["private_payload"] = "PRIVATE-COOKIE"; self.assertFalse(DRIVER.native_failure_observation(bad))
+        bad = copy.deepcopy(facts); bad["evidence_returned"] = True; self.assertFalse(DRIVER.native_failure_observation(bad))
+        bad = copy.deepcopy(facts); bad["evidence_called"] = False; self.assertFalse(DRIVER.native_failure_observation(bad))
+
     def test_source_registration_counterfactual_is_finite_optional_and_failure_only(self):
         probe = {"observation": "pure_registration_counterfactual_original_attempt_not_retried", "native_query_singleton_present": True, "native_query_tuple_count": 1, "pre_get_posts_callback_count": 1, "capture_without_exact_tuple": True, "original_hook_restored": True}
         facts = {"observation": "original_native_attempt", "prepare_entered": True, "prepare_returned": False, "prepare_error_class": "RuntimeException", "prepare_refusal_site": "source_local_binding", "prepare_refusal_line": 51, "evidence_called": False, "evidence_returned": False, "native_shipping_debug_enabled": None, "native_chosen_cache_present": False, "native_totals_cache_present": False, "native_shipping_cache_present": False, "source_reads": 0, "quote_writes": 0, "budget_writes": 0}

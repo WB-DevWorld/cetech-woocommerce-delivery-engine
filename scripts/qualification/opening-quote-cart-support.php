@@ -84,6 +84,7 @@ final class CetechQuoteCartFactory implements FactoryContract {
 
 /** Observe a genuine native preparation without replacing its draft, provider or facts. */
 final class CetechQuoteCartEnvironmentObservation implements CartQuoteEnvironment {
+	private const FOLLOWUP_STAGES = [ 'input_ready', 'environment_same_draft', 'environment_matches_original', 'environment_authorized', 'control_observed', 'cached_shipping_restored', 'preparation_matches_original', 'source_captured', 'source_bound', 'packages_restored', 'native_captured', 'native_bound', 'context_digest_matches', 'source_applicable', 'native_unchanged', 'source_local_unchanged', 'final_same_draft', 'final_authorized', 'control_confirmed' ];
 	public array $diagnostics = [ 'prepare_entered' => false, 'prepare_returned' => false, 'prepare_error_class' => null, 'prepare_refusal_site' => null, 'prepare_refusal_line' => null, 'evidence_called' => false, 'evidence_returned' => false, 'native_shipping_debug_enabled' => null, 'native_chosen_cache_present' => false, 'native_totals_cache_present' => false, 'native_shipping_cache_present' => false ];
 	public ?array $source_registration_probe = null;
 	private ?QuoteIssueCommand $evidence_original = null;
@@ -99,11 +100,12 @@ final class CetechQuoteCartEnvironmentObservation implements CartQuoteEnvironmen
 	}
 	public function evidence( QuoteIssueCommand $original, QuoteHeader $header, QuoteCartDraft $draft ): ?QuoteCartCurrentEvidence {
 		$this->evidence_original = $original; $this->evidence_header = $header; $this->evidence_draft = $draft;
-		$this->diagnostics['evidence_called'] = true; $result = $this->native->evidence( $original, $header, $draft ); $this->diagnostics['evidence_returned'] = null !== $result; return $result;
+		$this->diagnostics['evidence_called'] = true; $this->cache_presence(); $result = $this->native->evidence( $original, $header, $draft ); $this->diagnostics['evidence_returned'] = null !== $result; return $result;
 	}
-	/** Failure-only follow-up on the same actual objects. Never prepare, reprice, issue or save. */
+	public function has_evidence_input(): bool { return null !== $this->evidence_original && null !== $this->evidence_header && null !== $this->evidence_draft; }
+	/** Failure-only follow-up on the same objects. Never admitted cart preparation, reprice, issue or save. */
 	public function readonly_followup(): array {
-		$stages = [ 'input_ready', 'environment_same_draft', 'environment_matches_original', 'environment_authorized', 'control_observed', 'cached_shipping_restored', 'preparation_matches_original', 'source_captured', 'source_bound', 'packages_restored', 'native_captured', 'native_bound', 'context_digest_matches', 'source_applicable', 'native_unchanged', 'source_local_unchanged', 'final_same_draft', 'final_authorized', 'control_confirmed' ];
+		$stages = self::FOLLOWUP_STAGES;
 		$report = [ 'observation' => 'followup_readonly_not_original_timing', 'failed_stage' => null, 'error_class' => null, 'refusal_site' => null, 'refusal_line' => null, ...array_fill_keys( $stages, null ) ];
 		$stage = 'input_ready'; $known_false = false;
 		$step = static function ( string $name, callable $read ) use ( &$report, &$stage, &$known_false ): void {
@@ -147,11 +149,20 @@ final class CetechQuoteCartEnvironmentObservation implements CartQuoteEnvironmen
 		}
 		return $report;
 	}
+	public static function valid_evidence_followup( mixed $value ): bool {
+		$keys = [ 'observation', 'failed_stage', 'error_class', 'refusal_site', 'refusal_line', ...self::FOLLOWUP_STAGES, 'source_read_delta', 'quote_write_delta', 'budget_write_delta' ];
+		if ( ! is_array( $value ) || count( $value ) !== count( $keys ) || [] !== array_diff( $keys, array_keys( $value ) ) || 'followup_readonly_not_original_timing' !== $value['observation'] || ! in_array( $value['failed_stage'], [ null, ...self::FOLLOWUP_STAGES ], true ) || ! in_array( $value['error_class'], [ null, 'RuntimeException', 'InvalidArgumentException', 'Error' ], true ) || ! in_array( $value['refusal_site'], [ null, 'native_environment', 'native_shipping', 'native_preparation', 'legacy_source', 'source_local_binding', 'native_context', 'native_receipt', 'source_snapshot' ], true ) ) { return false; }
+		if ( null === $value['refusal_site'] ? null !== $value['refusal_line'] : ( null === $value['error_class'] || ! is_int( $value['refusal_line'] ) || $value['refusal_line'] < 1 || $value['refusal_line'] > 100000 ) ) { return false; }
+		foreach ( self::FOLLOWUP_STAGES as $key ) { if ( null !== $value[$key] && ! is_bool( $value[$key] ) ) { return false; } }
+		foreach ( [ 'source_read_delta', 'quote_write_delta', 'budget_write_delta' ] as $key ) { if ( ! is_int( $value[$key] ) || $value[$key] < 0 || $value[$key] > 1000000 ) { return false; } }
+		return true;
+	}
 	private function cache_presence(): void {
 		try {
-			$session = $GLOBALS['woocommerce']->session; $data = ( new ReflectionProperty( $session, '_data' ) )->getValue( $session );
+			$raw = static function ( object $object, string $name ): mixed { $property = new ReflectionProperty( $object, $name ); if ( $property->isStatic() || ! $property->isInitialized( $object ) ) { throw new LogicException( 'Raw native cache presence is unavailable.' ); } return method_exists( $property, 'getRawValue' ) ? $property->getRawValue( $object ) : $property->getValue( $object ); };
+			$wc = $GLOBALS['woocommerce'] ?? null; if ( ! is_object( $wc ) ) { return; } $session = $raw( $wc, 'session' ); if ( ! is_object( $session ) ) { return; } $data = $raw( $session, '_data' );
 			if ( is_array( $data ) ) { $this->diagnostics['native_chosen_cache_present'] = isset( $data['chosen_shipping_methods'] ); $this->diagnostics['native_totals_cache_present'] = isset( $data['cart_totals'] ); $this->diagnostics['native_shipping_cache_present'] = isset( $data['shipping_for_package_0'] ); }
-			$cache = $GLOBALS['wp_object_cache'] ?? null; if ( ! is_object( $cache ) || 'WP_Object_Cache' !== get_class( $cache ) ) { return; } $data = ( new ReflectionProperty( $cache, 'cache' ) )->getValue( $cache ); $prefix = ( new ReflectionProperty( $cache, 'blog_prefix' ) )->getValue( $cache ); $multisite = ( new ReflectionProperty( $cache, 'multisite' ) )->getValue( $cache ); $groups = ( new ReflectionProperty( $cache, 'global_groups' ) )->getValue( $cache );
+			$cache = $GLOBALS['wp_object_cache'] ?? null; if ( ! is_object( $cache ) || 'WP_Object_Cache' !== get_class( $cache ) ) { return; } $data = $raw( $cache, 'cache' ); $prefix = $raw( $cache, 'blog_prefix' ); $multisite = $raw( $cache, 'multisite' ); $groups = $raw( $cache, 'global_groups' );
 			if ( ! is_array( $data ) || ! is_string( $prefix ) || ! is_bool( $multisite ) || ! is_array( $groups ) ) { return; } $key = $multisite && ! isset( $groups['options'] ) ? $prefix : ''; $options = $data['options'] ?? []; $all = $options[$key . 'alloptions'] ?? []; $value = is_array( $all ) && array_key_exists( 'woocommerce_shipping_debug_mode', $all ) ? $all['woocommerce_shipping_debug_mode'] : ( $options[$key . 'woocommerce_shipping_debug_mode'] ?? null ); if ( is_string( $value ) ) { $this->diagnostics['native_shipping_debug_enabled'] = 'yes' === $value; }
 		} catch ( Throwable ) { /* Presence remains unknown; no fallback native getter or query. */ }
 	}
@@ -333,7 +344,7 @@ final class CetechQuoteCartHttpFixture {
 		$observed = new CetechQuoteCartEnvironmentObservation( $environment );
 		return [ new CartQuoteService( $observed, new QuotePreparationGate( $factory, [ $environment, 'authorize' ] ), $sessions, $factory ), $sessions, $factory, $observed ];
 	}
-	/** Original failed native attempt only: no follow-up capture, getters or SQL. */
+	/** Copy original failure facts before any separately labelled read-only follow-up. */
 	public static function failure_observation( CetechQuoteCartEnvironmentObservation $observed, CetechQuoteCartFactory $factory ): ?array {
 		$facts = $observed->diagnostics;
 		$booleans = [ 'prepare_entered', 'prepare_returned', 'evidence_called', 'evidence_returned', 'native_chosen_cache_present', 'native_totals_cache_present', 'native_shipping_cache_present' ];
@@ -348,7 +359,12 @@ final class CetechQuoteCartHttpFixture {
 		foreach ( $counts as $value ) { if ( $value < 0 || $value > 1000000 ) { return null; } }
 		$probe = $observed->source_registration_probe;
 		if ( null !== $probe && ( 'source_local_binding' !== $facts['prepare_refusal_site'] || ! CetechQuoteCartEnvironmentObservation::valid_source_registration_probe( $probe ) ) ) { return null; }
-		return [ 'observation' => 'original_native_attempt', ...$facts, ...$counts, ...( null !== $probe ? [ 'source_registration_probe' => $probe ] : [] ) ];
+		$failure = [ 'observation' => 'original_native_attempt', ...$facts, ...$counts, ...( null !== $probe ? [ 'source_registration_probe' => $probe ] : [] ) ];
+		if ( true === $facts['evidence_called'] && false === $facts['evidence_returned'] && $observed->has_evidence_input() ) {
+			$followup = [ ...$observed->readonly_followup(), 'source_read_delta' => $factory->source_reads - $counts['source_reads'], 'quote_write_delta' => $factory->quote_writes - $counts['quote_writes'], 'budget_write_delta' => $factory->budget_writes - $counts['budget_writes'] ];
+			if ( CetechQuoteCartEnvironmentObservation::valid_evidence_followup( $followup ) ) { $failure['current_evidence_followup'] = $followup; }
+		}
+		return $failure;
 	}
 	public static function track_owner( array &$state, NativeCartQuoteSessionStore $sessions ): QuoteOwner {
 		$owner = ( new QuoteNativeOwnerResolver() )->current(); $key = $sessions->key_for( $owner ); $session_id = WC()->session->get_customer_id();
@@ -372,7 +388,7 @@ final class CetechQuoteCartHttpFixture {
 		$fixture = self::hydrate_native( $db, $state['native'] ); $before = $state['native']['domain_before']; $owners = [];
 		foreach ( $state['owners'] as $facts ) { $owner = QuoteOwner::from_array( $facts['owner'] ); $owners[$owner->digest()] = $owner; }
 		$namespaces = $state['native']['owned_namespaces']; $quotes = $state['native']['owned_quotes']; $old_quote_ids = array_column( $before['delivery_quotes'], 'id' );
-		foreach ( CetechNativeQuoteProviderFixture::rows( TableNames::for( 'delivery_quotes' ) ) as $row ) { if ( in_array( $row['id'], $old_quote_ids, true ) ) { continue; } $typed = QuoteStoredRow::from_row( $row ); if ( ! isset( $owners[$typed->header()->owner()->digest()] ) ) { continue; } $quotes[] = $typed->id()->value(); $namespaces = [ ...$namespaces, ...array_values( $typed->header()->namespace_hashes() ) ]; }
+		foreach ( CetechNativeQuoteProviderFixture::rows( TableNames::for( 'delivery_quotes' ) ) as $row ) { if ( in_array( $row['id'], $old_quote_ids, true ) ) { continue; } $typed = QuoteStoredRow::from_row( $row ); if ( ! isset( $owners[$typed->header()->owner()->digest()] ) ) { continue; } $quotes[] = $typed->header()->id()->value(); $namespaces = [ ...$namespaces, ...array_values( $typed->header()->namespace_hashes() ) ]; }
 		$old_budget_ids = array_column( $before['delivery_quote_budget_windows'], 'id' ); $budget_table = TableNames::for( 'delivery_quote_budget_windows' );
 		foreach ( CetechNativeQuoteProviderFixture::rows( $budget_table ) as $row ) {
 			$owned = (int) $row['site_id'] === $state['site_id'] && $row['slot_key'] === CetechDeliveryEngine\Domain\DeliveryQuote\QuoteBudgetSlot::site_slot_key( $state['site_id'] );

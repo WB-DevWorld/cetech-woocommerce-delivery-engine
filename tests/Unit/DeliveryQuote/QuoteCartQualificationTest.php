@@ -12,6 +12,32 @@ require_once dirname( __DIR__, 3 ) . '/scripts/qualification/opening-quote-cart-
 /** Fixture protocol only; actual WordPress/SQL/browser results remain separate. */
 final class QuoteCartQualificationTest extends TestCase {
 	private function factory(): \CetechQuoteCartFactory { return ( new \ReflectionClass( \CetechQuoteCartFactory::class ) )->newInstanceWithoutConstructor(); }
+	/** Actual persisted row through cleanup discovery; SQL transport stops after exact selectors. */
+	public function test_cleanup_uses_the_owned_persisted_header_uuid_for_quote_selectors(): void {
+		$program = <<<'PHP'
+function wp_delete_user( int $id ): bool { return true; }
+class wpdb {
+    public string $prefix = 'owned_'; public string $last_error = ''; public array $quote_rows = []; public array $deleted = [];
+    public function get_results( string $sql, mixed $format ): array { return str_contains( $sql, '`owned_delivery_engine_delivery_quotes`' ) ? $this->quote_rows : []; }
+    public function delete( string $table, array $where ): int { if ( in_array( $table, [ 'owned_delivery_engine_delivery_quote_bindings', 'owned_delivery_engine_delivery_quotes' ], true ) ) { $this->deleted[$table] = $where; if ( str_ends_with( $table, '_delivery_quotes' ) ) { throw new LogicException( 'OWNED-SELECTOR-OBSERVED' ); } } return 1; }
+}
+require 'tests/bootstrap.php'; require 'tests/Support/DeliveryQuote/CartQuoteFixtures.php'; require 'scripts/qualification/opening-quote-cart-support.php';
+$f = new CetechDeliveryEngine\Tests\Support\DeliveryQuote\QuoteDurableFixtureFactory(); $environment = new CetechDeliveryEngine\Tests\Support\DeliveryQuote\CartQuoteFixtureEnvironment( $f ); $sessions = new CetechDeliveryEngine\Tests\Support\DeliveryQuote\CartQuoteFixtureSessions(); $service = CetechDeliveryEngine\Tests\Support\DeliveryQuote\CartQuoteFixtures::service( $f, $environment, $sessions );
+$issued = $service->refresh( CetechDeliveryEngine\Domain\DeliveryQuote\QuoteId::generate()->value(), 0, CetechDeliveryEngine\Domain\Contracts\RequestContext::create() );
+$row = $f->pdo->query( 'SELECT * FROM durable_delivery_engine_delivery_quotes' )->fetch( PDO::FETCH_ASSOC ); $typed = CetechDeliveryEngine\Domain\DeliveryQuote\QuoteStoredRow::from_row( $row ); $owner = $typed->header()->owner();
+$db = new wpdb(); $db->quote_rows = [ $row ]; $GLOBALS['wpdb'] = $db; $GLOBALS['wp_filter'] = []; $GLOBALS['cetech_de_test_wc'] = new class { public mixed $session = null; public mixed $cart = null; public mixed $customer = null; public function shipping(): object { return (object) []; } };
+$fixture = ( new ReflectionClass( CetechNativeQuoteProviderFixture::class ) )->newInstanceWithoutConstructor();
+foreach ( [ 'suffix' => 'fixture', 'tax_class' => 'fixture_tax', 'offer' => 1, 'zone' => 2, 'rate' => 3, 'shipping_instance' => 4, 'alternate_supplier' => 5, 'alternate_profile' => 6, 'alternate_origin' => 7 ] as $name => $value ) { ( new ReflectionProperty( $fixture, $name ) )->setValue( $fixture, $value ); }
+$native = CetechQuoteCartHttpFixture::export_native( $fixture ); $native['domain_before'] = [ 'delivery_quotes' => [], 'delivery_quote_budget_windows' => [] ]; $native['native_before'] = [ 'woocommerce_sessions' => [] ];
+$state = [ 'native' => $native, 'owners' => [ [ 'owner' => $owner->facts(), 'auxiliary_key' => 'owned-auxiliary', 'native_session_key' => 'owned-session' ] ], 'site_id' => $owner->site_id(), 'page_ids' => [], 'user_id' => 9 ]; $reached = false; $failure_class = null;
+try { CetechQuoteCartHttpFixture::cleanup( $db, $state ); }
+catch ( Throwable $error ) { $reached = $error instanceof LogicException && 'OWNED-SELECTOR-OBSERVED' === $error->getMessage(); $failure_class = $error instanceof Error ? 'Error' : ( $error instanceof LogicException ? 'LogicException' : 'OtherError' ); }
+$wanted = [ 'site_id' => $owner->site_id(), 'quote_uuid' => $typed->header()->id()->value() ];
+echo json_encode( [ 'actual_issued_quote' => 'review_required' === $issued->shopper_facts()['status'], 'stored_id_is_integer' => is_int( $typed->id() ), 'owned_selectors_reached' => $reached, 'exact_binding_uuid_selector' => $wanted === ( $db->deleted['owned_delivery_engine_delivery_quote_bindings'] ?? null ), 'exact_quote_uuid_selector' => $wanted === ( $db->deleted['owned_delivery_engine_delivery_quotes'] ?? null ), 'selector_count' => count( $db->deleted ), 'failure_class' => $failure_class ], JSON_THROW_ON_ERROR );
+PHP;
+		$process = proc_open( [ PHP_BINARY, '-r', $program ], [ [ 'pipe', 'r' ], [ 'pipe', 'w' ], [ 'pipe', 'w' ] ], $pipes, dirname( __DIR__, 3 ) ); self::assertIsResource( $process ); fclose( $pipes[0] ); $stdout = stream_get_contents( $pipes[1] ); $stderr = stream_get_contents( $pipes[2] ); fclose( $pipes[1] ); fclose( $pipes[2] ); self::assertSame( 0, proc_close( $process ), $stderr );
+		$facts = json_decode( $stdout, true, 8, JSON_THROW_ON_ERROR ); self::assertTrue( $facts['actual_issued_quote'] ); self::assertTrue( $facts['stored_id_is_integer'] ); self::assertTrue( $facts['owned_selectors_reached'] ); self::assertTrue( $facts['exact_binding_uuid_selector'] ); self::assertTrue( $facts['exact_quote_uuid_selector'] ); self::assertSame( 2, $facts['selector_count'] );
+	}
 	public function test_lost_ack_seam_masks_only_after_actual_quote_effect_and_native_commit_acknowledgement(): void {
 		$factory = $this->factory(); $factory->mask_next_quote_ack = true; $native = new QuoteCartFixtureNativeTransport(); $transport = new \CetechQuoteCartTransport( $native, $factory, 'owned_' );
 		$transport->execute( 'START TRANSACTION' ); $transport->execute( 'INSERT INTO `owned_delivery_engine_delivery_quotes` (id) VALUES (1)' ); $result = $transport->execute( 'COMMIT' );
@@ -92,6 +118,23 @@ PHP;
 		self::assertSame( 'followup_readonly_not_original_timing', $report['observation'] ); self::assertSame( 'input_ready', $report['failed_stage'] ); self::assertFalse( $report['input_ready'] ); self::assertNull( $report['error_class'] ); self::assertNull( $report['refusal_site'] ); self::assertNull( $report['refusal_line'] );
 		foreach ( array_slice( $report, 6 ) as $value ) { self::assertNull( $value ); }
 		self::assertStringNotContainsString( 'original_token', json_encode( $report, JSON_THROW_ON_ERROR ) );
+	}
+	public function test_failed_evidence_samples_raw_cache_and_keeps_original_counts_separate_from_followup(): void {
+		require_once dirname( __DIR__, 2 ) . '/Support/DeliveryQuote/CartQuoteFixtures.php';
+		$existed = array_key_exists( 'woocommerce', $GLOBALS ); $before_wc = $GLOBALS['woocommerce'] ?? null;
+		$GLOBALS['woocommerce'] = (object) [ 'session' => new class { private array $_data = [ 'chosen_shipping_methods' => [ 'PRIVATE-RATE' ], 'cart_totals' => [ 'PRIVATE-TOTAL' ], 'shipping_for_package_0' => [ 'PRIVATE-PACKAGE' ] ]; } ];
+		try {
+			$factory = $this->createMock( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class ); $factory->expects( self::never() )->method( 'open' );
+			$observer = new \CetechQuoteCartEnvironmentObservation( new \CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuoteEnvironment( $factory ) ); $owner = \CetechDeliveryEngine\Tests\Support\DeliveryQuote\CartQuoteFixtures::owner(); $context = \CetechDeliveryEngine\Tests\Support\DeliveryQuote\CartQuoteFixtures::context();
+			$original = \CetechDeliveryEngine\Application\DeliveryQuote\QuoteIssueCommand::create( $owner, $context, 'legacy_fixed_base_v1', 1, 'legacy_fixed_base_v1', 1, \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteId::generate()->value() ); $header = \CetechDeliveryEngine\Tests\Support\DeliveryQuote\QuoteFixtures::issue( $owner, context: $context )->header(); $draft = \CetechDeliveryEngine\Tests\Support\DeliveryQuote\CartQuoteFixtures::draft();
+			self::assertNull( $observer->evidence( $original, $header, $draft ) ); $original_facts = $observer->diagnostics; $counts = $this->factory(); $counts->source_reads = 0; $counts->quote_writes = 0; $counts->budget_writes = 4;
+			$failure = \CetechQuoteCartHttpFixture::failure_observation( $observer, $counts ); self::assertSame( $original_facts, $observer->diagnostics ); self::assertFalse( $failure['prepare_entered'] ); self::assertTrue( $failure['evidence_called'] ); self::assertFalse( $failure['evidence_returned'] );
+			foreach ( [ 'native_chosen_cache_present', 'native_totals_cache_present', 'native_shipping_cache_present' ] as $key ) { self::assertTrue( $failure[$key] ); }
+			self::assertSame( 0, $failure['source_reads'] ); self::assertSame( 0, $failure['quote_writes'] ); self::assertSame( 4, $failure['budget_writes'] );
+			$followup = $failure['current_evidence_followup']; self::assertCount( 27, $followup ); self::assertTrue( \CetechQuoteCartEnvironmentObservation::valid_evidence_followup( $followup ) ); self::assertSame( 'followup_readonly_not_original_timing', $followup['observation'] ); self::assertSame( 'environment_same_draft', $followup['failed_stage'] ); self::assertFalse( $followup['environment_same_draft'] );
+			foreach ( [ 'source_read_delta', 'quote_write_delta', 'budget_write_delta' ] as $key ) { self::assertSame( 0, $followup[$key] ); }
+			self::assertStringNotContainsString( 'PRIVATE-', json_encode( $failure, JSON_THROW_ON_ERROR ) ); $bad = $followup; $bad['private_cookie'] = 'PRIVATE-COOKIE'; self::assertFalse( \CetechQuoteCartEnvironmentObservation::valid_evidence_followup( $bad ) ); $bad = $followup; $bad['failed_stage'] = 'PRIVATE-COOKIE'; self::assertFalse( \CetechQuoteCartEnvironmentObservation::valid_evidence_followup( $bad ) );
+		} finally { if ( $existed ) { $GLOBALS['woocommerce'] = $before_wc; } else { unset( $GLOBALS['woocommerce'] ); } }
 	}
 	public function test_followup_stops_at_actual_native_same_draft_false_before_any_connection_or_cache_restore(): void {
 		require_once dirname( __DIR__, 2 ) . '/Support/DeliveryQuote/CartQuoteFixtures.php';
