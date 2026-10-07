@@ -29,7 +29,7 @@ return static function ( callable $check ): void {
 	}
 	foreach ( get_included_files() as $file ) { if ( str_ends_with( str_replace( '\\', '/', $file ), '/tests/bootstrap.php' ) ) { throw new RuntimeException( 'Unit bootstrap is forbidden in native quote reader proof.' ); } }
 	require_once dirname( __DIR__, 2 ) . '/tests/Support/DeliveryQuote/QuoteFixtures.php';
-	$db = $wpdb; $orders = []; $items = []; $products = []; $original_error = null;
+	$db = $wpdb; $orders = []; $items = []; $products = []; $owned_product_id = 0; $original_error = null;
 	$reader = new OrderDeliverySnapshotReader(); $factory = new HistoricalOrderShipmentContextFactory( $reader ); $planner = new HistoricalShipmentPlanner();
 	$hpos = \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
 	$meta_table = $hpos ? $db->prefix . 'wc_orders_meta' : $db->postmeta; $owner_column = $hpos ? 'order_id' : 'post_id'; $meta_id = $hpos ? 'id' : 'meta_id';
@@ -41,12 +41,15 @@ return static function ( callable $check ): void {
 		if ( [] === $orders ) { return [ [], [] ]; } $order_ids = implode( ',', array_map( 'intval', $orders ) ); $item_ids = implode( ',', array_map( 'intval', $items ) );
 		return [ $rows( "SELECT `{$meta_id}`,`{$owner_column}`,meta_key,meta_value FROM `{$meta_table}` WHERE `{$owner_column}` IN ({$order_ids}) ORDER BY `{$meta_id}`" ), [] === $items ? [] : $rows( "SELECT meta_id,order_item_id,meta_key,meta_value FROM `{$item_meta}` WHERE order_item_id IN ({$item_ids}) ORDER BY meta_id" ) ];
 	};
-	$seed = static function ( array|string $line, array|string $package, bool $marker_exists = false, mixed $marker = '1' ) use ( &$orders, &$items, $encode ): array {
+	$seed = static function ( array|string $line, array|string $package, bool $marker_exists = false, mixed $marker = '1' ) use ( &$orders, &$items, &$owned_product_id, $encode ): array {
+		if ( $owned_product_id < 1 ) { throw new RuntimeException( 'Quote reader owned product is unavailable.' ); }
 		$order = wc_create_order(); if ( ! $order instanceof WC_Order || $order->get_id() < 1 ) { throw new RuntimeException( 'Quote reader order fixture failed.' ); } $orders[] = (int) $order->get_id();
 		$order->set_currency( 'GHS' ); $order->update_meta_data( OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, is_array( $package ) ? $encode( $package ) : $package );
 		$order->update_meta_data( OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION, is_array( $package ) ? $package['snapshot_version'] : '1' );
 		$order->update_meta_data( '_w2q05_reader_foreign', 'PRIVATE-READER-FOREIGN-SENTINEL' );
-		$item = new WC_Order_Item_Product(); $item->set_name( 'Seeded historical reader item' ); $item->set_product_id( is_array( $line ) ? $line['product_id'] : 1 ); $item->set_quantity( 2 ); $item->set_subtotal( '20' ); $item->set_total( '20' );
+		// Malformed snapshot JSON is the test input; native CRUD still requires
+		// this fixture's actual product, not an unrelated fallback post ID.
+		$item = new WC_Order_Item_Product(); $item->set_name( 'Seeded historical reader item' ); $item->set_product_id( $owned_product_id ); $item->set_quantity( 2 ); $item->set_subtotal( '20' ); $item->set_total( '20' );
 		$item->add_meta_data( OrderDeliverySnapshot::META_LINE_SNAPSHOT, is_array( $line ) ? $encode( $line ) : $line, true ); $item->add_meta_data( OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION, is_array( $line ) ? $line['snapshot_version'] : '1', true );
 		$item->add_meta_data( '_w2q05_reader_foreign', 'PRIVATE-READER-LINE-SENTINEL', true );
 		if ( $marker_exists ) { $order->add_meta_data( DeliveryQuoteSnapshotEnvelope::META_FORMAT, $marker, true ); $item->add_meta_data( DeliveryQuoteSnapshotEnvelope::META_FORMAT, $marker, true ); }
@@ -61,7 +64,7 @@ return static function ( callable $check ): void {
 	$assert_read = static function ( string $id, array $fixture, callable $predicate ) use ( $read, $physical, $check ): void { $before = $physical(); $warnings = 0; set_error_handler( static function () use ( &$warnings ): bool { ++$warnings; return true; } ); try { $value = $read( $fixture ); } finally { restore_error_handler(); } $unchanged = $before === $physical(); $check( $id, $predicate( $value ) && $unchanged && 0 === $warnings, [ 'physical_meta_unchanged' => $unchanged, 'reader_warning_count' => $warnings ] ); };
 	try {
 		$check( 'NATIVE-W2Q05-READER-ENVIRONMENT', $hpos && DeliveryQuoteSnapshotReadiness::supports( 1, [ 'code' => 'legacy_fixed_base_v1', 'version' => 1 ] ) && DeliveryQuoteSnapshotReadiness::contract()['reader_only'], [ 'hpos' => $hpos, 'proof' => 'seeded captured-shaped history; native CRUD; no issue or placement claim' ] );
-		$product = new WC_Product_Simple(); $product->set_name( 'Q05 reader owned product' ); $product->set_status( 'publish' ); $product_id = (int) $product->save(); if ( $product_id < 1 ) { throw new RuntimeException( 'Quote reader product fixture failed.' ); } $products[] = $product_id;
+		$product = new WC_Product_Simple(); $product->set_name( 'Q05 reader owned product' ); $product->set_status( 'publish' ); $product_id = (int) $product->save(); if ( $product_id < 1 ) { throw new RuntimeException( 'Quote reader product fixture failed.' ); } $products[] = $product_id; $owned_product_id = $product_id;
 		$line = [ 'contract_version' => '1', 'snapshot_version' => '1', 'product_id' => $product_id, 'variation_id' => null, 'fulfilment_availability' => 'in_warehouse', 'fulfilment_choice' => 'delivery', 'delivery_offer_id' => 17, 'delivery_offer_public_label' => 'Captured historical delivery', 'delivery_offer_public_description' => 'Saved historical description', 'estimate_text' => 'Captured three days', 'rule_id' => 111, 'destination_zone_id' => 19, 'quantity' => 2, 'currency_code' => 'GHS', 'quoted_amount' => '12.5000', 'quote_status' => 'quoted', 'rate_card_id' => 29, 'rate_card_code' => 'PRIVATE-Q05-RATE', 'snapshotted_at' => '2026-10-07T05:00:10+00:00', 'delivery_group_id' => 'in_warehouse|delivery|17' ];
 		$package = [ 'snapshot_version' => '1', 'shipping_method_id' => 'delivery_engine_selected_offer', 'shipping_method_label' => 'Captured historical delivery', 'package_total_delivery_amount' => '12.5000', 'currency_code' => 'GHS', 'destination_zone_id' => 19, 'quote_status' => 'success', 'snapshotted_at' => '2026-10-07T05:00:10+00:00', 'groups' => [ [ 'group_id' => $line['delivery_group_id'], 'shipping_method_id' => 'delivery_engine_selected_offer', 'shipping_method_label' => 'Captured historical delivery', 'package_total_delivery_amount' => '12.5000', 'fulfilment_choice' => 'delivery', 'is_pickup' => false, 'display_index' => 1 ] ] ];
 		$legacy = $seed( $line, $package );
