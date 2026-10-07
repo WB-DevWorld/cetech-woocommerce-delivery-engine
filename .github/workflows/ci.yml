@@ -182,6 +182,8 @@ jobs:
             'CetechDeliveryEngine\Tests\Integration\RuleLifecycle\RuleLifecycleRealDatabaseTest' 44
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
             'CetechDeliveryEngine\Tests\Integration\DataLifecycle\DataLifecycleRealDatabaseTest' 30
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+            'CetechDeliveryEngine\Tests\Integration\EmergencyControl\EmergencyControlRealDatabaseTest' 30
 
   php85-wordpress:
     name: PHP 8.5 WordPress/WooCommerce
@@ -216,6 +218,13 @@ jobs:
           python3 scripts/qualification/test-store-smoke-diagnostic.py
       - name: Install native crash debugger for the disposable HTTP listener
         run: sudo apt-get update -qq && sudo apt-get install -y -qq gdb
+      - name: Install the pinned disposable C07 browser proof tool
+        run: |
+          npm install --prefix "${RUNNER_TEMP}/cetech-de-c07-browser" --no-save --package-lock=false playwright@1.58.2
+          PLAYWRIGHT_BROWSERS_PATH="${RUNNER_TEMP}/cetech-de-c07-browsers" \
+            "${RUNNER_TEMP}/cetech-de-c07-browser/node_modules/.bin/playwright" install --with-deps chromium
+          echo "CETECH_DE_EMERGENCY_PLAYWRIGHT_MODULE=${RUNNER_TEMP}/cetech-de-c07-browser/node_modules/playwright" >> "$GITHUB_ENV"
+          echo "PLAYWRIGHT_BROWSERS_PATH=${RUNNER_TEMP}/cetech-de-c07-browsers" >> "$GITHUB_ENV"
       - name: WordPress bootstrap, WooCommerce, HPOS, Store API, upgrade from RC.12
         env:
           CETECH_DE_NATIVE_OPENING_QUALIFICATION: '1'

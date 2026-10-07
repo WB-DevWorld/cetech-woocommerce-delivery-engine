@@ -14,6 +14,7 @@ final class DataLifecycleManifest {
 	public const CACHE_CLASS = 'geography_response_cache_v1';
 	public const CACHE_PREFIX = 'cetech_de_gc_geo_v1_';
 	public const COORDINATOR_OPTION = 'cetech_de_gc_state_geo_v1';
+	public const CHECKOUT_CONTROL_OPTION = 'cetech_de_checkout_control_v1';
 	public const UNINSTALL_STATUS = 'cetech_de_data_lifecycle_uninstall_status';
 	public const UNINSTALL_INTENT = 'cetech_de_delete_data_on_uninstall';
 	public const CAPABILITIES_MARKER = 'cetech_de_capabilities_version';
@@ -74,7 +75,7 @@ final class DataLifecycleManifest {
 		'cetech_de_shipment_ops_issues', 'cetech_de_schema6_coverage_upgrade',
 		'cetech_de_country_identity_repair_revision', 'cetech_de_country_identity_repair_lock',
 		'cetech_de_country_identity_repair', 'cetech_de_coverage_migration_report', 'cetech_de_geography_revision',
-		...self::FEATURE_FLAG_OPTIONS, self::COORDINATOR_OPTION, self::UNINSTALL_STATUS,
+		...self::FEATURE_FLAG_OPTIONS, self::COORDINATOR_OPTION, self::UNINSTALL_STATUS, self::CHECKOUT_CONTROL_OPTION,
 	];
 	public const CONDITIONAL_OPTIONS = [ self::CAPABILITIES_MARKER, self::UNINSTALL_INTENT ];
 	public const OPTIONS = [ ...self::PRESERVED_OPTIONS, ...self::CONDITIONAL_OPTIONS ];
@@ -276,6 +277,7 @@ final class DataLifecycleManifest {
 	}
 
 	private static function option_owner( string $name ): string {
+		if ( self::CHECKOUT_CONTROL_OPTION === $name ) { return 'emergency_control'; }
 		if ( in_array( $name, self::FEATURE_FLAG_OPTIONS, true ) ) { return 'feature_flags'; }
 		if ( in_array( $name, [ self::COORDINATOR_OPTION, self::UNINSTALL_STATUS, self::UNINSTALL_INTENT ], true ) ) { return 'data_lifecycle'; }
 		if ( str_contains( $name, 'shipment' ) ) { return 'shipment'; }
@@ -287,6 +289,7 @@ final class DataLifecycleManifest {
 	private static function option_source( string $name ): string {
 		if ( in_array( $name, self::FEATURE_FLAG_OPTIONS, true ) ) { return 'src/Bootstrap/FeatureFlags.php'; }
 		return match ( $name ) {
+			self::CHECKOUT_CONTROL_OPTION => 'src/Infrastructure/Persistence/EmergencyControlStore.php',
 			'cetech_de_db_version' => 'src/Core/Versioning/SchemaVersion.php',
 			'cetech_de_last_migration_status' => 'src/Core/Versioning/MigrationStatus.php',
 			self::CAPABILITIES_MARKER => 'src/Core/Capabilities/Capabilities.php',

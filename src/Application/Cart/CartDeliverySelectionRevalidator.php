@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Cart;
 
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlResponse;
+
 use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidator;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
@@ -18,7 +21,8 @@ final class CartDeliverySelectionRevalidator {
 	public function __construct(
 		private FeatureFlags $feature_flags,
 		private Requirements $requirements,
-		private ProductDeliverySelectionValidator $selection_validator
+		private ProductDeliverySelectionValidator $selection_validator,
+		private ?EmergencyControlRuntime $emergency_control = null
 	) {
 	}
 
@@ -61,6 +65,10 @@ final class CartDeliverySelectionRevalidator {
 	 * @param array<string, mixed> $cart_item
 	 */
 	public function revalidate_cart_item( string $cart_item_key, array $cart_item ): CartDeliverySelectionRevalidationResult {
+		$decision = $this->emergency_control?->line_decision( $cart_item_key, $cart_item );
+		if ( null !== $decision && ! $decision->allowed ) {
+			return new CartDeliverySelectionRevalidationResult( $cart_item_key, CartDeliverySelectionRevalidationResult::STATUS_UNAVAILABLE, EmergencyControlResponse::shopper_message( $decision ), CartDeliverySelectionSessionData::normalizeIntent( $cart_item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] ?? null ), null );
+		}
 		if ( ! empty( $cart_item[ CartDeliverySelectionCapture::CART_NEEDS_RESELECTION_KEY ] ) ) {
 			$stored_intent = CartDeliverySelectionSessionData::normalizeIntent(
 				$cart_item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] ?? null

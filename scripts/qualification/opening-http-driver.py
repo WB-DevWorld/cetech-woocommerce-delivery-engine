@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
-"""Disposable loopback HTTP proof for the public-only configuration import.
+"""Disposable authenticated HTTP qualification for bounded plugin workflows.
 
-The client uses actual WordPress login cookies, page form nonces, terminal
-redirects and admin AJAX. The CLI bridge only prepares/revokes fixture roles
-and reads physical SQL state; it must not dispatch the qualified handlers.
-No browser JavaScript, external site, order, payment or worker policy proof.
+Actual WordPress cookies, native nonces, redirects and AJAX dispatch the
+qualified handlers. Dedicated C07 fixtures add native checkout/order-pay and
+an actual Blocks browser submission with an instrumented local gateway.
+CLI bridges prepare isolated fixtures and inspect state; they do not substitute
+for the qualified HTTP handlers. External payments and release proof are separate.
 """
 from __future__ import annotations
 
@@ -228,19 +229,29 @@ class HttpClient:
             raise RuntimeError("Refusing qualification request or redirect outside loopback origin")
         return resolved
 
-    def request(self, url: str, fields: dict | None = None, extra_headers: dict | None = None) -> Response:
+    def json_post(self, url: str, payload: dict, headers: dict | None = None) -> Response:
+        if not isinstance(payload, dict):
+            raise RuntimeError("Qualification JSON payload must be an object")
+        body = json.dumps(payload, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        if len(body) > 64 * 1024:
+            raise RuntimeError("Qualification JSON request exceeded bounded size")
+        return self.request(url, extra_headers=headers, raw_body=body)
+
+    def request(self, url: str, fields: dict | None = None, extra_headers: dict | None = None, raw_body: bytes | None = None) -> Response:
         global REQUEST_OBSERVATION
         target = self.resolve(url)
-        data = urlencode(fields).encode("utf-8") if fields is not None else None
+        if fields is not None and raw_body is not None:
+            raise RuntimeError("Qualification request has conflicting transports")
+        data = raw_body if raw_body is not None else (urlencode(fields).encode("utf-8") if fields is not None else None)
         headers = {"User-Agent": "CETECH-Opening-HTTP-Qualification/1", "Accept": "text/html,application/json"}
         headers.update(extra_headers or {})
-        if fields is not None:
-            headers["Content-Type"] = "application/x-www-form-urlencoded; charset=UTF-8"
+        if data is not None:
+            headers["Content-Type"] = "application/json; charset=UTF-8" if raw_body is not None else "application/x-www-form-urlencoded; charset=UTF-8"
             headers["Origin"] = self.base_url
             headers["Referer"] = target
         request = Request(target, data=data, headers=headers)
         self.ordinal += 1
-        method = "POST" if fields is not None else "GET"
+        method = "POST" if data is not None else "GET"
         started = time.monotonic()
         phase = "pre_response_headers"
         REQUEST_OBSERVATION = {
@@ -487,6 +498,9 @@ def main() -> int:
     parser.add_argument("--configuration-driver", help="Reviewed qualification-only module for the independent configuration principal")
     parser.add_argument("--configuration-bridge")
     parser.add_argument("--configuration-state")
+    parser.add_argument("--emergency-driver")
+    parser.add_argument("--emergency-bridge")
+    parser.add_argument("--emergency-state")
     options = parser.parse_args()
     if os.environ.get("CETECH_DE_NATIVE_OPENING_QUALIFICATION") != "1" or os.environ.get("CETECH_DE_HTTP_OPENING_QUALIFICATION") != "1" or os.environ.get("CETECH_DE_WP_DB_HOST") != "127.0.0.1":
         raise RuntimeError("Refusing HTTP qualification without explicit disposable loopback gates")
@@ -497,6 +511,7 @@ def main() -> int:
     receipt_path.parent.mkdir(parents=True, exist_ok=True)
     bridge = FixtureBridge(options.php, options.wpcli, options.site, options.admin_context, options.bridge, Path(options.state), workdir)
     configuration_bridge = None
+    emergency_bridge = None
     if any((options.configuration_driver, options.configuration_bridge, options.configuration_state)):
         if not all((options.configuration_driver, options.configuration_bridge, options.configuration_state)):
             raise RuntimeError("Configuration HTTP qualification requires all three explicit paths")
@@ -504,6 +519,12 @@ def main() -> int:
         configuration_work = workdir / "configuration-snapshots"
         configuration_work.mkdir(mode=0o700, exist_ok=True)
         configuration_bridge = FixtureBridge(options.php, options.wpcli, options.site, options.admin_context, options.configuration_bridge, Path(options.configuration_state), configuration_work)
+    if any((options.emergency_driver, options.emergency_bridge, options.emergency_state)):
+        if not all((options.emergency_driver, options.emergency_bridge, options.emergency_state)):
+            raise RuntimeError("Emergency HTTP qualification requires all three explicit paths")
+        emergency_work = workdir / "emergency-snapshots"
+        emergency_work.mkdir(mode=0o700, exist_ok=True)
+        emergency_bridge = FixtureBridge(options.php, options.wpcli, options.site, options.admin_context, options.emergency_bridge, Path(options.emergency_state), emergency_work)
     recorder = Recorder(receipt_path, {"source_head": os.environ.get("CETECH_DE_QUALIFICATION_HEAD", ""), "candidate_head": os.environ.get("CETECH_DE_QUALIFICATION_CANDIDATE_HEAD", ""), "source_tree": os.environ.get("CETECH_DE_QUALIFICATION_TREE", ""), "identity_verified": False})
     error = None
     prepared = False
@@ -527,12 +548,30 @@ def main() -> int:
             configuration_state = json.loads(Path(options.configuration_state).read_text(encoding="utf-8"))
             recorder.check("CONFIGURATION-HTTP-SAME-INSTALLED-SOURCE-IDENTITY", all(configuration_identity.get(key) == identity.get(key) for key in ("source_head", "candidate_head", "source_tree", "installed_php_sources", "installed_php_sources_hash")), {"source_hash": configuration_identity.get("installed_php_sources_hash"), "installed_php_files": len(configuration_identity.get("installed_php_sources", {}))})
             module.run_configuration(HttpClient(configuration_state["base_url"]), configuration_state, configuration_bridge, recorder, Page, login)
+        if emergency_bridge is not None:
+            import importlib.util
+            module_spec = importlib.util.spec_from_file_location("opening_http_emergency_driver", options.emergency_driver)
+            if module_spec is None or module_spec.loader is None:
+                raise RuntimeError("Could not load the emergency qualification module")
+            module = importlib.util.module_from_spec(module_spec)
+            module_spec.loader.exec_module(module)
+            emergency_prepared = emergency_bridge.call("prepareemergency")
+            emergency_identity = emergency_prepared["identity"]
+            emergency_state = json.loads(Path(options.emergency_state).read_text(encoding="utf-8"))
+            recorder.check("C07-HTTP-SAME-INSTALLED-SOURCE-IDENTITY", all(emergency_identity.get(key) == identity.get(key) for key in ("source_head", "candidate_head", "source_tree", "installed_php_sources", "installed_php_sources_hash")), {"source_hash": emergency_identity.get("installed_php_sources_hash"), "installed_php_files": len(emergency_identity.get("installed_php_sources", {}))})
+            module.run_emergency(HttpClient(emergency_state["base_url"]), emergency_state, emergency_bridge, recorder, Page, login)
     except Exception as failure:
         error = type(failure).__name__ + ": HTTP qualification failed; inspect recorded case status and private runner logs"
         if REQUEST_OBSERVATION:
             recorder.report["request_observation"] = {key: value for key, value in REQUEST_OBSERVATION.items() if key in ("ordinal", "method", "route", "phase", "elapsed_ms", "monotonic_ms", "error_class")}
             recorder.write()
     finally:
+        if emergency_bridge is not None and emergency_bridge.state_path.is_file():
+            try:
+                cleaned = emergency_bridge.call("cleanupemergency")
+                recorder.check("C07-HTTP-FIXTURE-CLEANUP", cleaned.get("cleanup_restored") is True and not cleaned.get("role_exists", True) and not cleaned.get("user_exists", True), {key: value for key, value in cleaned.items() if key in ("cleanup_restored", "role_exists", "user_exists", "history_preserved", "control_restored", "fixture_orders_removed", "fixture_products_removed")})
+            except Exception as failure:
+                error = error or (type(failure).__name__ + ": emergency fixture cleanup failed")
         if prepared or bridge.state_path.is_file():
             try:
                 cleaned = bridge.call("cleanup")

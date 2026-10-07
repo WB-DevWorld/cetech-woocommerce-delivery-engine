@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Selector;
 
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlResponse;
+
 use CetechDeliveryEngine\Application\CustomerContext\LocationAwareDeliveryOptions;
 use CetechDeliveryEngine\Application\CustomerContext\ProductPageQuoteContext;
 use CetechDeliveryEngine\Application\CustomerContext\ShopperDeliveryLocationPrecision;
@@ -34,7 +37,8 @@ final class VariationDeliveryOptionsEndpoint {
 		private ProductDeliveryOptionsBuilder $options_builder,
 		private VariationRelationshipInspectorInterface $variation_inspector,
 		private ?LocationAwareDeliveryOptions $location_options = null,
-		private ?ShopperDeliveryLocationPrecision $precision = null
+		private ?ShopperDeliveryLocationPrecision $precision = null,
+		private ?EmergencyControlRuntime $emergency_control = null
 	) {
 	}
 
@@ -97,6 +101,10 @@ final class VariationDeliveryOptionsEndpoint {
 	 * }
 	 */
 	public function build_payload( int $product_id, int $variation_id, ?MatchingLocation $location = null, int $quantity = 1 ): array {
+		$decision = $this->emergency_control?->product_decision( $product_id, $variation_id );
+		if ( null !== $decision && ! $decision->allowed ) {
+			return $this->payload( 'unavailable', $product_id, $variation_id, EmergencyControlResponse::shopper_message( $decision ), [] );
+		}
 		if ( $product_id <= 0 || $variation_id <= 0 ) {
 			return $this->payload(
 				'error',

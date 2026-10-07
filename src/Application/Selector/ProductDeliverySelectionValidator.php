@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Selector;
 
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlResponse;
+
 use CetechDeliveryEngine\Application\ProductRule\ProductRuleResolutionResult;
 use CetechDeliveryEngine\Application\ProductRule\ResolvedProductDeliveryRule;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
@@ -23,11 +26,16 @@ final class ProductDeliverySelectionValidator implements ProductDeliverySelectio
 		private FeatureFlags $feature_flags,
 		private Requirements $requirements,
 		private ProductDeliveryConfigurationSourceInterface $configuration_source,
-		private ProductDeliveryOptionsBuilder $options_builder
+		private ProductDeliveryOptionsBuilder $options_builder,
+		private ?EmergencyControlRuntime $emergency_control = null
 	) {
 	}
 
 	public function validate( int $product_id, ?int $variation_id, string $display_key ): ProductDeliverySelectionValidationResult {
+		$decision = $this->emergency_control?->product_decision( $product_id, $variation_id );
+		if ( null !== $decision && ! $decision->allowed ) {
+			return ProductDeliverySelectionValidationResult::invalid( $decision->code, EmergencyControlResponse::shopper_message( $decision ) );
+		}
 		$display_key = ProductDeliveryOptionsBuilder::normalizeDisplayKey( $display_key );
 		$warnings    = [];
 
