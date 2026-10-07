@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Tests\Unit\EmergencyControl;
 
+require_once __DIR__ . '/CheckoutTestFixtures.php';
+
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartCustomerContextEditorService;
 use CetechDeliveryEngine\Application\Cart\CartCustomerContextMutationService;
@@ -66,6 +68,20 @@ final class EmergencyCheckoutHooksTest extends TestCase {
 		$flags = new FeatureFlags(); $requirements = new Requirements(); $builder = new ProductDeliveryOptionsBuilder( $this->createMock( DeliveryOfferRepositoryInterface::class ) );
 		$validator = new ProductDeliverySelectionValidator( $flags, $requirements, $this->source, $builder, $this->runtime );
 		return new CartDeliverySelectionCapture( $flags, $requirements, $this->source, $builder, $validator, null, null, null, $this->runtime );
+	}
+	public function test_saved_order_hook_freezes_exact_coordinates_before_classic_reloads_items(): void {
+		$old_actions = $GLOBALS['cetech_de_test_actions'] ?? []; $GLOBALS['cetech_de_test_actions'] = [];
+		try {
+			$this->hooks->register(); $registered = $GLOBALS['cetech_de_test_actions']['woocommerce_checkout_order_created'] ?? [];
+			self::assertCount( 1, $registered ); self::assertSame( PHP_INT_MAX, $registered[0]['priority'] ); self::assertSame( 1, $registered[0]['args'] );
+			$item = new CheckoutPersistedItemFixture( [ 'id' => 71, 'product_id' => 101, 'quantity' => 1 ], 17 );
+			$original = new \WC_Order( [ 'id' => 17, 'items' => [ $item ] ] );
+			$this->hooks->bind_order_line( $item, 'line', $this->line(), $original );
+			( $registered[0]['callback'] )( $original );
+			$reloaded = new \WC_Order( [ 'id' => 17, 'items' => [ new CheckoutPersistedItemFixture( [ 'id' => 71, 'product_id' => 101, 'quantity' => 1 ], 17 ) ] ] );
+			$this->hooks->final_classic( 17, [], $reloaded );
+			self::assertSame( 1, $this->quote->validations ); self::assertSame( 1, $this->control->confirmations );
+		} finally { $GLOBALS['cetech_de_test_actions'] = $old_actions; }
 	}
 	public function test_pause_after_early_success_refuses_paid_and_free_classic_and_store_api_before_gateway(): void {
 		self::assertTrue( $this->hooks->validate_add_to_cart( true, 101, 1 ) );

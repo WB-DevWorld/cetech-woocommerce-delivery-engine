@@ -89,4 +89,60 @@ final class OwnershipTest extends TestCase {
 		$GLOBALS['wpdb'] = new class { public string $prefix = 'wp_'; public string $last_error = ''; public function prepare( string $sql, mixed ...$args ): string { return $sql; } public function get_results( string $sql, mixed $format ): array { $this->last_error = 'PRIVATE_SQL'; return []; } };
 		try { self::assertSame( EmergencyOwnership::Unresolved, ( new WpdbEmergencyConfigurationOwnershipProbe() )->ownership( 10, null ) ); } finally { $GLOBALS['wpdb'] = $old; }
 	}
+	public function test_latch_accepts_the_exact_persisted_item_after_woocommerce_reload(): void {
+		$latch = new EmergencyOwnershipLatch(); $latch->capture_line( 'line', $this->line(), EmergencyOwnership::Managed );
+		$original = new CheckoutPersistedItemFixture( [ 'id' => 71, 'product_id' => 10, 'quantity' => 1 ], 19 );
+		$order = new \WC_Order( [ 'id' => 19, 'items' => [ $original ] ] ); $latch->bind_order_line( 'line', $original );
+		$latch->freeze_saved_order( $order );
+		$reloaded = new CheckoutPersistedItemFixture( [ 'id' => 71, 'product_id' => 10, 'quantity' => 1 ], 19 );
+		self::assertNotSame( $original, $reloaded );
+		self::assertTrue( $latch->matches_order( new \WC_Order( [ 'id' => 19, 'items' => [ $reloaded ] ] ) ) );
+	}
+	private function persisted_pickup( int $item_id = 71, int $owner_id = 19, int $pickup = 55, array $extra = [] ): CheckoutPersistedItemFixture {
+		$raw = [ 'contract_version' => '1', 'snapshot_version' => '2', 'product_id' => 10, 'variation_id' => null, 'fulfilment_availability' => 'in_store', 'fulfilment_choice' => 'store_pickup', 'delivery_offer_id' => null, 'quantity' => 1, 'currency_code' => 'GHS', 'quoted_amount' => null, 'quote_status' => 'selection_only', 'snapshotted_at' => '2026-10-07T01:00:00+00:00', 'customer_context_version' => 1, 'pickup_location_id' => $pickup ];
+		return new CheckoutPersistedItemFixture( $extra + [ 'id' => $item_id, 'product_id' => 10, 'quantity' => 1, 'meta' => [ OrderDeliverySnapshot::META_LINE_SNAPSHOT => json_encode( $raw, JSON_THROW_ON_ERROR ), OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION => '2' ] ], $owner_id );
+	}
+	private function frozen_pickup(): array {
+		$latch = new EmergencyOwnershipLatch(); $context = \CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext::pickup( 55 );
+		$latch->capture_line( 'line', $this->line( [ 'cetech_de_customer_context' => $context->toArray() ] ), EmergencyOwnership::Managed );
+		$item = $this->persisted_pickup(); $order = new \WC_Order( [ 'id' => 19, 'items' => [ $item ] ] );
+		$latch->bind_order_line( 'line', $item ); $latch->freeze_saved_order( $order );
+		return [ $latch, $item, $order ];
+	}
+	public function test_saved_coordinates_never_accept_a_different_same_product_line_or_context(): void {
+		[ $latch ] = $this->frozen_pickup();
+		self::assertTrue( $latch->matches_order( new \WC_Order( [ 'id' => 19, 'items' => [ $this->persisted_pickup() ] ] ) ) );
+		foreach ( [ $this->persisted_pickup( item_id: 72 ), $this->persisted_pickup( owner_id: 20 ), $this->persisted_pickup( pickup: 56 ), $this->persisted_pickup( extra: [ 'quantity' => 2 ] ), $this->persisted_pickup( extra: [ 'product_id' => 11 ] ), $this->persisted_pickup( extra: [ 'variation_id' => 12 ] ) ] as $wrong ) {
+			self::assertFalse( $latch->matches_order( new \WC_Order( [ 'id' => 19, 'items' => [ $wrong ] ] ) ) );
+		}
+		self::assertFalse( $latch->matches_order( new \WC_Order( [ 'id' => 20, 'items' => [ $this->persisted_pickup() ] ] ) ) );
+		$GLOBALS['blog_id'] = 2; self::assertFalse( $latch->matches_order( new \WC_Order( [ 'id' => 19, 'items' => [ $this->persisted_pickup() ] ] ) ) );
+	}
+	public function test_original_reference_mutation_cannot_reassign_frozen_coordinates(): void {
+		[ $latch, $item, $order ] = $this->frozen_pickup(); $item->mutate_raw( 'id', 72 );
+		$latch->freeze_saved_order( $order );
+		self::assertFalse( $latch->matches_order( new \WC_Order( [ 'id' => 19, 'items' => [ $this->persisted_pickup( item_id: 72 ) ] ] ) ) );
+		[ $latch, $item ] = $this->frozen_pickup(); $item->change_owner( 20 );
+		self::assertFalse( $latch->matches_order( new \WC_Order( [ 'id' => 19, 'items' => [ $this->persisted_pickup() ] ] ) ) );
+	}
+	public function test_raw_original_quantity_mutation_hidden_by_view_getter_still_refuses_reload(): void {
+		[ $latch, $item ] = $this->frozen_pickup(); $item->view_quantity = 1; $item->mutate_raw( 'quantity', 2 );
+		self::assertSame( 1, $item->get_quantity() );
+		self::assertFalse( $latch->matches_order( new \WC_Order( [ 'id' => 19, 'items' => [ $this->persisted_pickup() ] ] ) ) );
+	}
+	public function test_unsaved_reference_does_not_transfer_before_a_trusted_save_boundary(): void {
+		$latch = new EmergencyOwnershipLatch(); $latch->capture_line( 'line', $this->line(), EmergencyOwnership::Managed );
+		$item = new \WC_Order_Item_Product( [ 'product_id' => 10, 'quantity' => 1 ] ); $latch->bind_order_line( 'line', $item );
+		self::assertTrue( $latch->matches_order( new \WC_Order( [ 'items' => [ $item ] ] ) ) );
+		self::assertFalse( $latch->matches_order( new \WC_Order( [ 'items' => [ clone $item ] ] ) ) );
+	}
+	public function test_saved_boundary_refuses_missing_mapping_duplicate_physical_ids_and_later_rebinding(): void {
+		$latch = new EmergencyOwnershipLatch(); $latch->capture_line( 'unbound', $this->line(), EmergencyOwnership::Managed );
+		$order = new \WC_Order( [ 'id' => 19, 'items' => [ $this->persisted_pickup() ] ] ); $latch->freeze_saved_order( $order ); self::assertFalse( $latch->matches_order( $order ) );
+		$latch = new EmergencyOwnershipLatch(); $items = [ $this->persisted_pickup(), $this->persisted_pickup() ];
+		foreach ( $items as $key => $item ) { $latch->capture_line( (string) $key, $this->line(), EmergencyOwnership::Managed ); $latch->bind_order_line( (string) $key, $item ); }
+		$order = new \WC_Order( [ 'id' => 19, 'items' => $items ] ); $latch->freeze_saved_order( $order ); self::assertFalse( $latch->matches_order( $order ) );
+		[ $latch ] = $this->frozen_pickup(); $latch->bind_order_line( 'line', $this->persisted_pickup( item_id: 72 ) );
+		self::assertFalse( $latch->matches_order( new \WC_Order( [ 'id' => 19, 'items' => [ $this->persisted_pickup() ] ] ) ) );
+	}
 }

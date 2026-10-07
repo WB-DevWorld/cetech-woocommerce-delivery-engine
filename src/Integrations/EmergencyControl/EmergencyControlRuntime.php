@@ -30,6 +30,7 @@ final class EmergencyControlRuntime {
 		try { $this->latch->capture_line( $key, $line, $ownership ); } catch ( \Throwable ) { $this->latch_failed = true; }
 	}
 	public function bind_order_line( string $key, \WC_Order_Item_Product $item ): void { try { $this->latch->bind_order_line( $key, $item ); } catch ( \Throwable ) { $this->latch_failed = true; } }
+	public function freeze_saved_order( \WC_Order $order ): void { try { $this->latch->freeze_saved_order( $order ); } catch ( \Throwable ) { $this->latch_failed = true; } }
 	public function forget_removed_line( string $key, mixed $cart ): void {
 		try { if ( is_object( $cart ) && method_exists( $cart, 'get_cart_item' ) && ! is_array( $cart->get_cart_item( $key ) ) ) { $this->latch->forget_line( $key ); } } catch ( \Throwable ) { $this->latch_failed = true; }
 	}

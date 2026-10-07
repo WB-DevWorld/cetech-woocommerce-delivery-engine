@@ -75,4 +75,26 @@ final class AdmissionTest extends TestCase {
 		$this->order->set_status( 'cancelled' );
 		self::assertFalse( $this->service->admitted( $this->order, 'classic' ) );
 	}
+	public function test_late_pause_reports_suspension_when_owned_snapshot_facts_are_missing(): void {
+		$context = \CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext::pickup( 55 );
+		$this->latch->capture_line( 'line', [ 'product_id' => 10, 'quantity' => 1, 'cetech_de_customer_context' => $context->toArray() ], EmergencyOwnership::Managed );
+		$this->latch->bind_order_line( 'line', $this->order->get_items( 'line_item' )[0] );
+		$this->control->pause(); $result = $this->service->final_order( $this->order, 'classic' );
+		self::assertFalse( $result->allowed ); self::assertSame( 'checkout_suspended', $result->code );
+		self::assertSame( 0, $this->quote->calls ); self::assertFalse( $this->service->admitted( $this->order, 'classic' ) );
+		$this->control->resume(); $resumed = $this->service->final_order( $this->order, 'classic' );
+		self::assertFalse( $resumed->allowed ); self::assertSame( 'checkout_revalidation_required', $resumed->code );
+		self::assertSame( 0, $this->quote->calls ); self::assertSame( 0, $this->control->confirms );
+	}
+	public function test_order_pay_does_not_adopt_an_unrelated_cart_ownership_latch(): void {
+		$this->source->managed = false;
+		$this->latch->capture_line( 'unrelated-cart-line', [ 'product_id' => 10, 'quantity' => 2 ], EmergencyOwnership::Managed );
+		$result = $this->service->final_order( $this->order, 'order_pay' );
+		self::assertTrue( $result->allowed ); self::assertSame( 'unmanaged', $result->code );
+		self::assertSame( 0, $this->control->reads ); self::assertSame( 0, $this->quote->calls );
+		$this->source->managed = true; $this->quote->valid = false;
+		$managed = $this->service->final_order( $this->order, 'order_pay' );
+		self::assertFalse( $managed->allowed ); self::assertSame( 'checkout_revalidation_required', $managed->code );
+		self::assertSame( 1, $this->quote->calls ); self::assertSame( 0, $this->control->confirms );
+	}
 }

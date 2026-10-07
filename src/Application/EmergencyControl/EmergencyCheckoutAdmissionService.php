@@ -48,17 +48,13 @@ final class EmergencyCheckoutAdmissionService {
 				return new EmergencyAdmissionResult( true, 'allowed', EmergencyOwnership::Managed, $this->stamps[ $order ]['revision'] );
 			}
 			$ownership = $this->classifier->order( $order );
-			if ( $this->latch->has_possible_ownership() ) {
-				if ( ! $this->latch->matches_order( $order ) ) {
-					return new EmergencyAdmissionResult( false, 'checkout_revalidation_required', EmergencyOwnership::Unresolved );
-				}
+			// Paying an existing order uses that order's facts, independently of the live cart draft.
+			$uses_cart_latch = 'order_pay' !== $route && $this->latch->has_possible_ownership();
+			if ( $uses_cart_latch ) {
 				$ownership = EmergencyOwnership::Managed;
 			}
 			if ( EmergencyOwnership::Unmanaged === $ownership ) {
 				return new EmergencyAdmissionResult( true, 'unmanaged', $ownership );
-			}
-			if ( EmergencyOwnership::Unresolved === $ownership ) {
-				return new EmergencyAdmissionResult( false, 'checkout_revalidation_required', $ownership );
 			}
 			$site = get_current_blog_id();
 			if ( ! is_int( $site ) || $site < 1 ) {
@@ -70,6 +66,9 @@ final class EmergencyCheckoutAdmissionService {
 			}
 			if ( ! $read->state->enabled() ) {
 				return new EmergencyAdmissionResult( false, 'checkout_suspended', $ownership, $read->state->revision );
+			}
+			if ( EmergencyOwnership::Unresolved === $ownership || $uses_cart_latch && ! $this->latch->matches_order( $order ) ) {
+				return new EmergencyAdmissionResult( false, 'checkout_revalidation_required', EmergencyOwnership::Unresolved, $read->state->revision );
 			}
 			$before = $this->quote_validator->fingerprint( $order );
 			if ( null === $before || ! $this->quote_validator->validate_order( $order, $route ) ) {

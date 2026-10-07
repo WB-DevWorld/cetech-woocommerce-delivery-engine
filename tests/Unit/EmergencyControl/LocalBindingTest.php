@@ -19,4 +19,11 @@ final class LocalBindingTest extends TestCase {
 	public function test_unknown_object_graph_refuses_without_invoking_arbitrary_serializer(): void { $calls = 0; $private = new class( $calls ) implements \JsonSerializable { public function __construct( private int &$calls ) {} public function jsonSerialize(): mixed { ++$this->calls; return 'PRIVATE_RAW_DATA'; } }; self::assertNull( EmergencyCheckoutLocalBinding::capture( new \WC_Order( [ 'date_paid' => $private ] ) ) ); self::assertSame( 0, $calls ); }
 	public function test_site_change_is_detected_without_calling_locale_or_site_filters(): void { $binding = EmergencyCheckoutLocalBinding::capture( $this->order() ); $GLOBALS['blog_id'] = 2; self::assertFalse( $binding->unchanged() ); }
 	public function test_private_binding_cannot_be_generically_serialized(): void { $binding = EmergencyCheckoutLocalBinding::capture( $this->order() ); $this->expectException( \LogicException::class ); json_encode( $binding, JSON_THROW_ON_ERROR ); }
+	public function test_inherited_native_private_data_remains_bound_but_shadow_data_is_not_trusted(): void {
+		$order = new class( [ 'id' => 19 ] ) extends \WC_Order {};
+		$binding = EmergencyCheckoutLocalBinding::capture( $order ); self::assertNotNull( $binding ); self::assertTrue( $binding->unchanged() );
+		$order->set_status( 'cancelled' ); self::assertFalse( $binding->unchanged() );
+		$shadow = new class( [ 'id' => 19 ] ) extends \WC_Order { private array $data = [ 'arbitrary_private_payload' => 'private' ]; };
+		self::assertNull( EmergencyCheckoutLocalBinding::capture( $shadow ) );
+	}
 }

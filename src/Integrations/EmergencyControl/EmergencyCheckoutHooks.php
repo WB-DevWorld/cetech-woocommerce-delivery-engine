@@ -15,6 +15,7 @@ final class EmergencyCheckoutHooks {
 		add_action( 'woocommerce_cart_item_removed', [ $this->runtime, 'forget_removed_line' ], PHP_INT_MAX, 2 );
 		add_action( 'woocommerce_cart_item_restored', [ $this, 'latch_restored_cart_item' ], PHP_INT_MAX, 2 );
 		add_action( 'woocommerce_checkout_create_order_line_item', [ $this, 'bind_order_line' ], PHP_INT_MAX, 4 );
+		add_action( 'woocommerce_checkout_order_created', [ $this->runtime, 'freeze_saved_order' ], PHP_INT_MAX, 1 );
 		add_filter( 'woocommerce_add_to_cart_validation', [ $this, 'validate_add_to_cart' ], -100, 6 );
 		add_filter( 'woocommerce_add_cart_item_data', [ $this, 'guard_item_data' ], PHP_INT_MAX, 3 );
 		add_action( 'woocommerce_store_api_validate_add_to_cart', [ $this, 'validate_store_add_to_cart' ], -100, 2 );

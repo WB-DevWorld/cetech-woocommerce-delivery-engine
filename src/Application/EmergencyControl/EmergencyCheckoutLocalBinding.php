@@ -71,10 +71,12 @@ final class EmergencyCheckoutLocalBinding implements \JsonSerializable {
 		$reflection = new \ReflectionObject( $value );
 		$result = [ 'class' => $class, 'object' => $id ];
 		foreach ( self::NATIVE_PROPERTIES as $name ) {
-			if ( ! $reflection->hasProperty( $name ) ) {
+			$declaring = $reflection;
+			while ( ! $declaring->hasProperty( $name ) && false !== $declaring->getParentClass() ) { $declaring = $declaring->getParentClass(); }
+			if ( ! $declaring->hasProperty( $name ) ) {
 				continue;
 			}
-			$property = $reflection->getProperty( $name );
+			$property = $declaring->getProperty( $name );
 			if ( ! in_array( $property->getDeclaringClass()->getName(), self::PROPERTY_OWNERS, true ) || $property->isStatic() || ! $property->isInitialized( $value ) ) {
 				throw new \UnexpectedValueException( 'Unsupported checkout local property.' );
 			}

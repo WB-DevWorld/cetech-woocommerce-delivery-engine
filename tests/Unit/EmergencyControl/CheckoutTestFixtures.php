@@ -93,3 +93,15 @@ final class CheckoutShippingFixture extends \WC_Order_Item_Shipping {
 	public function get_taxes( string $context = 'view' ): array { return $this->taxes; }
 	public function get_tax_status( string $context = 'view' ): string { return 'taxable'; }
 }
+
+final class CheckoutPersistedItemFixture extends \WC_Order_Item_Product {
+	public ?int $view_quantity = null;
+	public function __construct( array $data, private int $owner_id ) { parent::__construct( $data ); }
+	public function get_order_id( string $context = 'view' ): int { return $this->owner_id; }
+	public function get_quantity(): int { return $this->view_quantity ?? parent::get_quantity(); }
+	public function change_owner( int $id ): void { $this->owner_id = $id; }
+	public function mutate_raw( string $key, mixed $value ): void {
+		$property = new \ReflectionProperty( \WC_Order_Item_Product::class, 'data' );
+		$data = $property->getValue( $this ); $data[ $key ] = $value; $property->setValue( $this, $data );
+	}
+}
