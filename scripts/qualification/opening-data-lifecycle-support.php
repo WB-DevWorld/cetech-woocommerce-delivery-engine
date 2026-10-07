@@ -159,7 +159,7 @@ final class CetechNativeDataLifecycleFixture {
 	public function cleanup(): bool {
 		DataLifecycleProofDatabase::validate_prefix( $this->prefix );
 		$clean = true;
-		try { if ( $this->selected instanceof wpdb ) { $this->selected->close(); } } catch ( Throwable ) { $clean = false; }
+		try { if ( $this->selected instanceof wpdb ) { remove_filter( 'query', [ $this->selected, 'remove_placeholder_escape' ], 0 ); $this->selected->close(); $clean = false === has_filter( 'query', [ $this->selected, 'remove_placeholder_escape' ] ) && $clean; } } catch ( Throwable ) { $clean = false; }
 		foreach ( array_reverse( array_unique( $this->tables ) ) as $table ) { try { $this->execute( "DROP TABLE IF EXISTS `{$table}`" ); } catch ( Throwable ) { $clean = false; } }
 		try { $clean = $clean && 0 === (int) $this->scalar( "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND LEFT(TABLE_NAME,LENGTH('{$this->prefix}'))='{$this->prefix}'" ); } catch ( Throwable ) { $clean = false; }
 		try { $this->physical->close(); } catch ( Throwable ) { $clean = false; }

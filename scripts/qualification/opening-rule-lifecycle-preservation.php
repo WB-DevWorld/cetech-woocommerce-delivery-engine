@@ -184,7 +184,7 @@ return static function ( callable $check ): void {
 		foreach ( $original as $key => [ $exists, $value ] ) {
 			if ( $exists ) { $GLOBALS[$key] = $value; } else { unset( $GLOBALS[$key] ); }
 		}
-		if ( $fixture_db instanceof wpdb ) { $fixture_db->close(); }
+		if ( $fixture_db instanceof wpdb ) { remove_filter( 'query', [ $fixture_db, 'remove_placeholder_escape' ], 0 ); $fixture_db->close(); }
 		if ( is_string( $temporary ) ) {
 			if ( is_file( $temporary . '/uninstall.php' ) ) { unlink( $temporary . '/uninstall.php' ); }
 			if ( is_dir( $temporary ) ) { rmdir( $temporary ); }
@@ -201,6 +201,6 @@ return static function ( callable $check ): void {
 		}
 		$main_roles_after = $main_db->get_var( $main_db->prepare( "SELECT option_value FROM `{$main_db->options}` WHERE option_name=%s", $main_roles_key ) );
 		$main_schema_after = $main_db->get_var( $main_db->prepare( "SELECT option_value FROM `{$main_db->options}` WHERE option_name=%s", SchemaVersion::OPTION_NAME ) );
-		$check( 'NATIVE-C04-LIFECYCLE-FIXTURE-CLEANUP-RESTORE', $cleanup_ok && $globals_same && $main_roles_before === $main_roles_after && $main_schema_before === $main_schema_after && $main_connection_id === (int) $main_db->get_var( 'SELECT CONNECTION_ID()' ) );
+		$check( 'NATIVE-C04-LIFECYCLE-FIXTURE-CLEANUP-RESTORE', $cleanup_ok && $globals_same && $main_roles_before === $main_roles_after && $main_schema_before === $main_schema_after && $main_connection_id === (int) $main_db->get_var( 'SELECT CONNECTION_ID()' ) && false === has_filter( 'query', [ $fixture_db, 'remove_placeholder_escape' ] ) );
 	}
 };

@@ -100,7 +100,7 @@ final class CetechNativeQuoteStorageFixture {
 	}
 	public function cleanup(): bool {
 		$clean = true;
-		try { if ( $this->selected instanceof wpdb ) { $this->selected->close(); } } catch ( Throwable ) { $clean = false; }
+		try { if ( $this->selected instanceof wpdb ) { remove_filter( 'query', [ $this->selected, 'remove_placeholder_escape' ], 0 ); $this->selected->close(); $clean = false === has_filter( 'query', [ $this->selected, 'remove_placeholder_escape' ] ) && $clean; } } catch ( Throwable ) { $clean = false; }
 		foreach ( array_reverse( array_unique( $this->tables ) ) as $table ) { try { $this->execute( "DROP TABLE IF EXISTS `{$table}`" ); } catch ( Throwable ) { $clean = false; } }
 		try { $clean = 0 === $this->prefix_table_count() && $clean; } catch ( Throwable ) { $clean = false; }
 		try { $this->physical->close(); } catch ( Throwable ) { $clean = false; }

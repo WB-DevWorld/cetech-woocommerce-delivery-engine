@@ -244,7 +244,7 @@ final class CetechNativeQuoteLifecycleFixture {
 	}
 	public function cleanup(): bool {
 		$clean = $this->factory->close_all();
-		try { if ( $this->selected instanceof wpdb ) { $clean = $this->selected->close() && $clean; } } catch ( Throwable ) { $clean = false; }
+		try { if ( $this->selected instanceof wpdb ) { remove_filter( 'query', [ $this->selected, 'remove_placeholder_escape' ], 0 ); $clean = $this->selected->close() && $clean; $clean = false === has_filter( 'query', [ $this->selected, 'remove_placeholder_escape' ] ) && $clean; } } catch ( Throwable ) { $clean = false; }
 		foreach ( array_reverse( $this->tables ) as $table ) { try { $this->execute( "DROP TABLE IF EXISTS `{$table}`" ); } catch ( Throwable ) { $clean = false; } }
 		try { $clean = 0 === $this->table_count() && $clean; $this->physical->close(); } catch ( Throwable ) { $clean = false; }
 		return $clean;

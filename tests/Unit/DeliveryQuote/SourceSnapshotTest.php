@@ -7,6 +7,9 @@ require_once __DIR__ . '/../../Support/DeliveryQuote/QuoteFixtures.php';
 require_once __DIR__ . '/../../Support/DeliveryQuote/LegacyQuoteProviderFixtures.php';
 require_once __DIR__ . '/../../stubs/woocommerce-product-stub.php';
 
+// Registration-shape fixture only; no WordPress runtime behavior is claimed.
+if ( ! class_exists( '\WP_Hook', false ) ) { eval( 'class WP_Hook { public array $callbacks = []; }' ); }
+
 use CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourcePlan;
 use CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceSnapshot;
 use CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceLocalBinding;
@@ -68,17 +71,21 @@ final class SourceSnapshotTest extends TestCase {
 	public function test_private_snapshot_refuses_generic_json(): void { $this->expectException( \LogicException::class ); json_encode( $this->snapshot( [ F::card() ] ), JSON_THROW_ON_ERROR ); }
 	public function test_captured_repository_never_writes_a_source(): void { $this->expectException( \LogicException::class ); $this->snapshot( [ F::card() ] )->active_repository()->save( [ 'base_amount' => '0' ] ); }
 	public function test_changed_hook_registration_is_refused_without_invoking_a_callback(): void {
-		$old = $GLOBALS['wp_filter'] ?? null; $GLOBALS['wp_filter'] = []; $binding = LegacyQuoteSourceLocalBinding::capture(); self::assertTrue( $binding->unchanged() ); $called = false; $GLOBALS['wp_filter']['woocommerce_product_get_price'] = (object) [ 'callbacks' => [ 10 => [ [ 'function' => static function () use ( &$called ): void { $called = true; } ] ] ] ];
+		$old = $GLOBALS['wp_filter'] ?? null; $GLOBALS['wp_filter'] = []; $binding = LegacyQuoteSourceLocalBinding::capture(); self::assertTrue( $binding->unchanged() ); $called = false; $GLOBALS['wp_filter']['woocommerce_product_get_price'] = self::hook( [ 'callbacks' => [ 10 => [ [ 'function' => static function () use ( &$called ): void { $called = true; } ] ] ] ] );
 		try { self::assertFalse( $binding->unchanged() ); self::assertFalse( $called ); } finally { if ( null === $old ) { unset( $GLOBALS['wp_filter'] ); } else { $GLOBALS['wp_filter'] = $old; } }
 	}
 	public function test_default_native_stock_integer_filter_is_allowed_but_exactly_fenced(): void {
-		$old = $GLOBALS['wp_filter'] ?? null; $GLOBALS['wp_filter'] = [ 'woocommerce_stock_amount' => (object) [ 'callbacks' => [ 10 => [ [ 'function' => 'intval', 'accepted_args' => 1 ] ] ] ] ];
+		$old = $GLOBALS['wp_filter'] ?? null; $GLOBALS['wp_filter'] = [ 'woocommerce_stock_amount' => self::hook( [ 'callbacks' => [ 10 => [ [ 'function' => 'intval', 'accepted_args' => 1 ] ] ] ] ) ];
 		try { $binding = LegacyQuoteSourceLocalBinding::capture(); self::assertTrue( $binding->unchanged() ); $GLOBALS['wp_filter']['woocommerce_stock_amount']->callbacks[10][0]['accepted_args'] = 2; self::assertFalse( $binding->unchanged() ); } finally { if ( null === $old ) { unset( $GLOBALS['wp_filter'] ); } else { $GLOBALS['wp_filter'] = $old; } }
+	}
+	public function test_native_wordpress_term_defaults_are_transparent_to_product_taxonomies_and_fenced(): void {
+		$old = $GLOBALS['wp_filter'] ?? null; $GLOBALS['wp_filter'] = [ 'get_terms' => self::hook( [ 'callbacks' => [ 10 => [ [ 'function' => '_post_format_get_terms', 'accepted_args' => 3 ] ] ] ] ), 'wp_get_object_terms' => self::hook( [ 'callbacks' => [ 10 => [ [ 'function' => '_post_format_wp_get_object_terms', 'accepted_args' => 1 ] ] ] ] ) ];
+		try { $binding = LegacyQuoteSourceLocalBinding::capture(); self::assertTrue( $binding->unchanged() ); $GLOBALS['wp_filter']['get_terms']->callbacks[10][0]['accepted_args'] = 2; self::assertFalse( $binding->unchanged() ); } finally { if ( null === $old ) { unset( $GLOBALS['wp_filter'] ); } else { $GLOBALS['wp_filter'] = $old; } }
 	}
 	#[\PHPUnit\Framework\Attributes\DataProvider( 'variation_hooks' )]
 	public function test_variation_material_hooks_cannot_appear_after_preparation( string $hook ): void {
 		$old = $GLOBALS['wp_filter'] ?? null; $GLOBALS['wp_filter'] = [];
-		try { $binding = LegacyQuoteSourceLocalBinding::capture(); $GLOBALS['wp_filter'][$hook] = (object) [ 'callbacks' => [ 10 => [ [ 'function' => 'fixture_callback', 'accepted_args' => 1 ] ] ] ]; self::assertFalse( $binding->unchanged() ); $this->expectException( \RuntimeException::class ); LegacyQuoteSourceLocalBinding::capture(); } finally { if ( null === $old ) { unset( $GLOBALS['wp_filter'] ); } else { $GLOBALS['wp_filter'] = $old; } }
+		try { $binding = LegacyQuoteSourceLocalBinding::capture(); $GLOBALS['wp_filter'][$hook] = self::hook( [ 'callbacks' => [ 10 => [ [ 'function' => 'fixture_callback', 'accepted_args' => 1 ] ] ] ] ); self::assertFalse( $binding->unchanged() ); $this->expectException( \RuntimeException::class ); LegacyQuoteSourceLocalBinding::capture(); } finally { if ( null === $old ) { unset( $GLOBALS['wp_filter'] ); } else { $GLOBALS['wp_filter'] = $old; } }
 	}
 	public static function variation_hooks(): array { return [ [ 'woocommerce_variation_is_visible' ], [ 'woocommerce_product_variation_get_parent_id' ] ]; }
 	public function test_retained_zone_walk_terminates_in_the_closed_universe(): void {
@@ -108,6 +115,7 @@ final class SourceSnapshotTest extends TestCase {
 	public function test_unverified_native_runtime_cannot_open_a_source_transaction(): void {
 		$factory = $this->createMock( OperationConnectionFactory::class ); $factory->expects( self::never() )->method( 'open' ); $this->expectException( \RuntimeException::class ); ( new LegacyQuoteNativeSourcePreparer( $factory ) )->prepare( QuoteFixtures::owner(), F::context() );
 	}
+	private static function hook( array $facts ): \WP_Hook { $hook = new \WP_Hook(); $hook->callbacks = $facts['callbacks']; return $hook; }
 	private function snapshot( array $cards, array $rows = [], string $at = '2026-10-07 05:00:00.000000' ): LegacyQuoteSourceSnapshot { $plan = F::plan(); return LegacyQuoteSourceSnapshot::captured( $plan, F::context(), $rows, [ LegacyQuoteSourcePlan::range_key( $plan->rate_ranges()[0] ) => $cards ], QuoteTime::parse( $at ) ); }
 }
 

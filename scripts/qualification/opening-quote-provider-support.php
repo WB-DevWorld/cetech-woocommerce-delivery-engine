@@ -86,6 +86,20 @@ final class CetechNativeQuoteProviderFixture {
 	public function track_command( CetechDeliveryEngine\Application\DeliveryQuote\QuoteIssueCommand $command ): void { $this->owned_namespaces[] = $command->identity()->namespace_digest(); }
 	private static function shipping( ?WC_Shipping $replacement = null ): WC_Shipping { $property = new ReflectionProperty( WC_Shipping::class, '_instance' ); $current = WC()->shipping(); if ( null !== $replacement ) { $property->setValue( null, $replacement ); } return $current; }
 	public function cleanup_stage(): string { return $this->cleanup_stage; }
+	/** Fixed native callback codes only; never emit arbitrary callback names or paths. */
+	public static function source_hook_diagnostics( array $hooks ): array {
+		$rows = [];
+		foreach ( $hooks as $hook ) { foreach ( ( $GLOBALS['wp_filter'][$hook]->callbacks ?? [] ) as $priority => $callbacks ) { foreach ( $callbacks as $callback ) {
+			$fn = $callback['function'] ?? null; $code = 'unknown'; $legacy = null; $legacy_count = null;
+			if ( 'query' === $hook && is_array( $fn ) && array_is_list( $fn ) && 2 === count( $fn ) && is_object( $fn[0] ) && $fn[0] === ( $GLOBALS['wpdb'] ?? null ) && 'wpdb' === get_class( $fn[0] ) && 'remove_placeholder_escape' === $fn[1] ) { $code = 'wp_native_placeholder_escape'; }
+			elseif ( 'wp_get_object_terms' === $hook && '_post_format_wp_get_object_terms' === $fn ) { $code = 'wp_native_post_format_object_terms'; }
+			elseif ( 'get_terms' === $hook && '_post_format_get_terms' === $fn ) { $code = 'wp_native_post_format_terms'; }
+			elseif ( in_array( $hook, [ 'woocommerce_product_get_stock_quantity', 'woocommerce_product_get_price' ], true ) && is_array( $fn ) && array_is_list( $fn ) && 2 === count( $fn ) && is_object( $fn[0] ) && 'WC_Deprecated_Filter_Hooks' === get_class( $fn[0] ) && 'maybe_handle_deprecated_hook' === $fn[1] ) { $code = 'woo_native_deprecated_filter_adapter'; $old_hook = 'woocommerce_product_get_stock_quantity' === $hook ? 'woocommerce_get_stock_quantity' : 'woocommerce_get_price'; $legacy = false !== has_filter( $old_hook ); $legacy_count = 0; foreach ( ( $GLOBALS['wp_filter'][$old_hook]->callbacks ?? [] ) as $old_callbacks ) { $legacy_count += count( $old_callbacks ); } }
+			elseif ( 'woocommerce_stock_amount' === $hook && 'intval' === $fn ) { $code = 'native_integer_stock'; }
+			$rows[] = [ 'hook' => $hook, 'priority' => (int) $priority, 'accepted_args' => is_int( $callback['accepted_args'] ?? null ) ? $callback['accepted_args'] : null, 'callback_code' => $code, 'legacy_target_registered' => $legacy, 'legacy_target_callback_count' => $legacy_count ];
+		} } }
+		return $rows;
+	}
 
 	public function install(): void {
 		if ( $this->installed ) { throw new RuntimeException( 'Native Q04 fixture is already allocated.' ); } $this->installed = true;
@@ -201,10 +215,14 @@ final class CetechNativeQuoteProviderFixture {
 		foreach ( $before as $row ) { if ( $row['slot_key'] === CetechDeliveryEngine\Domain\DeliveryQuote\QuoteBudgetSlot::site_slot_key( get_current_blog_id() ) ) { $ok = false !== $this->db->replace( $budget_table, $row ) && $ok; } }
 		$this->cleanup_stage = 'owned_sources';
 		foreach ( array_reverse( $this->entities ) as [ $suffix, $id ] ) { $ok = false !== $this->db->delete( TableNames::for( $suffix ), [ 'id' => $id ] ) && $ok; }
+		$this->cleanup_stage = 'owned_products';
 		foreach ( array_reverse( [ ...$this->products, ...$this->extra_products ] ) as $id ) { wp_delete_post( $id, true ); clean_post_cache( $id ); }
+		$this->cleanup_stage = 'native_shipping_method';
 		if ( isset( $this->shipping_instance ) ) { ( new WC_Shipping_Zone( 0 ) )->delete_shipping_method( $this->shipping_instance ); }
+		$this->cleanup_stage = 'native_tax_rates';
 		foreach ( $this->tax_rates as $id ) { WC_Tax::_delete_tax_rate( $id ); }
-		if ( $this->tax_class_created ) { WC_Tax::delete_tax_class( $this->tax_class ); }
+		$this->cleanup_stage = 'native_tax_class';
+		if ( $this->tax_class_created ) { $deleted_class = WC_Tax::delete_tax_class_by( 'slug', $this->tax_class ); $ok = true === $deleted_class && $ok; }
 		$this->cleanup_stage = 'raw_options';
 		foreach ( $this->original_options as $name => $row ) { if ( null === $row ) { $ok = false !== $this->db->delete( $this->db->options, [ 'option_name' => $name ] ) && $ok; } else { $ok = false !== $this->db->replace( $this->db->options, $row ) && $ok; } wp_cache_delete( $name, 'options' ); } wp_cache_delete( 'alloptions', 'options' ); wp_cache_delete( 'notoptions', 'options' ); WC_Tax::init();
 		$this->cleanup_stage = 'native_objects';
