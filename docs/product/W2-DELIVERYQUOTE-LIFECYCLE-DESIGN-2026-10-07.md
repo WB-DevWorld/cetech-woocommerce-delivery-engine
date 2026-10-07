@@ -69,6 +69,9 @@ C01 authority/identity and C03 authorization run before stored lookup, effects, 
 
 ## Persistence, concurrency and retention
 
+**Q02 source alignment (2026-10-07):** the proposal below names `currency_code` in the new rate-candidate index. The actual retained legacy rate table uses `base_currency` (configuration migration 20260705160000). The implementation maps the approved currency-range meaning to `(delivery_offer_id,destination_zone_id,base_currency,id)` under `quote_candidate_range`. It adds no currency column and rewrites no prices. The original proposal remains below as historical design wording.
+
+
 Proposed physical tables, site-prefixed InnoDB, strict codecs and native C03 connection/readiness checks:
 
 | Table | Required fields / exact lookup indexes |

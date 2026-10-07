@@ -34,8 +34,8 @@ final class DataLifecycleManifest {
 
 	public const UNINSTALL_STATUSES = [ 'incomplete', 'refused', 'outcome_unknown', 'completed' ];
 
-	/** All physical domain stores, including separately governed C03/C04 history. */
-	public const DOMAIN_TABLE_SUFFIXES = [
+	/** Original C06 inventory remains an exact, separately named preservation set. */
+	public const ORIGINAL_DOMAIN_TABLE_SUFFIXES = [
 		'delivery_offers', 'destination_zones', 'destination_rules', 'logistics_profiles',
 		'suppliers', 'origins', 'pickup_locations', 'rate_cards', 'rate_card_rules', 'audit_log',
 		'product_delivery_rules', 'configuration_scopes', 'configuration_fields', 'configuration_collections',
@@ -44,6 +44,9 @@ final class DataLifecycleManifest {
 		'destination_coverage_groups', 'destination_coverage_members', 'destination_coverage_postcodes',
 		'operation_records', 'operation_changes', 'rule_family_guards', 'logical_rules', 'rule_versions',
 	];
+	/** Q02 only registers preservation; quote cleanup and admission are not granted here. */
+	public const QUOTE_TABLE_SUFFIXES = [ 'delivery_quotes', 'delivery_quote_bindings', 'delivery_quote_budget_windows' ];
+	public const DOMAIN_TABLE_SUFFIXES = [ ...self::ORIGINAL_DOMAIN_TABLE_SUFFIXES, ...self::QUOTE_TABLE_SUFFIXES ];
 
 	public const CAPABILITIES = [
 		'view_delivery_engine', 'manage_delivery_settings', 'manage_site_wide_defaults',
@@ -111,6 +114,7 @@ final class DataLifecycleManifest {
 		'destination_coverage_members' => 'coverage', 'destination_coverage_postcodes' => 'coverage',
 		'operation_records' => 'operation', 'operation_changes' => 'operation',
 		'rule_family_guards' => 'rule_lifecycle', 'logical_rules' => 'rule_lifecycle', 'rule_versions' => 'rule_lifecycle',
+		'delivery_quotes' => 'delivery_quote', 'delivery_quote_bindings' => 'delivery_quote', 'delivery_quote_budget_windows' => 'delivery_quote',
 	];
 
 	private function __construct() {
@@ -126,9 +130,10 @@ final class DataLifecycleManifest {
 		$entries = [];
 		foreach ( self::DOMAIN_TABLE_SUFFIXES as $suffix ) {
 			$owner = self::TABLE_OWNERS[$suffix];
-			$entries[] = self::entry( 'table.' . $suffix, $owner, 'plugin_table', $suffix, 'observe_domain_table_v1', 'schema8',
+			$quote = in_array( $suffix, self::QUOTE_TABLE_SUFFIXES, true );
+			$entries[] = self::entry( 'table.' . $suffix, $owner, 'plugin_table', $suffix, 'observe_domain_table_v1', $quote ? 'schema9' : 'schema8',
 				protections: self::table_protections( $suffix ),
-				sources: [ self::table_source( $owner, $suffix ) ], proofs: [ 'C06-01', 'C06-02', 'C06-24' ] );
+				sources: [ self::table_source( $owner, $suffix ) ], proofs: $quote ? [ 'W2Q-09', 'W2Q-39' ] : [ 'C06-01', 'C06-02', 'C06-24' ] );
 		}
 		foreach ( self::OPTIONS as $name ) {
 			$policy = match ( $name ) {
@@ -251,12 +256,20 @@ final class DataLifecycleManifest {
 			'coverage' => 'src/Infrastructure/Persistence/CoverageSchema.php',
 			'operation' => 'src/Infrastructure/Persistence/OperationStoreSchema.php',
 			'rule_lifecycle' => 'src/Infrastructure/Persistence/RuleLifecycleSchema.php',
+			'delivery_quote' => 'src/Infrastructure/Persistence/DeliveryQuoteSchema.php',
 			default => 'database/migrations/20260705160000_create_configuration_tables.php',
 		};
 	}
 
 	/** @return list<string> */
 	private static function table_protections( string $suffix ): array {
+		$quote_reference = match ( $suffix ) {
+			'delivery_quotes' => 'preserve_immutable_header_body_namespaces_and_tombstones',
+			'delivery_quote_bindings' => 'preserve_order_group_native_snapshot_and_seal_references',
+			'delivery_quote_budget_windows' => 'preserve_admission_intent_leases_and_unknown_outcomes_without_takeover',
+			default => null,
+		};
+		if ( null !== $quote_reference ) { return [ 'preserve_all_rows_and_identities', $quote_reference, 'no_quote_cleanup_or_admission_grant' ]; }
 		$reference = match ( self::TABLE_OWNERS[$suffix] ) {
 			'configuration_audit' => 'preserve_cor007_token_completions_and_all_material_audit',
 			'operation' => 'preserve_acceptance_event_pair_both_directions_and_publication_receipt',

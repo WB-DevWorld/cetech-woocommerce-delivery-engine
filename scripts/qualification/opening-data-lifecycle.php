@@ -12,6 +12,7 @@ use CetechDeliveryEngine\Bootstrap\DataLifecycleScheduler;
 use CetechDeliveryEngine\Bootstrap\DataLifecycleUninstallExecutor;
 use CetechDeliveryEngine\Bootstrap\Deactivator;
 use CetechDeliveryEngine\Bootstrap\Uninstaller;
+use CetechDeliveryEngine\Core\Versioning\SchemaVersion;
 use CetechDeliveryEngine\Domain\Contracts\OperationIdentity;
 use CetechDeliveryEngine\Domain\Contracts\RequestContext;
 use CetechDeliveryEngine\Domain\DataLifecycle\DataLifecycleRegistry;
@@ -116,7 +117,8 @@ return static function ( callable $check, ?array $history = null ): void {
 		$opened = RuleProofEnvelope::opened( $fixture->physical, $fixture->prefix, $payload['logical_uuid'], $payload['version_uuid'] );
 		$published = $rules->attempt( RuleProofEnvelope::identity( $opened, 'rule.publish', 'c06-published', $fixture->site ), $opened, RequestContext::create() );
 		$domain_before = $fixture->domain_rows(); $options_before = $fixture->preserved_options();
-		$check( 'NATIVE-C06-ALL32-PHYSICAL-DOMAIN-SENTINELS', 32 === count( $domain_before ) && 32 === count( array_filter( $domain_before, static fn ( array $rows ): bool => [] !== $rows ) ), [ 'exact_physical_tables' => count( $domain_before ) ] );
+		$original32 = array_intersect_key( $domain_before, array_fill_keys( DataLifecycleManifest::ORIGINAL_DOMAIN_TABLE_SUFFIXES, true ) );
+		$check( 'NATIVE-C06-ALL32-PHYSICAL-DOMAIN-SENTINELS', 32 === count( $original32 ) && 32 === count( array_filter( $original32, static fn ( array $rows ): bool => [] !== $rows ) ) && 35 === count( $domain_before ) && 35 === count( array_filter( $domain_before, static fn ( array $rows ): bool => [] !== $rows ) ), [ 'original_physical_tables' => count( $original32 ), 'current_physical_tables' => count( $domain_before ), 'quote_marker_rows_not_dto_proof' => true ] );
 		$check( 'NATIVE-C06-C03-C04-REAL-ACCEPTANCE-HISTORY-SEEDED', 'accepted' === $accepted->outcome->state && 'accepted' === $draft->outcome->state && 'accepted' === $published->outcome->state && 3 === count( $domain_before['operation_records'] ) && 3 === count( $domain_before['operation_changes'] ) && 'published' === $domain_before['rule_versions'][0]['state'] );
 		$check( 'NATIVE-C06-AUTHORED-OPTIONS-ALL23-FLAGS-SEEDED', 23 === count( DataLifecycleManifest::FEATURE_FLAG_OPTIONS ) && count( DataLifecycleManifest::PRESERVED_OPTIONS ) - 2 === count( $options_before ) && [] === array_filter( $options_before, static fn ( array $row ): bool => 'off' !== $row['autoload'] ) );
 		$clock = time(); $cache = new ManagedGeographyCache( $fixture->factory, clock: static fn (): int => $clock );
@@ -158,7 +160,7 @@ return static function ( callable $check, ?array $history = null ): void {
 			$GLOBALS['wp_object_cache'] = new WP_Object_Cache(); get_option( 'cetech_de_db_version' ); get_option( 'cetech_de_absent_native_option', false ); $loaded = get_option( $name );
 			$state = $worker->read( $fixture->site ); if ( null === $state->progress || 'completed' === $state->progress->status ) { $state = $worker->start( $fixture->site ); }
 			$state = $worker->batch( $fixture->site, $state->continuation );
-			$check( 'NATIVE-C06-' . strtoupper( $autoload ) . '-AUTOLOAD-PREWARMED-PHYSICAL-FRESH-READ-PARITY', $envelope->to_json() === $loaded && 'accepted' === $state->status && 'completed' === $state->progress?->status && null === $fixture->option( $name ) && false === get_option( $name, false ) && '8' === get_option( 'cetech_de_db_version' ) && $read_fresh( $fixture, [ $name, 'cetech_de_db_version', 'cetech_de_geography_revision' ] ), [ 'all_autoload_off' => 'off' === $autoload, 'fresh_os_process' => true ] );
+			$check( 'NATIVE-C06-' . strtoupper( $autoload ) . '-AUTOLOAD-PREWARMED-PHYSICAL-FRESH-READ-PARITY', $envelope->to_json() === $loaded && 'accepted' === $state->status && 'completed' === $state->progress?->status && null === $fixture->option( $name ) && false === get_option( $name, false ) && SchemaVersion::TARGET === get_option( 'cetech_de_db_version' ) && $read_fresh( $fixture, [ $name, 'cetech_de_db_version', 'cetech_de_geography_revision' ] ), [ 'all_autoload_off' => 'off' === $autoload, 'fresh_os_process' => true ] );
 			if ( 'on' === $autoload ) { $fixture->execute( "DELETE FROM `{$fixture->prefix}options` WHERE option_name='c06_fixture_autoload_marker'" ); }
 		}
 		$check( 'NATIVE-C06-ORDINARY-CLEANUP-PRESERVES-ALL32-AND-CONTROLS', $domain_before === $fixture->domain_rows() && $options_before === $fixture->preserved_options() && null !== $fixture->option( DataLifecycleManifest::COORDINATOR_OPTION ) && 'off' === $fixture->option( DataLifecycleManifest::COORDINATOR_OPTION )['autoload'] );
@@ -281,5 +283,5 @@ return static function ( callable $check, ?array $history = null ): void {
 	}
 	$classic = require __DIR__ . '/opening-data-lifecycle-classic.php'; $classic( $check, $pressure );
 	$schema_after = $main->get_results( $main->prepare( "SELECT option_name,option_value,autoload FROM `{$main->options}` WHERE option_name IN (%s,%s) ORDER BY option_name", 'cetech_de_db_version', 'cetech_de_last_migration_status' ), ARRAY_A );
-	$check( 'NATIVE-C06-FIXTURE-SOURCE-SCHEMA-RESTORED', $schema_before === $schema_after && '8' === (string) get_option( 'cetech_de_db_version' ) && $GLOBALS['wpdb'] === $main );
+	$check( 'NATIVE-C06-FIXTURE-SOURCE-SCHEMA-RESTORED', $schema_before === $schema_after && SchemaVersion::TARGET === (string) get_option( 'cetech_de_db_version' ) && $GLOBALS['wpdb'] === $main );
 };

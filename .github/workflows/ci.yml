@@ -184,6 +184,8 @@ jobs:
             'CetechDeliveryEngine\Tests\Integration\DataLifecycle\DataLifecycleRealDatabaseTest' 30
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
             'CetechDeliveryEngine\Tests\Integration\EmergencyControl\EmergencyControlRealDatabaseTest' 30
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+            'CetechDeliveryEngine\Tests\Integration\DeliveryQuote\DeliveryQuoteStorageRealDatabaseTest' 30
 
   php85-wordpress:
     name: PHP 8.5 WordPress/WooCommerce

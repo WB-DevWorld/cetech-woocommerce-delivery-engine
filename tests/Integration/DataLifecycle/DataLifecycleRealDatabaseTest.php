@@ -56,7 +56,9 @@ final class DataLifecycleRealDatabaseTest extends TestCase {
 		AbstractWpdbRepository::reset_transaction_state(); unset( $GLOBALS['wpdb'] ); DB::cleanup( $this->database, $this->prefix ); $this->database->close();
 	}
 	public function test_normal_cleanup_preserves_all32_physical_domain_tables_and_authored_options(): void {
-		$tables = $this->domain_tables(); self::assertCount( 32, $tables );
+		$tables = $this->domain_tables(); self::assertCount( 35, $tables );
+		$original32 = array_map( fn( string $suffix ): string => $this->prefix . 'delivery_engine_' . $suffix, DataLifecycleManifest::ORIGINAL_DOMAIN_TABLE_SUFFIXES );
+		self::assertCount( 32, $original32 ); self::assertCount( 32, array_intersect( $original32, $tables ) );
 		foreach ( $tables as $table ) { $this->seed_sentinel( $table ); }
 		$before = $this->domain_bytes();
 		$preserved = [ 'cetech_de_sitewide_defaults', 'cetech_de_global_configuration_version', 'cetech_de_country_identity_repair_lock', 'cetech_de_delete_data_on_uninstall', '_transient_cetech_de_notice_private', '_transient_timeout_cetech_de_notice_private', '_transient_cetech_de_geo_old', '_transient_timeout_cetech_de_geo_old' ];

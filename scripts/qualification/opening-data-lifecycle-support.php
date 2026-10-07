@@ -6,7 +6,8 @@ use CetechDeliveryEngine\Bootstrap\DataLifecycleManifest;
 use CetechDeliveryEngine\Infrastructure\WordPress\OperationConnectionFactory;
 use CetechDeliveryEngine\Infrastructure\Persistence\OperationStoreSchema;
 use CetechDeliveryEngine\Infrastructure\Persistence\RuleLifecycleSchema;
-use CetechDeliveryEngine\Infrastructure\Persistence\RuleLifecycleReadiness;
+use CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteReadiness;
+use CetechDeliveryEngine\Core\Versioning\SchemaVersion;
 use CetechDeliveryEngine\Tests\Support\Operation\OperationProofDatabase;
 use CetechDeliveryEngine\Tests\Support\DataLifecycle\DataLifecycleProofDatabase;
 
@@ -46,8 +47,8 @@ final class CetechNativeDataLifecycleFixture {
 		$this->create_table( $this->prefix . 'operation_fixture_counter', "CREATE TABLE `{$this->prefix}operation_fixture_counter` (id bigint unsigned NOT NULL PRIMARY KEY, revision bigint unsigned NOT NULL, value bigint NOT NULL, published_revision bigint unsigned NOT NULL DEFAULT 0) ENGINE=InnoDB {$charset}" );
 		$this->execute( "INSERT INTO `{$this->prefix}operation_fixture_counter` (id,revision,value) VALUES (1,1,0)" );
 		foreach ( RuleLifecycleSchema::create_table_statements( $charset, $this->prefix . 'delivery_engine_' ) as $suffix => $sql ) { $this->create_table( $this->prefix . 'delivery_engine_' . $suffix, $sql ); }
-		$this->write_option( 'cetech_de_db_version', '8' );
-		$this->write_option( 'cetech_de_last_migration_status', serialize( [ 'status' => 'success', 'to_version' => '8', 'migration_id' => RuleLifecycleReadiness::MIGRATION_ID ] ) );
+		$this->write_option( 'cetech_de_db_version', SchemaVersion::TARGET );
+		$this->write_option( 'cetech_de_last_migration_status', serialize( [ 'status' => 'success', 'to_version' => SchemaVersion::TARGET, 'migration_id' => DeliveryQuoteReadiness::MIGRATION_ID ] ) );
 		foreach ( DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES as $suffix ) {
 			$table = $this->prefix . 'delivery_engine_' . $suffix;
 			if ( in_array( $suffix, [ 'operation_records', 'operation_changes', 'rule_family_guards', 'logical_rules', 'rule_versions' ], true ) ) { continue; }

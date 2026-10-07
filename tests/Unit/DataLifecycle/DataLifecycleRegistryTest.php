@@ -11,6 +11,7 @@ use CetechDeliveryEngine\Domain\DataLifecycle\DataLifecycleClass;
 use CetechDeliveryEngine\Domain\DataLifecycle\DataLifecyclePolicy;
 use CetechDeliveryEngine\Domain\DataLifecycle\DataLifecycleRegistry;
 use CetechDeliveryEngine\Infrastructure\Persistence\ConfigurationTables;
+use CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteSchema;
 use CetechDeliveryEngine\Infrastructure\Persistence\OperationStoreSchema;
 use CetechDeliveryEngine\Infrastructure\Persistence\RuleLifecycleSchema;
 use PHPUnit\Framework\Attributes\DataProvider;
@@ -18,11 +19,15 @@ use PHPUnit\Framework\TestCase;
 
 final class DataLifecycleRegistryTest extends TestCase {
 
-	public function test_complete_inventory_matches_actual_legacy_operation_and_rule_stores(): void {
-		$expected = array_merge( ConfigurationTables::all_suffixes(), OperationStoreSchema::SUFFIXES, RuleLifecycleSchema::SUFFIXES );
+	public function test_complete_inventory_matches_original32_and_three_quote_stores(): void {
+		$original = array_merge( ConfigurationTables::all_suffixes(), OperationStoreSchema::SUFFIXES, RuleLifecycleSchema::SUFFIXES );
+		$expected = array_merge( $original, DeliveryQuoteSchema::SUFFIXES );
 		$registry = DataLifecycleRegistry::standard();
 		$tables = array_values( array_filter( $registry->classes(), static fn( DataLifecycleClass $class ): bool => 'plugin_table' === $class->storage_adapter ) );
-		self::assertCount( 32, $expected );
+		self::assertCount( 32, $original );
+		self::assertSame( $this->sorted( $original ), $this->sorted( DataLifecycleManifest::ORIGINAL_DOMAIN_TABLE_SUFFIXES ) );
+		self::assertSame( DeliveryQuoteSchema::SUFFIXES, DataLifecycleManifest::QUOTE_TABLE_SUFFIXES );
+		self::assertCount( 35, $expected );
 		self::assertSame( $this->sorted( $expected ), $this->sorted( array_column( $tables, 'storage_key' ) ) );
 		foreach ( $tables as $class ) {
 			self::assertSame( [ DataLifecyclePolicy::Preserve, DataLifecyclePolicy::Preserve, DataLifecyclePolicy::Preserve, null ],
@@ -31,6 +36,15 @@ final class DataLifecycleRegistryTest extends TestCase {
 		self::assertContains( 'preserve_cor007_token_completions_and_all_material_audit', $registry->get( 'table.audit_log' )->protections );
 		self::assertContains( 'preserve_acceptance_event_pair_both_directions_and_publication_receipt', $registry->get( 'table.operation_records' )->protections );
 		self::assertContains( 'preserve_guard_pointers_supersession_all_states_and_schedule_evidence', $registry->get( 'table.rule_versions' )->protections );
+		foreach ( DeliveryQuoteSchema::SUFFIXES as $suffix ) {
+			$class = $registry->get( 'table.' . $suffix );
+			self::assertSame( 'schema9', $class->accepted_format );
+			self::assertFalse( $class->cleanup_eligible() );
+			self::assertContains( 'no_quote_cleanup_or_admission_grant', $class->protections );
+		}
+		self::assertContains( 'preserve_immutable_header_body_namespaces_and_tombstones', $registry->get( 'table.delivery_quotes' )->protections );
+		self::assertContains( 'preserve_order_group_native_snapshot_and_seal_references', $registry->get( 'table.delivery_quote_bindings' )->protections );
+		self::assertContains( 'preserve_admission_intent_leases_and_unknown_outcomes_without_takeover', $registry->get( 'table.delivery_quote_budget_windows' )->protections );
 	}
 
 	public function test_exact_capabilities_and_authored_control_options_follow_existing_owners(): void {
@@ -100,6 +114,8 @@ final class DataLifecycleRegistryTest extends TestCase {
 	public static function missing_store_provider(): array {
 		return [
 			'new operation history' => [ 'table.operation_records' ], 'new rule history' => [ 'table.rule_versions' ],
+			'quote immutable body and tombstone' => [ 'table.delivery_quotes' ], 'quote order and seal binding' => [ 'table.delivery_quote_bindings' ],
+			'quote budget and lease' => [ 'table.delivery_quote_budget_windows' ],
 			'authored option' => [ 'option.cetech_de_sitewide_defaults' ], 'Woo snapshot' => [ 'woo_meta._cetech_de_delivery_snapshot' ],
 			'user reference cursor' => [ 'user._cetech_de_shipments_reviewed_event_id' ], 'session' => [ 'session.cetech_de_customer_context' ],
 			'legacy draft' => [ 'transient.scoped_draft' ], 'source file' => [ 'file.geography_generation_source' ],
@@ -177,7 +193,7 @@ final class DataLifecycleRegistryTest extends TestCase {
 		$list = $standard->classes();
 		array_pop( $list );
 		self::assertSame( $standard->policy_digest(), DataLifecycleRegistry::standard()->policy_digest() );
-		self::assertCount( 124, $standard->classes() );
+		self::assertCount( 127, $standard->classes() );
 	}
 
 	public function test_diagnostics_do_not_emit_selectors_paths_storage_names_or_caller_content(): void {
@@ -205,7 +221,11 @@ final class DataLifecycleRegistryTest extends TestCase {
 				self::assertFileExists( $root . '/' . $path, $class->class_id );
 			}
 			foreach ( $class->proof_cases as $case ) {
-				self::assertMatchesRegularExpression( '/^C06-(?:0[1-9]|[12][0-9]|30)$/D', $case );
+				if ( in_array( $class->storage_key, DataLifecycleManifest::QUOTE_TABLE_SUFFIXES, true ) && 'plugin_table' === $class->storage_adapter ) {
+					self::assertContains( $case, [ 'W2Q-09', 'W2Q-39' ] );
+				} else {
+					self::assertMatchesRegularExpression( '/^C06-(?:0[1-9]|[12][0-9]|30)$/D', $case );
+				}
 			}
 		}
 	}
@@ -223,7 +243,7 @@ final class DataLifecycleRegistryTest extends TestCase {
 		$error = stream_get_contents( $pipes[2] );
 		fclose( $pipes[1] ); fclose( $pipes[2] );
 		self::assertSame( 0, proc_close( $process ), $error );
-		self::assertSame( [ 32, 43, 18, 124, false, false, false, true, true, false ], json_decode( $output, true, 16, JSON_THROW_ON_ERROR ) );
+		self::assertSame( [ 35, 43, 18, 127, false, false, false, true, true, false ], json_decode( $output, true, 16, JSON_THROW_ON_ERROR ) );
 	}
 
 	private function sorted( array $values ): array {

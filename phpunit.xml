@@ -30,6 +30,7 @@
             <group>rule-lifecycle-real-db</group>
             <group>data-lifecycle-real-db</group>
             <group>emergency-control-real-db</group>
+            <group>quote-storage-real-db</group>
         </exclude>
     </groups>
 </phpunit>

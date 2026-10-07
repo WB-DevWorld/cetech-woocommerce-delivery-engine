@@ -92,7 +92,7 @@ add_filter( 'action_scheduler_allow_async_request_runner', '__return_false', PHP
 try {
 	$lifecycle = require __DIR__ . '/opening-data-lifecycle.php';
 	$emergency = require __DIR__ . '/opening-emergency-control.php';
-	foreach ( array( 'authority', 'public-import', 'configuration', 'migrations', 'operation', 'operation-migration', 'operation-lifecycle', 'rule-lifecycle', 'rule-lifecycle-migration', 'rule-lifecycle-preservation', 'snapshot-readers' ) as $module ) {
+	foreach ( array( 'authority', 'public-import', 'configuration', 'migrations', 'operation', 'operation-migration', 'operation-lifecycle', 'rule-lifecycle', 'rule-lifecycle-migration', 'rule-lifecycle-preservation', 'snapshot-readers', 'quote-storage' ) as $module ) {
 		$run = require __DIR__ . '/opening-' . $module . '.php';
 		if ( ! is_callable( $run ) ) {
 			throw new RuntimeException( 'Invalid qualification module: ' . $module );
@@ -106,7 +106,7 @@ try {
 	}
 	$lifecycle( $check );
 	$emergency( $check );
-	$check( 'NATIVE-FIXTURE-SCHEMA-RESTORED', '8' === (string) get_option( 'cetech_de_db_version' ), array( 'schema_after' => (string) get_option( 'cetech_de_db_version' ) ) );
+	$check( 'NATIVE-FIXTURE-SCHEMA-RESTORED', '9' === (string) get_option( 'cetech_de_db_version' ), array( 'schema_after' => (string) get_option( 'cetech_de_db_version' ) ) );
 	$report['status'] = 'PASS';
 	$write();
 	echo 'opening_native_qualification=PASS cases=' . count( $report['cases'] ) . PHP_EOL;

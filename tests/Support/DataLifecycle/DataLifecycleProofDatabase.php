@@ -6,8 +6,9 @@ namespace CetechDeliveryEngine\Tests\Support\DataLifecycle;
 
 use CetechDeliveryEngine\Infrastructure\Persistence\BulkJobSchema;
 use CetechDeliveryEngine\Infrastructure\Persistence\OperationStoreSchema;
+use CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteSchema;
+use CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteReadiness;
 use CetechDeliveryEngine\Infrastructure\Persistence\RuleLifecycleSchema;
-use CetechDeliveryEngine\Infrastructure\Persistence\RuleLifecycleReadiness;
 use CetechDeliveryEngine\Core\Versioning\SchemaVersion;
 use CetechDeliveryEngine\Core\Versioning\MigrationStatus;
 use CetechDeliveryEngine\Infrastructure\Persistence\CoverageSchema;
@@ -24,9 +25,9 @@ final class DataLifecycleProofDatabase {
 	public static function validate_prefix( string $prefix ): void { if ( 1 !== preg_match( '/\Agc6_[a-f0-9]{12}_\z/D', $prefix ) ) { throw new \InvalidArgumentException( 'Invalid disposable lifecycle prefix.' ); } }
 	public static function install( \mysqli $database, string $prefix ): void {
 		self::validate_prefix( $prefix );
-		foreach ( [ OperationStoreSchema::class, RuleLifecycleSchema::class ] as $schema ) { foreach ( $schema::create_table_statements( 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', $prefix . 'delivery_engine_' ) as $sql ) { self::execute( $database, $sql ); } }
+		foreach ( [ OperationStoreSchema::class, RuleLifecycleSchema::class, DeliveryQuoteSchema::class ] as $schema ) { foreach ( $schema::create_table_statements( 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', $prefix . 'delivery_engine_' ) as $sql ) { self::execute( $database, $sql ); } }
 		self::execute( $database, "CREATE TABLE `{$prefix}options` (option_id bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY, option_name varchar(191) NOT NULL UNIQUE, option_value longtext NOT NULL, autoload varchar(20) NOT NULL DEFAULT 'off') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci" );
-		self::insert_option( $database, $prefix, SchemaVersion::OPTION_NAME, '8' ); self::insert_option( $database, $prefix, MigrationStatus::OPTION_NAME, serialize( [ 'status' => 'success', 'to_version' => '8', 'migration_id' => RuleLifecycleReadiness::MIGRATION_ID ] ) );
+		self::insert_option( $database, $prefix, SchemaVersion::OPTION_NAME, SchemaVersion::TARGET ); self::insert_option( $database, $prefix, MigrationStatus::OPTION_NAME, serialize( [ 'status' => 'success', 'to_version' => SchemaVersion::TARGET, 'migration_id' => DeliveryQuoteReadiness::MIGRATION_ID ] ) );
 		self::execute( $database, "CREATE TABLE `{$prefix}operation_fixture_counter` (id bigint unsigned NOT NULL PRIMARY KEY, revision bigint unsigned NOT NULL, value bigint NOT NULL, published_revision bigint unsigned NOT NULL DEFAULT 0) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci" );
 		self::execute( $database, "INSERT INTO `{$prefix}operation_fixture_counter` (id,revision,value) VALUES (1,1,0)" );
 		$charset = 'ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
@@ -38,6 +39,7 @@ final class DataLifecycleProofDatabase {
 		foreach ( [ BulkJobSchema::class, CoverageSchema::class, GeographySchema::class, ScopedConfigurationSchema::class, ShipmentSchema::class ] as $schema ) {
 			foreach ( $schema::create_table_statements( 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', $prefix . 'delivery_engine_' ) as $suffix => $sql ) { if ( false === $database->query( $sql ) ) { throw new \RuntimeException( 'Disposable lifecycle schema setup failed: ' . $suffix . ' / ' . $database->errno ); } }
 		}
+		self::execute( $database, DeliveryQuoteSchema::rate_index_statement( $prefix ) );
 	}
 	public static function execute( \mysqli $database, string $sql ): void { OperationProofDatabase::execute( $database, $sql ); }
 	public static function row( \mysqli $database, string $sql ): ?array { return OperationProofDatabase::row( $database, $sql ); }

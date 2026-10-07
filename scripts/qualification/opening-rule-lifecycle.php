@@ -32,7 +32,7 @@ return static function ( callable $check ): void {
 	$root = dirname( __DIR__, 2 );
 	require_once $root . '/tests/Support/Operation/OperationProofDatabase.php';
 	foreach ( [ 'RuleProofDatabase', 'RuleProofEnvelope', 'RuleProofFamily', 'RuleProofTransport' ] as $fixture ) { require_once $root . '/tests/Support/RuleLifecycle/' . $fixture . '.php'; }
-	$check( 'NATIVE-C04-ACTUAL-SCHEMA-EIGHT-FIVE-TABLES-READY', '8' === get_option( 'cetech_de_db_version' ) && ( new RuleLifecycleReadiness() )->get_status()['ready'] && ( new OperationStoreReadiness() )->get_status()['ready'] );
+	$check( 'NATIVE-C04-ACTUAL-SCHEMA-EIGHT-FIVE-TABLES-READY', '9' === get_option( 'cetech_de_db_version' ) && ( new RuleLifecycleReadiness() )->get_status()['ready'] && ( new OperationStoreReadiness() )->get_status()['ready'] );
 	$host = $wpdb->parse_db_host( DB_HOST );
 	if ( ! is_array( $host ) ) { throw new RuntimeException( 'Native rule database configuration is unavailable.' ); }
 	$physical = new mysqli( $host[0], DB_USER, DB_PASSWORD, DB_NAME, $host[1] ?: 3306, $host[2] );
