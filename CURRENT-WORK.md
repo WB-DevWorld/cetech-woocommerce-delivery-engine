@@ -1,3 +1,21 @@
+# Current Work — Wave 2 DeliveryQuote design
+
+Status: **WAVE1 C01–C07 INTEGRATED — W2-QUOTE-LIFECYCLE-1 PROPOSED / DESIGN ONLY**
+
+## 2026-10-07 — Owner requested the next lifecycle design
+
+At 04:27:15 UTC the owner instructed “Prepare Wave 2’s DeliveryQuote lifecycle design and bounded implementation plan.” [Issue #81](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/81) tracks the design on `ws3/wave2-deliveryquote-design`, starting from protected master `f6f7ee7c84c5d92753629b3884535a0d1b0deffb`, tree `e15951e301c8df6c8b03d7eb4a6adca7faaa4850`. All C01–C07 are accepted/integrated; #48/#78 completed. Actual final master CI37570943997 attempt1 passed all eight jobs, native380/finalHTTP98 and smoke/cleanup with every615-source hash verified. This current record supersedes older pending-task wording below without changing historical failed evidence.
+
+The [DeliveryQuote proposal](docs/product/W2-DELIVERYQUOTE-LIFECYCLE-DESIGN-2026-10-07.md) defines stable identity, proposed300-second nonrenewing validity, price immutability/material revalidation, original-envelope acceptance/replay, guest/session authority, new storage/retention profiles, a verified base-only existing-price provider and explicit quote-specific placement/C07 ordering. The [six-checkpoint plan](docs/product/W2-DELIVERYQUOTE-IMPLEMENTATION-PLAN-2026-10-07.md) contains48 future NOT_EXECUTED obligations. The [source inventory](docs/product/W2-DELIVERYQUOTE-SOURCE-INVENTORY-2026-10-07.md) and [all12 quote mappings](docs/product/W2-DELIVERYQUOTE-TRACEABILITY-2026-10-07.csv) retain broader tariff/economics/FX/promise dependencies and current partial classifications.
+
+Root owns the shared design/traceability/records and all ref/PR/Issue publications. Four read-only agents inspected existing-price provenance, C03/schema/retention, pinned native Woo hooks and privacy/requirements; finite independent review checks the proposal. Only owner and AI agents are working. No external acceptance-availability blocker is introduced. This task publishes a draft design; implementation starts only with the owner's next bounded task.
+
+No quote runtime, table, snapshot writer, test, CI profile, flag, schema or development version changes are made by this proposal. Existing615 production PHP/map `7563a48389b93dd865a279646cb5763800fdeca64a6973ed1fd616a7a909af30`, schema8 and identity1.0.0-dev.wave1-emergency-control.1 stay current. Design CI is preservation only, not proof of the48 future cases. Its exact candidate/run/artifact/source verification is attached to the draft PR after execution, avoiding a source self-receipt loop.
+
+Next owner task after review: **“Approve W2-QUOTE-LIFECYCLE-1 and implement W2-Q01.”** Q01 is schema-neutral internal values/codecs/projections with fixture provider; later storage/provider/cart/placement checkpoints are separately qualified.
+
+# Historical work — Wave 1 integration closeout
+
 # Current Work — Wave 1 integrated / integration closeout
 
 Status: **WAVE1-PLAN-1 ACCEPTED — C01–C07 OWNER-ACCEPTED AND INTEGRATED**

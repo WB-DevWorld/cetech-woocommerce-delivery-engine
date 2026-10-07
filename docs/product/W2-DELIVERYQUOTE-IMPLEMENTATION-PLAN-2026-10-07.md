@@ -1,0 +1,83 @@
+# DeliveryQuote bounded implementation plan
+
+Status: **PROPOSED / NOT EXECUTED** under [W2-QUOTE-LIFECYCLE-1](W2-DELIVERYQUOTE-LIFECYCLE-DESIGN-2026-10-07.md). Six checkpoints; root holds shared schema/Plugin/bootstrap/settings/flags/manifest/CI/ref/PR leases. Delegated edits use separate finite file leases. Only the owner and AI agents are working. No outside human-availability gate is introduced.
+
+## Checkpoints and exit conditions
+
+| Checkpoint | Deliverable / change boundary | Evidence and decision at exit |
+|---|---|---|
+| **W2-Q01 — internal contract** | New internal Domain/DeliveryQuote values and Application contracts: strict owner/context/terms/header/reference codecs, purpose/status/clock/expiry state machine, finite provider registry, safe quote and private facts projections. Trusted fixture provider only. No DDL, registration into shopper runtime, quote persistence or native writer. Existing Money/Currency/selection/group formats stay unchanged. | Cases01–08 and34–35 in meaningful units; no generic private serialization; unchanged existing runtime/source map separately qualified. Bring back qualified internal checkpoint for owner integration. |
+| **W2-Q02 — storage/readiness** | Schema9 forward migration for quotes, bindings, budget windows and the named bounded rate range index; exact native type/index/engine/collation/identity preflight; repositories and read codecs, explicit C06 preservation/quote-class inventory and both uninstall paths. Profiles still unused by shopper runtime. No history down migration. | Cases09–12 and39 in required physical SQL/native fixtures;27–30 are later Q03 cleanup dependencies, not skipped optional groups. Failure before/after each migration unit, existing conflicting structures and readiness refusals. Reader-compatible rollback/preexisting schema8 data preservation. |
+| **W2-Q03 — durable internal lifecycle** | Register finite internal issue/accept/invalidate/bind/seal profiles with C03. Fixture-provider issue/accept/current read/reconcile, exact namespace linkage and single-use admission lease through an owned pre-C03-reservation gate; reference-safe private-payload stripping, finite retention checkpoints. Accepted issue means row issued, not shopper accepted. No real RateCard/cart/order path adoption. | Cases13–19,27–33 and36–38; two real sessions and fresh OS process; event/completion/row atomicity, commit uncertainty/retirement, budget and cleanup races. Internal fixture success does not certify native pricing. |
+| **W2-Q04 — retained existing-price provider** | Explicit `legacy_fixed_base_v1` finite provider, bounded repository view passed to existing RateQuoteEngine, full per-member homogeneous eligibility, current source/range fences, sealed legacy policy digest, native Woo tax/money/no-promo/no-FX receipt. Cost unavailable remains typed. No new order snapshot writer, grouping/matcher repair or new promotion/FX/pickup tariff. | Cases20–26 and37. Actual existing fixed item/shipment/zero amounts and native rounding, complete limit+1 refusal, same-second update/new candidate/preopened RR snapshot with two connections. All unknown customer-charge contexts refuse. Q04 must demonstrate real supported contexts before Q05 adopts them. |
+| **W2-Q05 — cart confirmation and readers** | Separate server-owned quote session/rate references and shopper DTO; explicit review/refresh in native Classic/Blocks/direct StoreAPI; PDP stays estimate. Add strict reader-first `delivery_quote` protected snapshot envelope and exact reference/format readiness. No order writer activation, acceptance on GET/PATCH/totals or new public quote-by-ID endpoint. | Cases31,34–36 and40–42 with actual session, authenticated HTTP and Chromium Blocks interactions. Preserve choices on expiry/change, new amount visible before confirmation, warm cache checks, no managed native/free fallback, all legacy readers. Native quote confirmation is tested as an internal prepared flow until Q06 authorizes placement. |
+| **W2-Q06 — placement adopter** | Implement proposed COR029 draft/context-seal/final-placement boundary. Stage Classic at order_created/PHP_INT_MAX-1 before C07 saved freeze; StoreAPI only on final POST after request sync, processed writer verifies quote context. Trusted final coordinator acknowledges private placement receipt after exact C07 admission and before gateway/free branch. Exact HPOS mapping, order-pay/empty-cart, reused-order handling, supported-reader rollback, all-or-none site activation. | Cases40–48, all earlier cases and preserved native baseline. Actual gateway-spy/free-order/native redirects, late pause, staged-write/ack failures and historical bytes. Native accepted placement/history required before DE-QUOTE-011 can be reviewed as implemented. Return for owner integration/adoption acceptance. |
+
+The source layout is proposed; implementations may choose equivalent local names while preserving these boundaries and finite schemas. Each checkpoint starts from its accepted predecessor. Source drift is reviewed as a new baseline, not mixed into old proof. A normal immutable checkpoint and complete qualification precede its integration request. A failed assertion is retained with its exact candidate; a repair needs a demonstrated cause. There is no loop of speculative product changes or repeated approvals of the same accepted invariant.
+
+## Finite acceptance obligations
+
+These **48** local design case IDs are future **NOT_EXECUTED**. They are not new frozen capability IDs or current CI counts. A case can have several assertions; meaningful physical/route proof is required where specified.
+
+| ID | Checkpoint | Required observation |
+|---|---|---|
+| W2Q-01 | Q01 | Stable server quote/header IDs; distinct site/session/operation namespaces; canonical original issue input; request/correlation IDs never authority. |
+| W2Q-02 | Q01 | Reordered equal members have equal digest; quantity/member/destination/service/source/variation-parent edits change it; same SKU/different destination remains distinct. |
+| W2Q-03 | Q01 | Authored absent/null/zero dimension normalization follows existing tuple contract; unavailable evidence remains distinct; malformed relationships refuse. |
+| W2Q-04 | Q01 | Strict decimal/currency/precision, exponent/nonfinite/negative/overflow rejection; explicit zero differs from missing; detached immutable nested facts. |
+| W2Q-05 | Q01 | Before/exact/after expiry and clock regression; fixed300s proposal; read/replay/accept cannot extend; bad interval refuses. |
+| W2Q-06 | Q01 | Issued/accepted/invalidated/current-expired/stripped transitions preserve original body; unknown read never fabricates invalidation or acceptance. |
+| W2Q-07 | Q01 | Route not-recorded versus zero; cost unavailable versus known; promotion none versus unknown; unsupported provider/version/format refuses. |
+| W2Q-08 | Q01 | Quote expiry distinct from native stock/coupon/capacity TTL; acceptance never claims reservation/placement/payment. |
+| W2Q-09 | Q02 | Clean schema8 upgrade; exact tables/indexes/engine/unique keys/current prefix; existing32-table data bytes survive. |
+| W2Q-10 | Q02 | Interrupted forward migration and conflicting table/index/collation/readiness refuse new quote writes; no false schema9 publication. |
+| W2Q-11 | Q02 | Duplicate UUID/namespace/binding uniqueness and malformed persisted header/body/digest/row refuse; no cross-site load. |
+| W2Q-12 | Q02 | Default WordPress cache and actual replacement native connection see committed quote facts; no tests/bootstrap substitute. |
+| W2Q-13 | Q03 | Two actual sessions issue same original token/intent: one complete-cart quote/event/completion with bounded per-group terms, same identity/expiry; different intent conflicts. |
+| W2Q-14 | Q03 | Two acceptors on one quote: one receipt/audit; original envelope replay after101 unrelated later records in fresh OS process remains exact. |
+| W2Q-15 | Q03 | Stale opened revision/material/body/current owner refuses without overwriting a newer row; changed token cannot reaccept or renew. |
+| W2Q-16 | Q03 | Refused audit/completion/CAS rolls quote effects back; unsent COMMIT plus acknowledged rollback reports rejection. |
+| W2Q-17 | Q03 | Actual committed lost acknowledgement yields unconfirmed; retire owner, reconcile original namespace on fresh physical connection; no second issue/accept/audit. |
+| W2Q-18 | Q03 | Failed rollback/close/unknown reference stays unconfirmed and retains payload; recorded completion cannot rerun mutate on reconcile. |
+| W2Q-19 | Q03 | Pause before/after current control lock, missing-key fence and preopened RR snapshot on same OperationSession; separate confirm_enabled cannot masquerade as shared atomicity. |
+| W2Q-20 | Q04 | Actual homogeneous fixed-shipment and fixed-item groups match existing engine/native totals; explicit configured zero retained; unknown price refuses. |
+| W2Q-21 | Q04 | Mixed origin/supplier/profile tuples refuse in both member orders; positive scoped card with unproved request scope refuses; grouping/parser/matcher unchanged. |
+| W2Q-22 | Q04 | Complete rate universe includes higher-precedence insertion and same-second edit; current range locks wait on second connection, current receipt mismatch refuses old quote. |
+| W2Q-23 | Q04 | Existing legacy inclusive effective_to preserved; quote half-open expiry independent; rate/source/policy change invalidates applicability without repricing body. |
+| W2Q-24 | Q04 | Native per-rate tax versus rounded totals, tax_status/exemption/location change; no invented offer tax_class authority or tax engine. |
+| W2Q-25 | Q04 | Verified no-conversion/no-delivery-promo supported; mutated shipping amount, unknown coupon effect, ambiguous FX/provider or missing provenance refuse. No cost-zero fabrication. |
+| W2Q-26 | Q04 | Current source route, warmed configuration/geography, reparented variation, inventory/backorder/purchasability and offer edits are independently revalidated. |
+| W2Q-27 | Q03 | Exact expiry+30-minute retention boundary strips only unaccepted private body; accepted issue completion protects header but does not make unused body immortal. |
+| W2Q-28 | Q03 | Competing acceptance and cleanup plus missing accept namespace: same producer order, no accepted/pending/unconfirmed facts stripped. |
+| W2Q-29 | Q03 | Binding/history/HPOS/item reference and cleanup race: accepted/placed/malformed/unknown references retain; exact structured lookup, no JSON substring/all-history scan. |
+| W2Q-30 | Q03 | Fixed ceiling, refused retention checkpoint, crash/restart, row-generation change,100 inspection/mutation limits and soft-time stop preserve progress and truth. |
+| W2Q-31 | Q05 | Two guests and two carts of one user isolate ID/read/cache/replay/accept; stolen token/quote ID/nonce/cart key cannot disclose; login/logout/session rotation reissues. |
+| W2Q-32 | Q03 | Concurrent admission at20 cart attempts/session and200/site allows exactly bound independent of package count; forged IP/header irrelevant; denied new request creates zero C03 reservations/leases and performs zero provider capture; counters gate before generic pending insertion. |
+| W2Q-33 | Q03 | Original admission replay does not increment counters or start concurrent capture; dead60s lease no renewal/takeover; expired budget cleanup cannot revive it. |
+| W2Q-34 | Q01/Q05 | Dedicated shopper quote and diagnostic allowlists; recursive/list/renamed/private serializer/cache/error sentinels expose no origin/rate/cost/hash/address/token. |
+| W2Q-35 | Q01/Q05 | Current exact admin scope before load/disclosure; separate private cost/origin authority; revocation mid-projection denies sensitive loader/output. |
+| W2Q-36 | Q05 | Warm default/persistent cache: owner/expiry/current facts rechecked; delayed old generation cannot overwrite new; caching never extends TTL. |
+| W2Q-37 | Q03/Q04 | Actual limits+1 for input/member/group/zone/candidate/bytes/depth; no partial winning quote; SQL plan, query count and lock pressure bounded, zero external calls. |
+| W2Q-38 | Q03 | Private session publication fails or arrives late: invalidate-only monotonic generation; durable facts intact, original-envelope recovery no second effects. |
+| W2Q-39 | Q02/Q06 | Both uninstall/deactivation paths preserve accepted history/C03/tombstones/existing32 stores; new forward-reader rollback retains references, refuses incompatible downgrade. |
+| W2Q-40 | Q05/Q06 | Actual Classic submit and Chromium Blocks button/direct StoreAPI show/review exact quote; GET/PATCH/totals/session restore never accepts/places it. |
+| W2Q-41 | Q05/Q06 | Expiry/material change yields recoverable response and retained choices; refreshed new price visible before another submit; missing/paused/unknown quote never free/native fallback. |
+| W2Q-42 | Q05 | Reader-first V1/V2/C05 optional facts preserve raw bytes; unknown/malformed mandatory quote format refuses; no reference overloading/backfill/current reconstruction. |
+| W2Q-43 | Q06 | Classic pre-freeze hook and StoreAPI final staging produce exact verified accepted context; old processed writer cannot re-timestamp; post-freeze/stamp mutation denies. |
+| W2Q-44 | Q06 | Native reused pending/failed order item rebuild and StoreAPI persisted GET/PATCH: logical membership exact; Classic resume interception precedes item deletion, StoreAPI draft pointer detachment acknowledged before placement; sealed history unchanged; changed retry uses new order/binding. |
+| W2Q-45 | Q06 | Failure/kill/ack loss between each custom/Woo stage or final receipt: no gateway/free admission, honest prepared/unconfirmed state; original replay verifies physical bytes. |
+| W2Q-46 | Q06 | Final receipt current-lock rechecks exact quote/owner/context/expiry; late expiry/pause before that admission point wins/no placement; acknowledged receipt permits its continuation; zero gateway on denied/unknown actual routes. |
+| W2Q-47 | Q06 | Exact-order authorized order-pay/empty cart: valid quote and current C07 checks; expired new quote returns checkout; legacy path preserved; native safe notice303/termination. |
+| W2Q-48 | Q06 | HPOS on/off history, paid callbacks/shipment reads after config/rate/tax/currency deletion/change remain accepted bytes; native paid and free branches execute only after known admission/receipt. |
+
+## Qualification and bounded scope
+
+Internal unit proofs do not substitute for two independent SQL connections/processes or native WordPress. New physical quote classes must run as required non-skipped CI jobs, with per-case barrier/query/outcome evidence. Native readers use wp-load.php and real Woo/HPOS. The final adopter requires actual Classic, Blocks button, direct StoreAPI and order-pay/paid/free gateway evidence, cleanup and exact unique expected case sets. Preserve existing C01–C07 native380/HTTP98 obligations; future case totals are derived from final source, not copied from this design's48 obligations.
+
+Every checkpoint records candidate/tree/runtime/run/attempt, ZIP bytes/SHA256 and each JSON member separately, complete-versus-partial cases, source-derived installed map and all substantive required gates. Compare installed PHP hashes with immutable candidate blobs, not only another receipt. Current pinned PHP8.5.11/WP7.1.2/Woo11.1.2/MariaDB11.4.13 and OPcache-on/JIT-disabled listener plus20-second client timeout stay as the preservation profile unless a separately evidenced runtime task changes them. Baseline SQL173 includes required operation43/rule44/data30/emergency30; historical cor005/cor007 excluded groups remain separately identified.
+
+No elapsed-time claim replaces actual bounded SQL/lease/query evidence. Current connection timeout5s and per-lock wait2s do not establish a2s total deadline. Deadline/stalled-query failure must be measured at adopter qualification; if the existing20-second HTTP bound cannot be met reliably, make an evidence-supported bounded transport correction as a separately visible checkpoint change, rather than increasing the client bound or weakening an assertion.
+
+COR020 mixed-group tariff, deeper promotion/private economics/FX/promise/pickup semantics, theme/marketplace/multicurrency certification, wider published OpenAPI surfaces and bulk P07/P08 stay separate. Q06 explicitly proposes only quote-specific COR029 placement disposition. Requirement classifications remain unchanged until a later reviewed conformance reconciliation.
+
+Next owner task: **“Approve W2-QUOTE-LIFECYCLE-1 and implement W2-Q01.”** Approval chooses the proposed lifecycle defaults; only Q01 implementation begins. Later checkpoint handoffs explain completed behavior, remaining dependencies and the next bounded task.
