@@ -7,8 +7,10 @@ namespace CetechDeliveryEngine\Tests\Unit\EmergencyControl;
 require_once __DIR__ . '/CheckoutTestFixtures.php';
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
+use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
 use CetechDeliveryEngine\Application\Cart\CartCustomerContextEditorService;
 use CetechDeliveryEngine\Application\Cart\CartCustomerContextMutationService;
+use CetechDeliveryEngine\Application\Checkout\CheckoutDeliverySelectionValidator;
 use CetechDeliveryEngine\Application\CustomerContext\ApplyCustomerContextToEligibleLinesService;
 use CetechDeliveryEngine\Application\CustomerContext\LocationOfferQuoteProbe;
 use CetechDeliveryEngine\Application\Destination\PackageDestinationZoneResolverInterface;
@@ -39,12 +41,15 @@ use CetechDeliveryEngine\Domain\EmergencyControl\EmergencyControlState;
 use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyCheckoutHooks;
 use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlResponse;
 use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
+use CetechDeliveryEngine\Integrations\Blocks\BlocksCheckoutValidation;
+use CetechDeliveryEngine\Integrations\Blocks\BlocksStoreApiExtension;
 use PHPUnit\Framework\TestCase;
 
 final class EmergencyCheckoutHooksTest extends TestCase {
 	private EmergencyBridgeControl $control;
 	private EmergencyBridgeQuote $quote;
 	private EmergencyControlRuntime $runtime;
+	private EmergencyCheckoutAdmissionService $admission;
 	private EmergencyCheckoutHooks $hooks;
 	private ProductDeliveryConfigurationSourceInterface $source;
 	protected function setUp(): void {
@@ -57,8 +62,8 @@ final class EmergencyCheckoutHooksTest extends TestCase {
 			}
 		};
 		$classifier = new EmergencyOwnershipClassifier( [ $this->source ] ); $latch = new EmergencyOwnershipLatch();
-		$admission = new EmergencyCheckoutAdmissionService( $this->control, $classifier, $this->quote, $latch );
-		$this->runtime = new EmergencyControlRuntime( $this->control, $classifier, $latch, $admission );
+		$this->admission = new EmergencyCheckoutAdmissionService( $this->control, $classifier, $this->quote, $latch );
+		$this->runtime = new EmergencyControlRuntime( $this->control, $classifier, $latch, $this->admission );
 		$this->hooks = new EmergencyCheckoutHooks( $this->runtime );
 	}
 	protected function tearDown(): void { $GLOBALS['cetech_de_test_wc'] = null; $GLOBALS['cetech_de_test_wc_products'] = []; }
@@ -68,6 +73,76 @@ final class EmergencyCheckoutHooksTest extends TestCase {
 		$flags = new FeatureFlags(); $requirements = new Requirements(); $builder = new ProductDeliveryOptionsBuilder( $this->createMock( DeliveryOfferRepositoryInterface::class ) );
 		$validator = new ProductDeliverySelectionValidator( $flags, $requirements, $this->source, $builder, $this->runtime );
 		return new CartDeliverySelectionCapture( $flags, $requirements, $this->source, $builder, $validator, null, null, null, $this->runtime );
+	}
+	private function legacy_blocks_validation(): BlocksCheckoutValidation {
+		if ( ! class_exists( 'WooCommerce', false ) ) { eval( 'class WooCommerce {}' ); }
+		$flags = new FeatureFlags(); $requirements = new Requirements();
+		foreach ( [ 'enable_checkout_delivery_selection_validation', 'enable_cart_delivery_selection_capture', 'enable_product_delivery_selector' ] as $flag ) { $flags->set( $flag, true ); }
+		$builder = new ProductDeliveryOptionsBuilder( $this->createMock( DeliveryOfferRepositoryInterface::class ) );
+		$selection = new ProductDeliverySelectionValidator( $flags, $requirements, $this->source, $builder, $this->runtime );
+		$capture = new CartDeliverySelectionCapture( $flags, $requirements, $this->source, $builder, $selection, null, null, null, $this->runtime );
+		$revalidator = new CartDeliverySelectionRevalidator( $flags, $requirements, $selection, $this->runtime );
+		$classic = new CheckoutDeliverySelectionValidator( $flags, $requirements, $capture, $revalidator, null, $this->runtime );
+		$shipping = new ShippingRateCalculationGate( $flags, $requirements );
+		return new BlocksCheckoutValidation( $classic, new BlocksStoreApiExtension( $capture, $revalidator, $shipping ), $shipping );
+	}
+	private function install_cart( array $lines ): object {
+		$cart = new class( $lines ) {
+			public function __construct( private array $lines ) {}
+			public function get_cart(): array { return $this->lines; }
+		};
+		$GLOBALS['cetech_de_test_wc'] = (object) [ 'cart' => $cart ];
+		return $cart;
+	}
+	public function test_always_live_cart_error_hook_precedes_the_legacy_store_api_handler(): void {
+		$old = $GLOBALS['cetech_de_test_actions'] ?? []; $GLOBALS['cetech_de_test_actions'] = [];
+		try {
+			$this->legacy_blocks_validation()->register(); $this->hooks->register();
+			$callbacks = $GLOBALS['cetech_de_test_actions']['woocommerce_store_api_cart_errors'] ?? [];
+			usort( $callbacks, static fn( array $a, array $b ): int => $a['priority'] <=> $b['priority'] );
+			self::assertSame( -100, $callbacks[0]['priority'] ); self::assertSame( 2, $callbacks[0]['args'] );
+			self::assertSame( [ $this->hooks, 'append_store_cart_errors' ], $callbacks[0]['callback'] ); self::assertSame( 10, $callbacks[1]['priority'] );
+		} finally { $GLOBALS['cetech_de_test_actions'] = $old; }
+	}
+	public function test_paused_native_store_cart_error_keeps_control_code_before_actual_legacy_wrap(): void {
+		$old = $GLOBALS['cetech_de_test_actions'] ?? []; $GLOBALS['cetech_de_test_actions'] = [];
+		try {
+			$this->legacy_blocks_validation()->register(); $this->hooks->register(); $this->control->pause();
+			$cart = $this->install_cart( [ 'managed' => $this->line( extra: [ 'private_context' => 'PRIVATE-C07-SYNTHETIC-ADDRESS' ] ) ] ); $before = $cart->get_cart();
+			$callbacks = $GLOBALS['cetech_de_test_actions']['woocommerce_store_api_cart_errors'] ?? [];
+			usort( $callbacks, static fn( array $a, array $b ): int => $a['priority'] <=> $b['priority'] );
+			$errors = new \WP_Error(); foreach ( $callbacks as $callback ) { ( $callback['callback'] )( $errors, $cart ); }
+			self::assertContains( 'cetech_de_delivery_selection', $errors->get_error_codes() );
+			self::assertSame( 'cetech_de_checkout_control', $errors->get_error_code(), 'Woo Checkout converts the first inserted WP_Error code before the draft-order hooks.' );
+			self::assertSame( [ 'cetech_de_checkout_control', 'cetech_de_delivery_selection' ], $errors->get_error_codes() );
+			self::assertStringStartsWith( 'Delivery and pickup checkouts are temporarily paused.', $errors->get_error_message() );
+			self::assertMatchesRegularExpression( '/Reference: [A-Za-z0-9._:-]+$/', $errors->get_error_message() );
+			$projection = $errors->get_error_data( 'cetech_de_checkout_control' );
+			self::assertSame( [ 'contract_version', 'decision_kind', 'status', 'message_key', 'message', 'recovery_action', 'correlation_id' ], array_keys( $projection ) );
+			self::assertSame( 'site_control', $projection['decision_kind'] ); self::assertSame( 'refused', $projection['status'] );
+			foreach ( [ 'PRIVATE-C07', 'actor_user_id', 'incident_pause', 'opened_bytes', 'site_id', 'revision' ] as $private ) { self::assertStringNotContainsString( $private, json_encode( $projection, JSON_THROW_ON_ERROR ) ); }
+			self::assertSame( $before, $cart->get_cart() ); self::assertSame( 0, $this->quote->validations ); self::assertSame( 0, $this->control->confirmations ); self::assertFalse( $this->admission->admitted( $this->order(), 'store_api' ) );
+		} finally { $GLOBALS['cetech_de_test_actions'] = $old; }
+	}
+	public function test_store_cart_error_addition_preserves_draft_reads_and_enabled_or_unmanaged_errors(): void {
+		$cart = $this->install_cart( [ 'managed' => $this->line() ] ); $before = $cart->get_cart();
+		$errors = new \WP_Error( 'existing_selection', 'Existing selection error.' );
+		$this->hooks->append_store_cart_errors( $errors, $cart );
+		self::assertSame( [ 'existing_selection' ], $errors->get_error_codes() );
+		$this->control->pause(); $cart = $this->install_cart( [ 'native' => $this->line( 102 ) ] ); $reads = $this->control->reads;
+		$this->hooks->append_store_cart_errors( $errors, $cart );
+		self::assertSame( [ 'existing_selection' ], $errors->get_error_codes() ); self::assertSame( $reads, $this->control->reads );
+		$cart = $this->install_cart( $before ); $errors = new \WP_Error();
+		$this->hooks->append_store_cart_errors( $errors, $cart );
+		self::assertSame( 'cetech_de_checkout_control', $errors->get_error_code() ); self::assertSame( $before, $cart->get_cart() );
+		self::assertSame( 0, $this->quote->validations ); self::assertSame( 0, $this->control->confirmations ); self::assertFalse( $this->admission->admitted( $this->order(), 'store_api' ) );
+	}
+	public function test_store_cart_error_unavailable_is_safe_and_does_not_throw_or_mint_admission(): void {
+		$this->control->unavailable = true; $cart = $this->install_cart( [ 'managed' => $this->line() ] ); $errors = new \WP_Error();
+		$this->hooks->append_store_cart_errors( $errors, $cart );
+		self::assertSame( 'cetech_de_checkout_control', $errors->get_error_code() );
+		self::assertStringStartsWith( 'Checkout could not be confirmed.', $errors->get_error_message() ); self::assertSame( 'cetech.checkout.unavailable', $errors->get_error_data()['message_key'] );
+		self::assertSame( 0, $this->quote->validations ); self::assertSame( 0, $this->control->confirmations ); self::assertFalse( $this->admission->admitted( $this->order(), 'store_api' ) );
 	}
 	public function test_saved_order_hook_freezes_exact_coordinates_before_classic_reloads_items(): void {
 		$old_actions = $GLOBALS['cetech_de_test_actions'] ?? []; $GLOBALS['cetech_de_test_actions'] = [];
@@ -196,3 +271,15 @@ final class EmergencyBridgeQuote implements EmergencyOrderQuoteValidatorInterfac
 	public function fingerprint( \WC_Order $order ): ?string { return hash( 'sha256', (string) $order->get_id() . ':' . $order->get_status() ); }
 }
 final class EmergencyBridgeStop extends \RuntimeException {}
+
+/** WP_Error's native insertion order/data behavior for this no-WordPress unit fixture. */
+final class EmergencyBridgeWpError {
+	private array $errors = []; private array $data = [];
+	public function __construct( string $code = '', string $message = '', mixed $data = null ) { if ( '' !== $code ) { $this->add( $code, $message, $data ); } }
+	public function add( string $code, string $message, mixed $data = null ): void { $this->errors[ $code ][] = $message; if ( null !== $data ) { $this->data[ $code ] = $data; } }
+	public function get_error_codes(): array { return array_keys( $this->errors ); }
+	public function get_error_code(): string { return $this->get_error_codes()[0] ?? ''; }
+	public function get_error_message( string $code = '' ): string { return $this->errors[ '' === $code ? $this->get_error_code() : $code ][0] ?? ''; }
+	public function get_error_data( string $code = '' ): mixed { return $this->data[ '' === $code ? $this->get_error_code() : $code ] ?? null; }
+}
+if ( ! class_exists( '\WP_Error' ) ) { class_alias( EmergencyBridgeWpError::class, '\WP_Error' ); }

@@ -20,6 +20,7 @@ final class EmergencyCheckoutHooks {
 		add_filter( 'woocommerce_add_cart_item_data', [ $this, 'guard_item_data' ], PHP_INT_MAX, 3 );
 		add_action( 'woocommerce_store_api_validate_add_to_cart', [ $this, 'validate_store_add_to_cart' ], -100, 2 );
 		add_action( 'woocommerce_after_checkout_validation', [ $this, 'early_classic' ], -100, 2 );
+		add_action( 'woocommerce_store_api_cart_errors', [ $this, 'append_store_cart_errors' ], -100, 2 );
 		add_action( 'woocommerce_store_api_checkout_update_order_from_request', [ $this, 'early_store_api' ], -100, 2 );
 		add_action( 'woocommerce_checkout_order_processed', [ $this, 'final_classic' ], PHP_INT_MAX, 3 );
 		add_action( 'woocommerce_store_api_checkout_order_processed', [ $this, 'final_store_api' ], PHP_INT_MAX, 1 );
@@ -60,6 +61,16 @@ final class EmergencyCheckoutHooks {
 		return $data;
 	}
 	public function early_classic( array $data, \WP_Error $errors ): void { $decision = $this->runtime->cart_decision(); if ( ! $decision->allowed ) { $view = EmergencyControlResponse::shopper_projection( $decision ); $errors->add( 'cetech_de_checkout_control', $view['message'] . ' Reference: ' . $view['correlation_id'], $view ); } }
+	/** Woo validates cart errors before draft-order hooks; reads/editing must not throw. */
+	public function append_store_cart_errors( mixed $errors, mixed $cart ): void {
+		unset( $cart );
+		if ( ! $errors instanceof \WP_Error ) { return; }
+		$decision = $this->runtime->cart_decision();
+		if ( ! $decision->allowed ) {
+			$view = EmergencyControlResponse::shopper_projection( $decision );
+			$errors->add( 'cetech_de_checkout_control', $view['message'] . ' Reference: ' . $view['correlation_id'], $view );
+		}
+	}
 	public function early_store_api( mixed $order, mixed $request ): void { $decision = $this->runtime->cart_decision(); if ( ! $decision->allowed ) { EmergencyControlResponse::reject_store_api( $decision ); } }
 	public function final_classic( int $order_id, array $posted, mixed $order ): void { $decision = $order instanceof \WC_Order ? $this->runtime->final_order_decision( $order, 'classic' ) : EmergencyControlRuntime::unavailable(); if ( ! $decision->allowed ) { EmergencyControlResponse::reject_classic( $decision ); } }
 	public function final_store_api( mixed $order ): void { $decision = $order instanceof \WC_Order ? $this->runtime->final_order_decision( $order, 'store_api' ) : EmergencyControlRuntime::unavailable(); if ( ! $decision->allowed ) { EmergencyControlResponse::reject_store_api( $decision ); } }
