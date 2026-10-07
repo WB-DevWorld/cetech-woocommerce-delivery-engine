@@ -13,6 +13,80 @@ from pathlib import Path
 from urllib.parse import urljoin, urlsplit
 
 
+def store_error_privacy(result, raw_body, password):
+    """Keep C07 errors private without rejecting Woo's own-customer 409 cart.
+
+    WooCommerce 11.1.2 Checkout::get_route_error_response appends CartSchema
+    on 409, whose address fields and shipping-rate destinations contain the
+    authenticated shopper's own addresses. The existing Cetech cart-item
+    extension also exposes that shopper's editable delivery address. Only
+    those exact source-defined leaves may echo this prepared sentinel.
+    The C07 error message and all other nested/renamed leaves stay address-free.
+    """
+    marker = "PRIVATE-C07-SYNTHETIC-ADDRESS"
+    allowed = {("data", "cart", "billing_address", "address_1"): "billing",
+               ("data", "cart", "shipping_address", "address_1"): "shipping"}
+    message = result.get("message")
+    components = {"safe_correlation_present": isinstance(message, str) and "Reference:" in message,
+                  "error_message_address_free": isinstance(message, str) and "PRIVATE-C07" not in message,
+                  "password_absent": password not in raw_body,
+                  "internal_control_fields_absent": not any(value in raw_body for value in ("actor_user_id", "opened_bytes")),
+                  "private_control_reason_absent": "incident_pause" not in raw_body,
+                  "bounded_traversal_complete": True,
+                  "allowed_billing_address_markers": 0, "allowed_shipping_address_markers": 0,
+                  "allowed_shipping_rate_destination_address_markers": 0, "allowed_cart_item_delivery_address_markers": 0,
+                  "other_address_marker_occurrences": 0}
+    stack = [((), result, 0)]
+    nodes = 0
+    while stack:
+        path, value, depth = stack.pop()
+        nodes += 1
+        if nodes > 8192 or depth > 32:
+            components["bounded_traversal_complete"] = False
+            break
+        if isinstance(value, dict):
+            if len(value) + len(stack) + nodes > 8192:
+                components["bounded_traversal_complete"] = False
+                break
+            for key, child in value.items():
+                if not isinstance(key, str):
+                    components["bounded_traversal_complete"] = False
+                    break
+                if "PRIVATE-C07" in key:
+                    components["other_address_marker_occurrences"] += 1
+                components["password_absent"] &= password not in key
+                components["internal_control_fields_absent"] &= not any(item in key for item in ("actor_user_id", "opened_bytes"))
+                components["private_control_reason_absent"] &= "incident_pause" not in key
+                stack.append((path + (key,), child, depth + 1))
+            if not components["bounded_traversal_complete"]:
+                break
+        elif isinstance(value, list):
+            if len(value) + len(stack) + nodes > 8192:
+                components["bounded_traversal_complete"] = False
+                break
+            stack.extend((path + (index,), child, depth + 1) for index, child in enumerate(value))
+        elif isinstance(value, str):
+            components["password_absent"] &= password not in value
+            components["internal_control_fields_absent"] &= not any(item in value for item in ("actor_user_id", "opened_bytes"))
+            components["private_control_reason_absent"] &= "incident_pause" not in value
+            if "PRIVATE-C07" in value:
+                category = allowed.get(path) if value == marker else None
+                if value == marker and category is None:
+                    if len(path) == 6 and path[:3] == ("data", "cart", "shipping_rates") and type(path[3]) is int and 0 <= path[3] < 200 and path[4:] == ("destination", "address_1"):
+                        category = "shipping_rate_destination"
+                    elif len(path) == 8 and path[:3] == ("data", "cart", "items") and type(path[3]) is int and 0 <= path[3] < 200 and path[4:] == ("extensions", "cetech-delivery-engine", "delivery_address", "address_1"):
+                        category = "cart_item_delivery"
+                if category is None:
+                    components["other_address_marker_occurrences"] += 1
+                else:
+                    components["allowed_" + category + "_address_markers"] += 1
+    components["address_marker_paths_allowed"] = components["other_address_marker_occurrences"] == 0
+    safe = all(components[key] for key in ("safe_correlation_present", "error_message_address_free", "password_absent",
+                                           "internal_control_fields_absent", "private_control_reason_absent",
+                                           "bounded_traversal_complete", "address_marker_paths_allowed"))
+    return safe, components
+
+
 def run_emergency(client, state, bridge, recorder, Page, login):
     prefix = "HTTP-C07-"
     settings = client.resolve("/wp-admin/admin.php?page=cetech-delivery-engine-settings")
@@ -237,8 +311,9 @@ def run_emergency(client, state, bridge, recorder, Page, login):
                    and after["barrier"].get("triggered") is True and before["gateway_count"] == after["gateway_count"]
                    and before["protected_order_hash"] == after["protected_order_hash"],
                    dict(evidence(before, after, response), barrier=after["barrier"], required_error_code=result.get("code")))
-    recorder.check(prefix + "SHOPPER-HTTP-ERROR-HAS-SAFE-CORRELATION-NO-PRIVATE-CONTROL", "Reference:" in result.get("message", "")
-                   and not any(value in response.body.decode("utf-8", "replace") for value in (state["password"], "actor_user_id", "opened_bytes", "PRIVATE-C07", "incident_pause")), response.evidence())
+    privacy_safe, privacy_components = store_error_privacy(result, response.body.decode("utf-8", "replace"), state["password"])
+    recorder.check(prefix + "SHOPPER-HTTP-ERROR-HAS-SAFE-CORRELATION-NO-PRIVATE-CONTROL", privacy_safe,
+                   dict(response.evidence(), components=privacy_components))
 
     # Actual Woo before_pay_action route, outside the native gateway try/catch.
     bridge.call("pauseemergency")
