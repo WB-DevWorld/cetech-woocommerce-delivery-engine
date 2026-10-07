@@ -66,7 +66,7 @@ final class QuoteDurableService {
 	}
 	public function current( QuoteOwner $owner, QuoteReference $reference, ?QuoteContext $current, RequestContext $request ): QuoteCurrentReadResult {
 		if ( ! $this->authorized( $owner, 'delivery_quote.read' ) ) { return QuoteCurrentReadResult::unavailable(); }
-		$loaded = $this->load( $owner, $reference->id(), $current, $reference, 'delivery_quote.read' );
+		$loaded = $this->load( $owner, $reference->id(), $current, $reference, 'delivery_quote.read', true );
 		return null === $loaded ? QuoteCurrentReadResult::unavailable() : QuoteCurrentReadResult::ready( $loaded[0], $loaded[2] );
 	}
 	private function transition( string $action, QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, ?QuoteContext $current, RequestContext $request, ?QuoteBinding $binding = null ): QuoteDurableResult {
@@ -97,8 +97,8 @@ final class QuoteDurableService {
 		}
 		return new QuoteDurableResult( $attempt, $command, $loaded[0] ?? null, $loaded[1] ?? null, null === $loaded ? 'quote_unavailable' : $loaded[2] );
 	}
-	/** Every read gets a fresh owner; cache warmth never substitutes for physical facts. */
-	private function load( QuoteOwner $owner, QuoteId $id, ?QuoteContext $current, ?QuoteReference $reference, string $operation ): ?array {
+	/** Current reads require current evidence; original completion replay preserves authorized history. */
+	private function load( QuoteOwner $owner, QuoteId $id, ?QuoteContext $current, ?QuoteReference $reference, string $operation, bool $require_current_evidence = false ): ?array {
 		$session = null; $begun = false;
 		try {
 			if ( ! $this->authorized( $owner, $operation ) ) { return null; } $session = $this->factory->open(); if ( $session->site_id() !== $owner->site_id() || $session->is_retired() || $session->in_transaction() ) { return null; }
@@ -117,6 +117,7 @@ final class QuoteDurableService {
 			$reason = ! $control->enabled() ? 'checkout_suspended' : ( ! $evidence_ok ? 'quote_unavailable' : ( ! hash_equals( $quote->header()->material_digest(), $current->digest() ) ? 'quote_invalidated' : self::reason( $quote, $at ) ) );
 			if ( ! $session->rollback() ) { return null; } $begun = false; if ( ! $session->retire() ) { return null; }
 			if ( ! $this->authorized( $owner, $operation ) ) { return null; }
+			if ( $require_current_evidence && ! $evidence_ok ) { return null; }
 			return [ $quote, $binding, $reason ];
 		} catch ( \Throwable ) { return null; }
 		finally { if ( null !== $session ) { if ( $begun && ! $session->is_retired() ) { try { $session->rollback(); } catch ( \Throwable ) {} } try { $session->retire(); } catch ( \Throwable ) {} } }
