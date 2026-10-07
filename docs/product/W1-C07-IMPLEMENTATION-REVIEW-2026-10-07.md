@@ -1,6 +1,6 @@
 # W1-C07 implementation — finite technical review
 
-This is the owner/AI technical review of the approved emergency-control implementation tracked by Issue #78. It is not owner integration acceptance. Exact candidate CI and archive/source bindings are recorded in the implementation PR after execution.
+This is the owner/AI technical review of the emergency-control implementation. Finite source review and exact candidate qualification passed; the owner separately accepted integration at 2026-10-07 04:09:13 UTC. PR#79 merged unchanged as `e6f715cb7ac56197b01d07012b2bb95f8f591810`; #78 completed. See [closeout](WAVE1-CLOSEOUT-2026-10-07.md) and PR#79 for complete candidate380/98/requiredSQL30 execution, actual-master evidence and independently verified archive/source bindings. Earlier review/checkpoint statements below preserve the historical sequence and do not reopen completed qualification.
 
 Independent core/admin/privacy closure passed: current site, principal, capability, WCFM isolation and nonce precede administrative effects; replay authority is checked again before disclosure. Known refusals renew the opened envelope; uncertain retries preserve its original token, physical identity, revision and bytes. C03 acceptance, native owner retirement and invalidate-only publication retain their existing truth distinctions. Diagnostics do not invent publication confirmation or exhaustive impact counts.
 

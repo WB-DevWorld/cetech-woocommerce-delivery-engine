@@ -1,8 +1,8 @@
 # CETECH Delivery Standalone Realignment Plan
 
-Status: owner-approved on 2026-09-19. **Execution note updated 2026-10-06:** the geography pre-wave and RC.12 publication are complete. The approved bounded repairs for COR-001–007 and COR-010 are owner-accepted and merged through PR #55 at functional master baseline `7add0bf3ca66f73982797c0362fb33983da975a2`, tree `958efc0ab3fd7ad22ee6cc90e9372bfccbb69d1f`; post-merge CI `37502749839` passed all eight jobs. RC.12 remains immutable. The 2026-09-22 Issue #45 cleanup-only note is superseded by this completed integration.
+Status: owner-approved on 2026-09-19. **Execution note updated 2026-10-07:** the geography pre-wave and RC.12 publication are complete. The approved bounded repairs for COR-001–007 and COR-010 are owner-accepted and merged through PR #55 at functional master baseline `7add0bf3ca66f73982797c0362fb33983da975a2`, tree `958efc0ab3fd7ad22ee6cc90e9372bfccbb69d1f`; post-merge CI `37502749839` passed all eight jobs. RC.12 remains immutable. The 2026-09-22 Issue #45 cleanup-only note is superseded by this completed integration.
 
-The next development task is Issue #48's Wave 1 shared-contract planning and bounded implementation breakdown. The accepted dependency waves and frozen Requirement IDs remain unchanged. Completed opening repairs are a protected foundation, not completion of the later quote, promise, policy, label or interface capabilities. Wider production compatibility and release qualification are separate from this integration. See `CURRENT-WORK.md` and `docs/STATUS_CURRENT.md` for live evidence and the explicit JIT-disabled disposable CI profile.
+Wave 1 shared contracts and all seven bounded implementation checkpoints are owner-accepted and integrated through C07 PR#79 (`e6f715cb7ac56197b01d07012b2bb95f8f591810`). See [closeout](WAVE1-CLOSEOUT-2026-10-07.md) for qualified candidate/actual-master evidence and tracking reconciliation. The next dependency is Wave 2 first-class DeliveryQuote lifecycle design and bounded implementation planning using the existing price engine. Complete foundations do not complete later quote, promise, policy, label or public-interface capabilities. Accepted dependency waves and frozen Requirement IDs remain unchanged; broader production compatibility/release qualification stays separate.
 
 ## 1. Geography-stream decision — historical gate now complete
 
@@ -254,7 +254,7 @@ Complement rather than delete `docs/AUTHORITY.md`, governance, status, release a
 
 ## 7. Historical owner sequence and current position
 
-The sequence below records the September predecessor decisions. Steps 1–5 and the RC.12 release-candidate part of step 6 are complete; PR #24 is merged, not draft. The controlled Pilot has not started. The current development position is Wave 1 planning under Issue #48, after the merged opening-correction foundation. Retain the historical sequence as rationale rather than treating its old branch states as current instructions.
+The sequence below records the September predecessor decisions. Steps 1–5 and the RC.12 release-candidate part of step 6 are complete; PR #24 is merged, not draft. The controlled Pilot has not started. All seven Wave 1 checkpoints are now integrated after the opening-correction foundation. The next development design is Wave 2 DeliveryQuote lifecycle, following this integration closeout. Retain the historical sequence as rationale rather than treating its old branch states as current instructions.
 
 1. Keep RC.11 immutable and PR #24 Draft.
 2. **Completed 2026-09-19:** accept the audit, freeze product truth, resolve the six decisions, and approve the realignment plan.
