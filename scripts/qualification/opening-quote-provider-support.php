@@ -102,7 +102,7 @@ final class CetechNativeQuoteProviderFixture {
 		$identity = [ get_debug_type( $fn ) ];
 		if ( is_string( $fn ) ) { $identity[] = $fn; }
 		elseif ( is_object( $fn ) ) { $identity[] = get_class( $fn ); $identity[] = spl_object_id( $fn ); }
-		elseif ( is_array( $fn ) && array_is_list( $fn ) && 2 === count( $fn ) ) { $identity[] = is_object( $fn[0] ) ? [ get_class( $fn[0] ), spl_object_id( $fn[0] ) ] : get_debug_type( $fn[0] ); $identity[] = is_string( $fn[1] ) ? $fn[1] : get_debug_type( $fn[1] ); }
+		elseif ( is_array( $fn ) && array_is_list( $fn ) && 2 === count( $fn ) ) { $identity[] = is_object( $fn[0] ) ? [ get_class( $fn[0] ), spl_object_id( $fn[0] ) ] : ( is_string( $fn[0] ) ? [ 'static_class', $fn[0] ] : get_debug_type( $fn[0] ) ); $identity[] = is_string( $fn[1] ) ? $fn[1] : get_debug_type( $fn[1] ); }
 		return hash( 'sha256', json_encode( $identity, JSON_THROW_ON_ERROR ) );
 	}
 	/** Read-only probes of the exact production guards; no callback is invoked. */
@@ -118,12 +118,17 @@ final class CetechNativeQuoteProviderFixture {
 			$known = [
 				[ 'woocommerce_cart_shipping_packages', 'CetechDeliveryEngine\\Application\\Shipping\\ShippingPackageBuilder::filter_packages', 20, 1, 'delivery_shipping_packages' ],
 				[ 'woocommerce_cart_shipping_packages', 'CetechDeliveryEngine\\Integrations\\EmergencyControl\\EmergencyControlRuntime::decorate_packages', PHP_INT_MAX, 1, 'emergency_package_decoration' ],
+				[ 'woocommerce_shipping_packages', 'Automattic\\WooCommerce\\Blocks\\Shipping\\ShippingController::filter_shipping_packages', 10, 1, 'woo_native_blocks_shipping_packages' ],
+				[ 'woocommerce_shipping_packages', 'Automattic\\WooCommerce\\Blocks\\Shipping\\ShippingController::remove_shipping_if_no_address', 11, 1, 'woo_native_blocks_shipping_address_gate' ],
 				[ 'woocommerce_shipping_methods', 'CetechDeliveryEngine\\Application\\Shipping\\SelectedOfferShippingIntegration::register_shipping_method', 10, 1, 'delivery_shipping_methods' ],
 				[ 'woocommerce_package_rates', 'CetechDeliveryEngine\\Application\\Shipping\\SelectedOfferShippingIntegration::filter_managed_package_rates', 100, 2, 'delivery_managed_rates' ],
 				[ 'woocommerce_package_rates', 'CetechDeliveryEngine\\Integrations\\EmergencyControl\\EmergencyCheckoutHooks::package_rates', PHP_INT_MAX, 2, 'emergency_package_rates' ],
 				[ 'woocommerce_before_calculate_totals', 'CetechDeliveryEngine\\Application\\Cart\\CartDeliverySelectionReconciler::reconcile_cart', 5, 1, 'delivery_selection_reconciliation' ],
+				[ 'woocommerce_after_calculate_totals', 'WC_Cart_Session::set_session', 1000, 1, 'woo_native_cart_session_publication' ],
 				[ 'woocommerce_shipping_rate_label', 'sanitize_text_field', 10, 1, 'wp_native_shipping_label_sanitizer' ],
+				[ 'woocommerce_local_pickup_methods', 'Automattic\\WooCommerce\\Blocks\\Shipping\\ShippingController::register_local_pickup_method', 10, 1, 'woo_native_blocks_local_pickup_registry' ],
 				[ 'woocommerce_product_get_tax_class', 'WC_Deprecated_Filter_Hooks::maybe_handle_deprecated_hook', -1000, 8, 'woo_native_tax_class_adapter' ],
+				[ 'woocommerce_customer_taxable_address', 'Automattic\\WooCommerce\\Blocks\\Shipping\\ShippingController::filter_taxable_address', 10, 1, 'woo_native_blocks_taxable_address' ],
 			];
 			foreach ( $facts as $hook => $items ) { foreach ( $items as $item ) { $key = $item['function'] ?? ( ( $item['class'] ?? '' ) . '::' . ( $item['method'] ?? '' ) ); $code = 'unknown'; foreach ( $known as [ $known_hook, $known_key, $priority, $args, $known_code ] ) { if ( [ $hook, $key, $item['priority'], $item['accepted_args'] ] === [ $known_hook, $known_key, $priority, $args ] ) { $code = $known_code; break; } } $out['native_hook_tuples'][] = [ 'hook' => $hook, 'priority' => $item['priority'], 'accepted_args' => $item['accepted_args'], 'callback_code' => $code, 'unknown_identity_hash' => 'unknown' === $code ? hash( 'sha256', json_encode( $item, JSON_THROW_ON_ERROR ) ) : null ]; } }
 		} catch ( Throwable $error ) { $out['native_hooks_probe_error_class'] = get_class( $error ); }

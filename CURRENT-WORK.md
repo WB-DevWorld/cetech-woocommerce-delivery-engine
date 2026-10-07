@@ -20,6 +20,8 @@ Native-default successorab7d7ccee/treeda348960 failedCI37599055617 attempt1 desp
 
 Fourthnativecheckpoint8d38f621/tree4b9c4bd6 passedall3PHP2996/18111/skip1, butfirstcapturestillrefused in37601229701. All8sourcecallbacktuples,nestedcount0 andrealmerchandise20stored/15view proofs passed; all8cleanupfacts passed. Zero observedfactory source/native counters do not exclude globalnativewpdbreads, owner/control checks, transactionsetup orschemaqueries. Earlier attributions of the exactfirstrefusal to sourcecallbackpresence were not phase-proved; those genuine compatibility corrections remain separately regression-supported. Nextcandidateisfinitefixturediagnosticonly until theactual source step/refusal line is recorded; no guessed production correction.
 
+Diagnostic candidate4a3e366a/treec1d68587 failedCI37603121464 attempt1 with allthreePHP2996/18111/skip1, SQL291/6037/allsevenminima, JS/controls and691/1092lints passing. Native334PASS/1FAIL/107missing/noHTTP; cleanup passed. Actual failure is native_context at installed native refusal line18: native hook guard rejected five pinned Woo defaults; source binding passed, option callbacks0, no owned session opened. The finite successor accepts only the exact ShippingController four registrations and current-cart WC_Cart_Session set_session callback, fences relevant native option/cart/method/session inputs, and continues refusing pickup/unknown callbacks. Historical failed receipts and source-bound ZIP/JSON fingerprints remain in the Q04 record and PR90. Complete fresh native442/HTTP98 and substantive gates remain required before owner review.
+
 # Historical Q03 immutable freeze
 
 # Current Work — W2-Q03 durable internal quote lifecycle
