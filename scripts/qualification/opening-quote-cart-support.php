@@ -5,11 +5,17 @@ declare(strict_types=1);
 require_once __DIR__ . '/opening-quote-provider-support.php';
 
 use CetechDeliveryEngine\Application\DeliveryQuote\CartQuoteService;
+use CetechDeliveryEngine\Application\DeliveryQuote\CartQuoteEnvironment;
+use CetechDeliveryEngine\Application\DeliveryQuote\QuoteCartDraft;
+use CetechDeliveryEngine\Application\DeliveryQuote\QuoteIssueCommand;
+use CetechDeliveryEngine\Application\DeliveryQuote\QuoteCartCurrentEvidence;
+use CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuotePreparedCapture;
 use CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuoteEnvironment;
 use CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuoteSessionStore;
 use CetechDeliveryEngine\Application\DeliveryQuote\QuoteNativeOwnerResolver;
 use CetechDeliveryEngine\Application\DeliveryQuote\QuotePreparationGate;
 use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteOwner;
+use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteHeader;
 use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteStoredRow;
 use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime;
 use CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory as FactoryContract;
@@ -76,12 +82,55 @@ final class CetechQuoteCartFactory implements FactoryContract {
 	public function fault_retired(): bool { return null !== $this->fault_connection && isset( $this->sessions[$this->fault_connection] ) && $this->sessions[$this->fault_connection]->is_retired(); }
 }
 
+/** Observe a genuine native preparation without replacing its draft, provider or facts. */
+final class CetechQuoteCartEnvironmentObservation implements CartQuoteEnvironment {
+	public array $diagnostics = [ 'prepare_entered' => false, 'prepare_returned' => false, 'prepare_error_class' => null, 'prepare_refusal_site' => null, 'prepare_refusal_line' => null, 'evidence_called' => false, 'evidence_returned' => false, 'native_shipping_debug_enabled' => null, 'native_chosen_cache_present' => false, 'native_totals_cache_present' => false, 'native_shipping_cache_present' => false ];
+	public function __construct( private NativeCartQuoteEnvironment $native ) {}
+	public function draft(): ?QuoteCartDraft { return $this->native->draft(); }
+	public function authorize( QuoteOwner $owner, string $operation ): bool { return $this->native->authorize( $owner, $operation ); }
+	public function prepare( QuoteCartDraft $draft ): LegacyQuotePreparedCapture {
+		$this->diagnostics['prepare_entered'] = true; $this->cache_presence();
+		try { $prepared = $this->native->prepare( $draft ); $this->diagnostics['prepare_returned'] = true; return $prepared; }
+		catch ( Throwable $error ) { $this->diagnostics['prepare_error_class'] = self::safe_error_class( $error ); [ $site, $line ] = self::verified_refusal( $error ); $this->diagnostics['prepare_refusal_site'] = $site; $this->diagnostics['prepare_refusal_line'] = $line; throw $error; }
+	}
+	public function evidence( QuoteIssueCommand $original, QuoteHeader $header, QuoteCartDraft $draft ): ?QuoteCartCurrentEvidence {
+		$this->diagnostics['evidence_called'] = true; $result = $this->native->evidence( $original, $header, $draft ); $this->diagnostics['evidence_returned'] = null !== $result; return $result;
+	}
+	private function cache_presence(): void {
+		try {
+			$session = $GLOBALS['woocommerce']->session; $data = ( new ReflectionProperty( $session, '_data' ) )->getValue( $session );
+			if ( is_array( $data ) ) { $this->diagnostics['native_chosen_cache_present'] = isset( $data['chosen_shipping_methods'] ); $this->diagnostics['native_totals_cache_present'] = isset( $data['cart_totals'] ); $this->diagnostics['native_shipping_cache_present'] = isset( $data['shipping_for_package_0'] ); }
+			$cache = $GLOBALS['wp_object_cache'] ?? null; if ( ! is_object( $cache ) || 'WP_Object_Cache' !== get_class( $cache ) ) { return; } $data = ( new ReflectionProperty( $cache, 'cache' ) )->getValue( $cache ); $prefix = ( new ReflectionProperty( $cache, 'blog_prefix' ) )->getValue( $cache ); $multisite = ( new ReflectionProperty( $cache, 'multisite' ) )->getValue( $cache ); $groups = ( new ReflectionProperty( $cache, 'global_groups' ) )->getValue( $cache );
+			if ( ! is_array( $data ) || ! is_string( $prefix ) || ! is_bool( $multisite ) || ! is_array( $groups ) ) { return; } $key = $multisite && ! isset( $groups['options'] ) ? $prefix : ''; $options = $data['options'] ?? []; $all = $options[$key . 'alloptions'] ?? []; $value = is_array( $all ) && array_key_exists( 'woocommerce_shipping_debug_mode', $all ) ? $all['woocommerce_shipping_debug_mode'] : ( $options[$key . 'woocommerce_shipping_debug_mode'] ?? null ); if ( is_string( $value ) ) { $this->diagnostics['native_shipping_debug_enabled'] = 'yes' === $value; }
+		} catch ( Throwable ) { /* Presence remains unknown; no fallback native getter or query. */ }
+	}
+	public static function safe_error_class( Throwable $error ): string { return $error instanceof Error ? 'Error' : ( $error instanceof InvalidArgumentException ? 'InvalidArgumentException' : 'RuntimeException' ); }
+	/** A finite installed class code and integer source line; paths, messages and traces remain private. */
+	public static function verified_refusal( Throwable $error ): array {
+		$known = [
+			CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuoteEnvironment::class => [ 'native_environment', 'fail' ],
+			CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuoteShipping::class => [ 'native_shipping', 'fail' ],
+			CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuotePreparation::class => [ 'native_preparation', 'fail' ],
+			CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteNativeSourcePreparer::class => [ 'legacy_source', 'fail' ],
+			CetechDeliveryEngine\Application\DeliveryQuote\QuoteNativeWooSource::class => [ 'native_context', 'refuse' ],
+		]; $best = [ null, null ];
+		for ( $depth = 0; $depth < 4 && null !== $error; ++$depth, $error = $error->getPrevious() ) {
+			foreach ( array_slice( $error->getTrace(), 0, 16 ) as $frame ) {
+				$class = $frame['class'] ?? null; if ( ! is_string( $class ) || ! isset( $known[$class] ) || ( $frame['function'] ?? null ) !== $known[$class][1] ) { continue; }
+				$reflection = new ReflectionClass( $class ); if ( $reflection->getFileName() === ( $frame['file'] ?? null ) && is_int( $frame['line'] ?? null ) && $frame['line'] >= $reflection->getStartLine() && $frame['line'] <= $reflection->getEndLine() ) { $best = [ $known[$class][0], $frame['line'] ]; break; }
+			}
+		}
+		return $best;
+	}
+}
+
 /** Real retained cart fixtures are setup only; quote preparation remains inside the early gate. */
 final class CetechQuoteCartFixture {
 	public CetechNativeQuoteProviderFixture $native;
 	public CetechQuoteCartFactory $factory;
 	public NativeCartQuoteSessionStore $sessions;
 	public NativeCartQuoteEnvironment $environment;
+	public CetechQuoteCartEnvironmentObservation $observed_environment;
 	public CartQuoteService $service;
 	private array $auxiliary_keys = [];
 	private array $initial_history = [];
@@ -89,10 +138,11 @@ final class CetechQuoteCartFixture {
 		$this->native = new CetechNativeQuoteProviderFixture( $db ); $this->factory = new CetechQuoteCartFactory( $db );
 	}
 	public function prepare(): void {
-		$this->native->install(); $this->initial_history = $this->native->history();
+		$this->native->install(); $this->native->set_option( 'woocommerce_shipping_debug_mode', 'no' ); $this->native->recalculate(); $this->initial_history = $this->native->history();
 		$this->environment = new NativeCartQuoteEnvironment( $this->factory );
+		$this->observed_environment = new CetechQuoteCartEnvironmentObservation( $this->environment );
 		$this->sessions = new NativeCartQuoteSessionStore( $this->factory, [ $this->environment, 'authorize' ] );
-		$this->service = new CartQuoteService( $this->environment, new QuotePreparationGate( $this->factory, [ $this->environment, 'authorize' ] ), $this->sessions, $this->factory );
+		$this->service = new CartQuoteService( $this->observed_environment, new QuotePreparationGate( $this->factory, [ $this->environment, 'authorize' ] ), $this->sessions, $this->factory );
 		$this->track_session();
 	}
 	public function owner(): QuoteOwner { return ( new QuoteNativeOwnerResolver() )->current(); }

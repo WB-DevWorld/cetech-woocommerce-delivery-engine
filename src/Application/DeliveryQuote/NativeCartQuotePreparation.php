@@ -38,7 +38,7 @@ final class NativeCartQuotePreparation {
 			$native = $this->native_receipt( $draft->owner(), $packages );
 			$context = $this->context_from_observed( $draft, $seed, $native, $packages );
 			return ( new LegacyQuoteProviderStack( $this->factory ) )->prepare_current( $draft->owner(), $context, self::legacy_groups( $packages ) );
-		} catch ( \Throwable ) { self::fail(); }
+		} catch ( \Throwable $error ) { throw new \RuntimeException( 'Cart quote preparation unavailable.', 0, $error ); }
 	}
 	public function evidence( QuoteIssueCommand $original, QuoteHeader $header, QuoteCartDraft $draft ): ?QuoteCartCurrentEvidence {
 		try {

@@ -15,7 +15,7 @@ if ( 'preparequotecart' === $mode ) {
 	if ( file_exists( $state_path ) ) { throw new RuntimeException( 'Refusing to replace Q05 private credentials.' ); }
 	$identity = opening_http_identity(); $native = new CetechNativeQuoteProviderFixture( $wpdb ); $state = null; $created_user = 0; $created_pages = [];
 	try {
-		$native->install();
+		$native->install(); $native->set_option( 'woocommerce_shipping_debug_mode', 'no' ); $native->recalculate();
 		$suffix = bin2hex( random_bytes( 6 ) ); $password = bin2hex( random_bytes( 24 ) ); $username = 'q05_' . $suffix;
 		$user = wp_create_user( $username, $password, $username . '@example.invalid' ); if ( is_wp_error( $user ) || ! is_int( $user ) || $user < 1 ) { throw new RuntimeException( 'Q05 native user allocation failed.' ); } $created_user = $user; ( new WP_User( $user ) )->set_role( 'customer' );
 		$page_ids = []; foreach ( [ 'classic' => '[woocommerce_checkout]', 'blocks' => '<!-- wp:woocommerce/checkout /-->' ] as $kind => $content ) { $id = wp_insert_post( [ 'post_type' => 'page', 'post_status' => 'publish', 'post_title' => 'Q05 native review ' . $kind . ':' . $suffix, 'post_content' => $content ], true ); if ( is_wp_error( $id ) || ! is_int( $id ) || $id < 1 ) { throw new RuntimeException( 'Q05 native page allocation failed.' ); } $page_ids[$kind] = $id; $created_pages[] = $id; }

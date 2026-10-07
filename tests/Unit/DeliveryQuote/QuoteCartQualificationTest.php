@@ -36,6 +36,15 @@ final class QuoteCartQualificationTest extends TestCase {
 		$facts = \CetechQuoteCartHttpFixture::export_native( $fixture ); $json = json_encode( $facts, JSON_THROW_ON_ERROR );
 		self::assertStringNotContainsString( 'PRIVATE-', $json ); self::assertArrayNotHasKey( 'wc_before', $facts ); self::assertArrayNotHasKey( 'hooks_before', $facts ); self::assertArrayNotHasKey( 'globals_before', $facts ); self::assertArrayNotHasKey( 'db', $facts ); self::assertSame( 3, $facts['rate'] ); self::assertSame( $facts, json_decode( $json, true, 512, JSON_THROW_ON_ERROR ) );
 	}
+	public function test_native_diagnostic_finds_only_known_installed_guard_line_through_bounded_previous_chain(): void {
+		try { \CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuotePreparation::component_key( '' ); self::fail( 'Empty component was accepted.' ); }
+		catch ( \RuntimeException $error ) { $cause = $error; }
+		$wrapped = new \RuntimeException( 'PRIVATE-PAYLOAD /private/path', 0, $cause ); [ $site, $line ] = \CetechQuoteCartEnvironmentObservation::verified_refusal( $wrapped );
+		self::assertSame( 'native_preparation', $site ); self::assertIsInt( $line ); $class = new \ReflectionClass( \CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuotePreparation::class ); self::assertGreaterThanOrEqual( $class->getStartLine(), $line ); self::assertLessThanOrEqual( $class->getEndLine(), $line );
+		self::assertSame( [ null, null ], \CetechQuoteCartEnvironmentObservation::verified_refusal( new \RuntimeException( 'PRIVATE-PAYLOAD /private/path' ) ) );
+		for ( $i = 0; $i < 4; ++$i ) { $cause = new \RuntimeException( 'PRIVATE-PAYLOAD', 0, $cause ); } self::assertSame( [ null, null ], \CetechQuoteCartEnvironmentObservation::verified_refusal( $cause ) );
+		self::assertSame( 'Error', \CetechQuoteCartEnvironmentObservation::safe_error_class( new \Error( 'PRIVATE-ERROR' ) ) ); self::assertSame( 'InvalidArgumentException', \CetechQuoteCartEnvironmentObservation::safe_error_class( new \InvalidArgumentException( 'PRIVATE-ERROR' ) ) ); self::assertSame( 'RuntimeException', \CetechQuoteCartEnvironmentObservation::safe_error_class( new \LogicException( 'PRIVATE-ERROR' ) ) );
+	}
 }
 
 final class QuoteCartFixtureNativeTransport implements OperationConnectionTransport {
