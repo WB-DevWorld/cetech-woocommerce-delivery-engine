@@ -40,7 +40,7 @@ if ( 'preparequotecart' === $mode ) {
 		$phase = 'user';
 		$user = wp_create_user( $username, $password, $username . '@example.invalid' ); if ( is_wp_error( $user ) || ! is_int( $user ) || $user < 1 ) { throw new RuntimeException( 'Q05 native user allocation failed.' ); } $created_user = $user; ( new WP_User( $user ) )->set_role( 'customer' );
 		$phase = 'pages';
-		$page_ids = []; foreach ( [ 'classic' => '[woocommerce_checkout]', 'blocks' => '<!-- wp:woocommerce/checkout /-->' ] as $kind => $content ) { $id = wp_insert_post( [ 'post_type' => 'page', 'post_status' => 'publish', 'post_title' => 'Q05 native review ' . $kind . ':' . $suffix, 'post_content' => $content ], true ); if ( is_wp_error( $id ) || ! is_int( $id ) || $id < 1 ) { throw new RuntimeException( 'Q05 native page allocation failed.' ); } $page_ids[$kind] = $id; $created_pages[] = $id; }
+		$page_ids = []; foreach ( [ 'classic' => '[woocommerce_checkout]', 'blocks' => '<!-- wp:woocommerce/checkout --><div class="wp-block-woocommerce-checkout"></div><!-- /wp:woocommerce/checkout -->' ] as $kind => $content ) { $id = wp_insert_post( [ 'post_type' => 'page', 'post_status' => 'publish', 'post_title' => 'Q05 native review ' . $kind . ':' . $suffix, 'post_content' => $content ], true ); if ( is_wp_error( $id ) || ! is_int( $id ) || $id < 1 ) { throw new RuntimeException( 'Q05 native page allocation failed.' ); } $page_ids[$kind] = $id; $created_pages[] = $id; }
 		$native->set_option( 'woocommerce_checkout_page_id', $page_ids['classic'] );
 		$native->set_option( 'woocommerce_coming_soon', 'no' ); $native->set_option( 'woocommerce_store_pages_only', 'no' );
 		$phase = 'export';
