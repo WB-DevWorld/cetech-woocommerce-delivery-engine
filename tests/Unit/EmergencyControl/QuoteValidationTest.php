@@ -7,6 +7,8 @@ namespace CetechDeliveryEngine\Tests\Unit\EmergencyControl;
 require_once __DIR__ . '/CheckoutTestFixtures.php';
 
 use CetechDeliveryEngine\Application\Destination\PackageDestinationZoneResolverInterface;
+use CetechDeliveryEngine\Application\Destination\DestinationZoneMatcher;
+use CetechDeliveryEngine\Application\Destination\PackageDestinationZoneResolver;
 use CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutFacts;
 use CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutQuoteValidator;
 use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshot;
@@ -17,6 +19,8 @@ use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
 use CetechDeliveryEngine\Domain\DeliveryOffer\DeliveryOfferRepositoryInterface;
 use CetechDeliveryEngine\Domain\Pickup\PickupLocationRepositoryInterface;
 use CetechDeliveryEngine\Domain\RateCard\RateCardRepositoryInterface;
+use CetechDeliveryEngine\Tests\Unit\Runtime\InMemoryDestinationRuleRepository;
+use CetechDeliveryEngine\Tests\Unit\Runtime\InMemoryDestinationZoneRepository;
 use PHPUnit\Framework\TestCase;
 
 final class QuoteValidationTest extends TestCase {
@@ -93,6 +97,39 @@ final class QuoteValidationTest extends TestCase {
 		$shipping->tax = '0.2350'; $order->facts['shipping_tax'] = '0.2350'; self::assertFalse( $this->validator()->validate_order( $order, 'order_pay' ) );
 	}
 	public function test_refresh_happens_before_current_eligibility_and_price_read(): void { $this->source->managed = false; self::assertTrue( $this->validator( function (): void { $this->source->managed = true; } )->validate_order( $this->order(), 'classic' ) ); }
+	public function test_warmed_zone_match_cannot_admit_after_the_zone_is_deactivated(): void {
+		$zones = new InMemoryDestinationZoneRepository();
+		$zone = [ 'id' => 3, 'internal_name' => 'Fixture area', 'internal_code' => 'FIXTURE_AREA', 'status' => 'active', 'priority' => 100, 'is_fallback' => false ];
+		$zones->save( $zone );
+		$rules = new InMemoryDestinationRuleRepository();
+		$rules->replaceForZone( 3, [ [ 'rule_type' => 'country', 'rule_value' => 'GH', 'match_mode' => 'exact' ] ] );
+		$matcher = new DestinationZoneMatcher( $zones, $rules );
+		$this->destination = new PackageDestinationZoneResolver( $matcher );
+		$validator = $this->validator( static function () use ( $matcher ): void { $matcher->clearMemoization(); } );
+		$order = $this->order();
+		$before = $order->get_meta( OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, true );
+		self::assertTrue( $validator->validate_order( $order, 'order_pay' ) );
+		$zone['status'] = 'inactive';
+		$zones->save( $zone );
+		self::assertFalse( $validator->validate_order( $order, 'order_pay' ) );
+		self::assertSame( $before, $order->get_meta( OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, true ) );
+		self::assertSame( '10.00', $order->get_items( 'shipping' )[0]->get_total() );
+	}
+	public function test_warmed_zone_match_cannot_admit_after_its_country_rule_changes(): void {
+		$zones = new InMemoryDestinationZoneRepository();
+		$zones->save( [ 'id' => 3, 'internal_name' => 'Fixture area', 'internal_code' => 'FIXTURE_AREA', 'status' => 'active', 'priority' => 100, 'is_fallback' => false ] );
+		$rules = new InMemoryDestinationRuleRepository();
+		$rules->replaceForZone( 3, [ [ 'rule_type' => 'country', 'rule_value' => 'GH', 'match_mode' => 'exact' ] ] );
+		$matcher = new DestinationZoneMatcher( $zones, $rules );
+		$this->destination = new PackageDestinationZoneResolver( $matcher );
+		$validator = $this->validator( static function () use ( $matcher ): void { $matcher->clearMemoization(); } );
+		$order = $this->order();
+		$before = $order->get_items()[0]->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT, true );
+		self::assertTrue( $validator->validate_order( $order, 'classic' ) );
+		$rules->replaceForZone( 3, [ [ 'rule_type' => 'country', 'rule_value' => 'US', 'match_mode' => 'exact' ] ] );
+		self::assertFalse( $validator->validate_order( $order, 'classic' ) );
+		self::assertSame( $before, $order->get_items()[0]->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT, true ) );
+	}
 	public function test_fingerprint_binds_actual_context_money_and_private_bytes_without_exposing_them(): void { $order = $this->order(); $before = EmergencyCheckoutFacts::order_fingerprint( $order ); self::assertMatchesRegularExpression( '/^[a-f0-9]{64}$/', $before ); $order->facts['city'] = 'Kumasi'; self::assertNotSame( $before, EmergencyCheckoutFacts::order_fingerprint( $order ) ); }
 	public function test_money_equality_is_strict_and_does_not_lose_four_decimal_precision(): void { self::assertSame( 100001, EmergencyCheckoutQuoteValidator::money_units( '10.0001' ) ); self::assertSame( 100000, EmergencyCheckoutQuoteValidator::money_units( '10.00' ) ); foreach ( [ '1e2', '-1', '1.00001', '10 trailing', 10.0, '99999999999999' ] as $bad ) { self::assertNull( EmergencyCheckoutQuoteValidator::money_units( $bad ) ); } }
 }

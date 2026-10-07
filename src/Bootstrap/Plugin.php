@@ -456,7 +456,10 @@ final class Plugin {
 			static fn( ServiceContainer $container ): EmergencyCheckoutQuoteValidator => new EmergencyCheckoutQuoteValidator(
 				$container->get( ProductDeliveryConfigurationSourceInterface::class ), $container->get( ProductDeliveryOptionsBuilder::class ),
 				$container->get( PackageDestinationZoneResolver::class ), $container->get( RateQuoteEngine::class ), $container->get( OrderDeliverySnapshotReader::class ),
-				static function () use ( $container ): void { $container->get( EffectiveConfigurationResolver::class )->clearMemoization(); }
+				static function () use ( $container ): void {
+					$container->get( EffectiveConfigurationResolver::class )->clearMemoization();
+					$container->get( DestinationZoneMatcher::class )->clearMemoization();
+				}
 			) );
 		$this->container->singleton( EmergencyCheckoutAdmissionService::class,
 			static fn( ServiceContainer $container ): EmergencyCheckoutAdmissionService => new EmergencyCheckoutAdmissionService(

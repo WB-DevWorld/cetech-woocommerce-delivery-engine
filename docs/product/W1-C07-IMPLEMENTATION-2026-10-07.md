@@ -65,12 +65,15 @@ These are local results, not CI totals or native HTTP qualification counts.
 | Initial full local suite | PHP 8.3.6 | 2446 / 15391 / 1 skip, PASS | Initial checkpoint; it predates the final malformed-input source/test follow-up. It is not a final-candidate or CI total. |
 | Final ownership/admission/quote and raw binding | PHP 8.3.6 | 60 / 140, PASS | Includes filtered getters, hidden raw mutations and admission-stamp reuse regressions. |
 | Final full local suite | PHP 8.3.6 | 2469 / 15445 / 1 skip, PASS | Final production source; JavaScript 8 files / 102, package and production lint 615/0, repository lint 959/0 also passed. |
+| Current-zone freshness follow-up | PHP 8.3.6 | 62 / 147 focused; 2471 / 15452 / 1 skip full, PASS | Supersedes the earlier final counts after two actual shared-matcher regressions. Production package/autoload/lint remains 615/0. |
 
 Malformed-input follow-up: scalar package, scalar cart content row and scalar contents container each reproduced `Unknown package evidence must survive until final admission. Failed asserting that true is false.` The three red tests became 3 tests / 9 assertions, PASS, after the narrow package-refusal/latch correction. The shipping refusal changes only derived output and does not silently erase unknown evidence before final admission.
 
 The design-merge CI run `37555635522` is historical failed evidence: one existing C06 compound native case failed, with 310 native PASS and 31 missing; HTTP did not execute. A separate production-cache reproduction through an in-memory owned-session fixture found the pending writer used real time T1 while the fixture reader used frozen time T0. It was not native SQL evidence. Its single-case red result was expected payload versus null (4 assertions); aligning the fixture clocks made that bounded reproduction green. The native pending writer now uses the same clock and finite per-condition evidence. The original five strict conditions are unchanged and no product cache correction was made. The original failed run lacked the individual condition booleans, so its full attribution is not established by this reproduction. Preserve the original failure and qualify the harness correction on the final candidate.
 
 ## Thirty-obligation map
+
+Current-zone follow-up: the real matcher retained a warmed destination after its zone was deactivated or its country rule changed. Two C07 validator regressions reproduced incorrect admission (2 tests / 4 assertions, true versus false), then passed 2 / 7 after C07's existing refresh cleared the shared matcher's request-local matches and diagnostics. Refresh runs outside the control lock and changes no destination ranking, pricing or saved history. The separate native resume refusal remains a failed qualification until fresh diagnostics and execution establish its cause.
 
 This map identifies implementation and actual test/fixture names. A named native/HTTP/browser fixture is source coverage, not an execution receipt. All native/HTTP/browser entries in this map remain execution pending until correctly bound final receipts exist. Unit and SQL results above retain their separate scopes.
 
