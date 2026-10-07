@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Cart;
 
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlResponse;
+
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidationResult;
 use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidator;
@@ -27,7 +30,8 @@ final class CartDeliverySelectionReconciler {
 		private FeatureFlags $feature_flags,
 		private Requirements $requirements,
 		private CartDeliverySelectionCapture $cart_capture,
-		private ProductDeliverySelectionValidator $selection_validator
+		private ProductDeliverySelectionValidator $selection_validator,
+		private ?EmergencyControlRuntime $emergency_control = null
 	) {
 	}
 
@@ -235,6 +239,11 @@ final class CartDeliverySelectionReconciler {
 	 * @param array<string, mixed> $cart_item
 	 */
 	public function reconcile_cart_item( string $cart_item_key, array $cart_item ): CartReconciliationOutcome {
+		$this->emergency_control?->latch_line( $cart_item_key, $cart_item );
+		$decision = $this->emergency_control?->line_decision( $cart_item_key, $cart_item );
+		if ( null !== $decision && ! $decision->allowed ) {
+			return new CartReconciliationOutcome( $cart_item_key, CartReconciliationOutcome::ACTION_UNCHANGED, $cart_item, false, CartDeliverySelectionRevalidationResult::STATUS_UNAVAILABLE, EmergencyControlResponse::shopper_message( $decision ) );
+		}
 		$product_id   = (int) ( $cart_item['product_id'] ?? 0 );
 		$variation_id = (int) ( $cart_item['variation_id'] ?? 0 );
 

@@ -91,16 +91,21 @@ echo 'opening_candidate_head=' . $report['candidate_head'] . ' checkout=' . $rep
 add_filter( 'action_scheduler_allow_async_request_runner', '__return_false', PHP_INT_MAX );
 try {
 	$lifecycle = require __DIR__ . '/opening-data-lifecycle.php';
+	$emergency = require __DIR__ . '/opening-emergency-control.php';
 	foreach ( array( 'authority', 'public-import', 'configuration', 'migrations', 'operation', 'operation-migration', 'operation-lifecycle', 'rule-lifecycle', 'rule-lifecycle-migration', 'rule-lifecycle-preservation', 'snapshot-readers' ) as $module ) {
 		$run = require __DIR__ . '/opening-' . $module . '.php';
 		if ( ! is_callable( $run ) ) {
 			throw new RuntimeException( 'Invalid qualification module: ' . $module );
 		}
 		if ( 'snapshot-readers' === $module ) {
-			$run( $check, static function ( callable $physical, callable $historical ) use ( $lifecycle, $check ): void { $lifecycle( $check, [ 'physical' => $physical, 'historical' => $historical ] ); } );
+			$run( $check, static function ( callable $physical, callable $historical ) use ( $lifecycle, $emergency, $check ): void {
+				$lifecycle( $check, [ 'physical' => $physical, 'historical' => $historical ] );
+				$emergency( $check, [ 'physical' => $physical, 'historical' => $historical ] );
+			} );
 		} else { $run( $check ); }
 	}
 	$lifecycle( $check );
+	$emergency( $check );
 	$check( 'NATIVE-FIXTURE-SCHEMA-RESTORED', '8' === (string) get_option( 'cetech_de_db_version' ), array( 'schema_after' => (string) get_option( 'cetech_de_db_version' ) ) );
 	$report['status'] = 'PASS';
 	$write();

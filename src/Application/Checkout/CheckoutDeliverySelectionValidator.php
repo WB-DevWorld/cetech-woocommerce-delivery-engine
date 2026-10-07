@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Checkout;
 
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlResponse;
+
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionFingerprint;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidationResult;
@@ -28,7 +31,8 @@ final class CheckoutDeliverySelectionValidator {
 		private Requirements $requirements,
 		private CartDeliverySelectionCapture $cart_capture,
 		private CartDeliverySelectionRevalidator $cart_revalidator,
-		private ?LocationOfferQuoteProbe $quote_probe = null
+		private ?LocationOfferQuoteProbe $quote_probe = null,
+		private ?EmergencyControlRuntime $emergency_control = null
 	) {
 	}
 
@@ -73,6 +77,8 @@ final class CheckoutDeliverySelectionValidator {
 	}
 
 	public function validate_cart(): CheckoutDeliveryValidationResult {
+		$decision = $this->emergency_control?->cart_decision();
+		if ( null !== $decision && ! $decision->allowed ) { return CheckoutDeliveryValidationResult::invalid( [ EmergencyControlResponse::shopper_message( $decision ) ] ); }
 		if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
 			return CheckoutDeliveryValidationResult::valid();
 		}

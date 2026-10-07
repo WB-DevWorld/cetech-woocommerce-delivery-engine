@@ -4,6 +4,15 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Bootstrap;
 
+use CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutAdmissionService;
+use CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutQuoteValidator;
+use CetechDeliveryEngine\Application\EmergencyControl\EmergencyControlService;
+use CetechDeliveryEngine\Application\EmergencyControl\EmergencyOwnershipClassifier;
+use CetechDeliveryEngine\Application\EmergencyControl\EmergencyOwnershipLatch;
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyCheckoutHooks;
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
+use CetechDeliveryEngine\Presentation\Admin\EmergencyControlSettings;
+
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionReconciler;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
@@ -386,6 +395,8 @@ final class Plugin {
 		$health = $this->container->get( HealthCheckRegistry::class );
 		$health->run();
 
+		$this->container->get( EmergencyCheckoutHooks::class )->register();
+
 		$this->container->get( ProductDeliverySelectorRenderer::class )->register();
 		$this->container->get( VariableDeliverySelectorAssets::class )->register();
 		$this->container->get( VariationDeliveryOptionsEndpoint::class )->register();
@@ -424,7 +435,59 @@ final class Plugin {
 		return $this->container;
 	}
 
+	/** The shared guards remain registered independently of all old module flags. */
+	private function register_emergency_control_services(): void {
+		$this->container->singleton( EmergencyControlService::class,
+			static fn(): EmergencyControlService => new EmergencyControlService(
+				new \CetechDeliveryEngine\Infrastructure\WordPress\OperationConnectionFactory(),
+				static fn( int $site, int $actor ): bool => $site === ( function_exists( 'get_current_blog_id' ) ? get_current_blog_id() : 1 )
+					&& $actor === get_current_user_id() && is_admin() && ! AdminPageAccess::current_user_is_restricted() && current_user_can( 'manage_delivery_settings' )
+			) );
+		$this->container->singleton( EmergencyOwnershipLatch::class,
+			static fn(): EmergencyOwnershipLatch => new EmergencyOwnershipLatch() );
+		$this->container->singleton( EmergencyOwnershipClassifier::class,
+			static fn( ServiceContainer $container ): EmergencyOwnershipClassifier => new EmergencyOwnershipClassifier(
+				[ new LegacyProductDeliveryConfigurationSource( $container->get( ProductDeliveryRuleResolver::class ) ),
+					new EcrProductDeliveryConfigurationSource( $container->get( EffectiveConfigurationResolver::class ), $container->get( EcrToRuntimeConfigurationAdapter::class ), $container->get( VariationRelationshipInspectorInterface::class ) ) ],
+				$container->get( VariationRelationshipInspectorInterface::class ), new \CetechDeliveryEngine\Application\EmergencyControl\WpdbEmergencyConfigurationOwnershipProbe(),
+				static function () use ( $container ): void { $container->get( EffectiveConfigurationResolver::class )->clearMemoization(); }
+			) );
+		$this->container->singleton( EmergencyCheckoutQuoteValidator::class,
+			static fn( ServiceContainer $container ): EmergencyCheckoutQuoteValidator => new EmergencyCheckoutQuoteValidator(
+				$container->get( ProductDeliveryConfigurationSourceInterface::class ), $container->get( ProductDeliveryOptionsBuilder::class ),
+				$container->get( PackageDestinationZoneResolver::class ), $container->get( RateQuoteEngine::class ), $container->get( OrderDeliverySnapshotReader::class ),
+				static function () use ( $container ): void {
+					$container->get( EffectiveConfigurationResolver::class )->clearMemoization();
+					$container->get( DestinationZoneMatcher::class )->clearMemoization();
+				}
+			) );
+		$this->container->singleton( EmergencyCheckoutAdmissionService::class,
+			static fn( ServiceContainer $container ): EmergencyCheckoutAdmissionService => new EmergencyCheckoutAdmissionService(
+				$container->get( EmergencyControlService::class ),
+				$container->get( EmergencyOwnershipClassifier::class ),
+				$container->get( EmergencyCheckoutQuoteValidator::class ),
+				$container->get( EmergencyOwnershipLatch::class )
+			) );
+		$this->container->singleton( EmergencyControlRuntime::class,
+			static fn( ServiceContainer $container ): EmergencyControlRuntime => new EmergencyControlRuntime(
+				$container->get( EmergencyControlService::class ),
+				$container->get( EmergencyOwnershipClassifier::class ),
+				$container->get( EmergencyOwnershipLatch::class ),
+				$container->get( EmergencyCheckoutAdmissionService::class )
+			) );
+		$this->container->singleton( EmergencyCheckoutHooks::class,
+			static fn( ServiceContainer $container ): EmergencyCheckoutHooks => new EmergencyCheckoutHooks(
+				$container->get( EmergencyControlRuntime::class )
+			) );
+		$this->container->singleton( EmergencyControlSettings::class,
+			static fn( ServiceContainer $container ): EmergencyControlSettings => new EmergencyControlSettings(
+				$container->get( EmergencyControlService::class ), $container->get( AdminActionHandler::class ),
+				! ( defined( 'CETECH_DE_EMERGENCY_WRITER_DISABLED' ) && CETECH_DE_EMERGENCY_WRITER_DISABLED )
+			) );
+	}
+
 	private function register_services(): void {
+		$this->register_emergency_control_services();
 		$this->container->singleton(
 			FeatureFlags::class,
 			static fn (): FeatureFlags => new FeatureFlags()
@@ -745,7 +808,8 @@ final class Plugin {
 				$container->get( FeatureFlags::class ),
 				$container->get( Requirements::class ),
 				$container->get( ProductDeliveryConfigurationSourceInterface::class ),
-				$container->get( ProductDeliveryOptionsBuilder::class )
+				$container->get( ProductDeliveryOptionsBuilder::class ),
+				$container->get( EmergencyControlRuntime::class )
 			)
 		);
 
@@ -791,7 +855,8 @@ final class Plugin {
 				$container->get( ProductDeliverySelectionValidator::class ),
 				$container->get( CustomerBrowsingLocationStore::class ),
 				$container->get( LocationOfferQuoteProbe::class ),
-				$container->get( ShopperDeliveryLocationPrecision::class )
+				$container->get( ShopperDeliveryLocationPrecision::class ),
+				$container->get( EmergencyControlRuntime::class )
 			)
 		);
 
@@ -800,7 +865,8 @@ final class Plugin {
 			static fn ( ServiceContainer $container ): CartDeliverySelectionRevalidator => new CartDeliverySelectionRevalidator(
 				$container->get( FeatureFlags::class ),
 				$container->get( Requirements::class ),
-				$container->get( ProductDeliverySelectionValidator::class )
+				$container->get( ProductDeliverySelectionValidator::class ),
+				$container->get( EmergencyControlRuntime::class )
 			)
 		);
 
@@ -810,7 +876,8 @@ final class Plugin {
 				$container->get( FeatureFlags::class ),
 				$container->get( Requirements::class ),
 				$container->get( CartDeliverySelectionCapture::class ),
-				$container->get( ProductDeliverySelectionValidator::class )
+				$container->get( ProductDeliverySelectionValidator::class ),
+				$container->get( EmergencyControlRuntime::class )
 			)
 		);
 
@@ -837,7 +904,8 @@ final class Plugin {
 				$container->get( Requirements::class ),
 				$container->get( CartCustomerContextMutationService::class ),
 				$container->get( ProductDeliverySelectionValidator::class ),
-				$container->get( ApplyCustomerContextToEligibleLinesService::class )
+				$container->get( ApplyCustomerContextToEligibleLinesService::class ),
+				$container->get( EmergencyControlRuntime::class )
 			)
 		);
 
@@ -850,7 +918,8 @@ final class Plugin {
 				$container->get( LocationAwareDeliveryOptions::class ),
 				$container->get( CustomerBrowsingLocationStore::class ),
 				$container->get( CanonicalLocationResolver::class ),
-				$container->get( ShopperDeliveryLocationPrecision::class )
+				$container->get( ShopperDeliveryLocationPrecision::class ),
+				$container->get( EmergencyControlRuntime::class )
 			)
 		);
 
@@ -881,7 +950,8 @@ final class Plugin {
 				$container->get( CartDeliverySelectionCapture::class ),
 				$container->get( ProductDeliverySelectionValidator::class ),
 				$container->get( CartDeliverySelectionReconciler::class ),
-				$container->get( BlocksCartContextCommandHandler::class )
+				$container->get( BlocksCartContextCommandHandler::class ),
+				$container->get( EmergencyControlRuntime::class )
 			)
 		);
 
@@ -901,7 +971,8 @@ final class Plugin {
 				$container->get( Requirements::class ),
 				$container->get( CartDeliverySelectionCapture::class ),
 				$container->get( CartDeliverySelectionRevalidator::class ),
-				$container->get( LocationOfferQuoteProbe::class )
+				$container->get( LocationOfferQuoteProbe::class ),
+				$container->get( EmergencyControlRuntime::class )
 			)
 		);
 
@@ -952,7 +1023,8 @@ final class Plugin {
 				$container->get( RateQuoteEngine::class ),
 				$container->get( ProductDeliveryRuleRepositoryInterface::class ),
 				$container->get( Logger::class ),
-				$container->get( ProductDeliveryConfigurationSourceInterface::class )
+				$container->get( ProductDeliveryConfigurationSourceInterface::class ),
+				$container->get( EmergencyControlRuntime::class )
 			)
 		);
 
@@ -960,7 +1032,8 @@ final class Plugin {
 			ShippingPackageBuilder::class,
 			static fn ( ServiceContainer $container ): ShippingPackageBuilder => new ShippingPackageBuilder(
 				$container->get( ShippingRateCalculationGate::class ),
-				$container->get( CartDeliverySelectionCapture::class )
+				$container->get( CartDeliverySelectionCapture::class ),
+				$container->get( EmergencyControlRuntime::class )
 			)
 		);
 
@@ -972,7 +1045,8 @@ final class Plugin {
 		$this->container->singleton(
 			SelectedOfferShippingIntegration::class,
 			static fn ( ServiceContainer $container ): SelectedOfferShippingIntegration => new SelectedOfferShippingIntegration(
-				$container->get( ShippingRateCalculationGate::class )
+				$container->get( ShippingRateCalculationGate::class ),
+				$container->get( EmergencyControlRuntime::class )
 			)
 		);
 
@@ -1230,7 +1304,8 @@ final class Plugin {
 				$container->get( ProductDeliveryOptionsBuilder::class ),
 				$container->get( CustomerBrowsingLocationStore::class ),
 				$container->get( LocationAwareDeliveryOptions::class ),
-				$container->get( ShopperDeliveryLocationPrecision::class )
+				$container->get( ShopperDeliveryLocationPrecision::class ),
+				$container->get( EmergencyControlRuntime::class )
 			)
 		);
 
@@ -1251,7 +1326,8 @@ final class Plugin {
 				$container->get( ProductDeliveryOptionsBuilder::class ),
 				$container->get( VariationRelationshipInspectorInterface::class ),
 				$container->get( LocationAwareDeliveryOptions::class ),
-				$container->get( ShopperDeliveryLocationPrecision::class )
+				$container->get( ShopperDeliveryLocationPrecision::class ),
+				$container->get( EmergencyControlRuntime::class )
 			)
 		);
 
@@ -1529,7 +1605,8 @@ final class Plugin {
 				$container->get( SiteWideDefaultsSettings::class ),
 				$container->get( OperationalStateService::class ),
 				$container->get( RoleAccessService::class ),
-				$container->get( IntegrationStatusCatalog::class )
+				$container->get( IntegrationStatusCatalog::class ),
+				$container->get( EmergencyControlSettings::class )
 			)
 		);
 
@@ -1550,7 +1627,8 @@ final class Plugin {
 				$container->get( RateCardRepositoryInterface::class ),
 				$container->get( ProductDeliveryRuleRepositoryInterface::class ),
 				$container->get( ConfigurationHealthChecker::class ),
-				$container->get( BulkQueueHealth::class )
+				$container->get( BulkQueueHealth::class ),
+				$container->get( EmergencyControlService::class )
 			)
 		);
 

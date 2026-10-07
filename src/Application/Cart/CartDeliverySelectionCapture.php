@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Cart;
 
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlResponse;
+
 use CetechDeliveryEngine\Application\CustomerContext\ClassicPdpContextPayload;
 use CetechDeliveryEngine\Application\CustomerContext\CustomerBrowsingLocationStore;
 use CetechDeliveryEngine\Application\CustomerContext\LocationOfferQuoteProbe;
@@ -60,7 +63,8 @@ final class CartDeliverySelectionCapture {
 		private ProductDeliverySelectionValidator $selection_validator,
 		private ?CustomerBrowsingLocationStore $browsing_store = null,
 		private ?LocationOfferQuoteProbe $quote_probe = null,
-		private ?ShopperDeliveryLocationPrecision $precision = null
+		private ?ShopperDeliveryLocationPrecision $precision = null,
+		private ?EmergencyControlRuntime $emergency_control = null
 	) {
 	}
 
@@ -92,6 +96,10 @@ final class CartDeliverySelectionCapture {
 		array $variations = [],
 		array $cart_item_data = []
 	): bool {
+		$decision = $passed ? $this->emergency_control?->product_decision( $product_id, $variation_id > 0 ? $variation_id : null ) : null;
+		if ( null !== $decision && ! $decision->allowed ) {
+			if ( function_exists( 'wc_add_notice' ) ) { wc_add_notice( EmergencyControlResponse::shopper_message( $decision ), 'error' ); } return false;
+		}
 		if ( ! $passed || ! $this->is_capture_enabled() || ! $this->should_apply_capture( $product_id, $variation_id ) ) {
 			return $passed;
 		}
@@ -205,6 +213,8 @@ final class CartDeliverySelectionCapture {
 	 * @return array<string, mixed>
 	 */
 	public function add_cart_item_data( array $cart_item_data, int $product_id, int $variation_id ): array {
+		$decision = $this->emergency_control?->product_decision( $product_id, $variation_id > 0 ? $variation_id : null );
+		if ( null !== $decision && ! $decision->allowed ) { EmergencyControlResponse::reject_classic( $decision ); }
 		if ( ! $this->is_capture_enabled() || ! $this->should_apply_capture( $product_id, $variation_id ) ) {
 			return $cart_item_data;
 		}
@@ -275,7 +285,7 @@ final class CartDeliverySelectionCapture {
 	 * @return array<string, mixed>
 	 */
 	public function restore_cart_item_from_session( array $cart_item, array $values, string $cart_item_key ): array {
-		unset( $cart_item_key );
+		$this->emergency_control?->latch_line( $cart_item_key, array_replace( $cart_item, $values ) );
 
 		if ( ! $this->is_capture_enabled() ) {
 			return $cart_item;
@@ -392,6 +402,9 @@ final class CartDeliverySelectionCapture {
 	 * @return array{requirement: string, options: list<ProductDeliveryOption>}
 	 */
 	public function assess_product_selection( int $product_id, int $variation_id ): array {
+		if ( null !== $this->emergency_control && ! $this->emergency_control->product_allowed( $product_id, $variation_id > 0 ? $variation_id : null ) ) {
+			return [ 'requirement' => 'blocked', 'options' => [] ];
+		}
 		$empty = [
 			'requirement' => 'none',
 			'options'     => [],

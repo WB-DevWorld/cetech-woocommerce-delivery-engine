@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Cart;
 
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
+
 use CetechDeliveryEngine\Application\CustomerContext\ApplyCustomerContextToEligibleLinesService;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
@@ -39,7 +41,8 @@ final class CartCustomerContextEditorService {
 		private Requirements $requirements,
 		private CartCustomerContextMutationService $mutation,
 		private ProductDeliverySelectionValidatorInterface $selection_validator,
-		private ApplyCustomerContextToEligibleLinesService $apply_all
+		private ApplyCustomerContextToEligibleLinesService $apply_all,
+		private ?EmergencyControlRuntime $emergency_control = null
 	) {
 	}
 
@@ -160,25 +163,24 @@ final class CartCustomerContextEditorService {
 
 		$product_id   = (int) ( $item['product_id'] ?? 0 );
 		$variation_id = (int) ( $item['variation_id'] ?? 0 );
-		$validated    = $this->selection_validator->validate(
-			$product_id,
-			$variation_id > 0 ? $variation_id : null,
-			$display_key
-		);
-
-		if ( ! $validated->valid || ! is_array( $validated->intent ) ) {
-			return null;
-		}
-
-		$option = ProductDeliveryOption::fromArray( is_array( $validated->matched_option ) ? $validated->matched_option : [] );
-
-		if ( FulfilmentChoice::StorePickup->value === $option->fulfilment_choice ) {
-			$pickup_id = $option->pickup_location_id;
-			if ( ( $pickup_id ?? 0 ) <= 0 ) {
-				$pickup_id = (int) ( $input['pickup_location_id'] ?? 0 );
+		$draft_only = null !== $this->emergency_control && ! $this->emergency_control->line_allowed( 'context_edit', $item );
+		if ( $draft_only ) {
+			// Address drafts retain the existing server-observed choice. A pause never accepts a different option.
+			$existing = CustomerCartContext::fromArray( is_array( $item[ CustomerCartContext::CART_KEY ] ?? null ) ? $item[ CustomerCartContext::CART_KEY ] : [] );
+			$stored = CartDeliverySelectionSessionData::normalizeIntent( $item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] ?? null );
+			if ( ! $existing instanceof CustomerCartContext || ( '' !== $display_key && ( ! is_array( $stored ) || $display_key !== ( $stored['display_key'] ?? '' ) ) ) ) { return null; }
+			if ( $existing->isPickup() ) { return $existing; }
+			$offer_id = $existing->delivery_offer_id;
+		} else {
+			$validated = $this->selection_validator->validate( $product_id, $variation_id > 0 ? $variation_id : null, $display_key );
+			if ( ! $validated->valid || ! is_array( $validated->intent ) ) { return null; }
+			$option = ProductDeliveryOption::fromArray( is_array( $validated->matched_option ) ? $validated->matched_option : [] );
+			if ( FulfilmentChoice::StorePickup->value === $option->fulfilment_choice ) {
+				$pickup_id = $option->pickup_location_id;
+				if ( ( $pickup_id ?? 0 ) <= 0 ) { $pickup_id = (int) ( $input['pickup_location_id'] ?? 0 ); }
+				return CustomerCartContext::pickup( $pickup_id > 0 ? $pickup_id : null );
 			}
-
-			return CustomerCartContext::pickup( $pickup_id > 0 ? $pickup_id : null );
+			$offer_id = $option->delivery_offer_id ?? (int) ( $validated->intent['delivery_offer_id'] ?? 0 );
 		}
 
 		$matching_raw = is_array( $input['matching_location'] ?? null ) ? $input['matching_location'] : [];
@@ -211,8 +213,6 @@ final class CartCustomerContextEditorService {
 				]
 			);
 		}
-
-		$offer_id = $option->delivery_offer_id ?? (int) ( $validated->intent['delivery_offer_id'] ?? 0 );
 
 		return CustomerCartContext::delivery( $offer_id > 0 ? $offer_id : null, $matching, $address );
 	}

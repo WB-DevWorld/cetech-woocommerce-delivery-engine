@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Shipping;
 
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
+
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionSessionData;
 use CetechDeliveryEngine\Application\Pickup\PickupLocationAddressFormatter;
@@ -20,7 +22,8 @@ final class ShippingPackageBuilder {
 
 	public function __construct(
 		private ShippingRateCalculationGate $gate,
-		private CartDeliverySelectionCapture $cart_capture
+		private CartDeliverySelectionCapture $cart_capture,
+		private ?EmergencyControlRuntime $emergency_control = null
 	) {
 	}
 
@@ -42,7 +45,10 @@ final class ShippingPackageBuilder {
 	 * @return list<array<string, mixed>>
 	 */
 	public function filter_packages( array $packages ): array {
-		if ( ! $this->is_runtime_active() ) {
+		if ( null !== $this->emergency_control && count( $packages ) > 200 ) {
+			return [ [ 'contents' => [], DeliveryGroupIdentity::PACKAGE_META_KEY => [ 'managed' => true, 'checkout_control_limit' => true, 'checkout_control' => [ 'state' => 'unavailable', 'revision' => 0 ] ] ] ];
+		}
+		if ( ! $this->is_runtime_active() && null === $this->emergency_control ) {
 			return $packages;
 		}
 
@@ -50,6 +56,7 @@ final class ShippingPackageBuilder {
 
 		foreach ( $packages as $package ) {
 			if ( ! is_array( $package ) ) {
+				if ( null !== $this->emergency_control ) { $built[] = $this->refuse_unknown_package( [] ); }
 				continue;
 			}
 
@@ -58,7 +65,8 @@ final class ShippingPackageBuilder {
 			}
 		}
 
-		return $this->assign_customer_labels( $built );
+		$built = $this->assign_customer_labels( $built );
+		return null !== $this->emergency_control ? $this->emergency_control->decorate_packages( $built ) : $built;
 	}
 
 	/**
@@ -69,7 +77,11 @@ final class ShippingPackageBuilder {
 	 * @return list<array<string, mixed>>
 	 */
 	public function split_package( array $package ): array {
+		if ( null !== $this->emergency_control && array_key_exists( 'contents', $package ) && ! is_array( $package['contents'] ) ) { return [ $this->refuse_unknown_package( $package ) ]; }
 		$contents = is_array( $package['contents'] ?? null ) ? $package['contents'] : [];
+		if ( null !== $this->emergency_control && count( $contents ) > 200 ) {
+			$package[ DeliveryGroupIdentity::PACKAGE_META_KEY ] = [ 'managed' => true, 'checkout_control_limit' => true ]; return [ $package ];
+		}
 
 		if ( [] === $contents ) {
 			return [ $package ];
@@ -78,15 +90,18 @@ final class ShippingPackageBuilder {
 		/** @var array<string, array<string, mixed>> $groups */
 		$groups = [];
 		$residual = [];
+		$blocked = [];
 
 		foreach ( $contents as $cart_item_key => $cart_item ) {
 			if ( ! is_array( $cart_item ) ) {
+				if ( null !== $this->emergency_control ) { return [ $this->refuse_unknown_package( $package ) ]; }
 				continue;
 			}
 
 			$key = (string) $cart_item_key;
 
-			if ( ! $this->is_managed_cart_item( $cart_item ) ) {
+			$owned = null !== $this->emergency_control ? $this->emergency_control->package_owned( [ 'contents' => [ $key => $cart_item ] ] ) : $this->is_managed_cart_item( $cart_item );
+			if ( ! $owned ) {
 				$residual[ $key ] = $cart_item;
 				continue;
 			}
@@ -94,7 +109,8 @@ final class ShippingPackageBuilder {
 			$group_id = DeliveryGroupIdentity::fromCartItem( $cart_item );
 
 			if ( null === $group_id ) {
-				$residual[ $key ] = $cart_item;
+				if ( null !== $this->emergency_control ) { $blocked[ $key ] = $cart_item; }
+				else { $residual[ $key ] = $cart_item; }
 				continue;
 			}
 
@@ -105,7 +121,7 @@ final class ShippingPackageBuilder {
 			$groups[ $group_id ][ $key ] = $cart_item;
 		}
 
-		if ( [] === $groups ) {
+		if ( [] === $groups && [] === $blocked ) {
 			return [ $package ];
 		}
 
@@ -114,12 +130,25 @@ final class ShippingPackageBuilder {
 		foreach ( $groups as $group_id => $group_contents ) {
 			$split[] = $this->build_managed_package( $package, $group_contents, $group_id );
 		}
+		if ( [] !== $blocked ) {
+			$refused = $this->clone_package_shell( $package, $blocked );
+			$refused[ DeliveryGroupIdentity::PACKAGE_META_KEY ] = [ 'managed' => true, 'checkout_control_limit' => true ];
+			$split[] = $refused;
+		}
 
 		if ( [] !== $residual ) {
 			$split[] = $this->build_residual_package( $package, $residual );
 		}
 
 		return $split;
+	}
+
+	/** Refusal changes only the derived package; the actual cart/order remain intact. */
+	private function refuse_unknown_package( array $package ): array {
+		$this->emergency_control?->latch_line( 'cetech_de_unresolved_package', [] );
+		$package['contents'] = [];
+		$package[ DeliveryGroupIdentity::PACKAGE_META_KEY ] = [ 'managed' => true, 'checkout_control_limit' => true ];
+		return $package;
 	}
 
 	/**

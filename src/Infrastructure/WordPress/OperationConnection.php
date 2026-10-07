@@ -256,6 +256,10 @@ final class OperationConnection implements OperationSession {
 		if ( 1 === preg_match( '/`?[a-zA-Z0-9_]+`?\s*\.\s*`?[a-zA-Z_][a-zA-Z0-9_]*`?\s*\(/', $sql ) ) {
 			return false;
 		}
+		// The C07 current read pins the verified native options unique key.
+		// This exact SQL clause is syntax, not a callable named INDEX. Other
+		// index expressions and every unknown function remain refused.
+		$sql = str_replace( ' FORCE INDEX (`option_name`)', '', $sql );
 		preg_match_all( '/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/', $sql, $calls );
 		foreach ( $calls[1] as $call ) {
 			if ( ! in_array( strtoupper( $call ), [ 'COUNT', 'MIN', 'MAX', 'SUM', 'AVG', 'COALESCE', 'IFNULL', 'CAST', 'CONVERT', 'DATABASE', 'CONNECTION_ID', 'NOW', 'UTC_TIMESTAMP', 'OCTET_LENGTH', 'LENGTH', 'CHAR_LENGTH', 'IN', 'VALUES', 'WHERE', 'AND', 'OR', 'NOT' ], true ) ) {

@@ -21,7 +21,8 @@ fi
 PRIVATE="$WORK/opening-http-private"
 RECEIPT="$WORK/opening-http-qualification-results.json"
 MU="$SITE/wp-content/mu-plugins/cetech-opening-http-fixture.php"
-if [[ -e "$PRIVATE" || -L "$PRIVATE" || -e "$MU" || -L "$MU" || -e "$RECEIPT" || -L "$RECEIPT" ]]; then
+EMERGENCY_MU="$SITE/wp-content/mu-plugins/cetech-opening-emergency-fixture.php"
+if [[ -e "$PRIVATE" || -L "$PRIVATE" || -e "$MU" || -L "$MU" || -e "$EMERGENCY_MU" || -L "$EMERGENCY_MU" || -e "$RECEIPT" || -L "$RECEIPT" ]]; then
     echo "BLOCKED: HTTP qualification refuses an existing credential, MU, or receipt allocation" >&2
     exit 1
 fi
@@ -52,13 +53,17 @@ LISTENER_CORE_PID=""
 WP=("$PHP_EXECUTABLE" "$WORK/wp-cli.phar" --allow-root --path="$SITE" --require="$ROOT/scripts/qualification/admin-context.php")
 IMPORT_BRIDGE="$ROOT/scripts/qualification/opening-http-fixture.php"
 CONFIG_BRIDGE="$ROOT/scripts/qualification/opening-http-configuration-fixture.php"
+EMERGENCY_BRIDGE="$ROOT/scripts/qualification/opening-http-emergency-fixture.php"
 IMPORT_STATE="$PRIVATE/import-state.json"
 CONFIG_STATE="$PRIVATE/config-state.json"
+EMERGENCY_STATE="$PRIVATE/emergency-state.json"
+export CETECH_DE_HTTP_EMERGENCY_STATE="$EMERGENCY_STATE"
 IMPORT_PREPARE="$PRIVATE/import-prepare-output.json"
 SERVER_PID=""
 SERVER_STARTED=0
 LISTENER_ATTESTED=0
 MU_CREATED=0
+EMERGENCY_MU_CREATED=0
 MU_REMOVED=0
 ROW_CLEANUP=1
 QUALIFICATION_STAGE="allocated"
@@ -71,7 +76,7 @@ report = {
     "source_head": os.environ.get("CETECH_DE_QUALIFICATION_HEAD", ""),
     "candidate_head": os.environ.get("CETECH_DE_QUALIFICATION_CANDIDATE_HEAD", ""),
     "source_tree": os.environ.get("CETECH_DE_QUALIFICATION_TREE", ""),
-    "limits": ["No browser JavaScript/theme/cache/payment or release qualification.", "Managed fixture cleanup does not certify rollback of Action Scheduler or ancillary WordPress state; the CI service/site are disposable."],
+    "limits": ["Only the pinned disposable Blocks browser and instrumented fixture gateway are exercised; broader theme, persistent-cache, external-payment and release qualification remain separate.", "Managed fixture cleanup does not certify rollback of Action Scheduler or ancillary WordPress state; the CI service/site are disposable."],
 }
 Path(sys.argv[1]).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
 PY
@@ -134,6 +139,10 @@ finish_http_fixture() {
     fi
     # Stop the listener and restore core handling before database cleanup can
     # wait on any fixture locks. Touch only identity-tracked fixture rows.
+    if [[ -f "$EMERGENCY_STATE" && -f "$EMERGENCY_BRIDGE" ]]; then
+        "${WP[@]}" eval-file "$EMERGENCY_BRIDGE" cleanupemergency "$EMERGENCY_STATE" "$PRIVATE/emergency-trap-cleanup.json" >"$PRIVATE/emergency-cleanup-command.log" 2>&1
+        if [[ "$?" != "0" ]]; then ROW_CLEANUP=0; fi
+    fi
     if [[ -f "$CONFIG_STATE" && -f "$CONFIG_BRIDGE" ]]; then
         "${WP[@]}" eval-file "$CONFIG_BRIDGE" cleanupconfig "$CONFIG_STATE" "$PRIVATE/config-trap-cleanup.json" >"$PRIVATE/config-cleanup-command.log" 2>&1
         if [[ "$?" != "0" ]]; then ROW_CLEANUP=0; fi
@@ -150,6 +159,14 @@ finish_http_fixture() {
     elif [[ "$MU_CREATED" == "0" ]]; then
         MU_REMOVED=1
     fi
+    if [[ "$EMERGENCY_MU_CREATED" == "1" && -f "$EMERGENCY_MU" ]]; then
+        if cmp -s "$ROOT/scripts/qualification/opening-http-emergency-mu.php" "$EMERGENCY_MU"; then
+            rm "$EMERGENCY_MU"
+        fi
+        if [[ -e "$EMERGENCY_MU" ]]; then MU_REMOVED=0; fi
+    fi
+    # Presence is the final cleanup truth, even when allocation/copy was refused.
+    if [[ -e "$MU" || -L "$MU" || -e "$EMERGENCY_MU" || -L "$EMERGENCY_MU" ]]; then MU_REMOVED=0; fi
     local db_connect="absent"
     local db_wait_ms=""
     if [[ -n "${CETECH_DE_WP_DB_PORT:-}" ]]; then
@@ -412,8 +429,12 @@ fi
 QUALIFICATION_STAGE="origin_preflight"
 "${WP[@]}" eval-file "$ROOT/scripts/qualification/opening-http-origin-preflight.php" "$PRIVATE/origin-preflight-output.json" >"$PRIVATE/origin-preflight-command.log" 2>&1
 QUALIFICATION_STAGE="mu_copy"
-cp "$ROOT/scripts/qualification/opening-http-mu.php" "$MU"
+# Track each exact owned destination before copying: a failed partial copy
+# remains an explicitly unremoved fixture rather than a false cleanup success.
 MU_CREATED=1
+cp "$ROOT/scripts/qualification/opening-http-mu.php" "$MU"
+EMERGENCY_MU_CREATED=1
+cp "$ROOT/scripts/qualification/opening-http-emergency-mu.php" "$EMERGENCY_MU"
 QUALIFICATION_STAGE="import_prepare"
 "${WP[@]}" eval-file "$IMPORT_BRIDGE" prepare "$IMPORT_STATE" "$IMPORT_PREPARE" >"$PRIVATE/import-prepare-command.log" 2>&1
 
@@ -503,7 +524,9 @@ python3 "$ROOT/scripts/qualification/opening-http-driver.py" \
     --bridge "$IMPORT_BRIDGE" --state "$IMPORT_STATE" --work "$PRIVATE" \
     --receipt "$RECEIPT" --prepare-output "$IMPORT_PREPARE" \
     --configuration-driver "$ROOT/scripts/qualification/opening-http-configuration-driver.py" \
-    --configuration-bridge "$CONFIG_BRIDGE" --configuration-state "$CONFIG_STATE"
+    --configuration-bridge "$CONFIG_BRIDGE" --configuration-state "$CONFIG_STATE" \
+    --emergency-driver "$ROOT/scripts/qualification/opening-http-emergency-driver.py" \
+    --emergency-bridge "$EMERGENCY_BRIDGE" --emergency-state "$EMERGENCY_STATE"
 QUALIFICATION_STAGE="complete"
 
 # EXIT performs final owned-listener/MU/private-file cleanup and appends its

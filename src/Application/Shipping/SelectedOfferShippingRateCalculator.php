@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Shipping;
 
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
+
 use CetechDeliveryEngine\Application\Destination\PackageDestinationZoneResolverInterface;
 use CetechDeliveryEngine\Application\RateQuote\RateQuoteEngine;
 use CetechDeliveryEngine\Application\RateQuote\RateQuoteRequest;
@@ -44,7 +46,8 @@ final class SelectedOfferShippingRateCalculator {
 		private RateQuoteEngine $quote_engine,
 		private ProductDeliveryRuleRepositoryInterface $product_rule_repository,
 		private Logger $logger,
-		private ?ProductDeliveryConfigurationSourceInterface $configuration_source = null
+		private ?ProductDeliveryConfigurationSourceInterface $configuration_source = null,
+		private ?EmergencyControlRuntime $emergency_control = null
 	) {
 	}
 
@@ -56,6 +59,8 @@ final class SelectedOfferShippingRateCalculator {
 	 * @param array<string, mixed> $package WooCommerce shipping package.
 	 */
 	public function calculate_for_package( array $package ): SelectedOfferShippingRateResult {
+		$decision = $this->emergency_control?->package_decision( $package );
+		if ( null !== $decision && ! $decision->allowed ) { return SelectedOfferShippingRateResult::blocked( $decision->code ); }
 		if ( ! $this->is_runtime_active() ) {
 			return SelectedOfferShippingRateResult::blocked( self::BLOCK_RUNTIME_INACTIVE );
 		}
@@ -335,6 +340,8 @@ final class SelectedOfferShippingRateCalculator {
 		array $destination,
 		string $currency_code
 	): SelectedOfferShippingRateResult {
+		$decision = $this->emergency_control?->line_decision( 'quote', $cart_item );
+		if ( null !== $decision && ! $decision->allowed ) { return SelectedOfferShippingRateResult::blocked( $decision->code ); }
 		if ( ! $this->is_runtime_active() ) {
 			return SelectedOfferShippingRateResult::blocked( self::BLOCK_RUNTIME_INACTIVE );
 		}

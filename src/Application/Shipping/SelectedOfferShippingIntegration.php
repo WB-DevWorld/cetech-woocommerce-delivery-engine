@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Shipping;
 
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
+
 use CetechDeliveryEngine\Infrastructure\WooCommerce\Shipping\SelectedOfferShippingMethod;
 
 /**
@@ -18,7 +20,8 @@ use CetechDeliveryEngine\Infrastructure\WooCommerce\Shipping\SelectedOfferShippi
 final class SelectedOfferShippingIntegration {
 
 	public function __construct(
-		private ShippingRateCalculationGate $gate
+		private ShippingRateCalculationGate $gate,
+		private ?EmergencyControlRuntime $emergency_control = null
 	) {
 	}
 
@@ -51,6 +54,7 @@ final class SelectedOfferShippingIntegration {
 	 * @return array<string, mixed>
 	 */
 	public function filter_managed_package_rates( array $rates, array $package ): array {
+		if ( null !== $this->emergency_control && $this->emergency_control->package_owned( $package ) && ( ! $this->emergency_control->package_allowed( $package ) || ! $this->gate->is_runtime_active() ) ) { return []; }
 		if ( ! $this->gate->is_runtime_active() ) {
 			return $rates;
 		}

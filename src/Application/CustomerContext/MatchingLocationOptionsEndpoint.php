@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\CustomerContext;
 
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlResponse;
+
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryFulfilmentCapabilities;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
@@ -30,7 +33,8 @@ final class MatchingLocationOptionsEndpoint {
 		private LocationAwareDeliveryOptions $location_options,
 		private CustomerBrowsingLocationStore $browsing_store,
 		private ?CanonicalLocationResolver $resolver = null,
-		private ?ShopperDeliveryLocationPrecision $precision = null
+		private ?ShopperDeliveryLocationPrecision $precision = null,
+		private ?EmergencyControlRuntime $emergency_control = null
 	) {
 	}
 
@@ -75,6 +79,10 @@ final class MatchingLocationOptionsEndpoint {
 	 * }
 	 */
 	public function build_payload( int $product_id, int $variation_id, ?MatchingLocation $location, int $quantity = 1 ): array {
+		$decision = $this->emergency_control?->product_decision( $product_id, $variation_id > 0 ? $variation_id : null );
+		if ( null !== $decision && ! $decision->allowed ) {
+			return [ 'status' => 'unavailable', 'message' => EmergencyControlResponse::shopper_message( $decision ), 'options' => [], 'requires_location' => false ];
+		}
 		if ( ! $this->requirements->is_woocommerce_active() || ! $this->feature_flags->is_enabled( 'enable_product_delivery_selector' ) ) {
 			return [
 				'status'            => 'error',

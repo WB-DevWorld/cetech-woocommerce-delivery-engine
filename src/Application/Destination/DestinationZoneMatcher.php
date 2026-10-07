@@ -59,6 +59,12 @@ final class DestinationZoneMatcher {
 		$this->region_matcher = $region_matcher ?? new RegionCodeLabelMatcher();
 	}
 
+	/** Discard only this request's derived matches before a required current quote. */
+	public function clearMemoization(): void {
+		$this->match_cache = [];
+		$this->last_diagnostics = [];
+	}
+
 	/**
 	 * Admin/test diagnostics from the most recent match_all() call. Never customer-facing.
 	 *

@@ -95,6 +95,21 @@ final class OperationConnectionTest extends TestCase {
 		self::assertTrue( $connection->rollback() );
 	}
 
+	public function test_fixed_options_unique_index_is_sql_syntax_without_allowing_index_calls(): void {
+		$transport = new OperationConnectionTestTransport();
+		$connection = $this->connection( $transport );
+		self::assertTrue( $connection->begin() );
+		$sql = $connection->prepare( 'SELECT option_id FROM `op_options` FORCE INDEX (`option_name`) WHERE option_name = %s LIMIT 1 FOR UPDATE', 'cetech_de_checkout_control_v1' );
+		self::assertIsArray( $connection->get_row( $sql ) );
+		self::assertContains( $sql, $transport->statements );
+		foreach ( [ 'SELECT INDEX(1)', 'SELECT * FROM `op_options` FORCE INDEX (`other_index`)', 'SELECT * FROM `op_options` FORCE INDEX (hidden_effect())', 'SELECT hidden_effect() FROM `op_options` FORCE INDEX (`option_name`)', 'SELECT private.INDEX(1)', 'SELECT 1 /* FORCE INDEX (`option_name`) */' ] as $forbidden ) {
+			self::assertFalse( $connection->get_row( $forbidden ) );
+			self::assertNotContains( $forbidden, $transport->statements );
+		}
+		self::assertTrue( $connection->rollback() );
+		self::assertTrue( $connection->retire() );
+	}
+
 	public function test_pinned_server_identity_change_refuses_without_sending_a_write(): void {
 		$transport = new OperationConnectionTestTransport();
 		$connection = $this->connection( $transport );

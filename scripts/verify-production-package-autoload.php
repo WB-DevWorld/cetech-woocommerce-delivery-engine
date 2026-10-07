@@ -334,7 +334,8 @@ $is_schema5_release = str_contains( $header_source, '1.0.0-dev.bulk' )
 
 $is_schema8_release = str_contains( $header_source, '1.0.0-dev.wave1-rule-lifecycle' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-snapshot-readers' )
-	|| str_contains( $header_source, '1.0.0-dev.wave1-data-lifecycle' );
+	|| str_contains( $header_source, '1.0.0-dev.wave1-data-lifecycle' )
+	|| str_contains( $header_source, '1.0.0-dev.wave1-emergency-control' );
 $is_schema7_release = str_contains( $header_source, '1.0.0-dev.wave1-operation-storage' );
 $is_schema6_release = str_contains( $header_source, '1.0.0-dev.geo' )
 	|| str_contains( $header_source, '1.0.0-rc.12' )

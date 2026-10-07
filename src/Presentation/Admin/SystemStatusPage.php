@@ -73,7 +73,8 @@ final class SystemStatusPage {
 		private RateCardRepositoryInterface $rate_card_repository,
 		private ProductDeliveryRuleRepositoryInterface $product_rule_repository,
 		private ConfigurationHealthChecker $configuration_health_checker,
-		private ?BulkQueueHealth $bulk_queue_health = null
+		private ?BulkQueueHealth $bulk_queue_health = null,
+		private ?\CetechDeliveryEngine\Application\EmergencyControl\EmergencyControlService $emergency_control = null
 	) {
 	}
 
@@ -706,6 +707,29 @@ final class SystemStatusPage {
 			'',
 			'Health',
 		];
+
+		if ( null !== $this->emergency_control ) {
+			$site = function_exists( 'get_current_blog_id' ) ? get_current_blog_id() : 1;
+			$view = \CetechDeliveryEngine\Application\EmergencyControl\EmergencyControlProjection::for_diagnostics( $site,
+				\CetechDeliveryEngine\Domain\Contracts\RequestContext::create(),
+				static fn( int $requested, string $capability, string $purpose ): bool => $requested === ( function_exists( 'get_current_blog_id' ) ? get_current_blog_id() : 1 )
+					&& is_admin() && ! AdminPageAccess::current_user_is_restricted() && current_user_can( $capability ),
+				fn(): \CetechDeliveryEngine\Domain\EmergencyControl\EmergencyControlDiagnostics => new \CetechDeliveryEngine\Domain\EmergencyControl\EmergencyControlDiagnostics(
+					$site, $this->emergency_control->read( $site ),
+					( new ShippingRateCalculationGate( $this->feature_flags, $this->requirements ) )->is_runtime_active() ? 'ready' : 'unready'
+				) );
+			if ( is_array( $view ) ) {
+				$lines[] = 'Emergency checkout control';
+				$lines[] = 'Recorded state: ' . ( $view['stored_state'] ?? 'not initialized or unavailable' );
+				$lines[] = 'Current control: ' . ( $view['current_control_state'] ?? 'unavailable' );
+				$lines[] = 'Effective checkout: ' . $view['effective_state'];
+				$lines[] = 'Module readiness: ' . $view['module_readiness'];
+				$lines[] = 'Activation: entire current store across qualified checkout surfaces';
+				$lines[] = 'Publication: ' . ( null === $view['publication_pending'] ? 'not observed by this state read' : ( $view['publication_pending'] ? 'pending' : 'confirmed' ) );
+				$lines[] = 'Impact: live carts and unpaid orders were not enumerated; no exhaustive affected-customer count';
+				$lines[] = '';
+			}
+		}
 
 		$health = $this->configuration_health_checker->run();
 		$diagnostics = is_array( $health['diagnostics'] ?? null ) ? $health['diagnostics'] : [];

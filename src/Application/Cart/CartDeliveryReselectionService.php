@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Cart;
 
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlResponse;
+
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidator;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
@@ -30,7 +33,8 @@ final class CartDeliveryReselectionService {
 		private CartDeliverySelectionCapture $cart_capture,
 		private ProductDeliverySelectionValidator $selection_validator,
 		private CartDeliverySelectionReconciler $reconciler,
-		private ?BlocksCartContextCommandHandler $context_commands = null
+		private ?BlocksCartContextCommandHandler $context_commands = null,
+		private ?EmergencyControlRuntime $emergency_control = null
 	) {
 	}
 
@@ -212,6 +216,10 @@ final class CartDeliveryReselectionService {
 			];
 		}
 
+		$decision = $this->emergency_control?->line_decision( $cart_item_key, $item );
+		if ( null !== $decision && ! $decision->allowed ) {
+			return [ 'success' => false, 'message' => EmergencyControlResponse::shopper_message( $decision ) ];
+		}
 		$product_id   = (int) ( $item['product_id'] ?? 0 );
 		$variation_id = (int) ( $item['variation_id'] ?? 0 );
 

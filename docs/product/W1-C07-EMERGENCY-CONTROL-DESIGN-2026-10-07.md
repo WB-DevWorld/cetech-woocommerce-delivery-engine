@@ -1,6 +1,8 @@
 # W1-C07 emergency-control design
 
-Proposal: **W1-C07-EMERGENCY-CONTROL-1 — OWNER REVIEW REQUIRED; NOT IMPLEMENTED**.
+Decision: **W1-C07-EMERGENCY-CONTROL-1 — OWNER APPROVED 2026-10-07 01:08:21UTC**.
+
+The owner instructed “Approve W1-C07-EMERGENCY-CONTROL-1 and implement W1-C07.” Design PR#77 merged unchanged as `11c48f1a7dd6440fb0a355b3b8d045408de9526d`, tree `d576632df57fbf3166ce1f29e970f711c71c4406`; #76 completed. [Issue#78](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/78) and the [implementation record](W1-C07-IMPLEMENTATION-2026-10-07.md) track implementation and its separate execution evidence. The proposal wording below preserves the approved decision context; its thirty future obligations are not retrospective claims about design CI.
 
 The owner approved W1-C06 integration and requested this design at2026-10-07 00:45:41UTC. [PR#75](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/75) merged its qualified head `0ebeca8d33b17fec9fd70cb7706a50d447ad8d91` unchanged normally as `9cbdc6b5f0b9a509cad137d7379d96809f6d240e`, tree `66536ad4e5d47d820baa18569c729357248972ed`. [Issue#76](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/76), under #48, tracks design only. Production remains `1.0.0-dev.wave1-data-lifecycle.1`, schema8,591PHP files; this proposal changes none of those sources or settings.
 

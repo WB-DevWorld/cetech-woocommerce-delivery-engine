@@ -134,9 +134,15 @@ return static function ( callable $check, ?array $history = null ): void {
 		$check( 'NATIVE-C06-LOCALE-OPAQUE-REVISION-SEPARATE-IDENTITIES', 3 === count( array_unique( [ $base_id->option_name(), $locale_id->option_name(), $revision_id->option_name() ] ) ) && null === $cache->lookup( $revision_id )->payload() );
 		$expired_cache = new ManagedGeographyCache( $fixture->factory, clock: static fn (): int => $clock + 120 );
 		$check( 'NATIVE-C06-PREWARMED-ADVISORY-CACHE-INLINE-EXPIRY', is_array( wp_cache_get( $tickets['search']->identity()->digest(), ManagedGeographyCacheIdentity::CACHE_GROUP ) ) && null === $expired_cache->lookup( $tickets['search']->identity() )->payload() && 'expired' === $expired_cache->diagnostics()['status'] );
-		$pending_cache = new ManagedGeographyCache( $fixture->factory, cache_set: static fn (): bool => false ); $pending_id = $pending_cache->identity( $fixture->site, 'postcode', 'GH', '', '', 'publication-failure', 1, '7', 'en_US' );
+		// Every participant in this controlled observation uses the same fixture clock.
+		// A native-time writer can otherwise create a correctly refused future row
+		// for the already frozen reader when a second boundary is crossed.
+		$pending_cache = new ManagedGeographyCache( $fixture->factory, clock: static fn (): int => $clock, cache_set: static fn (): bool => false ); $pending_id = $pending_cache->identity( $fixture->site, 'postcode', 'GH', '', '', 'publication-failure', 1, '7', 'en_US' );
 		$pending = $pending_cache->publish( $pending_cache->lookup( $pending_id ), $payloads['postcode'] ); $pending_row = $fixture->option( $pending_id->option_name() );
-		$check( 'NATIVE-C06-ADVISORY-PUBLICATION-FAILURE-KEEPS-ACCEPTED-SQL', $pending && 'publication_pending' === $pending_cache->diagnostics()['status'] && null !== $pending_row && $payloads['postcode'] === $cache->lookup( $pending_id )->payload() && $pending_row === $fixture->option( $pending_id->option_name() ) );
+		$pending_status = $pending_cache->diagnostics()['status']; $pending_read = $cache->lookup( $pending_id ); $pending_after = $fixture->option( $pending_id->option_name() );
+		$pending_observed = null === $pending_row ? null : ManagedGeographyCacheEnvelope::from_json( $pending_row['option_value'] )->expires_at() - 120;
+		$check( 'NATIVE-C06-ADVISORY-PUBLICATION-FAILURE-KEEPS-ACCEPTED-SQL', $pending && 'publication_pending' === $pending_status && null !== $pending_row && $payloads['postcode'] === $pending_read->payload() && $pending_row === $pending_after,
+			[ 'sql_accepted' => $pending, 'publication_status' => $pending_status, 'row_present' => null !== $pending_row, 'writer_observed_at' => $pending_observed, 'reader_observed_at' => $pending_read->observed_at(), 'fixture_clock' => $clock, 'reader_status' => $cache->diagnostics()['status'], 'payload_matches' => $payloads['postcode'] === $pending_read->payload(), 'row_unchanged' => $pending_row === $pending_after ] );
 		set_transient( 'cetech_de_scoped_draft_9_product_17_in_warehouse_none', [ 'save_token' => 'PRIVATE-C06-DRAFT-TOKEN' ], 900 ); set_transient( 'cetech_de_geo_rl_' . str_repeat( 'a', 32 ), 7, 60 );
 		$legacy_before = $fixture->rows( "SELECT * FROM `{$fixture->prefix}options` WHERE option_name LIKE '_transient%cetech_de%' ORDER BY option_id" );
 		$all_before = $fixture->option_rows(); $preview = $worker->preview( $fixture->site );

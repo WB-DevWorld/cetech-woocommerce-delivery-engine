@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Frontend;
 
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlResponse;
+
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\CustomerContext\ClassicPdpContextPayload;
 use CetechDeliveryEngine\Application\CustomerContext\CustomerBrowsingLocationStore;
@@ -48,7 +51,8 @@ final class ProductDeliverySelectorRenderer {
 		private ProductDeliveryOptionsBuilder $options_builder,
 		private ?CustomerBrowsingLocationStore $browsing_store = null,
 		private ?LocationAwareDeliveryOptions $location_options = null,
-		private ?ShopperDeliveryLocationPrecision $precision = null
+		private ?ShopperDeliveryLocationPrecision $precision = null,
+		private ?EmergencyControlRuntime $emergency_control = null
 	) {
 	}
 
@@ -193,6 +197,13 @@ final class ProductDeliverySelectorRenderer {
 
 		if ( null === $product ) {
 			return;
+		}
+
+		$variation_id = $product->is_type( 'variation' ) ? $product->get_id() : null;
+		$product_id = null !== $variation_id ? $product->get_parent_id() : $product->get_id();
+		$decision = $this->emergency_control?->product_decision( $product_id, $variation_id );
+		if ( null !== $decision && ! $decision->allowed ) {
+			$this->render_notice( EmergencyControlResponse::shopper_message( $decision ) ); return;
 		}
 
 		if ( $product->is_type( 'variable' ) ) {
