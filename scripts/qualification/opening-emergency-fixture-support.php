@@ -158,6 +158,7 @@ final class CetechOpeningEmergencyFixture {
 		$item = $context->applyToCartItem( $item ); $private = $item; foreach ( [ 'key', 'product_id', 'variation_id', 'quantity', 'data' ] as $name ) { unset( $private[$name] ); } $this->state['cart_data'][ $kind ] = $private; return $item;
 	}
 	public function order( string $kind = 'managed', bool $legacy = false, bool $missing = false ): WC_Order {
+		if ( wc_tax_enabled() ) { throw new RuntimeException( 'C07 owned order fixture requires its explicit no-tax checkout policy.' ); }
 		$item = $this->item( $kind ); $order = wc_create_order( [ 'customer_id' => $this->state['user_id'] ] );
 		if ( ! $order instanceof WC_Order || $order->get_id() < 1 ) { throw new RuntimeException( 'C07 order allocation failed.' ); }
 		$this->state['orders'][] = $order->get_id();
@@ -172,11 +173,14 @@ final class CetechOpeningEmergencyFixture {
 			if ( $legacy ) { $data['snapshot_version'] = '1'; foreach ( [ 'customer_context_version', 'matching_location', 'delivery_address', 'matching_identity', 'delivery_location_identity', 'pickup_location_id' ] as $field ) { unset( $data[ $field ] ); } $data['delivery_group_id'] = CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity::fromIntent( $item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] ); }
 			$line->add_meta_data( CetechDeliveryEngine\Application\Order\OrderDeliverySnapshot::META_LINE_SNAPSHOT, wp_json_encode( $data ), true ); $line->add_meta_data( CetechDeliveryEngine\Application\Order\OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION, $data['snapshot_version'], true ); $line->save();
 			$group = $data['delivery_group_id'];
-			$shipping = new WC_Order_Item_Shipping(); $shipping->set_method_id( 'delivery_engine_selected_offer' ); $shipping->set_method_title( 'C07 selected delivery' ); $shipping->set_total( 'pickup' === $kind ? '0.0000' : '7.0000' ); $shipping->add_meta_data( 'cetech_de_group_id', $group, true ); $order->add_item( $shipping );
+			$shipping = new WC_Order_Item_Shipping(); $shipping->set_method_id( 'delivery_engine_selected_offer' ); $shipping->set_method_title( 'C07 selected delivery' ); $shipping->set_total( 'pickup' === $kind ? '0.0000' : '7.0000' ); $shipping->set_taxes( [ 'total' => [] ] ); $shipping->add_meta_data( 'cetech_de_group_id', $group, true ); $order->add_item( $shipping );
 			$package = [ 'snapshot_version' => $data['snapshot_version'], 'shipping_method_id' => 'delivery_engine_selected_offer', 'shipping_method_label' => 'C07 selected delivery', 'package_total_delivery_amount' => 'pickup' === $kind ? '0.0000' : '7.0000', 'currency_code' => 'GHS', 'destination_zone_id' => 'pickup' === $kind ? null : $this->state['zone_id'], 'quote_status' => 'success', 'snapshotted_at' => gmdate( 'c' ), 'groups' => [ [ 'group_id' => $group, 'shipping_method_id' => 'delivery_engine_selected_offer', 'shipping_method_label' => 'C07 selected delivery', 'package_total_delivery_amount' => 'pickup' === $kind ? '0.0000' : '7.0000', 'fulfilment_choice' => 'pickup' === $kind ? 'store_pickup' : 'delivery', 'is_pickup' => 'pickup' === $kind, 'display_index' => 1 ] ] ];
 			$order->update_meta_data( CetechDeliveryEngine\Application\Order\OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, wp_json_encode( $package ) ); $order->update_meta_data( CetechDeliveryEngine\Application\Order\OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION, $data['snapshot_version'] );
-		} elseif ( $missing ) { $shipping = new WC_Order_Item_Shipping(); $shipping->set_method_id( 'delivery_engine_selected_offer' ); $shipping->set_total( '7.0000' ); $order->add_item( $shipping ); }
-		$order->set_status( 'pending' ); $order->calculate_totals( false ); $order->save(); return $order;
+		} elseif ( $missing ) { $shipping = new WC_Order_Item_Shipping(); $shipping->set_method_id( 'delivery_engine_selected_offer' ); $shipping->set_total( '7.0000' ); $shipping->set_taxes( [ 'total' => [] ] ); $order->add_item( $shipping ); }
+		$order->set_status( 'pending' ); $order->calculate_totals( false );
+		// Native Woo checkout assigns no-tax cart/shipping facts through setters;
+		// calculate_totals(false) alone leaves new-object integer tax defaults.
+		$order->set_cart_tax( '0' ); $order->set_shipping_tax( '0' ); $order->save(); return $order;
 	}
 	public static function order_bytes( array $ids ): array {
 		global $wpdb;
