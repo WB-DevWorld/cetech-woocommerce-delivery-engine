@@ -39,6 +39,9 @@ return static function ( callable $check, ?array $history = null ): void {
 		$read = $service->read( $site );
 		$check( 'NATIVE-C07-DEFAULT-CACHE-NATIVE-READY-READ', $read->available && null !== $read->state && $read->state->site_id === $site && WP_Object_Cache::class === get_class( $GLOBALS['wp_object_cache'] ), [ 'native_default_object_cache' => true, 'no_object_cache_dropin' => ! file_exists( WP_CONTENT_DIR . '/object-cache.php' ) ] );
 		$managed = $fixture->order(); $legacy = $fixture->order( legacy: true ); $missing = $fixture->order( missing: true ); $pickup = $fixture->order( 'pickup' ); $ordinary = $fixture->order( 'unmanaged' ); $paid = $fixture->order(); $paid->set_date_paid( time() ); $paid->set_status( 'processing' ); $paid->save();
+		// Prepare the existing COD order while enabled; paused operational checks
+		// reuse its stored facts rather than attempting a new selected snapshot.
+		$cod = $fixture->order(); $cod->set_payment_method( 'cod' ); $cod->set_status( 'on-hold' ); $cod->save();
 		$product_ownership = []; foreach ( [ 'managed', 'pickup', 'unmanaged' ] as $kind ) { $product_ownership[$kind] = $classifier->product( $fixture->state[$kind . '_product_id'] ); }
 		// The assertion remains exact; diagnostics disclose only finite classifications,
 		// identity booleans and bounded source counts, never rule/configuration payloads.
@@ -149,7 +152,7 @@ return static function ( callable $check, ?array $history = null ): void {
 		$shipment = $creation->shipments[0]; $tracking = $container->get( CetechDeliveryEngine\Application\Shipment\ShipmentTrackingService::class )->save( $shipment->id, new CetechDeliveryEngine\Application\Shipment\ShipmentTrackingInput( 'C07 synthetic carrier', 'C07-SYNTHETIC-TRACK', 'https://example.invalid/c07-track', gmdate( 'Y-m-d' ), 'C07 synthetic tracking note' ), get_current_user_id() );
 		$status = $container->get( CetechDeliveryEngine\Application\Shipment\ShipmentStatusService::class )->change( $shipment->id, CetechDeliveryEngine\Domain\Enum\ShipmentStatus::Processing, CetechDeliveryEngine\Application\Shipment\ShipmentStatusChangeRequest::staff_normal( 'C07 synthetic progress', get_current_user_id() ) );
 		$check( 'NATIVE-C07-EXISTING-SHIPMENT-TRACKING-STATUS-CONTINUES', $tracking->ok && $status->ok && 'processing' === $status->shipment?->status->value && 'C07-SYNTHETIC-TRACK' === $tracking->shipment?->tracking_number && 'checkout_suspended' === $service->read( $site )->state?->state );
-		$cod = $fixture->order(); $cod->set_payment_method( 'cod' ); $cod->set_status( 'on-hold' ); $cod->save(); $container->get( CetechDeliveryEngine\Application\Shipment\CodAwaitingShipmentEvaluator::class )->sync( $cod );
+		$container->get( CetechDeliveryEngine\Application\Shipment\CodAwaitingShipmentEvaluator::class )->sync( $cod );
 		$check( 'NATIVE-C07-EXISTING-COD-MANUAL-AUTHORITY-PRESERVED', $container->get( CetechDeliveryEngine\Application\Shipment\CodAwaitingShipmentStore::class )->is_awaiting( $cod ) && null === $cod->get_date_paid() && current_user_can( 'manage_shipments' ) && 'checkout_suspended' === $service->read( $site )->state?->state, [ 'existing_cod_task_index' => true, 'no_payment_confirmation_inferred' => true ] );
 	} catch ( Throwable $error ) { $failure = $error; throw $error; }
 	finally {
