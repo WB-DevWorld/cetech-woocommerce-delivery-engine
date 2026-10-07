@@ -29,9 +29,12 @@ use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidator;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
+use CetechDeliveryEngine\Domain\Configuration\CollectionFieldInstruction;
+use CetechDeliveryEngine\Domain\Configuration\ScalarFieldInstruction;
 use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteContext;
 use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteJson;
 use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteOwner;
+use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteStorageCodec;
 use CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory;
 use CetechDeliveryEngine\Infrastructure\Persistence\LegacyQuoteSourceSnapshotReader;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbDeliveryOfferRepository;
@@ -124,6 +127,7 @@ final class LegacyQuoteNativeSourcePreparer {
 		if ( ! self::inventory_demand_available( $inventory_members ) ) { self::fail(); }
 		ksort( $selection, SORT_STRING ); if ( hash( 'sha256', QuoteJson::encode( $selection ) ) !== $facts['selection_digest'] || $facts['currency']['base'] !== get_option( 'woocommerce_currency' ) ) { self::fail(); }
 		$tax_ids = $db->get_col( 'SELECT DISTINCT term_taxonomy_id FROM `' . $db->term_relationships . '` WHERE object_id IN (' . implode( ',', $product_ids ) . ') ORDER BY term_taxonomy_id ASC LIMIT 601' ); if ( ! is_array( $tax_ids ) || count( $tax_ids ) > 600 || '' !== $db->last_error ) { self::fail(); }
+		[ $offers, $dimensions ] = self::reference_sources( $captured->rows_for( 'legacy_rules' ), $captured->rows_for( 'scope_fields' ), $captured->rows_for( 'scope_collections' ), $offers, $dimensions );
 		$fences = [ [ 'source' => 'product', 'ids' => array_values( $product_ids ) ], [ 'source' => 'product_meta', 'ids' => array_values( $product_ids ) ], [ 'source' => 'term_relationships', 'ids' => array_values( $product_ids ) ], [ 'source' => 'options', 'names' => LegacyQuoteSourcePlan::OPTIONS ], [ 'source' => 'offers', 'ids' => array_values( $offers ) ], [ 'source' => 'legacy_rules', 'targets' => array_values( $targets ) ], [ 'source' => 'scopes', 'targets' => array_values( $scopes ) ], [ 'source' => 'scope_fields' ], [ 'source' => 'scope_collections' ], [ 'source' => 'zones' ], [ 'source' => 'zone_rules' ], [ 'source' => 'coverage_groups' ], [ 'source' => 'coverage_members' ], [ 'source' => 'coverage_postcodes' ] ];
 		if ( [] !== $tax_ids ) { $fences[] = [ 'source' => 'term_taxonomy', 'ids' => array_map( 'intval', $tax_ids ) ]; } foreach ( $dimensions as $source => $ids ) { if ( [] !== $ids ) { $fences[] = [ 'source' => $source, 'ids' => array_values( $ids ) ]; } }
 		return LegacyQuoteSourcePlan::create( $owner, $context, $members, array_values( $ranges ), $fences );
@@ -155,7 +159,39 @@ final class LegacyQuoteNativeSourcePreparer {
 		foreach ( $facts['lines'] as $line ) { foreach ( array_filter( [ $line['product_id'], $line['variation_id'], $line['parent_id'] ] ) as $id ) { $ids[$id] = $id; } foreach ( [ [ 'product', $line['product_id'] ], [ 'variation', $line['variation_id'] ] ] as [ $type, $id ] ) { if ( null !== $id ) { $targets[$type . ':' . $id] = [ 'type' => $type, 'id' => $id ]; $scopes[$type . ':' . $id] = [ 'type' => $type, 'id' => $id ]; } } }
 		$terms = $db->get_results( 'SELECT DISTINCT tr.term_taxonomy_id,tt.term_id,tt.taxonomy FROM `' . $db->term_relationships . '` tr INNER JOIN `' . $db->term_taxonomy . '` tt ON tt.term_taxonomy_id=tr.term_taxonomy_id WHERE tr.object_id IN (' . implode( ',', $ids ) . ') ORDER BY tr.term_taxonomy_id ASC LIMIT 601', ARRAY_A ); if ( ! is_array( $terms ) || count( $terms ) > 600 || '' !== $db->last_error ) { self::fail(); } $taxonomy = []; foreach ( $terms as $term ) { $taxonomy[(int) $term['term_taxonomy_id']] = (int) $term['term_taxonomy_id']; if ( 'product_cat' === $term['taxonomy'] ) { $targets['category:' . $term['term_id']] = [ 'type' => 'category', 'id' => (int) $term['term_id'] ]; } }
 		foreach ( $facts['groups'] as $group ) { foreach ( $group['line_keys'] as $key ) { $member = [ 'line_key' => $key ]; foreach ( [ 'offer_id', 'service_id', 'choice', 'origin', 'supplier', 'profile', 'destination_zone_id', 'endpoint_digest' ] as $field ) { $member[$field] = $group[$field]; } $members[] = $member; } $offers[$group['offer_id']] = $group['offer_id']; foreach ( [ 'origin' => 'origins', 'supplier' => 'suppliers', 'profile' => 'profiles' ] as $field => $source ) { if ( 'known' === $group[$field]['state'] ) { $dimensions[$source][$group[$field]['id']] = $group[$field]['id']; } } $range = [ 'delivery_offer_id' => $group['offer_id'], 'destination_zone_id' => $group['destination_zone_id'], 'base_currency' => $facts['currency']['base'] ]; $ranges[LegacyQuoteSourcePlan::range_key( $range )] = $range; }
+		[ $offers, $dimensions ] = $this->discover_references( $db, array_values( $targets ), array_values( $scopes ), $offers, $dimensions );
 		$fences = [ [ 'source' => 'product', 'ids' => array_values( $ids ) ], [ 'source' => 'product_meta', 'ids' => array_values( $ids ) ], [ 'source' => 'term_relationships', 'ids' => array_values( $ids ) ], [ 'source' => 'options', 'names' => LegacyQuoteSourcePlan::OPTIONS ], [ 'source' => 'offers', 'ids' => array_values( $offers ) ], [ 'source' => 'legacy_rules', 'targets' => array_values( $targets ) ], [ 'source' => 'scopes', 'targets' => array_values( $scopes ) ], [ 'source' => 'scope_fields' ], [ 'source' => 'scope_collections' ], [ 'source' => 'zones' ], [ 'source' => 'zone_rules' ], [ 'source' => 'coverage_groups' ], [ 'source' => 'coverage_members' ], [ 'source' => 'coverage_postcodes' ] ]; if ( [] !== $taxonomy ) { $fences[] = [ 'source' => 'term_taxonomy', 'ids' => array_values( $taxonomy ) ]; } foreach ( $dimensions as $source => $values ) { if ( [] !== $values ) { $fences[] = [ 'source' => $source, 'ids' => array_values( $values ) ]; } } return LegacyQuoteSourcePlan::create( $owner, $context, $members, array_values( $ranges ), $fences );
+	}
+	/** Read-only bounded discovery; the later current capture verifies every reference again. */
+	private function discover_references( \wpdb $db, array $targets, array $scopes, array $offers, array $dimensions ): array {
+		$parts = []; foreach ( $targets as $target ) { $parts[] = $db->prepare( '(target_type=%s AND target_id=%d)', $target['type'], $target['id'] ); }
+		$count = 0; $bytes = 0; $rules = self::discovery_rows( $db, 'SELECT origin_id,supplier_id,logistics_profile_id,CASE WHEN OCTET_LENGTH(delivery_offer_ids)<=8192 THEN delivery_offer_ids ELSE NULL END AS delivery_offer_ids,CASE WHEN OCTET_LENGTH(delivery_offer_ids)>8192 THEN 1 ELSE 0 END AS source_oversized FROM `' . $db->prefix . 'delivery_engine_product_delivery_rules` WHERE (' . implode( ' OR ', $parts ) . ') ORDER BY id ASC LIMIT 1001', $count, $bytes );
+		$parts = []; foreach ( $scopes as $scope ) { $parts[] = $db->prepare( '(scope_type=%s AND scope_id=%d)', $scope['type'], $scope['id'] ); }
+		$scope_rows = self::discovery_rows( $db, 'SELECT id,0 AS source_oversized FROM `' . $db->prefix . 'delivery_engine_configuration_scopes` WHERE (' . implode( ' OR ', $parts ) . ') ORDER BY id ASC LIMIT 1001', $count, $bytes );
+		$ids = []; foreach ( $scope_rows as $row ) { $ids[] = QuoteStorageCodec::integer( $row['id'] ); } $fields = []; $collections = [];
+		if ( [] !== $ids ) {
+			$where = 'scope_row_id IN (' . implode( ',', $ids ) . ')';
+			$fields = self::discovery_rows( $db, 'SELECT field_key,mode,value_type,CASE WHEN OCTET_LENGTH(value_text)<=8192 THEN value_text ELSE NULL END AS value_text,CASE WHEN OCTET_LENGTH(value_text)>8192 THEN 1 ELSE 0 END AS source_oversized FROM `' . $db->prefix . 'delivery_engine_configuration_fields` WHERE ' . $where . ' ORDER BY id ASC LIMIT 1001', $count, $bytes );
+			$collections = self::discovery_rows( $db, 'SELECT field_key,mode,CASE WHEN OCTET_LENGTH(members_json)<=8192 THEN members_json ELSE NULL END AS members_json,CASE WHEN OCTET_LENGTH(members_json)>8192 THEN 1 ELSE 0 END AS source_oversized FROM `' . $db->prefix . 'delivery_engine_configuration_collections` WHERE ' . $where . ' ORDER BY id ASC LIMIT 1001', $count, $bytes );
+		}
+		return self::reference_sources( $rules, $fields, $collections, $offers, $dimensions );
+	}
+	private static function discovery_rows( \wpdb $db, string $sql, int &$count, int &$bytes ): array {
+		$rows = $db->get_results( $sql, ARRAY_A ); if ( ! is_array( $rows ) || ! array_is_list( $rows ) || count( $rows ) > 1000 || '' !== $db->last_error ) { self::fail(); }
+		foreach ( $rows as &$row ) { if ( ! is_array( $row ) || ! in_array( $row['source_oversized'] ?? null, [ 0, '0' ], true ) ) { self::fail(); } unset( $row['source_oversized'] ); ++$count; $bytes += strlen( QuoteJson::encode( $row ) ); if ( $count > LegacyQuoteSourceSnapshotReader::MAX_SOURCE_ROWS || $bytes > LegacyQuoteSourceSnapshotReader::MAX_CAPTURE_BYTES ) { self::fail(); } } unset( $row ); return $rows;
+	}
+	/** Selected and referenced identities are fenced; they never add price ranges. */
+	private static function reference_sources( array $rules, array $fields, array $collections, array $offers, array $dimensions ): array {
+		if ( count( $rules ) > 1000 || count( $fields ) > 1000 || count( $collections ) > 1000 ) { self::fail(); }
+		$decoder = new WpdbProductDeliveryRuleRepository(); $mapping = [ 'origin_id' => 'origins', 'supplier_id' => 'suppliers', 'logistics_profile_id' => 'profiles' ];
+		foreach ( $rules as $rule ) {
+			$raw = $rule['delivery_offer_ids'] ?? null; if ( null !== $raw && ( ! is_string( $raw ) || strlen( $raw ) > 8192 ) ) { self::fail(); }
+			foreach ( $decoder->decode_offer_ids( $raw ) as $id ) { $offers[$id] = $id; if ( count( $offers ) > 200 ) { self::fail(); } }
+			foreach ( $mapping as $field => $source ) { $raw = $rule[$field] ?? null; if ( null !== $raw ) { $id = QuoteStorageCodec::integer( $raw, 0 ); if ( $id > 0 ) { $dimensions[$source][$id] = $id; } } }
+		}
+		foreach ( $collections as $row ) { if ( 'delivery_offer_ids' !== ( $row['field_key'] ?? null ) ) { continue; } $raw = $row['members_json'] ?? null; if ( null !== $raw && ( ! is_string( $raw ) || strlen( $raw ) > 8192 ) ) { self::fail(); } $instruction = CollectionFieldInstruction::fromStorage( $row['field_key'], $row['mode'], $raw ); foreach ( $instruction->members as $id ) { $offers[$id] = $id; if ( count( $offers ) > 200 ) { self::fail(); } } }
+		foreach ( $fields as $row ) { $source = $mapping[$row['field_key'] ?? ''] ?? null; if ( null === $source ) { continue; } $instruction = ScalarFieldInstruction::fromStorage( $row['field_key'], $row['mode'], $row['value_text'], $row['value_type'] ); if ( null !== $instruction->value ) { $id = QuoteStorageCodec::integer( $instruction->value, 0 ); if ( $id > 0 ) { $dimensions[$source][$id] = $id; } } }
+		if ( count( $offers ) > 200 ) { self::fail(); } foreach ( $dimensions as $ids ) { if ( count( $ids ) > 600 ) { self::fail(); } } return [ $offers, $dimensions ];
 	}
 	private static function fail(): never { throw new \RuntimeException( 'Delivery quote source unavailable.' ); }
 }
