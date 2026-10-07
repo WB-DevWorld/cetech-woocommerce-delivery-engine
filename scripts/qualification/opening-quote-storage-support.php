@@ -138,17 +138,29 @@ final class CetechNativeQuoteStorageFixture {
 			$process = proc_open( [ PHP_BINARY, $script, $path ], [ 0 => [ 'pipe', 'r' ], 1 => [ 'pipe', 'w' ], 2 => [ 'pipe', 'w' ] ], $pipes );
 			if ( ! is_resource( $process ) ) { throw new RuntimeException( 'Native quote reader could not start.' ); }
 			fclose( $pipes[0] ); stream_set_blocking( $pipes[1], false ); stream_set_blocking( $pipes[2], false );
-			$output = ''; $errors = ''; $deadline = microtime( true ) + 10; $exit = -1; $status = [ 'running' => true ];
+			$output = ''; $errors = ''; $deadline = microtime( true ) + 10; $exit = -1; $status = [ 'running' => true ]; $transport_code = 'completed';
 			do {
 				$output .= stream_get_contents( $pipes[1] ); $errors .= stream_get_contents( $pipes[2] ); $status = proc_get_status( $process );
 				if ( ! $status['running'] ) { $exit = $status['exitcode']; break; }
-				if ( strlen( $output ) > 4096 || strlen( $errors ) > 16384 ) { break; }
+				if ( strlen( $output ) > 4096 || strlen( $errors ) > 16384 ) { $transport_code = 'output_limit'; break; }
 				usleep( 10000 );
 			} while ( microtime( true ) < $deadline );
-			if ( $status['running'] ) { proc_terminate( $process, 9 ); }
+			if ( $status['running'] ) { if ( 'completed' === $transport_code ) { $transport_code = 'timeout'; } proc_terminate( $process, 9 ); }
 			$output .= stream_get_contents( $pipes[1] ); fclose( $pipes[1] ); fclose( $pipes[2] ); $pipes = [];
-			$closed = proc_close( $process ); $process = null; $decoded = json_decode( $output, true );
-			return strlen( $output ) <= 4096 && strlen( $errors ) <= 16384 && 0 === ( $exit >= 0 ? $exit : $closed ) && is_array( $decoded ) ? $decoded : [ 'status' => 'FAIL' ];
+			$closed = proc_close( $process ); $process = null; $decoded = json_decode( $output, true ); $observed_exit = $exit >= 0 ? $exit : $closed;
+			if ( strlen( $output ) > 4096 || strlen( $errors ) > 16384 ) { $transport_code = 'output_limit'; }
+			elseif ( 'completed' === $transport_code && 0 !== $observed_exit ) { $transport_code = 'nonzero_exit'; }
+			elseif ( 'completed' === $transport_code && ! is_array( $decoded ) ) { $transport_code = 'invalid_json'; }
+			$transport = [ 'transport_code' => $transport_code, 'exit_code' => $observed_exit >= -1 && $observed_exit <= 255 ? $observed_exit : -1, 'signal' => is_int( $status['termsig'] ?? null ) && $status['termsig'] >= 0 && $status['termsig'] <= 64 ? $status['termsig'] : 0, 'stderr_present' => '' !== $errors ];
+			if ( 'completed' === $transport_code && is_array( $decoded ) ) { return $decoded + $transport; }
+			// Retain only finite child failure facts; no messages, paths, SQL or stderr.
+			$phases = [ 'configuration', 'wp_load', 'fixture_authority', 'installed_autoload', 'native_connection', 'readiness', 'read_owner', 'quote_read', 'immutable_comparison', 'read_release' ];
+			$classes = [ 'RuntimeException', 'Error', 'TypeError', 'JsonException', 'InvalidArgumentException', 'LogicException', 'OperationStorageException', 'other' ];
+			$safe = [ 'status' => 'FAIL', 'phase' => in_array( $decoded['phase'] ?? null, $phases, true ) ? $decoded['phase'] : 'unreported', 'error_class' => in_array( $decoded['error_class'] ?? null, $classes, true ) ? $decoded['error_class'] : 'unreported' ];
+			$safe['process_id'] = is_int( $decoded['process_id'] ?? null ) && $decoded['process_id'] > 0 ? $decoded['process_id'] : null;
+			foreach ( [ 'wp_load', 'default_object_cache', 'installed_candidate_autoload' ] as $key ) { $safe[$key] = is_bool( $decoded[$key] ?? null ) ? $decoded[$key] : null; }
+			foreach ( [ 'exact_row', 'immutable_header', 'immutable_body', 'schema9', 'rolled_back', 'retired' ] as $key ) { $safe[$key] = is_bool( $decoded['checks'][$key] ?? null ) ? $decoded['checks'][$key] : null; }
+			return $safe + $transport;
 		} finally {
 			foreach ( $pipes as $pipe ) { if ( is_resource( $pipe ) ) { fclose( $pipe ); } }
 			if ( is_resource( $process ) ) { proc_terminate( $process, 9 ); proc_close( $process ); }
