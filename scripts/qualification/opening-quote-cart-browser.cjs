@@ -28,10 +28,59 @@ function nativeRouteMatches(observedValue, nativeValue, expectedRoute = '/wc/sto
     const left = observed.searchParams.getAll('rest_route'); const right = native.searchParams.getAll('rest_route');
     if (left.length > 1 || right.length > 1) return false;
     const normalize = value => value.endsWith('/') ? value.slice(0, -1) : value;
-    if (!['/wc/store/v1/cart/extensions','/wc/store/v1/checkout'].includes(expectedRoute)) return false;
+    if (!['/wc/store/v1/cart/extensions','/wc/store/v1/checkout','/wc/store/v1/batch'].includes(expectedRoute)) return false;
     if (right.length === 1) return normalize(right[0]) === expectedRoute && left.length === 1 && observed.pathname === native.pathname && normalize(left[0]) === expectedRoute;
     return normalize(native.pathname).endsWith(expectedRoute) && left.length === 0 && normalize(observed.pathname) === normalize(native.pathname);
   } catch (_) { return false; }
+}
+function nativeBatchUrl(nativeValue) {
+  try {
+    const url=new URL(nativeValue,base); if (!own(url.href)) return null;
+    const routes=url.searchParams.getAll('rest_route'); if (routes.length > 1) return null;
+    if (routes.length === 1) { if (routes[0].replace(/\/$/,'') !== '/wc/store/v1/cart/extensions') return null; url.searchParams.set('rest_route','/wc/store/v1/batch'); }
+    else { if (!url.pathname.replace(/\/$/,'').endsWith('/wc/store/v1/cart/extensions')) return null; url.pathname=url.pathname.replace(/\/cart\/extensions\/?$/,'/batch'); }
+    return url.href;
+  } catch (_) { return null; }
+}
+function nativeBatchRequests(observedValue,nativeValue,postData) {
+  const batch=nativeBatchUrl(nativeValue); if (!batch || !nativeRouteMatches(observedValue,batch,'/wc/store/v1/batch') || typeof postData !== 'string' || Buffer.byteLength(postData) > 262144) return null;
+  try {
+    const payload=JSON.parse(postData); if (!exact(payload,['requests']) || !Array.isArray(payload.requests) || payload.requests.length < 1 || payload.requests.length > 25) return null;
+    for (const item of payload.requests) {
+      if (!item || typeof item !== 'object' || Array.isArray(item) || Object.keys(item).some(key => !['path','method','data','body','cache','headers'].includes(key)) || typeof item.path !== 'string' || !/^\/wc\/store\/v1\/[a-z0-9_-]+(?:\/[a-z0-9_-]+)*$/.test(item.path) || !['GET','POST','PUT','PATCH','DELETE','OPTIONS'].includes(item.method) || !item.body || typeof item.body !== 'object' || Array.isArray(item.body) || (Object.hasOwn(item,'cache') && item.cache !== 'no-store') || (Object.hasOwn(item,'data') && JSON.stringify(item.data) !== JSON.stringify(item.body)) || (Object.hasOwn(item,'headers') && (!exact(item.headers,['Nonce']) || typeof item.headers.Nonce !== 'string' || item.headers.Nonce.length > 256 || /[\u0000-\u001f\u007f]/.test(item.headers.Nonce)))) return null;
+    }
+    return payload.requests;
+  } catch (_) { return null; }
+}
+function nativeReviewBody(body,action) {
+  return ['refresh','confirm'].includes(action) && exact(body,['namespace','data']) && body.namespace === 'cetech-delivery-quote-review'
+    && exact(body.data,action === 'refresh' ? ['action','generation','review_token'] : ['action','generation']) && body.data.action === action
+    && Number.isSafeInteger(body.data.generation) && body.data.generation >= 0 && (action !== 'refresh' || (uuid(body.data.review_token) && body.data.review_token[14] === '4'));
+}
+function nativeReviewRequest(observedValue,nativeValue,postData,action) {
+  if (typeof postData !== 'string' || Buffer.byteLength(postData) > 262144) return null;
+  try {
+    if (nativeRouteMatches(observedValue,nativeValue)) return nativeReviewBody(JSON.parse(postData),action) ? {transport:'direct',index:0,count:1} : null;
+    const requests=nativeBatchRequests(observedValue,nativeValue,postData); if (!requests) return null;
+    const matches=[]; for (let i=0;i<requests.length;i++) { if (requests[i].path === '/wc/store/v1/cart/extensions' && requests[i].method === 'POST') { if (!nativeReviewBody(requests[i].body,action)) return null; matches.push(i); } }
+    return matches.length === 1 ? {transport:'batch',index:matches[0],count:requests.length} : null;
+  } catch (_) { return null; }
+}
+function nativeReviewResponse(selection,payload,httpStatus) {
+  if (!exact(selection,['transport','index','count']) || !['direct','batch'].includes(selection.transport) || !Number.isInteger(selection.index) || !Number.isInteger(selection.count) || selection.index < 0 || selection.index >= selection.count || selection.count > 25 || httpStatus !== (selection.transport === 'batch' ? 207 : 200)) return null;
+  let body=payload;
+  if (selection.transport === 'batch') {
+    if (!exact(payload,['responses']) || !Array.isArray(payload.responses) || payload.responses.length !== selection.count) return null;
+    for (const response of payload.responses) { if (!exact(response,['status','headers','body']) || !Number.isInteger(response.status) || response.status < 100 || response.status > 599 || !response.headers || typeof response.headers !== 'object' || (Array.isArray(response.headers) && response.headers.length !== 0)) return null; }
+    const response=payload.responses[selection.index]; if (response.status !== 200) return null; body=response.body;
+  } else if (selection.index !== 0 || selection.count !== 1) { return null; }
+  const facts=body && body.extensions && body.extensions['cetech-delivery-quote-review']; return safeFacts(facts) ? {status:200,facts} : null;
+}
+function nativeCheckoutPosts(observedValue,method,postData,nativeExtensions,nativeCheckout) {
+  if (method !== 'POST') return 0;
+  if (nativeRouteMatches(observedValue,nativeCheckout,'/wc/store/v1/checkout')) return 1;
+  const batch=nativeBatchUrl(nativeExtensions); if (!batch || !nativeRouteMatches(observedValue,batch,'/wc/store/v1/batch')) return 0;
+  const requests=nativeBatchRequests(observedValue,nativeExtensions,postData); return requests ? requests.filter(item => item.method === 'POST' && item.path === '/wc/store/v1/checkout').length : null;
 }
 function noPlacement(before, after) { return before.history_counts.bindings === after.history_counts.bindings && before.orders_count === after.orders_count && before.gateway_count === after.gateway_count; }
 function sameHistory(before, after) { return ['records','events','quotes','accepted','bindings','budget'].every(key => before.history_counts[key] === after.history_counts[key]) && noPlacement(before, after); }
@@ -83,17 +132,16 @@ write();
     if (response.status() !== 200 || value.success !== true || !finiteCounts(value.data.history_counts) || !Number.isSafeInteger(value.data.orders_count) || !Number.isSafeInteger(value.data.gateway_count) || ['source_head','candidate_head','source_tree','installed_php_sources_hash'].some(key => value.data.source_identity[key] !== state.identity[key])) throw new Error('Native quote fixture/source authorization refused');
     return value.data;
   }
-  async function responseFacts(response) { const value=await response.json(); return value.extensions && value.extensions['cetech-delivery-quote-review']; }
   async function clickReview(action) {
-    const observed=page.waitForResponse(response => response.request().method() === 'POST' && nativeRouteMatches(response.url(),state.store_extensions_url),{timeout:20000});
+    const observed=page.waitForResponse(response => response.request().method() === 'POST' && nativeReviewRequest(response.url(),state.store_extensions_url,response.request().postData(),action) !== null,{timeout:20000});
     await page.locator('#cetech-de-quote-review-blocks [data-quote-review-action="'+action+'"]').click();
-    const response=await observed; const sent=JSON.parse(response.request().postData() || 'null');
-    if (!exact(sent,['namespace','data']) || sent.namespace !== 'cetech-delivery-quote-review' || !sent.data || sent.data.action !== action) throw new Error('Actual quote button dispatched another native command');
-    return [response,await responseFacts(response)];
+    const response=await observed; const selection=nativeReviewRequest(response.url(),state.store_extensions_url,response.request().postData(),action);
+    const returned=nativeReviewResponse(selection,await response.json(),response.status()); if (!returned) throw new Error('Actual quote response did not match its native command');
+    return [{status:()=>returned.status,wireStatus:()=>response.status()},returned.facts];
   }
   try {
     await page.route('**/*',route => own(route.request().url()) ? route.continue() : route.abort());
-    page.on('request',request => { if (request.method() === 'POST' && nativeRouteMatches(request.url(),state.checkout_url,'/wc/store/v1/checkout')) ++checkoutPosts; });
+    page.on('request',request => { const count=nativeCheckoutPosts(request.url(),request.method(),request.postData(),state.store_extensions_url,state.checkout_url); checkoutPosts += count === null ? 1 : count; });
     const probe=await context.request.get('/?cetech_opening_http_probe=1',{headers:{'X-CETECH-Opening-Probe':state.probe_token},timeout:20000}); const identity=await probe.json();
     if (probe.status() !== 200 || ['source_head','candidate_head','source_tree'].some(key => identity[key] !== state.identity[key]) || identity.probe_sha256 !== crypto.createHash('sha256').update(state.probe_token).digest('hex') || identity.site_path_sha256 !== crypto.createHash('sha256').update(state.site_path).digest('hex') || identity.database_name_sha256 !== crypto.createHash('sha256').update(state.database_name).digest('hex')) throw new Error('Owned quote listener not confirmed');
     stage='login';
@@ -113,7 +161,7 @@ write();
     check(ids[0], await blocks.isVisible() && await mount.isVisible() && await mount.locator('[data-quote-review-action="refresh"]').isVisible() && afterRender.facts.status === 'no_quote' && sameHistory(before,afterRender) && checkoutPosts === 0,
       {real_chromium:true,actual_native_blocks_ui:true,visible_review_controls:true,native_seed_is_setup_only:true,read_render_no_quote_acceptance:sameHistory(before,afterRender),no_checkout_post:checkoutPosts === 0,no_placement_or_payment:noPlacement(before,afterRender),runtime:{playwright:report.runtime.playwright,chromium:report.runtime.chromium},history_before:before.history_counts,history_after:afterRender.history_counts});
     stage='refresh'; const refreshBefore=await inspect(); const [refreshResponse,review]=await clickReview('refresh');
-    refreshObservation=refreshObservationFor(refreshResponse.status(),review);
+    refreshObservation=refreshObservationFor(refreshResponse.wireStatus(),review);
     await mount.locator('[data-quote-review-action="confirm"]').waitFor({state:'visible'}); await mount.locator('.cetech-de-quote-review-money').getByText('GHS 7.70',{exact:false}).waitFor({state:'visible'});
     dom.confirm_visible=true; dom.price_visible=true;
     const afterRefresh=await inspect();

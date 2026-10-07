@@ -76,6 +76,79 @@ class QuoteCartProtocol(unittest.TestCase):
         self.assertEqual(1, len(checks)); self.assertTrue(checks[0][0]); self.assertTrue(checks[0][1]["choices_destination_retained"])
         self.assertEqual("original-full-choice", current["choice_digest"])
 
+    def test_native_batch_correlates_one_owned_command_to_its_same_index_response(self):
+        body = {"namespace": "cetech-delivery-quote-review", "data": {"action": "refresh", "generation": 1, "review_token": "a49d6a70-4dad-4a89-94a7-0bde7d1e9d23"}}
+        entry = {"path": "/wc/store/v1/cart/extensions", "method": "POST", "data": body, "cache": "no-store", "body": body, "headers": {"Nonce": "CONTROLLED-NATIVE-NONCE"}}
+        sibling = {"path": "/wc/store/v1/cart/update-customer", "method": "POST", "body": {}}
+        payload = {"requests": [sibling, entry]}
+        expression = "nativeReviewRequest('/?rest_route=/wc/store/v1/batch','/?rest_route=/wc/store/v1/cart/extensions'," + json.dumps(json.dumps(payload)) + ",'refresh')"
+        selection = child_helpers(expression)
+        self.assertEqual({"transport": "batch", "index": 1, "count": 2}, selection)
+        returned = {"responses": [{"status": 200, "headers": [], "body": {}}, {"status": 200, "headers": {}, "body": {"extensions": {"cetech-delivery-quote-review": public_facts()}}}]}
+        selected = child_helpers("nativeReviewResponse(" + json.dumps(selection) + "," + json.dumps(returned) + ",207)")
+        self.assertEqual(200, selected["status"]); self.assertEqual(public_facts(), selected["facts"])
+        self.assertFalse(child_helpers("nativeRouteMatches('/?rest_route=/wc/store/v1/batch','/?rest_route=/wc/store/v1/cart/extensions')"))
+        direct = child_helpers("nativeReviewRequest('/?rest_route=/wc/store/v1/cart/extensions','/?rest_route=/wc/store/v1/cart/extensions'," + json.dumps(json.dumps(body)) + ",'refresh')")
+        self.assertEqual({"transport": "direct", "index": 0, "count": 1}, direct)
+        self.assertEqual(selected, child_helpers("nativeReviewResponse(" + json.dumps(direct) + "," + json.dumps(returned["responses"][1]["body"]) + ",200)"))
+        maximum = {"requests": [sibling] * 24 + [entry]}
+        self.assertEqual({"transport": "batch", "index": 24, "count": 25}, child_helpers("nativeReviewRequest('/wp-json/wc/store/v1/batch','/wp-json/wc/store/v1/cart/extensions'," + json.dumps(json.dumps(maximum)) + ",'refresh')"))
+
+    def test_native_batch_refuses_ambiguous_foreign_wrong_or_unbounded_commands(self):
+        body = {"namespace": "cetech-delivery-quote-review", "data": {"action": "refresh", "generation": 1, "review_token": "a49d6a70-4dad-4a89-94a7-0bde7d1e9d23"}}
+        entry = {"path": "/wc/store/v1/cart/extensions", "method": "POST", "body": body}
+        payloads = []
+        for change in ("namespace", "action", "duplicate", "index_path", "foreign_path", "method", "extra_field", "data_mismatch", "malformed", "over_count", "invalid_token", "foreign_header", "long_header", "invalid_header"):
+            value = {"requests": [copy.deepcopy(entry)]}
+            candidate = value["requests"][0]
+            if change == "namespace": candidate["body"]["namespace"] = "PRIVATE-FOREIGN"
+            elif change == "action": candidate["body"]["data"]["action"] = "confirm"
+            elif change == "duplicate": value["requests"].append(copy.deepcopy(entry))
+            elif change == "index_path": candidate["path"] = "/wc/store/v1/cart/extensions?ambiguous=1"
+            elif change == "foreign_path": candidate["path"] = "https://example.invalid/wc/store/v1/cart/extensions"
+            elif change == "method": candidate["method"] = "GET"
+            elif change == "extra_field": candidate["private_payload"] = "PRIVATE"
+            elif change == "data_mismatch": candidate["data"] = {"namespace": "PRIVATE"}
+            elif change == "malformed": value["requests"] = [None]
+            elif change == "over_count": value["requests"] = [{"path": "/wc/store/v1/cart/update-customer", "method": "POST", "body": {}}] * 25 + [entry]
+            elif change == "invalid_token": candidate["body"]["data"]["review_token"] = "PRIVATE-TOKEN"
+            elif change == "foreign_header": candidate["headers"] = {"Authorization": "PRIVATE-CREDENTIAL"}
+            elif change == "long_header": candidate["headers"] = {"Nonce": "x" * 257}
+            elif change == "invalid_header": candidate["headers"] = {"Nonce": "PRIVATE\nHEADER"}
+            payloads.append(json.dumps(value))
+        expression = json.dumps(payloads) + ".map(payload=>nativeReviewRequest('/?rest_route=/wc/store/v1/batch','/?rest_route=/wc/store/v1/cart/extensions',payload,'refresh')===null)"
+        self.assertEqual([True] * len(payloads), child_helpers(expression))
+        oversized = "JSON.stringify({requests:[{path:'/wc/store/v1/cart/extensions',method:'POST',body:{padding:'x'.repeat(262145)}}]})"
+        self.assertIsNone(child_helpers("nativeReviewRequest('/?rest_route=/wc/store/v1/batch','/?rest_route=/wc/store/v1/cart/extensions'," + oversized + ",'refresh')"))
+        raw = json.dumps(json.dumps({"requests": [entry]}))
+        for url in ("http://127.0.0.1:8086/?rest_route=/wc/store/v1/batch", "/?rest_route=/wc/store/v1/batch&rest_route=/other", "http://user@127.0.0.1:8085/?rest_route=/wc/store/v1/batch", "/?rest_route=/wc/store/v1/batch#private"):
+            self.assertIsNone(child_helpers("nativeReviewRequest(" + json.dumps(url) + ",'/?rest_route=/wc/store/v1/cart/extensions'," + raw + ",'refresh')"))
+
+    def test_native_batch_response_status_index_and_safe_body_cannot_be_substituted(self):
+        selection = {"transport": "batch", "index": 0, "count": 1}
+        payload = {"responses": [{"status": 200, "headers": {}, "body": {"extensions": {"cetech-delivery-quote-review": public_facts()}}}]}
+        cases = []
+        for change in ("outer_status", "inner_status", "error", "wrong_index", "missing_index", "extra_envelope", "invalid_headers", "private_dto"):
+            wanted = copy.deepcopy(selection); returned = copy.deepcopy(payload); outer = 207
+            if change == "outer_status": outer = 200
+            elif change == "inner_status": returned["responses"][0]["status"] = 500
+            elif change == "error": returned["responses"][0]["body"] = {"code": "PRIVATE-ERROR"}
+            elif change == "wrong_index": wanted["index"] = 1
+            elif change == "missing_index": wanted["count"] = 2
+            elif change == "extra_envelope": returned["responses"][0]["private_payload"] = "PRIVATE"
+            elif change == "invalid_headers": returned["responses"][0]["headers"] = ["PRIVATE"]
+            elif change == "private_dto": returned["responses"][0]["body"]["extensions"]["cetech-delivery-quote-review"]["private_address"] = "PRIVATE"
+            cases.append([wanted, returned, outer])
+        self.assertEqual([True] * len(cases), child_helpers(json.dumps(cases) + ".map(([selection,payload,status])=>nativeReviewResponse(selection,payload,status)===null)"))
+
+    def test_native_checkout_post_counter_observes_nested_batches_and_refuses_unknown_wrappers(self):
+        payload = {"requests": [{"path": "/wc/store/v1/checkout", "method": "POST", "body": {}}]}
+        tail = ",'/?rest_route=/wc/store/v1/cart/extensions','/?rest_route=/wc/store/v1/checkout')"
+        self.assertEqual(1, child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','POST'," + json.dumps(json.dumps(payload)) + tail))
+        self.assertEqual(1, child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/checkout','POST','{}'" + tail))
+        self.assertIsNone(child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','POST','{}'" + tail))
+        self.assertEqual(0, child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','GET','{}'" + tail))
+
     def test_returned_refresh_projection_retains_only_safe_money_before_price_wait(self):
         facts = public_facts(); facts["quote"]["money"][0]["display_total"]["amount"] = "7.00"
         projected = child_helpers("refreshObservationFor(200," + json.dumps(facts) + ")")
