@@ -382,8 +382,8 @@ def browser_refresh_observation(value):
 
 
 def browser_checkout_observation(value):
-    keys = ("direct_checkout_posts", "nested_checkout_posts", "unclassified_batches", "observed_batches")
-    return exact(value, keys) and all(integer(value[key], 0, 1000000) for key in keys) and value["unclassified_batches"] <= value["observed_batches"] and value["nested_checkout_posts"] <= value["observed_batches"] * 25
+    keys = ("direct_checkout_posts", "direct_placement_posts", "native_update_requests", "unclassified_checkout_requests", "nested_checkout_posts", "unclassified_batches", "observed_batches")
+    return exact(value, keys) and all(integer(value[key], 0, 1000000) for key in keys) and value["direct_checkout_posts"] == value["direct_placement_posts"] + value["native_update_requests"] + value["unclassified_checkout_requests"] and value["unclassified_batches"] <= value["observed_batches"] and value["nested_checkout_posts"] <= value["observed_batches"] * 25
 
 
 def browser_evidence(case):

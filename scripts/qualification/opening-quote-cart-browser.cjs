@@ -16,7 +16,7 @@ const report = {format:'cetech-w2q05-cart-browser-v1', source_head:state.identit
   installed_php_sources_hash:state.identity.installed_php_sources_hash, runtime:{playwright:'1.58.2'}, status:'RUNNING', cases:[]};
 let stage = 'ownership';
 const dom = {blocks_visible:false,review_visible:false,refresh_visible:false,confirm_visible:false,price_visible:false,confirmed_visible:false};
-const checkoutRequests = {direct_checkout_posts:0,nested_checkout_posts:0,unclassified_batches:0,observed_batches:0};
+const checkoutRequests = {direct_checkout_posts:0,direct_placement_posts:0,native_update_requests:0,unclassified_checkout_requests:0,nested_checkout_posts:0,unclassified_batches:0,observed_batches:0};
 let refreshObservation = null;
 function write() { const tmp = receiptPath + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(report, null, 2) + '\n', {mode:0o600}); fs.renameSync(tmp, receiptPath); }
 function check(id, condition, evidence) { if (report.cases.some(item => item.id === id)) throw new Error('Duplicate quote browser case'); report.cases.push({id,status:condition ? 'PASS' : 'FAIL',evidence}); write(); if (!condition) throw new Error('Quote browser qualification diverged'); }
@@ -76,9 +76,22 @@ function nativeReviewResponse(selection,payload,httpStatus) {
   } else if (selection.index !== 0 || selection.count !== 1) { return null; }
   const facts=body && body.extensions && body.extensions['cetech-delivery-quote-review']; return safeFacts(facts) ? {status:200,facts} : null;
 }
-function nativeCheckoutPosts(observedValue,method,postData,nativeExtensions,nativeCheckout) {
+function nativeCheckoutMethod(observedValue,method,headers={}) {
+  try {
+    const url=new URL(observedValue,base); if (!own(url.href) || !['GET','HEAD','POST','PUT','PATCH','DELETE','OPTIONS'].includes(method) || !headers || typeof headers !== 'object' || Array.isArray(headers)) return null;
+    const query=url.searchParams.getAll('_method'); if (query.length > 1 || [...url.searchParams.keys()].some(key => /[.\u0000-\u0020\u007f]/.test(key) || key.startsWith('_method['))) return null;
+    const keys=Object.keys(headers).filter(key => key.toLowerCase() === 'x-http-method-override'); if (keys.length > 1) return null;
+    const override=keys.length ? headers[keys[0]] : null; if (override !== null && !['PUT','PATCH','DELETE'].includes(override)) return null;
+    if (query.length) return ['GET','HEAD','POST','PUT','PATCH','DELETE','OPTIONS'].includes(query[0]) ? query[0] : null;
+    return override || method;
+  } catch (_) { return null; }
+}
+function nativeCheckoutPosts(observedValue,method,postData,nativeExtensions,nativeCheckout,headers={}) {
+  if (nativeRouteMatches(observedValue,nativeCheckout,'/wc/store/v1/checkout')) {
+    const effective=nativeCheckoutMethod(observedValue,method,headers);
+    return effective === 'POST' ? 1 : ['PUT','PATCH'].includes(effective) || (method === 'GET' && effective === 'GET') ? 0 : null;
+  }
   if (method !== 'POST') return 0;
-  if (nativeRouteMatches(observedValue,nativeCheckout,'/wc/store/v1/checkout')) return 1;
   const batch=nativeBatchUrl(nativeExtensions); if (!batch || !nativeRouteMatches(observedValue,batch,'/wc/store/v1/batch')) return 0;
   if (typeof postData !== 'string' || Buffer.byteLength(postData) > 262144) return null;
   try {
@@ -92,7 +105,7 @@ function nativeCheckoutPosts(observedValue,method,postData,nativeExtensions,nati
     return count;
   } catch (_) { return null; }
 }
-function noCheckoutRequests(value=checkoutRequests) { return value.direct_checkout_posts === 0 && value.nested_checkout_posts === 0 && value.unclassified_batches === 0; }
+function noCheckoutRequests(value=checkoutRequests) { return value.direct_placement_posts === 0 && value.nested_checkout_posts === 0 && value.unclassified_checkout_requests === 0 && value.unclassified_batches === 0; }
 function noPlacement(before, after) { return before.history_counts.bindings === after.history_counts.bindings && before.orders_count === after.orders_count && before.gateway_count === after.gateway_count; }
 function sameHistory(before, after) { return ['records','events','quotes','accepted','bindings','budget'].every(key => before.history_counts[key] === after.history_counts[key]) && noPlacement(before, after); }
 function finiteCounts(value) { const keys=['records','events','quotes','accepted','bindings','budget']; return value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every(key => Number.isSafeInteger(value[key]) && value[key] >= 0); }
@@ -153,8 +166,16 @@ write();
   try {
     await page.route('**/*',route => own(route.request().url()) ? route.continue() : route.abort());
     page.on('request',request => {
+      if (nativeRouteMatches(request.url(),state.checkout_url,'/wc/store/v1/checkout')) {
+        if (request.method() !== 'POST') return;
+        checkoutRequests.direct_checkout_posts=Math.min(1000000,checkoutRequests.direct_checkout_posts+1);
+        const method=nativeCheckoutMethod(request.url(),request.method(),request.headers());
+        if (method === 'POST') checkoutRequests.direct_placement_posts=Math.min(1000000,checkoutRequests.direct_placement_posts+1);
+        else if (['PUT','PATCH'].includes(method)) checkoutRequests.native_update_requests=Math.min(1000000,checkoutRequests.native_update_requests+1);
+        else checkoutRequests.unclassified_checkout_requests=Math.min(1000000,checkoutRequests.unclassified_checkout_requests+1);
+        return;
+      }
       if (request.method() !== 'POST') return;
-      if (nativeRouteMatches(request.url(),state.checkout_url,'/wc/store/v1/checkout')) { checkoutRequests.direct_checkout_posts=Math.min(1000000,checkoutRequests.direct_checkout_posts+1); return; }
       const batch=nativeBatchUrl(state.store_extensions_url); if (!batch || !nativeRouteMatches(request.url(),batch,'/wc/store/v1/batch')) return;
       checkoutRequests.observed_batches=Math.min(1000000,checkoutRequests.observed_batches+1);
       const count=nativeCheckoutPosts(request.url(),request.method(),request.postData(),state.store_extensions_url,state.checkout_url);

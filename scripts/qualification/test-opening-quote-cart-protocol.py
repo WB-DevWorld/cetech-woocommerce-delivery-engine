@@ -163,16 +163,18 @@ class QuoteCartProtocol(unittest.TestCase):
         self.assertIsNone(child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','POST'," + oversized + tail))
 
     def test_original_checkout_counters_are_closed_and_failure_only(self):
-        counts = {"direct_checkout_posts": 0, "nested_checkout_posts": 0, "unclassified_batches": 1, "observed_batches": 2}
+        counts = {"direct_checkout_posts": 0, "direct_placement_posts": 0, "native_update_requests": 0, "unclassified_checkout_requests": 0, "nested_checkout_posts": 0, "unclassified_batches": 1, "observed_batches": 2}
         self.assertTrue(DRIVER.browser_checkout_observation(counts))
         self.assertFalse(child_helpers("noCheckoutRequests(" + json.dumps(counts) + ")"))
         known = dict(counts, unclassified_batches=0)
         self.assertTrue(child_helpers("noCheckoutRequests(" + json.dumps(known) + ")"))
-        for key in ("direct_checkout_posts", "nested_checkout_posts"):
+        for key in ("direct_placement_posts", "nested_checkout_posts", "unclassified_checkout_requests"):
             self.assertFalse(child_helpers("noCheckoutRequests(" + json.dumps(dict(known, **{key: 1})) + ")"))
+        self.assertTrue(child_helpers("noCheckoutRequests(" + json.dumps(dict(known, direct_checkout_posts=1, native_update_requests=1)) + ")"))
+        self.assertTrue(DRIVER.browser_checkout_observation(dict(known, direct_checkout_posts=1, native_update_requests=1)))
         case = {"id": DRIVER.BROWSER_IDS[1], "status": "FAIL", "evidence": {"stage": "refresh", "error_class": "Error", "dom": dict.fromkeys(("blocks_visible", "review_visible", "refresh_visible", "confirm_visible", "price_visible", "confirmed_visible"), False), "required_case_incomplete": True, "checkout_request_observation": counts}}
         self.assertTrue(DRIVER.browser_evidence(case))
-        for key, value in (("direct_checkout_posts", True), ("nested_checkout_posts", 51), ("unclassified_batches", 3), ("observed_batches", -1), ("observed_batches", 1000001), ("observed_batches", "PRIVATE-URL"), ("private_body", "PRIVATE-CREDENTIAL")):
+        for key, value in (("direct_checkout_posts", True), ("direct_checkout_posts", 1), ("nested_checkout_posts", 51), ("unclassified_batches", 3), ("observed_batches", -1), ("observed_batches", 1000001), ("observed_batches", "PRIVATE-URL"), ("private_body", "PRIVATE-CREDENTIAL")):
             bad = copy.deepcopy(case); bad["evidence"]["checkout_request_observation"][key] = value
             self.assertFalse(DRIVER.browser_evidence(bad))
         history = dict.fromkeys(DRIVER.HISTORY, 0)
@@ -180,6 +182,25 @@ class QuoteCartProtocol(unittest.TestCase):
         self.assertTrue(DRIVER.browser_evidence(passed))
         passed["evidence"]["checkout_request_observation"] = counts
         self.assertFalse(DRIVER.browser_evidence(passed))
+
+    def test_native_checkout_semantic_method_preserves_post_and_query_precedence(self):
+        url = "/?rest_route=/wc/store/v1/checkout&__experimental_calc_totals=true"
+        headers = {"x-http-method-override": "PUT"}
+        for alias in ("%20_method", ".method", "_method%00ignored"):
+            self.assertIsNone(child_helpers("nativeCheckoutMethod(" + json.dumps(url + "&" + alias + "=POST") + ",'POST'," + json.dumps(headers) + ")"))
+        self.assertEqual("PUT", child_helpers("nativeCheckoutMethod(" + json.dumps(url) + ",'POST'," + json.dumps(headers) + ")"))
+        tail = ",'POST','{}','/?rest_route=/wc/store/v1/cart/extensions','/?rest_route=/wc/store/v1/checkout',"
+        self.assertEqual(0, child_helpers("nativeCheckoutPosts(" + json.dumps(url) + tail + json.dumps(headers) + ")"))
+        self.assertEqual(1, child_helpers("nativeCheckoutPosts(" + json.dumps(url) + tail + "{})"))
+        self.assertEqual(1, child_helpers("nativeCheckoutPosts(" + json.dumps(url + "&_method=POST") + tail + json.dumps(headers) + ")"))
+        self.assertIsNone(child_helpers("nativeCheckoutPosts(" + json.dumps(url + "&_method=GET") + tail + json.dumps(headers) + ")"))
+        self.assertIsNone(child_helpers("nativeCheckoutPosts(" + json.dumps(url) + tail + "{'x-http-method-override':'DELETE'})"))
+        self.assertEqual(1, child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/checkout&_method=POST','GET','{}','/?rest_route=/wc/store/v1/cart/extensions','/?rest_route=/wc/store/v1/checkout')"))
+        for observed, method, override in ((url + "&_method=PUT&_method=POST", "POST", headers), (url + "&_method[]=PUT", "POST", headers), (url + "&_method=PRIVATE", "POST", headers), (url, "POST", {"x-http-method-override": "PRIVATE"}), (url + "&_method=POST", "POST", {"x-http-method-override": "PRIVATE"}), (url, "POST", {"x-http-method-override": "PUT,POST"}), (url, "POST", {"x-http-method-override": "PUT\n"}), (url, "POST", {"x-http-method-override": "PUT", "X-HTTP-Method-Override": "PATCH"}), (url, "POST", {"x-http-method-override": ["PUT"]}), (url, "PRIVATE", {})):
+            self.assertIsNone(child_helpers("nativeCheckoutMethod(" + json.dumps(observed) + "," + json.dumps(method) + "," + json.dumps(override) + ")"))
+        # Subrequests are dispatched directly and do not use outer HTTP overrides.
+        batch = {"requests": [{"path": "/wc/store/v1/checkout", "method": "POST", "headers": {"X-HTTP-Method-Override": "PUT"}}]}
+        self.assertEqual(1, child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','POST'," + json.dumps(json.dumps(batch)) + ",'/?rest_route=/wc/store/v1/cart/extensions','/?rest_route=/wc/store/v1/checkout')"))
 
     def test_returned_refresh_projection_retains_only_safe_money_before_price_wait(self):
         facts = public_facts(); facts["quote"]["money"][0]["display_total"]["amount"] = "7.00"
