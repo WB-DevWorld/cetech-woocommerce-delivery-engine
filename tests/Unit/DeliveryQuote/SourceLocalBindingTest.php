@@ -16,6 +16,7 @@ final class SourceLocalBindingTest extends TestCase {
 		if ( ! class_exists( '\WP_Hook', false ) ) { eval( 'class WP_Hook { public array $callbacks = []; }' ); }
 		if ( ! class_exists( '\wpdb', false ) ) { eval( 'class wpdb { public int $calls = 0; public function remove_placeholder_escape() { ++$this->calls; throw new LogicException("Callback must not execute."); } }' ); }
 		if ( ! class_exists( '\WC_Deprecated_Filter_Hooks', false ) ) { eval( 'class WC_Deprecated_Filter_Hooks { protected array $deprecated_hooks = ["woocommerce_product_get_price" => "woocommerce_get_price", "woocommerce_product_get_stock_quantity" => "woocommerce_get_stock_quantity"]; public int $calls = 0; public function maybe_handle_deprecated_hook() { ++$this->calls; throw new LogicException("Callback must not execute."); } public function replace_mapping(string $hook,string $target): void { $this->deprecated_hooks[$hook] = $target; } }' ); }
+		if ( ! class_exists( '\Automattic\WooCommerce\Internal\ScheduledSalePriceReconciler', false ) ) { eval( 'namespace Automattic\WooCommerce\Internal; class ScheduledSalePriceReconciler { public int $calls = 0; public function reconcile_price() { ++$this->calls; throw new \LogicException("Callback must not execute."); } }' ); }
 		$GLOBALS['wpdb'] = new \wpdb(); $GLOBALS['wp_filter'] = [];
 	}
 	public function test_exact_native_default_bundle_is_accepted_without_invoking_callbacks(): void {
@@ -24,6 +25,20 @@ final class SourceLocalBindingTest extends TestCase {
 	}
 	public function test_replacing_global_database_invalidates_the_original_query_binding(): void {
 		$this->native_defaults(); $binding = LegacyQuoteSourceLocalBinding::capture(); $GLOBALS['wpdb'] = new \wpdb(); self::assertFalse( $binding->unchanged() );
+	}
+	public function test_native_term_count_and_scheduled_price_helpers_are_exactly_fenced(): void {
+		$this->native_defaults(); $sale = new \Automattic\WooCommerce\Internal\ScheduledSalePriceReconciler();
+		$GLOBALS['wp_filter']['get_terms']->callbacks[10][] = [ 'function' => 'wc_change_term_counts', 'accepted_args' => 2 ];
+		$GLOBALS['wp_filter']['woocommerce_product_get_price']->callbacks[99] = [ [ 'function' => [ $sale, 'reconcile_price' ], 'accepted_args' => 2 ] ];
+		$binding = LegacyQuoteSourceLocalBinding::capture(); self::assertTrue( $binding->unchanged() ); self::assertSame( 0, $sale->calls );
+		$GLOBALS['wp_filter']['woocommerce_product_get_price']->callbacks[99][0]['accepted_args'] = 3; self::assertFalse( $binding->unchanged() );
+	}
+	public function test_nested_term_count_callback_cannot_enter_through_the_native_helper(): void {
+		$this->hook( 'get_terms', 10, 'wc_change_term_counts', 2 ); $binding = LegacyQuoteSourceLocalBinding::capture();
+		$this->hook( 'woocommerce_change_term_counts', 10, static fn( mixed $value ): mixed => $value, 1 ); self::assertFalse( $binding->unchanged() ); $this->expectException( \RuntimeException::class ); LegacyQuoteSourceLocalBinding::capture();
+	}
+	public function test_scheduled_price_subclass_does_not_receive_the_native_allowance(): void {
+		$sale = new class() extends \Automattic\WooCommerce\Internal\ScheduledSalePriceReconciler {}; $this->hook( 'woocommerce_product_get_price', 99, [ $sale, 'reconcile_price' ], 2 ); $this->expectException( \RuntimeException::class ); LegacyQuoteSourceLocalBinding::capture();
 	}
 	public function test_database_identity_cannot_be_reused_after_original_references_are_removed(): void {
 		$this->hook( 'query', 0, [ $GLOBALS['wpdb'], 'remove_placeholder_escape' ], 1 ); $binding = LegacyQuoteSourceLocalBinding::capture();

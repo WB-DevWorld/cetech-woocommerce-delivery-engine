@@ -109,6 +109,12 @@ final class SourceSnapshotTest extends TestCase {
 		$source = LegacyQuoteNativeSourcePreparer::source_facts( $runtime, $rule ); $inventory = LegacyQuoteNativeSourcePreparer::inventory_facts( new SourceSnapshotStockProduct( 10, 10 ), 2 ); $facts = F::context()->private_facts(); $facts['lines'][0]['source'] = $source; $facts['lines'][0]['inventory'] = $inventory; $roundtrip = QuoteContext::from_array( $facts )->private_facts();
 		self::assertSame( $source, $roundtrip['lines'][0]['source'] ); self::assertSame( $inventory, $roundtrip['lines'][0]['inventory'] );
 	}
+	public function test_inventory_receipt_uses_native_price_presence_without_adopting_merchandise_amount(): void {
+		$regular = LegacyQuoteNativeSourcePreparer::inventory_facts( new SourceSnapshotPricedProduct( '20.00' ), 2 );
+		self::assertSame( $regular, LegacyQuoteNativeSourcePreparer::inventory_facts( new SourceSnapshotPricedProduct( '9.00' ), 2 ) );
+		self::assertSame( $regular, LegacyQuoteNativeSourcePreparer::inventory_facts( new SourceSnapshotPricedProduct( '0.00' ), 2 ) );
+		$empty = LegacyQuoteNativeSourcePreparer::inventory_facts( new SourceSnapshotPricedProduct( '' ), 2 ); self::assertSame( 'ineligible', $empty['status'] ); self::assertNotSame( $regular, $empty );
+	}
 	public function test_unfenced_offer_reference_refuses_before_any_live_offer_lookup(): void {
 		$view = new LegacyQuoteCapturedSourceView( $this->snapshot( [], [ 'offers' => [ [ 'id' => '20' ] ], 'legacy_rules' => [ [ 'delivery_offer_ids' => '[20,21]' ] ] ] ) ); $this->expectException( \RuntimeException::class ); $view->offers();
 	}
@@ -120,8 +126,14 @@ final class SourceSnapshotTest extends TestCase {
 }
 
 /** Narrow native-stock algorithm fixture; this is not real WooCommerce qualification. */
-final class SourceSnapshotStockProduct extends \WC_Product {
+class SourceSnapshotStockProduct extends \WC_Product {
 	public function __construct( private int $owner_id, private int $stock ) { parent::__construct(); }
 	public function get_stock_managed_by_id(): int { return $this->owner_id; } public function managing_stock(): bool { return true; } public function backorders_allowed(): bool { return false; } public function has_enough_stock( int $quantity ): bool { return $quantity <= $this->stock; }
 	public function get_id(): int { return $this->owner_id; } public function get_stock_quantity(): int { return $this->stock; } public function get_status(): string { return 'publish'; } public function is_purchasable(): bool { return true; } public function get_stock_status(): string { return $this->stock > 0 ? 'instock' : 'outofstock'; } public function get_backorders(): string { return 'no'; } public function is_in_stock(): bool { return $this->stock > 0; }
+}
+
+/** Models only Woo's retained empty/nonempty purchasability predicate, not sale computation. */
+final class SourceSnapshotPricedProduct extends SourceSnapshotStockProduct {
+	public function __construct( private string $price ) { parent::__construct( 10, 10 ); }
+	public function is_purchasable(): bool { return '' !== $this->price; }
 }

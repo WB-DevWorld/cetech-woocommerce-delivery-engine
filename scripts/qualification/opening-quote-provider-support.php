@@ -86,6 +86,7 @@ final class CetechNativeQuoteProviderFixture {
 	public function track_command( CetechDeliveryEngine\Application\DeliveryQuote\QuoteIssueCommand $command ): void { $this->owned_namespaces[] = $command->identity()->namespace_digest(); }
 	private static function shipping( ?WC_Shipping $replacement = null ): WC_Shipping { $property = new ReflectionProperty( WC_Shipping::class, '_instance' ); $current = WC()->shipping(); if ( null !== $replacement ) { $property->setValue( null, $replacement ); } return $current; }
 	public function cleanup_stage(): string { return $this->cleanup_stage; }
+	public static function term_count_nested_callback_count(): int { $count = 0; foreach ( ( $GLOBALS['wp_filter']['woocommerce_change_term_counts']->callbacks ?? [] ) as $callbacks ) { $count += count( $callbacks ); } return $count; }
 	/** Fixed native callback codes only; never emit arbitrary callback names or paths. */
 	public static function source_hook_diagnostics( array $hooks ): array {
 		$rows = [];
@@ -94,6 +95,8 @@ final class CetechNativeQuoteProviderFixture {
 			if ( 'query' === $hook && is_array( $fn ) && array_is_list( $fn ) && 2 === count( $fn ) && is_object( $fn[0] ) && $fn[0] === ( $GLOBALS['wpdb'] ?? null ) && 'wpdb' === get_class( $fn[0] ) && 'remove_placeholder_escape' === $fn[1] ) { $code = 'wp_native_placeholder_escape'; }
 			elseif ( 'wp_get_object_terms' === $hook && '_post_format_wp_get_object_terms' === $fn ) { $code = 'wp_native_post_format_object_terms'; }
 			elseif ( 'get_terms' === $hook && '_post_format_get_terms' === $fn ) { $code = 'wp_native_post_format_terms'; }
+			elseif ( 'get_terms' === $hook && 'wc_change_term_counts' === $fn ) { $code = 'woo_native_term_counts'; }
+			elseif ( 'woocommerce_product_get_price' === $hook && is_array( $fn ) && array_is_list( $fn ) && 2 === count( $fn ) && is_object( $fn[0] ) && 'Automattic\\WooCommerce\\Internal\\ScheduledSalePriceReconciler' === get_class( $fn[0] ) && 'reconcile_price' === $fn[1] ) { $code = 'woo_native_scheduled_sale_price'; }
 			elseif ( in_array( $hook, [ 'woocommerce_product_get_stock_quantity', 'woocommerce_product_get_price' ], true ) && is_array( $fn ) && array_is_list( $fn ) && 2 === count( $fn ) && is_object( $fn[0] ) && 'WC_Deprecated_Filter_Hooks' === get_class( $fn[0] ) && 'maybe_handle_deprecated_hook' === $fn[1] ) { $code = 'woo_native_deprecated_filter_adapter'; $old_hook = 'woocommerce_product_get_stock_quantity' === $hook ? 'woocommerce_get_stock_quantity' : 'woocommerce_get_price'; $legacy = false !== has_filter( $old_hook ); $legacy_count = 0; foreach ( ( $GLOBALS['wp_filter'][$old_hook]->callbacks ?? [] ) as $old_callbacks ) { $legacy_count += count( $old_callbacks ); } }
 			elseif ( 'woocommerce_stock_amount' === $hook && 'intval' === $fn ) { $code = 'native_integer_stock'; }
 			$rows[] = [ 'hook' => $hook, 'priority' => (int) $priority, 'accepted_args' => is_int( $callback['accepted_args'] ?? null ) ? $callback['accepted_args'] : null, 'callback_code' => $code, 'legacy_target_registered' => $legacy, 'legacy_target_callback_count' => $legacy_count ];
@@ -134,6 +137,14 @@ final class CetechNativeQuoteProviderFixture {
 		$this->alternate_profile = $this->insert( 'logistics_profiles', [ 'internal_code' => 'q04_profile_' . $this->suffix, 'internal_name' => 'Q04 private fixture profile', 'status' => 'active' ] );
 		$this->alternate_origin = $this->insert( 'origins', [ 'supplier_id' => $this->alternate_supplier, 'internal_code' => 'q04_origin_' . $this->suffix, 'internal_name' => 'Q04 private fixture origin', 'status' => 'active' ] );
 		for ( $i = 0; $i < 2; ++$i ) { $product = new WC_Product_Simple(); $product->set_name( 'Q04 native item ' . $this->suffix . ':' . $i ); $product->set_status( 'publish' ); $product->set_regular_price( '20.00' ); $product->set_tax_status( 'taxable' ); $product->set_tax_class( $this->tax_class ); $product->set_manage_stock( true ); $product->set_stock_quantity( 10 ); $product->set_backorders( 'no' ); $id = $product->save(); if ( $id < 1 ) { throw new RuntimeException( 'Native Q04 product allocation failed.' ); } $this->products[] = $id; $this->rules[] = $this->insert( 'product_delivery_rules', [ 'target_type' => 'product', 'target_id' => $id, 'fulfilment_availability' => 'in_warehouse', 'fulfilment_choice' => 'delivery', 'delivery_offer_ids' => wp_json_encode( [ $this->offer ] ), 'priority' => 1, 'status' => 'active' ] ); }
+		// Physical owned metadata reproduces a delayed native sale-price update.
+		// It does not invoke sale-boundary scheduling or substitute the runtime clock.
+		foreach ( [ '_sale_price' => '15.00', '_sale_price_dates_from' => (string) ( time() - HOUR_IN_SECONDS ), '_sale_price_dates_to' => '', '_price' => '20.00' ] as $key => $value ) {
+			$ids = $this->db->get_col( $this->db->prepare( "SELECT meta_id FROM `{$this->db->postmeta}` WHERE post_id=%d AND meta_key=%s", $this->products[0], $key ) );
+			if ( ! is_array( $ids ) || count( $ids ) > 1 || '' !== $this->db->last_error ) { throw new RuntimeException( 'Native Q04 owned sale metadata is unavailable.' ); }
+			$written = [] === $ids ? $this->db->insert( $this->db->postmeta, [ 'post_id' => $this->products[0], 'meta_key' => $key, 'meta_value' => $value ] ) : $this->db->update( $this->db->postmeta, [ 'meta_value' => $value ], [ 'meta_id' => (int) $ids[0], 'post_id' => $this->products[0] ] );
+			if ( false === $written ) { throw new RuntimeException( 'Native Q04 owned sale metadata was not established.' ); }
+		} clean_post_cache( $this->products[0] );
 		$zone = new WC_Shipping_Zone( 0 ); $this->shipping_instance = (int) $zone->add_shipping_method( SelectedOfferShippingMethod::METHOD_ID ); if ( $this->shipping_instance < 1 ) { throw new RuntimeException( 'Native Q04 shipping method allocation failed.' ); }
 		$this->set_option( 'woocommerce_' . SelectedOfferShippingMethod::METHOD_ID . '_' . $this->shipping_instance . '_settings', [ 'enabled' => 'yes', 'title' => 'Q04 native delivery', 'tax_status' => 'taxable' ] );
 		foreach ( [ 1, 2 ] as $priority ) { $id = WC_Tax::_insert_tax_rate( [ 'tax_rate_country' => 'GH', 'tax_rate_state' => 'AA', 'tax_rate' => '5.0000', 'tax_rate_name' => 'Q04 native tax ' . $priority, 'tax_rate_priority' => $priority, 'tax_rate_compound' => 0, 'tax_rate_shipping' => 1, 'tax_rate_order' => $priority, 'tax_rate_class' => $this->tax_class ] ); if ( $id < 1 ) { throw new RuntimeException( 'Native Q04 tax rate allocation failed.' ); } $this->tax_rates[] = (int) $id; }
@@ -198,6 +209,13 @@ final class CetechNativeQuoteProviderFixture {
 
 	public function method_tax_status( string $status ): void { $this->set_option( 'woocommerce_' . SelectedOfferShippingMethod::METHOD_ID . '_' . $this->shipping_instance . '_settings', [ 'enabled' => 'yes', 'title' => 'Q04 native delivery', 'tax_status' => $status ] ); }
 	public function warm_sources(): void { foreach ( $this->products as $id ) { wc_get_product( $id ); Plugin::instance()->container()->get( ProductDeliveryConfigurationSourceInterface::class )->resolve( 'product', $id ); } get_option( 'cetech_de_enable_effective_configuration_runtime' ); get_option( 'woocommerce_currency' ); }
+	/** Actual native scheduled-sale read; no clock substitution or merchandise repricing. */
+	public function native_sale_facts(): array {
+		$id = $this->products[0]; $raw = $this->db->get_col( $this->db->prepare( "SELECT meta_value FROM `{$this->db->postmeta}` WHERE post_id=%d AND meta_key='_price'", $id ) ); $product = wc_get_product( $id );
+		if ( ! $product instanceof WC_Product || ! is_array( $raw ) || 1 !== count( $raw ) || '' !== $this->db->last_error ) { throw new RuntimeException( 'Native Q04 scheduled-sale facts are unavailable.' ); }
+		$pending = 0; foreach ( [ 'wc_product_start_scheduled_sale', 'wc_product_end_scheduled_sale' ] as $hook ) { $pending += count( as_get_scheduled_actions( [ 'hook' => $hook, 'args' => [ 'product_id' => $id ], 'group' => 'woocommerce-sales', 'status' => ActionScheduler_Store::STATUS_PENDING, 'per_page' => 1 ], 'ids' ) ); }
+		return [ 'physical_price_is_regular20' => (float) $raw[0] === 20.0, 'native_view_price_is_sale15' => (float) $product->get_price() === 15.0, 'scheduled_sale_started_in_real_past' => null !== $product->get_date_on_sale_from( 'edit' ) && $product->get_date_on_sale_from( 'edit' )->getTimestamp() < time(), 'scheduled_sale_has_no_future_end' => null === $product->get_date_on_sale_to( 'edit' ), 'owned_pending_sale_actions' => $pending ];
+	}
 
 	public function cleanup(): array {
 		$this->cleanup_stage = 'owned_connections';
