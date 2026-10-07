@@ -157,6 +157,12 @@ final class CetechNativeQuoteLifecycleFixture {
 	public readonly CetechNativeQuoteLifecycleFactory $factory;
 	public ?wpdb $selected = null;
 	private array $tables = [];
+	/** Exact validated keys and string values; canonical JSON map order is immaterial. */
+	public static function original_namespaces_match( \CetechDeliveryEngine\Application\DeliveryQuote\QuoteIssueCommand $issue, \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteHeader $header ): bool {
+		$expected = $issue->namespace_hashes( $header->id() ); $actual = $header->namespace_hashes();
+		ksort( $expected, SORT_STRING ); ksort( $actual, SORT_STRING );
+		return $expected === $actual;
+	}
 	public function __construct( private readonly wpdb $main ) {
 		$this->site = 99176; $this->prefix = 'gc6_' . bin2hex( random_bytes( 6 ) ) . '_';
 		$host = $main->parse_db_host( DB_HOST );

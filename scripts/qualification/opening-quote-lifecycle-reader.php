@@ -45,7 +45,7 @@ try {
 	if ( $owner->site_id() !== $config['site'] || ! $header->owner()->equals( $owner ) || ! $header->matches_reference( $reference ) || ! hash_equals( $header->material_digest(), $context->digest() ) ) { throw new RuntimeException(); }
 	$original = QuoteDurableCommand::accept( $owner, $reference, $header, $context );
 	$original_issue = QuoteIssueCommand::create( $owner, $context, 'fixture_v1', 1, 'fixture_v1', 1, $config['original_issue_token'] );
-	if ( $original_issue->namespace_hashes( $header->id() ) !== $header->namespace_hashes() ) { throw new RuntimeException(); }
+	if ( ! CetechNativeQuoteLifecycleFixture::original_namespaces_match( $original_issue, $header ) ) { throw new RuntimeException(); }
 	$factory = new CetechNativeQuoteLifecycleFactory( $GLOBALS['wpdb'], $config['site'], $config['prefix'] ); $factory->fixture_time( QuoteTime::parse( $config['fixture_time'] ) );
 	$provider = new CetechNativeQuoteLifecycleProvider( $context, $factory );
 	$authorize = static fn ( QuoteOwner $candidate, string $operation ): bool => $owner->equals( $candidate ) && str_starts_with( $operation, 'delivery_quote.' );
