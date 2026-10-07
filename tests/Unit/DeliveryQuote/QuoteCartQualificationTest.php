@@ -11,6 +11,37 @@ require_once dirname( __DIR__, 3 ) . '/scripts/qualification/opening-quote-cart-
 
 /** Fixture protocol only; actual WordPress/SQL/browser results remain separate. */
 final class QuoteCartQualificationTest extends TestCase {
+	/** Actual private price endpoint and native fixture calculation on controlled host transports. */
+	public function test_price_fixture_recalculates_the_loaded_cart_without_reissuing_customer_choices(): void {
+		$program = <<<'PHP'
+class Probe { public static int $rebuilds=0,$loads=0,$totals=0,$saves=0; public static string $price='7.70'; public static bool $loaded_before_totals=true; }
+class wpdb { public string $prefix='owned_'; public function update(string $table,array $values,array $where):int{Probe::$price='9.90';return 1;} }
+class WC_Shipping_Method {}
+class WC_Tax { public static function init():void{} }
+class WC_Cache_Helper { public static function get_transient_version(string $name,bool $refresh):string{return 'fixture-version';} }
+class WC_Shipping_Rate { public function get_method_id():string{return 'delivery_engine_selected_offer';} public function get_instance_id():int{return 4;} }
+class WC_Shipping { private static ?self $_instance=null; public static function instance():self{return self::$_instance??=new self();} public function get_packages():array{return [['rates'=>['retained-rate'=>new WC_Shipping_Rate()]]];} }
+class RetainedCart { public array $cart_contents=[]; public array $retained=[]; public string $shipping_total='7.70'; public function get_cart():array{if([]===$this->cart_contents){++Probe::$loads;$this->cart_contents=$this->retained;}return $this->cart_contents;} public function calculate_totals():void{++Probe::$totals;Probe::$loaded_before_totals=Probe::$loaded_before_totals&&[]!==$this->cart_contents;$this->shipping_total=Probe::$price;} public function set_session():void{} }
+class RetainedSession { public function set_customer_session_cookie(bool $value):void{} public function set(string $key,mixed $value):void{} public function save_data():never{++Probe::$saves;throw new LogicException('RETAINED-CALCULATION-OBSERVED');} }
+function wc_get_product(int $id):never{++Probe::$rebuilds;throw new LogicException('CHOICE-REBUILD-OBSERVED');}
+define('ABSPATH',getcwd().'/');define('DB_HOST','127.0.0.1');define('DB_NAME','cetech_wp_opening_qualification_protocol');
+require 'tests/bootstrap.php';require 'scripts/qualification/opening-quote-cart-support.php';
+$cart=new RetainedCart();$cart->retained=['retained-line'=>['quantity'=>3,CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture::CART_SELECTION_KEY=>['display_key'=>'in_warehouse:delivery:7','issued_at'=>'2026-10-07T12:00:00+00:00'],CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext::CART_KEY=>['kind'=>'delivery','delivery_offer_id'=>7,'address'=>['country'=>'GH','postcode'=>'00001']]]];
+$GLOBALS['cetech_de_test_wc']=new class($cart){public RetainedSession $session;public mixed $customer=null;public function __construct(public RetainedCart $cart){$this->session=new RetainedSession();}public function shipping():WC_Shipping{return WC_Shipping::instance();}};$GLOBALS['wp_filter']=[];$GLOBALS['wpdb']=new wpdb();
+$before=CetechQuoteCartHttpFixture::choice_digest();$cart->cart_contents=[];Probe::$loads=0;
+$fixture=(new ReflectionClass(CetechNativeQuoteProviderFixture::class))->newInstanceWithoutConstructor();
+foreach(['suffix'=>'fixture','tax_class'=>'fixture_tax','offer'=>7,'zone'=>2,'rate'=>3,'shipping_instance'=>4,'alternate_supplier'=>5,'alternate_profile'=>6,'alternate_origin'=>7,'products'=>[10]]as $key=>$value){(new ReflectionProperty($fixture,$key))->setValue($fixture,$value);}
+$path=tempnam(sys_get_temp_dir(),'q05-private-price-');chmod($path,0600);$state=['site_path'=>realpath(ABSPATH),'database_name'=>DB_NAME,'fixture_token'=>str_repeat('a',48),'user_id'=>get_current_user_id(),'support_file'=>realpath('scripts/qualification/opening-quote-cart-support.php'),'native'=>CetechQuoteCartHttpFixture::export_native($fixture)];file_put_contents($path,json_encode($state,JSON_THROW_ON_ERROR));
+putenv('CETECH_DE_HTTP_OPENING_QUALIFICATION=1');putenv('CETECH_DE_NATIVE_OPENING_QUALIFICATION=1');putenv('CETECH_DE_HTTP_FIXTURE_SITE='.ABSPATH);putenv('CETECH_DE_HTTP_PRIVATE_DIR='.dirname($path));putenv('CETECH_DE_HTTP_QUOTE_CART_STATE='.$path);
+$_GET=['cetech_q05_fixture'=>'price'];$_POST=['nonce'=>'test-nonce-cetech_q05_fixture'];$_SERVER['REQUEST_METHOD']='POST';$_SERVER['HTTP_X_CETECH_Q05_FIXTURE']=$state['fixture_token'];$GLOBALS['cetech_q05_review_runtime']=(object)[];$GLOBALS['cetech_q05_sessions']=(object)[];$observed=false;
+try{require 'scripts/qualification/opening-http-quote-cart-mu.php';foreach($GLOBALS['cetech_de_test_actions']['template_redirect']as $action){$action['callback']();}}
+catch(LogicException $error){$observed='RETAINED-CALCULATION-OBSERVED'===$error->getMessage();}
+finally{unlink($path);}
+$after=CetechQuoteCartHttpFixture::choice_digest();echo json_encode(['calculation_reached'=>$observed,'cart_loaded_before_calculation'=>1===Probe::$loads&&Probe::$loaded_before_totals,'choice_digest_retained'=>$before===$after,'quantity_retained'=>3===$cart->cart_contents['retained-line']['quantity'],'context_retained'=>$cart->retained['retained-line'][CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext::CART_KEY]===$cart->cart_contents['retained-line'][CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext::CART_KEY],'new_transport_price_visible'=>'9.90'===$cart->shipping_total,'choice_rebuilds'=>Probe::$rebuilds,'totals_calls'=>Probe::$totals,'session_saves'=>Probe::$saves],JSON_THROW_ON_ERROR);
+PHP;
+		$process=proc_open([PHP_BINARY,'-r',$program],[['pipe','r'],['pipe','w'],['pipe','w']],$pipes,dirname(__DIR__,3));self::assertIsResource($process);fclose($pipes[0]);$stdout=stream_get_contents($pipes[1]);$stderr=stream_get_contents($pipes[2]);fclose($pipes[1]);fclose($pipes[2]);self::assertSame(0,proc_close($process),$stderr);$out=json_decode($stdout,true,8,JSON_THROW_ON_ERROR);
+		self::assertTrue($out['calculation_reached']);self::assertTrue($out['cart_loaded_before_calculation']);self::assertTrue($out['choice_digest_retained']);self::assertTrue($out['quantity_retained']);self::assertTrue($out['context_retained']);self::assertTrue($out['new_transport_price_visible']);self::assertSame(0,$out['choice_rebuilds']);self::assertSame(2,$out['totals_calls']);self::assertSame(1,$out['session_saves']);
+	}
 	private function factory(): \CetechQuoteCartFactory { return ( new \ReflectionClass( \CetechQuoteCartFactory::class ) )->newInstanceWithoutConstructor(); }
 	/** Actual persisted row through cleanup discovery; SQL transport stops after exact selectors. */
 	public function test_cleanup_uses_the_owned_persisted_header_uuid_for_quote_selectors(): void {

@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Adversarial public/receipt/URI protocol checks; not native quote qualification."""
+import ast
 import copy
 import html
 import importlib.util
@@ -7,6 +8,7 @@ import json
 from pathlib import Path
 import subprocess
 import tempfile
+import textwrap
 import unittest
 from unittest.mock import patch
 
@@ -35,6 +37,45 @@ def child_helpers(expression):
 
 
 class QuoteCartProtocol(unittest.TestCase):
+    def test_source_price_refresh_keeps_the_original_full_choice_comparison(self):
+        source = (ROOT / "opening-http-quote-cart-driver.py").read_text()
+        outer = next(node for node in ast.parse(source).body if isinstance(node, ast.FunctionDef) and node.name == "run_quote_cart")
+        helpers = [node for node in outer.body if isinstance(node, ast.FunctionDef) and node.name in ("fixture_calculated", "seeded")]
+        old_id = "a49d6a70-4dad-4a89-94a7-0bde7d1e9d23"
+        state = {"seed_url": "owned-seed", "price_url": "owned-price"}
+        counts = dict.fromkeys(DRIVER.HISTORY, 0); counts.update(quotes=1, accepted=1)
+        current = {"fixture_nonce": "fixture-nonce", "choice_digest": "original-full-choice", "quote_body_digest": "original-body", "quote_body_digests": {old_id: "original-body"}, "facts": {"status": "confirmed"}, "history_counts": counts}
+        calls = []; checks = []
+        response = type("Response", (), {"status": 200, "body": b'{"success":true}'})()
+        class Shopper:
+            def request(self, url, fields, headers):
+                calls.append((url, fields, headers))
+                if url == state["seed_url"]:
+                    current["choice_digest"] = "fresh-intent-timestamp"
+                elif url != state["price_url"]:
+                    raise AssertionError("Unowned fixture URL")
+                return response
+        class Bridge:
+            def call(self, command):
+                if command != "ratechangequotecart":
+                    raise AssertionError("Unexpected physical source mutation")
+                current["facts"] = {"status": "changed"}
+        def inspect(shopper): return copy.deepcopy(current)
+        def classic(shopper, action, generation, token):
+            self.assertEqual("refresh", action)
+            facts = public_facts(); facts["quote"]["quote_id"] = "b49d6a70-4dad-4a89-94a7-0bde7d1e9d23"
+            facts["quote"]["money"][0]["display_total"]["amount"] = "9.90"
+            current["facts"] = copy.deepcopy(facts); current["history_counts"]["quotes"] += 1
+            return response, facts
+        namespace = {"state": state, "headers": {"X-Cetech-Q05-Fixture": "fixture-token"}, "inspect": inspect, "request_json": lambda response: json.loads(response.body), "guest_a": Shopper(), "bridge": Bridge(), "classic": classic, "review_a": {"generation": 1, "quote": {"quote_id": old_id}}, "safe_facts": DRIVER.safe_facts, "DIRECT_IDS": DRIVER.DIRECT_IDS, "uuid": __import__("uuid"), "check": lambda case, condition, before, after, components, response: checks.append((condition, components))}
+        exec(compile(ast.Module(body=helpers, type_ignores=[]), "actual-driver-fixture-helpers", "exec"), namespace)
+        start = source.index('        active_case = DIRECT_IDS[8]; stage = "source_change"')
+        end = source.index('        active_case = DIRECT_IDS[9];', start)
+        exec(textwrap.dedent(source[start:end]), namespace)
+        self.assertEqual([(state["price_url"], {"nonce": "fixture-nonce"}, namespace["headers"])], calls)
+        self.assertEqual(1, len(checks)); self.assertTrue(checks[0][0]); self.assertTrue(checks[0][1]["choices_destination_retained"])
+        self.assertEqual("original-full-choice", current["choice_digest"])
+
     def test_current_evidence_followup_is_separate_finite_and_refused_on_success(self):
         stages = ("input_ready", "environment_same_draft", "environment_matches_original", "environment_authorized", "control_observed", "cached_shipping_restored", "preparation_matches_original", "source_captured", "source_bound", "packages_restored", "native_captured", "native_bound", "context_digest_matches", "source_applicable", "native_unchanged", "source_local_unchanged", "final_same_draft", "final_authorized", "control_confirmed")
         followup = dict.fromkeys(stages)

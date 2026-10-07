@@ -46,7 +46,9 @@ add_action( 'template_redirect', static function (): void {
 	if ( 'inspect' !== $mode ) {
 		if ( 'POST' !== ( $_SERVER['REQUEST_METHOD'] ?? '' ) || ! is_string( $_POST['nonce'] ?? null ) || ! wp_verify_nonce( $_POST['nonce'], 'cetech_q05_fixture' ) ) { wp_send_json_error( [ 'code' => 'fixture_nonce' ], 403 ); }
 		if ( 'price' === $mode && false === $wpdb->update( CetechDeliveryEngine\Infrastructure\Persistence\TableNames::for( 'rate_cards' ), [ 'base_amount' => '9.0000' ], [ 'id' => $state['native']['rate'] ] ) ) { wp_send_json_error( [ 'code' => 'fixture_price' ], 503 ); }
-		$native = CetechQuoteCartHttpFixture::hydrate_native( $wpdb, $state['native'] ); $native->cart();
+		$native = CetechQuoteCartHttpFixture::hydrate_native( $wpdb, $state['native'] );
+		if ( 'seed' === $mode ) { $native->cart(); }
+		else { WC()->cart->get_cart(); $native->recalculate(); }
 	} else { WC()->cart->get_cart(); }
 	// These normal native reads load the already resolved display settings before the raw pre-gate draft.
 	get_option( 'woocommerce_currency' ); get_option( 'woocommerce_price_num_decimals' ); wp_salt( 'auth' );

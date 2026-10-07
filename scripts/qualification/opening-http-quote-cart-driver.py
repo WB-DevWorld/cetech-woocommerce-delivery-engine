@@ -204,13 +204,16 @@ def run_quote_cart(client, state, bridge, recorder, Page, login):
             raise RuntimeError("Native quote fixture counts were not finite")
         return data
 
-    def seeded(shopper):
+    def fixture_calculated(shopper, url):
         before = inspect(shopper)
-        response = shopper.request(state["seed_url"], {"nonce": before["fixture_nonce"]}, headers)
+        response = shopper.request(url, {"nonce": before["fixture_nonce"]}, headers)
         value = request_json(response)
         if response.status != 200 or value.get("success") is not True:
-            raise RuntimeError("Native quote cart seed refused")
+            raise RuntimeError("Native quote cart fixture calculation refused")
         return inspect(shopper)
+
+    def seeded(shopper):
+        return fixture_calculated(shopper, state["seed_url"])
 
     def no_placement(before, after):
         return before["history_counts"]["bindings"] == after["history_counts"]["bindings"] and before["orders_count"] == after["orders_count"] and before["gateway_count"] == after["gateway_count"]
@@ -334,7 +337,7 @@ def run_quote_cart(client, state, bridge, recorder, Page, login):
         bridge.call("ratechangequotecart"); after_change = inspect(guest_a)
         if after_change["facts"]["status"] not in ("changed", "unavailable"):
             raise RuntimeError("Changed physical quote source was not refused")
-        seeded(guest_a)
+        fixture_calculated(guest_a, state["price_url"])
         response, new_review = classic(guest_a, "refresh", review_a["generation"], str(uuid.uuid4())); after = inspect(guest_a)
         amount = new_review["quote"]["money"][0]["display_total"]["amount"] if safe_facts(new_review) and new_review["quote"] and new_review["quote"]["money"] else None
         original_preserved = original_body == after["quote_body_digests"].get(review_a["quote"]["quote_id"])
