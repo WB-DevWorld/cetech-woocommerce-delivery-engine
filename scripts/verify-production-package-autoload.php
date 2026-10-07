@@ -56,6 +56,16 @@ if ( ! str_contains( $health_source, 'namespace CetechDeliveryEngine\\Applicatio
 require_once $autoload;
 
 $required_classes = [
+	'CetechDeliveryEngine\\Application\\DataLifecycle\\DataLifecycleCleanupService',
+	'CetechDeliveryEngine\\Application\\DataLifecycle\\ManagedGeographyCache',
+	'CetechDeliveryEngine\\Domain\\DataLifecycle\\DataLifecycleRegistry',
+	'CetechDeliveryEngine\\Domain\\DataLifecycle\\ManagedGeographyCacheEnvelope',
+	'CetechDeliveryEngine\\Domain\\DataLifecycle\\DataLifecycleProgress',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\DataLifecycleOptionsStore',
+	'CetechDeliveryEngine\\Bootstrap\\DataLifecycleBootstrap',
+	'CetechDeliveryEngine\\Bootstrap\\DataLifecycleManifest',
+	'CetechDeliveryEngine\\Bootstrap\\DataLifecycleScheduler',
+	'CetechDeliveryEngine\\Bootstrap\\DataLifecycleUninstallExecutor',
 	'CetechDeliveryEngine\\Application\\Order\\OrderDeliverySnapshotReader',
 	'CetechDeliveryEngine\\Application\\Order\\OrderDeliverySnapshotJson',
 	'CetechDeliveryEngine\\Application\\Order\\SnapshotExtensionParser',
@@ -323,7 +333,8 @@ $is_schema5_release = str_contains( $header_source, '1.0.0-dev.bulk' )
 	|| str_contains( $header_source, '1.0.0-rc.11' );
 
 $is_schema8_release = str_contains( $header_source, '1.0.0-dev.wave1-rule-lifecycle' )
-	|| str_contains( $header_source, '1.0.0-dev.wave1-snapshot-readers' );
+	|| str_contains( $header_source, '1.0.0-dev.wave1-snapshot-readers' )
+	|| str_contains( $header_source, '1.0.0-dev.wave1-data-lifecycle' );
 $is_schema7_release = str_contains( $header_source, '1.0.0-dev.wave1-operation-storage' );
 $is_schema6_release = str_contains( $header_source, '1.0.0-dev.geo' )
 	|| str_contains( $header_source, '1.0.0-rc.12' )

@@ -13,6 +13,7 @@ namespace CetechDeliveryEngine\Bootstrap;
 final class Deactivator {
 
 	public static function deactivate(): void {
+		DataLifecycleScheduler::suspend_current_site();
 		delete_transient( 'cetech_de_activation_notice' );
 		flush_rewrite_rules();
 	}

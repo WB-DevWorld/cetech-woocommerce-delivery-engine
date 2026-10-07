@@ -305,6 +305,12 @@ final class Plugin {
 		// Woo-dependent coverage conversion waits for init after Action Scheduler (priority 1).
 		$this->container->get( Schema6CoverageUpgradeKickoff::class )->register();
 		$this->container->get( CountryIdentityKickoff::class )->register();
+		$cleanup_site = function_exists( 'get_current_blog_id' ) ? get_current_blog_id() : 1;
+		( new DataLifecycleScheduler( new \CetechDeliveryEngine\Application\DataLifecycle\DataLifecycleCleanupService(
+			\CetechDeliveryEngine\Domain\DataLifecycle\DataLifecycleRegistry::standard(),
+			new \CetechDeliveryEngine\Infrastructure\WordPress\OperationConnectionFactory(),
+			static fn ( int $site ): bool => $site === $cleanup_site && ( ! function_exists( 'get_current_blog_id' ) || get_current_blog_id() === $cleanup_site )
+		) ) )->register();
 
 		// Capability matrix must self-heal when an active plugin folder is replaced
 		// without reactivation (activation hooks do not run in that path).

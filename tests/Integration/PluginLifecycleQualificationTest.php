@@ -215,7 +215,7 @@ final class PluginLifecycleQualificationTest extends TestCase {
 		self::assertTrue( $GLOBALS['cetech_de_test_roles']['administrator']->has_cap( Capabilities::VIEW ) );
 	}
 
-	public function test_delete_data_uninstall_drops_plugin_tables_and_keeps_order_meta_and_foreign_options(): void {
+	public function test_explicit_uninstall_without_native_owner_preserves_business_data_and_intent(): void {
 		Activator::activate();
 		$operation_sentinels = [];
 		foreach ( [ 'operation_records', 'operation_changes', 'rule_family_guards', 'logical_rules', 'rule_versions' ] as $suffix ) {
@@ -223,6 +223,7 @@ final class PluginLifecycleQualificationTest extends TestCase {
 			$operation_sentinels[ $table ] = [ 'id' => 7, 'record_format' => 99, 'preservation_sentinel' => 'unknown-history-must-remain' ];
 			$GLOBALS['wpdb']->insert( $table, $operation_sentinels[ $table ] );
 		}
+		$tables_before = $GLOBALS['wpdb']->table_names();
 		update_option( Uninstaller::DELETE_DATA_OPTION, 1, false );
 		update_option( 'cetech_de_sitewide_defaults', [ 'setup_completed' => true ], false );
 		update_option( '_cetech_de_delivery_snapshot', 'order-meta-retained', false );
@@ -231,25 +232,25 @@ final class PluginLifecycleQualificationTest extends TestCase {
 
 		Uninstaller::uninstall();
 
-		self::assertSame( 5, LifecycleHarness::table_count() );
-		self::assertSame( array_keys( $operation_sentinels ), $GLOBALS['wpdb']->table_names() );
+		self::assertCount( 32, $tables_before );
+		self::assertSame( $tables_before, $GLOBALS['wpdb']->table_names() );
 		foreach ( $operation_sentinels as $table => $sentinel ) {
 			self::assertSame( [ $sentinel ], $GLOBALS['wpdb']->table_rows( $table ), 'Explicit uninstall preserves operation and rule history, including an unknown format.' );
 		}
-		self::assertNull( get_option( SchemaVersion::OPTION_NAME, null ) );
-		self::assertNull( get_option( 'cetech_de_sitewide_defaults', null ) );
-		self::assertNull( get_option( FeatureFlags::OPTION_PREFIX . 'enable_shipment_records', null ) );
-		self::assertFalse( $GLOBALS['cetech_de_test_roles']['administrator']->has_cap( Capabilities::VIEW ) );
+		self::assertSame( SchemaVersion::TARGET, SchemaVersion::get() );
+		self::assertTrue( get_option( 'cetech_de_sitewide_defaults' )['setup_completed'] );
+		self::assertSame( 1, get_option( Uninstaller::DELETE_DATA_OPTION ) );
+		self::assertTrue( $GLOBALS['cetech_de_test_roles']['administrator']->has_cap( Capabilities::VIEW ) );
 		self::assertSame( 'order-meta-retained', get_option( '_cetech_de_delivery_snapshot' ) );
 		self::assertSame( 'keep-wc', get_option( 'woocommerce_unrelated' ) );
 		self::assertSame(
 			[ 1 => true ],
 			get_option( ShipmentOperationsIssueStore::INDEX_OPTION ),
-			'Known RC.6 residual: shipment ops issue index is not removed on delete-data uninstall.'
+			'The approved manifest preserves the shipment issue index.'
 		);
 	}
 
-	public function test_wordpress_delete_runner_preserve_and_delete_paths(): void {
+	public function test_wordpress_runner_preserves_default_and_refuses_an_unsupported_explicit_owner(): void {
 		$php    = PHP_BINARY;
 		$runner = LifecycleHarness::plugin_root() . DIRECTORY_SEPARATOR . 'tests/Integration/fixtures/uninstall-runner.php';
 
@@ -261,11 +262,12 @@ final class PluginLifecycleQualificationTest extends TestCase {
 		self::assertTrue( $preserve['admin_has_view'] );
 
 		$delete = $this->run_json_fixture( $php, $runner, 'delete' );
-		self::assertNull( $delete['db_version'] );
-		self::assertNull( $delete['shipment_flag'] );
+		self::assertSame( '4', $delete['db_version'] );
+		self::assertSame( 1, $delete['shipment_flag'] );
+		self::assertSame( 1, $delete['cleanup_intent'] );
 		self::assertSame( 'keep-me', $delete['unrelated'] );
-		self::assertSame( [], $delete['tables'] );
-		self::assertFalse( $delete['admin_has_view'] );
+		self::assertSame( $preserve['tables'], $delete['tables'] );
+		self::assertTrue( $delete['admin_has_view'] );
 	}
 
 	public function test_uninstall_php_is_not_equivalent_to_folder_deletion(): void {

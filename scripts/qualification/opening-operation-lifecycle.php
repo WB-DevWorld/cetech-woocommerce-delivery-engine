@@ -135,32 +135,31 @@ return static function ( callable $check ): void {
 		$schema_cache_found = false;
 		$schema_cached = wp_cache_get( SchemaVersion::OPTION_NAME, 'options', false, $schema_cache_found );
 		$fixture_alloptions = wp_cache_get( 'alloptions', 'options' );
-		$diagnostics_gone = 0 === (int) OperationProofDatabase::scalar( $physical, "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='{$diagnostics}'" );
-		$check( 'NATIVE-C03-EXPLICIT-UNINSTALL-PRESERVES-PAIR', $before === $after_explicit && null === $schema_row && false === $schema_read, [
+		$diagnostics_preserved = 1 === (int) OperationProofDatabase::scalar( $physical, "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='{$diagnostics}'" );
+		$check( 'NATIVE-C03-EXPLICIT-UNINSTALL-PRESERVES-PAIR', $before === $after_explicit && '7' === ($schema_row['option_value'] ?? null) && '7' === $schema_read && $diagnostics_preserved, [
 			'record_bytes_unchanged' => $before[0] === $after_explicit[0],
 			'event_bytes_unchanged' => $before[1] === $after_explicit[1],
 			'resource_unchanged' => $before[2] === $after_explicit[2],
-			'schema_deleted_in_database' => null === $schema_row,
-			'schema_read_reports_absent' => false === $schema_read,
-			'schema_read_is_original_value' => '7' === $schema_read,
+			'schema_preserved_in_database' => '7' === ($schema_row['option_value'] ?? null),
+						'schema_read_is_original_value' => '7' === $schema_read,
 			'schema_cache_found' => $schema_cache_found,
 			'schema_cache_is_original_value' => '7' === $schema_cached,
 			'fixture_autoload_marker_cached' => is_array( $fixture_alloptions ) && '1' === ( $fixture_alloptions['operation_fixture_autoload_marker'] ?? null ),
 			'schema_in_alloptions_cache' => is_array( $fixture_alloptions ) && array_key_exists( SchemaVersion::OPTION_NAME, $fixture_alloptions ),
 			'delete_policy_deleted_in_database' => null === $policy_row,
-			'legacy_diagnostic_table_deleted' => $diagnostics_gone,
+			'legacy_diagnostic_table_preserved' => $diagnostics_preserved,
 			'isolated_native_connection_still_selected' => $GLOBALS['wpdb'] === $fixture_db && $fixture_db->prefix === $prefix,
 		] );
 
-		// An exact uninstall.php copy has no vendor directory: this executes the
-		// genuine fallback branch, even though this native process has other classes.
+		// An exact root-only copy intentionally lacks the fixed own-source helper.
+		// It must retain the intent and records; C06 separately proves the complete loader.
 		$temporary = sys_get_temp_dir() . '/cetech-operation-uninstall-' . bin2hex( random_bytes( 8 ) );
 		if ( ! mkdir( $temporary, 0700 ) || ! copy( $root . '/uninstall.php', $temporary . '/uninstall.php' ) ) { throw new RuntimeException( 'Native fallback lifecycle fixture could not be prepared.' ); }
 		update_option( Uninstaller::DELETE_DATA_OPTION, 1, false );
 		if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) { define( 'WP_UNINSTALL_PLUGIN', 'cetech-operation-disposable-proof' ); }
 		$run_fallback = static function ( string $path ): void { require $path; };
 		$run_fallback( $temporary . '/uninstall.php' );
-		$check( 'NATIVE-C03-NO-VENDOR-UNINSTALL-PRESERVES-PAIR', ! is_readable( $temporary . '/vendor/autoload.php' ) && $before === $pair() && false === get_option( Uninstaller::DELETE_DATA_OPTION, false ) );
+		$check( 'NATIVE-C03-NO-VENDOR-UNINSTALL-PRESERVES-PAIR', ! is_readable( $temporary . '/vendor/autoload.php' ) && $before === $pair() && 1 === get_option( Uninstaller::DELETE_DATA_OPTION, false ) );
 	} finally {
 		if ( $filter_installed ) { remove_filter( 'flush_rewrite_rules_hard', $no_hard_flush, PHP_INT_MAX ); }
 		foreach ( $original as $key => [ $exists, $value ] ) {

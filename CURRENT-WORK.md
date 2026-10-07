@@ -1,3 +1,19 @@
+# Current Work — W1-C06 data-lifecycle implementation
+
+Status: WAVE1-PLAN-1 ACCEPTED — C01–C05 INTEGRATED — W1-C06-DATA-LIFECYCLE-1 APPROVED / IMPLEMENTATION AUTHORIZED — RC.12 IMMUTABLE
+
+## 2026-10-06 — Owner approved C06 design and authorized implementation
+
+At23:54:13UTC the owner instructed: “Approve W1-C06-DATA-LIFECYCLE-1 and implement W1-C06.” Qualified design PR#73 head `c260514ab696888e3354371770d7ea9fb4150f8c` integrated unchanged normally as `581107eaa8d023ef31ff1d5c839c4cb84e27a95a`, tree `24bfe7be87203e74376418bed24ad7aea1e912b7`; #72 completed. Exact design candidate run37548341694 attempt1 all8/native299/finalHTTP66/smoke/PHP2144/12826/SQL113/2891/0skips/C03class43+C04class44/JS102 and575-file immutable map PASS. Actual design-merge run37549135316 is verified separately. Design CI did not execute C06’s30 cases.
+
+[Issue#74](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/74) tracks implementation on `ws3/wave1-c06-data-lifecycle`, starting at the actual approved design merge. Implement the exact32-store typed preservation registry, only managed geography-response cache adoption, fixed cutoff/ceiling bounded dry-run and cleanup, atomic delete/progress and explicit uncertain-commit reconciliation, exact owned300-second AS tick/continuation, shared standalone uninstall preservation and truthful merchant checkbox copy. Schema8 remains unchanged. Authoritative history/settings/audit/scoped and generic completions/rules/bulk/packs/Woo protected facts are preserved.
+
+Only the owner and AI agents are working. Root solely edits central refs/PRs/Plugin/Deactivator/Uninstaller/rootuninstall/settingscopy/developmentidentity/CI/native runner/status/docs and existing lifecycle fixture expectations. Exclusive leases: catalog/context owns new Domain/DataLifecycle Registry/Class/Policy and Bootstrap/DataLifecycleManifest plus registry units; cache adapter owns ManagedGeographyCache/Envelope/Ticket/Identity and Persistence/DataLifecycleOptionsStore plus cache units; worker identity owns DataLifecycleCleanupService/Progress/Result/Continuation plus worker units; SQL proof agent owns Integration/DataLifecycle and Support/DataLifecycle; native privacy agent owns only scripts/qualification/opening-data-lifecycle.php and its dedicated support; independent reviewer is read-only and first verifies actual design merge, then one finite frozen implementation closure. Agents do not commit or mutate remote state. Shared APIs are agreed before use; no concurrent central editing.
+
+Permitted mutations are disposable local/CI options/domain/meta/order/role/cache/scheduler fixtures under exact owned prefixes. Local PHP8.3.6/MariaDB10.11 evidence is comparative; required CI PHP8.5.11/MariaDB11.4.13/native WordPress7.1.2/Woo11.1.2 is separately bound. Preserve current listener OPcache-on/JIT-disabled profile and20-second client timeout. All30 accepted cases need meaningful implementation evidence; new physical group data-lifecycle-real-db becomes separately required in blocking CI. Final checkpoint preserves existing native299/HTTP66/smoke/SQL113/JS102 plus new tests and exact installed-source/archive/member evidence. No new schema, generic ledger/business profile, protected erase/globalreset, quote/log retention, pack/file sweep or C07 emergency adoption is included.
+
+Next owner decision after qualified implementation: “Approve W1-C06 for integration and prepare W1-C07’s emergency-control design.”
+
 # Current Work — W1-C06 data-lifecycle design
 
 Status: WAVE1-PLAN-1 OWNER ACCEPTED — W1-C01–C05 INTEGRATED — W1-C06 DESIGN AUTHORIZED — RC.12 IMMUTABLE

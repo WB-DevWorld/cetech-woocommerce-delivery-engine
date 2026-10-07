@@ -286,6 +286,19 @@ if ( ! function_exists( 'add_action' ) ) {
 	}
 }
 
+if ( ! function_exists( 'remove_action' ) ) {
+	function remove_action( string $hook, $callback, int $priority = 10 ): bool {
+		$removed = false;
+		foreach ( $GLOBALS['cetech_de_test_actions'][ $hook ] ?? [] as $key => $action ) {
+			if ( $action['callback'] === $callback && $action['priority'] === $priority ) {
+				unset( $GLOBALS['cetech_de_test_actions'][ $hook ][ $key ] );
+				$removed = true;
+			}
+		}
+		return $removed;
+	}
+}
+
 if ( ! function_exists( 'did_action' ) ) {
 	function did_action( string $hook_name ): int {
 		return (int) ( $GLOBALS['wp_actions'][ $hook_name ] ?? 0 );
@@ -688,3 +701,7 @@ require_once __DIR__ . '/stubs/woocommerce-order-stub.php';
 require_once __DIR__ . '/stubs/wordpress-frontend-stubs.php';
 
 require_once dirname( __DIR__ ) . '/vendor/autoload.php';
+
+if ( ! function_exists( 'get_current_blog_id' ) ) {
+ function get_current_blog_id(): int { return (int) ( $GLOBALS['blog_id'] ?? 1 ); }
+}

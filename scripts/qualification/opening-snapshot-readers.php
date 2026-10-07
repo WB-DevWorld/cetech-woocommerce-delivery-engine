@@ -28,7 +28,7 @@ use CetechDeliveryEngine\Tests\Support\Operation\OperationProofDatabase;
  * business policy writer evidence. No unit bootstrap, snapshot repair or backfill.
  * Private JSON/address/policy facts are compared only in-process.
  */
-return static function ( callable $check ): void {
+return static function ( callable $check, ?callable $lifecycle_probe = null ): void {
 	global $wpdb;
 	if ( '1' !== getenv( 'CETECH_DE_NATIVE_OPENING_QUALIFICATION' )
 		|| ! defined( 'WP_ADMIN' ) || true !== WP_ADMIN
@@ -272,6 +272,7 @@ return static function ( callable $check ): void {
 		}
 		$fixture = $seed( null, null, null, null, $config_product );
 		$assert_unchanged( 'NATIVE-C05-MISSING-META-IS-UNAVAILABLE-NOT-REBUILT', static fn (): array => $read_fixture( $fixture ), static function ( array $reads ): bool { foreach ( $reads as $read ) { if ( $read->has_meta || 'missing' !== $read->error || null !== $read->snapshot || null !== $read->extensions ) { return false; } } return true; } );
+		if ( null !== $lifecycle_probe ) { $lifecycle_probe( $physical, static fn (): array => [ $historical( $base1 ), $historical( $base2 ) ] ); }
 	} finally {
 		$wpdb = $main_db;
 		if ( $isolated instanceof wpdb ) { $isolated->close(); }
