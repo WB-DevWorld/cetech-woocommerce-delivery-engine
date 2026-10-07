@@ -21,7 +21,7 @@ final class CetechOpeningEmergencyFixture {
 	public const GATEWAY_COUNT = 'cetech_opening_c07_gateway_count';
 	public const BARRIER = 'cetech_opening_c07_barrier';
 	public const OWN_OPTIONS = [ self::CONTROL, self::GATEWAY_COUNT, self::BARRIER ];
-	public const WOO_OPTIONS = [ 'woocommerce_currency', 'woocommerce_calc_taxes', 'woocommerce_default_country', 'woocommerce_allowed_countries', 'woocommerce_specific_allowed_countries', 'woocommerce_ship_to_countries', 'woocommerce_checkout_page_id', 'woocommerce_cart_page_id', 'woocommerce_enable_guest_checkout' ];
+	public const WOO_OPTIONS = [ 'woocommerce_currency', 'woocommerce_calc_taxes', 'woocommerce_default_country', 'woocommerce_allowed_countries', 'woocommerce_specific_allowed_countries', 'woocommerce_ship_to_countries', 'woocommerce_checkout_page_id', 'woocommerce_cart_page_id', 'woocommerce_enable_guest_checkout', 'woocommerce_coming_soon', 'woocommerce_store_pages_only' ];
 
 	/** Physical state and credentials stay in the private fixture file. */
 	public array $state;
@@ -44,6 +44,17 @@ final class CetechOpeningEmergencyFixture {
 	}
 	public static function hash( array $value ): string { return hash( 'sha256', json_encode( $value, JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR ) ); }
 	public static function invalidate( string $name ): void { wp_cache_delete( $name, 'options' ); wp_cache_delete( 'alloptions', 'options' ); wp_cache_delete( 'notoptions', 'options' ); }
+	/** Finite private-fixture facts, never a store control or a capability grant. */
+	public function coming_soon_facts(): array {
+		$setting = static fn ( ?array $row ): string => null === $row ? 'absent' : ( in_array( $row['option_value'] ?? null, [ 'yes', 'no' ], true ) ? $row['option_value'] : 'other' );
+		$current = self::option( 'woocommerce_coming_soon' );
+		$user = get_user_by( 'id', $this->state['user_id'] );
+		return [ 'original' => $setting( $this->state['original_options']['woocommerce_coming_soon'] ?? null ),
+			'original_store_pages_only' => $setting( $this->state['original_options']['woocommerce_store_pages_only'] ?? null ),
+			'current' => $setting( $current ), 'current_store_pages_only' => $setting( self::option( 'woocommerce_store_pages_only' ) ),
+			'native_read_matches_physical' => null !== $current && get_option( 'woocommerce_coming_soon' ) === $current['option_value'],
+			'fixture_principal_manage_woocommerce' => $user instanceof WP_User && $user->has_cap( 'manage_woocommerce' ) ];
+	}
 	public function prepare(): void {
 		global $wpdb;
 		if ( [] !== $this->state ) { throw new RuntimeException( 'Refusing duplicate C07 fixture allocation.' ); }
@@ -58,6 +69,12 @@ final class CetechOpeningEmergencyFixture {
 		if ( is_wp_error( $id ) || $id < 1 ) { throw new RuntimeException( 'C07 fixture principal allocation failed.' ); }
 		$this->state['user_id'] = (int) $id;
 		$this->isolate_prior_global_instructions();
+		// Woo 11.1.2 puts freshly installed store pages behind Coming Soon for
+		// this intentionally narrow principal. Prepare a live disposable frontend
+		// without broadening its authority; cleanup restores the original row.
+		update_option( 'woocommerce_coming_soon', 'no' );
+		$this->state['coming_soon_preparation'] = $this->coming_soon_facts();
+		if ( 'no' !== $this->state['coming_soon_preparation']['current'] || ! $this->state['coming_soon_preparation']['native_read_matches_physical'] ) { throw new RuntimeException( 'C07 disposable frontend visibility was not prepared.' ); }
 		foreach ( [ 'enable_product_delivery_selector', 'enable_cart_delivery_selection_capture', 'enable_checkout_delivery_selection_validation', 'enable_woocommerce_shipping_rate_calculation', 'enable_order_delivery_snapshot_persistence', 'enable_classic_checkout_adapter' ] as $flag ) { update_option( 'cetech_de_' . $flag, 1, false ); }
 		foreach ( [ 'enable_effective_configuration_runtime', 'enable_variable_product_ecr_runtime' ] as $flag ) { update_option( 'cetech_de_' . $flag, 0, false ); }
 		update_option( 'woocommerce_currency', 'GHS', false ); update_option( 'woocommerce_calc_taxes', 'no', false ); update_option( 'woocommerce_default_country', 'GH', false ); update_option( 'woocommerce_allowed_countries', 'all', false ); update_option( 'woocommerce_ship_to_countries', '', false ); update_option( 'woocommerce_enable_guest_checkout', 'yes', false );

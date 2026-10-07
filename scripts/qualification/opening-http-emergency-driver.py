@@ -105,7 +105,8 @@ def run_emergency(client, state, bridge, recorder, Page, login):
         try:
             bridge.call("classicpageemergency")
             diagnostic["stage"] = "bridge_resume"
-            bridge.call("resumeemergency")
+            resumed = bridge.call("resumeemergency")
+            diagnostic["frontend_visibility"] = resumed["snapshot"]["coming_soon"]
             diagnostic["stage"] = "inspect"
             current, _ = fixture(diagnostic=diagnostic)
             diagnostic["stage"] = "seed"
@@ -154,7 +155,8 @@ def run_emergency(client, state, bridge, recorder, Page, login):
                        and before["protected_order_hash"] == after["protected_order_hash"]
                        and all(not order["paid"] for key, order in after["orders"].items() if key not in before["orders"]),
                        dict(evidence(before, after, response), page_rendered=rendered.status == 200,
-                            fixture_preparation="existing server-validated cart choices; actual checkout request follows", barrier=after["barrier"]))
+                            fixture_preparation="existing server-validated cart choices; actual checkout request follows", barrier=after["barrier"],
+                            frontend_visibility=before["coming_soon"]))
 
     response = login(client, state, settings, recorder, "HTTP-C07")
     opened = form(response)
