@@ -10,6 +10,8 @@ Root owns shared bootstrap/version/registry/schema/CI/package/control-plane/docs
 
 The [Q04 implementation record](docs/product/W2-Q04-LEGACY-PRICE-PROVIDER-2026-10-07.md) defines the actual finite legacy/native subset and explicit Q05 preparation-budget dependency. Current provider/source/native stack is implemented; configured comparative units2970/18042/1existing skip and physical SQL41/334 passed. JS8/102, autoload, production691/0, repository1091/0 and controls passed. Comparative proofs do not substitute for immutable native qualification. Schema9 remains; production package has691 PHP files. Native442/HTTP98 are source-derived targets until executed candidate receipts establish success.
 
+Q04 first draft PR90 candidate0c3aa60c/treeb7e4dfd9 failed CI37594321787: physical SQL291/6037 incl41provider passed, PHP8.3/JS/controls passed;8.4/8.5 isolated binding probes and native admin cart bootstrap failed. Native333PASS/1FAIL/108missing, cleanupfailed/noHTTP,691-source provenance verified. The checkpoint record preserves ZIP/JSON fingerprints and the two distinct source-established causes. Narrow static-reflection and actual native frontend-helper corrections require fresh complete qualification; no prior failure is promoted to success.
+
 # Historical Q03 immutable freeze
 
 # Current Work — W2-Q03 durable internal quote lifecycle

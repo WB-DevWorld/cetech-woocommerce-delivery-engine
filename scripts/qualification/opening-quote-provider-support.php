@@ -59,6 +59,7 @@ final class CetechNativeQuoteProviderFixture {
 	public array $last_native = [];
 	private bool $installed = false;
 	private bool $tax_class_created = false;
+	private string $cleanup_stage = 'not_started';
 
 	public function __construct( private wpdb $db ) {
 		$this->factory = new CetechNativeQuoteProviderObservedFactory( new OperationConnectionFactory() );
@@ -84,6 +85,7 @@ final class CetechNativeQuoteProviderFixture {
 	public function track( $result ): void { if ( null !== $result->command ) { $this->owned_namespaces[] = $result->command->identity->namespace_digest(); } if ( null !== $result->quote ) { $row = $result->quote->row(); $this->owned_quotes[] = $row['quote_uuid']; foreach ( [ 'issue_namespace_hash', 'accept_namespace_hash', 'invalidate_namespace_hash' ] as $key ) { $this->owned_namespaces[] = $row[$key]; } } }
 	public function track_command( CetechDeliveryEngine\Application\DeliveryQuote\QuoteIssueCommand $command ): void { $this->owned_namespaces[] = $command->identity()->namespace_digest(); }
 	private static function shipping( ?WC_Shipping $replacement = null ): WC_Shipping { $property = new ReflectionProperty( WC_Shipping::class, '_instance' ); $current = WC()->shipping(); if ( null !== $replacement ) { $property->setValue( null, $replacement ); } return $current; }
+	public function cleanup_stage(): string { return $this->cleanup_stage; }
 
 	public function install(): void {
 		if ( $this->installed ) { throw new RuntimeException( 'Native Q04 fixture is already allocated.' ); } $this->installed = true;
@@ -93,6 +95,13 @@ final class CetechNativeQuoteProviderFixture {
 		foreach ( [ 'current_user', 'user_ID' ] as $key ) { $this->globals_before[$key] = [ array_key_exists( $key, $GLOBALS ), $GLOBALS[$key] ?? null ]; }
 		foreach ( [ 'session', 'cart', 'customer' ] as $key ) { $this->wc_before[$key] = WC()->$key ?? null; } $this->wc_before['shipping'] = self::shipping();
 		foreach ( $GLOBALS['wp_filter'] as $hook => $callbacks ) { $this->hooks_before[$hook] = is_object( $callbacks ) ? clone $callbacks : $callbacks; }
+		// WP_ADMIN qualification does not load Woo's frontend cart helpers. Use
+		// the actual installed Woo files before constructing the native shopper.
+		$woo_root = defined( 'WC_ABSPATH' ) ? realpath( WC_ABSPATH ) : false; $customer_file = ( new ReflectionClass( WC_Customer::class ) )->getFileName();
+		if ( false === $woo_root || ! is_string( $customer_file ) || realpath( $customer_file ) !== $woo_root . '/includes/class-wc-customer.php' ) { throw new RuntimeException( 'Native Q04 installed Woo helper identity is unavailable.' ); }
+		require_once $woo_root . '/includes/wc-cart-functions.php';
+		require_once $woo_root . '/includes/wc-notice-functions.php';
+		if ( ! function_exists( 'wc_get_chosen_shipping_method_ids' ) || ! function_exists( 'wc_get_chosen_shipping_method_for_package' ) || ! function_exists( 'wc_add_notice' ) ) { throw new RuntimeException( 'Native Q04 installed Woo cart helpers are unavailable.' ); }
 		foreach ( [ '_transient_shipping-transient-version', '_transient_timeout_shipping-transient-version' ] as $name ) { $this->original_options[$name] = $this->option( $name ); }
 		foreach ( [ 'enable_product_delivery_selector', 'enable_cart_delivery_selection_capture', 'enable_checkout_delivery_selection_validation', 'enable_woocommerce_shipping_rate_calculation' ] as $flag ) { $this->set_option( 'cetech_de_' . $flag, 1 ); }
 		foreach ( [ 'enable_effective_configuration_runtime', 'enable_variable_product_ecr_runtime', 'enable_category_rules', 'enable_site_fallback_rule' ] as $flag ) { $this->set_option( 'cetech_de_' . $flag, 0 ); }
@@ -177,9 +186,12 @@ final class CetechNativeQuoteProviderFixture {
 	public function warm_sources(): void { foreach ( $this->products as $id ) { wc_get_product( $id ); Plugin::instance()->container()->get( ProductDeliveryConfigurationSourceInterface::class )->resolve( 'product', $id ); } get_option( 'cetech_de_enable_effective_configuration_runtime' ); get_option( 'woocommerce_currency' ); }
 
 	public function cleanup(): array {
+		$this->cleanup_stage = 'owned_connections';
 		$ok = $this->factory->close_all();
 		$GLOBALS['wp_filter'] = $this->hooks_before;
+		$this->cleanup_stage = 'owned_session';
 		if ( null !== $this->session ) { $this->session->destroy_session(); remove_action( 'shutdown', [ $this->session, 'save_data' ], 20 ); remove_action( 'woocommerce_set_cart_cookies', [ $this->session, 'set_customer_session_cookie' ], 10 ); }
+		$this->cleanup_stage = 'quote_operation_history';
 		foreach ( [ 'delivery_quote_bindings', 'delivery_quotes' ] as $suffix ) { foreach ( array_unique( $this->owned_quotes ) as $uuid ) { $field = 'delivery_quotes' === $suffix ? 'quote_uuid' : 'quote_uuid'; if ( false === $this->db->delete( TableNames::for( $suffix ), [ 'site_id' => get_current_blog_id(), $field => $uuid ] ) ) { $ok = false; } } }
 		foreach ( array_unique( $this->owned_namespaces ) as $namespace ) { $records = TableNames::for( 'operation_records' ); $ids = $this->db->get_col( $this->db->prepare( "SELECT id FROM `{$records}` WHERE site_id=%d AND namespace_hash=%s AND operation IN ('delivery_quote.issue','delivery_quote.accept','delivery_quote.invalidate')", get_current_blog_id(), $namespace ) ); foreach ( $ids as $id ) { $ok = false !== $this->db->delete( TableNames::for( 'operation_changes' ), [ 'site_id' => get_current_blog_id(), 'operation_id' => (int) $id ] ) && $ok; $ok = false !== $this->db->delete( $records, [ 'site_id' => get_current_blog_id(), 'id' => (int) $id ] ) && $ok; } }
 		// Only rows absent from the pre-fixture snapshot and exact existing counter IDs
@@ -187,18 +199,23 @@ final class CetechNativeQuoteProviderFixture {
 		$budget_table = TableNames::for( 'delivery_quote_budget_windows' ); $before = $this->domain_before['delivery_quote_budget_windows'] ?? []; $before_ids = array_column( $before, 'id' );
 		foreach ( self::rows( $budget_table ) as $row ) { $owned = isset( $this->owner ) && (int) $row['site_id'] === get_current_blog_id() && ( $row['slot_key'] === CetechDeliveryEngine\Domain\DeliveryQuote\QuoteBudgetSlot::site_slot_key( get_current_blog_id() ) || $row['slot_key'] === CetechDeliveryEngine\Domain\DeliveryQuote\QuoteBudgetSlot::session_slot_key( $this->owner ) || in_array( $row['admission_namespace_hash'], $this->owned_namespaces, true ) ); if ( $owned && ! in_array( $row['id'], $before_ids, true ) ) { $ok = false !== $this->db->delete( $budget_table, [ 'id' => $row['id'], 'site_id' => get_current_blog_id() ] ) && $ok; } }
 		foreach ( $before as $row ) { if ( $row['slot_key'] === CetechDeliveryEngine\Domain\DeliveryQuote\QuoteBudgetSlot::site_slot_key( get_current_blog_id() ) ) { $ok = false !== $this->db->replace( $budget_table, $row ) && $ok; } }
+		$this->cleanup_stage = 'owned_sources';
 		foreach ( array_reverse( $this->entities ) as [ $suffix, $id ] ) { $ok = false !== $this->db->delete( TableNames::for( $suffix ), [ 'id' => $id ] ) && $ok; }
 		foreach ( array_reverse( [ ...$this->products, ...$this->extra_products ] ) as $id ) { wp_delete_post( $id, true ); clean_post_cache( $id ); }
 		if ( isset( $this->shipping_instance ) ) { ( new WC_Shipping_Zone( 0 ) )->delete_shipping_method( $this->shipping_instance ); }
 		foreach ( $this->tax_rates as $id ) { WC_Tax::_delete_tax_rate( $id ); }
 		if ( $this->tax_class_created ) { WC_Tax::delete_tax_class( $this->tax_class ); }
+		$this->cleanup_stage = 'raw_options';
 		foreach ( $this->original_options as $name => $row ) { if ( null === $row ) { $ok = false !== $this->db->delete( $this->db->options, [ 'option_name' => $name ] ) && $ok; } else { $ok = false !== $this->db->replace( $this->db->options, $row ) && $ok; } wp_cache_delete( $name, 'options' ); } wp_cache_delete( 'alloptions', 'options' ); wp_cache_delete( 'notoptions', 'options' ); WC_Tax::init();
+		$this->cleanup_stage = 'native_objects';
 		foreach ( $this->wc_before as $key => $value ) { if ( 'shipping' === $key ) { self::shipping( $value ); } else { WC()->$key = $value; } } foreach ( $this->globals_before as $key => [ $exists, $value ] ) { if ( $exists ) { $GLOBALS[$key] = $value; } else { unset( $GLOBALS[$key] ); } }
+		$this->cleanup_stage = 'restoration_verification';
 		$domains = true; foreach ( $this->domain_before as $suffix => $rows ) { $domains = $domains && $rows === self::rows( TableNames::for( $suffix ) ); }
 		$options = true; foreach ( $this->original_options as $name => $row ) { $options = $options && $row === $this->option( $name ); }
 		$native = true; foreach ( [ 'woocommerce_tax_rates' => 'tax_rate_id', 'woocommerce_tax_rate_locations' => 'location_id', 'woocommerce_shipping_zone_methods' => 'instance_id', 'woocommerce_sessions' => 'session_id', 'wc_tax_rate_classes' => 'tax_rate_class_id' ] as $suffix => $key ) { $native = $native && $this->native_before[$suffix] === self::rows( $this->db->prefix . $suffix, $key ); } $taxonomy = $this->term_before === self::rows( $this->db->term_taxonomy, 'term_taxonomy_id' );
 		$products = true; foreach ( [ ...$this->products, ...$this->extra_products ] as $id ) { $products = $products && 0 === (int) $this->db->get_var( $this->db->prepare( "SELECT COUNT(*) FROM `{$this->db->posts}` WHERE ID=%d", $id ) ) && 0 === (int) $this->db->get_var( $this->db->prepare( "SELECT COUNT(*) FROM `{$this->db->postmeta}` WHERE post_id=%d", $id ) ) && 0 === (int) $this->db->get_var( $this->db->prepare( "SELECT COUNT(*) FROM `{$this->db->prefix}wc_product_meta_lookup` WHERE product_id=%d", $id ) ); }
 		$objects = WC()->cart === $this->wc_before['cart'] && WC()->customer === $this->wc_before['customer'] && WC()->session === $this->wc_before['session'] && WC()->shipping() === $this->wc_before['shipping'];
+		$this->cleanup_stage = 'completed';
 		return [ 'cleanup_restored' => $ok && $domains && $options && $native && $products && $taxonomy && $objects, 'domain35_and_quote_operation_history_restored' => $domains, 'raw_options_restored' => $options, 'native_tax_method_session_rows_restored' => $native, 'native_taxonomy_restored' => $taxonomy, 'owned_products_removed' => $products, 'native_wc_objects_restored' => $objects, 'all_owned_connections_retired' => $this->factory->all_retired() ];
 	}
 }

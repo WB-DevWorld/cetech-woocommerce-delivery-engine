@@ -91,7 +91,7 @@ return static function ( callable $check ): void {
 		$check( 'NATIVE-W2Q04-WARM-VARIATION-REPARENT-CURRENT-REFUSAL', 1 === $changed && $current_parent === $fixture->alternate_parent && 'unavailable' === $variation_read->status && null === $variation_read->quote && $variation_body === $stored_variation['private_body_json'] && $variation_events === count( $fixture->history()['operation_changes'] ), [ 'actual_native_variation' => true, 'native_product_cache_prewarmed' => true, 'physical_parent_changed_without_cache_invalidation' => 1 === $changed, 'current_read_status' => $variation_read->status, 'immutable_body_preserved' => $variation_body === $stored_variation['private_body_json'], 'current_read_has_no_material_event' => $variation_events === count( $fixture->history()['operation_changes'] ) ] ); $wpdb->update( $wpdb->posts, [ 'post_parent' => $fixture->variation_parent ], [ 'ID' => $fixture->variation_id ] );
 	} catch ( Throwable $error ) { $failure = $error; throw $error; }
 	finally {
-		$cleanup = [ 'cleanup_restored' => false ]; try { $cleanup = $fixture->cleanup(); } catch ( Throwable ) {}
+		$cleanup = [ 'cleanup_restored' => false ]; try { $cleanup = $fixture->cleanup(); } catch ( Throwable $cleanup_error ) { $cleanup['cleanup_stage'] = $fixture->cleanup_stage(); $cleanup['cleanup_error_class'] = get_class( $cleanup_error ); }
 		if ( null === $failure ) { $check( 'NATIVE-W2Q04-OWNED-NATIVE-PROVIDER-FIXTURE-CLEANUP', true === $cleanup['cleanup_restored'], $cleanup ); } else { try { $check( 'NATIVE-W2Q04-OWNED-NATIVE-PROVIDER-FIXTURE-CLEANUP', true === $cleanup['cleanup_restored'], $cleanup ); } catch ( Throwable ) {} }
 	}
 };
