@@ -31,7 +31,7 @@ if ( 'prepareemergency' === $mode ) {
 	$fixture = new CetechOpeningEmergencyFixture();
 	try {
 		$fixture->prepare(); wp_set_current_user( $fixture->state['user_id'] );
-		$fixture->state += [ 'probe_token' => getenv( 'CETECH_DE_HTTP_PROBE_TOKEN' ), 'fixture_token' => bin2hex( random_bytes( 24 ) ), 'base_url' => 'http://127.0.0.1:8085', 'identity' => opening_http_identity(), 'support_file' => realpath( __DIR__ . '/opening-emergency-fixture-support.php' ) ];
+		$fixture->state += [ 'probe_token' => getenv( 'CETECH_DE_HTTP_PROBE_TOKEN' ), 'fixture_token' => bin2hex( random_bytes( 24 ) ), 'base_url' => 'http://127.0.0.1:8085', 'identity' => opening_http_identity(), 'support_file' => realpath( __DIR__ . '/opening-emergency-fixture-support.php' ), 'store_checkout_url' => rest_url( 'wc/store/v1/checkout' ) ];
 		foreach ( [ 'new' => [ false, false ], 'legacy' => [ true, false ], 'missing' => [ false, true ], 'ordinary' => [ false, false ] ] as $kind => [ $legacy, $missing ] ) {
 			$order = $fixture->order( 'ordinary' === $kind ? 'unmanaged' : 'managed', $legacy, $missing ); $fixture->state[ $kind . '_order_id' ] = $order->get_id(); $fixture->state[ $kind . '_order_pay_url' ] = $order->get_checkout_payment_url();
 		}

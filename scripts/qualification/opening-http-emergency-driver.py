@@ -6,6 +6,7 @@ is explicit; only the subsequent checkout/payment requests are admission proofs.
 import copy
 import json
 import os
+import re
 import subprocess
 import uuid
 from pathlib import Path
@@ -151,12 +152,20 @@ def run_emergency(client, state, bridge, recorder, Page, login):
     def blocked(case, data):
         prepared, rendered, response, result, before, after = data
         denied = result.get("result") == "failure" and "temporarily paused" in result.get("messages", "")
+        messages = result.get("messages", "") if isinstance(result.get("messages"), str) else ""
+        new_orders = [order for key, order in after["orders"].items() if key not in before["orders"]]
+        components = {"result_is_failure": result.get("result") == "failure", "paused_message_present": "temporarily paused" in messages,
+                      "revalidation_message_present": "need to be checked again" in messages, "gateway_unchanged": before["gateway_count"] == after["gateway_count"],
+                      "protected_history_unchanged": before["protected_order_hash"] == after["protected_order_hash"],
+                      "new_orders_count": len(new_orders), "new_paid_orders_count": sum(bool(order["paid"]) for order in new_orders),
+                      "error_id_presence": {code: re.search(r'\bdata-id=["\']' + re.escape(code) + r'["\']', messages) is not None
+                                            for code in ("cetech_de_checkout_control", "cetech_de_delivery_selection", "billing_email", "billing_phone", "billing_state", "billing_postcode", "shipping", "payment", "terms")}}
         recorder.check(prefix + case, response.status == 200 and denied and before["gateway_count"] == after["gateway_count"]
                        and before["protected_order_hash"] == after["protected_order_hash"]
                        and all(not order["paid"] for key, order in after["orders"].items() if key not in before["orders"]),
                        dict(evidence(before, after, response), page_rendered=rendered.status == 200,
                             fixture_preparation="existing server-validated cart choices; actual checkout request follows", barrier=after["barrier"],
-                            frontend_visibility=before["coming_soon"]))
+                            frontend_visibility=before["coming_soon"], components=components))
 
     response = login(client, state, settings, recorder, "HTTP-C07")
     opened = form(response)
@@ -217,7 +226,7 @@ def run_emergency(client, state, bridge, recorder, Page, login):
     prepared = seed("managed"); before = snapshot(); bridge.call("armstoreemergency")
     cart, _ = fixture(); address = {"first_name": "Synthetic", "last_name": "Shopper", "company": "", "address_1": "PRIVATE-C07-SYNTHETIC-ADDRESS", "address_2": "", "city": "Accra", "state": "AA", "postcode": "00001", "country": "GH", "phone": "0200000000"}
     billing = dict(address, email="c07-shopper@example.invalid")
-    response = client.json_post("/wp-json/wc/store/v1/checkout", {"billing_address": billing, "shipping_address": address, "payment_method": "cetech_c07_local_gateway", "payment_data": [], "customer_note": ""}, {"Nonce": cart["store_nonce"]})
+    response = client.json_post(client.resolve(state["store_checkout_url"]), {"billing_address": billing, "shipping_address": address, "payment_method": "cetech_c07_local_gateway", "payment_data": [], "customer_note": ""}, {"Nonce": cart["store_nonce"]})
     result = json.loads(response.body); after = snapshot()
     recorder.check(prefix + "DIRECT-STORE-API-LATE-PAUSE-409-NO-PAYMENT", response.status == 409
                    and result.get("code") == "cetech_de_checkout_control" and "temporarily paused" in result.get("message", "")

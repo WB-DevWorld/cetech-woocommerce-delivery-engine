@@ -20,6 +20,19 @@ const dom = {checkout_visible:false,place_order_visible:false,shopper_pause_visi
 function write() { const temp = receiptPath + '.tmp'; fs.writeFileSync(temp, JSON.stringify(report, null, 2) + '\n', {mode:0o600}); fs.renameSync(temp, receiptPath); }
 function check(id, condition, evidence) { report.cases.push({id, status: condition ? 'PASS' : 'FAIL', evidence}); write(); if (!condition) throw new Error('Blocks browser qualification assertion failed: ' + id); }
 function owned(url) { return new URL(url, base).origin === base.origin; }
+function isCheckoutPost(url, method, nativeUrl, origin) {
+  if (method !== 'POST') return false;
+  try {
+    const observed = new URL(url, origin); const native = new URL(nativeUrl, origin);
+    if (observed.origin !== origin || native.origin !== origin || observed.username || observed.password || native.username || native.password || observed.hash || native.hash) return false;
+    const route = '/wc/store/v1/checkout';
+    const normalize = value => value.endsWith('/') ? value.slice(0, -1) : value;
+    const nativeQueries = native.searchParams.getAll('rest_route'); const observedQueries = observed.searchParams.getAll('rest_route');
+    if (nativeQueries.length > 1 || observedQueries.length > 1) return false;
+    if (nativeQueries.length === 1) return observedQueries.length === 1 && normalize(nativeQueries[0]) === route && observed.pathname === native.pathname && normalize(observedQueries[0]) === route;
+    return normalize(native.pathname).endsWith(route) && observedQueries.length === 0 && normalize(observed.pathname) === normalize(native.pathname);
+  } catch (_) { return false; }
+}
 
 (async () => {
   const modulePath = process.env.CETECH_DE_EMERGENCY_PLAYWRIGHT_MODULE;
@@ -68,7 +81,7 @@ function owned(url) { return new URL(url, base).origin === base.origin; }
     const paused = await context.request.post('/?cetech_c07_fixture=pause', {headers,form:{nonce:data.data.nonce},timeout:20000});
     if (paused.status() !== 200 || !(await paused.json()).success) throw new Error('Browser after-render control transition failed');
     stage = 'submit';
-    const requestObserved = page.waitForResponse(response => /\/wc\/store\/v1\/checkout(?:\?|$)/.test(response.url()) && response.request().method() === 'POST', {timeout:20000});
+    const requestObserved = page.waitForResponse(response => isCheckoutPost(response.url(), response.request().method(), state.store_checkout_url, base.origin), {timeout:20000});
     await button.click();
     const checkout = await requestObserved;
     const value = await checkout.json();

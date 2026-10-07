@@ -48,6 +48,14 @@ add_action( 'plugins_loaded', static function (): void {
 	}
 	add_filter( 'woocommerce_payment_gateways', static function ( array $methods ): array { $methods[] = CetechOpeningEmergencyGateway::class; return $methods; } );
 	add_action( 'woocommerce_after_checkout_validation', static function (): void { cetech_c07_barrier( 'classic_after_validation' ); }, 1000 );
+	// Observe this actual request boundary without altering the order or admission.
+	add_action( 'woocommerce_checkout_order_processed', static function (): void {
+		if ( defined( 'WP_CLI' ) && WP_CLI || ! cetech_c07_fixture_principal() ) { return; }
+		$barrier = get_option( 'cetech_opening_c07_barrier', null );
+		if ( is_array( $barrier ) && in_array( $barrier['phase'] ?? null, [ 'classic_after_validation', 'classic_empty_cart' ], true ) ) {
+			$barrier['classic_processed_reached'] = true; update_option( 'cetech_opening_c07_barrier', $barrier, false );
+		}
+	}, -100 );
 	add_action( 'woocommerce_store_api_checkout_update_order_from_request', static function (): void { cetech_c07_barrier( 'store_after_update' ); }, 1000 );
 	add_action( 'woocommerce_checkout_order_processed', static function (): void { cetech_c07_barrier( 'classic_empty_cart' ); }, 1000 );
 	$track = static function ( mixed $order ): void { if ( defined( 'WP_CLI' ) && WP_CLI || ! $order instanceof WC_Order || ! cetech_c07_fixture_principal() ) { return; } $state = cetech_c07_private_state(); if ( ! in_array( $order->get_id(), $state['orders'], true ) ) { $state['orders'][] = $order->get_id(); cetech_c07_private_write( $state ); } };
