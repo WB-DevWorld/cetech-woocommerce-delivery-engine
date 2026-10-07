@@ -1,3 +1,17 @@
+# Current Work — W2-Q03 durable internal quote lifecycle
+
+Status: **W2-Q02 OWNER-APPROVED AND INTEGRATED — W2-Q03 IMPLEMENTED / IMMUTABLE CANDIDATE QUALIFICATION PENDING**
+
+At 2026-10-07 06:40:53 UTC the owner instructed “Approve W2-Q02 for integration and implement W2-Q03.” The unchanged qualified Q02 head `99e3626a386a5fe7012fe6374d7ed5b410fa2b6e` integrated normally through PR #86 as `64a0d1856a5fb4780ccaf98e4d79766d1695cb2e`, tree `71bf29d32433a1d3fd0933c6ec4abf7659d1bae3`. Candidate CI37581625505 attempt1 passed all eight substantive jobs, native392/finalHTTP98/smoke/cleanup, and all643 installed source hashes matched immutable Git bytes. Actual-master CI37582927815 attempt1 separately passed all eight jobs, complete native392/finalHTTP98/smoke/cleanup/browser and all643 exact merged-source hashes/mapc06b58d5. Issue #85 completed; exact separate artifact fingerprints remain on PR #86. Historical failed Q02 receipts remain failed evidence on PR #86.
+
+[Issue #87](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/87) tracks Q03 on `ws3/wave2-q03-durable-lifecycle`, from the actual integrated Q02 merge under the accepted [six-checkpoint plan](docs/product/W2-DELIVERYQUOTE-IMPLEMENTATION-PLAN-2026-10-07.md). The authorized boundary is internal C03 issue/accept/invalidate/bind/seal coordination, original-envelope read/reconciliation, owned pre-reservation budget admission with immutable single-use lease, reference-safe private payload stripping and finite retention checkpoints. Only trusted test providers are used. The real legacy price provider, shopper/cart readers and native placement adoption remain Q04–Q06. Schema9 is retained.
+
+Root holds the shared bootstrap/version/schema/CI/package/control-plane/docs/ref/PR/Issue lease. Disjoint agents own core durable profiles/service, admission gate, retention, physical SQL tests and actual WordPress proofs. A read-only agent independently verifies actual-master receipts. The owner and AI agents are the active team; no outside availability gate is introduced. Proof mutations use marked disposable fixtures and bounded cleanup. Generic C03 coordination, current shopper behavior and existing history are preserved unless a demonstrated bounded defect requires correction.
+
+The [Q03 implementation record](docs/product/W2-Q03-DURABLE-LIFECYCLE-2026-10-07.md) records the internal durable profiles, admission and separate conservative retention adopter. Comparative full units2862/17683/one existing skip, production666/0, repository1049/0 and control-plane/negative-fixture checks passed. Native412/HTTP98 are the source-derived candidate targets; executed immutable receipts remain pending until CI. Comparative real SQL `quote-lifecycle-real-db`46/960 passed with zero skips/errors/failures, both race orderings zero deadlocks/timeouts and zero remaining owned tables. Fresh-process results and exact final CI/runtime fingerprints are separately recorded on the implementation PR.
+
+# Historical work — Q02 checkpoint
+
 # Current Work — W2-Q02 quote storage/readiness
 
 Status: **W2-Q01 OWNER-APPROVED AND INTEGRATED — W2-Q02 IMPLEMENTED / FINAL QUALIFICATION PENDING**

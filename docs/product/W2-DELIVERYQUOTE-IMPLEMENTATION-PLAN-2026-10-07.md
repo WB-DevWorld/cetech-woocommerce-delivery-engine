@@ -6,6 +6,8 @@ Q01 execution is recorded separately in the [internal-contract checkpoint](W2-Q0
 
 Q01 is owner-approved and integrated through PR #84 as `090a0ad535ee8faac59d2763333d762cb89ef0d0`. Q02 storage/readiness is authorized by the 2026-10-07 05:40:20 UTC instruction and tracked in Issue #85. The named rate index maps the proposed currency dimension to the retained table’s actual `base_currency` field; see the design’s explicit source-alignment note. Current Q02 executed proof is recorded in its separate checkpoint rather than rewriting this approval-time case table.
 
+Q02 is owner-approved and integrated through PR #86 as `64a0d1856a5fb4780ccaf98e4d79766d1695cb2e`. Q03 is authorized by the 2026-10-07 06:40:53 UTC instruction and tracked in Issue #87. Its executed proof is recorded separately from the approval-time case table below.
+
 ## Checkpoints and exit conditions
 
 | Checkpoint | Deliverable / change boundary | Evidence and decision at exit |

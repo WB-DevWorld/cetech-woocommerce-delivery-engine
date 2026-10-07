@@ -191,6 +191,25 @@ $required_classes = [
 	'CetechDeliveryEngine\\Application\\Geography\\LegacyDestinationCoverageMigrator',
 	'CetechDeliveryEngine\\Application\\Coverage\\CoverageGroupMatcher',
 	'CetechDeliveryEngine\\Presentation\\Admin\\LocationPacksPage',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteAdmissionAttempt',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteAdmissionGate',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteAdmissionLease',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteAdmissionResult',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteAdvisoryPublication',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteCurrentReadResult',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteDurableCommand',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteDurableResult',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteDurableService',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteOperationProfile',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteReceiptVerifier',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteRetentionCheckpoint',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteRetentionNativeControl',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteRetentionProfile',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteRetentionRequest',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteRetentionResult',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteRetentionService',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteRetentionUnknownReferences',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\QuoteRetentionStore',
 ];
 
 $required_interfaces = [
@@ -200,6 +219,10 @@ $required_interfaces = [
 	'CetechDeliveryEngine\\Application\\Shipping\\CartLineShippingAssessorInterface',
 	'CetechDeliveryEngine\\Application\\Destination\\PackageDestinationZoneResolverInterface',
 	'CetechDeliveryEngine\\Application\\Bulk\\Queue\\ActionSchedulerGateway',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteCurrentEvidenceGuard',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePrivatePublication',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteRetentionControl',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteRetentionReferenceInspector',
 ];
 
 foreach ( $required_classes as $class ) {
@@ -332,7 +355,8 @@ $is_schema5_release = str_contains( $header_source, '1.0.0-dev.bulk' )
 	|| str_contains( $header_source, '1.0.0-dev.pdp-price' )
 	|| str_contains( $header_source, '1.0.0-rc.11' );
 
-$is_schema9_release = str_contains( $header_source, '1.0.0-dev.wave2-quote-storage' );
+$is_schema9_release = str_contains( $header_source, '1.0.0-dev.wave2-quote-storage' )
+	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-lifecycle' );
 $is_schema8_release = str_contains( $header_source, '1.0.0-dev.wave1-rule-lifecycle' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-snapshot-readers' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-data-lifecycle' )

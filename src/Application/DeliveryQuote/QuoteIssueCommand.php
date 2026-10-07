@@ -30,6 +30,9 @@ final readonly class QuoteIssueCommand implements \JsonSerializable {
 	public function profile(): string { return $this->quote_profile; }
 	public function profile_version(): int { return $this->quote_profile_version; }
 	public function intent_digest(): string { return $this->intent->fingerprint(); }
+	/** The exact original internal namespace, never a newly minted replay token. */
+	public function identity(): OperationIdentity { return $this->issue_identity; }
+	public function intent(): CanonicalIntent { return $this->intent; }
 	public function namespace_hashes( QuoteId $id ): array {
 		$namespaces = [ 'issue' => $this->issue_identity->namespace_digest() ];
 		foreach ( [ 'accept', 'invalidate' ] as $purpose ) {

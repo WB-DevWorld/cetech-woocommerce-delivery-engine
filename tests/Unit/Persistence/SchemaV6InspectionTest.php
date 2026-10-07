@@ -21,8 +21,8 @@ final class SchemaV6InspectionTest extends TestCase {
 		$plugin_root = dirname( __DIR__, 3 );
 		$header      = (string) file_get_contents( $plugin_root . '/cetech-woocommerce-delivery-engine.php' );
 
-		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.wave2-quote-storage\\.1'\s*\)/", $header );
-		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.wave2-quote-storage\\.1\s*$/m', $header );
+		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.wave2-quote-lifecycle\\.1'\s*\)/", $header );
+		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.wave2-quote-lifecycle\\.1\s*$/m', $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.wave1-emergency-control.1' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.shipment-order-read.1' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.address-ux.3' )", $header );
