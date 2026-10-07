@@ -129,7 +129,7 @@ def native_failure_observation(value):
         return False
     if not choice(value["prepare_error_class"], {None, "RuntimeException", "InvalidArgumentException", "Error"}):
         return False
-    if not choice(value["prepare_refusal_site"], {None, "native_environment", "native_shipping", "native_preparation", "legacy_source", "native_context", "native_receipt", "source_snapshot"}):
+    if not choice(value["prepare_refusal_site"], {None, "native_environment", "native_shipping", "native_preparation", "legacy_source", "source_local_binding", "native_context", "native_receipt", "source_snapshot"}):
         return False
     if value["prepare_refusal_site"] is None:
         if value["prepare_refusal_line"] is not None:

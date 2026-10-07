@@ -121,6 +121,55 @@ final class SourceSnapshotTest extends TestCase {
 	public function test_unverified_native_runtime_cannot_open_a_source_transaction(): void {
 		$factory = $this->createMock( OperationConnectionFactory::class ); $factory->expects( self::never() )->method( 'open' ); $this->expectException( \RuntimeException::class ); ( new LegacyQuoteNativeSourcePreparer( $factory ) )->prepare( QuoteFixtures::owner(), F::context() );
 	}
+	public function test_native_source_failure_preserves_private_cause_without_changing_public_error(): void {
+		// Fresh host shim: the actual preparer catches a native owner-read failure.
+		// This is private exception protocol evidence, not a native SQL qualification.
+		$program = <<<'PHP'
+function wp_salt( string $scheme = 'auth' ): string { return str_repeat( 'key', 16 ); }
+require 'tests/bootstrap.php';
+require 'tests/Support/DeliveryQuote/QuoteFixtures.php';
+require 'tests/Support/DeliveryQuote/LegacyQuoteProviderFixtures.php';
+$private = 'PRIVATE-SOURCE-FAILURE-COOKIE-SENTINEL'; $cause = new RuntimeException( $private );
+$GLOBALS['cetech_de_test_wc'] = new class( $cause ) {
+    public function __construct( private Throwable $cause ) {}
+    public function __isset( string $name ): bool { return true; }
+    public function __get( string $name ): never { throw $this->cause; }
+};
+$factory = new class implements CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory {
+    public int $calls = 0;
+    public function open(): CetechDeliveryEngine\Domain\Operation\OperationSession { ++$this->calls; throw new LogicException( 'No source transaction expected.' ); }
+};
+try {
+    ( new CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteNativeSourcePreparer( $factory ) )->prepare( CetechDeliveryEngine\Tests\Support\DeliveryQuote\QuoteFixtures::owner(), CetechDeliveryEngine\Tests\Support\DeliveryQuote\LegacyQuoteProviderFixtures::context() );
+    exit( 3 );
+} catch ( Throwable $error ) {
+    $projection = CetechDeliveryEngine\Application\DeliveryQuote\CartQuoteResult::create( 'unavailable', 0, CetechDeliveryEngine\Domain\Contracts\RequestContext::create() )->shopper_facts();
+    echo json_encode( [ 'same_private_cause' => $cause === $error->getPrevious(), 'private_message_retained' => $private === $error->getPrevious()?->getMessage(), 'public_message' => $error->getMessage(), 'public_code' => $error->getCode(), 'public_sentinel_absent' => ! str_contains( json_encode( [ 'message' => $error->getMessage(), 'facts' => $projection ], JSON_THROW_ON_ERROR ), $private ), 'shopper_status' => $projection['status'], 'factory_calls' => $factory->calls ], JSON_THROW_ON_ERROR );
+}
+PHP;
+		$process = proc_open( [ PHP_BINARY, '-r', $program ], [ [ 'pipe', 'r' ], [ 'pipe', 'w' ], [ 'pipe', 'w' ] ], $pipes, dirname( __DIR__, 3 ) ); self::assertIsResource( $process ); fclose( $pipes[0] ); $stdout = stream_get_contents( $pipes[1] ); $stderr = stream_get_contents( $pipes[2] ); fclose( $pipes[1] ); fclose( $pipes[2] ); self::assertSame( 0, proc_close( $process ), $stderr );
+		$facts = json_decode( $stdout, true, 8, JSON_THROW_ON_ERROR ); self::assertTrue( $facts['same_private_cause'] ); self::assertTrue( $facts['private_message_retained'] ); self::assertSame( 'Delivery quote source unavailable.', $facts['public_message'] ); self::assertSame( 0, $facts['public_code'] ); self::assertTrue( $facts['public_sentinel_absent'] ); self::assertSame( 'unavailable', $facts['shopper_status'] ); self::assertSame( 0, $facts['factory_calls'] );
+	}
+	public function test_private_source_hook_refusal_maps_only_its_verified_installed_line(): void {
+		$program = <<<'PHP'
+function wp_salt( string $scheme = 'auth' ): string { return str_repeat( 'key', 16 ); }
+class WC_Session_Handler { public function has_session(): bool { return true; } public function get_customer_id(): string { return 'owned-fixture-guest'; } }
+class WC_Customer {}
+class WP_Hook { public array $callbacks = []; }
+require 'tests/bootstrap.php'; require 'tests/Support/DeliveryQuote/QuoteFixtures.php'; require 'scripts/qualification/opening-quote-cart-support.php';
+$GLOBALS['cetech_de_test_wc'] = (object) [ 'session' => new WC_Session_Handler(), 'customer' => new WC_Customer() ]; $GLOBALS['cetech_de_test_user_id'] = 0;
+$owner = ( new CetechDeliveryEngine\Application\DeliveryQuote\QuoteNativeOwnerResolver() )->current(); $called = false; $hook = new WP_Hook(); $hook->callbacks = [ 10 => [ [ 'function' => static function () use ( &$called ): void { $called = true; throw new RuntimeException( 'PRIVATE-CALLBACK-COOKIE' ); }, 'accepted_args' => 1 ] ] ]; $GLOBALS['wp_filter'] = [ 'woocommerce_product_get_status' => $hook ];
+$factory = new class implements CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory { public int $calls = 0; public function open(): CetechDeliveryEngine\Domain\Operation\OperationSession { ++$this->calls; throw new LogicException( 'Source refusal must precede SQL.' ); } };
+try {
+    ( new CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteNativeSourcePreparer( $factory ) )->prepare( $owner, CetechDeliveryEngine\Tests\Support\DeliveryQuote\QuoteFixtures::context() ); exit( 3 );
+} catch ( Throwable $error ) {
+    [ $site, $line ] = CetechQuoteCartEnvironmentObservation::verified_refusal( $error ); $method = new ReflectionMethod( CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceLocalBinding::class, 'fingerprint' );
+    echo json_encode( [ 'private_cause_kept' => $error->getPrevious() instanceof RuntimeException, 'source_code' => $site, 'line_verified' => is_int( $line ) && $line >= $method->getStartLine() && $line <= $method->getEndLine(), 'callback_not_invoked' => ! $called, 'factory_calls' => $factory->calls, 'public_message' => $error->getMessage(), 'private_sentinel_absent' => ! str_contains( json_encode( [ 'source_code' => $site, 'public_message' => $error->getMessage() ], JSON_THROW_ON_ERROR ), 'PRIVATE' ) ], JSON_THROW_ON_ERROR );
+}
+PHP;
+		$process = proc_open( [ PHP_BINARY, '-r', $program ], [ [ 'pipe', 'r' ], [ 'pipe', 'w' ], [ 'pipe', 'w' ] ], $pipes, dirname( __DIR__, 3 ) ); self::assertIsResource( $process ); fclose( $pipes[0] ); $stdout = stream_get_contents( $pipes[1] ); $stderr = stream_get_contents( $pipes[2] ); fclose( $pipes[1] ); fclose( $pipes[2] ); self::assertSame( 0, proc_close( $process ), $stderr );
+		$facts = json_decode( $stdout, true, 8, JSON_THROW_ON_ERROR ); self::assertTrue( $facts['private_cause_kept'] ); self::assertSame( 'source_local_binding', $facts['source_code'] ); self::assertTrue( $facts['line_verified'] ); self::assertTrue( $facts['callback_not_invoked'] ); self::assertSame( 0, $facts['factory_calls'] ); self::assertSame( 'Delivery quote source unavailable.', $facts['public_message'] ); self::assertTrue( $facts['private_sentinel_absent'] );
+	}
 	private static function hook( array $facts ): \WP_Hook { $hook = new \WP_Hook(); $hook->callbacks = $facts['callbacks']; return $hook; }
 	private function snapshot( array $cards, array $rows = [], string $at = '2026-10-07 05:00:00.000000' ): LegacyQuoteSourceSnapshot { $plan = F::plan(); return LegacyQuoteSourceSnapshot::captured( $plan, F::context(), $rows, [ LegacyQuoteSourcePlan::range_key( $plan->rate_ranges()[0] ) => $cards ], QuoteTime::parse( $at ) ); }
 }

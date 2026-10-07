@@ -98,7 +98,7 @@ final class LegacyQuoteNativeSourcePreparer {
 			if ( ! $first->matches( $second ) || ! $local->unchanged() || ! $owner->equals( ( new QuoteNativeOwnerResolver() )->current() ) ) { self::fail(); }
 			$this->supported_geography( $second );
 			return $second->with_local_binding( $local );
-		} catch ( \Throwable ) { self::fail(); }
+		} catch ( \Throwable $error ) { throw new \RuntimeException( 'Delivery quote source unavailable.', 0, $error ); }
 	}
 
 	/** Exact internal receipt grammar shared with native server-context construction. */

@@ -162,6 +162,7 @@ final class CetechQuoteCartEnvironmentObservation implements CartQuoteEnvironmen
 			CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuoteShipping::class => [ 'native_shipping', 'fail' ],
 			CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuotePreparation::class => [ 'native_preparation', 'fail' ],
 			CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteNativeSourcePreparer::class => [ 'legacy_source', 'fail' ],
+			CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceLocalBinding::class => [ 'source_local_binding', 'unavailable' ],
 			CetechDeliveryEngine\Application\DeliveryQuote\QuoteNativeWooSource::class => [ 'native_context', 'refuse' ],
 		]; $best = [ null, null ];
 		for ( $depth = 0; $depth < 4 && null !== $error; ++$depth, $error = $error->getPrevious() ) {
@@ -289,7 +290,7 @@ final class CetechQuoteCartHttpFixture {
 		if ( count( $facts ) !== count( $keys ) || [] !== array_diff( $keys, array_keys( $facts ) ) ) { return null; }
 		foreach ( $booleans as $key ) { if ( ! is_bool( $facts[$key] ) ) { return null; } }
 		if ( null !== $facts['native_shipping_debug_enabled'] && ! is_bool( $facts['native_shipping_debug_enabled'] ) ) { return null; }
-		if ( ! in_array( $facts['prepare_error_class'], [ null, 'RuntimeException', 'InvalidArgumentException', 'Error' ], true ) || ! in_array( $facts['prepare_refusal_site'], [ null, 'native_environment', 'native_shipping', 'native_preparation', 'legacy_source', 'native_context', 'native_receipt', 'source_snapshot' ], true ) ) { return null; }
+		if ( ! in_array( $facts['prepare_error_class'], [ null, 'RuntimeException', 'InvalidArgumentException', 'Error' ], true ) || ! in_array( $facts['prepare_refusal_site'], [ null, 'native_environment', 'native_shipping', 'native_preparation', 'legacy_source', 'source_local_binding', 'native_context', 'native_receipt', 'source_snapshot' ], true ) ) { return null; }
 		if ( null === $facts['prepare_refusal_site'] ? null !== $facts['prepare_refusal_line'] : ( ! is_int( $facts['prepare_refusal_line'] ) || $facts['prepare_refusal_line'] < 1 || $facts['prepare_refusal_line'] > 100000 ) ) { return null; }
 		if ( ! ( ( true === $facts['prepare_entered'] && false === $facts['prepare_returned'] ) || ( true === $facts['evidence_called'] && false === $facts['evidence_returned'] ) ) ) { return null; }
 		$counts = [ 'source_reads' => $factory->source_reads, 'quote_writes' => $factory->quote_writes, 'budget_writes' => $factory->budget_writes ];
