@@ -116,6 +116,35 @@ class ReviewPage(HTMLParser):
                 self.facts.append(None)
 
 
+def native_failure_observation(value):
+    """Exact original observer fields only; no exception text or private facts."""
+    booleans = ("prepare_entered", "prepare_returned", "evidence_called", "evidence_returned", "native_chosen_cache_present", "native_totals_cache_present", "native_shipping_cache_present")
+    counters = ("source_reads", "quote_writes", "budget_writes")
+    keys = ("observation", "prepare_error_class", "prepare_refusal_site", "prepare_refusal_line", "native_shipping_debug_enabled", *booleans, *counters)
+    if not exact(value, keys) or value["observation"] != "original_native_attempt":
+        return False
+    if any(type(value[key]) is not bool for key in booleans) or any(not integer(value[key], 0, 1000000) for key in counters):
+        return False
+    if value["native_shipping_debug_enabled"] is not None and type(value["native_shipping_debug_enabled"]) is not bool:
+        return False
+    if not choice(value["prepare_error_class"], {None, "RuntimeException", "InvalidArgumentException", "Error"}):
+        return False
+    if not choice(value["prepare_refusal_site"], {None, "native_environment", "native_shipping", "native_preparation", "legacy_source", "native_context", "native_receipt", "source_snapshot"}):
+        return False
+    if value["prepare_refusal_site"] is None:
+        if value["prepare_refusal_line"] is not None:
+            return False
+    elif not integer(value["prepare_refusal_line"], 1, 100000):
+        return False
+    if value["prepare_returned"] and not value["prepare_entered"] or value["evidence_returned"] and not value["evidence_called"]:
+        return False
+    if value["prepare_error_class"] is not None and (not value["prepare_entered"] or value["prepare_returned"]):
+        return False
+    if value["prepare_refusal_site"] is not None and value["prepare_error_class"] is None:
+        return False
+    return value["prepare_entered"] and not value["prepare_returned"] or value["evidence_called"] and not value["evidence_returned"]
+
+
 def run_quote_cart(client, state, bridge, recorder, Page, login):
     del login  # Its admin-only redirects and four extra IDs do not apply to shopper jars.
     stage = "ownership"
@@ -158,6 +187,11 @@ def run_quote_cart(client, state, bridge, recorder, Page, login):
         evidence = {"history_before": before["history_counts"], "history_after": after["history_counts"], "no_placement_or_payment": no_placement(before, after), "components": components or {}}
         if response is not None:
             evidence["http"] = response.evidence()
+        if not condition and "failure_observation" in after:
+            diagnostic = after["failure_observation"]
+            if not native_failure_observation(diagnostic):
+                raise RuntimeError("Native quote failure observation was not finite")
+            evidence["failure_observation"] = diagnostic
         recorder.check(case, bool(condition and no_placement(before, after)), evidence)
 
     def classic(shopper, action, generation, token=None, extra=None):

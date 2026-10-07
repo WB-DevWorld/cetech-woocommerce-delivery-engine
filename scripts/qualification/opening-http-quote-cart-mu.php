@@ -21,11 +21,19 @@ add_action( 'init', static function (): void {
 	$state = cetech_q05_state(); $support = $state['support_file'] ?? null;
 	if ( ! is_string( $support ) || ! is_file( $support ) || is_link( $support ) || 'opening-quote-cart-support.php' !== basename( $support ) ) { throw new RuntimeException( 'Q05 support source is unavailable.' ); }
 	require_once $support; global $wpdb;
-	[ $service, $sessions, $factory ] = CetechQuoteCartHttpFixture::service( $wpdb ); $runtime = new CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteReviewRuntime( $service, true ); $runtime->register();
+	[ $service, $sessions, $factory, $observed ] = CetechQuoteCartHttpFixture::service( $wpdb ); $runtime = new CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteReviewRuntime( $service, true ); $runtime->register();
 	// This explicit fixture-only composition is neither a shopper feature flag nor placement activation.
 	$GLOBALS['cetech_q05_review_runtime'] = $runtime; $GLOBALS['cetech_q05_sessions'] = $sessions; $GLOBALS['cetech_q05_factory'] = $factory;
-	add_action( 'shutdown', static function () use ( $sessions, $factory ): void {
-		try { if ( WC()->session instanceof WC_Session_Handler && WC()->cart instanceof WC_Cart && WC()->customer instanceof WC_Customer ) { $state = cetech_q05_state(); CetechQuoteCartHttpFixture::track_owner( $state, $sessions ); cetech_q05_write( $state ); } } finally { $factory->close_all(); }
+	add_action( 'shutdown', static function () use ( $sessions, $factory, $observed ): void {
+		try {
+			if ( WC()->session instanceof WC_Session_Handler && WC()->cart instanceof WC_Cart && WC()->customer instanceof WC_Customer ) {
+				$state = cetech_q05_state(); $owner = CetechQuoteCartHttpFixture::track_owner( $state, $sessions );
+				$failure = CetechQuoteCartHttpFixture::failure_observation( $observed, $factory );
+				if ( null !== $failure ) { $state['failure_observations'][$owner->digest()] = $failure; }
+				elseif ( true === $observed->diagnostics['prepare_entered'] || true === $observed->diagnostics['evidence_called'] ) { unset( $state['failure_observations'][$owner->digest()] ); }
+				cetech_q05_write( $state );
+			}
+		} finally { $factory->close_all(); }
 	}, 19 );
 }, 100 );
 add_action( 'template_redirect', static function (): void {
@@ -45,5 +53,6 @@ add_action( 'template_redirect', static function (): void {
 	$owner = CetechQuoteCartHttpFixture::track_owner( $state, $sessions ); cetech_q05_write( $state ); $facts = $runtime->current_facts(); $envelope = $sessions->load( $owner ); $quote_state = null; $quote_body = null; $uuid = $envelope?->header()?->id()->value();
 	if ( null !== $uuid ) { $row = $wpdb->get_row( $wpdb->prepare( 'SELECT state,body_digest FROM `' . CetechDeliveryEngine\Infrastructure\Persistence\TableNames::for( 'delivery_quotes' ) . '` WHERE site_id=%d AND quote_uuid=%s', get_current_blog_id(), $uuid ), ARRAY_A ); if ( is_array( $row ) ) { $quote_state = $row['state']; $quote_body = $row['body_digest']; } }
 	$body_digests = []; foreach ( CetechNativeQuoteProviderFixture::rows( CetechDeliveryEngine\Infrastructure\Persistence\TableNames::for( 'delivery_quotes' ) ) as $row ) { if ( isset( $state['owners'][$row['owner_digest']] ) ) { $body_digests[$row['quote_uuid']] = $row['body_digest']; if ( count( $body_digests ) > 200 ) { throw new RuntimeException( 'Q05 fixture quote observation exceeded its bound.' ); } } }
-	wp_send_json_success( [ ...CetechQuoteCartHttpFixture::placement_counts( $wpdb ), 'quote_body_digests' => $body_digests, 'fixture_nonce' => wp_create_nonce( 'cetech_q05_fixture' ), 'review_nonce' => wp_create_nonce( CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteReviewRuntime::NONCE_ACTION ), 'store_nonce' => wp_create_nonce( 'wc_store_api' ), 'facts' => $facts, 'history_counts' => CetechQuoteCartHttpFixture::counts( $wpdb ), 'choice_digest' => CetechQuoteCartHttpFixture::choice_digest(), 'owner_digest' => $owner->digest(), 'native_user_id' => get_current_user_id(), 'native_session_key_digest' => hash( 'sha256', WC()->session->get_customer_id() ), 'current_quote_state' => $quote_state, 'quote_body_digest' => $quote_body, 'private_uuid' => $uuid, 'source_identity' => [ 'source_head' => $state['identity']['source_head'], 'candidate_head' => $state['identity']['candidate_head'], 'source_tree' => $state['identity']['source_tree'], 'installed_php_sources_hash' => $state['identity']['installed_php_sources_hash'] ], 'prepared_mount_is_fixture_only' => true ] );
+	$diagnostic = $state['failure_observations'][$owner->digest()] ?? null;
+	wp_send_json_success( [ ...CetechQuoteCartHttpFixture::placement_counts( $wpdb ), 'quote_body_digests' => $body_digests, 'fixture_nonce' => wp_create_nonce( 'cetech_q05_fixture' ), 'review_nonce' => wp_create_nonce( CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteReviewRuntime::NONCE_ACTION ), 'store_nonce' => wp_create_nonce( 'wc_store_api' ), 'facts' => $facts, 'history_counts' => CetechQuoteCartHttpFixture::counts( $wpdb ), 'choice_digest' => CetechQuoteCartHttpFixture::choice_digest(), 'owner_digest' => $owner->digest(), 'native_user_id' => get_current_user_id(), 'native_session_key_digest' => hash( 'sha256', WC()->session->get_customer_id() ), 'current_quote_state' => $quote_state, 'quote_body_digest' => $quote_body, 'private_uuid' => $uuid, 'source_identity' => [ 'source_head' => $state['identity']['source_head'], 'candidate_head' => $state['identity']['candidate_head'], 'source_tree' => $state['identity']['source_tree'], 'installed_php_sources_hash' => $state['identity']['installed_php_sources_hash'] ], 'prepared_mount_is_fixture_only' => true, ...( is_array( $diagnostic ) ? [ 'failure_observation' => $diagnostic ] : [] ) ] );
 }, -100 );

@@ -278,7 +278,23 @@ final class CetechQuoteCartHttpFixture {
 	}
 	public static function service( wpdb $db ): array {
 		$factory = new CetechQuoteCartFactory( $db ); $environment = new NativeCartQuoteEnvironment( $factory ); $sessions = new NativeCartQuoteSessionStore( $factory, [ $environment, 'authorize' ] );
-		return [ new CartQuoteService( $environment, new QuotePreparationGate( $factory, [ $environment, 'authorize' ] ), $sessions, $factory ), $sessions, $factory ];
+		$observed = new CetechQuoteCartEnvironmentObservation( $environment );
+		return [ new CartQuoteService( $observed, new QuotePreparationGate( $factory, [ $environment, 'authorize' ] ), $sessions, $factory ), $sessions, $factory, $observed ];
+	}
+	/** Original failed native attempt only: no follow-up capture, getters or SQL. */
+	public static function failure_observation( CetechQuoteCartEnvironmentObservation $observed, CetechQuoteCartFactory $factory ): ?array {
+		$facts = $observed->diagnostics;
+		$booleans = [ 'prepare_entered', 'prepare_returned', 'evidence_called', 'evidence_returned', 'native_chosen_cache_present', 'native_totals_cache_present', 'native_shipping_cache_present' ];
+		$keys = [ 'prepare_entered', 'prepare_returned', 'prepare_error_class', 'prepare_refusal_site', 'prepare_refusal_line', 'evidence_called', 'evidence_returned', 'native_shipping_debug_enabled', 'native_chosen_cache_present', 'native_totals_cache_present', 'native_shipping_cache_present' ];
+		if ( count( $facts ) !== count( $keys ) || [] !== array_diff( $keys, array_keys( $facts ) ) ) { return null; }
+		foreach ( $booleans as $key ) { if ( ! is_bool( $facts[$key] ) ) { return null; } }
+		if ( null !== $facts['native_shipping_debug_enabled'] && ! is_bool( $facts['native_shipping_debug_enabled'] ) ) { return null; }
+		if ( ! in_array( $facts['prepare_error_class'], [ null, 'RuntimeException', 'InvalidArgumentException', 'Error' ], true ) || ! in_array( $facts['prepare_refusal_site'], [ null, 'native_environment', 'native_shipping', 'native_preparation', 'legacy_source', 'native_context', 'native_receipt', 'source_snapshot' ], true ) ) { return null; }
+		if ( null === $facts['prepare_refusal_site'] ? null !== $facts['prepare_refusal_line'] : ( ! is_int( $facts['prepare_refusal_line'] ) || $facts['prepare_refusal_line'] < 1 || $facts['prepare_refusal_line'] > 100000 ) ) { return null; }
+		if ( ! ( ( true === $facts['prepare_entered'] && false === $facts['prepare_returned'] ) || ( true === $facts['evidence_called'] && false === $facts['evidence_returned'] ) ) ) { return null; }
+		$counts = [ 'source_reads' => $factory->source_reads, 'quote_writes' => $factory->quote_writes, 'budget_writes' => $factory->budget_writes ];
+		foreach ( $counts as $value ) { if ( $value < 0 || $value > 1000000 ) { return null; } }
+		return [ 'observation' => 'original_native_attempt', ...$facts, ...$counts ];
 	}
 	public static function track_owner( array &$state, NativeCartQuoteSessionStore $sessions ): QuoteOwner {
 		$owner = ( new QuoteNativeOwnerResolver() )->current(); $key = $sessions->key_for( $owner ); $session_id = WC()->session->get_customer_id();
@@ -316,6 +332,6 @@ final class CetechQuoteCartHttpFixture {
 		foreach ( $state['native']['native_before']['woocommerce_sessions'] as $row ) { if ( in_array( $row['session_key'], $keys, true ) && false === $db->replace( $native_table, $row ) ) { throw new RuntimeException( 'Q05 prior session restoration failed.' ); } }
 		foreach ( $state['page_ids'] as $id ) { wp_delete_post( $id, true ); }
 		if ( ! function_exists( 'wp_delete_user' ) ) { require_once ABSPATH . 'wp-admin/includes/user.php'; } wp_delete_user( $state['user_id'] );
-		$cleanup = $fixture->cleanup(); $cleanup['owned_review_users_pages_removed'] = null === get_userdata( $state['user_id'] ); foreach ( $state['page_ids'] as $id ) { $cleanup['owned_review_users_pages_removed'] = $cleanup['owned_review_users_pages_removed'] && null === get_post( $id ); } $cleanup['cleanup_restored'] = $cleanup['cleanup_restored'] && $cleanup['owned_review_users_pages_removed']; return $cleanup;
+		$cleanup = $fixture->cleanup(); $cleanup['owned_review_users_pages_removed'] = false === get_userdata( $state['user_id'] ); foreach ( $state['page_ids'] as $id ) { $cleanup['owned_review_users_pages_removed'] = $cleanup['owned_review_users_pages_removed'] && null === get_post( $id ); } $cleanup['cleanup_restored'] = $cleanup['cleanup_restored'] && $cleanup['owned_review_users_pages_removed']; return $cleanup;
 	}
 }
