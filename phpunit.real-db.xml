@@ -23,6 +23,7 @@
             <group>data-lifecycle-real-db</group>
             <group>emergency-control-real-db</group>
             <group>quote-storage-real-db</group>
+            <group>quote-lifecycle-real-db</group>
         </include>
     </groups>
 </phpunit>
