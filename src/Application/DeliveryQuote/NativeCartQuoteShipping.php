@@ -24,7 +24,7 @@ final class NativeCartQuoteShipping {
 			if ( null !== $hook && ( ! is_object( $hook ) || [] !== self::raw( $hook, 'callbacks' ) ) ) { self::fail(); }
 		}
 		$wc = $GLOBALS['woocommerce']; $shipping = $wc->shipping();
-		if ( ! $shipping instanceof \WC_Shipping || 'WC_Shipping' !== get_class( $shipping ) || ! class_exists( '\WC_Shipping_Rate', false ) ) { self::fail(); }
+		if ( ! $shipping instanceof \WC_Shipping || 'WC_Shipping' !== get_class( $shipping ) || ! class_exists( '\WC_Shipping_Rate' ) ) { self::fail(); }
 		$rate_class = new \ReflectionClass( '\WC_Shipping_Rate' ); if ( $rate_class->hasMethod( '__wakeup' ) || $rate_class->hasMethod( '__unserialize' ) ) { self::fail(); }
 		$hook = $GLOBALS['wp_filter']['woocommerce_shipping_package_hash_ignored_fields'] ?? null;
 		if ( null !== $hook && ( ! is_object( $hook ) || [] !== self::raw( $hook, 'callbacks' ) ) ) { self::fail(); }
