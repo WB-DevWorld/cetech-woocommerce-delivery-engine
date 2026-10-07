@@ -332,6 +332,25 @@ class Recorder:
         self.write()
 
 
+def quote_cart_setup_diagnostic(path: Path):
+    """Reviewed failure facts only; captured bridge stderr remains private."""
+    try:
+        if not path.is_file() or path.stat().st_size > 1024:
+            return None
+        value = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(value, dict) or set(value) != {"phase", "error_class", "source_key", "source_line"}:
+            return None
+        if value["phase"] not in {"identity", "control", "install", "cache", "user", "pages", "export", "write"} or value["error_class"] not in {"RuntimeException", "LogicException", "InvalidArgumentException", "WC_Data_Exception", "Error", "OtherError"}:
+            return None
+        if value["source_key"] is None:
+            return value if value["source_line"] is None else None
+        if value["source_key"] not in {"native_fixture", "quote_bridge", "cart_support"} or type(value["source_line"]) is not int or not 1 <= value["source_line"] <= 100000:
+            return None
+        return value
+    except (OSError, UnicodeDecodeError, ValueError, TypeError):
+        return None
+
+
 class FixtureBridge:
     def __init__(self, php: str, wpcli: str, site: str, admin_context: str, bridge_path: str, state_path: Path, workdir: Path):
         self.command = [php, wpcli, "--allow-root", "--path=" + site, "--require=" + admin_context, "eval-file", bridge_path]
@@ -351,7 +370,10 @@ class FixtureBridge:
             descriptor = os.open(log_path, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             with os.fdopen(descriptor, "wb") as log:
                 log.write(result.stdout + b"\n" + result.stderr)
-            raise RuntimeError("HTTP fixture bridge failed in " + mode + "; inspect the private bridge log")
+            failure = RuntimeError("HTTP fixture bridge failed in " + mode + "; inspect the private bridge log")
+            if mode == "preparequotecart":
+                failure.quote_cart_fixture_diagnostic = quote_cart_setup_diagnostic(Path(str(output) + ".failure.json"))
+            raise failure
         return json.loads(output.read_text(encoding="utf-8"))
 
 
@@ -547,6 +569,7 @@ def main() -> int:
         quote_cart_bridge = FixtureBridge(options.php, options.wpcli, options.site, options.admin_context, options.quote_cart_bridge, Path(options.quote_cart_state), quote_work)
     recorder = Recorder(receipt_path, {"source_head": os.environ.get("CETECH_DE_QUALIFICATION_HEAD", ""), "candidate_head": os.environ.get("CETECH_DE_QUALIFICATION_CANDIDATE_HEAD", ""), "source_tree": os.environ.get("CETECH_DE_QUALIFICATION_TREE", ""), "identity_verified": False})
     error = None
+    quote_setup_stage = None
     prepared = False
     try:
         identity = json.loads(Path(options.prepare_output).read_text(encoding="utf-8")) if options.prepare_output else bridge.call("prepare")
@@ -581,20 +604,30 @@ def main() -> int:
             recorder.check("C07-HTTP-SAME-INSTALLED-SOURCE-IDENTITY", all(emergency_identity.get(key) == identity.get(key) for key in ("source_head", "candidate_head", "source_tree", "installed_php_sources", "installed_php_sources_hash")), {"source_hash": emergency_identity.get("installed_php_sources_hash"), "installed_php_files": len(emergency_identity.get("installed_php_sources", {}))})
             module.run_emergency(HttpClient(emergency_state["base_url"]), emergency_state, emergency_bridge, recorder, Page, login)
         if quote_cart_bridge is not None:
+            quote_setup_stage = "module"
             import importlib.util
             module_spec = importlib.util.spec_from_file_location("opening_http_quote_cart_driver", options.quote_cart_driver)
             if module_spec is None or module_spec.loader is None:
                 raise RuntimeError("Could not load the quote cart qualification module")
             module = importlib.util.module_from_spec(module_spec)
             module_spec.loader.exec_module(module)
+            quote_setup_stage = "prepare"
             quote_prepared = quote_cart_bridge.call("preparequotecart")
+            quote_setup_stage = "identity"
             quote_identity = quote_prepared["identity"]
             if not all(quote_identity.get(key) == identity.get(key) for key in ("source_head", "candidate_head", "source_tree", "installed_php_sources", "installed_php_sources_hash")):
                 raise RuntimeError("Quote cart fixture source identity does not match the qualified listener")
+            quote_setup_stage = "state"
             quote_state = json.loads(Path(options.quote_cart_state).read_text(encoding="utf-8"))
+            quote_setup_stage = "requests"
             module.run_quote_cart(HttpClient(quote_state["base_url"]), quote_state, quote_cart_bridge, recorder, Page, login)
     except Exception as failure:
         error = type(failure).__name__ + ": HTTP qualification failed; inspect recorded case status and private runner logs"
+        if quote_setup_stage is not None:
+            recorder.report["quote_cart_failure_stage"] = quote_setup_stage
+            safe_fixture_failure = getattr(failure, "quote_cart_fixture_diagnostic", None)
+            if safe_fixture_failure is not None:
+                recorder.report["quote_cart_fixture_failure"] = safe_fixture_failure
         if REQUEST_OBSERVATION:
             recorder.report["request_observation"] = {key: value for key, value in REQUEST_OBSERVATION.items() if key in ("ordinal", "method", "route", "phase", "elapsed_ms", "monotonic_ms", "error_class")}
             recorder.write()
