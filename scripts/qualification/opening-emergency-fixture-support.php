@@ -57,6 +57,7 @@ final class CetechOpeningEmergencyFixture {
 		$id = wp_insert_user( [ 'user_login' => $username, 'user_pass' => $password, 'user_email' => $username . '@example.invalid', 'role' => $role ] );
 		if ( is_wp_error( $id ) || $id < 1 ) { throw new RuntimeException( 'C07 fixture principal allocation failed.' ); }
 		$this->state['user_id'] = (int) $id;
+		$this->isolate_prior_global_instructions();
 		foreach ( [ 'enable_product_delivery_selector', 'enable_cart_delivery_selection_capture', 'enable_checkout_delivery_selection_validation', 'enable_woocommerce_shipping_rate_calculation', 'enable_order_delivery_snapshot_persistence', 'enable_classic_checkout_adapter' ] as $flag ) { update_option( 'cetech_de_' . $flag, 1, false ); }
 		foreach ( [ 'enable_effective_configuration_runtime', 'enable_variable_product_ecr_runtime' ] as $flag ) { update_option( 'cetech_de_' . $flag, 0, false ); }
 		update_option( 'woocommerce_currency', 'GHS', false ); update_option( 'woocommerce_calc_taxes', 'no', false ); update_option( 'woocommerce_default_country', 'GH', false ); update_option( 'woocommerce_allowed_countries', 'all', false ); update_option( 'woocommerce_ship_to_countries', '', false ); update_option( 'woocommerce_enable_guest_checkout', 'yes', false );
@@ -84,6 +85,49 @@ final class CetechOpeningEmergencyFixture {
 			update_option( $name, [ 'enabled' => 'yes', 'title' => 'C07 synthetic ' . $method, 'cost' => '4.00', 'tax_status' => 'none' ], false );
 		}
 		foreach ( [ 'managed', 'pickup' ] as $kind ) { $this->item( $kind ); }
+	}
+	/** The earlier wizard proof leaves authored global defaults in this disposable site. */
+	private function isolate_prior_global_instructions(): void {
+		global $wpdb;
+		$global_ids = [];
+		foreach ( $this->state['domain_before']['configuration_scopes'] as $row ) {
+			if ( 'global' !== ( $row['scope_type'] ?? null ) ) { continue; }
+			$id = CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutFacts::positive_int( $row['id'] ?? null );
+			if ( null === $id || count( $global_ids ) >= 200 ) { throw new RuntimeException( 'C07 prior global fixture exceeds its supported bound.' ); }
+			$global_ids[] = $id;
+		}
+		$captured = [];
+		foreach ( [ 'configuration_fields', 'configuration_collections' ] as $suffix ) {
+			$captured[$suffix] = [];
+			foreach ( $this->state['domain_before'][$suffix] as $row ) {
+				$scope_id = CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutFacts::positive_int( $row['scope_row_id'] ?? null );
+				if ( ! in_array( $scope_id, $global_ids, true ) ) { continue; }
+				if ( null === CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutFacts::positive_int( $row['id'] ?? null ) || count( $captured[$suffix] ) >= 200 ) { throw new RuntimeException( 'C07 prior global instructions exceed their supported bound.' ); }
+				$captured[$suffix][] = $row;
+			}
+		}
+		$this->state['global_instruction_rows'] = $captured;
+		// Only captured instruction IDs are isolated. Scope identities, revisions,
+		// audits and the saved all32 baseline remain intact for exact restoration.
+		foreach ( $captured as $suffix => $rows ) { foreach ( $rows as $row ) {
+			if ( 1 !== $wpdb->delete( TableNames::for( $suffix ), [ 'id' => $row['id'], 'scope_row_id' => $row['scope_row_id'] ], [ '%d', '%d' ] ) ) { throw new RuntimeException( 'C07 prior global instruction isolation failed.' ); }
+		} }
+		Plugin::instance()->container()->get( CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver::class )->clearMemoization();
+	}
+	private function restore_prior_global_instructions(): void {
+		global $wpdb;
+		foreach ( $this->state['global_instruction_rows'] ?? [] as $suffix => $rows ) {
+			if ( ! in_array( $suffix, [ 'configuration_fields', 'configuration_collections' ], true ) || ! is_array( $rows ) || count( $rows ) > 200 ) { throw new RuntimeException( 'C07 prior global restoration identity is invalid.' ); }
+			$table = TableNames::for( $suffix );
+			foreach ( $rows as $row ) {
+				$id = CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutFacts::positive_int( $row['id'] ?? null );
+				if ( null === $id ) { throw new RuntimeException( 'C07 prior global restoration row is invalid.' ); }
+				$present = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM `{$table}` WHERE id=%d", $id ), ARRAY_A );
+				if ( '' !== $wpdb->last_error || ( is_array( $present ) && $present !== $row ) ) { throw new RuntimeException( 'C07 prior global restoration refused a changed row.' ); }
+				if ( null === $present && 1 !== $wpdb->insert( $table, $row ) ) { throw new RuntimeException( 'C07 prior global instruction restoration failed.' ); }
+			}
+		}
+		Plugin::instance()->container()->get( CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver::class )->clearMemoization();
 	}
 	private function insert( string $suffix, array $values ): int {
 		global $wpdb;
@@ -157,6 +201,7 @@ final class CetechOpeningEmergencyFixture {
 			$records = TableNames::for( 'operation_records' ); $changes = TableNames::for( 'operation_changes' ); $ids = $wpdb->get_col( $wpdb->prepare( "SELECT id FROM `{$records}` WHERE site_id=%d AND namespace_hash=%s AND operation=%s", $this->state['site_id'], $digest, EmergencyControlCommand::OPERATION ) );
 			foreach ( $ids as $id ) { $wpdb->delete( $changes, [ 'operation_id' => (int) $id, 'site_id' => $this->state['site_id'] ] ); $wpdb->delete( $records, [ 'id' => (int) $id, 'site_id' => $this->state['site_id'] ] ); }
 		}
+		$this->restore_prior_global_instructions();
 		foreach ( $this->state['original_options'] as $name => $row ) {
 			if ( null === $row ) { $wpdb->delete( $wpdb->options, [ 'option_name' => $name ] ); }
 			else { if ( false === $wpdb->replace( $wpdb->options, $row ) ) { throw new RuntimeException( 'C07 original option restoration failed.' ); } }
