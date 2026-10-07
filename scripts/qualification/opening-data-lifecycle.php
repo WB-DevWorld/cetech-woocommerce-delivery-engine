@@ -21,7 +21,7 @@ use CetechDeliveryEngine\Domain\Operation\OperationProfileRegistry;
 use CetechDeliveryEngine\Domain\RuleLifecycle\RuleFamilyRegistry;
 use CetechDeliveryEngine\Infrastructure\WordPress\OperationConnectionFactory;
 use CetechDeliveryEngine\Tests\Support\Operation\OperationProofDatabase;
-use CetechDeliveryEngine\Tests\Support\Operation\OperationProofProfile;
+use CetechDeliveryEngine\Tests\Support\DataLifecycle\DataLifecycleProofOperationProfile;
 use CetechDeliveryEngine\Tests\Support\RuleLifecycle\RuleProofEnvelope;
 use CetechDeliveryEngine\Tests\Support\RuleLifecycle\RuleProofFamily;
 
@@ -31,7 +31,7 @@ return static function ( callable $check, ?array $history = null ): void {
 	if ( '1' !== getenv( 'CETECH_DE_NATIVE_OPENING_QUALIFICATION' ) || ! defined( 'WP_ADMIN' ) || true !== WP_ADMIN || '1' !== (string) get_option( 'cetech_opening_qualification_disposable' ) || ! defined( 'DB_HOST' ) || 1 !== preg_match( '/^127\.0\.0\.1(?::[0-9]+)?$/D', DB_HOST ) || ! defined( 'DB_NAME' ) || 1 !== preg_match( '/^cetech_wp_opening_qualification(?:_[a-z0-9]+)?$/D', DB_NAME ) || ! $wpdb instanceof wpdb || is_multisite() || ! isset( $GLOBALS['wp_object_cache'] ) || WP_Object_Cache::class !== get_class( $GLOBALS['wp_object_cache'] ) ) { throw new RuntimeException( 'C06 proof requires the marked native default-cache fixture.' ); }
 	foreach ( get_included_files() as $included ) { if ( str_ends_with( str_replace( '\\', '/', $included ), '/tests/bootstrap.php' ) ) { throw new RuntimeException( 'Unit bootstrap is forbidden in native lifecycle proof.' ); } }
 	$root = dirname( __DIR__, 2 );
-	foreach ( [ 'Operation/OperationProofCommand', 'Operation/OperationProofDatabase', 'Operation/OperationProofProfile', 'RuleLifecycle/RuleProofDatabase', 'RuleLifecycle/RuleProofEnvelope', 'RuleLifecycle/RuleProofFamily' ] as $fixture ) { require_once $root . '/tests/Support/' . $fixture . '.php'; }
+	foreach ( [ 'Operation/OperationProofCommand', 'Operation/OperationProofDatabase', 'DataLifecycle/DataLifecycleProofDatabase', 'DataLifecycle/DataLifecycleProofOperationProfile', 'RuleLifecycle/RuleProofDatabase', 'RuleLifecycle/RuleProofEnvelope', 'RuleLifecycle/RuleProofFamily' ] as $fixture ) { require_once $root . '/tests/Support/' . $fixture . '.php'; }
 	require_once __DIR__ . '/opening-data-lifecycle-support.php';
 	$pressure = static function (): void {
 		global $wpdb;
@@ -60,7 +60,7 @@ return static function ( callable $check, ?array $history = null ): void {
 	foreach ( [ 'wpdb', 'wp_roles', 'wp_user_roles', 'wp_object_cache', 'wp_rewrite', 'current_user', 'user_ID', 'blog_id' ] as $key ) { $original[$key] = [ array_key_exists( $key, $GLOBALS ), $GLOBALS[$key] ?? null ]; }
 	$main = $wpdb;
 	$schema_before = $main->get_results( $main->prepare( "SELECT option_name,option_value,autoload FROM `{$main->options}` WHERE option_name IN (%s,%s) ORDER BY option_name", 'cetech_de_db_version', 'cetech_de_last_migration_status' ), ARRAY_A );
-	$fixture = null; $temporary = []; $actions = []; $cleanup_ok = false; $scheduler = null; $principal = null; $principal_caps = null; $role_refusal = null; $role_conflict = null;
+	$fixture = null; $temporary = []; $actions = []; $cleanup_ok = false; $scheduler = null; $principal = null; $principal_caps = null; $role_refusal = null; $role_conflict = null; $fixture_failure = null;
 	$no_hard_flush = static fn (): bool => false;
 	$foreign_callback = static function (): void {};
 	$filter_installed = false;
@@ -107,7 +107,7 @@ return static function ( callable $check, ?array $history = null ): void {
 		add_filter( 'flush_rewrite_rules_hard', $no_hard_flush, PHP_INT_MAX ); $filter_installed = true;
 		$worker = new DataLifecycleCleanupService( DataLifecycleRegistry::standard(), $fixture->factory, static fn ( int $target ): bool => 99174 === $target );
 		$check( 'NATIVE-C06-DEFAULT-WORDPRESS-ISOLATED-FIXTURE', WP_Object_Cache::class === get_class( $GLOBALS['wp_object_cache'] ) && $GLOBALS['wpdb']->prefix === $fixture->prefix && 99174 === get_current_blog_id(), [ 'default_object_cache' => true, 'fixture_server_context' => true, 'schema' => (string) get_option( 'cetech_de_db_version' ) ] );
-		$profile = new OperationProofProfile( $fixture->prefix );
+		$profile = new DataLifecycleProofOperationProfile( $fixture->prefix );
 		$identity = new OperationIdentity( $fixture->site, 'wordpress', 'staff:9', 'fixture.counter_update', 1, 'counter:1', 'c06-preserved-receipt' );
 		$accepted = ( new OperationCoordinator( new OperationProfileRegistry( [ $profile ] ), $fixture->factory ) )->attempt( $identity, [ 'row_id' => 1, 'expected_revision' => 1, 'value' => 73 ], RequestContext::create() );
 		$rules = new RuleLifecycleService( new RuleFamilyRegistry( [ new RuleProofFamily() ] ), $fixture->factory );
@@ -146,9 +146,9 @@ return static function ( callable $check, ?array $history = null ): void {
 			$name = 'cetech_de_gc_geo_v1_' . hash( 'sha256', 'native-wp-cache-' . $autoload );
 			$native_identity = $cache->identity( $fixture->site, 'postcode', 'GH', '', '', 'native-wp-cache-' . $autoload, 1, '7', 'en_US' ); $name = $native_identity->option_name();
 			$envelope = ManagedGeographyCacheEnvelope::create( $native_identity, $payloads['postcode'], time() - 300 );
-			OperationProofDatabase::option( $fixture->physical, $fixture->prefix, $name, $envelope->to_json() );
+			$fixture->write_option( $name, $envelope->to_json() );
 			$fixture->execute( "UPDATE `{$fixture->prefix}options` SET autoload='off'" );
-			if ( 'on' === $autoload ) { OperationProofDatabase::option( $fixture->physical, $fixture->prefix, 'c06_fixture_autoload_marker', '1' ); $fixture->execute( "UPDATE `{$fixture->prefix}options` SET autoload='on' WHERE option_name='c06_fixture_autoload_marker'" ); }
+			if ( 'on' === $autoload ) { $fixture->write_option( 'c06_fixture_autoload_marker', '1' ); $fixture->execute( "UPDATE `{$fixture->prefix}options` SET autoload='on' WHERE option_name='c06_fixture_autoload_marker'" ); }
 			$GLOBALS['wp_object_cache'] = new WP_Object_Cache(); get_option( 'cetech_de_db_version' ); get_option( 'cetech_de_absent_native_option', false ); $loaded = get_option( $name );
 			$state = $worker->read( $fixture->site ); if ( null === $state->progress || 'completed' === $state->progress->status ) { $state = $worker->start( $fixture->site ); }
 			$state = $worker->batch( $fixture->site, $state->continuation );
@@ -221,12 +221,12 @@ return static function ( callable $check, ?array $history = null ): void {
 		$missing = sys_get_temp_dir() . '/cetech-c06-missing-helper-' . bin2hex( random_bytes( 8 ) ); $temporary[] = $missing; $copy_fallback( $missing, false ); update_option( DataLifecycleManifest::UNINSTALL_INTENT, 1, false ); $missing_before = $fixture->option_rows(); $missing_result = $run_fallback( $missing );
 		$check( 'NATIVE-C06-MISSING-STANDALONE-HELPER-FAILS-PRESERVED', 'PASS' === ( $missing_result['status'] ?? null ) && true === ( $missing_result['intent_present'] ?? null ) && $missing_before === $fixture->option_rows() && $domain_before === $fixture->domain_rows() );
 		$fixture->reset_roles(); update_option( DataLifecycleManifest::CAPABILITIES_MARKER, 4, false );
-		for ( $index = 0; $index < 55; ++$index ) { $bulk_id = $cache->identity( $fixture->site, 'postcode', 'GH', '', '', 'bounded-uninstall-' . $index, 1, '7', 'en_US' ); OperationProofDatabase::option( $fixture->physical, $fixture->prefix, $bulk_id->option_name(), ManagedGeographyCacheEnvelope::create( $bulk_id, $payloads['postcode'], time() )->to_json() ); }
+		for ( $index = 0; $index < 55; ++$index ) { $bulk_id = $cache->identity( $fixture->site, 'postcode', 'GH', '', '', 'bounded-uninstall-' . $index, 1, '7', 'en_US' ); $fixture->write_option( $bulk_id->option_name(), ManagedGeographyCacheEnvelope::create( $bulk_id, $payloads['postcode'], time() )->to_json() ); }
 		Uninstaller::uninstall(); $partial = $uninstall_status(); $checkpoint = $worker->read( $fixture->site );
 		$remaining = (int) $fixture->scalar( "SELECT COUNT(*) FROM `{$fixture->prefix}options` WHERE option_name LIKE 'cetech!_de!_gc!_geo!_v1!_%' ESCAPE '!'" );
 		$check( 'NATIVE-C06-LARGE-EXPLICIT-UNINSTALL-BOUNDED-INCOMPLETE', is_array( $partial ) && 'incomplete' === ( $partial['status'] ?? null ) && 'running' === $checkpoint->progress?->status && $checkpoint->progress->deleted <= 50 && $remaining >= 5 && 1 === (int) get_option( DataLifecycleManifest::UNINSTALL_INTENT ) && $domain_before === $fixture->domain_rows() );
 		$next = $worker->batch( $fixture->site, $checkpoint->continuation ); if ( 'accepted' !== $next->status || 'completed' !== $next->progress?->status ) { throw new RuntimeException( 'Native bounded uninstall continuation failed.' ); }
-		$unknown_name = DataLifecycleManifest::CACHE_PREFIX . hash( 'sha256', 'unknown-native-cache' ); OperationProofDatabase::option( $fixture->physical, $fixture->prefix, $unknown_name, '{"format":99,"private":"PRIVATE-C06-UNKNOWN"}' ); $unknown_before = $fixture->option( $unknown_name );
+		$unknown_name = DataLifecycleManifest::CACHE_PREFIX . hash( 'sha256', 'unknown-native-cache' ); $fixture->write_option( $unknown_name, '{"format":99,"private":"PRIVATE-C06-UNKNOWN"}' ); $unknown_before = $fixture->option( $unknown_name );
 		Uninstaller::uninstall(); $unknown_status = $uninstall_status();
 		$check( 'NATIVE-C06-UNKNOWN-CACHE-FORMAT-RETAINED-SAFE-STATUS', $unknown_before === $fixture->option( $unknown_name ) && $domain_before === $fixture->domain_rows() && is_array( $unknown_status ) && 'incomplete' === ( $unknown_status['status'] ?? null ) && 'retained_unknown_cache' === ( $unknown_status['code'] ?? null ) && ( $unknown_status['counts']['invalid'] ?? 0 ) > 0 && 1 === (int) get_option( DataLifecycleManifest::UNINSTALL_INTENT ) && ! str_contains( json_encode( $unknown_status ), 'PRIVATE-C06-UNKNOWN' ) );
 		$check( 'NATIVE-C06-PROVIDER-REFERENCED-OUTSIDE-SYMLINK-FILES-PRESERVED', $file_hashes === [ hash_file( 'sha256', $active_file ), hash_file( 'sha256', $unknown_file ), hash_file( 'sha256', $outside ) ] && is_link( $pack_dir . '/GH.forged-link.txt' ) && $outside === readlink( $pack_dir . '/GH.forged-link.txt' ) && $domain_before['geography_packs'] === $fixture->domain_rows()['geography_packs'], [ 'file_deletion_adopted' => false, 'referenced_source_unchanged' => true ] );
@@ -235,7 +235,7 @@ return static function ( callable $check, ?array $history = null ): void {
 		$fixture->execute( "ALTER TABLE `{$fixture->prefix}options` ENGINE=InnoDB" );
 		$private_json_refused = false; try { json_encode( $checkpoint, JSON_THROW_ON_ERROR ); } catch ( LogicException ) { $private_json_refused = true; }
 		$check( 'NATIVE-C06-FINITE-SAFE-STATUS-NO-PRIVATE-CONTINUATION', $private_json_refused && ! str_contains( json_encode( $checkpoint->safe() ), 'PRIVATE-C06' ) && ! str_contains( json_encode( $checkpoint->safe() ), 'checkpoint_token' ) && ! str_contains( json_encode( $checkpoint->safe() ), 'run_id' ) );
-	} finally {
+	} catch ( Throwable $error ) { $fixture_failure = $error; throw $error; } finally {
 		if ( $filter_installed ) { remove_filter( 'flush_rewrite_rules_hard', $no_hard_flush, PHP_INT_MAX ); }
 		if ( null !== $role_refusal && null !== $fixture ) { remove_filter( 'pre_update_option_' . $fixture->prefix . 'user_roles', $role_refusal, PHP_INT_MAX ); }
 		if ( null !== $role_conflict && null !== $fixture ) { remove_filter( 'pre_update_option_' . $fixture->prefix . 'user_roles', $role_conflict, PHP_INT_MAX ); }
@@ -250,7 +250,9 @@ return static function ( callable $check, ?array $history = null ): void {
 			if ( ! is_dir( $path ) ) { continue; }
 			$entries = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $path, FilesystemIterator::SKIP_DOTS ), RecursiveIteratorIterator::CHILD_FIRST ); foreach ( $entries as $entry ) { if ( $entry->isDir() ) { rmdir( $entry->getPathname() ); } else { unlink( $entry->getPathname() ); } } rmdir( $path );
 		}
-		$check( 'NATIVE-C06-ISOLATED-TABLES-CACHE-CONTEXT-CLEANUP', $cleanup_ok && $GLOBALS['wpdb'] === $main && $GLOBALS['wp_object_cache'] === $original['wp_object_cache'][1] && get_current_blog_id() === (int) $original['blog_id'][1] );
+		$cleanup_condition = $cleanup_ok && $GLOBALS['wpdb'] === $main && $GLOBALS['wp_object_cache'] === $original['wp_object_cache'][1] && get_current_blog_id() === (int) $original['blog_id'][1];
+		if ( null === $fixture_failure ) { $check( 'NATIVE-C06-ISOLATED-TABLES-CACHE-CONTEXT-CLEANUP', $cleanup_condition ); }
+		else { try { $check( 'NATIVE-C06-ISOLATED-TABLES-CACHE-CONTEXT-CLEANUP', $cleanup_condition ); } catch ( Throwable ) { /* The failed cleanup is recorded; retain the original fixture exception. */ } }
 	}
 	$classic = require __DIR__ . '/opening-data-lifecycle-classic.php'; $classic( $check, $pressure );
 	$schema_after = $main->get_results( $main->prepare( "SELECT option_name,option_value,autoload FROM `{$main->options}` WHERE option_name IN (%s,%s) ORDER BY option_name", 'cetech_de_db_version', 'cetech_de_last_migration_status' ), ARRAY_A );

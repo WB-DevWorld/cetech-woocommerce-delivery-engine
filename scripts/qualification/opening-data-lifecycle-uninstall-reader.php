@@ -7,7 +7,7 @@ $path = $argv[1] ?? '';
 if ( ! is_string( $path ) || ! is_file( $path ) || is_link( $path ) ) { exit( 2 ); }
 try {
 	$config = json_decode( (string) file_get_contents( $path ), true, 4, JSON_THROW_ON_ERROR );
-	if ( ! is_array( $config ) || ! is_string( $config['wp_load'] ?? null ) || ! str_ends_with( $config['wp_load'], '/wp-load.php' ) || ! is_file( $config['wp_load'] ) || ! is_string( $config['uninstall'] ?? null ) || ! is_file( $config['uninstall'] ) || ! is_string( $config['prefix'] ?? null ) || 1 !== preg_match( '/\Aop_proof_[0-9]+_[a-f0-9]{8}_\z/D', $config['prefix'] ) || ! is_int( $config['site'] ?? null ) || $config['site'] < 1 ) { throw new RuntimeException(); }
+	if ( ! is_array( $config ) || ! is_string( $config['wp_load'] ?? null ) || ! str_ends_with( $config['wp_load'], '/wp-load.php' ) || ! is_file( $config['wp_load'] ) || ! is_string( $config['uninstall'] ?? null ) || ! is_file( $config['uninstall'] ) || ! is_string( $config['prefix'] ?? null ) || 1 !== preg_match( '/\Agc6_[a-f0-9]{12}_\z/D', $config['prefix'] ) || ! is_int( $config['site'] ?? null ) || $config['site'] < 1 ) { throw new RuntimeException(); }
 	define( 'SHORTINIT', true ); define( 'WP_ADMIN', true );
 	require $config['wp_load'];
 	if ( ! defined( 'DB_HOST' ) || 1 !== preg_match( '/^127\.0\.0\.1(?::[0-9]+)?$/D', DB_HOST ) || ! defined( 'DB_NAME' ) || 1 !== preg_match( '/^cetech_wp_opening_qualification(?:_[a-z0-9]+)?$/D', DB_NAME ) || ! $GLOBALS['wpdb'] instanceof wpdb ) { throw new RuntimeException(); }

@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 use CetechDeliveryEngine\Bootstrap\DataLifecycleManifest;
 use CetechDeliveryEngine\Infrastructure\WordPress\OperationConnectionFactory;
+use CetechDeliveryEngine\Infrastructure\Persistence\OperationStoreSchema;
+use CetechDeliveryEngine\Infrastructure\Persistence\RuleLifecycleSchema;
+use CetechDeliveryEngine\Infrastructure\Persistence\RuleLifecycleReadiness;
 use CetechDeliveryEngine\Tests\Support\Operation\OperationProofDatabase;
-use CetechDeliveryEngine\Tests\Support\RuleLifecycle\RuleProofDatabase;
+use CetechDeliveryEngine\Tests\Support\DataLifecycle\DataLifecycleProofDatabase;
 
 /** Native-only fixture support; no production registration or unit bootstrap. */
 final class CetechNativeDataLifecycleFixture {
@@ -21,7 +24,10 @@ final class CetechNativeDataLifecycleFixture {
 	public function __construct( wpdb $main ) {
 		$this->main = $main;
 		$this->site = (int) get_current_blog_id();
-		$this->prefix = OperationProofDatabase::prefix();
+		// The longest preserved table name needs 46 characters after the
+		// raw prefix. Reuse the C06 SQL fixture's validated 17-byte namespace.
+		$this->prefix = DataLifecycleProofDatabase::prefix();
+		DataLifecycleProofDatabase::validate_prefix( $this->prefix );
 		$host = $main->parse_db_host( DB_HOST );
 		if ( ! is_array( $host ) ) { throw new RuntimeException( 'Lifecycle fixture database authority is unavailable.' ); }
 		try {
@@ -33,15 +39,21 @@ final class CetechNativeDataLifecycleFixture {
 
 	public function install(): void {
 		if ( 0 !== (int) $this->scalar( "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND LEFT(TABLE_NAME,LENGTH('{$this->prefix}'))='{$this->prefix}'" ) ) { throw new RuntimeException( 'Lifecycle fixture prefix is occupied.' ); }
-		$this->tables = [ $this->prefix . 'options', $this->prefix . 'operation_fixture_counter' ];
-		foreach ( DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES as $suffix ) { $this->tables[] = $this->prefix . 'delivery_engine_' . $suffix; }
-		RuleProofDatabase::install( $this->physical, $this->prefix );
+		foreach ( DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES as $suffix ) { if ( strlen( $this->prefix . 'delivery_engine_' . $suffix ) > 64 ) { throw new RuntimeException( 'Lifecycle fixture table identity exceeds the native limit.' ); } }
+		$charset = 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
+		foreach ( OperationStoreSchema::create_table_statements( $charset, $this->prefix . 'delivery_engine_' ) as $suffix => $sql ) { $this->create_table( $this->prefix . 'delivery_engine_' . $suffix, $sql ); }
+		$this->create_table( $this->prefix . 'options', "CREATE TABLE `{$this->prefix}options` (option_id bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY, option_name varchar(191) NOT NULL UNIQUE, option_value longtext NOT NULL, autoload varchar(20) NOT NULL DEFAULT 'off') ENGINE=InnoDB {$charset}" );
+		$this->create_table( $this->prefix . 'operation_fixture_counter', "CREATE TABLE `{$this->prefix}operation_fixture_counter` (id bigint unsigned NOT NULL PRIMARY KEY, revision bigint unsigned NOT NULL, value bigint NOT NULL, published_revision bigint unsigned NOT NULL DEFAULT 0) ENGINE=InnoDB {$charset}" );
+		$this->execute( "INSERT INTO `{$this->prefix}operation_fixture_counter` (id,revision,value) VALUES (1,1,0)" );
+		foreach ( RuleLifecycleSchema::create_table_statements( $charset, $this->prefix . 'delivery_engine_' ) as $suffix => $sql ) { $this->create_table( $this->prefix . 'delivery_engine_' . $suffix, $sql ); }
+		$this->write_option( 'cetech_de_db_version', '8' );
+		$this->write_option( 'cetech_de_last_migration_status', serialize( [ 'status' => 'success', 'to_version' => '8', 'migration_id' => RuleLifecycleReadiness::MIGRATION_ID ] ) );
 		foreach ( DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES as $suffix ) {
 			$table = $this->prefix . 'delivery_engine_' . $suffix;
 			if ( in_array( $suffix, [ 'operation_records', 'operation_changes', 'rule_family_guards', 'logical_rules', 'rule_versions' ], true ) ) { continue; }
 			$source = $this->main->prefix . 'delivery_engine_' . $suffix;
 			if ( 1 !== preg_match( '/\A[A-Za-z0-9_]+\z/D', $source ) ) { throw new RuntimeException( 'Lifecycle fixture source identity is invalid.' ); }
-			$this->execute( "CREATE TABLE `{$table}` LIKE `{$source}`" );
+			$this->create_table( $table, "CREATE TABLE `{$table}` LIKE `{$source}`" );
 			$columns = $this->rows( "SHOW FULL COLUMNS FROM `{$table}`" );
 			$names = [];
 			$values = [];
@@ -54,6 +66,12 @@ final class CetechNativeDataLifecycleFixture {
 			}
 			$this->execute( "INSERT INTO `{$table}` (" . implode( ',', $names ) . ') VALUES (' . implode( ',', $values ) . ')' );
 		}
+	}
+
+	private function create_table( string $table, string $sql ): void {
+		if ( strlen( $table ) > 64 || ! str_starts_with( $table, $this->prefix ) || 1 !== preg_match( '/\A[A-Za-z0-9_]+\z/D', $table ) ) { throw new RuntimeException( 'Lifecycle fixture table identity is invalid.' ); }
+		$this->execute( $sql );
+		$this->tables[] = $table;
 	}
 
 	/** Full schemas and physical marker rows; no claim that arbitrary markers are business DTOs. */
@@ -77,7 +95,7 @@ final class CetechNativeDataLifecycleFixture {
 			if ( in_array( $name, [ 'cetech_de_db_version', 'cetech_de_last_migration_status', DataLifecycleManifest::COORDINATOR_OPTION, DataLifecycleManifest::UNINSTALL_STATUS ], true ) ) { continue; }
 			$value = str_starts_with( $name, 'cetech_de_enable_' ) || 'cetech_de_demo_data_on_activation' === $name ? '1' : serialize( [ 'fixture' => 'PRIVATE-C06-PRESERVED-OPTION', 'revision' => 7 ] );
 			if ( in_array( $name, [ 'cetech_de_geography_revision', 'cetech_de_global_configuration_version' ], true ) ) { $value = '7'; }
-			OperationProofDatabase::option( $this->physical, $this->prefix, $name, $value );
+			$this->write_option( $name, $value );
 		}
 	}
 
@@ -91,7 +109,7 @@ final class CetechNativeDataLifecycleFixture {
 	}
 
 	public function reset_roles(): void {
-		OperationProofDatabase::option( $this->physical, $this->prefix, $this->prefix . 'user_roles', serialize( $this->roles() ) );
+		$this->write_option( $this->prefix . 'user_roles', serialize( $this->roles() ) );
 		$GLOBALS['wp_object_cache'] = new WP_Object_Cache();
 		$GLOBALS['wp_user_roles'] = null;
 		$GLOBALS['wp_roles'] = new WP_Roles( $this->site );
@@ -119,6 +137,12 @@ final class CetechNativeDataLifecycleFixture {
 	}
 
 	public function option_rows(): array { return $this->rows( "SELECT option_id,option_name,option_value,autoload FROM `{$this->prefix}options` ORDER BY option_id ASC" ); }
+	public function write_option( string $name, string $value ): void {
+		DataLifecycleProofDatabase::validate_prefix( $this->prefix );
+		$statement = $this->physical->prepare( "INSERT INTO `{$this->prefix}options` (option_name,option_value) VALUES (?,?) ON DUPLICATE KEY UPDATE option_value=VALUES(option_value)" );
+		if ( false === $statement || ! $statement->bind_param( 'ss', $name, $value ) || ! $statement->execute() ) { throw new RuntimeException( 'Native lifecycle option setup failed.' ); }
+		$statement->close();
+	}
 	public function option( string $name ): ?array { return OperationProofDatabase::row( $this->physical, "SELECT option_id,option_name,option_value,autoload FROM `{$this->prefix}options` WHERE option_name=" . $this->literal( $name ) ); }
 	public function scalar( string $sql ): mixed { return OperationProofDatabase::scalar( $this->physical, $sql ); }
 	public function execute( string $sql ): void { OperationProofDatabase::execute( $this->physical, $sql ); }
@@ -132,12 +156,13 @@ final class CetechNativeDataLifecycleFixture {
 	}
 
 	public function cleanup(): bool {
-		if ( $this->selected instanceof wpdb ) { $this->selected->close(); }
-		OperationProofDatabase::validate_prefix( $this->prefix );
-		foreach ( array_reverse( array_unique( $this->tables ) ) as $table ) { $this->execute( "DROP TABLE IF EXISTS `{$table}`" ); }
-		$gone = 0 === (int) $this->scalar( "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND LEFT(TABLE_NAME,LENGTH('{$this->prefix}'))='{$this->prefix}'" );
-		$this->physical->close();
-		return $gone;
+		DataLifecycleProofDatabase::validate_prefix( $this->prefix );
+		$clean = true;
+		try { if ( $this->selected instanceof wpdb ) { $this->selected->close(); } } catch ( Throwable ) { $clean = false; }
+		foreach ( array_reverse( array_unique( $this->tables ) ) as $table ) { try { $this->execute( "DROP TABLE IF EXISTS `{$table}`" ); } catch ( Throwable ) { $clean = false; } }
+		try { $clean = $clean && 0 === (int) $this->scalar( "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND LEFT(TABLE_NAME,LENGTH('{$this->prefix}'))='{$this->prefix}'" ); } catch ( Throwable ) { $clean = false; }
+		try { $this->physical->close(); } catch ( Throwable ) { $clean = false; }
+		return $clean;
 	}
 
 	/** Fixed native child entry points only; private input and stderr are never emitted. */

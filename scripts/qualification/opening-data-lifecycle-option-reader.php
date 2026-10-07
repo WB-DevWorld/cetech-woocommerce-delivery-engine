@@ -7,7 +7,7 @@ $config_path = $argv[1] ?? '';
 if ( ! is_string( $config_path ) || ! is_file( $config_path ) || is_link( $config_path ) || strlen( $config_path ) > 4096 ) { exit( 2 ); }
 try {
 	$config = json_decode( (string) file_get_contents( $config_path ), true, 4, JSON_THROW_ON_ERROR );
-	if ( ! is_array( $config ) || ! isset( $config['wp_load'], $config['prefix'], $config['site'], $config['expectations'] ) || ! is_string( $config['wp_load'] ) || ! str_ends_with( $config['wp_load'], '/wp-load.php' ) || ! is_file( $config['wp_load'] ) || ! is_string( $config['prefix'] ) || 1 !== preg_match( '/\Aop_proof_[0-9]+_[a-f0-9]{8}_\z/D', $config['prefix'] ) || ! is_int( $config['site'] ) || $config['site'] < 1 || ! is_array( $config['expectations'] ) || count( $config['expectations'] ) > 8 ) { throw new RuntimeException(); }
+	if ( ! is_array( $config ) || ! isset( $config['wp_load'], $config['prefix'], $config['site'], $config['expectations'] ) || ! is_string( $config['wp_load'] ) || ! str_ends_with( $config['wp_load'], '/wp-load.php' ) || ! is_file( $config['wp_load'] ) || ! is_string( $config['prefix'] ) || 1 !== preg_match( '/\Agc6_[a-f0-9]{12}_\z/D', $config['prefix'] ) || ! is_int( $config['site'] ) || $config['site'] < 1 || ! is_array( $config['expectations'] ) || count( $config['expectations'] ) > 8 ) { throw new RuntimeException(); }
 	define( 'SHORTINIT', true );
 	define( 'WP_ADMIN', true );
 	require $config['wp_load'];
