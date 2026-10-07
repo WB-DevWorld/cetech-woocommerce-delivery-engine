@@ -19,9 +19,10 @@ final readonly class LegacyQuoteSourceLocalBinding implements \JsonSerializable 
 	private static function fingerprint( ?array &$objects = null ): string {
 		$hooks = [ ...self::HOOKS, self::TERM_COUNT_DEPENDENCY ];
 		foreach ( LegacyQuoteSourcePlan::OPTIONS as $name ) { foreach ( [ 'pre_option_', 'option_', 'default_option_' ] as $prefix ) { $hooks[] = $prefix . $name; } }
-		$db = $GLOBALS['wpdb'] ?? null;
+		$db = $GLOBALS['wpdb'] ?? null; $query = self::native_query(); $query_registered = false;
 		if ( null !== $objects && is_object( $db ) ) { $objects[spl_object_id( $db )] = $db; }
-		$values = [ 'native_wpdb' => is_object( $db ) ? [ get_class( $db ), spl_object_id( $db ) ] : null, 'hooks' => [] ]; $total = 0;
+		if ( null !== $objects && null !== $query ) { $objects[spl_object_id( $query )] = $query; }
+		$values = [ 'native_wpdb' => is_object( $db ) ? [ get_class( $db ), spl_object_id( $db ) ] : null, 'native_wc_query' => null === $query ? null : [ get_class( $query ), spl_object_id( $query ) ], 'hooks' => [] ]; $total = 0;
 		foreach ( $hooks as $hook ) {
 			$callbacks = self::callbacks( $hook ); $items = [];
 			foreach ( $callbacks as $priority => $at_priority ) {
@@ -42,6 +43,11 @@ final readonly class LegacyQuoteSourceLocalBinding implements \JsonSerializable 
 							$mapping = is_array( $raw ) ? ( $raw[$hook] ?? null ) : null;
 							$known = self::LEGACY_HOOKS[$hook] === $mapping && [] === self::callbacks( self::LEGACY_HOOKS[$hook] );
 						}
+						// Native Woo's frontend handler returns before changing any non-main query.
+						// Retained product/source reads do not execute the page's main WP_Query.
+						if ( 'pre_get_posts' === $hook && null !== $query && $fn[0] === $query && 'pre_get_posts' === $fn[1] && 10 === $priority && 1 === $args ) {
+							if ( $query_registered ) { self::unavailable(); } $query_registered = true; $known = true;
+						}
 						// Merchandise prices remain Woo-owned. This stateless native helper preserves
 						// the empty/nonempty price predicate used by is_purchasable(), not its amount.
 						if ( 'woocommerce_product_get_price' === $hook && 'Automattic\\WooCommerce\\Internal\\ScheduledSalePriceReconciler' === get_class( $fn[0] ) && 'reconcile_price' === $fn[1] && 99 === $priority && 2 === $args ) { $known = true; }
@@ -55,6 +61,12 @@ final readonly class LegacyQuoteSourceLocalBinding implements \JsonSerializable 
 			$values['hooks'][$hook] = $items;
 		}
 		return hash( 'sha256', \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteJson::encode( $values ) );
+	}
+
+	/** Raw native singleton identity only; never invokes WC(), a getter or a query. */
+	private static function native_query(): ?object {
+		$wc = $GLOBALS['woocommerce'] ?? null; if ( ! is_object( $wc ) || 'WooCommerce' !== get_class( $wc ) ) { return null; }
+		$query = self::raw_property( $wc, 'query' ); return is_object( $query ) && 'WC_Query' === get_class( $query ) ? $query : null;
 	}
 
 	private static function callbacks( string $hook ): array {

@@ -170,6 +170,42 @@ PHP;
 		$process = proc_open( [ PHP_BINARY, '-r', $program ], [ [ 'pipe', 'r' ], [ 'pipe', 'w' ], [ 'pipe', 'w' ] ], $pipes, dirname( __DIR__, 3 ) ); self::assertIsResource( $process ); fclose( $pipes[0] ); $stdout = stream_get_contents( $pipes[1] ); $stderr = stream_get_contents( $pipes[2] ); fclose( $pipes[1] ); fclose( $pipes[2] ); self::assertSame( 0, proc_close( $process ), $stderr );
 		$facts = json_decode( $stdout, true, 8, JSON_THROW_ON_ERROR ); self::assertTrue( $facts['private_cause_kept'] ); self::assertSame( 'source_local_binding', $facts['source_code'] ); self::assertTrue( $facts['line_verified'] ); self::assertTrue( $facts['callback_not_invoked'] ); self::assertSame( 0, $facts['factory_calls'] ); self::assertSame( 'Delivery quote source unavailable.', $facts['public_message'] ); self::assertTrue( $facts['private_sentinel_absent'] );
 	}
+	/** Registration protocol only; the native callback is never executed here. */
+	public function test_native_frontend_query_singleton_is_allowed_once_and_its_identity_is_fenced(): void {
+		$program = <<<'PHP'
+class WC_Query { public static int $calls = 0; public function pre_get_posts(): never { ++self::$calls; throw new RuntimeException( 'PRIVATE-CALLBACK' ); } }
+class WooCommerce { public function __construct( public WC_Query $query ) {} }
+class SourceNativeQuerySubclass extends WC_Query {}
+class SourceNativeContainerSubclass extends WooCommerce {}
+class WP_Hook { public array $callbacks = []; }
+require 'tests/bootstrap.php';
+$query = new WC_Query(); $container = new WooCommerce( $query ); $GLOBALS['woocommerce'] = $container;
+$tuple = [ 'function' => [ $query, 'pre_get_posts' ], 'accepted_args' => 1 ]; $hook = new WP_Hook(); $hook->callbacks = [ 10 => [ 'native' => $tuple ] ]; $GLOBALS['wp_filter'] = [ 'pre_get_posts' => $hook ];
+$accepted = []; $binding = null;
+try { $binding = CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceLocalBinding::capture(); $accepted['exact'] = true; }
+catch ( Throwable ) { $accepted['exact'] = false; }
+$stable = null === $binding ? false : $binding->unchanged();
+foreach ( [ 'wrong_priority', 'wrong_args', 'wrong_method', 'foreign_instance', 'duplicate', 'unknown_callback', 'wrong_container', 'query_subclass', 'container_subclass' ] as $mode ) {
+    $GLOBALS['woocommerce'] = $container; $hook->callbacks = [ 10 => [ 'native' => $tuple ] ];
+    if ( 'wrong_priority' === $mode ) { $hook->callbacks = [ 11 => [ 'native' => $tuple ] ]; }
+    if ( 'wrong_args' === $mode ) { $hook->callbacks[10]['native']['accepted_args'] = 2; }
+    if ( 'wrong_method' === $mode ) { $hook->callbacks[10]['native']['function'][1] = 'add_endpoints'; }
+    if ( 'foreign_instance' === $mode ) { $hook->callbacks[10]['native']['function'][0] = new WC_Query(); }
+    if ( 'duplicate' === $mode ) { $hook->callbacks[10]['duplicate'] = $tuple; }
+    if ( 'unknown_callback' === $mode ) { $hook->callbacks[10]['unknown'] = [ 'function' => static fn (): never => throw new RuntimeException( 'PRIVATE-CALLBACK' ), 'accepted_args' => 1 ]; }
+    if ( 'wrong_container' === $mode ) { $GLOBALS['woocommerce'] = (object) [ 'query' => $query ]; }
+    if ( 'query_subclass' === $mode ) { $subclass = new SourceNativeQuerySubclass(); $GLOBALS['woocommerce'] = new WooCommerce( $subclass ); $hook->callbacks[10]['native']['function'][0] = $subclass; }
+    if ( 'container_subclass' === $mode ) { $GLOBALS['woocommerce'] = new SourceNativeContainerSubclass( $query ); }
+    try { CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceLocalBinding::capture(); $accepted[$mode] = true; }
+    catch ( Throwable ) { $accepted[$mode] = false; }
+}
+$GLOBALS['woocommerce'] = $container; $replacement = new WC_Query(); $container->query = $replacement; $hook->callbacks = [ 10 => [ 'native' => [ 'function' => [ $replacement, 'pre_get_posts' ], 'accepted_args' => 1 ] ] ];
+$replacement_refused = null === $binding ? false : ! $binding->unchanged(); $container->query = $query; $hook->callbacks = [ 10 => [ 'native' => $tuple ] ]; $original_restored = null === $binding ? false : $binding->unchanged();
+echo json_encode( [ 'accepted' => $accepted, 'stable' => $stable, 'replacement_refused' => $replacement_refused, 'original_restored' => $original_restored, 'callbacks_not_invoked' => 0 === WC_Query::$calls ], JSON_THROW_ON_ERROR );
+PHP;
+		$process = proc_open( [ PHP_BINARY, '-r', $program ], [ [ 'pipe', 'r' ], [ 'pipe', 'w' ], [ 'pipe', 'w' ] ], $pipes, dirname( __DIR__, 3 ) ); self::assertIsResource( $process ); fclose( $pipes[0] ); $stdout = stream_get_contents( $pipes[1] ); $stderr = stream_get_contents( $pipes[2] ); fclose( $pipes[1] ); fclose( $pipes[2] ); self::assertSame( 0, proc_close( $process ), $stderr );
+		$facts = json_decode( $stdout, true, 8, JSON_THROW_ON_ERROR ); self::assertTrue( $facts['accepted']['exact'] ); foreach ( array_diff_key( $facts['accepted'], [ 'exact' => true ] ) as $value ) { self::assertFalse( $value ); } self::assertTrue( $facts['stable'] ); self::assertTrue( $facts['replacement_refused'] ); self::assertTrue( $facts['original_restored'] ); self::assertTrue( $facts['callbacks_not_invoked'] );
+	}
 	private static function hook( array $facts ): \WP_Hook { $hook = new \WP_Hook(); $hook->callbacks = $facts['callbacks']; return $hook; }
 	private function snapshot( array $cards, array $rows = [], string $at = '2026-10-07 05:00:00.000000' ): LegacyQuoteSourceSnapshot { $plan = F::plan(); return LegacyQuoteSourceSnapshot::captured( $plan, F::context(), $rows, [ LegacyQuoteSourcePlan::range_key( $plan->rate_ranges()[0] ) => $cards ], QuoteTime::parse( $at ) ); }
 }
