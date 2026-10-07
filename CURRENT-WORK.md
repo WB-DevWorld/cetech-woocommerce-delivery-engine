@@ -1,3 +1,21 @@
+# Current Work — W1-C07 emergency-control design
+
+Status: **WAVE1-PLAN-1 ACCEPTED — C01–C06 INTEGRATED — W1-C07 DESIGN AUTHORIZED / PROPOSED — RC.12 IMMUTABLE**
+
+## 2026-10-07 — Owner integrated C06 and requested C07 design
+
+At00:45:41UTC the owner instructed “Approve W1-C06 for integration and prepare W1-C07’s emergency-control design.” Exact qualified PR#75 head `0ebeca8d33b17fec9fd70cb7706a50d447ad8d91` integrated unchanged normally as `9cbdc6b5f0b9a509cad137d7379d96809f6d240e`, tree `66536ad4e5d47d820baa18569c729357248972ed`; expected master/candidate parents verified; #74 completed. CandidateCI37553062613 and actual-masterCI37553724693 attempt1 each passed all8/native342/finalHTTP66/smoke/PHP2302/14678/1skip/requiredSQL143/3234/2deprecations/0skips(classes43+44+30)/JS8files102/lints591/0+915/0; independent and root source/ZIP/member/runtime/cleanup verification PASS. Every591-source map is `9b438b6ac798cf071992e5a261348480bbfb8f814a5127f5b6d0e3107c2c008a`. Actual-merge fingerprints and historical failed C06 receipts remain separately recorded in PR#75, not inferred from candidate CI.
+
+[Issue#76](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/76) tracks design-only C07 on `ws3/wave1-c07-emergency-design`, from actual C06 merge. Root solely edits proposal, source inventory, shared status/accepted plan and ref/PR/issue records. Read-only AI agents cover exact checkout/Woo cache/payment paths, C03 state/authority/replay ownership, flags/requirements/privacy and one finite independent closure. Only the owner and AI agents are working; no outside availability gate. No concurrent production editor.
+
+The proposed W1-C07-EMERGENCY-CONTROL-1 specifies one strict preserved2048-byte option and C03 administrative transition profile, current native state independent of23 module flags, virtual legacy enabled/rev1 and changed1→2, exact row/revision/CAS, atomic state/material audit/completion and invalidate-only publication. Ownmanaged/unmanaged/unresolved classification, cached-rate epoch fences, always-live Classic/Blocks/directStoreAPI final guards and precise short-lock admission ordering close native/free fallback paths. The proposal deliberately also pauses new payments on ALL unpaidmanagedorders through nativeorder-pay; this additional pending-payment impact is an explicit OWNER REVIEW decision, not an already-settled D10 fact. Resume needs fresh quote/eligibility equality without repricing/history repair. Paid-order callbacks, shipment operations and all history remain governed as before. Current-site all-or-none is the proposed activation policy; no undefined percentage cohort.
+
+Native source establishes that provisional order/snapshot/COD-index writes may precede final admission; the proposal does not claim zero such rows or COR029 sealing repair. Proposed limits200lines/200packages/2secondlockwait/finite reasons are explicit approval values. Thirty future cases map T18–T21; they are NOT EXECUTED by this design. Production identity1.0.0-dev.wave1-data-lifecycle.1/schema8/591source bytes remain unchanged. Design qualification preserves existing all8/native342/HTTP66/smoke/SQL143/JS102 and immutable-source/runtime/ZIP/member evidence; actual proposal qualification is recorded in its PR, separately from C06 merge execution.
+
+Finite independent core/route/source design closure PASS. The sole requested correction makes nativeorder-pay refusal controlled notice/redirect/termination rather than an uncaught exception; C07-20/21 prove response and zero gateway calls. Thirty future cases remain NOTEXECUTED. Exact design candidate qualification is recorded separately in its PR.
+
+Next owner decision after finite design review and qualification: “Approve W1-C07-EMERGENCY-CONTROL-1 and implement W1-C07.”
+
 # Current Work — W1-C06 data-lifecycle implementation
 
 Status: WAVE1-PLAN-1 ACCEPTED — C01–C05 INTEGRATED — W1-C06-DATA-LIFECYCLE-1 APPROVED / IMPLEMENTATION AUTHORIZED — RC.12 IMMUTABLE
