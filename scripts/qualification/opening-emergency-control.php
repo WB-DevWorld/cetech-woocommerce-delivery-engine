@@ -109,9 +109,9 @@ return static function ( callable $check, ?array $history = null ): void {
 		if ( isset( $fixture->state['user_id'] ) ) { try {
 			// Track exact new native operational rows in this single-process disposable
 			// phase. Cleanup deletes only these captured IDs, never an order/table sweep.
-			foreach ( [ 'shipments', 'shipment_items', 'shipment_events', 'audit_logs' ] as $suffix ) { $baseline = array_column( $fixture->state['domain_before'][ $suffix ], 'id' ); $already = array_map( static fn ( array $item ): int => $item[0] === $suffix ? $item[1] : 0, $fixture->state['entities'] ); foreach ( $fixture::rows( $suffix ) as $row ) { if ( ! in_array( $row['id'], $baseline, true ) && ! in_array( (int) $row['id'], $already, true ) ) { $fixture->state['entities'][] = [ $suffix, (int) $row['id'] ]; } } }
+			foreach ( [ 'shipments', 'shipment_items', 'shipment_events', 'audit_log' ] as $suffix ) { if ( ! in_array( $suffix, DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES, true ) || ! isset( $fixture->state['domain_before'][ $suffix ] ) || ! is_array( $fixture->state['domain_before'][ $suffix ] ) ) { throw new RuntimeException( 'C07 tracked operational cleanup baseline is unavailable.' ); } $baseline = array_column( $fixture->state['domain_before'][ $suffix ], 'id' ); $already = array_map( static fn ( array $item ): int => $item[0] === $suffix ? $item[1] : 0, $fixture->state['entities'] ); foreach ( $fixture::rows( $suffix ) as $row ) { if ( ! in_array( $row['id'], $baseline, true ) && ! in_array( (int) $row['id'], $already, true ) ) { $fixture->state['entities'][] = [ $suffix, (int) $row['id'] ]; } } }
 			$cleanup = $fixture->cleanup(); $check( null === $history ? 'NATIVE-C07-EXACT-FIXTURE-CLEANUP-ALL32-CONTROL-PRESERVED' : 'NATIVE-C07-HISTORY-HOOK-FIXTURE-CLEANUP', $cleanup['cleanup_restored'] && ! $cleanup['role_exists'] && ! $cleanup['user_exists'], $cleanup );
-		} catch ( Throwable $cleanup_error ) { if ( null === $failure ) { throw $cleanup_error; } } }
-		wp_set_current_user( 0 ); wp_set_current_user( $old_user );
+		} catch ( Throwable $cleanup_error ) { if ( null === $failure ) { throw $cleanup_error; } } finally { wp_set_current_user( 0 ); wp_set_current_user( $old_user ); } }
+		else { wp_set_current_user( 0 ); wp_set_current_user( $old_user ); }
 	}
 };
