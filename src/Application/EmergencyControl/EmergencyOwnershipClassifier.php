@@ -133,10 +133,10 @@ final class EmergencyOwnershipClassifier {
 				if ( EmergencyOwnership::Unresolved === $ownership ) {
 					return $ownership;
 				}
+				// The cart-item mapping is also written for native Woo lines; it does not establish delivery ownership.
 				$owned = $owned || EmergencyOwnership::Managed === $ownership
 					|| self::meta_present( $item->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT, true ) )
-					|| self::meta_present( $item->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION, true ) )
-					|| self::meta_present( $item->get_meta( OrderDeliverySnapshot::META_CART_ITEM_KEY, true ) );
+					|| self::meta_present( $item->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION, true ) );
 			}
 			foreach ( $shipping as $item ) {
 				if ( ! is_object( $item ) || ! method_exists( $item, 'get_method_id' ) || ! method_exists( $item, 'get_meta' ) ) {

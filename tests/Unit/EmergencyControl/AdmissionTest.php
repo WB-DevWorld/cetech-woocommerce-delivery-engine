@@ -97,4 +97,11 @@ final class AdmissionTest extends TestCase {
 		self::assertFalse( $managed->allowed ); self::assertSame( 'checkout_revalidation_required', $managed->code );
 		self::assertSame( 1, $this->quote->calls ); self::assertSame( 0, $this->control->confirms );
 	}
+	public function test_actual_native_persister_order_continues_during_pause_without_loading_control(): void {
+		$this->source->managed = false; $order = checkout_native_mapping_order(); $this->control->pause();
+		foreach ( [ 'classic', 'store_api', 'order_pay' ] as $route ) {
+			$result = $this->service->final_order( $order, $route ); self::assertTrue( $result->allowed ); self::assertSame( 'unmanaged', $result->code ); self::assertFalse( $this->service->admitted( $order, $route ) );
+		}
+		self::assertSame( 0, $this->control->reads ); self::assertSame( 0, $this->control->confirms ); self::assertSame( 0, $this->quote->calls );
+	}
 }

@@ -105,3 +105,24 @@ final class CheckoutPersistedItemFixture extends \WC_Order_Item_Product {
 		$data = $property->getValue( $this ); $data[ $key ] = $value; $property->setValue( $this, $data );
 	}
 }
+
+/** Real no-selection Builder/Persister path; unrelated quote dependencies are not reached. */
+function checkout_native_mapping_order(): \WC_Order {
+	if ( ! class_exists( 'WooCommerce', false ) ) { eval( 'class WooCommerce {}' ); }
+	if ( ! class_exists( 'WC_Shipping_Method', false ) ) { eval( 'class WC_Shipping_Method { public string $id=""; public int $instance_id=0; public string $title=""; public string $method_title=""; public string $method_description=""; public string $tax_status=""; public array $supports=[]; public array $instance_form_fields=[]; public function init_form_fields():void{} public function init_settings():void{} public function get_option(string $key,$default_value=""){return $default_value;} public function process_admin_options():void{} }' ); }
+	$old_options = $GLOBALS['cetech_de_test_options'] ?? []; $old_wc = $GLOBALS['cetech_de_test_wc'] ?? null;
+	try {
+		$line = [ 'product_id' => 10, 'variation_id' => 0, 'quantity' => 1 ];
+		$GLOBALS['cetech_de_test_wc'] = (object) [ 'cart' => new class( $line ) { public function __construct( private array $line ) {} public function get_cart(): array { return [ 'ordinary-key' => $this->line ]; } } ];
+		$flags = new \CetechDeliveryEngine\Bootstrap\FeatureFlags();
+		foreach ( [ 'enable_order_delivery_snapshot_persistence', 'enable_woocommerce_shipping_rate_calculation', 'enable_product_delivery_selector', 'enable_cart_delivery_selection_capture', 'enable_checkout_delivery_selection_validation' ] as $flag ) { $flags->set( $flag, true ); }
+		$requirements = new \CetechDeliveryEngine\Core\Requirements();
+		$gate = new \CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotGate( $flags, $requirements, new \CetechDeliveryEngine\Application\Shipping\ShippingRateCalculationGate( $flags, $requirements ) );
+		$builder = ( new \ReflectionClass( \CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotBuilder::class ) )->newInstanceWithoutConstructor();
+		$persister = new \CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotPersister( $gate, $builder, new \CetechDeliveryEngine\Support\Logger() );
+		$item = new \WC_Order_Item_Product( [ 'id' => 71, 'product_id' => 10, 'quantity' => 1 ] ); $order = new \WC_Order( [ 'id' => 19, 'items' => [ $item ] ] );
+		if ( ! $gate->is_runtime_active() || null !== $builder->build_line_snapshot( 'ordinary-key', $line, $order ) ) { throw new \LogicException( 'Native no-selection fixture is not active.' ); }
+		$persister->handle_create_order_line_item( $item, 'ordinary-key', $line, $order ); $persister->handle_order_created( $order );
+		return $order;
+	} finally { $GLOBALS['cetech_de_test_options'] = $old_options; $GLOBALS['cetech_de_test_wc'] = $old_wc; }
+}

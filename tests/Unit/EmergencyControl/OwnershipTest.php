@@ -145,4 +145,27 @@ final class OwnershipTest extends TestCase {
 		[ $latch ] = $this->frozen_pickup(); $latch->bind_order_line( 'line', $this->persisted_pickup( item_id: 72 ) );
 		self::assertFalse( $latch->matches_order( new \WC_Order( [ 'id' => 19, 'items' => [ $this->persisted_pickup() ] ] ) ) );
 	}
+	public function test_actual_native_persister_mapping_is_not_delivery_ownership(): void {
+		$this->source->managed = false; $order = checkout_native_mapping_order(); $item = $order->get_items( 'line_item' )[0];
+		self::assertSame( 'ordinary-key', $item->get_meta( OrderDeliverySnapshot::META_CART_ITEM_KEY, true ) );
+		foreach ( [ OrderDeliverySnapshot::META_LINE_SNAPSHOT, OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION ] as $key ) { self::assertSame( '', $item->get_meta( $key, true ) ); }
+		foreach ( [ OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION ] as $key ) { self::assertSame( '', $order->get_meta( $key, true ) ); }
+		self::assertSame( EmergencyOwnership::Unmanaged, $this->classifier->order( $order ) );
+		$this->source->failed = true; self::assertSame( EmergencyOwnership::Unresolved, $this->classifier->order( $order ) );
+	}
+	public function test_mapping_only_exception_never_masks_real_or_malformed_delivery_evidence(): void {
+		$this->source->managed = false;
+		foreach ( [ OrderDeliverySnapshot::META_LINE_SNAPSHOT, OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION ] as $key ) {
+			$order = checkout_native_mapping_order(); $order->get_items( 'line_item' )[0]->update_meta_data( $key, false );
+			self::assertSame( EmergencyOwnership::Managed, $this->classifier->order( $order ) );
+		}
+		foreach ( [ OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION ] as $key ) {
+			$order = checkout_native_mapping_order(); $order->update_meta_data( $key, false ); self::assertSame( EmergencyOwnership::Managed, $this->classifier->order( $order ) );
+		}
+		foreach ( [ [ 'method_id' => \CetechDeliveryEngine\Infrastructure\WooCommerce\Shipping\SelectedOfferShippingMethod::METHOD_ID ], [ 'method_id' => 'flat_rate', 'meta' => [ 'cetech_de_group_id' => false ] ] ] as $shipping ) {
+			$native = checkout_native_mapping_order(); $order = new \WC_Order( [ 'id' => 19, 'items' => $native->get_items(), 'shipping_items' => [ new \WC_Order_Item_Shipping( $shipping ) ] ] );
+			self::assertSame( EmergencyOwnership::Managed, $this->classifier->order( $order ) );
+		}
+		$this->source->managed = true; self::assertSame( EmergencyOwnership::Managed, $this->classifier->order( checkout_native_mapping_order() ) );
+	}
 }

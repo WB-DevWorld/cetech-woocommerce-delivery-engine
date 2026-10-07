@@ -149,23 +149,26 @@ def run_emergency(client, state, bridge, recorder, Page, login):
                 raise error from recorded
             raise
 
-    def blocked(case, data):
-        prepared, rendered, response, result, before, after = data
-        denied = result.get("result") == "failure" and "temporarily paused" in result.get("messages", "")
+    def checkout_components(result, before, after):
         messages = result.get("messages", "") if isinstance(result.get("messages"), str) else ""
         new_orders = [order for key, order in after["orders"].items() if key not in before["orders"]]
-        components = {"result_is_failure": result.get("result") == "failure", "paused_message_present": "temporarily paused" in messages,
+        return {"result_is_failure": result.get("result") == "failure", "result_is_success": result.get("result") == "success", "paused_message_present": "temporarily paused" in messages,
                       "revalidation_message_present": "need to be checked again" in messages, "gateway_unchanged": before["gateway_count"] == after["gateway_count"],
+                      "gateway_delta": after["gateway_count"] - before["gateway_count"],
                       "protected_history_unchanged": before["protected_order_hash"] == after["protected_order_hash"],
                       "new_orders_count": len(new_orders), "new_paid_orders_count": sum(bool(order["paid"]) for order in new_orders),
                       "error_id_presence": {code: re.search(r'\bdata-id=["\']' + re.escape(code) + r'["\']', messages) is not None
                                             for code in ("cetech_de_checkout_control", "cetech_de_delivery_selection", "billing_email", "billing_phone", "billing_state", "billing_postcode", "shipping", "payment", "terms")}}
+
+    def blocked(case, data):
+        prepared, rendered, response, result, before, after = data
+        denied = result.get("result") == "failure" and "temporarily paused" in result.get("messages", "")
         recorder.check(prefix + case, response.status == 200 and denied and before["gateway_count"] == after["gateway_count"]
                        and before["protected_order_hash"] == after["protected_order_hash"]
                        and all(not order["paid"] for key, order in after["orders"].items() if key not in before["orders"]),
                        dict(evidence(before, after, response), page_rendered=rendered.status == 200,
                             fixture_preparation="existing server-validated cart choices; actual checkout request follows", barrier=after["barrier"],
-                            frontend_visibility=before["coming_soon"], components=components))
+                            frontend_visibility=before["coming_soon"], components=checkout_components(result, before, after)))
 
     response = login(client, state, settings, recorder, "HTTP-C07")
     opened = form(response)
@@ -216,12 +219,13 @@ def run_emergency(client, state, bridge, recorder, Page, login):
     ordinary = classic("unmanaged", "CLASSIC-UNMANAGED-CHECKOUT-UNAFFECTED", pause=True)
     recorder.check(prefix + "CLASSIC-UNMANAGED-CHECKOUT-UNAFFECTED", ordinary[3].get("result") == "success"
                    and ordinary[5]["gateway_count"] == ordinary[4]["gateway_count"] + 1,
-                   evidence(ordinary[4], ordinary[5], ordinary[2]))
+                   dict(evidence(ordinary[4], ordinary[5], ordinary[2]), components=checkout_components(ordinary[3], ordinary[4], ordinary[5])))
     emptied = classic("managed", "CLASSIC-EMPTY-CART-FINAL-OWNERSHIP-LATCH", arm="armemptyemergency")
     recorder.check(prefix + "CLASSIC-EMPTY-CART-FINAL-OWNERSHIP-LATCH", emptied[3].get("result") == "success"
                    and emptied[5]["gateway_count"] == emptied[4]["gateway_count"] + 1
                    and emptied[5]["barrier"].get("triggered") is True,
-                   dict(evidence(emptied[4], emptied[5], emptied[2]), cart_emptied_after_order_creation=True))
+                   dict(evidence(emptied[4], emptied[5], emptied[2]), cart_emptied_after_order_creation=True,
+                        components=checkout_components(emptied[3], emptied[4], emptied[5])))
 
     prepared = seed("managed"); before = snapshot(); bridge.call("armstoreemergency")
     cart, _ = fixture(); address = {"first_name": "Synthetic", "last_name": "Shopper", "company": "", "address_1": "PRIVATE-C07-SYNTHETIC-ADDRESS", "address_2": "", "city": "Accra", "state": "AA", "postcode": "00001", "country": "GH", "phone": "0200000000"}
