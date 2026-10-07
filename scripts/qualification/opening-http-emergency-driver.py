@@ -7,6 +7,7 @@ import copy
 import json
 import os
 import subprocess
+import uuid
 from pathlib import Path
 from urllib.parse import urljoin, urlsplit
 
@@ -125,7 +126,7 @@ def run_emergency(client, state, bridge, recorder, Page, login):
     recorder.check(prefix + "REPEATED-ORIGINAL-POST-RECORDED-COMPLETION", unchanged(before, after)
                    and "already completed" in follow(repeated).page().text, evidence(before, after, repeated))
     # A different request token and the actual older opened revision is a stale form.
-    stale.fields["request_token"] = "c07_stale_form_" + os.urandom(8).hex()
+    stale.fields["request_token"] = str(uuid.uuid4())
     before = snapshot(); response = submit(stale, "enabled", "resume_verified"); after = snapshot()
     recorder.check(prefix + "STALE-RENDERED-FORM-CANNOT-OVERWRITE", unchanged(before, after)
                    and "Reload the current state" in follow(response).page().text, evidence(before, after, response))
