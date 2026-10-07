@@ -76,6 +76,39 @@ class QuoteCartProtocol(unittest.TestCase):
         self.assertEqual(1, len(checks)); self.assertTrue(checks[0][0]); self.assertTrue(checks[0][1]["choices_destination_retained"])
         self.assertEqual("original-full-choice", current["choice_digest"])
 
+    def test_returned_refresh_projection_retains_only_safe_money_before_price_wait(self):
+        facts = public_facts(); facts["quote"]["money"][0]["display_total"]["amount"] = "7.00"
+        projected = child_helpers("refreshObservationFor(200," + json.dumps(facts) + ")")
+        self.assertTrue(DRIVER.browser_refresh_observation(projected))
+        self.assertEqual({"amount": "7.00", "currency": "GHS", "precision": 2}, projected["money"])
+        self.assertTrue(projected["safe_shopper_dto"]); self.assertEqual("review_required", projected["status"])
+        self.assertFalse(projected["expected_price"]); self.assertIsNone(projected["dom_matches_response_price"])
+        self.assertNotIn("quote_id", json.dumps(projected)); self.assertNotIn("customer_label", json.dumps(projected))
+        projected["dom_matches_expected_price"] = False; projected["dom_matches_response_price"] = True
+        self.assertTrue(DRIVER.browser_refresh_observation(projected))
+        private = copy.deepcopy(facts); private["quote"]["money"][0]["private_address"] = "PRIVATE-ADDRESS"
+        refused = child_helpers("refreshObservationFor(200," + json.dumps(private) + ")")
+        self.assertTrue(DRIVER.browser_refresh_observation(refused)); self.assertFalse(refused["safe_shopper_dto"])
+        self.assertIsNone(refused["money"]); self.assertIsNone(refused["status"])
+        self.assertNotIn("PRIVATE", json.dumps(refused))
+
+    def test_refresh_failure_projection_is_closed_nested_and_never_allowed_on_success(self):
+        observation = child_helpers("refreshObservationFor(200," + json.dumps(public_facts()) + ")")
+        case = {"id": DRIVER.BROWSER_IDS[1], "status": "FAIL", "evidence": {"stage": "refresh", "error_class": "TimeoutError", "dom": dict.fromkeys(("blocks_visible", "review_visible", "refresh_visible", "confirm_visible", "price_visible", "confirmed_visible"), False), "required_case_incomplete": True, "refresh_observation": observation}}
+        self.assertTrue(DRIVER.browser_evidence(case))
+        mutations = [("observation", "PRIVATE-PATH"), ("http_status", True), ("http_status", 600), ("safe_shopper_dto", 1), ("status", "PRIVATE-STATE"), ("can_confirm", 1), ("expected_price", False), ("dom_matches_expected_price", "PRIVATE-DOM"), ("dom_matches_response_price", 1), ("money", {"amount": "PRIVATE-ADDRESS", "currency": "GHS", "precision": 2}), ("money", {"amount": "7.70", "currency": "PRIVATE-CURRENCY", "precision": 2}), ("money", {"amount": "7.70", "currency": "GHS", "precision": True}), ("money", {"amount": "7.701", "currency": "GHS", "precision": 2}), ("money", {"amount": "7.70", "currency": "GHS", "precision": 2, "private_payload": "PRIVATE"})]
+        for key, value in mutations:
+            with self.subTest(key=key, value=value):
+                bad = copy.deepcopy(case); bad["evidence"]["refresh_observation"][key] = value
+                self.assertFalse(DRIVER.browser_evidence(bad))
+        bad = copy.deepcopy(case); bad["evidence"]["refresh_observation"]["private_payload"] = "PRIVATE"; self.assertFalse(DRIVER.browser_evidence(bad))
+        bad = copy.deepcopy(case); bad["evidence"]["stage"] = "render"; self.assertFalse(DRIVER.browser_evidence(bad))
+        bad = copy.deepcopy(case); bad["id"] = DRIVER.BROWSER_IDS[0]; self.assertFalse(DRIVER.browser_evidence(bad))
+        counts = dict.fromkeys(DRIVER.HISTORY, 0)
+        passed = {"id": DRIVER.BROWSER_IDS[1], "status": "PASS", "evidence": dict(dict.fromkeys(DRIVER.BROWSER_BOOLS[1], True), status=200, history_before=counts, history_after=counts)}
+        self.assertTrue(DRIVER.browser_evidence(passed))
+        passed["evidence"]["refresh_observation"] = observation; self.assertFalse(DRIVER.browser_evidence(passed))
+
     def test_current_evidence_followup_is_separate_finite_and_refused_on_success(self):
         stages = ("input_ready", "environment_same_draft", "environment_matches_original", "environment_authorized", "control_observed", "cached_shipping_restored", "preparation_matches_original", "source_captured", "source_bound", "packages_restored", "native_captured", "native_bound", "context_digest_matches", "source_applicable", "native_unchanged", "source_local_unchanged", "final_same_draft", "final_authorized", "control_confirmed")
         followup = dict.fromkeys(stages)

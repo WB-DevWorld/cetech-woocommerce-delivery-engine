@@ -362,6 +362,25 @@ def run_quote_cart(client, state, bridge, recorder, Page, login):
         raise
 
 
+def browser_refresh_observation(value):
+    keys = ("observation", "http_status", "safe_shopper_dto", "status", "can_confirm", "money", "expected_price", "dom_matches_expected_price", "dom_matches_response_price")
+    if not exact(value, keys) or value["observation"] != "returned_refresh_before_price_wait":
+        return False
+    if value["http_status"] is not None and not integer(value["http_status"], 100, 599):
+        return False
+    if type(value["safe_shopper_dto"]) is not bool or type(value["expected_price"]) is not bool:
+        return False
+    if any(value[key] is not None and type(value[key]) is not bool for key in ("dom_matches_expected_price", "dom_matches_response_price")):
+        return False
+    if value["safe_shopper_dto"]:
+        if not choice(value["status"], STATUS) or type(value["can_confirm"]) is not bool or (value["money"] is not None and not money(value["money"])):
+            return False
+    elif value["status"] is not None or value["can_confirm"] is not None or value["money"] is not None:
+        return False
+    expected = value["money"] == {"amount": "7.70", "currency": "GHS", "precision": 2}
+    return value["expected_price"] is expected and (value["money"] is not None or value["dom_matches_response_price"] is None)
+
+
 def browser_evidence(case):
     """No arbitrary strings, nested leaves or credentials enter the parent receipt."""
     if not exact(case, ("id", "status", "evidence")) or case["id"] not in BROWSER_IDS or case["status"] not in ("PASS", "FAIL") or not isinstance(case["evidence"], dict):
@@ -370,6 +389,10 @@ def browser_evidence(case):
     evidence = case["evidence"]
     basic = set(BROWSER_BOOLS[index]) | {"history_before", "history_after"} | ({"runtime"} if index == 0 else {"status"})
     diagnostic = {"stage", "error_class", "dom", "required_case_incomplete"}
+    if "refresh_observation" in evidence:
+        if case["status"] != "FAIL" or index != 1 or evidence.get("stage") != "refresh" or not browser_refresh_observation(evidence["refresh_observation"]):
+            return False
+        diagnostic.add("refresh_observation")
     if set(evidence) - basic - diagnostic:
         return False
     if case["status"] == "PASS" and set(evidence) != basic:

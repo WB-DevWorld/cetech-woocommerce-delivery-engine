@@ -17,6 +17,7 @@ const report = {format:'cetech-w2q05-cart-browser-v1', source_head:state.identit
 let stage = 'ownership';
 const dom = {blocks_visible:false,review_visible:false,refresh_visible:false,confirm_visible:false,price_visible:false,confirmed_visible:false};
 let checkoutPosts = 0;
+let refreshObservation = null;
 function write() { const tmp = receiptPath + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(report, null, 2) + '\n', {mode:0o600}); fs.renameSync(tmp, receiptPath); }
 function check(id, condition, evidence) { if (report.cases.some(item => item.id === id)) throw new Error('Duplicate quote browser case'); report.cases.push({id,status:condition ? 'PASS' : 'FAIL',evidence}); write(); if (!condition) throw new Error('Quote browser qualification diverged'); }
 function own(value) { try { const url = new URL(value, base); return url.origin === base.origin && !url.username && !url.password && !url.hash; } catch (_) { return false; } }
@@ -52,6 +53,17 @@ function safeFacts(value) {
   if (value.can_confirm && (value.status !== 'review_required' || value.quote === null || !value.quote.currently_applicable)) return false;
   const encoded=JSON.stringify(value);
   return Buffer.byteLength(encoded) <= 65536 && !['PRIVATE-','acceptance_handle','owner_digest','session_hash','principal_hash','body_digest','material_digest','origin_id','supplier','rate_card','provider_json','issue_context_json','review_token'].some(marker => encoded.includes(marker));
+}
+/** Failure-only projection of the response already returned before the price wait. */
+function refreshObservationFor(status, facts) {
+  const safe = safeFacts(facts);
+  const part = safe && facts.quote && facts.quote.money.length ? facts.quote.money[0] : null;
+  const amount = part ? (part.display_total || part.total) : null;
+  const money = amount && safeMoney(amount) ? {amount:amount.amount,currency:amount.currency,precision:amount.precision} : null;
+  return {observation:'returned_refresh_before_price_wait',http_status:Number.isInteger(status) && status >= 100 && status <= 599 ? status : null,
+    safe_shopper_dto:safe,status:safe ? facts.status : null,can_confirm:safe ? facts.can_confirm : null,money,
+    expected_price:!!money && money.currency === 'GHS' && money.amount === '7.70' && money.precision === 2,
+    dom_matches_expected_price:null,dom_matches_response_price:null};
 }
 write();
 (async () => {
@@ -101,6 +113,7 @@ write();
     check(ids[0], await blocks.isVisible() && await mount.isVisible() && await mount.locator('[data-quote-review-action="refresh"]').isVisible() && afterRender.facts.status === 'no_quote' && sameHistory(before,afterRender) && checkoutPosts === 0,
       {real_chromium:true,actual_native_blocks_ui:true,visible_review_controls:true,native_seed_is_setup_only:true,read_render_no_quote_acceptance:sameHistory(before,afterRender),no_checkout_post:checkoutPosts === 0,no_placement_or_payment:noPlacement(before,afterRender),runtime:{playwright:report.runtime.playwright,chromium:report.runtime.chromium},history_before:before.history_counts,history_after:afterRender.history_counts});
     stage='refresh'; const refreshBefore=await inspect(); const [refreshResponse,review]=await clickReview('refresh');
+    refreshObservation=refreshObservationFor(refreshResponse.status(),review);
     await mount.locator('[data-quote-review-action="confirm"]').waitFor({state:'visible'}); await mount.locator('.cetech-de-quote-review-money').getByText('GHS 7.70',{exact:false}).waitFor({state:'visible'});
     dom.confirm_visible=true; dom.price_visible=true;
     const afterRefresh=await inspect();
@@ -114,6 +127,11 @@ write();
     stage='complete'; report.status='PASS'; report.stage=stage; write();
   } catch(error) {
     try { dom.blocks_visible=await page.locator('.wc-block-checkout').isVisible(); dom.review_visible=await page.locator('#cetech-de-quote-review-blocks').isVisible(); dom.refresh_visible=await page.locator('#cetech-de-quote-review-blocks [data-quote-review-action="refresh"]').isVisible(); dom.confirm_visible=await page.locator('#cetech-de-quote-review-blocks [data-quote-review-action="confirm"]').isVisible(); } catch(_) {}
+    if (stage === 'refresh' && refreshObservation) {
+      const money = page.locator('#cetech-de-quote-review-blocks .cetech-de-quote-review-money');
+      try { refreshObservation.dom_matches_expected_price=await money.getByText('GHS 7.70',{exact:false}).isVisible(); } catch(_) {}
+      if (refreshObservation.money) { try { refreshObservation.dom_matches_response_price=await money.getByText(refreshObservation.money.currency+' '+refreshObservation.money.amount,{exact:false}).isVisible(); } catch(_) {} }
+    }
     throw error;
   } finally { await context.close(); await browser.close(); }
 })().catch(error => {
@@ -121,5 +139,6 @@ write();
   const next=ids.find(id => !report.cases.some(item => item.id === id));
   if (next && !report.cases.some(item => item.status === 'FAIL')) report.cases.push({id:next,status:'FAIL',evidence:{stage,error_class:report.error_class,dom:{...dom},required_case_incomplete:true}});
   const failure=report.cases.find(item => item.status === 'FAIL'); if (failure) Object.assign(failure.evidence,{stage,error_class:report.error_class,dom:{...dom}});
+  if (failure && failure.id === ids[1] && stage === 'refresh' && refreshObservation) failure.evidence.refresh_observation=refreshObservation;
   write(); process.stderr.write('Q05 browser failure; inspect bounded private receipt.\n'); process.exitCode=1;
 });
