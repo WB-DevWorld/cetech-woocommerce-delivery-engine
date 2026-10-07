@@ -149,6 +149,38 @@ class QuoteCartProtocol(unittest.TestCase):
         self.assertIsNone(child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','POST','{}'" + tail))
         self.assertEqual(0, child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','GET','{}'" + tail))
 
+    def test_checkout_route_accounting_keeps_bodyless_native_siblings_distinct_from_checkout(self):
+        payload = {"requests": [{"path": "/wc/store/v1/cart", "method": "GET"}, {"path": "/wc/store/v1/cart/remove-item", "method": "DELETE", "headers": {"Nonce": "CONTROLLED-NATIVE-NONCE"}}, {"path": "/wc/store/v1/cart/update-customer", "method": "POST", "body": None, "cache": "default", "data": {"opaque": "PRIVATE-UNOBSERVED"}}]}
+        raw = json.dumps(json.dumps(payload))
+        self.assertIsNone(child_helpers("nativeBatchRequests('/?rest_route=/wc/store/v1/batch','/?rest_route=/wc/store/v1/cart/extensions'," + raw + ")"))
+        tail = ",'/?rest_route=/wc/store/v1/cart/extensions','/?rest_route=/wc/store/v1/checkout')"
+        self.assertEqual(0, child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','POST'," + raw + tail))
+        payload["requests"].append({"path": "/wc/store/v1/checkout?fixed=1", "method": "POST"})
+        self.assertEqual(1, child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','POST'," + json.dumps(json.dumps(payload)) + tail))
+        for requests in ([{"path": "/wc/store/v1/checkout"}], [{"path": "https://example.invalid/wc/store/v1/checkout", "method": "POST"}], [{"path": "/wc/store/v1/batch", "method": "POST"}], [{"path": "/wc/store/v1/cart/../checkout", "method": "POST"}], [{"path": "/wc/store/v1/checkout#ambiguous", "method": "POST"}], [None], [], [{"path": "/wc/store/v1/cart", "method": "GET"}] * 26):
+            self.assertIsNone(child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','POST'," + json.dumps(json.dumps({"requests": requests})) + tail))
+        oversized = "JSON.stringify({requests:[{path:'/wc/store/v1/cart',method:'DELETE',opaque:'x'.repeat(262145)}]})"
+        self.assertIsNone(child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','POST'," + oversized + tail))
+
+    def test_original_checkout_counters_are_closed_and_failure_only(self):
+        counts = {"direct_checkout_posts": 0, "nested_checkout_posts": 0, "unclassified_batches": 1, "observed_batches": 2}
+        self.assertTrue(DRIVER.browser_checkout_observation(counts))
+        self.assertFalse(child_helpers("noCheckoutRequests(" + json.dumps(counts) + ")"))
+        known = dict(counts, unclassified_batches=0)
+        self.assertTrue(child_helpers("noCheckoutRequests(" + json.dumps(known) + ")"))
+        for key in ("direct_checkout_posts", "nested_checkout_posts"):
+            self.assertFalse(child_helpers("noCheckoutRequests(" + json.dumps(dict(known, **{key: 1})) + ")"))
+        case = {"id": DRIVER.BROWSER_IDS[1], "status": "FAIL", "evidence": {"stage": "refresh", "error_class": "Error", "dom": dict.fromkeys(("blocks_visible", "review_visible", "refresh_visible", "confirm_visible", "price_visible", "confirmed_visible"), False), "required_case_incomplete": True, "checkout_request_observation": counts}}
+        self.assertTrue(DRIVER.browser_evidence(case))
+        for key, value in (("direct_checkout_posts", True), ("nested_checkout_posts", 51), ("unclassified_batches", 3), ("observed_batches", -1), ("observed_batches", 1000001), ("observed_batches", "PRIVATE-URL"), ("private_body", "PRIVATE-CREDENTIAL")):
+            bad = copy.deepcopy(case); bad["evidence"]["checkout_request_observation"][key] = value
+            self.assertFalse(DRIVER.browser_evidence(bad))
+        history = dict.fromkeys(DRIVER.HISTORY, 0)
+        passed = {"id": DRIVER.BROWSER_IDS[1], "status": "PASS", "evidence": dict(dict.fromkeys(DRIVER.BROWSER_BOOLS[1], True), status=200, history_before=history, history_after=history)}
+        self.assertTrue(DRIVER.browser_evidence(passed))
+        passed["evidence"]["checkout_request_observation"] = counts
+        self.assertFalse(DRIVER.browser_evidence(passed))
+
     def test_returned_refresh_projection_retains_only_safe_money_before_price_wait(self):
         facts = public_facts(); facts["quote"]["money"][0]["display_total"]["amount"] = "7.00"
         projected = child_helpers("refreshObservationFor(200," + json.dumps(facts) + ")")

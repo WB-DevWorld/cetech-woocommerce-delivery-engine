@@ -16,7 +16,7 @@ const report = {format:'cetech-w2q05-cart-browser-v1', source_head:state.identit
   installed_php_sources_hash:state.identity.installed_php_sources_hash, runtime:{playwright:'1.58.2'}, status:'RUNNING', cases:[]};
 let stage = 'ownership';
 const dom = {blocks_visible:false,review_visible:false,refresh_visible:false,confirm_visible:false,price_visible:false,confirmed_visible:false};
-let checkoutPosts = 0;
+const checkoutRequests = {direct_checkout_posts:0,nested_checkout_posts:0,unclassified_batches:0,observed_batches:0};
 let refreshObservation = null;
 function write() { const tmp = receiptPath + '.tmp'; fs.writeFileSync(tmp, JSON.stringify(report, null, 2) + '\n', {mode:0o600}); fs.renameSync(tmp, receiptPath); }
 function check(id, condition, evidence) { if (report.cases.some(item => item.id === id)) throw new Error('Duplicate quote browser case'); report.cases.push({id,status:condition ? 'PASS' : 'FAIL',evidence}); write(); if (!condition) throw new Error('Quote browser qualification diverged'); }
@@ -80,8 +80,19 @@ function nativeCheckoutPosts(observedValue,method,postData,nativeExtensions,nati
   if (method !== 'POST') return 0;
   if (nativeRouteMatches(observedValue,nativeCheckout,'/wc/store/v1/checkout')) return 1;
   const batch=nativeBatchUrl(nativeExtensions); if (!batch || !nativeRouteMatches(observedValue,batch,'/wc/store/v1/batch')) return 0;
-  const requests=nativeBatchRequests(observedValue,nativeExtensions,postData); return requests ? requests.filter(item => item.method === 'POST' && item.path === '/wc/store/v1/checkout').length : null;
+  if (typeof postData !== 'string' || Buffer.byteLength(postData) > 262144) return null;
+  try {
+    const payload=JSON.parse(postData); if (!exact(payload,['requests']) || !Array.isArray(payload.requests) || payload.requests.length < 1 || payload.requests.length > 25) return null;
+    let count=0;
+    for (const item of payload.requests) {
+      if (!item || typeof item !== 'object' || Array.isArray(item) || typeof item.path !== 'string' || !/^\/wc\/store\/v1\/[a-z0-9_-]+(?:\/[a-z0-9_-]+)*$/.test(item.path.split('?')[0]) || !['GET','POST','PUT','PATCH','DELETE','OPTIONS'].includes(item.method)) return null;
+      const route=new URL(item.path,base); if (!own(route.href) || !/^\/wc\/store\/v1\/[a-z0-9_-]+(?:\/[a-z0-9_-]+)*$/.test(route.pathname) || route.pathname === '/wc/store/v1/batch') return null;
+      if (item.method === 'POST' && route.pathname === '/wc/store/v1/checkout') count++;
+    }
+    return count;
+  } catch (_) { return null; }
 }
+function noCheckoutRequests(value=checkoutRequests) { return value.direct_checkout_posts === 0 && value.nested_checkout_posts === 0 && value.unclassified_batches === 0; }
 function noPlacement(before, after) { return before.history_counts.bindings === after.history_counts.bindings && before.orders_count === after.orders_count && before.gateway_count === after.gateway_count; }
 function sameHistory(before, after) { return ['records','events','quotes','accepted','bindings','budget'].every(key => before.history_counts[key] === after.history_counts[key]) && noPlacement(before, after); }
 function finiteCounts(value) { const keys=['records','events','quotes','accepted','bindings','budget']; return value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every(key => Number.isSafeInteger(value[key]) && value[key] >= 0); }
@@ -141,7 +152,15 @@ write();
   }
   try {
     await page.route('**/*',route => own(route.request().url()) ? route.continue() : route.abort());
-    page.on('request',request => { const count=nativeCheckoutPosts(request.url(),request.method(),request.postData(),state.store_extensions_url,state.checkout_url); checkoutPosts += count === null ? 1 : count; });
+    page.on('request',request => {
+      if (request.method() !== 'POST') return;
+      if (nativeRouteMatches(request.url(),state.checkout_url,'/wc/store/v1/checkout')) { checkoutRequests.direct_checkout_posts=Math.min(1000000,checkoutRequests.direct_checkout_posts+1); return; }
+      const batch=nativeBatchUrl(state.store_extensions_url); if (!batch || !nativeRouteMatches(request.url(),batch,'/wc/store/v1/batch')) return;
+      checkoutRequests.observed_batches=Math.min(1000000,checkoutRequests.observed_batches+1);
+      const count=nativeCheckoutPosts(request.url(),request.method(),request.postData(),state.store_extensions_url,state.checkout_url);
+      if (count === null) checkoutRequests.unclassified_batches=Math.min(1000000,checkoutRequests.unclassified_batches+1);
+      else checkoutRequests.nested_checkout_posts=Math.min(1000000,checkoutRequests.nested_checkout_posts+count);
+    });
     const probe=await context.request.get('/?cetech_opening_http_probe=1',{headers:{'X-CETECH-Opening-Probe':state.probe_token},timeout:20000}); const identity=await probe.json();
     if (probe.status() !== 200 || ['source_head','candidate_head','source_tree'].some(key => identity[key] !== state.identity[key]) || identity.probe_sha256 !== crypto.createHash('sha256').update(state.probe_token).digest('hex') || identity.site_path_sha256 !== crypto.createHash('sha256').update(state.site_path).digest('hex') || identity.database_name_sha256 !== crypto.createHash('sha256').update(state.database_name).digest('hex')) throw new Error('Owned quote listener not confirmed');
     stage='login';
@@ -158,20 +177,20 @@ write();
     await blocks.waitFor({state:'visible'}); await mount.waitFor({state:'visible'}); await mount.locator('[data-quote-review-action="refresh"]').waitFor({state:'visible'});
     dom.blocks_visible=true; dom.review_visible=true; dom.refresh_visible=true;
     const afterRender=await inspect();
-    check(ids[0], await blocks.isVisible() && await mount.isVisible() && await mount.locator('[data-quote-review-action="refresh"]').isVisible() && afterRender.facts.status === 'no_quote' && sameHistory(before,afterRender) && checkoutPosts === 0,
-      {real_chromium:true,actual_native_blocks_ui:true,visible_review_controls:true,native_seed_is_setup_only:true,read_render_no_quote_acceptance:sameHistory(before,afterRender),no_checkout_post:checkoutPosts === 0,no_placement_or_payment:noPlacement(before,afterRender),runtime:{playwright:report.runtime.playwright,chromium:report.runtime.chromium},history_before:before.history_counts,history_after:afterRender.history_counts});
+    check(ids[0], await blocks.isVisible() && await mount.isVisible() && await mount.locator('[data-quote-review-action="refresh"]').isVisible() && afterRender.facts.status === 'no_quote' && sameHistory(before,afterRender) && noCheckoutRequests(),
+      {real_chromium:true,actual_native_blocks_ui:true,visible_review_controls:true,native_seed_is_setup_only:true,read_render_no_quote_acceptance:sameHistory(before,afterRender),no_checkout_post:noCheckoutRequests(),no_placement_or_payment:noPlacement(before,afterRender),runtime:{playwright:report.runtime.playwright,chromium:report.runtime.chromium},history_before:before.history_counts,history_after:afterRender.history_counts});
     stage='refresh'; const refreshBefore=await inspect(); const [refreshResponse,review]=await clickReview('refresh');
     refreshObservation=refreshObservationFor(refreshResponse.wireStatus(),review);
     await mount.locator('[data-quote-review-action="confirm"]').waitFor({state:'visible'}); await mount.locator('.cetech-de-quote-review-money').getByText('GHS 7.70',{exact:false}).waitFor({state:'visible'});
     dom.confirm_visible=true; dom.price_visible=true;
     const afterRefresh=await inspect();
-    check(ids[1], refreshResponse.status() === 200 && safeFacts(review) && review.status === 'review_required' && review.quote.status === 'issued' && review.can_confirm && afterRefresh.history_counts.quotes === refreshBefore.history_counts.quotes+1 && afterRefresh.history_counts.accepted === refreshBefore.history_counts.accepted && noPlacement(refreshBefore,afterRefresh) && checkoutPosts === 0 && await mount.locator('[data-quote-review-action="confirm"]').isEnabled(),
-      {actual_refresh_button_clicked:true,actual_store_api_extensions_post:true,status:refreshResponse.status(),safe_shopper_dto:safeFacts(review),native_price_visible:true,explicit_confirm_required:true,issued_not_accepted:afterRefresh.history_counts.accepted === refreshBefore.history_counts.accepted,no_checkout_post:checkoutPosts === 0,no_placement_or_payment:noPlacement(refreshBefore,afterRefresh),history_before:refreshBefore.history_counts,history_after:afterRefresh.history_counts});
+    check(ids[1], refreshResponse.status() === 200 && safeFacts(review) && review.status === 'review_required' && review.quote.status === 'issued' && review.can_confirm && afterRefresh.history_counts.quotes === refreshBefore.history_counts.quotes+1 && afterRefresh.history_counts.accepted === refreshBefore.history_counts.accepted && noPlacement(refreshBefore,afterRefresh) && noCheckoutRequests() && await mount.locator('[data-quote-review-action="confirm"]').isEnabled(),
+      {actual_refresh_button_clicked:true,actual_store_api_extensions_post:true,status:refreshResponse.status(),safe_shopper_dto:safeFacts(review),native_price_visible:true,explicit_confirm_required:true,issued_not_accepted:afterRefresh.history_counts.accepted === refreshBefore.history_counts.accepted,no_checkout_post:noCheckoutRequests(),no_placement_or_payment:noPlacement(refreshBefore,afterRefresh),history_before:refreshBefore.history_counts,history_after:afterRefresh.history_counts});
     stage='confirm'; const [confirmResponse,confirmed]=await clickReview('confirm');
     await mount.getByText('Delivery price confirmed for these delivery details.',{exact:true}).waitFor({state:'visible'}); dom.confirmed_visible=true;
     const afterConfirm=await inspect(); const afterRead=await inspect();
-    check(ids[2], confirmResponse.status() === 200 && safeFacts(confirmed) && confirmed.status === 'confirmed' && confirmed.quote.status === 'accepted' && !confirmed.can_confirm && afterConfirm.history_counts.accepted === afterRefresh.history_counts.accepted+1 && sameHistory(afterConfirm,afterRead) && noPlacement(afterRefresh,afterRead) && checkoutPosts === 0 && await mount.locator('[data-quote-review-action="confirm"]').count() === 0,
-      {actual_confirm_button_clicked:true,actual_store_api_extensions_post:true,status:confirmResponse.status(),safe_shopper_dto:safeFacts(confirmed),one_acceptance:afterConfirm.history_counts.accepted === afterRefresh.history_counts.accepted+1,confirmed_visible:true,repeat_reads_no_acceptance:sameHistory(afterConfirm,afterRead),no_checkout_post:checkoutPosts === 0,no_placement_or_payment:noPlacement(afterRefresh,afterRead),history_before:afterRefresh.history_counts,history_after:afterRead.history_counts});
+    check(ids[2], confirmResponse.status() === 200 && safeFacts(confirmed) && confirmed.status === 'confirmed' && confirmed.quote.status === 'accepted' && !confirmed.can_confirm && afterConfirm.history_counts.accepted === afterRefresh.history_counts.accepted+1 && sameHistory(afterConfirm,afterRead) && noPlacement(afterRefresh,afterRead) && noCheckoutRequests() && await mount.locator('[data-quote-review-action="confirm"]').count() === 0,
+      {actual_confirm_button_clicked:true,actual_store_api_extensions_post:true,status:confirmResponse.status(),safe_shopper_dto:safeFacts(confirmed),one_acceptance:afterConfirm.history_counts.accepted === afterRefresh.history_counts.accepted+1,confirmed_visible:true,repeat_reads_no_acceptance:sameHistory(afterConfirm,afterRead),no_checkout_post:noCheckoutRequests(),no_placement_or_payment:noPlacement(afterRefresh,afterRead),history_before:afterRefresh.history_counts,history_after:afterRead.history_counts});
     stage='complete'; report.status='PASS'; report.stage=stage; write();
   } catch(error) {
     try { dom.blocks_visible=await page.locator('.wc-block-checkout').isVisible(); dom.review_visible=await page.locator('#cetech-de-quote-review-blocks').isVisible(); dom.refresh_visible=await page.locator('#cetech-de-quote-review-blocks [data-quote-review-action="refresh"]').isVisible(); dom.confirm_visible=await page.locator('#cetech-de-quote-review-blocks [data-quote-review-action="confirm"]').isVisible(); } catch(_) {}
@@ -187,6 +206,7 @@ write();
   const next=ids.find(id => !report.cases.some(item => item.id === id));
   if (next && !report.cases.some(item => item.status === 'FAIL')) report.cases.push({id:next,status:'FAIL',evidence:{stage,error_class:report.error_class,dom:{...dom},required_case_incomplete:true}});
   const failure=report.cases.find(item => item.status === 'FAIL'); if (failure) Object.assign(failure.evidence,{stage,error_class:report.error_class,dom:{...dom}});
+  if (failure) failure.evidence.checkout_request_observation={...checkoutRequests};
   if (failure && failure.id === ids[1] && stage === 'refresh' && refreshObservation) failure.evidence.refresh_observation=refreshObservation;
   write(); process.stderr.write('Q05 browser failure; inspect bounded private receipt.\n'); process.exitCode=1;
 });

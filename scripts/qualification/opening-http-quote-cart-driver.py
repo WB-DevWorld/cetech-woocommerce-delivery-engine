@@ -381,6 +381,11 @@ def browser_refresh_observation(value):
     return value["expected_price"] is expected and (value["money"] is not None or value["dom_matches_response_price"] is None)
 
 
+def browser_checkout_observation(value):
+    keys = ("direct_checkout_posts", "nested_checkout_posts", "unclassified_batches", "observed_batches")
+    return exact(value, keys) and all(integer(value[key], 0, 1000000) for key in keys) and value["unclassified_batches"] <= value["observed_batches"] and value["nested_checkout_posts"] <= value["observed_batches"] * 25
+
+
 def browser_evidence(case):
     """No arbitrary strings, nested leaves or credentials enter the parent receipt."""
     if not exact(case, ("id", "status", "evidence")) or case["id"] not in BROWSER_IDS or case["status"] not in ("PASS", "FAIL") or not isinstance(case["evidence"], dict):
@@ -389,6 +394,10 @@ def browser_evidence(case):
     evidence = case["evidence"]
     basic = set(BROWSER_BOOLS[index]) | {"history_before", "history_after"} | ({"runtime"} if index == 0 else {"status"})
     diagnostic = {"stage", "error_class", "dom", "required_case_incomplete"}
+    if "checkout_request_observation" in evidence:
+        if case["status"] != "FAIL" or not browser_checkout_observation(evidence["checkout_request_observation"]):
+            return False
+        diagnostic.add("checkout_request_observation")
     if "refresh_observation" in evidence:
         if case["status"] != "FAIL" or index != 1 or evidence.get("stage") != "refresh" or not browser_refresh_observation(evidence["refresh_observation"]):
             return False
