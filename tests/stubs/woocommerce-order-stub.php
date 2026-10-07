@@ -75,6 +75,10 @@ if ( ! class_exists( 'WC_Order', false ) ) {
 			return $this->data['items'];
 		}
 
+		public function meta_exists( string $key ): bool {
+			return array_key_exists( $key, $this->data['meta'] );
+		}
+
 		public function get_meta( string $key, bool $single = true ): mixed {
 			unset( $single );
 
@@ -226,6 +230,10 @@ if ( ! class_exists( 'WC_Order_Item_Product', false ) ) {
 
 		public function get_quantity(): int {
 			return (int) ( $this->data['quantity'] ?? 1 );
+		}
+
+		public function meta_exists( string $key ): bool {
+			return array_key_exists( $key, $this->data['meta'] );
 		}
 
 		public function get_meta( string $key, bool $single = true ): mixed {

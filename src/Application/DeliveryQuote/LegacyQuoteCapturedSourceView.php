@@ -20,7 +20,7 @@ use CetechDeliveryEngine\Domain\DeliveryOffer\DeliveryOfferRepositoryInterface;
 
 /** The retained resolvers read one bounded physical universe, never an open-ended live query. */
 final readonly class LegacyQuoteCapturedSourceView implements \JsonSerializable {
-	public function __construct( private LegacyQuoteSourceSnapshot $snapshot ) {}
+	public function __construct( private LegacyQuoteSourceSnapshot|LegacyQuoteSourceSeedRows $snapshot ) {}
 	public function jsonSerialize(): never { throw new \LogicException( 'Captured source views are private.' ); }
 	public function __serialize(): never { throw new \LogicException( 'Captured source views are private.' ); }
 	public function offers(): DeliveryOfferRepositoryInterface {

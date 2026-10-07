@@ -45,6 +45,11 @@ final class OrderDeliverySnapshotJson {
 		if ( property_exists( $object, 'groups' ) && $object->groups instanceof \stdClass ) {
 			$decoded['groups'] = false;
 		}
+		// New mandatory quote semantics must keep every nested JSON object/list
+		// distinction (notably an empty rates list); old containers stay untouched.
+		if ( property_exists( $object, DeliveryQuoteSnapshotEnvelope::MEMBER ) ) {
+			$decoded[DeliveryQuoteSnapshotEnvelope::MEMBER] = $object->{DeliveryQuoteSnapshotEnvelope::MEMBER};
+		}
 
 		return $decoded;
 	}

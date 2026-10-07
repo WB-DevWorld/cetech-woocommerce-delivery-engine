@@ -23,6 +23,8 @@ final class HistoricalOrderShipmentContextFactory {
 	public function from_order( WC_Order $order ): HistoricalOrderShipmentContext {
 		$package_read = $this->reader->read_package( $order );
 		$package_ok   = OrderDeliveryPackageReadResult::ERROR_NONE === $package_read->error && null !== $package_read->snapshot;
+		$package_unreadable = $package_read->has_meta && ! $package_ok;
+		$expected_quote = $package_read->delivery_quote?->envelope;
 
 		$lines = [];
 
@@ -37,6 +39,12 @@ final class HistoricalOrderShipmentContextFactory {
 
 			$unreadable = $read->has_meta && OrderDeliveryLineReadResult::ERROR_NONE !== $read->error;
 			$has        = $read->has_meta && OrderDeliveryLineReadResult::ERROR_NONE === $read->error && null !== $read->snapshot;
+			$line_quote = $read->delivery_quote?->envelope;
+			// A quote-owned historical order cannot mix in a legacy fallback line.
+			// This compares captured facts only; it never consults a current quote,
+			// configuration, or private placement seal.
+			if ( null !== $expected_quote && $read->has_meta && ( null === $line_quote || ! $expected_quote->matches( $line_quote ) ) ) { $unreadable = true; $has = false; }
+			if ( null !== $line_quote && null === $expected_quote ) { $package_unreadable = true; $unreadable = true; $has = false; }
 
 			$lines[] = new HistoricalShipmentLineContext(
 				$item_id,
@@ -71,7 +79,7 @@ final class HistoricalOrderShipmentContextFactory {
 			(string) $order->get_order_number(),
 			$package_ok ? $package_read->snapshot : null,
 			$package_read->has_meta,
-			$package_read->has_meta && ! $package_ok,
+			$package_unreadable,
 			$lines,
 			$shipping_lines
 		);

@@ -51,6 +51,40 @@ final class LegacyQuoteNativeSourcePreparer {
 	private LegacyQuoteSourceSnapshotReader $reader;
 	public function __construct( private OperationConnectionFactory $factory, ?LegacyQuoteSourceSnapshotReader $reader = null ) { $this->reader = $reader ?? new LegacyQuoteSourceSnapshotReader(); }
 
+	/** Observe a complete bounded retained source view before constructing a genuine quote input. */
+	public function seed_for_cart( QuoteOwner $owner, array $lines, array $selected_offer_ids ): LegacyQuoteSourceSeedRows {
+		try {
+			if ( ! $owner->equals( ( new QuoteNativeOwnerResolver() )->current() ) || ! array_is_list( $lines ) || [] === $lines || count( $lines ) > 200 || ! array_is_list( $selected_offer_ids ) || [] === $selected_offer_ids || count( $selected_offer_ids ) > 200 ) { self::fail(); }
+			$ids = []; $targets = []; $scopes = [ 'global:0' => [ 'type' => 'global', 'id' => 0 ] ]; $offers = []; $dimensions = [ 'origins' => [], 'suppliers' => [], 'profiles' => [] ];
+			foreach ( $selected_offer_ids as $id ) { if ( ! is_int( $id ) || $id < 1 ) { self::fail(); } $offers[$id] = $id; }
+			foreach ( $lines as $line ) {
+				if ( ! is_array( $line ) || ! is_int( $line['product_id'] ?? null ) || $line['product_id'] < 1 || ( null !== ( $line['variation_id'] ?? null ) && ( ! is_int( $line['variation_id'] ) || $line['variation_id'] < 1 || $line['variation_id'] === $line['product_id'] ) ) ) { self::fail(); }
+				foreach ( [ [ 'product', $line['product_id'] ], [ 'variation', $line['variation_id'] ?? null ] ] as [ $type, $id ] ) { if ( null !== $id ) { $ids[$id] = $id; $targets[$type . ':' . $id] = [ 'type' => $type, 'id' => $id ]; $scopes[$type . ':' . $id] = [ 'type' => $type, 'id' => $id ]; } }
+			}
+			$db = $GLOBALS['wpdb'] ?? null;
+			if ( ! $db instanceof \wpdb || ! is_string( $db->prefix ) || 1 !== preg_match( '/\A[a-zA-Z0-9_]+\z/D', $db->prefix ) || $db->term_relationships !== $db->prefix . 'term_relationships' || $db->term_taxonomy !== $db->prefix . 'term_taxonomy' ) { self::fail(); }
+			$terms = $db->get_results( 'SELECT DISTINCT tr.term_taxonomy_id,tt.term_id,tt.taxonomy FROM `' . $db->term_relationships . '` tr INNER JOIN `' . $db->term_taxonomy . '` tt ON tt.term_taxonomy_id=tr.term_taxonomy_id WHERE tr.object_id IN (' . implode( ',', $ids ) . ') ORDER BY tr.term_taxonomy_id ASC LIMIT 601', ARRAY_A );
+			if ( ! is_array( $terms ) || count( $terms ) > 600 || '' !== $db->last_error ) { self::fail(); } $taxonomy = [];
+			foreach ( $terms as $term ) { $tax_id = QuoteStorageCodec::integer( $term['term_taxonomy_id'] ?? null ); $taxonomy[$tax_id] = $tax_id; if ( 'product_cat' === ( $term['taxonomy'] ?? null ) ) { $category = QuoteStorageCodec::integer( $term['term_id'] ?? null ); $targets['category:' . $category] = [ 'type' => 'category', 'id' => $category ]; } }
+			[ $offers, $dimensions ] = $this->discover_references( $db, array_values( $targets ), array_values( $scopes ), $offers, $dimensions );
+			$fences = [ [ 'source' => 'product', 'ids' => array_values( $ids ) ], [ 'source' => 'product_meta', 'ids' => array_values( $ids ) ], [ 'source' => 'term_relationships', 'ids' => array_values( $ids ) ], [ 'source' => 'options', 'names' => LegacyQuoteSourcePlan::OPTIONS ], [ 'source' => 'offers', 'ids' => array_values( $offers ) ], [ 'source' => 'legacy_rules', 'targets' => array_values( $targets ) ], [ 'source' => 'scopes', 'targets' => array_values( $scopes ) ], [ 'source' => 'scope_fields' ], [ 'source' => 'scope_collections' ], [ 'source' => 'zones' ], [ 'source' => 'zone_rules' ], [ 'source' => 'coverage_groups' ], [ 'source' => 'coverage_members' ], [ 'source' => 'coverage_postcodes' ] ];
+			if ( [] !== $taxonomy ) { $fences[] = [ 'source' => 'term_taxonomy', 'ids' => array_values( $taxonomy ) ]; } foreach ( $dimensions as $source => $values ) { if ( [] !== $values ) { $fences[] = [ 'source' => $source, 'ids' => array_values( $values ) ]; } }
+			$session = null; $begun = false;
+			try {
+				$session = $this->factory->open(); if ( $session->site_id() !== $owner->site_id() || $session->table_prefix() !== $db->prefix || $session->is_retired() || $session->in_transaction() || ! $session->begin() ) { self::fail(); } $begun = true;
+				$seed = $this->reader->capture_seed( $session, $owner, $fences ); if ( ! $session->rollback() ) { self::fail(); } $begun = false; if ( ! $session->retire() ) { self::fail(); } return $seed;
+			} finally { if ( null !== $session ) { if ( $begun && ! $session->is_retired() ) { try { $session->rollback(); } catch ( \Throwable ) {} } if ( ! $session->is_retired() ) { try { $session->retire(); } catch ( \Throwable ) {} } } }
+		} catch ( \Throwable ) { self::fail(); }
+	}
+
+	/** Retained resolver construction uses only the observed view; final current fences are still required. */
+	public function runtime_for_seed( LegacyQuoteSourceSeedRows $seed ): ProductDeliveryRuntimeConfigurationRouter {
+		foreach ( $seed->rows_for( 'zone_rules' ) as $rule ) { if ( ! in_array( $rule['rule_type'] ?? null, [ 'country', 'region', 'city', 'postcode' ], true ) || ! in_array( $rule['match_mode'] ?? null, [ 'exact', 'prefix' ], true ) ) { self::fail(); } }
+		foreach ( $seed->rows_for( 'coverage_groups' ) as $group ) { if ( 'active' === ( $group['status'] ?? null ) ) { self::fail(); } }
+		foreach ( LegacyQuoteSourcePlan::OPTIONS as $name ) { wp_cache_delete( $name, 'options' ); } wp_cache_delete( 'alloptions', 'options' ); wp_cache_delete( 'notoptions', 'options' );
+		return $this->router( new LegacyQuoteCapturedSourceView( $seed ) );
+	}
+
 	public function prepare( QuoteOwner $owner, QuoteContext $server_selection_context ): LegacyQuoteSourceSnapshot {
 		try {
 			if ( ! $owner->equals( ( new QuoteNativeOwnerResolver() )->current() ) || ! $server_selection_context->checkout_acceptable() ) { self::fail(); }

@@ -237,21 +237,31 @@ class HttpClient:
             raise RuntimeError("Qualification JSON request exceeded bounded size")
         return self.request(url, extra_headers=headers, raw_body=body)
 
-    def request(self, url: str, fields: dict | None = None, extra_headers: dict | None = None, raw_body: bytes | None = None) -> Response:
+    def json_patch(self, url: str, payload: dict, headers: dict | None = None) -> Response:
+        if not isinstance(payload, dict):
+            raise RuntimeError("Qualification JSON payload must be an object")
+        body = json.dumps(payload, separators=(",", ":"), allow_nan=False).encode("utf-8")
+        if len(body) > 64 * 1024:
+            raise RuntimeError("Qualification JSON request exceeded bounded size")
+        return self.request(url, extra_headers=headers, raw_body=body, method="PATCH")
+
+    def request(self, url: str, fields: dict | None = None, extra_headers: dict | None = None, raw_body: bytes | None = None, method: str | None = None) -> Response:
         global REQUEST_OBSERVATION
         target = self.resolve(url)
         if fields is not None and raw_body is not None:
             raise RuntimeError("Qualification request has conflicting transports")
         data = raw_body if raw_body is not None else (urlencode(fields).encode("utf-8") if fields is not None else None)
+        method = method or ("POST" if data is not None else "GET")
+        if method not in ("GET", "POST", "PATCH") or (method == "GET" and data is not None):
+            raise RuntimeError("Qualification request has an unsupported method")
         headers = {"User-Agent": "CETECH-Opening-HTTP-Qualification/1", "Accept": "text/html,application/json"}
         headers.update(extra_headers or {})
         if data is not None:
             headers["Content-Type"] = "application/json; charset=UTF-8" if raw_body is not None else "application/x-www-form-urlencoded; charset=UTF-8"
             headers["Origin"] = self.base_url
             headers["Referer"] = target
-        request = Request(target, data=data, headers=headers)
+        request = Request(target, data=data, headers=headers, method=method)
         self.ordinal += 1
-        method = "POST" if data is not None else "GET"
         started = time.monotonic()
         phase = "pre_response_headers"
         REQUEST_OBSERVATION = {
@@ -501,6 +511,9 @@ def main() -> int:
     parser.add_argument("--emergency-driver")
     parser.add_argument("--emergency-bridge")
     parser.add_argument("--emergency-state")
+    parser.add_argument("--quote-cart-driver")
+    parser.add_argument("--quote-cart-bridge")
+    parser.add_argument("--quote-cart-state")
     options = parser.parse_args()
     if os.environ.get("CETECH_DE_NATIVE_OPENING_QUALIFICATION") != "1" or os.environ.get("CETECH_DE_HTTP_OPENING_QUALIFICATION") != "1" or os.environ.get("CETECH_DE_WP_DB_HOST") != "127.0.0.1":
         raise RuntimeError("Refusing HTTP qualification without explicit disposable loopback gates")
@@ -512,6 +525,7 @@ def main() -> int:
     bridge = FixtureBridge(options.php, options.wpcli, options.site, options.admin_context, options.bridge, Path(options.state), workdir)
     configuration_bridge = None
     emergency_bridge = None
+    quote_cart_bridge = None
     if any((options.configuration_driver, options.configuration_bridge, options.configuration_state)):
         if not all((options.configuration_driver, options.configuration_bridge, options.configuration_state)):
             raise RuntimeError("Configuration HTTP qualification requires all three explicit paths")
@@ -525,6 +539,12 @@ def main() -> int:
         emergency_work = workdir / "emergency-snapshots"
         emergency_work.mkdir(mode=0o700, exist_ok=True)
         emergency_bridge = FixtureBridge(options.php, options.wpcli, options.site, options.admin_context, options.emergency_bridge, Path(options.emergency_state), emergency_work)
+    if any((options.quote_cart_driver, options.quote_cart_bridge, options.quote_cart_state)):
+        if not all((options.quote_cart_driver, options.quote_cart_bridge, options.quote_cart_state)):
+            raise RuntimeError("Quote cart HTTP qualification requires all three explicit paths")
+        quote_work = workdir / "quote-cart-snapshots"
+        quote_work.mkdir(mode=0o700, exist_ok=True)
+        quote_cart_bridge = FixtureBridge(options.php, options.wpcli, options.site, options.admin_context, options.quote_cart_bridge, Path(options.quote_cart_state), quote_work)
     recorder = Recorder(receipt_path, {"source_head": os.environ.get("CETECH_DE_QUALIFICATION_HEAD", ""), "candidate_head": os.environ.get("CETECH_DE_QUALIFICATION_CANDIDATE_HEAD", ""), "source_tree": os.environ.get("CETECH_DE_QUALIFICATION_TREE", ""), "identity_verified": False})
     error = None
     prepared = False
@@ -560,12 +580,33 @@ def main() -> int:
             emergency_state = json.loads(Path(options.emergency_state).read_text(encoding="utf-8"))
             recorder.check("C07-HTTP-SAME-INSTALLED-SOURCE-IDENTITY", all(emergency_identity.get(key) == identity.get(key) for key in ("source_head", "candidate_head", "source_tree", "installed_php_sources", "installed_php_sources_hash")), {"source_hash": emergency_identity.get("installed_php_sources_hash"), "installed_php_files": len(emergency_identity.get("installed_php_sources", {}))})
             module.run_emergency(HttpClient(emergency_state["base_url"]), emergency_state, emergency_bridge, recorder, Page, login)
+        if quote_cart_bridge is not None:
+            import importlib.util
+            module_spec = importlib.util.spec_from_file_location("opening_http_quote_cart_driver", options.quote_cart_driver)
+            if module_spec is None or module_spec.loader is None:
+                raise RuntimeError("Could not load the quote cart qualification module")
+            module = importlib.util.module_from_spec(module_spec)
+            module_spec.loader.exec_module(module)
+            quote_prepared = quote_cart_bridge.call("preparequotecart")
+            quote_identity = quote_prepared["identity"]
+            if not all(quote_identity.get(key) == identity.get(key) for key in ("source_head", "candidate_head", "source_tree", "installed_php_sources", "installed_php_sources_hash")):
+                raise RuntimeError("Quote cart fixture source identity does not match the qualified listener")
+            quote_state = json.loads(Path(options.quote_cart_state).read_text(encoding="utf-8"))
+            module.run_quote_cart(HttpClient(quote_state["base_url"]), quote_state, quote_cart_bridge, recorder, Page, login)
     except Exception as failure:
         error = type(failure).__name__ + ": HTTP qualification failed; inspect recorded case status and private runner logs"
         if REQUEST_OBSERVATION:
             recorder.report["request_observation"] = {key: value for key, value in REQUEST_OBSERVATION.items() if key in ("ordinal", "method", "route", "phase", "elapsed_ms", "monotonic_ms", "error_class")}
             recorder.write()
     finally:
+        if quote_cart_bridge is not None and quote_cart_bridge.state_path.is_file():
+            try:
+                cleaned = quote_cart_bridge.call("cleanupquotecart")
+                cleanup_keys = ("cleanup_restored", "domain35_and_quote_operation_history_restored", "raw_options_restored", "native_tax_method_session_rows_restored", "native_taxonomy_restored", "owned_products_removed", "native_wc_objects_restored", "all_owned_connections_retired", "owned_review_users_pages_removed")
+                safe_cleanup = {key: cleaned.get(key) is True for key in cleanup_keys}
+                recorder.check("HTTP-W2Q05-FIXTURE-CLEANUP", set(cleaned) == set(cleanup_keys) and all(safe_cleanup.values()), safe_cleanup)
+            except Exception as failure:
+                error = error or (type(failure).__name__ + ": quote cart fixture cleanup failed")
         if emergency_bridge is not None and emergency_bridge.state_path.is_file():
             try:
                 cleaned = emergency_bridge.call("cleanupemergency")

@@ -56,6 +56,30 @@ if ( ! str_contains( $health_source, 'namespace CetechDeliveryEngine\\Applicatio
 require_once $autoload;
 
 $required_classes = [
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\CartQuoteService',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\CartQuoteRateReference',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\CartQuoteResult',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\CartQuoteSessionEnvelope',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\NativeCartQuoteEnvironment',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\NativeCartQuotePreparation',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\NativeCartQuoteShipping',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\NativeCartQuoteSessionStore',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteCartCurrentEvidence',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteCartDraft',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePreparationAttempt',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePreparationCommand',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePreparationGate',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePreparationLease',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePreparationResult',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\LegacyQuoteSourceSeedRows',
+	'CetechDeliveryEngine\\Application\\Order\\DeliveryQuoteSnapshotEnvelope',
+	'CetechDeliveryEngine\\Application\\Order\\DeliveryQuoteSnapshotMarker',
+	'CetechDeliveryEngine\\Application\\Order\\DeliveryQuoteSnapshotProjection',
+	'CetechDeliveryEngine\\Application\\Order\\DeliveryQuoteSnapshotReadResult',
+	'CetechDeliveryEngine\\Application\\Order\\DeliveryQuoteSnapshotReader',
+	'CetechDeliveryEngine\\Application\\Order\\DeliveryQuoteSnapshotReadiness',
+	'CetechDeliveryEngine\\Integrations\\DeliveryQuote\\QuoteReviewRuntime',
+	'CetechDeliveryEngine\\Presentation\\Frontend\\QuoteReviewRenderer',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\LegacyFixedBaseQuoteProvider',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\LegacyQuoteCaptureGuard',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\LegacyQuoteCapturedRateRepository',
@@ -382,7 +406,8 @@ $is_schema5_release = str_contains( $header_source, '1.0.0-dev.bulk' )
 
 $is_schema9_release = str_contains( $header_source, '1.0.0-dev.wave2-quote-storage' )
 	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-lifecycle' )
-	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-provider' );
+	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-provider' )
+	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-cart' );
 $is_schema8_release = str_contains( $header_source, '1.0.0-dev.wave1-rule-lifecycle' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-snapshot-readers' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-data-lifecycle' )

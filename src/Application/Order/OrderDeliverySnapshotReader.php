@@ -20,16 +20,22 @@ final class OrderDeliverySnapshotReader {
 	private const CHOICES = [ 'delivery', 'store_pickup' ];
 
 	private readonly SnapshotExtensionParser $extension_parser;
+	private readonly DeliveryQuoteSnapshotReader $quote_reader;
 
-	public function __construct( ?SnapshotExtensionParser $extension_parser = null ) {
+	public function __construct( ?SnapshotExtensionParser $extension_parser = null, ?DeliveryQuoteSnapshotReader $quote_reader = null ) {
 		$this->extension_parser = $extension_parser ?? new SnapshotExtensionParser();
+		$this->quote_reader = $quote_reader ?? new DeliveryQuoteSnapshotReader();
 	}
 
 	public function read_line( WC_Order_Item_Product $item ): OrderDeliveryLineReadResult {
 		$raw = $item->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT, true );
 		$meta = $item->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION, true );
 		$stored = $this->version( $meta, true );
+		$marker_exists = DeliveryQuoteSnapshotMarker::exists( $item );
+		$marker = $item->get_meta( DeliveryQuoteSnapshotEnvelope::META_FORMAT, true );
+		if ( null === $marker_exists ) { return new OrderDeliveryLineReadResult( true, null, OrderDeliveryLineReadResult::ERROR_VERSION_MISMATCH, $stored, null, $this->quote_reader->read( [], true, null ) ); }
 		if ( $this->missing( $raw ) ) {
+			if ( $marker_exists ) { return new OrderDeliveryLineReadResult( true, null, OrderDeliveryLineReadResult::ERROR_VERSION_MISMATCH, $stored, null, $this->quote_reader->read( [], true, $marker ) ); }
 			return new OrderDeliveryLineReadResult( false, null, OrderDeliveryLineReadResult::ERROR_MISSING, null );
 		}
 		try {
@@ -40,22 +46,25 @@ final class OrderDeliverySnapshotReader {
 		} catch ( \InvalidArgumentException ) {
 			return new OrderDeliveryLineReadResult( true, null, OrderDeliveryLineReadResult::ERROR_MALFORMED, $stored );
 		}
+		$quote = $this->quote_reader->read( $decoded, $marker_exists, $marker );
+		if ( ! $quote->supported() ) { return new OrderDeliveryLineReadResult( true, null, OrderDeliveryLineReadResult::ERROR_VERSION_MISMATCH, $stored, null, $quote ); }
+		$quote = 'not_recorded' === $quote->status ? null : $quote;
 
 		$format = $this->version( $decoded['snapshot_version'] ?? null );
 		$contract = $this->version( $decoded['contract_version'] ?? null );
 		if ( ! $this->supported_format( $format ) || ! $this->metadata_agrees( $meta, $stored, $format )
 			|| ProductDeliverySelectionIntent::CONTRACT_VERSION !== $contract ) {
-			return new OrderDeliveryLineReadResult( true, null, OrderDeliveryLineReadResult::ERROR_VERSION_MISMATCH, $stored );
+			return new OrderDeliveryLineReadResult( true, null, OrderDeliveryLineReadResult::ERROR_VERSION_MISMATCH, $stored, null, $quote );
 		}
 		$extensions = $this->extension_parser->read( $decoded );
 		if ( ! $extensions->required_semantics_supported() ) {
-			return new OrderDeliveryLineReadResult( true, null, OrderDeliveryLineReadResult::ERROR_VERSION_MISMATCH, $stored, $extensions );
+			return new OrderDeliveryLineReadResult( true, null, OrderDeliveryLineReadResult::ERROR_VERSION_MISMATCH, $stored, $extensions, $quote );
 		}
 
 		try {
 			$context_version = $this->positive_int( $decoded['customer_context_version'] ?? null, true );
 			if ( null !== $context_version && CustomerCartContext::CONTRACT_VERSION !== $context_version ) {
-				return new OrderDeliveryLineReadResult( true, null, OrderDeliveryLineReadResult::ERROR_VERSION_MISMATCH, $stored, $extensions );
+				return new OrderDeliveryLineReadResult( true, null, OrderDeliveryLineReadResult::ERROR_VERSION_MISMATCH, $stored, $extensions, $quote );
 			}
 			$snapshot = new OrderDeliveryLineSnapshot(
 				$contract,
@@ -89,16 +98,20 @@ final class OrderDeliverySnapshotReader {
 				$this->positive_int( $decoded['pickup_location_id'] ?? null, true )
 			);
 		} catch ( \InvalidArgumentException ) {
-			return new OrderDeliveryLineReadResult( true, null, OrderDeliveryLineReadResult::ERROR_PARTIAL, $stored, $extensions );
+			return new OrderDeliveryLineReadResult( true, null, OrderDeliveryLineReadResult::ERROR_PARTIAL, $stored, $extensions, $quote );
 		}
-		return new OrderDeliveryLineReadResult( true, $snapshot, OrderDeliveryLineReadResult::ERROR_NONE, $stored, $extensions );
+		return new OrderDeliveryLineReadResult( true, $snapshot, OrderDeliveryLineReadResult::ERROR_NONE, $stored, $extensions, $quote );
 	}
 
 	public function read_package( WC_Order $order ): OrderDeliveryPackageReadResult {
 		$raw = $order->get_meta( OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, true );
 		$meta = $order->get_meta( OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION, true );
 		$stored = $this->version( $meta, true );
+		$marker_exists = DeliveryQuoteSnapshotMarker::exists( $order );
+		$marker = $order->get_meta( DeliveryQuoteSnapshotEnvelope::META_FORMAT, true );
+		if ( null === $marker_exists ) { return new OrderDeliveryPackageReadResult( true, null, OrderDeliveryPackageReadResult::ERROR_VERSION_MISMATCH, $stored, null, $this->quote_reader->read( [], true, null ) ); }
 		if ( $this->missing( $raw ) ) {
+			if ( $marker_exists ) { return new OrderDeliveryPackageReadResult( true, null, OrderDeliveryPackageReadResult::ERROR_VERSION_MISMATCH, $stored, null, $this->quote_reader->read( [], true, $marker ) ); }
 			return new OrderDeliveryPackageReadResult( false, null, OrderDeliveryPackageReadResult::ERROR_MISSING, null );
 		}
 		try {
@@ -109,13 +122,16 @@ final class OrderDeliverySnapshotReader {
 		} catch ( \InvalidArgumentException ) {
 			return new OrderDeliveryPackageReadResult( true, null, OrderDeliveryPackageReadResult::ERROR_MALFORMED, $stored );
 		}
+		$quote = $this->quote_reader->read( $decoded, $marker_exists, $marker );
+		if ( ! $quote->supported() ) { return new OrderDeliveryPackageReadResult( true, null, OrderDeliveryPackageReadResult::ERROR_VERSION_MISMATCH, $stored, null, $quote ); }
+		$quote = 'not_recorded' === $quote->status ? null : $quote;
 		$format = $this->version( $decoded['snapshot_version'] ?? null );
 		if ( ! $this->supported_format( $format ) || ! $this->metadata_agrees( $meta, $stored, $format ) ) {
-			return new OrderDeliveryPackageReadResult( true, null, OrderDeliveryPackageReadResult::ERROR_VERSION_MISMATCH, $stored );
+			return new OrderDeliveryPackageReadResult( true, null, OrderDeliveryPackageReadResult::ERROR_VERSION_MISMATCH, $stored, null, $quote );
 		}
 		$extensions = $this->extension_parser->read( $decoded );
 		if ( ! $extensions->required_semantics_supported() ) {
-			return new OrderDeliveryPackageReadResult( true, null, OrderDeliveryPackageReadResult::ERROR_VERSION_MISMATCH, $stored, $extensions );
+			return new OrderDeliveryPackageReadResult( true, null, OrderDeliveryPackageReadResult::ERROR_VERSION_MISMATCH, $stored, $extensions, $quote );
 		}
 		try {
 			$snapshot = new OrderDeliveryPackageSnapshot(
@@ -131,9 +147,9 @@ final class OrderDeliverySnapshotReader {
 				$this->groups( $decoded['groups'] ?? null )
 			);
 		} catch ( \InvalidArgumentException ) {
-			return new OrderDeliveryPackageReadResult( true, null, OrderDeliveryPackageReadResult::ERROR_PARTIAL, $stored, $extensions );
+			return new OrderDeliveryPackageReadResult( true, null, OrderDeliveryPackageReadResult::ERROR_PARTIAL, $stored, $extensions, $quote );
 		}
-		return new OrderDeliveryPackageReadResult( true, $snapshot, OrderDeliveryPackageReadResult::ERROR_NONE, $stored, $extensions );
+		return new OrderDeliveryPackageReadResult( true, $snapshot, OrderDeliveryPackageReadResult::ERROR_NONE, $stored, $extensions, $quote );
 	}
 
 	/** @return list<OrderDeliveryGroupSnapshot> */
@@ -342,7 +358,8 @@ final class OrderDeliveryLineReadResult {
 		public readonly ?OrderDeliveryLineSnapshot $snapshot,
 		public readonly string $error,
 		public readonly ?string $stored_version,
-		public readonly ?SnapshotExtensionSet $extensions = null
+		public readonly ?SnapshotExtensionSet $extensions = null,
+		public readonly ?DeliveryQuoteSnapshotReadResult $delivery_quote = null
 	) {
 	}
 }
@@ -361,7 +378,8 @@ final class OrderDeliveryPackageReadResult {
 		public readonly ?OrderDeliveryPackageSnapshot $snapshot,
 		public readonly string $error,
 		public readonly ?string $stored_version,
-		public readonly ?SnapshotExtensionSet $extensions = null
+		public readonly ?SnapshotExtensionSet $extensions = null,
+		public readonly ?DeliveryQuoteSnapshotReadResult $delivery_quote = null
 	) {
 	}
 }

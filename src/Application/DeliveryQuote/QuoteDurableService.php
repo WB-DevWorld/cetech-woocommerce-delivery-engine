@@ -56,6 +56,23 @@ final class QuoteDurableService {
 			return $this->execute( $captured, $request );
 		} catch ( \Throwable ) { return $this->unknown( $request, $this->authorized( $command->owner(), 'delivery_quote.issue' ) ? QuoteDurableCommand::issue_probe( $command ) : null ); }
 	}
+	/** One charged preparation handoff. Its original recovery envelope is acknowledged before C03. */
+	public function issue_admitted( QuoteIssueCommand $command, QuoteAdmissionLease $lease, RequestContext $request, callable $stage ): QuoteDurableResult {
+		if ( ! $this->authorized( $command->owner(), 'delivery_quote.issue' ) ) { return $this->reject( $request, 'not_authorized' ); }
+		if ( 'checkout' !== $command->context()->private_facts()['kind'] || ! $command->context()->material_evidence_available() || null === $this->evidence || ! $lease->matches( $command ) ) { return $this->reject( $request, 'temporarily_unavailable' ); }
+		$original = QuoteDurableCommand::issue_probe( $command );
+		try {
+			$this->providers->get( $command->provider_code(), $command->provider_version(), $command->profile(), $command->profile_version() );
+			if ( ! $lease->claim_capture() ) { return $this->pending( $original ); }
+			$terms = $this->providers->capture( $command->provider_code(), $command->provider_version(), $command->profile(), $command->profile_version(), $command->context() );
+			$id = QuoteId::generate(); $reference = QuoteReference::generate( $id );
+			$header = QuoteHeader::issue( $id, $command->owner(), $command->context(), $terms, $lease->created_at(), $command->namespace_hashes( $id ), $command->profile(), $command->profile_version(), $reference );
+			$original = QuoteDurableCommand::issue_probe( $command, $reference, $header );
+			$captured = QuoteDurableCommand::captured_issue( $command, $lease, DeliveryQuote::issue( $header, $command->context(), $terms ), $reference );
+			if ( true !== $stage( $captured ) ) { return $this->unknown( $request, $this->authorized( $command->owner(), 'delivery_quote.issue' ) ? $original : null ); }
+			return $this->execute( $captured, $request );
+		} catch ( \Throwable ) { return $this->unknown( $request, $this->authorized( $command->owner(), 'delivery_quote.issue' ) ? $original : null ); }
+	}
 	public function accept( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, ?QuoteContext $current, RequestContext $request ): QuoteDurableResult { return $this->transition( 'accept', $owner, $reference, $opened, $current, $request ); }
 	public function invalidate( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, ?QuoteContext $current, RequestContext $request ): QuoteDurableResult { return $this->transition( 'invalidate', $owner, $reference, $opened, $current, $request ); }
 	public function bind( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, QuoteBinding $binding, RequestContext $request, ?QuoteContext $current = null ): QuoteDurableResult { return $this->transition( 'bind', $owner, $reference, $opened, $current, $request, $binding ); }
@@ -67,7 +84,7 @@ final class QuoteDurableService {
 	public function current( QuoteOwner $owner, QuoteReference $reference, ?QuoteContext $current, RequestContext $request ): QuoteCurrentReadResult {
 		if ( ! $this->authorized( $owner, 'delivery_quote.read' ) ) { return QuoteCurrentReadResult::unavailable(); }
 		$loaded = $this->load( $owner, $reference->id(), $current, $reference, 'delivery_quote.read', true );
-		return null === $loaded ? QuoteCurrentReadResult::unavailable() : QuoteCurrentReadResult::ready( $loaded[0], $loaded[2] );
+		return null === $loaded ? QuoteCurrentReadResult::unavailable() : QuoteCurrentReadResult::ready( $loaded[0], $loaded[2], $loaded[3] );
 	}
 	private function transition( string $action, QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, ?QuoteContext $current, RequestContext $request, ?QuoteBinding $binding = null ): QuoteDurableResult {
 		if ( ! $this->authorized( $owner, 'delivery_quote.' . $action ) ) { return $this->reject( $request, 'not_authorized' ); }
@@ -118,7 +135,7 @@ final class QuoteDurableService {
 			if ( ! $session->rollback() ) { return null; } $begun = false; if ( ! $session->retire() ) { return null; }
 			if ( ! $this->authorized( $owner, $operation ) ) { return null; }
 			if ( $require_current_evidence && ! $evidence_ok ) { return null; }
-			return [ $quote, $binding, $reason ];
+			return [ $quote, $binding, $reason, $at ];
 		} catch ( \Throwable ) { return null; }
 		finally { if ( null !== $session ) { if ( $begun && ! $session->is_retired() ) { try { $session->rollback(); } catch ( \Throwable ) {} } try { $session->retire(); } catch ( \Throwable ) {} } }
 	}
