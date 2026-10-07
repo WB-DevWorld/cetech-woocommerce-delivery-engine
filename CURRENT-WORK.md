@@ -1,3 +1,19 @@
+# Current Work — W2-Q01 internal quote contract
+
+Status: **W2-QUOTE-LIFECYCLE-1 ACCEPTED AND INTEGRATED — W2-Q01 IMPLEMENTED / SEPARATE INTEGRATION ACCEPTANCE PENDING**
+
+## 2026-10-07 — Approved design and SQL prerequisite integrated
+
+The owner instruction at05:01:14UTC approved W2-QUOTE-LIFECYCLE-1, authorized W2-Q01 and required the existing SQL discrepancy be resolved before integration. PR#82 integrated the unchanged qualified candidate `3d34c7bc90771176ba99c248dfe26459f148b90b` normally as `6f3cad770a9a0cb3a3204b373ec761368097d6ef`, tree `88867bb6bd5e21a403bb4ab1964a611a49de2bd5`; Issue#81 completed. Q01 starts at that actual integrated baseline on ws3/wave2-q01-quote-contract under [Issue#83](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/83).
+
+Pinned prerequisite PR CI37575281557 attempt1 passed all8jobs/substantive gates: PHP8.3.35/8.4.26/8.5.11 each2488/15559/1skip (deprecation summary absent/2/14); MariaDB11.4.13 SQL174/4137/2deprecations with actual43operations/44rules/30data/31emergency non-skipped cases. Native380/finalHTTP98/smoke/cleanup/browser passed; root and independent verification bound every615 source to map7563a483 and separately hashed ZIP/JSON members. Exact fingerprints remain on PR#82. Actual design-merge CI37575834199 attempt1 separately passed all8jobs/native380/finalHTTP98/smoke, with all615 exact merged-source hashes verified. Its receipts are separate from candidate execution. Historical failed37573222546 remains failed; the [observer repair](docs/product/W2-SQL-OBSERVATION-REPAIR-2026-10-07.md) records the demonstrated cache defect and unchanged1.5s/2s bounds.
+
+Q01 implements20 new internal production types/application classes: immutable complete quote identity/context/captured terms, strict bounded codecs and original header, CanonicalIntent issue command and distinct namespaces, pure acceptance/invalidation/expiry/model-strip transitions, finite injected registry empty by default, and independent shopper/diagnostic/exact-authority admin projections. Trusted fixture provider lives only in tests. Two concrete review findings receive failing/green regression closure: hydrated body checksum is insufficient without semantic crosslinks, and explicitly unknown current evidence must stay unavailable without invalidation. A further precision regression preserves captured native precision separately from display precision. See the [Q01 handoff](docs/product/W2-Q01-INTERNAL-CONTRACT-2026-10-07.md).
+
+Root owns shared docs/bootstrap/version/package-verifier/refs/PR/Issue/qualification. Value/codec, aggregate/provider/lifecycle and privacy projection agents have disjoint source/test leases; independent review reads only. The owner and AI agents are the active team. New development identity1.0.0-dev.wave2-quote-contract.1, schema8; current package has635 production PHP. No Plugin registration, quote DDL/storage, shopper endpoint, pricing engine change or native order writer is introduced. Q02 storage/readiness is next, then durable lifecycle, actual provider, cart/readers and placement in the accepted dependency order. All372 IDs and12 DE-QUOTE partial classifications remain unchanged. Q01 integration needs its separate owner acceptance after full qualification; final exact candidate/CI/artifact bindings attach to its PR without a self-receipt source loop.
+
+# Historical work — approved design and SQL prerequisite
+
 # Current Work — approved Wave 2 design / Q01 implementation
 
 Status: **W2-QUOTE-LIFECYCLE-1 OWNER-APPROVED — SQL OBSERVER REPAIR BEFORE DESIGN INTEGRATION — W2-Q01 AUTHORIZED**
