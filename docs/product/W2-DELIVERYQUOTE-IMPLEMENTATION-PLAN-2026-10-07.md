@@ -2,6 +2,8 @@
 
 Status: **OWNER-APPROVED 2026-10-07 05:01:14 UTC / IMPLEMENTATIONS NOT EXECUTED BY THIS DESIGN PACKET** under [W2-QUOTE-LIFECYCLE-1](W2-DELIVERYQUOTE-LIFECYCLE-DESIGN-2026-10-07.md). Six checkpoints; root holds shared schema/Plugin/bootstrap/settings/flags/manifest/CI/ref/PR leases. Delegated edits use separate finite file leases. Only the owner and AI agents are working. No outside human-availability gate is introduced.
 
+Q01 execution is recorded separately in the [internal-contract checkpoint](W2-Q01-INTERNAL-CONTRACT-2026-10-07.md). The NOT_EXECUTED wording and48-case table below describe the approved design packet at approval; they are not a current assertion that Q01 unit proofs have never run. Later physical/durable/native obligations remain unexecuted by Q01.
+
 ## Checkpoints and exit conditions
 
 | Checkpoint | Deliverable / change boundary | Evidence and decision at exit |
