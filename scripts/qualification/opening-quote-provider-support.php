@@ -86,6 +86,11 @@ final class CetechNativeQuoteProviderFixture {
 	public function track_command( CetechDeliveryEngine\Application\DeliveryQuote\QuoteIssueCommand $command ): void { $this->owned_namespaces[] = $command->identity()->namespace_digest(); }
 	private static function shipping( ?WC_Shipping $replacement = null ): WC_Shipping { $property = new ReflectionProperty( WC_Shipping::class, '_instance' ); $current = WC()->shipping(); if ( null !== $replacement ) { $property->setValue( null, $replacement ); } return $current; }
 	public function cleanup_stage(): string { return $this->cleanup_stage; }
+	/** The next native module must not inherit matches of this fixture's removed zones. */
+	public static function clear_destination_fixture_memoization( CetechDeliveryEngine\Application\Destination\DestinationZoneMatcher $matcher ): bool {
+		$matcher->clearMemoization();
+		return [] === ( new ReflectionProperty( CetechDeliveryEngine\Application\Destination\DestinationZoneMatcher::class, 'match_cache' ) )->getValue( $matcher ) && [] === $matcher->last_diagnostics();
+	}
 	public static function term_count_nested_callback_count(): int { $count = 0; foreach ( ( $GLOBALS['wp_filter']['woocommerce_change_term_counts']->callbacks ?? [] ) as $callbacks ) { $count += count( $callbacks ); } return $count; }
 	/** Publish only a verified installed native refusal line; every other trace fact is private. */
 	public static function native_refusal_line( Throwable $error ): ?int {
@@ -296,6 +301,8 @@ final class CetechNativeQuoteProviderFixture {
 		foreach ( $this->original_options as $name => $row ) { if ( null === $row ) { $ok = false !== $this->db->delete( $this->db->options, [ 'option_name' => $name ] ) && $ok; } else { $ok = false !== $this->db->replace( $this->db->options, $row ) && $ok; } wp_cache_delete( $name, 'options' ); } wp_cache_delete( 'alloptions', 'options' ); wp_cache_delete( 'notoptions', 'options' ); WC_Tax::init();
 		$this->cleanup_stage = 'native_objects';
 		foreach ( $this->wc_before as $key => $value ) { if ( 'shipping' === $key ) { self::shipping( $value ); } else { WC()->$key = $value; } } foreach ( $this->globals_before as $key => [ $exists, $value ] ) { if ( $exists ) { $GLOBALS[$key] = $value; } else { unset( $GLOBALS[$key] ); } }
+		$this->cleanup_stage = 'destination_memoization';
+		$ok = self::clear_destination_fixture_memoization( Plugin::instance()->container()->get( CetechDeliveryEngine\Application\Destination\DestinationZoneMatcher::class ) ) && $ok;
 		$this->cleanup_stage = 'restoration_verification';
 		$domains = true; foreach ( $this->domain_before as $suffix => $rows ) { $domains = $domains && $rows === self::rows( TableNames::for( $suffix ) ); }
 		$options = true; foreach ( $this->original_options as $name => $row ) { $options = $options && $row === $this->option( $name ); }

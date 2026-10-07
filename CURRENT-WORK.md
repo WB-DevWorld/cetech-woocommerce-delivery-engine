@@ -26,6 +26,8 @@ Native-guard candidate6e152bf4/treedf5c0323 passedactualnativecontext but failed
 
 Seventhsourcecandidateeb8b11ba/tree94ef83ed passed actual native price/tax capture and durable issuance in CI37606550279, but current-read disclosure failed: native357PASS1FAIL/84missing/noHTTP; cleanupPASS. AllthreePHP3026/18227/skip1, SQL291/6037/allsevenminima, JS/control and691/1093lints passed. Physical sourceguard correctly refuses changed options; ordinary current() still discloses the private quote with unavailable reason. The frozen current-read-only correction returns unavailable/nullquote for false/unknown evidence and preserves historical completion replay/reconciliation and valid pause/expiry/material reasons. Red3/35/1failure then focused25/262 comparativePASS. Seven failed immutable bundles/fingerprints remain recorded. Fresh complete442/98 and substantive gates pending.
 
+Eighthcandidate69a8b086/tree58cc5550 closes all30actualQ04cases inCI37607986409, including sourcecurrentrefusals/nativeacceptreplay/reparent/cleanup. The laterC07directfixturebuilder failed before its first order snapshot; native407PASS/35missing/noHTTP andoverallFAIL. AllthreePHP3029/18329/skip1, SQL291/6037/allsevenminima, JS/control and691/1093lints passed. Controlledmatcher/resolver/engine reproduces Q04cachedremovedzone leaking into nextfixture; seven-linefixture-onlycleanup clears existingdestinationmemo API and verifiesempty, withoutproduction/dictionary/ID/runtimechanges. Red1/6 then green1/10, lint/observation24PASS. Eight immutable failedbundles remain recorded; fresh full442/98 remains required.
+
 # Historical Q03 immutable freeze
 
 # Current Work — W2-Q03 durable internal quote lifecycle
