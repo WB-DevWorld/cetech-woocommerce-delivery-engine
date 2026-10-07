@@ -253,7 +253,10 @@ final class EmergencyControlRealDatabaseTest extends TestCase {
 		foreach ( $flags->defaults() as $name => $value ) { $key = $flags->option_name( $name ); DB::insert_option( $this->database, $this->prefix, $key, $value ? '1' : '0', 'on' ); $names[] = $key; }
 		$before = DB::options( $this->database, $this->prefix ); $definitions = [];
 		foreach ( DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES as $suffix ) { $definitions[$suffix] = $this->definition( $suffix ); }
-		self::assertCount( 23, $names ); self::assertCount( 32, $definitions ); $this->accept( $this->transition() ); $accepted = $this->records()[0]; $this->accept( $this->transition( 'resume', $this->payload( 'enabled' ) ) );
+		self::assertCount( 23, $names );
+		self::assertCount( 32, DataLifecycleManifest::ORIGINAL_DOMAIN_TABLE_SUFFIXES );
+		self::assertCount( 32, array_intersect( DataLifecycleManifest::ORIGINAL_DOMAIN_TABLE_SUFFIXES, array_keys( $definitions ) ) );
+		self::assertCount( 35, $definitions ); $this->accept( $this->transition() ); $accepted = $this->records()[0]; $this->accept( $this->transition( 'resume', $this->payload( 'enabled' ) ) );
 		foreach ( $definitions as $suffix => $definition ) { self::assertSame( $definition, $this->definition( $suffix ) ); }
 		$after = array_values( array_filter( DB::options( $this->database, $this->prefix ), static fn ( array $r ): bool => EmergencyControlStore::OPTION_NAME !== $r['option_name'] ) ); self::assertSame( $before, $after ); self::assertSame( $accepted, $this->records()[0] );
 	}

@@ -39,4 +39,12 @@ Physical SQL uses real DDL/native connections with the existing whole-table dbDe
 
 Final candidate, tree, complete unit/SQL/JavaScript/lint/package counts, CI run/attempt, exact artifact ZIP and JSON member hashes, source-derived installed map and complete native/HTTP case sets are recorded on the checkpoint PR after execution. Existing OPcache-on/JIT-disabled listener and20-second client bound stay unchanged. Failed evidence remains failed; only complete fresh qualification supports the integration handoff.
 
+## First pinned qualification and bounded correction
+
+Candidate `fff463d998c9093cf8663475e754c62bd08a4903`, tree `f405ee07038fbd8c3bc02dcb92a4e4ea27d88742`, was published on draft PR#86. CI37579920661 attempt1 failed SQL/WordPress/Required Gates. PHP8.3/8.4/8.5 each passed2794/17084/1skip; PHP8.4 reported2 deprecations and PHP8.5 reported15. Production643/0, repository1009/0, package/JavaScript/control-plane passed. These are exact execution results; the15-count is not labeled as the historical14.
+
+Two obsolete qualification assertions caused the failures: the emergency-control SQL preservation test expected32 current tables, and the native C04 assertion expected current target8. SQL completed204/4694 with1failure/2deprecations. Native recorded183PASS/1FAIL (184unique), overallFAIL; all12 Q02 cases and HTTP were not reached. Native artifact11463749601 ZIP51224/SHA256db7f9957ebe0b12275c1b97626f9d1f29fc0fe858b9ecfb9edd8049bbdcc8588; JSON854506/SHA256aa5fa7ffb45d5ddd969b2206c5bf16f4ca74d1a4167a3562839d8ef559d61101. All643 installed source bytes still matched the immutable candidate mapc06b58d5c2c76aa0b0b7fb6f3b1790ebe0d77b1f291194aa6c8c9b17490866b5. Smoke passed separately; failed evidence is retained as failed.
+
+The correction strengthens preservation checks to original32 plus current35 and retains every per-table comparison. Focused1/51 and full EmergencyControl31/908 passed locally with no skips; owned database empty/server stopped. The historical native C04 case ID now proves migration8 remains8 and the current candidate target is9. No production source/map, runtime, timeout, case inventory or required gate changes. A fresh successor run must complete exact392native/98HTTP execution and all eight jobs.
+
 Next owner task after qualification: **“Approve W2-Q02 for integration and implement W2-Q03.”** Q03 adds the durable lifecycle coordinator and bounded admission/retention algorithms to these stores.
