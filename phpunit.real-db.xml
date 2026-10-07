@@ -20,6 +20,7 @@
             <group>geo-live-real-db</group>
             <group>operation-store-real-db</group>
             <group>rule-lifecycle-real-db</group>
+            <group>data-lifecycle-real-db</group>
         </include>
     </groups>
 </phpunit>

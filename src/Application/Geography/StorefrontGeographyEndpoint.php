@@ -7,6 +7,8 @@ namespace CetechDeliveryEngine\Application\Geography;
 use CetechDeliveryEngine\Domain\Enum\GeographyLocationType;
 use CetechDeliveryEngine\Domain\Geography\CanonicalLocationRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\GeographyPackRepositoryInterface;
+use CetechDeliveryEngine\Application\DataLifecycle\ManagedGeographyCache;
+use CetechDeliveryEngine\Domain\DataLifecycle\ManagedGeographyCacheTicket;
 
 /**
  * Customer-safe cascading geography endpoints.
@@ -28,7 +30,8 @@ final class StorefrontGeographyEndpoint {
 		private CanonicalLocationResolver $resolver,
 		private GeographyPackRepositoryInterface $packs,
 		private ?\CetechDeliveryEngine\Domain\Geography\ProviderMappingRepositoryInterface $mappings = null,
-		private ?GeographyPostcodeRelevance $postcodes = null
+		private ?GeographyPostcodeRelevance $postcodes = null,
+		private ?ManagedGeographyCache $managed_cache = null
 	) {
 	}
 
@@ -65,14 +68,14 @@ final class StorefrontGeographyEndpoint {
 			wp_send_json_success( [ 'items' => [] ] );
 		}
 
-		$cache_key = $this->cache_key( 'children', $country, $parent, $location_type->value, (string) $page, $page );
-		$cached    = $this->cache_get( $cache_key );
+		$ticket = $this->cache_lookup( 'children', $country, $parent, $location_type->value, (string) $page, $page );
+		$cached = $ticket?->payload();
 		if ( is_array( $cached ) ) {
 			wp_send_json_success( $cached );
 		}
 
 		$payload = $this->children_result_for( $parent_location, $country, $location_type, $page );
-		$this->cache_set( $cache_key, $payload );
+		$this->cache_set( $ticket, $payload );
 
 		wp_send_json_success( $payload );
 	}
@@ -104,8 +107,8 @@ final class StorefrontGeographyEndpoint {
 		}
 
 		$parent_id = $parent_location?->id;
-		$cache_key = $this->cache_key( 'search', $country, $parent, $query, (string) $page, $page );
-		$cached    = $this->cache_get( $cache_key );
+		$ticket = $this->cache_lookup( 'search', $country, $parent, $query, (string) $page, $page );
+		$cached = $ticket?->payload();
 		if ( is_array( $cached ) ) {
 			$cached['request_token'] = $token;
 			wp_send_json_success( $cached );
@@ -125,7 +128,7 @@ final class StorefrontGeographyEndpoint {
 			'has_more'      => ( $page * $limit ) < $total,
 			'has_pack'      => $this->country_has_locality_pack( $country ),
 		];
-		$this->cache_set( $cache_key, $payload );
+		$this->cache_set( $ticket, $payload );
 
 		wp_send_json_success( $payload );
 	}
@@ -137,8 +140,8 @@ final class StorefrontGeographyEndpoint {
 		}
 		$country   = strtoupper( sanitize_text_field( wp_unslash( (string) ( $_REQUEST['country'] ?? '' ) ) ) );
 		$parent    = sanitize_text_field( wp_unslash( (string) ( $_REQUEST['parent_key'] ?? '' ) ) );
-		$cache_key = $this->cache_key( 'postcode', $country, $parent, '', '', 1 );
-		$cached    = $this->cache_get( $cache_key );
+		$ticket = $this->cache_lookup( 'postcode', $country, $parent, '', '', 1 );
+		$cached = $ticket?->payload();
 		if ( is_array( $cached ) ) {
 			wp_send_json_success( $cached );
 		}
@@ -146,7 +149,7 @@ final class StorefrontGeographyEndpoint {
 			? $this->postcodes->is_visible( $country, $parent )
 			: $this->country_requires_postcode( $country );
 		$payload = [ 'required' => $visible, 'visible' => $visible ];
-		$this->cache_set( $cache_key, $payload );
+		$this->cache_set( $ticket, $payload );
 		wp_send_json_success( $payload );
 	}
 
@@ -306,31 +309,28 @@ final class StorefrontGeographyEndpoint {
 		return true;
 	}
 
-	private function cache_key( string $kind, string $country, string $parent, string $query, string $extra, int $page ): string {
-		$revision = (string) get_option( GeographyPackService::REVISION_OPTION, '0' );
-
-		return 'cetech_de_geo_' . md5( implode( '|', [ $kind, strtoupper( $country ), $parent, $query, $extra, (string) $page, $revision ] ) );
+	private function cache_lookup( string $kind, string $country, string $parent, string $query, string $extra, int $page ): ?ManagedGeographyCacheTicket {
+		try {
+			$cache = $this->managed_cache ??= new ManagedGeographyCache();
+			$identity = $cache->identity(
+				function_exists( 'get_current_blog_id' ) ? get_current_blog_id() : 1,
+				$kind, $country, $parent, $query, $extra, $page,
+				(string) get_option( GeographyPackService::REVISION_OPTION, '0' ),
+				function_exists( 'get_locale' ) ? get_locale() : 'en_US'
+			);
+			return $cache->lookup( $identity );
+		} catch ( \Throwable ) {
+			return null;
+		}
 	}
 
-	private function cache_get( string $key ): ?array {
-		if ( function_exists( 'wp_cache_get' ) ) {
-			$hit = wp_cache_get( $key, 'cetech_de_geography' );
-			if ( is_array( $hit ) ) {
-				return $hit;
-			}
+	private function cache_set( ?ManagedGeographyCacheTicket $ticket, array $payload ): void {
+		if ( null === $ticket ) { return; }
+		try {
+			$this->managed_cache?->publish( $ticket, $payload );
+		} catch ( \Throwable ) {
+			// Derived cache storage never changes the fresh geography response.
 		}
-		$transient = get_transient( $key );
-
-		return is_array( $transient ) ? $transient : null;
-	}
-
-	private function cache_set( string $key, array $payload ): void {
-		$safe = $payload;
-		unset( $safe['private'], $safe['internal'] );
-		if ( function_exists( 'wp_cache_set' ) ) {
-			wp_cache_set( $key, $safe, 'cetech_de_geography', self::CACHE_TTL );
-		}
-		set_transient( $key, $safe, self::CACHE_TTL );
 	}
 
 	private function verify( string $action ): void {

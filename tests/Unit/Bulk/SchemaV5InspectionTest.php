@@ -37,11 +37,13 @@ final class SchemaV5InspectionTest extends TestCase {
 		self::assertStringContainsString( 'ENGINE=InnoDB', $joined );
 	}
 
-	public function test_uninstall_fallback_includes_bulk_tables(): void {
+	public function test_shared_uninstall_manifest_preserves_bulk_tables(): void {
 		$source = (string) file_get_contents( dirname( __DIR__, 3 ) . '/uninstall.php' );
-		self::assertStringContainsString( "'bulk_jobs'", $source );
-		self::assertStringContainsString( "'bulk_job_items'", $source );
-		self::assertStringContainsString( "'bulk_recipes'", $source );
+		self::assertStringContainsString( 'DataLifecycleBootstrap', $source );
+		self::assertStringNotContainsString( 'DROP TABLE', $source );
+		self::assertContains( 'bulk_jobs', \CetechDeliveryEngine\Bootstrap\DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES );
+		self::assertContains( 'bulk_job_items', \CetechDeliveryEngine\Bootstrap\DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES );
+		self::assertContains( 'bulk_recipes', \CetechDeliveryEngine\Bootstrap\DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES );
 	}
 
 	public function test_job_payloads_are_not_wp_options(): void {

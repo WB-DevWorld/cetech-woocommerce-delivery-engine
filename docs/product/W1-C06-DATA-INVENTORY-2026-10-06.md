@@ -412,7 +412,7 @@ Woo session/cart stores (Woo owns storage and expiry):
 3. `Support/Logger.php` emits channel/source **`cetech-delivery-engine`** through Woo logger or PHP error_log when WP_DEBUG. Woo may choose filesystem/database handlers and its own retention. There is no plugin-owned log table/path or blanket log purge implementation here. These diagnostic logs are distinct from `audit_log`, `operation_changes` and shipment events.
 4. Shared **Action Scheduler** storage is external/provider-owned, not any of the 32 plugin tables. The plugin only schedules/unschedules owned hook/args/group via API:
    - `cetech_de_bulk_job_tick`, group `cetech-delivery-engine-bulk`, args `job_id`; `Application/Bulk/Queue/ActionSchedulerQueue.php`.
-   - `cetech_de_geography_pack_tick` and `cetech_de_geography_pack_download`, group `cetech-delivery-engine-geography`.
+   - `cetech_de_geography_pack_tick` and `cetech_de_geography_pack_download`, group `cetech-delivery-engine-geography-{positive pack ID}` (exact source correction during implementation; observe-only).
    - `cetech_de_geography_pack_liveness`, group `cetech-delivery-engine-geography-liveness`; 60s liveness interval.
    - `cetech_de_schema6_coverage_upgrade_tick`, group `cetech-delivery-engine-schema6`.
    Bulk claimed job/item lease TTL **300s**; pack ownership lease **120s**; expired leases enable fenced recovery, not deleting jobs/packs/history. Core WP `cron`/Action Scheduler claims/logs/groups/actions must not be globally drained or dropped; custom AS stores may not use canonical physical table names.

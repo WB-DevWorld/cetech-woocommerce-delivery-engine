@@ -17,12 +17,12 @@ final class SchemaV6InspectionTest extends TestCase {
 		self::assertSame( '8', SchemaVersion::target() );
 	}
 
-	public function test_plugin_version_is_rule_lifecycle_dev_identity(): void {
+	public function test_plugin_version_is_data_lifecycle_dev_identity(): void {
 		$plugin_root = dirname( __DIR__, 3 );
 		$header      = (string) file_get_contents( $plugin_root . '/cetech-woocommerce-delivery-engine.php' );
 
-		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.wave1-snapshot-readers\\.1'\s*\)/", $header );
-		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.wave1-snapshot-readers\\.1\s*$/m', $header );
+		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.wave1-data-lifecycle\\.1'\s*\)/", $header );
+		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.wave1-data-lifecycle\\.1\s*$/m', $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.shipment-order-read.1' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.address-ux.3' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.address-ux.2' )", $header );
@@ -84,8 +84,8 @@ final class SchemaV6InspectionTest extends TestCase {
 		}
 	}
 
-	public function test_uninstall_includes_schema_six_tables_and_keeps_destination_rules(): void {
-		$source = (string) file_get_contents( dirname( __DIR__, 3 ) . '/uninstall.php' );
+	public function test_shared_uninstall_manifest_preserves_schema_six_tables_and_controls(): void {
+		$source = (string) file_get_contents( dirname( __DIR__, 3 ) . '/src/Bootstrap/DataLifecycleManifest.php' );
 		self::assertStringContainsString( "'geography_packs'", $source );
 		self::assertStringContainsString( "'geography_locations'", $source );
 		self::assertStringContainsString( "'destination_coverage_groups'", $source );

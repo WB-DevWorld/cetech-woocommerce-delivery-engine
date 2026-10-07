@@ -262,9 +262,9 @@ final class DeliverySettingsPage {
 		);
 		AdminFormHelper::checkbox_field(
 			'delete_data_on_uninstall',
-			__( 'Delete plugin data when uninstalling', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Remove temporary data and permissions when uninstalling.', 'cetech-woocommerce-delivery-engine' ),
 			$delete,
-			__( 'When enabled, removing the plugin from WordPress will also remove Delivery Engine configuration tables and settings. Leave off unless you want a full clean uninstall.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Removes temporary geography responses, the activation notice and Delivery Engine role permissions. Your settings, order and shipment history, and saved records are kept.', 'cetech-woocommerce-delivery-engine' )
 		);
 		echo '<tr><th scope="row"></th><td>';
 		AdminPageLayout::open_technical_details();

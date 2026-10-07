@@ -65,6 +65,7 @@ echo wp_json_encode(
 	[
 		'mode'            => $mode,
 		'db_version'      => get_option( 'cetech_de_db_version', null ),
+		'cleanup_intent'  => get_option( 'cetech_de_delete_data_on_uninstall', null ),
 		'shipment_flag'   => get_option( 'cetech_de_enable_shipment_records', null ),
 		'sitewide'        => get_option( 'cetech_de_sitewide_defaults', null ),
 		'unrelated'       => get_option( 'woocommerce_unrelated', null ),

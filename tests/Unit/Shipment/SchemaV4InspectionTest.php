@@ -16,12 +16,12 @@ final class SchemaV4InspectionTest extends TestCase {
 		self::assertSame( '8', SchemaVersion::target() );
 	}
 
-	public function test_plugin_version_is_rule_lifecycle_dev_identity(): void {
+	public function test_plugin_version_is_data_lifecycle_dev_identity(): void {
 		$plugin_root = dirname( __DIR__, 3 );
 		$header      = (string) file_get_contents( $plugin_root . '/cetech-woocommerce-delivery-engine.php' );
 
-		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.wave1-snapshot-readers\\.1'\s*\)/", $header );
-		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.wave1-snapshot-readers\\.1\s*$/m', $header );
+		self::assertMatchesRegularExpression( "/define\(\s*'CETECH_DE_VERSION',\s*'1\\.0\\.0-dev\\.wave1-data-lifecycle\\.1'\s*\)/", $header );
+		self::assertMatchesRegularExpression( '/Version:\s+1\\.0\\.0-dev\\.wave1-data-lifecycle\\.1\s*$/m', $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.shipment-order-read.1' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.address-ux.3' )", $header );
 		self::assertStringNotContainsString( "define( 'CETECH_DE_VERSION', '1.0.0-dev.address-ux.2' )", $header );
@@ -98,13 +98,15 @@ final class SchemaV4InspectionTest extends TestCase {
 		self::assertStringContainsString( "status varchar(32) NOT NULL", $joined );
 	}
 
-	public function test_uninstall_fallback_includes_shipment_tables(): void {
+	public function test_shared_uninstall_manifest_preserves_shipment_tables(): void {
 		$plugin_root = dirname( __DIR__, 3 );
 		$source      = (string) file_get_contents( $plugin_root . '/uninstall.php' );
+		self::assertStringContainsString( 'DataLifecycleBootstrap', $source );
+		self::assertStringNotContainsString( 'DROP TABLE', $source );
 
-		self::assertStringContainsString( "'shipments'", $source );
-		self::assertStringContainsString( "'shipment_items'", $source );
-		self::assertStringContainsString( "'shipment_events'", $source );
+		self::assertContains( 'shipments', \CetechDeliveryEngine\Bootstrap\DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES );
+		self::assertContains( 'shipment_items', \CetechDeliveryEngine\Bootstrap\DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES );
+		self::assertContains( 'shipment_events', \CetechDeliveryEngine\Bootstrap\DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES );
 	}
 
 	public function test_delivery_group_id_column_fits_v2_identifier(): void {
