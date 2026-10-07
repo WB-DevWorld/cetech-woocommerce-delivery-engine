@@ -210,6 +210,29 @@ final class CetechQuoteCartFixture {
 		return hash( 'sha256', json_encode( $items, JSON_THROW_ON_ERROR ) );
 	}
 	public function row( string $uuid ): array { $row = $this->db->get_row( $this->db->prepare( 'SELECT * FROM `' . TableNames::for( 'delivery_quotes' ) . '` WHERE site_id=%d AND quote_uuid=%s', get_current_blog_id(), $uuid ), ARRAY_A ); if ( ! is_array( $row ) || '' !== $this->db->last_error ) { throw new RuntimeException( 'Quote cart physical row unavailable.' ); } return $row; }
+	/** Exactly one original C03 publication marker may finish after a committed lost ACK. */
+	public static function accept_retry_delta( array $before, array $after, CetechDeliveryEngine\Application\DeliveryQuote\QuoteDurableCommand $original ): array {
+		$out = [ 'no_second_quote_mutation_or_audit' => false, 'one_original_accept_publication_marker' => false, 'all_other_history_unchanged' => false ];
+		try {
+			$stores = [ 'operation_records', 'operation_changes', 'delivery_quotes', 'delivery_quote_bindings', 'delivery_quote_budget_windows' ];
+			if ( count( $before ) !== count( $stores ) || count( $after ) !== count( $stores ) || [] !== array_diff( $stores, array_keys( $before ) ) || [] !== array_diff( $stores, array_keys( $after ) ) || 'delivery_quote.accept' !== $original->identity->operation ) { return $out; }
+			$effect_equal = true; foreach ( array_slice( $stores, 1 ) as $store ) { $effect_equal = $effect_equal && is_array( $before[$store] ) && $before[$store] === $after[$store]; } $out['no_second_quote_mutation_or_audit'] = $effect_equal;
+			$find = static function ( array $rows ) use ( $original ): array {
+				$matches = []; foreach ( $rows as $index => $row ) { if ( is_array( $row ) && ( $row['namespace_hash'] ?? null ) === $original->identity->namespace_digest() && CetechDeliveryEngine\Domain\Operation\OperationRecord::positive_integer( $row['site_id'] ?? null ) === $original->identity->site_id ) { $matches[] = [ $index, $row ]; } } return $matches;
+			};
+			$old = $find( $before['operation_records'] ); $new = $find( $after['operation_records'] ); if ( 1 !== count( $old ) || 1 !== count( $new ) ) { return $out; }
+			[ $old_index, $old_row ] = $old[0]; [ $new_index, $new_row ] = $new[0];
+			$event_matches = []; foreach ( $before['operation_changes'] as $event ) { if ( CetechDeliveryEngine\Domain\Operation\OperationRecord::positive_integer( $event['id'] ?? null ) === CetechDeliveryEngine\Domain\Operation\OperationRecord::positive_integer( $old_row['audit_id'] ?? null ) ) { $event_matches[] = $event; } } if ( 1 !== count( $event_matches ) ) { return $out; }
+			$profile = CetechDeliveryEngine\Application\DeliveryQuote\QuoteOperationProfile::registry()->get( 'delivery_quote.accept', 1 );
+			$old_record = CetechDeliveryEngine\Domain\Operation\OperationRecord::from_row( $old_row, $profile, $event_matches[0] ); $new_record = CetechDeliveryEngine\Domain\Operation\OperationRecord::from_row( $new_row, $profile, $event_matches[0] );
+			if ( ! $old_record->matches( $original->identity, $original->intent() ) || ! $new_record->matches( $original->identity, $original->intent() ) || $old_record->id !== $new_record->id ) { return $out; }
+			$immutable = $new_row; foreach ( [ 'publication_state', 'row_version', 'updated_at' ] as $field ) { $immutable[$field] = $old_row[$field]; }
+			$out['one_original_accept_publication_marker'] = 'accepted' === $old_record->state && 'accepted' === $new_record->state && 'pending' === $old_record->publication_state && 'published' === $new_record->publication_state && $old_record->row_version < PHP_INT_MAX && $new_record->row_version === $old_record->row_version + 1 && $new_record->updated_at >= $old_record->updated_at && $immutable === $old_row;
+			$normalized = $after; $normalized['operation_records'][$new_index] = $old_row;
+			$out['all_other_history_unchanged'] = $old_index === $new_index && $before === $normalized;
+		} catch ( Throwable ) { /* Corrupt or unrelated facts never satisfy the exact permitted delta. */ }
+		return $out;
+	}
 	public static function public_safe( array $facts ): bool {
 		$json = json_encode( $facts, JSON_THROW_ON_ERROR );
 		foreach ( [ 'acceptance_handle', 'owner_digest', 'session_hash', 'principal_hash', 'body_digest', 'material_digest', 'cost_provider', 'origin_id', 'supplier', 'rate_card', 'PRIVATE-', 'issue_context_json', 'review_token' ] as $private ) { if ( str_contains( $json, $private ) ) { return false; } }

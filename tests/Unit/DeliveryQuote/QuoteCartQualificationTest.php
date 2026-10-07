@@ -75,6 +75,35 @@ final class QuoteCartQualificationTest extends TestCase {
 		self::assertSame( [ null, null ], \CetechQuoteCartEnvironmentObservation::verified_refusal( $unknown ) );
 	}
 
+	/** Actual service/C03 SQLite protocol; native MariaDB qualification is separate. */
+	private function actual_accept_publication_pair(): array {
+		require_once dirname( __DIR__, 2 ) . '/Support/DeliveryQuote/CartQuoteFixtures.php';
+		$f = new \CetechDeliveryEngine\Tests\Support\DeliveryQuote\QuoteDurableFixtureFactory(); $environment = new \CetechDeliveryEngine\Tests\Support\DeliveryQuote\CartQuoteFixtureEnvironment( $f ); $sessions = new \CetechDeliveryEngine\Tests\Support\DeliveryQuote\CartQuoteFixtureSessions(); $service = \CetechDeliveryEngine\Tests\Support\DeliveryQuote\CartQuoteFixtures::service( $f, $environment, $sessions );
+		$request = \CetechDeliveryEngine\Domain\Contracts\RequestContext::create(); self::assertSame( 'review_required', $service->refresh( \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteId::generate()->value(), 0, $request )->shopper_facts()['status'] );
+		$opened = $sessions->current; $original = \CetechDeliveryEngine\Application\DeliveryQuote\QuoteDurableCommand::accept( $opened->owner(), $opened->reference(), $opened->header(), null ); $f->effect_fault = 'lost_ack';
+		self::assertSame( 'unconfirmed', $service->confirm( 1, $request )->shopper_facts()['status'] );
+		$history = static function () use ( $f ): array { $out = []; foreach ( [ 'operation_records', 'operation_changes', 'delivery_quotes', 'delivery_quote_bindings', 'delivery_quote_budget_windows' ] as $store ) { $out[$store] = $f->pdo->query( 'SELECT * FROM durable_delivery_engine_' . $store . ' ORDER BY id' )->fetchAll( \PDO::FETCH_ASSOC ); } return $out; };
+		$before = $history(); self::assertSame( 'confirmed', $service->retry( 1, $request )->shopper_facts()['status'] ); return [ $before, $history(), $original, $service, $history ];
+	}
+	public function test_retry_delta_allows_only_the_actual_original_publication_marker_and_second_retry_is_readonly(): void {
+		[ $before, $after, $original, $service, $history ] = $this->actual_accept_publication_pair(); self::assertNotSame( $before, $after );
+		self::assertSame( [ 'no_second_quote_mutation_or_audit' => true, 'one_original_accept_publication_marker' => true, 'all_other_history_unchanged' => true ], \CetechQuoteCartFixture::accept_retry_delta( $before, $after, $original ) );
+		self::assertSame( 'confirmed', $service->retry( 1, \CetechDeliveryEngine\Domain\Contracts\RequestContext::create() )->shopper_facts()['status'] ); self::assertSame( $after, $history() );
+	}
+	public function test_retry_delta_rejects_extra_effects_identity_changes_and_nonmonotonic_marker_changes(): void {
+		[ $before, $after, $original ] = $this->actual_accept_publication_pair(); $index = null; foreach ( $after['operation_records'] as $i => $row ) { if ( $row['namespace_hash'] === $original->identity->namespace_digest() ) { $index = $i; } } self::assertNotNull( $index );
+		$mutations = [];
+		foreach ( [ 'completion_json', 'intent_hash', 'target_hash', 'audit_id', 'site_id', 'completed_at' ] as $field ) { $changed = $after; $changed['operation_records'][$index][$field] = 'PRIVATE-CORRUPT'; $mutations[$field] = $changed; }
+		$changed = $after; $changed['operation_records'][$index]['row_version'] += 1; $mutations['two_marker_versions'] = $changed;
+		$changed = $after; $changed['operation_records'][$index]['updated_at'] = '2026-10-07 04:59:59.999999'; $mutations['clock_regression'] = $changed;
+		$changed = $after; $changed['operation_records'][$index]['publication_state'] = 'pending'; $mutations['not_published'] = $changed;
+		$changed = $after; $changed['operation_records'][0]['updated_at'] = '2026-10-07 05:00:01.000000'; $mutations['other_record_write'] = $changed;
+		$changed = $after; $changed['operation_records'][] = $changed['operation_records'][$index]; $mutations['second_accept_record'] = $changed;
+		foreach ( [ 'operation_changes', 'delivery_quotes', 'delivery_quote_bindings', 'delivery_quote_budget_windows' ] as $store ) { $changed = $after; $changed[$store][] = [ 'private_unexpected_effect' => 'PRIVATE-PAYLOAD' ]; $mutations[$store] = $changed; }
+		foreach ( $mutations as $name => $changed ) { self::assertContains( false, \CetechQuoteCartFixture::accept_retry_delta( $before, $changed, $original ), $name ); }
+		self::assertFalse( \CetechQuoteCartFixture::accept_retry_delta( $after, $after, $original )['one_original_accept_publication_marker'] );
+	}
+
 }
 
 final class QuoteCartFixtureNativeTransport implements OperationConnectionTransport {

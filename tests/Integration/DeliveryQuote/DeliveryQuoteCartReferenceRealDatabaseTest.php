@@ -123,6 +123,61 @@ final class DeliveryQuoteCartReferenceRealDatabaseTest extends TestCase {
 	}
 	public function test_lost_accept_staging_ack_preserves_original_reference_and_explicit_fresh_process_retry_accepts_once():void {
 		$this->seed_provider();$s=$this->stack(static function($t):void{$t->before=static function(string $sql,$transport):void{if(str_starts_with($sql,'UPDATE ')&&str_contains($sql,'woocommerce_sessions')&&str_contains($sql,'accepting')){$transport->fault_commit=1;$transport->commit_fault='lost_ack';}};});self::assertSame('review_required',$s->service->refresh(QuoteId::generate()->value(),0,$this->request())->shopper_facts()['status']);$original=$s->sessions->load(CartF::owner());self::assertSame('unconfirmed',$s->service->confirm(1,$this->request())->shopper_facts()['status']);self::assertSame('accepting',$s->sessions->load(CartF::owner())->phase());self::assertSame('issued',$this->rows('delivery_quotes')[0]['state']);self::assertSame(1,$this->native_count('operation_records'));self::assertSame(1,$this->native_count('operation_changes'));$w=$this->worker(['action'=>'retry','generation'=>1]);$r=$w->finish();self::assertSame('confirmed',$r['status']);self::assertSame(0,$r['prepares']);$current=$s->sessions->load(CartF::owner());self::assertSame('confirmed',$current->phase());self::assertSame($original->reference()->public_fields(),$current->reference()->public_fields());self::assertSame($original->header()->to_private_json(),$current->header()->to_private_json());self::assertSame($original->rate_references()[0]->to_private_array(),$current->rate_references()[0]->to_private_array());self::assertSame('accepted',$this->rows('delivery_quotes')[0]['state']);self::assertSame(2,$this->native_count('operation_records'));self::assertSame(2,$this->native_count('operation_changes'));$quotes=$this->rows('delivery_quotes');$events=$this->rows('operation_changes');$records=$this->rows('operation_records');$sessions=QuoteCartProofDatabase::sessions($this->database,$this->prefix);$again=$this->worker(['action'=>'retry','generation'=>1]);$ar=$again->finish();self::assertSame('confirmed',$ar['status']);self::assertSame(0,$ar['prepares']);self::assertSame($quotes,$this->rows('delivery_quotes'));self::assertSame($events,$this->rows('operation_changes'));self::assertSame($records,$this->rows('operation_records'));self::assertSame($sessions,QuoteCartProofDatabase::sessions($this->database,$this->prefix));
+		$this->assert_lost_accept_effect_ack_publishes_only_original_completion();
+	}
+
+	/** Actual effect COMMIT, then fresh OS replay; staging-ACK proof above remains separate. */
+	private function assert_lost_accept_effect_ack_publishes_only_original_completion():void {
+		$masked=null;
+		$s=$this->stack(static function($t)use(&$masked):void {
+			$t->before=static function(string $sql,$transport)use(&$masked):void {
+				if(null!==$masked||!str_starts_with($sql,'UPDATE ')||!str_contains($sql,'delivery_engine_delivery_quotes')||!str_contains($sql,"`state`='accepted'")){return;}
+				$masked=$transport;$transport->fault_commit=$transport->commits+1;$transport->commit_fault='lost_ack';
+			};
+		});
+		self::assertSame('review_required',$s->service->refresh(QuoteId::generate()->value(),1,$this->request())->shopper_facts()['status']);
+		$original=$s->sessions->load(CartF::owner());
+		self::assertSame(2,$original->generation());
+		$command=\CetechDeliveryEngine\Application\DeliveryQuote\QuoteDurableCommand::accept(CartF::owner(),$original->reference(),$original->header(),null);
+		self::assertSame('unconfirmed',$s->service->confirm(2,$this->request())->shopper_facts()['status']);
+		self::assertNotNull($masked);
+		self::assertSame($masked->fault_commit,$masked->sent_commits);
+		self::assertSame(2,$masked->sent_commits);
+		self::assertSame('lost_ack',$masked->commit_fault);
+		$owner_index=array_search($masked,$s->factory->transports,true);
+		self::assertNotFalse($owner_index);
+		self::assertTrue($s->factory->sessions[$owner_index]->is_retired());
+		$quotes_before=$this->rows('delivery_quotes');$events_before=$this->rows('operation_changes');$records_before=$this->rows('operation_records');$budget_before=$this->rows('delivery_quote_budget_windows');$bindings_before=$this->rows('delivery_quote_bindings');
+		$matching=array_values(array_filter($records_before,static fn(array $row):bool=>$row['namespace_hash']===$command->identity->namespace_digest()));
+		self::assertCount(1,$matching);$record_before=$matching[0];
+		self::assertSame('1',$record_before['site_id']);
+		self::assertSame('delivery_quote.accept',$record_before['operation']);
+		self::assertSame($command->intent()->fingerprint(),$record_before['intent_hash']);
+		self::assertSame(\CetechDeliveryEngine\Infrastructure\Persistence\WpdbOperationRecordRepository::target_hash($command->identity),$record_before['target_hash']);
+		self::assertSame('accepted',$record_before['state']);self::assertSame('pending',$record_before['publication_state']);
+		self::assertSame(['accepted','accepted'],array_column($quotes_before,'state'));
+		$retry=$this->worker(['action'=>'retry','generation'=>2,'clock'=>Factory::NOW+1])->finish();
+		self::assertSame('confirmed',$retry['status']);self::assertSame(2,$retry['generation']);self::assertSame(0,$retry['prepares']);
+		self::assertNotSame(getmypid(),$retry['process_id']);self::assertSame(0,$retry['lock_timeouts']+$retry['deadlocks']);
+		$quotes_after=$this->rows('delivery_quotes');$events_after=$this->rows('operation_changes');$records_after=$this->rows('operation_records');$budget_after=$this->rows('delivery_quote_budget_windows');$bindings_after=$this->rows('delivery_quote_bindings');
+		require_once dirname(__DIR__,3).'/scripts/qualification/opening-quote-cart-support.php';
+		$history_before=['operation_records'=>$records_before,'operation_changes'=>$events_before,'delivery_quotes'=>$quotes_before,'delivery_quote_bindings'=>$bindings_before,'delivery_quote_budget_windows'=>$budget_before];
+		$history_after=['operation_records'=>$records_after,'operation_changes'=>$events_after,'delivery_quotes'=>$quotes_after,'delivery_quote_bindings'=>$bindings_after,'delivery_quote_budget_windows'=>$budget_after];
+		self::assertSame(['no_second_quote_mutation_or_audit'=>true,'one_original_accept_publication_marker'=>true,'all_other_history_unchanged'=>true],\CetechQuoteCartFixture::accept_retry_delta($history_before,$history_after,$command));
+		$changes=[];foreach($records_before as $index=>$before){$after=$records_after[$index]??[];foreach($before as $field=>$value){if(($after[$field]??null)!==$value){$changes[$before['id']][]=$field;}}}
+		self::assertSame($quotes_before,$quotes_after);self::assertSame($events_before,$events_after);self::assertSame($budget_before,$budget_after);self::assertSame($bindings_before,$bindings_after);
+		self::assertCount(count($records_before),$records_after);
+		$record_after=array_values(array_filter($records_after,static fn(array $row):bool=>$row['namespace_hash']===$command->identity->namespace_digest()))[0];
+		self::assertSame('published',$record_after['publication_state']);
+		self::assertSame((int)$record_before['row_version']+1,(int)$record_after['row_version']);
+		self::assertSame(gmdate('Y-m-d H:i:s',Factory::NOW+1).'.000000',$record_after['updated_at']);
+		self::assertSame([$record_before['id']=>['publication_state','row_version','updated_at']],$changes);
+		$stable_after=$records_after;foreach($stable_after as &$record){if($record['id']!==$record_before['id']){continue;}foreach(['publication_state','row_version','updated_at'] as $field){$record[$field]=$record_before[$field];}}unset($record);
+		self::assertSame($records_before,$stable_after);
+		$current=$s->sessions->load(CartF::owner());self::assertSame('confirmed',$current->phase());self::assertSame(2,$current->generation());self::assertSame($original->reference()->public_fields(),$current->reference()->public_fields());self::assertSame($original->header()->to_private_json(),$current->header()->to_private_json());
+		$sessions_after=QuoteCartProofDatabase::sessions($this->database,$this->prefix);
+		$again=$this->worker(['action'=>'retry','generation'=>2,'clock'=>Factory::NOW+2])->finish();self::assertSame('confirmed',$again['status']);self::assertSame(0,$again['prepares']);
+		self::assertSame($records_after,$this->rows('operation_records'));self::assertSame($quotes_after,$this->rows('delivery_quotes'));self::assertSame($events_after,$this->rows('operation_changes'));self::assertSame($budget_after,$this->rows('delivery_quote_budget_windows'));self::assertSame($bindings_after,$this->rows('delivery_quote_bindings'));self::assertSame($sessions_after,QuoteCartProofDatabase::sessions($this->database,$this->prefix));
 	}
 
 }
