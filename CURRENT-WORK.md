@@ -1,3 +1,17 @@
+# Current Work — W2-Q04 retained existing-price provider
+
+Status: **W2-Q03 OWNER-APPROVED AND INTEGRATED — W2-Q04 IMPLEMENTED / IMMUTABLE CANDIDATE QUALIFICATION PENDING**
+
+At 2026-10-07 07:41:59 UTC the owner instructed “Approve W2-Q03 for integration and implement W2-Q04.” Qualified Q03 candidate `825cb7049569402552c80cee34242f8342cab028` integrated normally through PR #88 as `1555d5ec19052eac4d9f1a019dbdc9aa058cf487`, unchanged tree `2b5ef07c37979e10e0eec3c84d45274d6e535363`. Candidate CI37587434368 attempt1 passed all eight substantive jobs, native412/HTTP98/smoke/cleanup; all666 immutable source hashes matched map7bdb9b64555b1abebff539037df466c3ae0cc7022939f289e7b17ad909399777. Q03 actual-master integration separately qualified: CI37589028902 attempt1 all8 substantive jobs, native412/HTTP98/smoke/cleanup, all666 exact merged-source hashes/map7bdb9b64555b1abebff539037df466c3ae0cc7022939f289e7b17ad909399777. PHP2862/17683/1skip across8.3.35/8.4.26/8.5.11; SQL250/5703 with all retained minima. PR88 merged; Issue87 completed. Exact actual-master and candidate artifact fingerprints remain separately recorded on PR88. Historical failed Q03 first-candidate receipts remain failed on PR #88.
+
+[Issue #89](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/89) tracks Q04 from that actual merge on `ws3/wave2-q04-legacy-price-provider`. Implement `legacy_fixed_base_v1` through the retained RateQuoteEngine using a complete bounded rate view, full per-member homogeneous source eligibility, owned current SQL/range fences and a sealed native Woo tax/money/no-promo/no-FX receipt. Preserve explicit zero and typed unavailable cost. Schema9, legacy formulas/matcher/grouping/writer and frozen classifications remain. Q05 cart/readers and Q06 placement are separate accepted checkpoints.
+
+Root owns shared bootstrap/version/registry/schema/CI/package/control-plane/docs/ref/PR/Issue files. Finite disjoint AI leases: c02_adapter_analysis owns provider orchestration and internal stack/new focused tests; c01_intent_identity owns bounded current source/candidate capture and same-session fences; c02_privacy_review owns native Woo money/tax/context receipt adapters and focused tests; q01_sql_observation owns physical SQL/process fixtures; c02_support_values owns native WordPress proof module and its runner inclusion; c01_catalog_context independently verifies actual-master and final evidence and reviews only finite demonstrated findings. Agents establish exact shared APIs before cross-file consumers. The owner + AI agents are the active team. Marked disposable fixtures are the authorized proof environment.
+
+The [Q04 implementation record](docs/product/W2-Q04-LEGACY-PRICE-PROVIDER-2026-10-07.md) defines the actual finite legacy/native subset and explicit Q05 preparation-budget dependency. Current provider/source/native stack is implemented; configured comparative units2970/18042/1existing skip and physical SQL41/334 passed. JS8/102, autoload, production691/0, repository1091/0 and controls passed. Comparative proofs do not substitute for immutable native qualification. Schema9 remains; production package has691 PHP files. Native442/HTTP98 are source-derived targets until executed candidate receipts establish success.
+
+# Historical Q03 immutable freeze
+
 # Current Work — W2-Q03 durable internal quote lifecycle
 
 Status: **W2-Q02 OWNER-APPROVED AND INTEGRATED — W2-Q03 IMPLEMENTED / IMMUTABLE CANDIDATE QUALIFICATION PENDING**

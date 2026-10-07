@@ -56,6 +56,29 @@ if ( ! str_contains( $health_source, 'namespace CetechDeliveryEngine\\Applicatio
 require_once $autoload;
 
 $required_classes = [
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\LegacyFixedBaseQuoteProvider',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\LegacyQuoteCaptureGuard',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\LegacyQuoteCapturedRateRepository',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\LegacyQuoteCapturedSourceView',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\LegacyQuoteCurrentEvidenceGuard',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\LegacyQuoteEngineCapture',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\LegacyQuoteNativeSourcePreparer',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\LegacyQuotePreparedCapture',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\LegacyQuoteProviderStack',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\LegacyQuoteSourceLocalBinding',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\LegacyQuoteSourcePlan',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\LegacyQuoteSourceSnapshot',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\NativeQuotePreparationAccess',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteNativeContextIdentity',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteNativeGroupReceipt',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteNativeGroupRequest',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteNativeOwnerResolver',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteNativeReceipt',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteNativeReceiptCapture',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteNativeReceiptGuard',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteNativeState',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteNativeWooSource',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\LegacyQuoteSourceSnapshotReader',
 	'CetechDeliveryEngine\\Application\\DataLifecycle\\DataLifecycleCleanupService',
 	'CetechDeliveryEngine\\Application\\DataLifecycle\\ManagedGeographyCache',
 	'CetechDeliveryEngine\\Domain\\DataLifecycle\\DataLifecycleRegistry',
@@ -213,6 +236,8 @@ $required_classes = [
 ];
 
 $required_interfaces = [
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteNativeCaptureSource',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePreparationAccess',
 	'CetechDeliveryEngine\\Application\\Runtime\\VariationRelationshipInspectorInterface',
 	'CetechDeliveryEngine\\Core\\Versioning\\VerifiableMigrationInterface',
 	'CetechDeliveryEngine\\Core\\Versioning\\MigrationInterface',
@@ -356,7 +381,8 @@ $is_schema5_release = str_contains( $header_source, '1.0.0-dev.bulk' )
 	|| str_contains( $header_source, '1.0.0-rc.11' );
 
 $is_schema9_release = str_contains( $header_source, '1.0.0-dev.wave2-quote-storage' )
-	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-lifecycle' );
+	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-lifecycle' )
+	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-provider' );
 $is_schema8_release = str_contains( $header_source, '1.0.0-dev.wave1-rule-lifecycle' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-snapshot-readers' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-data-lifecycle' )

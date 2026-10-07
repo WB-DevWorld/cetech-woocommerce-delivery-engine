@@ -43,6 +43,25 @@ final class OperationConnectionTest extends TestCase {
 		self::assertTrue( $connection->rollback() );
 	}
 
+	public function test_quote_source_native_and_coordinator_union_has_a_finite_total_ceiling(): void {
+		$transport = new OperationConnectionTestTransport(); $connection = $this->connection( $transport );
+		self::assertTrue( $connection->begin() );
+		$common = [ 'operation_records', 'operation_changes', 'quotes', 'quote_order_bindings', 'quote_admission_budget', 'options', 'product_delivery_rules', 'delivery_offers', 'rate_cards', 'destination_zones', 'destination_rules', 'posts', 'postmeta', 'term_relationships', 'term_taxonomy', 'woocommerce_tax_rates', 'woocommerce_tax_rate_locations', 'woocommerce_shipping_zone_methods', 'woocommerce_sessions', 'users', 'usermeta', 'configuration_scopes', 'configuration_fields' ];
+		$tables = array_map( static fn( string $suffix ): string => 'op_' . $suffix, $common );
+		self::assertTrue( $connection->validate_tables( $tables ) );
+		foreach ( $tables as $table ) { self::assertContains( 'SELECT 1 FROM `' . $table . '` LIMIT 0', $transport->statements ); }
+		$ceiling = [ ...$tables, ...array_map( static fn( int $id ): string => 'op_finite_' . $id, range( 1, 9 ) ) ];
+		self::assertTrue( $connection->validate_tables( $ceiling ) );
+		$before = count( $transport->statements );
+		self::assertFalse( $connection->validate_tables( [ ...$ceiling, 'op_finite_33' ] ) );
+		self::assertSame( $before, count( $transport->statements ) );
+		self::assertFalse( $connection->validate_tables( [ 'op_finite_33' ] ) );
+		self::assertSame( $before, count( $transport->statements ) );
+		self::assertFalse( $connection->validate_tables( [ ...array_slice( $ceiling, 0, 31 ), 'foreign_options' ] ) );
+		self::assertSame( $before, count( $transport->statements ) );
+		self::assertTrue( $connection->rollback() ); self::assertTrue( $connection->retire() );
+	}
+
 	public function test_nontransactional_participant_refuses(): void {
 		$transport = new OperationConnectionTestTransport();
 		$transport->engine = 'MyISAM';
@@ -108,6 +127,32 @@ final class OperationConnectionTest extends TestCase {
 		}
 		self::assertTrue( $connection->rollback() );
 		self::assertTrue( $connection->retire() );
+	}
+
+	public function test_fixed_quote_range_index_is_syntax_but_unknown_index_functions_refuse(): void {
+		$transport = new OperationConnectionTestTransport();
+		$connection = $this->connection( $transport );
+		self::assertTrue( $connection->begin() );
+		$sql = $connection->prepare( 'SELECT id FROM `op_rate_cards` FORCE INDEX (`quote_candidate_range`) WHERE delivery_offer_id = %d AND destination_zone_id = %d AND base_currency = %s ORDER BY id LIMIT 1001 FOR UPDATE', [ 20, 50, 'GHS' ] );
+		self::assertIsArray( $connection->get_row( $sql ) );
+		self::assertContains( $sql, $transport->statements );
+		foreach ( [ 'SELECT INDEX(1)', 'SELECT * FROM `op_rate_cards` FORCE INDEX (`other_range`)', 'SELECT * FROM `op_rate_cards` FORCE INDEX (hidden_effect())', 'SELECT hidden_effect() FROM `op_rate_cards` FORCE INDEX (`quote_candidate_range`)', 'SELECT private.INDEX(1)', 'SELECT 1 /* FORCE INDEX (`quote_candidate_range`) */' ] as $forbidden ) {
+			self::assertFalse( $connection->get_row( $forbidden ) );
+			self::assertNotContains( $forbidden, $transport->statements );
+		}
+		self::assertTrue( $connection->rollback() );
+		self::assertTrue( $connection->retire() );
+	}
+
+	public function test_native_receipt_text_probe_is_bounded_sql_without_admitting_unknown_functions(): void {
+		$transport = new OperationConnectionTestTransport(); $connection = $this->connection( $transport );
+		self::assertTrue( $connection->begin() );
+		$sql = $connection->prepare( 'SELECT session_id,session_key,LEFT(session_value,16385) AS session_value,session_expiry FROM `op_woocommerce_sessions` WHERE session_key = %s ORDER BY session_id LIMIT 2 FOR UPDATE', [ 'private_native_session' ] );
+		self::assertIsArray( $connection->get_row( $sql ) ); self::assertContains( $sql, $transport->statements );
+		foreach ( [ 'SELECT LEFT(hidden_effect(),16385)', 'SELECT private.LEFT(session_value,16385)', 'SELECT LEFT(session_value,16385),hidden_effect() FROM `op_woocommerce_sessions`' ] as $forbidden ) {
+			self::assertFalse( $connection->get_row( $forbidden ) ); self::assertNotContains( $forbidden, $transport->statements );
+		}
+		self::assertTrue( $connection->rollback() ); self::assertTrue( $connection->retire() );
 	}
 
 	public function test_pinned_server_identity_change_refuses_without_sending_a_write(): void {

@@ -32,6 +32,7 @@
             <group>emergency-control-real-db</group>
             <group>quote-storage-real-db</group>
             <group>quote-lifecycle-real-db</group>
+            <group>quote-provider-real-db</group>
         </exclude>
     </groups>
 </phpunit>

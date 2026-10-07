@@ -1,3 +1,7 @@
+## Q04 owner authorization — 2026-10-07
+
+The owner approved W2-Q03 for integration and W2-Q04 implementation. Q03 PR88 merged normally at `1555d5ec19052eac4d9f1a019dbdc9aa058cf487`, tree `2b5ef07c37979e10e0eec3c84d45274d6e535363`; separate actual-master CI37589028902 qualified all8jobs/native412/HTTP98/666-source map. Issue87 completed; Issue89 tracks Q04. This authorizes the retained existing-price provider checkpoint below; Q05 cart/readers and Q06 placement remain separate checkpoints. Q04 integration will have its own owner acceptance after immutable-candidate qualification.
+
 # DeliveryQuote bounded implementation plan
 
 Status: **OWNER-APPROVED 2026-10-07 05:01:14 UTC / IMPLEMENTATIONS NOT EXECUTED BY THIS DESIGN PACKET** under [W2-QUOTE-LIFECYCLE-1](W2-DELIVERYQUOTE-LIFECYCLE-DESIGN-2026-10-07.md). Six checkpoints; root holds shared schema/Plugin/bootstrap/settings/flags/manifest/CI/ref/PR leases. Delegated edits use separate finite file leases. Only the owner and AI agents are working. No outside human-availability gate is introduced.
