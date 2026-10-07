@@ -63,9 +63,28 @@ final class EmergencyControlRealDatabaseTest extends TestCase {
 	private function definition( string $suffix ): array { $row = DB::row( $this->database, "SHOW CREATE TABLE `{$this->prefix}delivery_engine_{$suffix}`" ); return array_map( static fn ( string $value ): string => preg_replace( '/ AUTO_INCREMENT=[0-9]+\b/', '', $value ), $row ); }
 	private function directory(): string { $d = OperationProofBarrier::directory(); $this->directories[] = $d; return $d; }
 	private function worker( array $args ): OperationProofProcess { $p = new OperationProofProcess( [ __DIR__ . '/process-worker.php', json_encode( [ 'prefix' => $this->prefix ] + $args, JSON_THROW_ON_ERROR ) ] ); $this->processes[] = $p; return $p; }
-	private function wait_for_lock_wait(): void {
+	private function connection_signal( string $path, OperationProofProcess $worker ): int {
+		OperationProofProcess::wait_for( $path );
+		$signal = json_decode( (string) file_get_contents( $path ), true, 4, JSON_THROW_ON_ERROR );
+		self::assertSame( $worker->pid(), $signal['process_id'] );
+		self::assertIsInt( $signal['connection_id'] ); self::assertGreaterThan( 0, $signal['connection_id'] );
+		self::assertNotSame( $this->database->thread_id, $signal['connection_id'] );
+		return $signal['connection_id'];
+	}
+	private function lock_wait_sql( int $waiter, int $blocker ): string {
+		return "SELECT COUNT(*) FROM information_schema.INNODB_LOCK_WAITS w JOIN information_schema.INNODB_LOCKS l ON l.lock_id=w.requested_lock_id JOIN information_schema.INNODB_TRX r ON r.trx_id=w.requesting_trx_id JOIN information_schema.INNODB_TRX b ON b.trx_id=w.blocking_trx_id WHERE l.lock_table=CONCAT('`', DATABASE(), '`.`{$this->prefix}options`') AND l.lock_index='option_name' AND r.trx_mysql_thread_id={$waiter} AND b.trx_mysql_thread_id={$blocker} AND r.trx_state='LOCK WAIT'";
+	}
+	private function wait_for_lock_wait( int $waiter, int $blocker ): void {
+		self::assertNotSame( $waiter, $blocker );
 		$end = microtime( true ) + 1.5;
-		do { if ( (int) DB::scalar( $this->database, "SELECT COUNT(*) FROM information_schema.INNODB_LOCK_WAITS w JOIN information_schema.INNODB_LOCKS l ON l.lock_id=w.requested_lock_id WHERE l.lock_table=CONCAT('`', DATABASE(), '`.`{$this->prefix}options`')" ) > 0 ) { self::assertTrue( true ); return; } usleep( 10000 ); } while ( microtime( true ) < $end );
+		// MariaDB retains these tables' shared snapshot until no reader has touched it for >100 ms.
+		// A 10 ms loop can keep a pre-dispatch empty snapshot alive throughout this unchanged bound.
+		do {
+			if ( (int) DB::scalar( $this->database, $this->lock_wait_sql( $waiter, $blocker ) ) > 0 ) { self::assertTrue( true ); return; }
+			$remaining = $end - microtime( true );
+			if ( $remaining <= 0 ) { break; }
+			usleep( (int) min( 120000, ceil( $remaining * 1000000 ) ) );
+		} while ( microtime( true ) < $end );
 		self::fail( 'The real second native connection did not enter a lock wait.' );
 	}
 
@@ -125,8 +144,8 @@ final class EmergencyControlRealDatabaseTest extends TestCase {
 	}
 	public function test_absent_unique_key_lock_admits_first_and_the_second_process_pause_waits(): void {
 		$p = $this->payload(); $d = $this->directory();
-		$admission = $this->worker( [ 'action' => 'confirm', 'revision' => 1, 'lock_ready' => $d . '/admission', 'lock_release' => $d . '/release' ] ); OperationProofProcess::wait_for( $d . '/admission' );
-		$pause = $this->worker( [ 'action' => 'transition', 'token' => 'later-pause', 'payload' => $p, 'state_dispatch' => $d . '/pause' ] ); OperationProofProcess::wait_for( $d . '/pause' ); $lock_failure = null; try { $this->wait_for_lock_wait(); } catch ( \Throwable $error ) { $lock_failure = $error->getMessage(); }
+		$admission = $this->worker( [ 'action' => 'confirm', 'revision' => 1, 'lock_ready' => $d . '/admission', 'lock_release' => $d . '/release' ] ); $blocker = $this->connection_signal( $d . '/admission', $admission );
+		$pause = $this->worker( [ 'action' => 'transition', 'token' => 'later-pause', 'payload' => $p, 'state_dispatch' => $d . '/pause' ] ); $waiter = $this->connection_signal( $d . '/pause', $pause ); $lock_failure = null; try { $this->wait_for_lock_wait( $waiter, $blocker ); } catch ( \Throwable $error ) { $lock_failure = $error->getMessage(); }
 		OperationProofBarrier::signal( $d . '/release' ); $a = $admission->finish(); $b = $pause->finish(); self::assertNull( $lock_failure, json_encode( [ 'admission' => $a, 'pause' => $b ], JSON_THROW_ON_ERROR ) );
 		self::assertSame( [ 'ready', true, 1 ], [ $a['status'], $a['available'], $a['revision'] ] ); self::assertSame( 'accepted', $b['state'] ); self::assertNotSame( $a['process_id'], $b['process_id'] ); self::assertNotSame( getmypid(), $a['process_id'] ); self::assertSame( 'checkout_suspended', $this->current()->state );
 	}
@@ -142,9 +161,23 @@ final class EmergencyControlRealDatabaseTest extends TestCase {
 	}
 	public function test_initialized_admission_lock_precedes_pause_and_releases_before_the_pause_commit(): void {
 		$this->accept( $this->transition() ); $this->accept( $this->transition( 'resume', $this->payload( 'enabled' ) ) ); $p = $this->payload(); $d = $this->directory();
-		$admission = $this->worker( [ 'action' => 'confirm', 'revision' => 3, 'lock_ready' => $d . '/admission', 'lock_release' => $d . '/release' ] ); OperationProofProcess::wait_for( $d . '/admission' );
-		$pause = $this->worker( [ 'action' => 'transition', 'token' => 'second-pause', 'payload' => $p, 'lock_dispatch' => $d . '/pause' ] ); OperationProofProcess::wait_for( $d . '/pause' ); $this->wait_for_lock_wait(); OperationProofBarrier::signal( $d . '/release' );
+		$admission = $this->worker( [ 'action' => 'confirm', 'revision' => 3, 'lock_ready' => $d . '/admission', 'lock_release' => $d . '/release' ] ); $blocker = $this->connection_signal( $d . '/admission', $admission );
+		$pause = $this->worker( [ 'action' => 'transition', 'token' => 'second-pause', 'payload' => $p, 'lock_dispatch' => $d . '/pause' ] ); $waiter = $this->connection_signal( $d . '/pause', $pause ); $this->wait_for_lock_wait( $waiter, $blocker ); OperationProofBarrier::signal( $d . '/release' );
 		$a = $admission->finish(); $b = $pause->finish(); self::assertTrue( $a['available'] ); self::assertSame( 3, $a['revision'] ); self::assertSame( 'accepted', $b['state'] ); self::assertSame( [ 'checkout_suspended', 4 ], [ $this->current()->state, $this->current()->revision ] );
+	}
+	public function test_exact_connection_wait_is_observed_after_priming_an_empty_metadata_snapshot(): void {
+		$this->accept( $this->transition() ); $this->accept( $this->transition( 'resume', $this->payload( 'enabled' ) ) ); $p = $this->payload(); $d = $this->directory(); $before = $this->control();
+		$admission = $this->worker( [ 'action' => 'confirm', 'revision' => 3, 'lock_ready' => $d . '/admission', 'lock_release' => $d . '/release' ] ); $blocker = $this->connection_signal( $d . '/admission', $admission );
+		$pause = $this->worker( [ 'action' => 'transition', 'token' => 'after-empty-snapshot', 'payload' => $p, 'lock_dispatch' => $d . '/pause', 'dispatch_release' => $d . '/dispatch' ] ); $waiter = $this->connection_signal( $d . '/pause', $pause );
+		// The real waiter is still stopped immediately before native dispatch, so this snapshot is empty.
+		usleep( 120000 ); self::assertSame( 0, (int) DB::scalar( $this->database, $this->lock_wait_sql( $waiter, $blocker ) ) );
+		OperationProofBarrier::signal( $d . '/dispatch' );
+		$this->wait_for_lock_wait( $waiter, $blocker );
+		self::assertSame( $before, $this->control() );
+		self::assertSame( 2, $this->row_count( 'operation_changes' ) );
+		OperationProofBarrier::signal( $d . '/release' );
+		$a = $admission->finish(); $b = $pause->finish(); self::assertSame( [ true, 3 ], [ $a['available'], $a['revision'] ] ); self::assertSame( 'accepted', $b['state'] ); self::assertSame( 0, $b['lock_timeouts'] );
+		self::assertSame( [ 'checkout_suspended', 4 ], [ $this->current()->state, $this->current()->revision ] );
 	}
 	public function test_actual_row_lock_timeout_is_two_seconds_and_never_grants_admission(): void {
 		$this->accept( $this->transition() ); $this->accept( $this->transition( 'resume', $this->payload( 'enabled' ) ) ); $s = $this->factory->open(); self::assertTrue( $s->begin() ); $store = new EmergencyControlStore(); $store->assert_ready( $s, 1 ); $store->current( $s );

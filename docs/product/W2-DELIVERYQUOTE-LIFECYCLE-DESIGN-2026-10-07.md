@@ -1,6 +1,6 @@
 # Wave 2 DeliveryQuote lifecycle — W2-QUOTE-LIFECYCLE-1
 
-Status: **PROPOSED FOR OWNER REVIEW; DESIGN ONLY**. Prepared for [Issue #81](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/81). Approval of this packet and implementation of W2-Q01 would authorize the first internal checkpoint, not immediate checkout adoption. The [bounded plan](W2-DELIVERYQUOTE-IMPLEMENTATION-PLAN-2026-10-07.md), [source inventory](W2-DELIVERYQUOTE-SOURCE-INVENTORY-2026-10-07.md) and [traceability](W2-DELIVERYQUOTE-TRACEABILITY-2026-10-07.csv) are part of this proposal.
+Status: **OWNER-APPROVED 2026-10-07 05:01:14 UTC; DESIGN PACKET / Q01 AUTHORIZED**. The owner also requires the existing SQL observation discrepancy be resolved and qualified before integration. The approval accepts the concrete proposed defaults below; it does not claim later implementation or conformance. Prepared for [Issue #81](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/81). Approval of this packet and implementation of W2-Q01 would authorize the first internal checkpoint, not immediate checkout adoption. The [bounded plan](W2-DELIVERYQUOTE-IMPLEMENTATION-PLAN-2026-10-07.md), [source inventory](W2-DELIVERYQUOTE-SOURCE-INVENTORY-2026-10-07.md) and [traceability](W2-DELIVERYQUOTE-TRACEABILITY-2026-10-07.csv) are part of this proposal.
 
 ## What this adds
 

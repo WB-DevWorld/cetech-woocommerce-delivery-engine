@@ -9,6 +9,7 @@ use CetechDeliveryEngine\Infrastructure\Persistence\EmergencyControlStore;
 use CetechDeliveryEngine\Tests\Support\EmergencyControl\EmergencyControlProofFactory;
 use CetechDeliveryEngine\Tests\Support\EmergencyControl\EmergencyControlProofTransport;
 use CetechDeliveryEngine\Tests\Support\Operation\OperationProofBarrier;
+use CetechDeliveryEngine\Tests\Support\Operation\OperationProofProcess;
 
 require dirname( __DIR__, 2 ) . '/bootstrap.php';
 
@@ -18,14 +19,22 @@ try {
 	$factory = new EmergencyControlProofFactory( $a['prefix'], (int) ( $a['site'] ?? 1 ) );
 	$factory->configure = static function ( EmergencyControlProofTransport $transport ) use ( $a ): void {
 		$control = static fn ( string $sql ): bool => str_starts_with( $sql, 'SELECT ' ) && str_contains( $sql, 'FOR UPDATE' ) && str_contains( $sql, 'cetech_de_checkout_control_v1' );
-		$transport->before = static function ( string $sql, EmergencyControlProofTransport $t ) use ( $a, $control ): void {
-			if ( $control( $sql ) && isset( $a['lock_dispatch'] ) ) { OperationProofBarrier::signal( $a['lock_dispatch'] ); }
-			if ( str_starts_with( $sql, 'INSERT INTO ' ) && str_contains( $sql, 'cetech_de_checkout_control_v1' ) && isset( $a['state_dispatch'] ) ) { OperationProofBarrier::signal( $a['state_dispatch'] ); }
+		$signal_connection = static function ( string $path, EmergencyControlProofTransport $t ): void {
+			$bytes = json_encode( [ 'connection_id' => $t->connection_id(), 'process_id' => getmypid() ], JSON_THROW_ON_ERROR );
+			if ( false === file_put_contents( $path . '.pending', $bytes, LOCK_EX ) || ! rename( $path . '.pending', $path ) ) { throw new RuntimeException( 'Proof connection signal failed.' ); }
+		};
+		$transport->before = static function ( string $sql, EmergencyControlProofTransport $t ) use ( $a, $control, $signal_connection ): void {
+			if ( $control( $sql ) && isset( $a['lock_dispatch'] ) ) {
+				$signal_connection( $a['lock_dispatch'], $t );
+				if ( isset( $a['dispatch_release'] ) ) { OperationProofProcess::wait_for( $a['dispatch_release'], 12.0 ); }
+			}
+			if ( str_starts_with( $sql, 'INSERT INTO ' ) && str_contains( $sql, 'cetech_de_checkout_control_v1' ) && isset( $a['state_dispatch'] ) ) { $signal_connection( $a['state_dispatch'], $t ); }
 		};
 		$paused = false;
-		$transport->after = static function ( string $sql, EmergencyControlProofTransport $t, $result ) use ( $a, $control, &$paused ): void {
+		$transport->after = static function ( string $sql, EmergencyControlProofTransport $t, $result ) use ( $a, $control, $signal_connection, &$paused ): void {
 			if ( ! $paused && $control( $sql ) && $result->acknowledged && isset( $a['lock_ready'], $a['lock_release'] ) ) {
-				$paused = true; OperationProofBarrier::pause( $a['lock_ready'], $a['lock_release'] );
+				$paused = true; $signal_connection( $a['lock_ready'], $t );
+				OperationProofProcess::wait_for( $a['lock_release'], 12.0 );
 			}
 		};
 	};

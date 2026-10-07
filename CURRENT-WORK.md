@@ -1,3 +1,19 @@
+# Current Work — approved Wave 2 design / Q01 implementation
+
+Status: **W2-QUOTE-LIFECYCLE-1 OWNER-APPROVED — SQL OBSERVER REPAIR BEFORE DESIGN INTEGRATION — W2-Q01 AUTHORIZED**
+
+## 2026-10-07 — Owner approved the lifecycle and first internal checkpoint
+
+At 05:01:14 UTC the owner instructed “Approve W2-QUOTE-LIFECYCLE-1 and implement W2-Q01, resolving the existing SQL test discrepancy before integration.” [Issue #83](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/83) tracks the two bounded steps. The approved seven-file design candidate is PR#82 head `a7151a49a819858eaa294e096da74d854acbec95`, tree `972234a38cf3e51a00d1e553459f6a18603b79fd`, from protected master `f6f7ee7c84c5d92753629b3884535a0d1b0deffb`.
+
+The [SQL observation repair](docs/product/W2-SQL-OBSERVATION-REPAIR-2026-10-07.md) closes a controlled reproduction of stale MariaDB metadata caused by10ms fixture polling. The correction keeps the1.5s observation bound and2s production lock timeout, identifies exact physical waiter/blocker connections, and adds a primed-empty-snapshot regression. Local PHP8.3.6/MariaDB10.11.14 emergency31/903 passed; fresh pinned required CI remains the integration condition. Historical PR37573222546 remains failed SQL173/4078; its passed preservation receipts and separate green push are distinct evidence. No product correction is inferred from that observation failure.
+
+Root holds sole shared records/decision register/bootstrap/version/CI/ref/PR/Issue/integration leases. SQL observation agent owns only tests/Integration/EmergencyControl/{EmergencyControlRealDatabaseTest.php,process-worker.php} in an isolated worktree. Concurrent Q01 agents own new Domain/DeliveryQuote values/codecs, the internal aggregate/provider/lifecycle fixture, and explicit quote projections under separate file leases. Only owner and AI agents are working. No external person's availability gate applies.
+
+The owner accepts the concrete five-minute nonrenewing lifecycle/defaults and six bounded checkpoint plan. After qualified design integration, Q01 adds schema-neutral internal quote contracts/codecs/status/clock/expiry/provider/projections with trusted test fixtures. It registers no shopper endpoint/provider/writer and introduces no quote DDL or persistence. Q01 returns separately for owner integration acceptance. The48 future cases are not certified by design preservation CI; all12 DE-QUOTE classifications and372 frozen IDs remain unchanged. Schema8 and existing development identity remain unchanged in this design/fixture prerequisite.
+
+# Historical work — proposed Wave 2 design
+
 # Current Work — Wave 2 DeliveryQuote design
 
 Status: **WAVE1 C01–C07 INTEGRATED — W2-QUOTE-LIFECYCLE-1 PROPOSED / DESIGN ONLY**
