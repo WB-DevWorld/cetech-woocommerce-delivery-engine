@@ -85,6 +85,9 @@ final class CetechQuoteCartFactory implements FactoryContract {
 /** Observe a genuine native preparation without replacing its draft, provider or facts. */
 final class CetechQuoteCartEnvironmentObservation implements CartQuoteEnvironment {
 	public array $diagnostics = [ 'prepare_entered' => false, 'prepare_returned' => false, 'prepare_error_class' => null, 'prepare_refusal_site' => null, 'prepare_refusal_line' => null, 'evidence_called' => false, 'evidence_returned' => false, 'native_shipping_debug_enabled' => null, 'native_chosen_cache_present' => false, 'native_totals_cache_present' => false, 'native_shipping_cache_present' => false ];
+	private ?QuoteIssueCommand $evidence_original = null;
+	private ?QuoteHeader $evidence_header = null;
+	private ?QuoteCartDraft $evidence_draft = null;
 	public function __construct( private NativeCartQuoteEnvironment $native ) {}
 	public function draft(): ?QuoteCartDraft { return $this->native->draft(); }
 	public function authorize( QuoteOwner $owner, string $operation ): bool { return $this->native->authorize( $owner, $operation ); }
@@ -94,7 +97,53 @@ final class CetechQuoteCartEnvironmentObservation implements CartQuoteEnvironmen
 		catch ( Throwable $error ) { $this->diagnostics['prepare_error_class'] = self::safe_error_class( $error ); [ $site, $line ] = self::verified_refusal( $error ); $this->diagnostics['prepare_refusal_site'] = $site; $this->diagnostics['prepare_refusal_line'] = $line; throw $error; }
 	}
 	public function evidence( QuoteIssueCommand $original, QuoteHeader $header, QuoteCartDraft $draft ): ?QuoteCartCurrentEvidence {
+		$this->evidence_original = $original; $this->evidence_header = $header; $this->evidence_draft = $draft;
 		$this->diagnostics['evidence_called'] = true; $result = $this->native->evidence( $original, $header, $draft ); $this->diagnostics['evidence_returned'] = null !== $result; return $result;
+	}
+	/** Failure-only follow-up on the same actual objects. Never prepare, reprice, issue or save. */
+	public function readonly_followup(): array {
+		$stages = [ 'input_ready', 'environment_same_draft', 'environment_matches_original', 'environment_authorized', 'control_observed', 'cached_shipping_restored', 'preparation_matches_original', 'source_captured', 'source_bound', 'packages_restored', 'native_captured', 'native_bound', 'context_digest_matches', 'source_applicable', 'native_unchanged', 'source_local_unchanged', 'final_same_draft', 'final_authorized', 'control_confirmed' ];
+		$report = [ 'observation' => 'followup_readonly_not_original_timing', 'failed_stage' => null, 'error_class' => null, 'refusal_site' => null, 'refusal_line' => null, ...array_fill_keys( $stages, null ) ];
+		$stage = 'input_ready'; $known_false = false;
+		$step = static function ( string $name, callable $read ) use ( &$report, &$stage, &$known_false ): void {
+			$stage = $name; $value = $read(); $report[$name] = true === $value;
+			if ( true !== $value ) { $known_false = true; throw new LogicException( 'The read-only follow-up guard refused.' ); }
+		};
+		try {
+			$original = $this->evidence_original; $header = $this->evidence_header; $draft = $this->evidence_draft;
+			$step( 'input_ready', static fn (): bool => null !== $original && null !== $header && null !== $draft );
+			$preparation = ( new ReflectionProperty( NativeCartQuoteEnvironment::class, 'preparation' ) )->getValue( $this->native );
+			$access = ( new ReflectionProperty( NativeCartQuoteEnvironment::class, 'current_access' ) )->getValue( $this->native );
+			$same_draft = new ReflectionMethod( NativeCartQuoteEnvironment::class, 'same_draft' );
+			$owner = $draft->owner(); $context = $original->context();
+			$step( 'environment_same_draft', fn (): bool => $same_draft->invoke( $this->native, $draft ) );
+			$step( 'environment_matches_original', static fn (): bool => $preparation->matches_original( $original, $header, $draft ) );
+			$step( 'environment_authorized', fn (): bool => $this->native->authorize( $owner, 'delivery_quote.read' ) );
+			$revision = null;
+			$step( 'control_observed', static function () use ( $access, $owner, &$revision ): bool { $revision = $access->observe( $owner ); return null !== $revision; } );
+			$step( 'cached_shipping_restored', static function (): bool { CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuoteShipping::restore_cached_calculation(); return true; } );
+			$step( 'preparation_matches_original', static fn (): bool => $preparation->matches_original( $original, $header, $draft ) );
+			$sources = ( new ReflectionProperty( CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuotePreparation::class, 'sources' ) )->getValue( $preparation ); $source = null;
+			$step( 'source_captured', static function () use ( $sources, $owner, $context, &$source ): bool { $source = $sources->prepare( $owner, $context ); return $source instanceof CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceSnapshot; } );
+			$step( 'source_bound', static function () use ( &$source, $context ): bool { $source = $source->bind_context( $context ); return $source instanceof CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceSnapshot; } );
+			$packages = null; $package_facts = new ReflectionMethod( CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuotePreparation::class, 'package_facts' );
+			$step( 'packages_restored', static function () use ( $package_facts, $draft, &$packages ): bool { $packages = $package_facts->invoke( null, WC()->shipping()->get_packages(), $draft ); return is_array( $packages ) && [] !== $packages; } );
+			$native = null; $native_receipt = new ReflectionMethod( CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuotePreparation::class, 'native_receipt' );
+			$step( 'native_captured', static function () use ( $native_receipt, $preparation, $owner, $packages, &$native ): bool { $native = $native_receipt->invoke( $preparation, $owner, $packages ); return $native instanceof CetechDeliveryEngine\Application\DeliveryQuote\QuoteNativeReceipt; } );
+			$current = null;
+			$step( 'native_bound', static function () use ( $native, $context, &$current ): bool { $current = $native->bind_context( $context ); return $current instanceof CetechDeliveryEngine\Domain\DeliveryQuote\QuoteContext; } );
+			$step( 'context_digest_matches', static fn (): bool => hash_equals( $context->digest(), $current->digest() ) );
+			$step( 'source_applicable', static fn (): bool => $source->applicable_at( QuoteTime::now() ) );
+			$step( 'native_unchanged', static fn (): bool => $native->unchanged() );
+			$step( 'source_local_unchanged', static fn (): bool => $source->local_state_unchanged() );
+			$step( 'final_same_draft', fn (): bool => $same_draft->invoke( $this->native, $draft ) );
+			$step( 'final_authorized', fn (): bool => $this->native->authorize( $owner, 'delivery_quote.read' ) );
+			$step( 'control_confirmed', static fn (): bool => $access->confirm( $owner, $revision ) );
+		} catch ( Throwable $error ) {
+			$report['failed_stage'] = $stage;
+			if ( ! $known_false ) { $report['error_class'] = self::safe_error_class( $error ); [ $report['refusal_site'], $report['refusal_line'] ] = self::verified_refusal( $error ); }
+		}
+		return $report;
 	}
 	private function cache_presence(): void {
 		try {
@@ -116,7 +165,14 @@ final class CetechQuoteCartEnvironmentObservation implements CartQuoteEnvironmen
 		]; $best = [ null, null ];
 		for ( $depth = 0; $depth < 4 && null !== $error; ++$depth, $error = $error->getPrevious() ) {
 			foreach ( array_slice( $error->getTrace(), 0, 16 ) as $frame ) {
-				$class = $frame['class'] ?? null; if ( ! is_string( $class ) || ! isset( $known[$class] ) || ( $frame['function'] ?? null ) !== $known[$class][1] ) { continue; }
+				$class = $frame['class'] ?? null;
+				if ( CetechDeliveryEngine\Domain\DeliveryQuote\QuoteShape::class === $class && 'invalid' === ( $frame['function'] ?? null ) ) {
+					foreach ( [ CetechDeliveryEngine\Application\DeliveryQuote\QuoteNativeReceipt::class => 'native_receipt', CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceSnapshot::class => 'source_snapshot' ] as $caller => $code ) {
+						$method = new ReflectionMethod( $caller, 'bind_context' );
+						if ( $method->getFileName() === ( $frame['file'] ?? null ) && is_int( $frame['line'] ?? null ) && $frame['line'] >= $method->getStartLine() && $frame['line'] <= $method->getEndLine() ) { $best = [ $code, $frame['line'] ]; break; }
+					}
+				}
+				if ( ! is_string( $class ) || ! isset( $known[$class] ) || ( $frame['function'] ?? null ) !== $known[$class][1] ) { continue; }
 				$reflection = new ReflectionClass( $class ); if ( $reflection->getFileName() === ( $frame['file'] ?? null ) && is_int( $frame['line'] ?? null ) && $frame['line'] >= $reflection->getStartLine() && $frame['line'] <= $reflection->getEndLine() ) { $best = [ $known[$class][0], $frame['line'] ]; break; }
 			}
 		}

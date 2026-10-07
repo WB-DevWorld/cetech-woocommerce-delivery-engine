@@ -22,6 +22,14 @@ Source inspection separately proves a fixture incompatibility: the reused Q04 se
 
 A delegating observer around the actual NativeCartQuoteEnvironment adds failure-only finite prepare/evidence phase, verified installed refusal code/line, raw cache presence and physical owned effect counts. It neither substitutes preparation nor adds native getters/queries. Native preparation keeps its fixed public failure message while retaining the original exception privately for this bounded diagnostic. Success dictionaries, all475native/112HTTP IDs, schema9,718-source production count and the20-second HTTP bound remain. A fresh exact successor is required; this correction does not establish the sole cause of the historical failure.
 
+## Second immutable Q05 execution — immediate current evidence refused
+
+Head `1a66230c3974991694d4fc20754b80f39717e353`, tree `4bb0587282dcc315821b936e68253b8df1538f36`; push CI37643839108 attempt1 failed with six successful jobs, failed WordPress and an actually executed failed Required Gates check. All PHP jobs passed3237/19724/1skip; SQL323/6338/2deprecations/zero skips/failures executed all eight class minima including32cart-reference; JS9/123 and controls passed. Native remains367unique=366PASS/1FAIL/108missing with all8Q05cleanup facts passed, no HTTP execution. All718 immutable installed sources match map `9fd2f3f210b7be77e05500e43a10c44f82ed2adc1126e56e4d2487f765318e4f`.
+
+The new actual diagnostics establish preparation returned successfully, one owned issued quote and event were committed, and the immediate native current-evidence read returned null. Normal debug mode was off; chosen, totals and shipping caches were present. This localizes the failure after issue; it does not locate the individual read-time guard or establish the old first receipt's precise cause. A bounded failure-only read-only followup probe of the exact original envelope and actual native/source objects is authorized to identify that guard. It cannot calculate prices, create terms, write quotes or change a successful dictionary. No speculative production correction follows from the unavailable DTO.
+
+Native11492994473 ZIP64845/SHA256 `eccd48ee7f894584d0e17a16effbfa0d80da879ae5b3359323956690b6b2db06`; JSON980277/SHA256 `4ccd110e068e80032e4d8f2756eb12ff5a7b81d03018a1dbbed9540c5bc279ae`. Smoke11493361767 ZIP988/SHA256 `b9a0365e457f942feb7998baac3f1120d52d8709e0a4d3d31cb4f75ca90b5ecb`; JSON1704/SHA256 `d4b71c3901ddefe92f681b4f26adb8f1a6a9ac6cdd7fbd82426708954f9d01f1`, overallPASS. Root and independent verification recomputed archive/member hashes and every installed PHP byte against actual candidate Git. Both historical native failures remain failed.
+
 # Historical Q04 immutable freeze
 
 # Current Work — W2-Q04 retained existing-price provider

@@ -45,6 +45,36 @@ final class QuoteCartQualificationTest extends TestCase {
 		for ( $i = 0; $i < 4; ++$i ) { $cause = new \RuntimeException( 'PRIVATE-PAYLOAD', 0, $cause ); } self::assertSame( [ null, null ], \CetechQuoteCartEnvironmentObservation::verified_refusal( $cause ) );
 		self::assertSame( 'Error', \CetechQuoteCartEnvironmentObservation::safe_error_class( new \Error( 'PRIVATE-ERROR' ) ) ); self::assertSame( 'InvalidArgumentException', \CetechQuoteCartEnvironmentObservation::safe_error_class( new \InvalidArgumentException( 'PRIVATE-ERROR' ) ) ); self::assertSame( 'RuntimeException', \CetechQuoteCartEnvironmentObservation::safe_error_class( new \LogicException( 'PRIVATE-ERROR' ) ) );
 	}
+	public function test_followup_stops_on_missing_original_input_without_reading_native_state(): void {
+		$native = ( new \ReflectionClass( \CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuoteEnvironment::class ) )->newInstanceWithoutConstructor();
+		$observer = new \CetechQuoteCartEnvironmentObservation( $native ); $report = $observer->readonly_followup();
+		self::assertSame( 'followup_readonly_not_original_timing', $report['observation'] ); self::assertSame( 'input_ready', $report['failed_stage'] ); self::assertFalse( $report['input_ready'] ); self::assertNull( $report['error_class'] ); self::assertNull( $report['refusal_site'] ); self::assertNull( $report['refusal_line'] );
+		foreach ( array_slice( $report, 6 ) as $value ) { self::assertNull( $value ); }
+		self::assertStringNotContainsString( 'original_token', json_encode( $report, JSON_THROW_ON_ERROR ) );
+	}
+	public function test_followup_stops_at_actual_native_same_draft_false_before_any_connection_or_cache_restore(): void {
+		require_once dirname( __DIR__, 2 ) . '/Support/DeliveryQuote/CartQuoteFixtures.php';
+		$factory = $this->createMock( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class ); $factory->expects( self::never() )->method( 'open' );
+		$native = new \CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuoteEnvironment( $factory ); $observer = new \CetechQuoteCartEnvironmentObservation( $native );
+		$owner = \CetechDeliveryEngine\Tests\Support\DeliveryQuote\CartQuoteFixtures::owner(); $context = \CetechDeliveryEngine\Tests\Support\DeliveryQuote\CartQuoteFixtures::context();
+		$original = \CetechDeliveryEngine\Application\DeliveryQuote\QuoteIssueCommand::create( $owner, $context, 'legacy_fixed_base_v1', 1, 'legacy_fixed_base_v1', 1, \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteId::generate()->value() );
+		$header = \CetechDeliveryEngine\Tests\Support\DeliveryQuote\QuoteFixtures::issue( $owner, context: $context )->header(); $draft = \CetechDeliveryEngine\Tests\Support\DeliveryQuote\CartQuoteFixtures::draft();
+		self::assertNull( $observer->evidence( $original, $header, $draft ) ); $report = $observer->readonly_followup();
+		self::assertTrue( $report['input_ready'] ); self::assertFalse( $report['environment_same_draft'] ); self::assertSame( 'environment_same_draft', $report['failed_stage'] ); self::assertNull( $report['error_class'] );
+		foreach ( array_slice( $report, 7 ) as $value ) { self::assertNull( $value ); }
+		self::assertStringNotContainsString( $original->identity()->namespace_digest(), json_encode( $report, JSON_THROW_ON_ERROR ) );
+	}
+	public function test_shape_refusal_is_located_only_at_exact_installed_bind_context_method(): void {
+		require_once dirname( __DIR__, 2 ) . '/Support/DeliveryQuote/LegacyQuoteProviderFixtures.php';
+		$context = \CetechDeliveryEngine\Tests\Support\DeliveryQuote\LegacyQuoteProviderFixtures::context();
+		$snapshot = \CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceSnapshot::captured( \CetechDeliveryEngine\Tests\Support\DeliveryQuote\LegacyQuoteProviderFixtures::plan(), $context, [], [], \CetechDeliveryEngine\Tests\Support\DeliveryQuote\QuoteFixtures::time() );
+		try { $snapshot->bind_context( $context ); self::fail( 'Synthetic unmatched policy was accepted.' ); } catch ( \InvalidArgumentException $error ) { $cause = $error; }
+		[ $site, $line ] = \CetechQuoteCartEnvironmentObservation::verified_refusal( $cause ); $method = new \ReflectionMethod( \CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceSnapshot::class, 'bind_context' );
+		self::assertSame( 'source_snapshot', $site ); self::assertIsInt( $line ); self::assertGreaterThanOrEqual( $method->getStartLine(), $line ); self::assertLessThanOrEqual( $method->getEndLine(), $line );
+		try { \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteShape::invalid(); } catch ( \InvalidArgumentException $unknown ) {}
+		self::assertSame( [ null, null ], \CetechQuoteCartEnvironmentObservation::verified_refusal( $unknown ) );
+	}
+
 }
 
 final class QuoteCartFixtureNativeTransport implements OperationConnectionTransport {
