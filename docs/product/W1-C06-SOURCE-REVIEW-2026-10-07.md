@@ -16,3 +16,7 @@ Fixture source includes native normal/all-off option cache and fresh-process che
 
 No source/ref/remote edits or reruns were performed by the reviewer. Final qualification must verify the actual immutable candidate, required SQL selection, all complete expected native/HTTP cases/cleanup, substantive eight-job gates and every installed-source entry before this source closure becomes an integration decision.
 
+
+## Native deactivation follow-up
+
+Diagnostic candidate85bdc670/native11453935706 proves a stale WordPress alloptions fallback after physically deleting the activation-notice pair. All domain, control and role rows match before and after. The bounded Deactivator correction invalidates the two fixed notice option entries and alloptions/notoptions after native delete_transient; it changes no preservation policy. The strict native check remains unchanged and fresh candidate execution is required.
