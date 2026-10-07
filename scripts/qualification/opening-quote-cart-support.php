@@ -125,14 +125,15 @@ final class CetechQuoteCartEnvironmentObservation implements CartQuoteEnvironmen
 			$step( 'preparation_matches_original', static fn (): bool => $preparation->matches_original( $original, $header, $draft ) );
 			$sources = ( new ReflectionProperty( CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuotePreparation::class, 'sources' ) )->getValue( $preparation ); $source = null;
 			$step( 'source_captured', static function () use ( $sources, $owner, $context, &$source ): bool { $source = $sources->prepare( $owner, $context ); return $source instanceof CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceSnapshot; } );
-			$step( 'source_bound', static function () use ( &$source, $context ): bool { $source = $source->bind_context( $context ); return $source instanceof CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceSnapshot; } );
+			$source_context = null; $current_source = new ReflectionMethod( CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuotePreparation::class, 'current_source' );
+			$step( 'source_bound', static function () use ( &$source, $context, &$source_context, $current_source ): bool { $source = $current_source->invoke( null, $source, $context ); $source_context = $source->context(); return $source instanceof CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceSnapshot; } );
 			$packages = null; $package_facts = new ReflectionMethod( CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuotePreparation::class, 'package_facts' );
 			$step( 'packages_restored', static function () use ( $package_facts, $draft, &$packages ): bool { $packages = $package_facts->invoke( null, WC()->shipping()->get_packages(), $draft ); return is_array( $packages ) && [] !== $packages; } );
 			$native = null; $native_receipt = new ReflectionMethod( CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuotePreparation::class, 'native_receipt' );
 			$step( 'native_captured', static function () use ( $native_receipt, $preparation, $owner, $packages, &$native ): bool { $native = $native_receipt->invoke( $preparation, $owner, $packages ); return $native instanceof CetechDeliveryEngine\Application\DeliveryQuote\QuoteNativeReceipt; } );
 			$current = null;
-			$step( 'native_bound', static function () use ( $native, $context, &$current ): bool { $current = $native->bind_context( $context ); return $current instanceof CetechDeliveryEngine\Domain\DeliveryQuote\QuoteContext; } );
-			$step( 'context_digest_matches', static fn (): bool => hash_equals( $context->digest(), $current->digest() ) );
+			$step( 'native_bound', static function () use ( $native, $source_context, &$current ): bool { $current = $native->bind_context( $source_context ); return $current instanceof CetechDeliveryEngine\Domain\DeliveryQuote\QuoteContext; } );
+			$step( 'context_digest_matches', static fn (): bool => hash_equals( $source_context->digest(), $current->digest() ) );
 			$step( 'source_applicable', static fn (): bool => $source->applicable_at( QuoteTime::now() ) );
 			$step( 'native_unchanged', static fn (): bool => $native->unchanged() );
 			$step( 'source_local_unchanged', static fn (): bool => $source->local_state_unchanged() );

@@ -5,7 +5,9 @@ namespace CetechDeliveryEngine\Tests\Unit\DeliveryQuote;
 
 require_once __DIR__ . '/../../Support/DeliveryQuote/CartQuoteFixtures.php';
 use CetechDeliveryEngine\Domain\Contracts\RequestContext;
-use CetechDeliveryEngine\Tests\Support\DeliveryQuote\{CartQuoteFixtureEnvironment,CartQuoteFixtureSessions,CartQuoteFixtures,QuoteDurableFixtureFactory,QuoteFixturePublication};
+use CetechDeliveryEngine\Application\DeliveryQuote\{LegacyQuoteSourcePlan,LegacyQuoteSourceSnapshot};
+use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteContext,QuoteTerms,QuoteTime};
+use CetechDeliveryEngine\Tests\Support\DeliveryQuote\{CartQuoteFixtureEnvironment,CartQuoteFixtureSessions,CartQuoteFixtures,LegacyQuoteProviderFixtures,QuoteDurableFixtureFactory,QuoteFixturePublication};
 use PHPUnit\Framework\TestCase;
 
 final class CartQuoteServiceTest extends TestCase {
@@ -59,6 +61,17 @@ final class CartQuoteServiceTest extends TestCase {
 	public function test_changed_draft_and_unknown_current_evidence_preserve_choices_and_history(): void {
 		$this->refresh(); $header = $this->sessions->current->header()->to_private_json(); $this->environment->current = CartQuoteFixtures::draft( 3 ); self::assertSame( 'changed', $this->service()->current( RequestContext::create() )->shopper_facts()['status'] ); self::assertSame( 'changed', $this->service()->confirm( 1, RequestContext::create() )->shopper_facts()['status'] );
 		$this->environment->current = CartQuoteFixtures::draft(); $this->environment->evidence_available = false; self::assertSame( 'unavailable', $this->service()->current( RequestContext::create() )->shopper_facts()['status'] ); self::assertSame( $header, $this->sessions->current->header()->to_private_json() ); self::assertSame( 1, $this->factory->count( 'operation_changes' ) ); self::assertSame( 1, $this->environment->preparations );
+	}
+	public function test_complete_known_rate_change_is_changed_without_repricing_acceptance_or_history_write(): void {
+		$template = LegacyQuoteProviderFixtures::plan(); $context = CartQuoteFixtures::context(); $owner = $this->environment->current->owner();
+		$plan = LegacyQuoteSourcePlan::create( $owner, $context, $template->member_proofs(), $template->rate_ranges(), $template->fences() ); $range = LegacyQuoteSourcePlan::range_key( $plan->rate_ranges()[0] ); $at = QuoteTime::parse( $this->factory->utc );
+		$old = LegacyQuoteSourceSnapshot::captured( $plan, $context, [], [ $range => [ LegacyQuoteProviderFixtures::card() ] ], $at ); $facts = $context->private_facts(); $facts['groups'][0]['policy_digest'] = $old->policy_digest(); $facts['groups'][0]['candidate_digest'] = $old->candidate_digest( 20, 50, 'GHS' ); $facts['groups'][0]['candidate_count'] = 1; $original = QuoteContext::from_array( $facts );
+		$this->environment->prepared_context = $original; $terms = LegacyQuoteProviderFixtures::terms()->private_facts(); $terms['groups'][0]['policy_digest'] = $old->policy_digest(); $this->environment->prepared_terms = QuoteTerms::from_array( $terms ); $this->environment->current_source = $old->bind_context( $original );
+		self::assertSame( 'review_required', $this->refresh()->shopper_facts()['status'] ); $envelope = $this->sessions->current->to_private_json(); $body = $this->factory->pdo->query( 'SELECT private_body_json FROM durable_delivery_engine_delivery_quotes' )->fetchColumn(); $writes = $this->sessions->writes;
+		$fresh = LegacyQuoteSourceSnapshot::captured( $plan, $original, [], [ $range => [ LegacyQuoteProviderFixtures::card( amount: '9.00' ) ] ], $at ); self::assertNotSame( $old->policy_digest(), $fresh->policy_digest() ); $this->environment->current_source = $fresh;
+		foreach ( [ $this->service()->current( RequestContext::create() ), $this->service()->confirm( 1, RequestContext::create() ) ] as $result ) { $facts = $result->shopper_facts(); self::assertSame( 'changed', $facts['status'] ); self::assertFalse( $facts['can_confirm'] ); self::assertTrue( $facts['can_refresh'] ); self::assertNull( $facts['quote'] ); }
+		$this->environment->evidence_available = false; self::assertSame( 'unavailable', $this->service()->current( RequestContext::create() )->shopper_facts()['status'] );
+		self::assertSame( $envelope, $this->sessions->current->to_private_json() ); self::assertSame( $body, $this->factory->pdo->query( 'SELECT private_body_json FROM durable_delivery_engine_delivery_quotes' )->fetchColumn() ); self::assertSame( $writes, $this->sessions->writes ); self::assertSame( 1, $this->factory->count( 'operation_records' ) ); self::assertSame( 1, $this->factory->count( 'operation_changes' ) ); self::assertSame( 1, $this->environment->preparations );
 	}
 	public function test_pause_denies_before_preparation_and_known_preparation_failure_terminates(): void {
 		$this->factory->paused = true; self::assertSame( 'unavailable', $this->refresh()->shopper_facts()['status'] ); self::assertSame( 0, $this->environment->preparations ); self::assertSame( 0, $this->factory->count( 'delivery_quote_budget_windows' ) ); self::assertSame( 0, $this->factory->count( 'operation_records' ) );

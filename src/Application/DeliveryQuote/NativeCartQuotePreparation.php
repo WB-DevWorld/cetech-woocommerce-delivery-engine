@@ -45,13 +45,24 @@ final class NativeCartQuotePreparation {
 			$owner = $draft->owner(); $context = $original->context();
 			if ( ! $this->matches_original( $original, $header, $draft ) ) { return null; }
 			$source = $this->sources->prepare( $owner, $context );
-			// Exact original policy/candidate facts must still be supported. No engine or new terms.
-			$source = $source->bind_context( $context );
+			// Complete current source facts may differ from the original quote. Preserve
+			// the original envelope; the durable read decides its current applicability.
+			$source = self::current_source( $source, $context ); $source_context = $source->context();
 			$packages = self::package_facts( WC()->shipping()->get_packages(), $draft );
-			$native = $this->native_receipt( $owner, $packages ); $current = $native->bind_context( $context );
-			if ( ! hash_equals( $context->digest(), $current->digest() ) || ! $source->applicable_at( QuoteTime::now() ) || ! $native->unchanged() || ! $source->local_state_unchanged() ) { return null; }
-			return new QuoteCartCurrentEvidence( $context, new LegacyQuoteCaptureGuard( $source->guard(), $native->guard() ) );
+			$native = $this->native_receipt( $owner, $packages ); $current = $native->bind_context( $source_context );
+			if ( ! hash_equals( $source_context->digest(), $current->digest() ) || ! $source->applicable_at( QuoteTime::now() ) || ! $native->unchanged() || ! $source->local_state_unchanged() ) { return null; }
+			return new QuoteCartCurrentEvidence( $current, new LegacyQuoteCaptureGuard( $source->guard(), $native->guard() ) );
 		} catch ( \Throwable ) { return null; }
+	}
+	/** Pure binding of a complete captured source packet; no rate calculation or original mutation. */
+	private static function current_source( LegacyQuoteSourceSnapshot $source, QuoteContext $original ): LegacyQuoteSourceSnapshot {
+		$facts = $original->private_facts();
+		foreach ( $facts['groups'] as &$group ) {
+			$group['policy_digest'] = $source->policy_digest();
+			$group['candidate_digest'] = $source->candidate_digest( $group['offer_id'], $group['destination_zone_id'], $facts['currency']['base'] );
+			$group['candidate_count'] = $source->candidate_count( $group['offer_id'], $group['destination_zone_id'], $facts['currency']['base'] );
+		} unset( $group );
+		return $source->bind_context( QuoteContext::from_array( $facts ) );
 	}
 	public function matches_original( QuoteIssueCommand $original, QuoteHeader $header, QuoteCartDraft $draft ): bool {
 		try {

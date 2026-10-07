@@ -6,9 +6,9 @@ namespace CetechDeliveryEngine\Tests\Support\DeliveryQuote;
 require_once __DIR__ . '/QuoteDurableFixtures.php';
 require_once __DIR__ . '/LegacyQuoteProviderFixtures.php';
 
-use CetechDeliveryEngine\Application\DeliveryQuote\{CartQuoteEnvironment,CartQuoteService,CartQuoteSessionEnvelope,CartQuoteSessionStore,LegacyQuotePreparedCapture,QuoteCartCurrentEvidence,QuoteCartDraft,QuoteIssueCommand,QuoteNativeContextIdentity,QuotePreparationGate};
+use CetechDeliveryEngine\Application\DeliveryQuote\{CartQuoteEnvironment,CartQuoteService,CartQuoteSessionEnvelope,CartQuoteSessionStore,LegacyQuotePreparedCapture,LegacyQuoteSourceSnapshot,NativeCartQuotePreparation,QuoteCartCurrentEvidence,QuoteCartDraft,QuoteIssueCommand,QuoteNativeContextIdentity,QuotePreparationGate};
 use CetechDeliveryEngine\Application\Operation\OperationReadiness;
-use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteContext,QuoteHeader,QuoteOwner};
+use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteContext,QuoteHeader,QuoteOwner,QuoteTerms};
 use CetechDeliveryEngine\Domain\Operation\OperationSession;
 
 /** Local protocol/transport model with real C03 storage; no native Woo or lock qualification. */
@@ -32,16 +32,25 @@ final class CartQuoteFixtures {
 }
 final class CartQuoteFixtureEnvironment implements CartQuoteEnvironment {
 	public ?QuoteCartDraft $current;
+	public ?QuoteContext $prepared_context = null; public ?QuoteTerms $prepared_terms = null; public ?LegacyQuoteSourceSnapshot $current_source = null;
 	public int $preparations = 0; public int $evidence_reads = 0; public bool $evidence_available = true; public bool $fail_preparation = false; public bool $read_authorized = true; public ?\Closure $before_prepare = null;
 	public function __construct( public QuoteDurableFixtureFactory $factory ) { $this->current = CartQuoteFixtures::draft(); }
 	public function draft(): ?QuoteCartDraft { return $this->current; }
 	public function authorize( QuoteOwner $owner, string $operation ): bool { return $this->factory->authorized && $this->read_authorized && null !== $this->current && $this->current->owner()->equals( $owner ); }
 	public function prepare( QuoteCartDraft $draft ): LegacyQuotePreparedCapture {
 		++$this->preparations; if ( null !== $this->before_prepare ) { ( $this->before_prepare )(); } if ( $this->fail_preparation ) { throw new \RuntimeException( 'PRIVATE-Q05-SOURCE-FAILURE' ); }
-		$this->factory->pdo->exec( "UPDATE durable_fence SET context_digest='" . CartQuoteFixtures::context()->digest() . "'" );
-		return new LegacyQuotePreparedCapture( $draft->owner(), CartQuoteFixtures::context(), LegacyQuoteProviderFixtures::terms(), new QuoteFixtureEvidence( $this->factory ) );
+		$context = $this->prepared_context ?? CartQuoteFixtures::context(); $this->factory->pdo->exec( "UPDATE durable_fence SET context_digest='" . $context->digest() . "'" );
+		return new LegacyQuotePreparedCapture( $draft->owner(), $context, $this->prepared_terms ?? LegacyQuoteProviderFixtures::terms(), new QuoteFixtureEvidence( $this->factory ) );
 	}
-	public function evidence( QuoteIssueCommand $original, QuoteHeader $header, QuoteCartDraft $draft ): ?QuoteCartCurrentEvidence { ++$this->evidence_reads; return $this->evidence_available ? new QuoteCartCurrentEvidence( $original->context(), new QuoteFixtureEvidence( $this->factory ) ) : null; }
+	public function evidence( QuoteIssueCommand $original, QuoteHeader $header, QuoteCartDraft $draft ): ?QuoteCartCurrentEvidence {
+		++$this->evidence_reads; if ( ! $this->evidence_available ) { return null; } $context = $original->context();
+		if ( null !== $this->current_source ) {
+			// Exercise the actual closed production source-context refresh, with synthetic native receipts.
+			try { $source = ( new \ReflectionMethod( NativeCartQuotePreparation::class, 'current_source' ) )->invoke( null, $this->current_source, $context ); $context = $source->context(); } catch ( \Throwable ) { return null; }
+			$this->factory->pdo->exec( "UPDATE durable_fence SET context_digest='" . $context->digest() . "'" );
+		}
+		return new QuoteCartCurrentEvidence( $context, new QuoteFixtureEvidence( $this->factory ) );
+	}
 }
 final class CartQuoteFixtureSessions implements CartQuoteSessionStore {
 	public ?CartQuoteSessionEnvelope $current = null; public int $writes = 0; public bool $lose_stage_ack = false; public bool $lose_accepting_ack = false; public bool $lose_publication_ack = false; public bool $refuse_publication = false;

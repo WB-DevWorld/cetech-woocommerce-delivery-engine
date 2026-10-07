@@ -20,6 +20,7 @@ final class NativeCartQuoteShipping {
 		// This read path supports their unmodified native behavior only.
 		foreach ( [ 'woocommerce_shipping_package_hash_ignored_fields', 'woocommerce_shipping_package_name', 'woocommerce_product_needs_shipping', 'woocommerce_product_get_virtual', 'woocommerce_product_variation_get_virtual', 'woocommerce_cart_display_prices_including_tax', 'woocommerce_cart_get_subtotal', 'woocommerce_cart_get_subtotal_tax', 'pre_option_woocommerce_tax_display_cart', 'option_woocommerce_tax_display_cart', 'default_option_woocommerce_tax_display_cart', 'woocommerce_shipping_enabled', 'pre_option_woocommerce_shipping_debug_mode', 'option_woocommerce_shipping_debug_mode', 'default_option_woocommerce_shipping_debug_mode', 'woocommerce_customer_get_shipping_address_1', 'woocommerce_customer_get_shipping_address_2' ] as $name ) {
 			$hook = $GLOBALS['wp_filter'][$name] ?? null;
+			if ( 'woocommerce_shipping_package_name' === $name ) { if ( ! self::retained_package_name_hook( $hook ) ) { self::fail(); } continue; }
 			if ( null !== $hook && ( ! is_object( $hook ) || [] !== self::raw( $hook, 'callbacks' ) ) ) { self::fail(); }
 		}
 		$wc = $GLOBALS['woocommerce']; $shipping = $wc->shipping();
@@ -61,6 +62,18 @@ final class NativeCartQuoteShipping {
 		$cart = self::raw( $wc, 'cart' ); $session = self::raw( $wc, 'session' );
 		if ( ! $cart instanceof \WC_Cart || 'WC_Cart' !== get_class( $cart ) || ! $session instanceof \WC_Session_Handler || 'WC_Session_Handler' !== get_class( $session ) ) { self::fail(); }
 		$items = self::raw( $cart, 'cart_contents' ); if ( ! is_array( $items ) || [] === $items || count( $items ) > 200 ) { self::fail(); } return [ $cart, $session ];
+	}
+	/** Woo invokes this heading hook, but excludes package_name from its native rate hash. */
+	private static function retained_package_name_hook( mixed $hook ): bool {
+		if ( null === $hook ) { return true; }
+		if ( ! is_object( $hook ) || 'WP_Hook' !== get_class( $hook ) ) { return false; }
+		$callbacks = self::raw( $hook, 'callbacks' );
+		if ( [] === $callbacks ) { return true; }
+		if ( ! is_array( $callbacks ) || 1 !== count( $callbacks ) || ! is_array( $callbacks[20] ?? null ) || 1 !== count( $callbacks[20] ) ) { return false; }
+		$callback = reset( $callbacks[20] ); $function = is_array( $callback ) ? ( $callback['function'] ?? null ) : null;
+		return is_array( $function ) && array_is_list( $function ) && 2 === count( $function ) && is_object( $function[0] )
+			&& \CetechDeliveryEngine\Presentation\Frontend\CartFulfilmentPackagePresentation::class === get_class( $function[0] )
+			&& 'filter_package_name' === $function[1] && 4 === ( $callback['accepted_args'] ?? null );
 	}
 	/** The native hash creates a missing version. Reads support an existing, non-expiring native version only. */
 	private static function cached_shipping_version(): void {
