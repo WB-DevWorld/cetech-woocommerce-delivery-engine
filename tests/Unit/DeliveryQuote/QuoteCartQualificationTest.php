@@ -45,6 +45,47 @@ final class QuoteCartQualificationTest extends TestCase {
 		for ( $i = 0; $i < 4; ++$i ) { $cause = new \RuntimeException( 'PRIVATE-PAYLOAD', 0, $cause ); } self::assertSame( [ null, null ], \CetechQuoteCartEnvironmentObservation::verified_refusal( $cause ) );
 		self::assertSame( 'Error', \CetechQuoteCartEnvironmentObservation::safe_error_class( new \Error( 'PRIVATE-ERROR' ) ) ); self::assertSame( 'InvalidArgumentException', \CetechQuoteCartEnvironmentObservation::safe_error_class( new \InvalidArgumentException( 'PRIVATE-ERROR' ) ) ); self::assertSame( 'RuntimeException', \CetechQuoteCartEnvironmentObservation::safe_error_class( new \LogicException( 'PRIVATE-ERROR' ) ) );
 	}
+	/** Fresh host shims test only pure fixture isolation, not native callback semantics. */
+	public function test_source_registration_probe_removes_only_one_exact_tuple_and_restores_before_returning(): void {
+		$program = <<<'PHP'
+class WC_Query { public static int $calls = 0; public function pre_get_posts(): never { ++self::$calls; throw new RuntimeException( 'PRIVATE-CALLBACK' ); } }
+class WooCommerce { public function __construct( public WC_Query $query ) {} }
+class WP_Hook { public array $callbacks = []; }
+require 'tests/bootstrap.php'; require 'scripts/qualification/opening-quote-cart-support.php';
+$cases = [];
+foreach ( [ 'exact', 'other_identity', 'wrong_priority', 'wrong_args', 'duplicate', 'additional_unknown', 'other_hook_unknown', 'over_budget', 'malformed' ] as $mode ) {
+    $query = new WC_Query(); $GLOBALS['woocommerce'] = new WooCommerce( $query ); $hook = new WP_Hook(); $tuple = [ 'function' => [ $query, 'pre_get_posts' ], 'accepted_args' => 1 ]; $hook->callbacks = [ 10 => [ 'PRIVATE-ENTRY' => $tuple ] ]; $GLOBALS['wp_filter'] = [ 'pre_get_posts' => $hook ];
+    if ( 'other_identity' === $mode ) { $hook->callbacks[10]['PRIVATE-ENTRY']['function'][0] = new WC_Query(); }
+    if ( 'wrong_priority' === $mode ) { $hook->callbacks = [ 11 => [ 'PRIVATE-ENTRY' => $tuple ] ]; }
+    if ( 'wrong_args' === $mode ) { $hook->callbacks[10]['PRIVATE-ENTRY']['accepted_args'] = 2; }
+    if ( 'duplicate' === $mode ) { $hook->callbacks[10]['PRIVATE-DUPLICATE'] = $tuple; }
+    if ( 'additional_unknown' === $mode ) { $hook->callbacks[10]['PRIVATE-UNKNOWN'] = [ 'function' => static fn (): never => throw new RuntimeException( 'PRIVATE-CALLBACK' ), 'accepted_args' => 1 ]; }
+    if ( 'other_hook_unknown' === $mode ) { $other = new WP_Hook(); $other->callbacks = [ 10 => [ [ 'function' => 'PRIVATE-UNKNOWN-CALLBACK', 'accepted_args' => 1 ] ] ]; $GLOBALS['wp_filter']['woocommerce_product_get_status'] = $other; }
+    if ( 'over_budget' === $mode ) { $hook->callbacks = [ 10 => array_fill( 0, 257, $tuple ) ]; }
+    if ( 'malformed' === $mode ) { $hook->callbacks[10]['PRIVATE-MALFORMED'] = 'PRIVATE-COOKIE'; }
+    $before = $hook->callbacks; $before_filters = $GLOBALS['wp_filter']; $report = CetechQuoteCartEnvironmentObservation::source_registration_counterfactual();
+    $cases[$mode] = [ 'report' => $report, 'report_valid' => null === $report || CetechQuoteCartEnvironmentObservation::valid_source_registration_probe( $report ), 'callbacks_restored' => $before === $hook->callbacks, 'hook_identity_restored' => $before_filters === $GLOBALS['wp_filter'], 'callbacks_not_invoked' => 0 === WC_Query::$calls, 'private_sentinel_absent' => ! str_contains( json_encode( $report, JSON_THROW_ON_ERROR ), 'PRIVATE' ) ];
+}
+echo json_encode( $cases, JSON_THROW_ON_ERROR );
+PHP;
+		$process = proc_open( [ PHP_BINARY, '-r', $program ], [ [ 'pipe', 'r' ], [ 'pipe', 'w' ], [ 'pipe', 'w' ] ], $pipes, dirname( __DIR__, 3 ) ); self::assertIsResource( $process ); fclose( $pipes[0] ); $stdout = stream_get_contents( $pipes[1] ); $stderr = stream_get_contents( $pipes[2] ); fclose( $pipes[1] ); fclose( $pipes[2] ); self::assertSame( 0, proc_close( $process ), $stderr );
+		$cases = json_decode( $stdout, true, 8, JSON_THROW_ON_ERROR );
+		foreach ( $cases as $case ) { self::assertTrue( $case['report_valid'] ); self::assertTrue( $case['callbacks_restored'] ); self::assertTrue( $case['hook_identity_restored'] ); self::assertTrue( $case['callbacks_not_invoked'] ); self::assertTrue( $case['private_sentinel_absent'] ); }
+		self::assertSame( 1, $cases['exact']['report']['native_query_tuple_count'] ); self::assertTrue( $cases['exact']['report']['capture_without_exact_tuple'] ); self::assertTrue( $cases['exact']['report']['original_hook_restored'] );
+		foreach ( [ 'other_identity', 'wrong_priority', 'wrong_args' ] as $mode ) { self::assertSame( 0, $cases[$mode]['report']['native_query_tuple_count'] ); self::assertNull( $cases[$mode]['report']['capture_without_exact_tuple'] ); }
+		self::assertSame( 2, $cases['duplicate']['report']['native_query_tuple_count'] ); self::assertNull( $cases['duplicate']['report']['capture_without_exact_tuple'] );
+		self::assertFalse( $cases['additional_unknown']['report']['capture_without_exact_tuple'] ); self::assertFalse( $cases['other_hook_unknown']['report']['capture_without_exact_tuple'] ); self::assertNull( $cases['over_budget']['report'] ); self::assertNull( $cases['malformed']['report'] );
+	}
+	public function test_source_registration_probe_is_optional_and_refuses_private_or_unrelated_failure_fields(): void {
+		$native = ( new \ReflectionClass( \CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuoteEnvironment::class ) )->newInstanceWithoutConstructor(); $observed = new \CetechQuoteCartEnvironmentObservation( $native ); $factory = $this->factory();
+		$observed->diagnostics['prepare_entered'] = true; $observed->diagnostics['prepare_error_class'] = 'RuntimeException'; $observed->diagnostics['prepare_refusal_site'] = 'source_local_binding'; $observed->diagnostics['prepare_refusal_line'] = 51;
+		$plain = \CetechQuoteCartHttpFixture::failure_observation( $observed, $factory ); self::assertCount( 15, $plain ); self::assertArrayNotHasKey( 'source_registration_probe', $plain );
+		$observed->source_registration_probe = [ 'observation' => 'pure_registration_counterfactual_original_attempt_not_retried', 'native_query_singleton_present' => true, 'native_query_tuple_count' => 1, 'pre_get_posts_callback_count' => 1, 'capture_without_exact_tuple' => true, 'original_hook_restored' => true ];
+		$with = \CetechQuoteCartHttpFixture::failure_observation( $observed, $factory ); self::assertCount( 16, $with ); self::assertSame( $plain, array_diff_key( $with, [ 'source_registration_probe' => true ] ) );
+		$observed->source_registration_probe['private_cookie'] = 'PRIVATE-COOKIE'; self::assertNull( \CetechQuoteCartHttpFixture::failure_observation( $observed, $factory ) ); unset( $observed->source_registration_probe['private_cookie'] );
+		$observed->source_registration_probe['native_query_tuple_count'] = 2; self::assertNull( \CetechQuoteCartHttpFixture::failure_observation( $observed, $factory ) ); $observed->source_registration_probe['native_query_tuple_count'] = 1;
+		$observed->diagnostics['prepare_refusal_site'] = 'legacy_source'; self::assertNull( \CetechQuoteCartHttpFixture::failure_observation( $observed, $factory ) );
+	}
 	public function test_followup_stops_on_missing_original_input_without_reading_native_state(): void {
 		$native = ( new \ReflectionClass( \CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuoteEnvironment::class ) )->newInstanceWithoutConstructor();
 		$observer = new \CetechQuoteCartEnvironmentObservation( $native ); $report = $observer->readonly_followup();

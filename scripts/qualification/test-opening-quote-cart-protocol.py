@@ -35,6 +35,22 @@ def child_helpers(expression):
 
 
 class QuoteCartProtocol(unittest.TestCase):
+    def test_source_registration_counterfactual_is_finite_optional_and_failure_only(self):
+        probe = {"observation": "pure_registration_counterfactual_original_attempt_not_retried", "native_query_singleton_present": True, "native_query_tuple_count": 1, "pre_get_posts_callback_count": 1, "capture_without_exact_tuple": True, "original_hook_restored": True}
+        facts = {"observation": "original_native_attempt", "prepare_entered": True, "prepare_returned": False, "prepare_error_class": "RuntimeException", "prepare_refusal_site": "source_local_binding", "prepare_refusal_line": 51, "evidence_called": False, "evidence_returned": False, "native_shipping_debug_enabled": None, "native_chosen_cache_present": False, "native_totals_cache_present": False, "native_shipping_cache_present": False, "source_reads": 0, "quote_writes": 0, "budget_writes": 0}
+        self.assertTrue(DRIVER.native_failure_observation(facts))
+        facts["source_registration_probe"] = probe
+        self.assertTrue(DRIVER.native_failure_observation(facts))
+        for key, value in (("observation", "PRIVATE-COOKIE"), ("native_query_tuple_count", True), ("native_query_tuple_count", 257), ("pre_get_posts_callback_count", 0), ("capture_without_exact_tuple", "PRIVATE-COOKIE"), ("original_hook_restored", 1), ("native_query_singleton_present", False)):
+            with self.subTest(key=key, value=value):
+                bad = copy.deepcopy(facts); bad["source_registration_probe"][key] = value
+                self.assertFalse(DRIVER.native_failure_observation(bad))
+        bad = copy.deepcopy(facts); bad["source_registration_probe"]["private_callback"] = "PRIVATE-COOKIE"; self.assertFalse(DRIVER.native_failure_observation(bad))
+        bad = copy.deepcopy(facts); bad["prepare_refusal_site"] = "legacy_source"; self.assertFalse(DRIVER.native_failure_observation(bad))
+        bad = copy.deepcopy(facts); bad["prepare_returned"] = True; self.assertFalse(DRIVER.native_failure_observation(bad))
+        bad = copy.deepcopy(facts); bad["source_registration_probe"].update(native_query_tuple_count=2, pre_get_posts_callback_count=2, capture_without_exact_tuple=None); self.assertTrue(DRIVER.native_failure_observation(bad))
+        bad["source_registration_probe"]["capture_without_exact_tuple"] = True; self.assertFalse(DRIVER.native_failure_observation(bad))
+
     def test_exact_valid_dto_agrees_in_python_and_browser(self):
         facts = public_facts()
         self.assertTrue(DRIVER.safe_facts(facts))

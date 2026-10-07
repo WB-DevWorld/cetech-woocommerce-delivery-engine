@@ -85,6 +85,7 @@ final class CetechQuoteCartFactory implements FactoryContract {
 /** Observe a genuine native preparation without replacing its draft, provider or facts. */
 final class CetechQuoteCartEnvironmentObservation implements CartQuoteEnvironment {
 	public array $diagnostics = [ 'prepare_entered' => false, 'prepare_returned' => false, 'prepare_error_class' => null, 'prepare_refusal_site' => null, 'prepare_refusal_line' => null, 'evidence_called' => false, 'evidence_returned' => false, 'native_shipping_debug_enabled' => null, 'native_chosen_cache_present' => false, 'native_totals_cache_present' => false, 'native_shipping_cache_present' => false ];
+	public ?array $source_registration_probe = null;
 	private ?QuoteIssueCommand $evidence_original = null;
 	private ?QuoteHeader $evidence_header = null;
 	private ?QuoteCartDraft $evidence_draft = null;
@@ -94,7 +95,7 @@ final class CetechQuoteCartEnvironmentObservation implements CartQuoteEnvironmen
 	public function prepare( QuoteCartDraft $draft ): LegacyQuotePreparedCapture {
 		$this->diagnostics['prepare_entered'] = true; $this->cache_presence();
 		try { $prepared = $this->native->prepare( $draft ); $this->diagnostics['prepare_returned'] = true; return $prepared; }
-		catch ( Throwable $error ) { $this->diagnostics['prepare_error_class'] = self::safe_error_class( $error ); [ $site, $line ] = self::verified_refusal( $error ); $this->diagnostics['prepare_refusal_site'] = $site; $this->diagnostics['prepare_refusal_line'] = $line; throw $error; }
+		catch ( Throwable $error ) { $this->diagnostics['prepare_error_class'] = self::safe_error_class( $error ); [ $site, $line ] = self::verified_refusal( $error ); $this->diagnostics['prepare_refusal_site'] = $site; $this->diagnostics['prepare_refusal_line'] = $line; if ( 'source_local_binding' === $site ) { $this->source_registration_probe = self::source_registration_counterfactual(); } throw $error; }
 	}
 	public function evidence( QuoteIssueCommand $original, QuoteHeader $header, QuoteCartDraft $draft ): ?QuoteCartCurrentEvidence {
 		$this->evidence_original = $original; $this->evidence_header = $header; $this->evidence_draft = $draft;
@@ -155,6 +156,56 @@ final class CetechQuoteCartEnvironmentObservation implements CartQuoteEnvironmen
 		} catch ( Throwable ) { /* Presence remains unknown; no fallback native getter or query. */ }
 	}
 	public static function safe_error_class( Throwable $error ): string { return $error instanceof Error ? 'Error' : ( $error instanceof InvalidArgumentException ? 'InvalidArgumentException' : 'RuntimeException' ); }
+	/** Pure registration counterfactual only; never retries the original preparation. */
+	public static function source_registration_counterfactual(): ?array {
+		$report = [ 'observation' => 'pure_registration_counterfactual_original_attempt_not_retried', 'native_query_singleton_present' => false, 'native_query_tuple_count' => 0, 'pre_get_posts_callback_count' => 0, 'capture_without_exact_tuple' => null, 'original_hook_restored' => true ];
+		try {
+			$wc = $GLOBALS['woocommerce'] ?? null;
+			if ( ! is_object( $wc ) || 'WooCommerce' !== get_class( $wc ) ) { return $report; }
+			$query_property = new ReflectionProperty( $wc, 'query' );
+			if ( $query_property->isStatic() || ! $query_property->isInitialized( $wc ) ) { return $report; }
+			$query = method_exists( $query_property, 'getRawValue' ) ? $query_property->getRawValue( $wc ) : $query_property->getValue( $wc );
+			if ( ! is_object( $query ) || 'WC_Query' !== get_class( $query ) ) { return $report; }
+			$report['native_query_singleton_present'] = true;
+			$filters = $GLOBALS['wp_filter'] ?? [];
+			if ( ! is_array( $filters ) ) { return null; }
+			$entry = $filters['pre_get_posts'] ?? null;
+			if ( null === $entry ) { return $report; }
+			if ( ! is_object( $entry ) || 'WP_Hook' !== get_class( $entry ) ) { return null; }
+			$property = new ReflectionProperty( $entry, 'callbacks' );
+			if ( $property->isStatic() || ! $property->isInitialized( $entry ) || 'WP_Hook' !== $property->getDeclaringClass()->getName() ) { return null; }
+			$callbacks = method_exists( $property, 'getRawValue' ) ? $property->getRawValue( $entry ) : $property->getValue( $entry );
+			if ( ! is_array( $callbacks ) || count( $callbacks ) > 256 ) { return null; }
+			$matched_key = null;
+			foreach ( $callbacks as $priority => $items ) {
+				if ( ! is_int( $priority ) || ! is_array( $items ) || count( $items ) > 256 - $report['pre_get_posts_callback_count'] ) { return null; }
+				$report['pre_get_posts_callback_count'] += count( $items );
+				foreach ( $items as $key => $item ) {
+					if ( ! is_array( $item ) ) { return null; }
+					$fn = $item['function'] ?? null;
+					if ( 10 === $priority && 1 === ( $item['accepted_args'] ?? null ) && is_array( $fn ) && array_is_list( $fn ) && 2 === count( $fn ) && $fn[0] === $query && 'pre_get_posts' === $fn[1] ) { ++$report['native_query_tuple_count']; $matched_key = $key; }
+				}
+			}
+			if ( 1 !== $report['native_query_tuple_count'] ) { return $report; }
+			$without = $callbacks; unset( $without[10][$matched_key] ); if ( [] === $without[10] ) { unset( $without[10] ); }
+			try {
+				$property->setValue( $entry, $without );
+				try { CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceLocalBinding::capture(); $report['capture_without_exact_tuple'] = true; }
+				catch ( Throwable ) { $report['capture_without_exact_tuple'] = false; }
+			} finally {
+				$property->setValue( $entry, $callbacks );
+				$restored = method_exists( $property, 'getRawValue' ) ? $property->getRawValue( $entry ) : $property->getValue( $entry );
+				$report['original_hook_restored'] = $callbacks === $restored;
+			}
+			return $report;
+		} catch ( Throwable ) { return null; }
+	}
+	public static function valid_source_registration_probe( mixed $value ): bool {
+		$keys = [ 'observation', 'native_query_singleton_present', 'native_query_tuple_count', 'pre_get_posts_callback_count', 'capture_without_exact_tuple', 'original_hook_restored' ];
+		if ( ! is_array( $value ) || count( $value ) !== count( $keys ) || [] !== array_diff( $keys, array_keys( $value ) ) || 'pure_registration_counterfactual_original_attempt_not_retried' !== $value['observation'] || ! is_bool( $value['native_query_singleton_present'] ) || ! is_bool( $value['original_hook_restored'] ) || ( null !== $value['capture_without_exact_tuple'] && ! is_bool( $value['capture_without_exact_tuple'] ) ) ) { return false; }
+		foreach ( [ 'native_query_tuple_count', 'pre_get_posts_callback_count' ] as $key ) { if ( ! is_int( $value[$key] ) || $value[$key] < 0 || $value[$key] > 256 ) { return false; } }
+		return $value['native_query_tuple_count'] <= $value['pre_get_posts_callback_count'] && ( $value['native_query_singleton_present'] || 0 === $value['native_query_tuple_count'] ) && ( 1 === $value['native_query_tuple_count'] || null === $value['capture_without_exact_tuple'] );
+	}
 	/** A finite installed class code and integer source line; paths, messages and traces remain private. */
 	public static function verified_refusal( Throwable $error ): array {
 		$known = [
@@ -295,7 +346,9 @@ final class CetechQuoteCartHttpFixture {
 		if ( ! ( ( true === $facts['prepare_entered'] && false === $facts['prepare_returned'] ) || ( true === $facts['evidence_called'] && false === $facts['evidence_returned'] ) ) ) { return null; }
 		$counts = [ 'source_reads' => $factory->source_reads, 'quote_writes' => $factory->quote_writes, 'budget_writes' => $factory->budget_writes ];
 		foreach ( $counts as $value ) { if ( $value < 0 || $value > 1000000 ) { return null; } }
-		return [ 'observation' => 'original_native_attempt', ...$facts, ...$counts ];
+		$probe = $observed->source_registration_probe;
+		if ( null !== $probe && ( 'source_local_binding' !== $facts['prepare_refusal_site'] || ! CetechQuoteCartEnvironmentObservation::valid_source_registration_probe( $probe ) ) ) { return null; }
+		return [ 'observation' => 'original_native_attempt', ...$facts, ...$counts, ...( null !== $probe ? [ 'source_registration_probe' => $probe ] : [] ) ];
 	}
 	public static function track_owner( array &$state, NativeCartQuoteSessionStore $sessions ): QuoteOwner {
 		$owner = ( new QuoteNativeOwnerResolver() )->current(); $key = $sessions->key_for( $owner ); $session_id = WC()->session->get_customer_id();

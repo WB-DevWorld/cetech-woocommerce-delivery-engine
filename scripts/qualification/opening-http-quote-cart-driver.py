@@ -121,6 +121,10 @@ def native_failure_observation(value):
     booleans = ("prepare_entered", "prepare_returned", "evidence_called", "evidence_returned", "native_chosen_cache_present", "native_totals_cache_present", "native_shipping_cache_present")
     counters = ("source_reads", "quote_writes", "budget_writes")
     keys = ("observation", "prepare_error_class", "prepare_refusal_site", "prepare_refusal_line", "native_shipping_debug_enabled", *booleans, *counters)
+    if isinstance(value, dict) and "source_registration_probe" in value:
+        if not source_registration_probe(value["source_registration_probe"]) or value.get("prepare_refusal_site") != "source_local_binding":
+            return False
+        value = {key: fact for key, fact in value.items() if key != "source_registration_probe"}
     if not exact(value, keys) or value["observation"] != "original_native_attempt":
         return False
     if any(type(value[key]) is not bool for key in booleans) or any(not integer(value[key], 0, 1000000) for key in counters):
@@ -143,6 +147,17 @@ def native_failure_observation(value):
     if value["prepare_refusal_site"] is not None and value["prepare_error_class"] is None:
         return False
     return value["prepare_entered"] and not value["prepare_returned"] or value["evidence_called"] and not value["evidence_returned"]
+
+
+def source_registration_probe(value):
+    keys = ("observation", "native_query_singleton_present", "native_query_tuple_count", "pre_get_posts_callback_count", "capture_without_exact_tuple", "original_hook_restored")
+    if not exact(value, keys) or value["observation"] != "pure_registration_counterfactual_original_attempt_not_retried":
+        return False
+    if type(value["native_query_singleton_present"]) is not bool or type(value["original_hook_restored"]) is not bool or value["capture_without_exact_tuple"] is not None and type(value["capture_without_exact_tuple"]) is not bool:
+        return False
+    if any(not integer(value[key], 0, 256) for key in ("native_query_tuple_count", "pre_get_posts_callback_count")):
+        return False
+    return value["native_query_tuple_count"] <= value["pre_get_posts_callback_count"] and (value["native_query_singleton_present"] or value["native_query_tuple_count"] == 0) and (value["native_query_tuple_count"] == 1 or value["capture_without_exact_tuple"] is None)
 
 
 def run_quote_cart(client, state, bridge, recorder, Page, login):
