@@ -3,11 +3,17 @@
 Uses the existing observed 20-second HTTP client. Setup commands seed native
 cart/order candidates only; placement and payment require production handlers.
 """
+import hashlib
 import json
+import os
+import re
+import stat
 import subprocess
+import tempfile
 import time
 import uuid
 from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 PREFIX = "HTTP-W2Q06-"
 DIRECT_IDS = tuple(PREFIX + name for name in (
@@ -378,6 +384,101 @@ def run_quote_placement(client, state, bridge, recorder, Page=None, login=None):
         raise
 
 
+COOKIE_IDENTITY = ("source_head", "candidate_head", "source_tree", "installed_php_sources_hash")
+
+
+def browser_cookie_packet(client, state, now=None):
+    """Preserve the original authenticated native session; never create another login."""
+    now = int(time.time()) if now is None else now
+    origin = client.base_url.rstrip("/"); parts = urlsplit(origin)
+    identity = {key: state.get("identity", {}).get(key) for key in COOKIE_IDENTITY}
+    if (type(now) is not int or parts.scheme != "http" or parts.hostname != "127.0.0.1" or parts.port is None
+            or parts.username or parts.password or parts.path or parts.query or parts.fragment
+            or state.get("base_url", "").rstrip("/") != origin or type(state.get("user_id")) is not int or state["user_id"] < 1
+            or not isinstance(state.get("username"), str) or not state["username"]
+            or any(not isinstance(value, str) or not re.fullmatch(r"[a-f0-9]{64}" if key == "installed_php_sources_hash" else r"[a-f0-9]{40}", value) for key, value in identity.items())):
+        raise RuntimeError("Q06 native cookie handoff identity unavailable")
+    cookies = []; seen = set(); hashes = set(); auth = []; logged = []; woo = []
+    for cookie in client.cookies:
+        name = cookie.name
+        match = re.fullmatch(r"(wordpress_|wordpress_logged_in_|wp_woocommerce_session_)([a-f0-9]{32})", name) if isinstance(name, str) else None
+        family = match[1] if match else None
+        if match:
+            hashes.add(match[2])
+        elif name not in ("wordpress_test_cookie", "woocommerce_cart_hash", "woocommerce_items_in_cart"):
+            raise RuntimeError("Q06 native cookie handoff contains an unknown cookie")
+        allowed_paths = ("/wp-admin", "/wp-content/plugins") if family == "wordpress_" else ("/",)
+        rest = {key.lower(): value for key, value in cookie._rest.items()}
+        expiry = -1 if cookie.expires is None else cookie.expires
+        same_site = rest.get("samesite")
+        if isinstance(same_site, str):
+            same_site = {"lax": "Lax", "strict": "Strict", "none": "None"}.get(same_site.lower())
+            if same_site is None:
+                raise RuntimeError("Q06 native cookie handoff SameSite unavailable")
+        if (len(rest) != len(cookie._rest) or set(rest) - {"httponly", "samesite"} or "samesite" in rest and not isinstance(rest["samesite"], str)
+                or cookie.domain != "127.0.0.1" or cookie.domain_specified or cookie.domain_initial_dot or cookie.path not in allowed_paths
+                or cookie.version != 0 or cookie.port is not None or cookie.secure is not False or same_site == "None"
+                or not isinstance(cookie.value, str) or not 0 < len(cookie.value.encode("utf-8")) <= 4096 or re.search(r"[\x00-\x1f\x7f]", cookie.value)
+                or type(expiry) is not int or expiry != -1 and not now < expiry <= now + 366 * 86400
+                or cookie.discard is not (cookie.expires is None)):
+            raise RuntimeError("Q06 native cookie handoff scope unavailable")
+        key = (name, cookie.domain, cookie.path)
+        if key in seen or len(cookies) >= 16:
+            raise RuntimeError("Q06 native cookie handoff aliases unavailable")
+        seen.add(key)
+        item = dict(name=name, value=cookie.value, domain=cookie.domain, path=cookie.path, expires=expiry, secure=cookie.secure, httpOnly="httponly" in rest, sameSite=same_site)
+        cookies.append(item)
+        if family in ("wordpress_", "wordpress_logged_in_"):
+            facts = unquote(cookie.value, errors="strict").split("|")
+            if len(facts) != 4 or facts[0] != state["username"] or not re.fullmatch(r"[1-9][0-9]{0,10}", facts[1]) or int(facts[1]) <= now or any(not value or len(value) > 256 for value in facts[2:]) or not item["httpOnly"]:
+                raise RuntimeError("Q06 native WordPress cookie principal unavailable")
+            (auth if family == "wordpress_" else logged).append((item, facts[:3]))
+        elif family == "wp_woocommerce_session_":
+            facts = unquote(cookie.value, errors="strict").split("|")
+            if len(facts) != 4 or facts[0] != str(state["user_id"]) or not re.fullmatch(r"[1-9][0-9]{0,10}", facts[1]) or int(facts[1]) <= now or not item["httpOnly"]:
+                raise RuntimeError("Q06 native Woo cookie customer unavailable")
+            woo.append(item)
+    if len(hashes) != 1 or len(auth) != 2 or {item[0]["path"] for item in auth} != {"/wp-admin", "/wp-content/plugins"} or len(logged) != 1 or len(woo) != 1 or any(facts != logged[0][1] for _, facts in auth):
+        raise RuntimeError("Q06 original authenticated native cookie session missing")
+    cookies.sort(key=lambda item: (item["name"], item["domain"], item["path"]))
+    packet = dict(format="cetech-q06-cookie-handoff-v1", origin=origin, identity=identity, created_at=now, customer_id=state["user_id"], logged_in_sha256=hashlib.sha256(logged[0][0]["value"].encode("utf-8")).hexdigest(), cookies=cookies)
+    if len(json.dumps(packet).encode("utf-8")) > 65536:
+        raise RuntimeError("Q06 native cookie handoff exceeds its private bound")
+    return packet
+
+
+def write_browser_cookie_handoff(client, state, path):
+    if path != Path(state.get("browser_state_path", "")) or path != Path(str(state.get("state_path", "")) + ".browser.json"):
+        raise RuntimeError("Q06 private browser handoff path diverged")
+    metadata = path.lstat()
+    if not stat.S_ISREG(metadata.st_mode) or stat.S_IMODE(metadata.st_mode) != 0o600 or metadata.st_size > 262144:
+        raise RuntimeError("Q06 private browser handoff file refused")
+    try:
+        private = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError, TypeError):
+        raise RuntimeError("Q06 private browser handoff file malformed") from None
+    if not isinstance(private, dict):
+        raise RuntimeError("Q06 private browser handoff file malformed")
+    packet = browser_cookie_packet(client, state)
+    if private.get("base_url", "").rstrip("/") != packet["origin"] or any(private.get("identity", {}).get(key) != packet["identity"][key] for key in COOKIE_IDENTITY):
+        raise RuntimeError("Q06 private browser handoff source diverged")
+    private.pop("username", None); private.pop("password", None); private["cookie_handoff"] = packet
+    encoded = json.dumps(private, ensure_ascii=True, separators=(",", ":")).encode("utf-8")
+    if len(encoded) > 262144:
+        raise RuntimeError("Q06 private browser state exceeds its bound")
+    temporary = None
+    try:
+        with tempfile.NamedTemporaryFile(dir=path.parent, prefix=path.name + ".handoff-", delete=False) as handle:
+            temporary = Path(handle.name); os.fchmod(handle.fileno(), 0o600); handle.write(encoded); handle.flush(); os.fsync(handle.fileno())
+        current = path.lstat()
+        if not stat.S_ISREG(current.st_mode) or current.st_ino != metadata.st_ino or current.st_dev != metadata.st_dev or stat.S_IMODE(current.st_mode) != 0o600:
+            raise RuntimeError("Q06 private browser handoff file changed")
+        os.replace(temporary, path); temporary = None
+    finally:
+        if temporary is not None:
+            temporary.unlink(missing_ok=True)
+
+
 def run_browser(client, state, recorder):
     path = Path(state.get("browser_state_path", ""))
     if not path.is_file():
@@ -385,6 +486,7 @@ def run_browser(client, state, recorder):
     receipt = path.with_name("quote-placement-browser-receipt.json")
     if receipt.exists():
         raise RuntimeError("Q06 refuses to replace existing browser evidence")
+    write_browser_cookie_handoff(client, state, path)
     result = subprocess.run(["node", str(Path(__file__).with_name("quote-placement-browser.cjs")), "--state", str(path), "--receipt", str(receipt), "--base-url", client.base_url], stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=180, check=False)
     if not receipt.is_file() or receipt.stat().st_size > 65536:
         raise RuntimeError("Q06 bounded browser receipt missing")

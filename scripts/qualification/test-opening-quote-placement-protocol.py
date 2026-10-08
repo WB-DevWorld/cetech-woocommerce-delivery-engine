@@ -4,18 +4,51 @@
 These adversarial checks do not claim disposable WordPress route qualification.
 """
 import copy
+import http.cookiejar
 import importlib.util
 import json
 import os
 from pathlib import Path
 import subprocess
+import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest import mock
+from urllib.parse import quote
 
 ROOT = Path(__file__).parent
 SPEC = importlib.util.spec_from_file_location('q06_http', ROOT / 'opening-http-quote-placement.py')
 DRIVER = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(DRIVER)
 IDENTITY = {'source_head': '1' * 40, 'candidate_head': '2' * 40, 'source_tree': '3' * 40, 'installed_php_sources_hash': '4' * 64}
+COOKIE_NOW = 1700000000
+
+
+def cookie_client():
+    state = dict(base_url='http://127.0.0.1:8085', username='q06_owned', password='UNUSED-SYNTHETIC-PASSWORD', user_id=20, identity=copy.deepcopy(IDENTITY))
+    client = SimpleNamespace(base_url=state['base_url'], cookies=http.cookiejar.CookieJar())
+    suffix = 'a' * 32
+    def add(name, value, path='/', expires=None, rest=None):
+        client.cookies.set_cookie(http.cookiejar.Cookie(0, name, value, None, False, '127.0.0.1', False, False, path, True, False, expires, expires is None, None, None, rest or {}, False))
+    facts = 'q06_owned|' + str(COOKIE_NOW + 86400) + '|OriginalSyntheticSessionToken|'
+    for path in ('/wp-admin', '/wp-content/plugins'):
+        add('wordpress_' + suffix, quote(facts + 'AUTH-HMAC', safe=''), path, rest={'HttpOnly': None})
+    add('wordpress_logged_in_' + suffix, quote(facts + 'LOGGED-HMAC', safe=''), rest={'HttpOnly': None})
+    add('wp_woocommerce_session_' + suffix, quote('20|' + str(COOKIE_NOW + 172800) + '|' + str(COOKIE_NOW + 86400) + '|WOO-HMAC', safe=''), expires=COOKIE_NOW + 172800, rest={'HttpOnly': None, 'SameSite': 'Strict'})
+    add('wordpress_test_cookie', 'WP Cookie check')
+    add('woocommerce_cart_hash', 'NATIVE-CART-HASH', expires=COOKIE_NOW + 172800)
+    add('woocommerce_items_in_cart', '1', expires=COOKIE_NOW + 172800)
+    return client, state
+
+
+def cookie_boundary(packet, state, observed=None):
+    source = (ROOT / 'quote-placement-browser.cjs').read_text()
+    functions = source[source.index('function nativeRouteMatches('):source.index('write();\n(async')]
+    script = "const crypto=require('node:crypto'),base=new URL('http://127.0.0.1:8085');const input=JSON.parse(require('node:fs').readFileSync(0,'utf8'));const state=input.state;function own(value){try{const u=new URL(value,base);return u.origin===base.origin&&!u.username&&!u.password&&!u.hash;}catch(_){return false;}};\n" + functions + "\nconst converted=nativeCookieHandoff(input.packet,state,input.now);const observed=input.observed===null&&converted?converted.map(cookie=>({...cookie,sameSite:cookie.sameSite||'Lax'})):input.observed;process.stdout.write(JSON.stringify({accepted:converted!==null,cookies:converted,readback:nativeCookieReadback(input.packet,observed,state,input.now)}));"
+    result = subprocess.run(['node', '-e', script], input=json.dumps(dict(packet=packet, state=state, observed=observed, now=COOKIE_NOW)).encode(), capture_output=True, timeout=20, check=False)
+    if result.returncode != 0:
+        raise AssertionError('Private native cookie boundary failed')
+    return json.loads(result.stdout)
 
 
 def evidence(case_id):
@@ -155,6 +188,118 @@ echo json_encode(['exact_foreign_owner'=>true,'exact_restored_owner'=>true,'wron
 
 
 class QuotePlacementProtocol(unittest.TestCase):
+    def test_original_python_cookiejar_roundtrips_through_node_without_another_login(self):
+        client, state = cookie_client(); packet = DRIVER.browser_cookie_packet(client, state, COOKIE_NOW)
+        observed = cookie_boundary(packet, state)
+        self.assertTrue(observed['accepted']); self.assertTrue(observed['readback'])
+        native = {(cookie.name, cookie.domain, cookie.path): cookie for cookie in client.cookies}
+        self.assertEqual(len(native), len(observed['cookies']))
+        for cookie in observed['cookies']:
+            original = native[(cookie['name'], cookie['domain'], cookie['path'])]
+            self.assertEqual(original.value, cookie['value'])
+            self.assertEqual(-1 if original.expires is None else original.expires, cookie['expires'])
+            self.assertEqual(original.secure, cookie['secure'])
+            self.assertEqual(original.has_nonstandard_attr('HttpOnly'), cookie['httpOnly'])
+            self.assertEqual(original.get_nonstandard_attr('SameSite'), cookie.get('sameSite'))
+        self.assertEqual({'/wp-admin', '/wp-content/plugins'}, {cookie['path'] for cookie in observed['cookies'] if cookie['name'].startswith('wordpress_') and not cookie['name'].startswith('wordpress_logged_in_') and cookie['name'] != 'wordpress_test_cookie'})
+
+    def test_python_cookie_export_refuses_foreign_expired_aliases_and_principal_loss(self):
+        for variant in ('host', 'dot_host', 'explicit_domain', 'path', 'expired', 'auth_expired', 'duplicate', 'unknown', 'oversize', 'secure', 'unknown_rest', 'lost_auth_path', 'lost_logged_in', 'lost_woo', 'woo_customer', 'other_token', 'other_username'):
+            with self.subTest(variant=variant):
+                client, state = cookie_client(); client.cookies = list(client.cookies)
+                logged = next(cookie for cookie in client.cookies if cookie.name.startswith('wordpress_logged_in_'))
+                woo = next(cookie for cookie in client.cookies if cookie.name.startswith('wp_woocommerce_session_'))
+                if variant == 'host': logged.domain = 'foreign.invalid'
+                elif variant == 'dot_host': logged.domain = '.127.0.0.1'; logged.domain_initial_dot = True
+                elif variant == 'explicit_domain': logged.domain_specified = True
+                elif variant == 'path': logged.path = '/foreign'
+                elif variant == 'expired': woo.expires = COOKIE_NOW
+                elif variant == 'auth_expired': logged.value = logged.value.replace(str(COOKIE_NOW + 86400), str(COOKIE_NOW))
+                elif variant == 'duplicate': client.cookies.append(copy.deepcopy(logged))
+                elif variant == 'unknown': logged.name = 'foreign_authority_cookie'
+                elif variant == 'oversize': logged.value = 'x' * 4097
+                elif variant == 'secure': logged.secure = True
+                elif variant == 'unknown_rest': logged._rest['Partitioned'] = None
+                elif variant == 'lost_auth_path': client.cookies = [cookie for cookie in client.cookies if cookie.path != '/wp-admin']
+                elif variant == 'lost_logged_in': client.cookies.remove(logged)
+                elif variant == 'lost_woo': client.cookies.remove(woo)
+                elif variant == 'woo_customer': woo.value = woo.value.replace('20%7C', '21%7C')
+                elif variant == 'other_token': logged.value = logged.value.replace('OriginalSyntheticSessionToken', 'OtherSyntheticSessionToken')
+                elif variant == 'other_username': logged.value = logged.value.replace('q06_owned', 'q06_foreign')
+                with self.assertRaises(RuntimeError): DRIVER.browser_cookie_packet(client, state, COOKIE_NOW)
+
+    def test_node_cookie_import_refuses_scope_identity_session_and_closed_shape_changes(self):
+        client, state = cookie_client(); original = DRIVER.browser_cookie_packet(client, state, COOKIE_NOW)
+        for variant in ('origin', 'identity', 'stale', 'future', 'customer', 'session_proof', 'host', 'path', 'expired', 'duplicate', 'lost_auth_path', 'lost_logged_in', 'lost_woo', 'extra_packet', 'extra_cookie', 'wrong_type', 'flags', 'samesite', 'woo_customer', 'token'):
+            with self.subTest(variant=variant):
+                packet = copy.deepcopy(original); logged = next(cookie for cookie in packet['cookies'] if cookie['name'].startswith('wordpress_logged_in_'))
+                woo = next(cookie for cookie in packet['cookies'] if cookie['name'].startswith('wp_woocommerce_session_'))
+                if variant == 'origin': packet['origin'] = 'http://127.0.0.1:8086'
+                elif variant == 'identity': packet['identity']['candidate_head'] = '9' * 40
+                elif variant == 'stale': packet['created_at'] -= 61
+                elif variant == 'future': packet['created_at'] += 6
+                elif variant == 'customer': packet['customer_id'] = 21
+                elif variant == 'session_proof': packet['logged_in_sha256'] = '9' * 64
+                elif variant == 'host': logged['domain'] = 'foreign.invalid'
+                elif variant == 'path': logged['path'] = '/foreign'
+                elif variant == 'expired': woo['expires'] = COOKIE_NOW
+                elif variant == 'duplicate': packet['cookies'].append(copy.deepcopy(logged))
+                elif variant == 'lost_auth_path': packet['cookies'] = [cookie for cookie in packet['cookies'] if cookie['path'] != '/wp-admin']
+                elif variant == 'lost_logged_in': packet['cookies'].remove(logged)
+                elif variant == 'lost_woo': packet['cookies'].remove(woo)
+                elif variant == 'extra_packet': packet['password'] = 'UNTRUSTED'
+                elif variant == 'extra_cookie': logged['partitionKey'] = 'UNTRUSTED'
+                elif variant == 'wrong_type': logged['expires'] = True
+                elif variant == 'flags': logged['httpOnly'] = False
+                elif variant == 'samesite': logged['sameSite'] = 'None'
+                elif variant == 'woo_customer': woo['value'] = woo['value'].replace('20%7C', '21%7C')
+                elif variant == 'token': logged['value'] = logged['value'].replace('OriginalSyntheticSessionToken', 'OtherSyntheticSessionToken')
+                self.assertFalse(cookie_boundary(packet, state)['accepted'])
+
+    def test_native_cookie_readback_refuses_loss_aliases_and_changed_values_or_flags(self):
+        client, state = cookie_client(); packet = DRIVER.browser_cookie_packet(client, state, COOKIE_NOW)
+        converted = cookie_boundary(packet, state)['cookies']
+        original = [dict(cookie, sameSite=cookie.get('sameSite', 'Lax')) for cookie in converted]
+        for variant in ('loss', 'duplicate', 'value', 'expiry', 'path', 'httpOnly', 'secure', 'sameSite', 'extra'):
+            with self.subTest(variant=variant):
+                observed = copy.deepcopy(original)
+                if variant == 'loss': observed.pop()
+                elif variant == 'duplicate': observed[1] = copy.deepcopy(observed[0])
+                elif variant == 'value': observed[0]['value'] += 'changed'
+                elif variant == 'expiry': observed[0]['expires'] += 1
+                elif variant == 'path': observed[0]['path'] = '/foreign'
+                elif variant == 'httpOnly': observed[0]['httpOnly'] = not observed[0]['httpOnly']
+                elif variant == 'secure': observed[0]['secure'] = True
+                elif variant == 'sameSite': observed[0]['sameSite'] = 'Strict'
+                elif variant == 'extra': observed[0]['partitionKey'] = 'foreign'
+                self.assertFalse(cookie_boundary(packet, state, observed)['readback'])
+
+    def test_cookie_handoff_updates_only_the_owned_private_browser_file(self):
+        client, state = cookie_client()
+        with tempfile.TemporaryDirectory() as directory:
+            main = Path(directory) / 'fixture.json'; main.write_text('main-private-authority'); os.chmod(main, 0o600)
+            path = Path(str(main) + '.browser.json'); state.update(state_path=str(main), browser_state_path=str(path))
+            private = dict(state, setup_marker='unchanged'); path.write_text(json.dumps(private)); os.chmod(path, 0o600)
+            with mock.patch.object(DRIVER.time, 'time', return_value=COOKIE_NOW): DRIVER.write_browser_cookie_handoff(client, state, path)
+            restored = json.loads(path.read_text()); self.assertEqual('main-private-authority', main.read_text()); self.assertEqual('unchanged', restored['setup_marker'])
+            self.assertNotIn('username', restored); self.assertNotIn('password', restored); self.assertEqual(0o600, path.stat().st_mode & 0o777)
+            self.assertTrue(cookie_boundary(restored['cookie_handoff'], state)['readback']); self.assertFalse(any(path.parent.glob(path.name + '.handoff-*')))
+            foreign = path.with_name('foreign.browser.json'); foreign.write_text(json.dumps(private)); os.chmod(foreign, 0o600)
+            with self.assertRaises(RuntimeError): DRIVER.write_browser_cookie_handoff(client, state, foreign)
+            for variant in ('permission', 'identity', 'origin', 'malformed'):
+                with self.subTest(variant=variant):
+                    altered = copy.deepcopy(private)
+                    if variant == 'identity': altered['identity']['source_tree'] = '9' * 40
+                    elif variant == 'origin': altered['base_url'] = 'http://127.0.0.1:8086'
+                    encoded = 'malformed-private-cookie-payload' if variant == 'malformed' else json.dumps(altered)
+                    path.write_text(encoded); os.chmod(path, 0o644 if variant == 'permission' else 0o600)
+                    with mock.patch.object(DRIVER.time, 'time', return_value=COOKIE_NOW):
+                        with self.assertRaises(RuntimeError): DRIVER.write_browser_cookie_handoff(client, state, path)
+                    self.assertEqual(encoded, path.read_text()); self.assertEqual('main-private-authority', main.read_text())
+            path.unlink(); path.symlink_to(main)
+            with self.assertRaises(RuntimeError): DRIVER.write_browser_cookie_handoff(client, state, path)
+            self.assertEqual('main-private-authority', main.read_text())
+
     def test_foreign_customer_restore_requires_exact_tracked_unpaid_history(self):
         observed = foreign_restoration_probe()
         self.assertEqual({'exact_foreign_owner', 'exact_restored_owner', 'wrong_phase_owner_refused', 'untracked_foreign_paid_history_changes_refused', 'typed_membership_and_closed_authority_refused'}, set(observed))

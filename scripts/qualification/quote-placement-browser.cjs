@@ -7,7 +7,7 @@ const args=process.argv.slice(2);
 function argument(name) { const index=args.indexOf(name); if(index<0 || !args[index+1]) throw new Error('Missing native placement browser argument'); return args[index+1]; }
 const statePath=path.resolve(argument('--state')); const receiptPath=path.resolve(argument('--receipt')); const base=new URL(argument('--base-url'));
 if(base.protocol!=='http:' || base.hostname!=='127.0.0.1' || !base.port || base.username || base.password || base.pathname!=='/' || base.search || base.hash || fs.lstatSync(statePath).isSymbolicLink() || (fs.statSync(statePath).mode&0o077)!==0 || fs.statSync(statePath).size>262144 || fs.existsSync(receiptPath)) throw new Error('Native placement requires private state and exact owned loopback');
-const state=JSON.parse(fs.readFileSync(statePath,'utf8'));
+let state; try { state=JSON.parse(fs.readFileSync(statePath,'utf8')); } catch(_) { throw new Error('Native placement private state malformed'); }
 const ids=['HTTP-W2Q06-BLOCKS-PAID-ACTUAL-FINAL-BUTTON','HTTP-W2Q06-BLOCKS-FREE-ACTUAL-FINAL-BUTTON'];
 const report={format:'cetech-w2q06-placement-browser-v1',source_head:state.identity.source_head,candidate_head:state.identity.candidate_head,source_tree:state.identity.source_tree,installed_php_sources_hash:state.identity.installed_php_sources_hash,runtime:{playwright:'1.58.2'},status:'RUNNING',cases:[]};
 let stage='ownership';
@@ -119,6 +119,49 @@ function safeFacts(value) {
 
 const countKeys=['orders','paid','sealed','prepared','gateway_calls','payment_complete_calls','free_completion_calls'];
 function counts(value) { return exact(value,countKeys) && countKeys.every(key=>Number.isSafeInteger(value[key]) && value[key]>=0 && value[key]<=1000000); }
+/** Closed private transport of the original HTTP session, never a new login. */
+function nativeCookieHandoff(packet,nativeState,now=Math.floor(Date.now()/1000)) {
+  try {
+    const identityKeys=['source_head','candidate_head','source_tree','installed_php_sources_hash'];
+    if(!exact(packet,['format','origin','identity','created_at','customer_id','logged_in_sha256','cookies']) || packet.format!=='cetech-q06-cookie-handoff-v1' || packet.origin!==base.origin || nativeState.base_url.replace(/\/$/,'')!==base.origin
+      || !exact(packet.identity,identityKeys) || identityKeys.some(key=>packet.identity[key]!==nativeState.identity[key] || !(key==='installed_php_sources_hash'?/^[a-f0-9]{64}$/:/^[a-f0-9]{40}$/).test(packet.identity[key]))
+      || !Number.isSafeInteger(now) || !Number.isSafeInteger(packet.created_at) || packet.created_at>now+5 || packet.created_at<now-60 || !Number.isSafeInteger(packet.customer_id) || packet.customer_id<1 || packet.customer_id!==nativeState.user_id
+      || typeof packet.logged_in_sha256!=='string' || !/^[a-f0-9]{64}$/.test(packet.logged_in_sha256) || !Array.isArray(packet.cookies) || packet.cookies.length<4 || packet.cookies.length>16 || Buffer.byteLength(JSON.stringify(packet))>65536) return null;
+    const seen=new Set(),hashes=new Set(),auth=[],logged=[],woo=[],result=[];
+    for(const cookie of packet.cookies) {
+      if(!exact(cookie,['name','value','domain','path','expires','secure','httpOnly','sameSite']) || typeof cookie.name!=='string' || typeof cookie.value!=='string' || Buffer.byteLength(cookie.value)<1 || Buffer.byteLength(cookie.value)>4096 || /[\u0000-\u001f\u007f]/.test(cookie.value)
+        || cookie.domain!=='127.0.0.1' || cookie.secure!==false || typeof cookie.httpOnly!=='boolean' || ![null,'Lax','Strict'].includes(cookie.sameSite) || !Number.isSafeInteger(cookie.expires) || cookie.expires!==-1 && (cookie.expires<=now || cookie.expires>packet.created_at+366*86400)) return null;
+      const match=/^(wordpress_|wordpress_logged_in_|wp_woocommerce_session_)([a-f0-9]{32})$/.exec(cookie.name); const family=match?match[1]:null;
+      if(match) hashes.add(match[2]); else if(!['wordpress_test_cookie','woocommerce_cart_hash','woocommerce_items_in_cart'].includes(cookie.name)) return null;
+      if(!(family==='wordpress_'?['/wp-admin','/wp-content/plugins']:['/']).includes(cookie.path)) return null;
+      const key=JSON.stringify([cookie.name,cookie.domain,cookie.path]); if(seen.has(key)) return null; seen.add(key);
+      if(family==='wordpress_' || family==='wordpress_logged_in_') {
+        const facts=decodeURIComponent(cookie.value).split('|');
+        if(facts.length!==4 || !facts[0] || !/^[1-9][0-9]{0,10}$/.test(facts[1]) || Number(facts[1])<=now || facts.slice(2).some(value=>!value || value.length>256) || !cookie.httpOnly) return null;
+        (family==='wordpress_'?auth:logged).push({cookie,facts:facts.slice(0,3)});
+      } else if(family==='wp_woocommerce_session_') {
+        const facts=decodeURIComponent(cookie.value).split('|');
+        if(facts.length!==4 || facts[0]!==String(packet.customer_id) || !/^[1-9][0-9]{0,10}$/.test(facts[1]) || Number(facts[1])<=now || !cookie.httpOnly) return null;
+        woo.push(cookie);
+      }
+      const item={name:cookie.name,value:cookie.value,domain:cookie.domain,path:cookie.path,expires:cookie.expires,secure:cookie.secure,httpOnly:cookie.httpOnly}; if(cookie.sameSite!==null) item.sameSite=cookie.sameSite; result.push(item);
+    }
+    if(hashes.size!==1 || auth.length!==2 || new Set(auth.map(item=>item.cookie.path)).size!==2 || logged.length!==1 || woo.length!==1 || auth.some(item=>JSON.stringify(item.facts)!==JSON.stringify(logged[0].facts))
+      || crypto.createHash('sha256').update(logged[0].cookie.value,'utf8').digest('hex')!==packet.logged_in_sha256) return null;
+    return result;
+  } catch(_) { return null; }
+}
+function nativeCookieReadback(packet,observed,nativeState,now=Math.floor(Date.now()/1000)) {
+  const expected=nativeCookieHandoff(packet,nativeState,now); if(!expected || !Array.isArray(observed) || observed.length!==expected.length) return false;
+  const seen=new Set();
+  for(const cookie of observed) {
+    if(!exact(cookie,['name','value','domain','path','expires','httpOnly','secure','sameSite'])) return false;
+    const key=JSON.stringify([cookie.name,cookie.domain,cookie.path]); if(seen.has(key)) return false; seen.add(key);
+    const original=expected.find(item=>item.name===cookie.name && item.domain===cookie.domain && item.path===cookie.path);
+    if(!original || ['value','expires','httpOnly','secure'].some(field=>cookie[field]!==original[field]) || cookie.sameSite!==(original.sameSite || 'Lax')) return false;
+  }
+  return true;
+}
 /** Exactly one final command and its response, never a sibling batch response. */
 function checkoutSelection(url,method,headers,postData) {
   if(nativeRouteMatches(url,state.checkout_url,'/wc/store/v1/checkout')) return nativeCheckoutMethod(url,method,headers)==='POST' ? {transport:'direct',index:0,count:1} : null;
@@ -167,6 +210,10 @@ write();
     const returned=nativeReviewResponse(selection,await response.json(),response.status()); if(!returned) throw new Error('Actual native Blocks review response refused'); return returned.facts;
   }
   try {
+    stage='login'; const originalCookies=nativeCookieHandoff(state.cookie_handoff,state);
+    if(!originalCookies || Object.hasOwn(state,'password') || Object.hasOwn(state,'username')) throw new Error('Original private browser session handoff unavailable');
+    await context.addCookies(originalCookies);
+    if(!nativeCookieReadback(state.cookie_handoff,await context.cookies(),state)) throw new Error('Original private browser session readback differs');
     await page.route('**/*',route=>own(route.request().url()) ? route.continue() : route.abort());
     page.on('request',request=>{
       const batch=nativeBatchUrl(state.store_extensions_url);
@@ -176,9 +223,6 @@ write();
     });
     const probe=await context.request.get('/?cetech_opening_http_probe=1',{headers:{'X-CETECH-Opening-Probe':state.probe_token},timeout:20000}); const identity=await probe.json();
     if(probe.status()!==200 || ['source_head','candidate_head','source_tree'].some(key=>identity[key]!==state.identity[key]) || identity.probe_sha256!==crypto.createHash('sha256').update(state.probe_token).digest('hex') || identity.site_path_sha256!==crypto.createHash('sha256').update(state.site_path).digest('hex') || identity.database_name_sha256!==crypto.createHash('sha256').update(state.database_name).digest('hex')) throw new Error('Owned native listener identity differs');
-    stage='login'; await page.goto('/wp-login.php',{waitUntil:'domcontentloaded'}); await page.locator('#user_login').fill(state.username); await page.locator('#user_pass').fill(state.password);
-    await Promise.all([page.waitForNavigation({waitUntil:'domcontentloaded'}),page.locator('#wp-submit').click()]);
-    if(!(await context.cookies()).some(cookie=>cookie.name.startsWith('wordpress_logged_in_'))) throw new Error('Actual browser shopper login absent');
     for(let index=0;index<ids.length;index++) {
       const free=index===1; stage='fixture'; await fixture(free?'free':'seed'); requestCounts={posts:0,unknown:0};
       stage='render'; if(!own(state.blocks_page_url)) throw new Error('Unowned native Blocks page'); await page.goto(state.blocks_page_url,{waitUntil:'domcontentloaded'});
