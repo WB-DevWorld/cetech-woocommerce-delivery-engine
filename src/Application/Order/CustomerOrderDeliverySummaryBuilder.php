@@ -23,20 +23,27 @@ final class CustomerOrderDeliverySummaryBuilder {
 
 	public function build( WC_Order $order ): ?CustomerOrderDeliverySummary {
 		$line_summaries = [];
+		$package_read = $this->reader->read_package( $order );
+		$expected_quote = $package_read->delivery_quote?->envelope;
+		$quote_owned = $order->meta_exists( DeliveryQuoteSnapshotEnvelope::META_FORMAT ) || null !== $package_read->delivery_quote;
+		if ( $quote_owned && ( null === $expected_quote || OrderDeliveryPackageReadResult::ERROR_NONE !== $package_read->error ) ) { return null; }
 
 		foreach ( $order->get_items() as $item ) {
 			if ( ! $item instanceof WC_Order_Item_Product ) {
 				continue;
 			}
 
-			$line_summary = $this->build_line_from_item( $item, $item->get_name() );
+			$line_read = $this->reader->read_line( $item ); $line_quote = $line_read->delivery_quote?->envelope;
+			if ( null !== $expected_quote && $line_read->has_meta && ( OrderDeliveryLineReadResult::ERROR_NONE !== $line_read->error || null === $line_quote || ! $expected_quote->matches( $line_quote ) ) ) { return null; }
+			if ( null !== $line_read->delivery_quote && ( null === $line_quote || null === $expected_quote ) ) { return null; }
+			$line_summary = $this->build_line_from_item( $item, $item->get_name(), $line_read );
 
 			if ( null !== $line_summary ) {
 				$line_summaries[] = $line_summary;
 			}
 		}
 
-		$package_summary = $this->build_package_from_order( $order );
+		$package_summary = $this->build_package_from_order( $order, $package_read );
 
 		if ( [] === $line_summaries && null === $package_summary ) {
 			return null;
@@ -45,8 +52,8 @@ final class CustomerOrderDeliverySummaryBuilder {
 		return new CustomerOrderDeliverySummary( $line_summaries, $package_summary );
 	}
 
-	private function build_line_from_item( WC_Order_Item_Product $item, string $product_name ): ?CustomerOrderDeliveryLineSummary {
-		$read   = $this->reader->read_line( $item );
+	private function build_line_from_item( WC_Order_Item_Product $item, string $product_name, ?OrderDeliveryLineReadResult $read = null ): ?CustomerOrderDeliveryLineSummary {
+		$read ??= $this->reader->read_line( $item );
 		$status = $this->integrity->classify_line( $read );
 
 		if (
@@ -63,8 +70,8 @@ final class CustomerOrderDeliverySummaryBuilder {
 		return $this->map_line_snapshot( $read->snapshot, $product_name, $status, (int) $item->get_id() );
 	}
 
-	private function build_package_from_order( WC_Order $order ): ?CustomerOrderDeliveryPackageSummary {
-		$read   = $this->reader->read_package( $order );
+	private function build_package_from_order( WC_Order $order, ?OrderDeliveryPackageReadResult $read = null ): ?CustomerOrderDeliveryPackageSummary {
+		$read ??= $this->reader->read_package( $order );
 		$status = $this->integrity->classify_package( $read );
 
 		if ( OrderDeliverySnapshotIntegrity::STATUS_PRESENT_VALID !== $status || null === $read->snapshot ) {

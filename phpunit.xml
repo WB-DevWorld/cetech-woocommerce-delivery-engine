@@ -33,6 +33,7 @@
             <group>quote-storage-real-db</group>
             <group>quote-lifecycle-real-db</group>
             <group>quote-provider-real-db</group>
+            <group>quote-cart-real-db</group>
         </exclude>
     </groups>
 </phpunit>

@@ -1,0 +1,366 @@
+#!/usr/bin/env python3
+"""Adversarial public/receipt/URI protocol checks; not native quote qualification."""
+import ast
+import copy
+import html
+import importlib.util
+import json
+from pathlib import Path
+import subprocess
+import tempfile
+import textwrap
+import unittest
+from unittest.mock import patch
+
+ROOT = Path(__file__).parent
+SPEC = importlib.util.spec_from_file_location("q05_driver", ROOT / "opening-http-quote-cart-driver.py")
+DRIVER = importlib.util.module_from_spec(SPEC)
+SPEC.loader.exec_module(DRIVER)
+
+
+def public_facts():
+    value = {"amount": "7.70", "currency": "GHS", "precision": 2}
+    part = {"customer_label": "Delivery", "list_price": value, "final_price": value, "tax": {"amount": "0", "currency": "GHS", "precision": 2}, "rounded_tax": None, "total": value, "display_total": value, "promotion": {"state": "none", "amount": {"amount": "0", "currency": "GHS", "precision": 2}}}
+    return {"contract_version": 1, "status": "review_required", "generation": 1, "quote": {"contract_version": 1, "decision_kind": "delivery_quote", "quote_id": "a49d6a70-4dad-4a89-94a7-0bde7d1e9d23", "status": "issued", "currently_applicable": True, "expires_at": "2026-10-07T12:00:00.000000Z", "customer_label": "Delivery", "money": [part], "reason_code": None, "recovery_action": None, "correlation_id": "96e70da7-a0b7-4eb4-a291-3da4c0302af1"}, "can_refresh": True, "can_confirm": True, "can_retry": False, "message_code": "review_required", "correlation_id": "dd72a7a1-cbfc-4f70-bde1-3f00b7c9986e"}
+
+
+def child_helpers(expression):
+    source = (ROOT / "opening-quote-cart-browser.cjs").read_text()
+    # Evaluate the pure helpers only, never launch a browser or read credentials.
+    route = source[source.index("function nativeRouteMatches("):source.index("function noPlacement(")]
+    schema = source[source.index("function safeMoney("):source.index("write();\n(async")]
+    program = "const base=new URL('http://127.0.0.1:8085');const own=value=>{const u=new URL(value,base);return u.origin===base.origin&&!u.username&&!u.password&&!u.hash;};\n" + route + schema + "\nconsole.log(JSON.stringify(" + expression + "));"
+    result = subprocess.run(["node", "-e", program], capture_output=True, timeout=20, check=False)
+    if result.returncode != 0:
+        raise AssertionError("Pure browser protocol did not finish")
+    return json.loads(result.stdout)
+
+
+class QuoteCartProtocol(unittest.TestCase):
+    def test_source_price_refresh_keeps_the_original_full_choice_comparison(self):
+        source = (ROOT / "opening-http-quote-cart-driver.py").read_text()
+        outer = next(node for node in ast.parse(source).body if isinstance(node, ast.FunctionDef) and node.name == "run_quote_cart")
+        helpers = [node for node in outer.body if isinstance(node, ast.FunctionDef) and node.name in ("fixture_calculated", "seeded")]
+        old_id = "a49d6a70-4dad-4a89-94a7-0bde7d1e9d23"
+        state = {"seed_url": "owned-seed", "price_url": "owned-price"}
+        counts = dict.fromkeys(DRIVER.HISTORY, 0); counts.update(quotes=1, accepted=1)
+        current = {"fixture_nonce": "fixture-nonce", "choice_digest": "original-full-choice", "quote_body_digest": "original-body", "quote_body_digests": {old_id: "original-body"}, "facts": {"status": "confirmed"}, "history_counts": counts}
+        calls = []; checks = []
+        response = type("Response", (), {"status": 200, "body": b'{"success":true}'})()
+        class Shopper:
+            def request(self, url, fields, headers):
+                calls.append((url, fields, headers))
+                if url == state["seed_url"]:
+                    current["choice_digest"] = "fresh-intent-timestamp"
+                elif url != state["price_url"]:
+                    raise AssertionError("Unowned fixture URL")
+                return response
+        class Bridge:
+            def call(self, command):
+                if command != "ratechangequotecart":
+                    raise AssertionError("Unexpected physical source mutation")
+                current["facts"] = {"status": "changed"}
+        def inspect(shopper): return copy.deepcopy(current)
+        def classic(shopper, action, generation, token):
+            self.assertEqual("refresh", action)
+            facts = public_facts(); facts["quote"]["quote_id"] = "b49d6a70-4dad-4a89-94a7-0bde7d1e9d23"
+            facts["quote"]["money"][0]["display_total"]["amount"] = "9.90"
+            current["facts"] = copy.deepcopy(facts); current["history_counts"]["quotes"] += 1
+            return response, facts
+        namespace = {"state": state, "headers": {"X-Cetech-Q05-Fixture": "fixture-token"}, "inspect": inspect, "request_json": lambda response: json.loads(response.body), "guest_a": Shopper(), "bridge": Bridge(), "classic": classic, "review_a": {"generation": 1, "quote": {"quote_id": old_id}}, "safe_facts": DRIVER.safe_facts, "DIRECT_IDS": DRIVER.DIRECT_IDS, "uuid": __import__("uuid"), "check": lambda case, condition, before, after, components, response: checks.append((condition, components))}
+        exec(compile(ast.Module(body=helpers, type_ignores=[]), "actual-driver-fixture-helpers", "exec"), namespace)
+        start = source.index('        active_case = DIRECT_IDS[8]; stage = "source_change"')
+        end = source.index('        active_case = DIRECT_IDS[9];', start)
+        exec(textwrap.dedent(source[start:end]), namespace)
+        self.assertEqual([(state["price_url"], {"nonce": "fixture-nonce"}, namespace["headers"])], calls)
+        self.assertEqual(1, len(checks)); self.assertTrue(checks[0][0]); self.assertTrue(checks[0][1]["choices_destination_retained"])
+        self.assertEqual("original-full-choice", current["choice_digest"])
+
+    def test_native_batch_correlates_one_owned_command_to_its_same_index_response(self):
+        body = {"namespace": "cetech-delivery-quote-review", "data": {"action": "refresh", "generation": 1, "review_token": "a49d6a70-4dad-4a89-94a7-0bde7d1e9d23"}}
+        entry = {"path": "/wc/store/v1/cart/extensions", "method": "POST", "data": body, "cache": "no-store", "body": body, "headers": {"Nonce": "CONTROLLED-NATIVE-NONCE"}}
+        sibling = {"path": "/wc/store/v1/cart/update-customer", "method": "POST", "body": {}}
+        payload = {"requests": [sibling, entry]}
+        expression = "nativeReviewRequest('/?rest_route=/wc/store/v1/batch','/?rest_route=/wc/store/v1/cart/extensions'," + json.dumps(json.dumps(payload)) + ",'refresh')"
+        selection = child_helpers(expression)
+        self.assertEqual({"transport": "batch", "index": 1, "count": 2}, selection)
+        returned = {"responses": [{"status": 200, "headers": [], "body": {}}, {"status": 200, "headers": {}, "body": {"extensions": {"cetech-delivery-quote-review": public_facts()}}}]}
+        selected = child_helpers("nativeReviewResponse(" + json.dumps(selection) + "," + json.dumps(returned) + ",207)")
+        self.assertEqual(200, selected["status"]); self.assertEqual(public_facts(), selected["facts"])
+        self.assertFalse(child_helpers("nativeRouteMatches('/?rest_route=/wc/store/v1/batch','/?rest_route=/wc/store/v1/cart/extensions')"))
+        direct = child_helpers("nativeReviewRequest('/?rest_route=/wc/store/v1/cart/extensions','/?rest_route=/wc/store/v1/cart/extensions'," + json.dumps(json.dumps(body)) + ",'refresh')")
+        self.assertEqual({"transport": "direct", "index": 0, "count": 1}, direct)
+        self.assertEqual(selected, child_helpers("nativeReviewResponse(" + json.dumps(direct) + "," + json.dumps(returned["responses"][1]["body"]) + ",200)"))
+        maximum = {"requests": [sibling] * 24 + [entry]}
+        self.assertEqual({"transport": "batch", "index": 24, "count": 25}, child_helpers("nativeReviewRequest('/wp-json/wc/store/v1/batch','/wp-json/wc/store/v1/cart/extensions'," + json.dumps(json.dumps(maximum)) + ",'refresh')"))
+
+    def test_native_batch_refuses_ambiguous_foreign_wrong_or_unbounded_commands(self):
+        body = {"namespace": "cetech-delivery-quote-review", "data": {"action": "refresh", "generation": 1, "review_token": "a49d6a70-4dad-4a89-94a7-0bde7d1e9d23"}}
+        entry = {"path": "/wc/store/v1/cart/extensions", "method": "POST", "body": body}
+        payloads = []
+        for change in ("namespace", "action", "duplicate", "index_path", "foreign_path", "method", "extra_field", "data_mismatch", "malformed", "over_count", "invalid_token", "foreign_header", "long_header", "invalid_header"):
+            value = {"requests": [copy.deepcopy(entry)]}
+            candidate = value["requests"][0]
+            if change == "namespace": candidate["body"]["namespace"] = "PRIVATE-FOREIGN"
+            elif change == "action": candidate["body"]["data"]["action"] = "confirm"
+            elif change == "duplicate": value["requests"].append(copy.deepcopy(entry))
+            elif change == "index_path": candidate["path"] = "/wc/store/v1/cart/extensions?ambiguous=1"
+            elif change == "foreign_path": candidate["path"] = "https://example.invalid/wc/store/v1/cart/extensions"
+            elif change == "method": candidate["method"] = "GET"
+            elif change == "extra_field": candidate["private_payload"] = "PRIVATE"
+            elif change == "data_mismatch": candidate["data"] = {"namespace": "PRIVATE"}
+            elif change == "malformed": value["requests"] = [None]
+            elif change == "over_count": value["requests"] = [{"path": "/wc/store/v1/cart/update-customer", "method": "POST", "body": {}}] * 25 + [entry]
+            elif change == "invalid_token": candidate["body"]["data"]["review_token"] = "PRIVATE-TOKEN"
+            elif change == "foreign_header": candidate["headers"] = {"Authorization": "PRIVATE-CREDENTIAL"}
+            elif change == "long_header": candidate["headers"] = {"Nonce": "x" * 257}
+            elif change == "invalid_header": candidate["headers"] = {"Nonce": "PRIVATE\nHEADER"}
+            payloads.append(json.dumps(value))
+        expression = json.dumps(payloads) + ".map(payload=>nativeReviewRequest('/?rest_route=/wc/store/v1/batch','/?rest_route=/wc/store/v1/cart/extensions',payload,'refresh')===null)"
+        self.assertEqual([True] * len(payloads), child_helpers(expression))
+        oversized = "JSON.stringify({requests:[{path:'/wc/store/v1/cart/extensions',method:'POST',body:{padding:'x'.repeat(262145)}}]})"
+        self.assertIsNone(child_helpers("nativeReviewRequest('/?rest_route=/wc/store/v1/batch','/?rest_route=/wc/store/v1/cart/extensions'," + oversized + ",'refresh')"))
+        raw = json.dumps(json.dumps({"requests": [entry]}))
+        for url in ("http://127.0.0.1:8086/?rest_route=/wc/store/v1/batch", "/?rest_route=/wc/store/v1/batch&rest_route=/other", "http://user@127.0.0.1:8085/?rest_route=/wc/store/v1/batch", "/?rest_route=/wc/store/v1/batch#private"):
+            self.assertIsNone(child_helpers("nativeReviewRequest(" + json.dumps(url) + ",'/?rest_route=/wc/store/v1/cart/extensions'," + raw + ",'refresh')"))
+
+    def test_native_batch_response_status_index_and_safe_body_cannot_be_substituted(self):
+        selection = {"transport": "batch", "index": 0, "count": 1}
+        payload = {"responses": [{"status": 200, "headers": {}, "body": {"extensions": {"cetech-delivery-quote-review": public_facts()}}}]}
+        cases = []
+        for change in ("outer_status", "inner_status", "error", "wrong_index", "missing_index", "extra_envelope", "invalid_headers", "private_dto"):
+            wanted = copy.deepcopy(selection); returned = copy.deepcopy(payload); outer = 207
+            if change == "outer_status": outer = 200
+            elif change == "inner_status": returned["responses"][0]["status"] = 500
+            elif change == "error": returned["responses"][0]["body"] = {"code": "PRIVATE-ERROR"}
+            elif change == "wrong_index": wanted["index"] = 1
+            elif change == "missing_index": wanted["count"] = 2
+            elif change == "extra_envelope": returned["responses"][0]["private_payload"] = "PRIVATE"
+            elif change == "invalid_headers": returned["responses"][0]["headers"] = ["PRIVATE"]
+            elif change == "private_dto": returned["responses"][0]["body"]["extensions"]["cetech-delivery-quote-review"]["private_address"] = "PRIVATE"
+            cases.append([wanted, returned, outer])
+        self.assertEqual([True] * len(cases), child_helpers(json.dumps(cases) + ".map(([selection,payload,status])=>nativeReviewResponse(selection,payload,status)===null)"))
+
+    def test_native_checkout_post_counter_observes_nested_batches_and_refuses_unknown_wrappers(self):
+        payload = {"requests": [{"path": "/wc/store/v1/checkout", "method": "POST", "body": {}}]}
+        tail = ",'/?rest_route=/wc/store/v1/cart/extensions','/?rest_route=/wc/store/v1/checkout')"
+        self.assertEqual(1, child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','POST'," + json.dumps(json.dumps(payload)) + tail))
+        self.assertEqual(1, child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/checkout','POST','{}'" + tail))
+        self.assertIsNone(child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','POST','{}'" + tail))
+        self.assertEqual(0, child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','GET','{}'" + tail))
+
+    def test_checkout_route_accounting_keeps_bodyless_native_siblings_distinct_from_checkout(self):
+        payload = {"requests": [{"path": "/wc/store/v1/cart", "method": "GET"}, {"path": "/wc/store/v1/cart/remove-item", "method": "DELETE", "headers": {"Nonce": "CONTROLLED-NATIVE-NONCE"}}, {"path": "/wc/store/v1/cart/update-customer", "method": "POST", "body": None, "cache": "default", "data": {"opaque": "PRIVATE-UNOBSERVED"}}]}
+        raw = json.dumps(json.dumps(payload))
+        self.assertIsNone(child_helpers("nativeBatchRequests('/?rest_route=/wc/store/v1/batch','/?rest_route=/wc/store/v1/cart/extensions'," + raw + ")"))
+        tail = ",'/?rest_route=/wc/store/v1/cart/extensions','/?rest_route=/wc/store/v1/checkout')"
+        self.assertEqual(0, child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','POST'," + raw + tail))
+        payload["requests"].append({"path": "/wc/store/v1/checkout?fixed=1", "method": "POST"})
+        self.assertEqual(1, child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','POST'," + json.dumps(json.dumps(payload)) + tail))
+        for requests in ([{"path": "/wc/store/v1/checkout"}], [{"path": "https://example.invalid/wc/store/v1/checkout", "method": "POST"}], [{"path": "/wc/store/v1/batch", "method": "POST"}], [{"path": "/wc/store/v1/cart/../checkout", "method": "POST"}], [{"path": "/wc/store/v1/checkout#ambiguous", "method": "POST"}], [None], [], [{"path": "/wc/store/v1/cart", "method": "GET"}] * 26):
+            self.assertIsNone(child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','POST'," + json.dumps(json.dumps({"requests": requests})) + tail))
+        oversized = "JSON.stringify({requests:[{path:'/wc/store/v1/cart',method:'DELETE',opaque:'x'.repeat(262145)}]})"
+        self.assertIsNone(child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','POST'," + oversized + tail))
+
+    def test_original_checkout_counters_are_closed_and_failure_only(self):
+        counts = {"direct_checkout_posts": 0, "direct_placement_posts": 0, "native_update_requests": 0, "unclassified_checkout_requests": 0, "nested_checkout_posts": 0, "unclassified_batches": 1, "observed_batches": 2}
+        self.assertTrue(DRIVER.browser_checkout_observation(counts))
+        self.assertFalse(child_helpers("noCheckoutRequests(" + json.dumps(counts) + ")"))
+        known = dict(counts, unclassified_batches=0)
+        self.assertTrue(child_helpers("noCheckoutRequests(" + json.dumps(known) + ")"))
+        for key in ("direct_placement_posts", "nested_checkout_posts", "unclassified_checkout_requests"):
+            self.assertFalse(child_helpers("noCheckoutRequests(" + json.dumps(dict(known, **{key: 1})) + ")"))
+        self.assertTrue(child_helpers("noCheckoutRequests(" + json.dumps(dict(known, direct_checkout_posts=1, native_update_requests=1)) + ")"))
+        self.assertTrue(DRIVER.browser_checkout_observation(dict(known, direct_checkout_posts=1, native_update_requests=1)))
+        case = {"id": DRIVER.BROWSER_IDS[1], "status": "FAIL", "evidence": {"stage": "refresh", "error_class": "Error", "dom": dict.fromkeys(("blocks_visible", "review_visible", "refresh_visible", "confirm_visible", "price_visible", "confirmed_visible"), False), "required_case_incomplete": True, "checkout_request_observation": counts}}
+        self.assertTrue(DRIVER.browser_evidence(case))
+        for key, value in (("direct_checkout_posts", True), ("direct_checkout_posts", 1), ("nested_checkout_posts", 51), ("unclassified_batches", 3), ("observed_batches", -1), ("observed_batches", 1000001), ("observed_batches", "PRIVATE-URL"), ("private_body", "PRIVATE-CREDENTIAL")):
+            bad = copy.deepcopy(case); bad["evidence"]["checkout_request_observation"][key] = value
+            self.assertFalse(DRIVER.browser_evidence(bad))
+        history = dict.fromkeys(DRIVER.HISTORY, 0)
+        passed = {"id": DRIVER.BROWSER_IDS[1], "status": "PASS", "evidence": dict(dict.fromkeys(DRIVER.BROWSER_BOOLS[1], True), status=200, history_before=history, history_after=history)}
+        self.assertTrue(DRIVER.browser_evidence(passed))
+        passed["evidence"]["checkout_request_observation"] = counts
+        self.assertFalse(DRIVER.browser_evidence(passed))
+
+    def test_native_checkout_semantic_method_preserves_post_and_query_precedence(self):
+        url = "/?rest_route=/wc/store/v1/checkout&__experimental_calc_totals=true"
+        headers = {"x-http-method-override": "PUT"}
+        for alias in ("%20_method", ".method", "_method%00ignored"):
+            self.assertIsNone(child_helpers("nativeCheckoutMethod(" + json.dumps(url + "&" + alias + "=POST") + ",'POST'," + json.dumps(headers) + ")"))
+        self.assertEqual("PUT", child_helpers("nativeCheckoutMethod(" + json.dumps(url) + ",'POST'," + json.dumps(headers) + ")"))
+        tail = ",'POST','{}','/?rest_route=/wc/store/v1/cart/extensions','/?rest_route=/wc/store/v1/checkout',"
+        self.assertEqual(0, child_helpers("nativeCheckoutPosts(" + json.dumps(url) + tail + json.dumps(headers) + ")"))
+        self.assertEqual(1, child_helpers("nativeCheckoutPosts(" + json.dumps(url) + tail + "{})"))
+        self.assertEqual(1, child_helpers("nativeCheckoutPosts(" + json.dumps(url + "&_method=POST") + tail + json.dumps(headers) + ")"))
+        self.assertIsNone(child_helpers("nativeCheckoutPosts(" + json.dumps(url + "&_method=GET") + tail + json.dumps(headers) + ")"))
+        self.assertIsNone(child_helpers("nativeCheckoutPosts(" + json.dumps(url) + tail + "{'x-http-method-override':'DELETE'})"))
+        self.assertEqual(1, child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/checkout&_method=POST','GET','{}','/?rest_route=/wc/store/v1/cart/extensions','/?rest_route=/wc/store/v1/checkout')"))
+        for observed, method, override in ((url + "&_method=PUT&_method=POST", "POST", headers), (url + "&_method[]=PUT", "POST", headers), (url + "&_method=PRIVATE", "POST", headers), (url, "POST", {"x-http-method-override": "PRIVATE"}), (url + "&_method=POST", "POST", {"x-http-method-override": "PRIVATE"}), (url, "POST", {"x-http-method-override": "PUT,POST"}), (url, "POST", {"x-http-method-override": "PUT\n"}), (url, "POST", {"x-http-method-override": "PUT", "X-HTTP-Method-Override": "PATCH"}), (url, "POST", {"x-http-method-override": ["PUT"]}), (url, "PRIVATE", {})):
+            self.assertIsNone(child_helpers("nativeCheckoutMethod(" + json.dumps(observed) + "," + json.dumps(method) + "," + json.dumps(override) + ")"))
+        # Subrequests are dispatched directly and do not use outer HTTP overrides.
+        batch = {"requests": [{"path": "/wc/store/v1/checkout", "method": "POST", "headers": {"X-HTTP-Method-Override": "PUT"}}]}
+        self.assertEqual(1, child_helpers("nativeCheckoutPosts('/?rest_route=/wc/store/v1/batch','POST'," + json.dumps(json.dumps(batch)) + ",'/?rest_route=/wc/store/v1/cart/extensions','/?rest_route=/wc/store/v1/checkout')"))
+
+    def test_returned_refresh_projection_retains_only_safe_money_before_price_wait(self):
+        facts = public_facts(); facts["quote"]["money"][0]["display_total"]["amount"] = "7.00"
+        projected = child_helpers("refreshObservationFor(200," + json.dumps(facts) + ")")
+        self.assertTrue(DRIVER.browser_refresh_observation(projected))
+        self.assertEqual({"amount": "7.00", "currency": "GHS", "precision": 2}, projected["money"])
+        self.assertTrue(projected["safe_shopper_dto"]); self.assertEqual("review_required", projected["status"])
+        self.assertFalse(projected["expected_price"]); self.assertIsNone(projected["dom_matches_response_price"])
+        self.assertNotIn("quote_id", json.dumps(projected)); self.assertNotIn("customer_label", json.dumps(projected))
+        projected["dom_matches_expected_price"] = False; projected["dom_matches_response_price"] = True
+        self.assertTrue(DRIVER.browser_refresh_observation(projected))
+        private = copy.deepcopy(facts); private["quote"]["money"][0]["private_address"] = "PRIVATE-ADDRESS"
+        refused = child_helpers("refreshObservationFor(200," + json.dumps(private) + ")")
+        self.assertTrue(DRIVER.browser_refresh_observation(refused)); self.assertFalse(refused["safe_shopper_dto"])
+        self.assertIsNone(refused["money"]); self.assertIsNone(refused["status"])
+        self.assertNotIn("PRIVATE", json.dumps(refused))
+
+    def test_refresh_failure_projection_is_closed_nested_and_never_allowed_on_success(self):
+        observation = child_helpers("refreshObservationFor(200," + json.dumps(public_facts()) + ")")
+        case = {"id": DRIVER.BROWSER_IDS[1], "status": "FAIL", "evidence": {"stage": "refresh", "error_class": "TimeoutError", "dom": dict.fromkeys(("blocks_visible", "review_visible", "refresh_visible", "confirm_visible", "price_visible", "confirmed_visible"), False), "required_case_incomplete": True, "refresh_observation": observation}}
+        self.assertTrue(DRIVER.browser_evidence(case))
+        mutations = [("observation", "PRIVATE-PATH"), ("http_status", True), ("http_status", 600), ("safe_shopper_dto", 1), ("status", "PRIVATE-STATE"), ("can_confirm", 1), ("expected_price", False), ("dom_matches_expected_price", "PRIVATE-DOM"), ("dom_matches_response_price", 1), ("money", {"amount": "PRIVATE-ADDRESS", "currency": "GHS", "precision": 2}), ("money", {"amount": "7.70", "currency": "PRIVATE-CURRENCY", "precision": 2}), ("money", {"amount": "7.70", "currency": "GHS", "precision": True}), ("money", {"amount": "7.701", "currency": "GHS", "precision": 2}), ("money", {"amount": "7.70", "currency": "GHS", "precision": 2, "private_payload": "PRIVATE"})]
+        for key, value in mutations:
+            with self.subTest(key=key, value=value):
+                bad = copy.deepcopy(case); bad["evidence"]["refresh_observation"][key] = value
+                self.assertFalse(DRIVER.browser_evidence(bad))
+        bad = copy.deepcopy(case); bad["evidence"]["refresh_observation"]["private_payload"] = "PRIVATE"; self.assertFalse(DRIVER.browser_evidence(bad))
+        bad = copy.deepcopy(case); bad["evidence"]["stage"] = "render"; self.assertFalse(DRIVER.browser_evidence(bad))
+        bad = copy.deepcopy(case); bad["id"] = DRIVER.BROWSER_IDS[0]; self.assertFalse(DRIVER.browser_evidence(bad))
+        counts = dict.fromkeys(DRIVER.HISTORY, 0)
+        passed = {"id": DRIVER.BROWSER_IDS[1], "status": "PASS", "evidence": dict(dict.fromkeys(DRIVER.BROWSER_BOOLS[1], True), status=200, history_before=counts, history_after=counts)}
+        self.assertTrue(DRIVER.browser_evidence(passed))
+        passed["evidence"]["refresh_observation"] = observation; self.assertFalse(DRIVER.browser_evidence(passed))
+
+    def test_current_evidence_followup_is_separate_finite_and_refused_on_success(self):
+        stages = ("input_ready", "environment_same_draft", "environment_matches_original", "environment_authorized", "control_observed", "cached_shipping_restored", "preparation_matches_original", "source_captured", "source_bound", "packages_restored", "native_captured", "native_bound", "context_digest_matches", "source_applicable", "native_unchanged", "source_local_unchanged", "final_same_draft", "final_authorized", "control_confirmed")
+        followup = dict.fromkeys(stages)
+        followup.update(observation="followup_readonly_not_original_timing", failed_stage="environment_same_draft", error_class=None, refusal_site=None, refusal_line=None, input_ready=True, environment_same_draft=False, source_read_delta=17, quote_write_delta=0, budget_write_delta=0)
+        original = {"observation": "original_native_attempt", "prepare_entered": False, "prepare_returned": False, "prepare_error_class": None, "prepare_refusal_site": None, "prepare_refusal_line": None, "evidence_called": True, "evidence_returned": False, "native_shipping_debug_enabled": None, "native_chosen_cache_present": True, "native_totals_cache_present": True, "native_shipping_cache_present": True, "source_reads": 0, "quote_writes": 0, "budget_writes": 4}
+        facts = dict(original, current_evidence_followup=followup)
+        self.assertTrue(DRIVER.native_failure_observation(facts)); self.assertEqual(0, facts["source_reads"]); self.assertEqual(original, {key: value for key, value in facts.items() if key != "current_evidence_followup"})
+        for key, value in (("observation", "original_native_attempt"), ("failed_stage", "PRIVATE-COOKIE"), ("error_class", "PRIVATE-CLASS"), ("refusal_site", "PRIVATE-CLASS"), ("refusal_line", 51), ("input_ready", 1), ("source_read_delta", True), ("quote_write_delta", -1), ("budget_write_delta", 1000001)):
+            with self.subTest(key=key, value=value):
+                bad = copy.deepcopy(facts); bad["current_evidence_followup"][key] = value
+                self.assertFalse(DRIVER.native_failure_observation(bad))
+        bad = copy.deepcopy(facts); bad["current_evidence_followup"]["private_payload"] = "PRIVATE-COOKIE"; self.assertFalse(DRIVER.native_failure_observation(bad))
+        bad = copy.deepcopy(facts); bad["evidence_returned"] = True; self.assertFalse(DRIVER.native_failure_observation(bad))
+        bad = copy.deepcopy(facts); bad["evidence_called"] = False; self.assertFalse(DRIVER.native_failure_observation(bad))
+
+    def test_source_registration_counterfactual_is_finite_optional_and_failure_only(self):
+        probe = {"observation": "pure_registration_counterfactual_original_attempt_not_retried", "native_query_singleton_present": True, "native_query_tuple_count": 1, "pre_get_posts_callback_count": 1, "capture_without_exact_tuple": True, "original_hook_restored": True}
+        facts = {"observation": "original_native_attempt", "prepare_entered": True, "prepare_returned": False, "prepare_error_class": "RuntimeException", "prepare_refusal_site": "source_local_binding", "prepare_refusal_line": 51, "evidence_called": False, "evidence_returned": False, "native_shipping_debug_enabled": None, "native_chosen_cache_present": False, "native_totals_cache_present": False, "native_shipping_cache_present": False, "source_reads": 0, "quote_writes": 0, "budget_writes": 0}
+        self.assertTrue(DRIVER.native_failure_observation(facts))
+        facts["source_registration_probe"] = probe
+        self.assertTrue(DRIVER.native_failure_observation(facts))
+        for key, value in (("observation", "PRIVATE-COOKIE"), ("native_query_tuple_count", True), ("native_query_tuple_count", 257), ("pre_get_posts_callback_count", 0), ("capture_without_exact_tuple", "PRIVATE-COOKIE"), ("original_hook_restored", 1), ("native_query_singleton_present", False)):
+            with self.subTest(key=key, value=value):
+                bad = copy.deepcopy(facts); bad["source_registration_probe"][key] = value
+                self.assertFalse(DRIVER.native_failure_observation(bad))
+        bad = copy.deepcopy(facts); bad["source_registration_probe"]["private_callback"] = "PRIVATE-COOKIE"; self.assertFalse(DRIVER.native_failure_observation(bad))
+        bad = copy.deepcopy(facts); bad["prepare_refusal_site"] = "legacy_source"; self.assertFalse(DRIVER.native_failure_observation(bad))
+        bad = copy.deepcopy(facts); bad["prepare_returned"] = True; self.assertFalse(DRIVER.native_failure_observation(bad))
+        bad = copy.deepcopy(facts); bad["source_registration_probe"].update(native_query_tuple_count=2, pre_get_posts_callback_count=2, capture_without_exact_tuple=None); self.assertTrue(DRIVER.native_failure_observation(bad))
+        bad["source_registration_probe"]["capture_without_exact_tuple"] = True; self.assertFalse(DRIVER.native_failure_observation(bad))
+
+    def test_exact_valid_dto_agrees_in_python_and_browser(self):
+        facts = public_facts()
+        self.assertTrue(DRIVER.safe_facts(facts))
+        self.assertTrue(child_helpers("safeFacts(" + json.dumps(facts) + ")"))
+
+    def test_nested_private_field_cannot_hide_behind_money_or_promotion(self):
+        values = []
+        for place in ("root", "quote", "money", "promotion"):
+            facts = public_facts()
+            target = facts if place == "root" else facts["quote"] if place == "quote" else facts["quote"]["money"][0] if place == "money" else facts["quote"]["money"][0]["promotion"]
+            target["renamed_internal_context"] = {"data": "PRIVATE-address"}
+            values.append(facts)
+            self.assertFalse(DRIVER.safe_facts(facts))
+        self.assertEqual([False] * 4, child_helpers(json.dumps(values) + ".map(safeFacts)"))
+
+    def test_reference_or_address_value_cannot_hide_in_safe_label(self):
+        for marker in ("PRIVATE-address", "acceptance_handle", "owner_digest", "session_hash", "rate_card", "supplier", "origin_id", "issue_context_json"):
+            with self.subTest(marker=marker):
+                facts = public_facts(); facts["quote"]["money"][0]["customer_label"] = marker
+                self.assertFalse(DRIVER.safe_facts(facts))
+
+    def test_unknown_status_array_and_false_integer_refuse(self):
+        for key, value in (("status", {}), ("generation", True), ("contract_version", True), ("can_confirm", 1)):
+            facts = public_facts(); facts[key] = value
+            self.assertFalse(DRIVER.safe_facts(facts))
+
+    def test_money_fraction_not_rounded_into_claimed_precision(self):
+        facts = public_facts(); facts["quote"]["money"][0]["tax"] = {"amount": "0.235", "currency": "GHS", "precision": 2}
+        self.assertFalse(DRIVER.safe_facts(facts)); self.assertFalse(child_helpers("safeFacts(" + json.dumps(facts) + ")"))
+
+    def test_unavailable_promotion_is_null_not_inferred_zero(self):
+        facts = public_facts(); facts["quote"]["money"][0]["promotion"] = {"state": "unavailable", "amount": None}
+        self.assertTrue(DRIVER.safe_facts(facts))
+        facts["quote"]["money"][0]["promotion"]["amount"] = {"amount": "0", "currency": "GHS", "precision": 2}
+        self.assertFalse(DRIVER.safe_facts(facts))
+
+    def test_component_budget_and_private_sentinel_are_bounded(self):
+        facts = public_facts(); facts["quote"]["money"] *= 201
+        self.assertFalse(DRIVER.safe_facts(facts))
+
+    def test_classic_html_bytes_are_read_without_js_execution(self):
+        facts = public_facts(); body = ('<div data-quote-review-transport="classic" data-quote-review-facts="' + html.escape(json.dumps(facts), quote=True) + '"></div>').encode()
+        self.assertEqual([facts], DRIVER.ReviewPage(body).facts)
+
+    def test_native_plain_pretty_encoded_routes_and_ambiguous_rejections(self):
+        native_plain = "/?rest_route=/wc/store/v1/cart/extensions"
+        native_pretty = "/wp-json/wc/store/v1/cart/extensions"
+        pairs = [(native_plain, native_plain, True), ("/?rest_route=%2Fwc%2Fstore%2Fv1%2Fcart%2Fextensions", native_plain, True), (native_pretty + "/", native_pretty, True), ("/?rest_route=/wc/store/v1/cart/extensions&rest_route=/other", native_plain, False), ("/?rest_route=/other&rest_route=/wc/store/v1/cart/extensions", native_plain, False), ("http://127.0.0.1:8086/?rest_route=/wc/store/v1/cart/extensions", native_plain, False), ("http://user@127.0.0.1:8085/?rest_route=/wc/store/v1/cart/extensions", native_plain, False), (native_plain + "#fragment", native_plain, False), ("/?rest_route=/wc/store/v1/cart", native_plain, False)]
+        expression = json.dumps(pairs) + ".map(([observed,native,expected])=>nativeRouteMatches(observed,native)===expected)"
+        self.assertEqual([True] * len(pairs), child_helpers(expression))
+
+    def test_browser_receipt_rejects_arbitrary_nested_private_diagnostics(self):
+        case = {"id": DRIVER.BROWSER_IDS[0], "status": "FAIL", "evidence": {"stage": "render", "error_class": "TimeoutError", "dom": dict.fromkeys(("blocks_visible", "review_visible", "refresh_visible", "confirm_visible", "price_visible", "confirmed_visible"), False), "required_case_incomplete": True}}
+        self.assertTrue(DRIVER.browser_evidence(case))
+        bad = copy.deepcopy(case); bad["evidence"]["error_message"] = "PRIVATE-cookie"; self.assertFalse(DRIVER.browser_evidence(bad))
+        bad = copy.deepcopy(case); bad["evidence"]["dom"]["review_visible"] = "PRIVATE-cookie"; self.assertFalse(DRIVER.browser_evidence(bad))
+        bad = copy.deepcopy(case); bad["evidence"]["stage"] = "PRIVATE-form"; self.assertFalse(DRIVER.browser_evidence(bad))
+
+    def test_browser_pass_requires_all_finite_fields_and_actual_runtime(self):
+        counts = dict.fromkeys(DRIVER.HISTORY, 0)
+        evidence = dict.fromkeys(DRIVER.BROWSER_BOOLS[0], True)
+        evidence.update(history_before=counts, history_after=counts, runtime={"playwright": "1.58.2", "chromium": "145.0.7632.6"})
+        case = {"id": DRIVER.BROWSER_IDS[0], "status": "PASS", "evidence": evidence}
+        self.assertTrue(DRIVER.browser_evidence(case))
+        bad = copy.deepcopy(case); del bad["evidence"]["runtime"]; self.assertFalse(DRIVER.browser_evidence(bad))
+        bad = copy.deepcopy(case); bad["evidence"]["runtime"]["chromium"] = "PRIVATE-path"; self.assertFalse(DRIVER.browser_evidence(bad))
+        bad = copy.deepcopy(case); bad["evidence"]["history_after"]["accepted"] = True; self.assertFalse(DRIVER.browser_evidence(bad))
+
+    def test_fixed_inventory_is_thirteen_unique_ids(self):
+        ids = DRIVER.DIRECT_IDS + DRIVER.BROWSER_IDS
+        self.assertEqual(13, len(ids)); self.assertEqual(13, len(set(ids)))
+
+    def test_valid_partial_browser_failure_is_retained_before_rejection(self):
+        counts = dict.fromkeys(DRIVER.HISTORY, 0)
+        first = dict.fromkeys(DRIVER.BROWSER_BOOLS[0], True)
+        first.update(history_before=counts, history_after=counts, runtime={"playwright": "1.58.2", "chromium": "145.0.7632.6"})
+        partial = [{"id": DRIVER.BROWSER_IDS[0], "status": "PASS", "evidence": first}, {"id": DRIVER.BROWSER_IDS[1], "status": "FAIL", "evidence": {"stage": "refresh", "error_class": "TimeoutError", "dom": dict.fromkeys(("blocks_visible", "review_visible", "refresh_visible", "confirm_visible", "price_visible", "confirmed_visible"), False), "required_case_incomplete": True}}]
+        identity = dict.fromkeys(("source_head", "candidate_head", "source_tree", "installed_php_sources_hash"), "fixture")
+        report = dict(identity, format="cetech-w2q05-cart-browser-v1", status="FAIL", cases=partial)
+        class Recorder:
+            def __init__(self): self.cases = []
+            def check(self, case_id, condition, evidence):
+                self.cases.append((case_id, condition, evidence))
+                if not condition: raise RuntimeError("Protocol recorded failure")
+        recorder = Recorder()
+        with tempfile.TemporaryDirectory() as directory:
+            state_path = Path(directory) / "private-state.json"; state_path.write_text("{}")
+            def child(command, **unused):
+                receipt = Path(command[command.index("--receipt") + 1]); receipt.write_text(json.dumps(report))
+                return subprocess.CompletedProcess(command, 1, b"", b"")
+            with patch.object(DRIVER.subprocess, "run", child):
+                with self.assertRaises(RuntimeError):
+                    DRIVER.run_browser({"state_path": str(state_path), "identity": identity}, recorder, type("Client", (), {"base_url": "http://127.0.0.1:8085"})())
+        self.assertEqual([(DRIVER.BROWSER_IDS[0], True), (DRIVER.BROWSER_IDS[1], False)], [(case_id, condition) for case_id, condition, unused in recorder.cases])
+
+
+if __name__ == "__main__":
+    unittest.main()

@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Infrastructure\Persistence;
 
 use CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourcePlan;
 use CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceSnapshot;
+use CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteSourceSeedRows;
 use CetechDeliveryEngine\Application\Operation\OperationStorageException;
 use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteContext;
 use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteJson;
@@ -21,6 +22,25 @@ final class LegacyQuoteSourceSnapshotReader {
 	public const MAX_CAPTURE_BYTES = 2097152;
 	private const MAX_TEXT_BYTES = 8192;
 	private const RATE_FIELDS = [ 'id', 'internal_code', 'delivery_offer_id', 'destination_zone_id', 'logistics_profile_id', 'supplier_id', 'origin_id', 'charge_type', 'base_amount', 'base_currency', 'included_weight', 'increment_weight', 'increment_amount', 'per_item_amount', 'per_line_amount', 'highest_fee_mode', 'remote_surcharge', 'free_shipping_threshold', 'manual_currency_override_data', 'priority', 'effective_from', 'effective_to', 'status', 'created_at', 'updated_at' ];
+	/** Source construction only: no rates, quote body, eligibility or currentness claim. */
+	public function capture_seed( OperationSession $session, QuoteOwner $owner, array $fences ): LegacyQuoteSourceSeedRows {
+		try {
+			if ( $session->is_retired() || ! $session->in_transaction() || $session->site_id() !== $owner->site_id() ) { self::fail(); }
+			$selectors = []; foreach ( LegacyQuoteSourceSeedRows::checked_fences( $fences ) as $fence ) { $selectors[LegacyQuoteSourcePlan::table( $session, $fence['source'] )] = $fence; } ksort( $selectors, SORT_STRING );
+			if ( ! $session->validate_tables( array_keys( $selectors ) ) ) { self::fail(); } $columns = [];
+			foreach ( $selectors as $table => $selector ) { $columns[$table] = $this->columns( $session, $table, $selector['source'] ); }
+			$scope_ids = []; $opened_scopes = [];
+			foreach ( $selectors as $table => $selector ) { if ( 'scopes' === $selector['source'] ) { $opened_scopes = $this->read( $session, $table, $columns[$table], $this->predicate( $session, $selector, [] ), 1001, false ); foreach ( $opened_scopes as $row ) { $scope_ids[] = QuoteStorageCodec::integer( $row['id'] ); } } }
+			$rows = []; $count = 0; $bytes = 0;
+			foreach ( $selectors as $table => $selector ) {
+				$source = $selector['source']; $limit = 'zones' === $source ? 201 : 1001;
+				$values = $this->read( $session, $table, $columns[$table], $this->predicate( $session, $selector, $scope_ids ), $limit, true ); if ( count( $values ) >= $limit || ( 'scopes' === $source && $opened_scopes !== $values ) ) { self::fail(); }
+				foreach ( $values as $row ) { $this->budget( $row, $count, $bytes ); } $rows[$source] = $values;
+			}
+			$at = $session->get_row( 'SELECT UTC_TIMESTAMP(6) AS utc' ); if ( ! is_array( $at ) || array_keys( $at ) !== [ 'utc' ] || ! is_string( $at['utc'] ) ) { self::fail(); }
+			return new LegacyQuoteSourceSeedRows( $rows, QuoteTime::parse( $at['utc'] ) );
+		} catch ( \Throwable ) { self::fail(); }
+	}
 	public function capture( OperationSession $session, QuoteOwner $owner, QuoteContext $context, LegacyQuoteSourcePlan $plan ): LegacyQuoteSourceSnapshot {
 		try {
 			if ( $session->is_retired() || ! $session->in_transaction() || $session->site_id() !== $owner->site_id() || ! $owner->equals( $plan->owner() ) || ! $plan->matches_context( $context ) || ! $session->validate_tables( $plan->tables( $session ) ) ) { self::fail(); }

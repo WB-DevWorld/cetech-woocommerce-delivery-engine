@@ -68,7 +68,7 @@ final class QuoteOperationProfile implements OperationProfile {
 		if ( 'delivery_quote.issue' === $this->name ) {
 			if ( null === $c->capture() || null === $c->lease() || null === $c->original_issue() || ! $c->lease()->capture_started() ) { $this->refuse( 'temporarily_unavailable' ); }
 			$lease = $repo->find_admission( $identity->namespace_digest(), true );
-			if ( null === $lease || ! $c->lease()->matches( $c->original_issue() ) || $lease->row() !== $c->lease()->slot()->row() || 'granted' !== $lease->row()['lease_state'] || $lease->row()['server_attempt_digest'] !== $c->lease()->server_attempt_digest() || $lease->row()['admission_intent_digest'] !== $c->intent()->fingerprint() || $lease->row()['principal_hash'] !== $c->owner()->facts()['principal_hash'] ) { $this->refuse( 'intent_conflict' ); }
+			if ( null === $lease || ! $c->lease()->matches( $c->original_issue() ) || $lease->row() !== $c->lease()->slot()->row() || 'granted' !== $lease->row()['lease_state'] || $lease->row()['server_attempt_digest'] !== $c->lease()->server_attempt_digest() || $lease->row()['admission_intent_digest'] !== $c->lease()->admission_intent_digest() || $lease->row()['principal_hash'] !== $c->owner()->facts()['principal_hash'] ) { $this->refuse( 'intent_conflict' ); }
 			$quote = $repo->find_quote( $c->header()->id(), true ); if ( null !== $quote ) { $this->refuse( 'stale_revision' ); }
 		} else {
 			$h = $c->header(); if ( null === $h || null === $c->reference() ) { $this->refuse( 'invalid_input' ); }

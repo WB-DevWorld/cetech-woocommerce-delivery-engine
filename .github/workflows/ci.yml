@@ -165,7 +165,7 @@ jobs:
             }
             echo "mariadb_preflight=ok\n";
           '
-      - name: Real MariaDB / geography / operation-store / rule-lifecycle / data-lifecycle / quote-lifecycle / retained-price-provider / migration proofs
+      - name: Real MariaDB / geography / operation-store / rule-lifecycle / data-lifecycle / quote-lifecycle / retained-price-provider / cart-reference / migration proofs
         env:
           CETECH_DE_REAL_DB_HOST: 127.0.0.1
           CETECH_DE_REAL_DB_PORT: 3306
@@ -190,6 +190,8 @@ jobs:
             'CetechDeliveryEngine\Tests\Integration\DeliveryQuote\DeliveryQuoteLifecycleRealDatabaseTest' 46
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryQuote\LegacyPriceProviderRealDatabaseTest' 41
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+            'CetechDeliveryEngine\Tests\Integration\DeliveryQuote\DeliveryQuoteCartReferenceRealDatabaseTest' 32
 
   php85-wordpress:
     name: PHP 8.5 WordPress/WooCommerce

@@ -6,6 +6,12 @@ namespace CetechDeliveryEngine\Bootstrap;
 
 use CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutAdmissionService;
 use CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutQuoteValidator;
+use CetechDeliveryEngine\Application\DeliveryQuote\CartQuoteReviewService;
+use CetechDeliveryEngine\Application\DeliveryQuote\CartQuoteService;
+use CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuoteEnvironment;
+use CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuoteSessionStore;
+use CetechDeliveryEngine\Application\DeliveryQuote\QuotePreparationGate;
+use CetechDeliveryEngine\Application\Order\DeliveryQuoteSnapshotReader;
 use CetechDeliveryEngine\Application\EmergencyControl\EmergencyControlService;
 use CetechDeliveryEngine\Application\EmergencyControl\EmergencyOwnershipClassifier;
 use CetechDeliveryEngine\Application\EmergencyControl\EmergencyOwnershipLatch;
@@ -435,6 +441,18 @@ final class Plugin {
 		return $this->container;
 	}
 
+	/** Q05 prepares compiled services; Q06 separately owns native placement activation. */
+	private function register_quote_review_services(): void {
+		$this->container->singleton( CartQuoteReviewService::class, static function (): CartQuoteReviewService {
+			$factory = new \CetechDeliveryEngine\Infrastructure\WordPress\OperationConnectionFactory();
+			$environment = new NativeCartQuoteEnvironment( $factory );
+			$authorize = [ $environment, 'authorize' ];
+			return new CartQuoteService( $environment, new QuotePreparationGate( $factory, $authorize ), new NativeCartQuoteSessionStore( $factory, $authorize ), $factory );
+		} );
+		$this->container->singleton( DeliveryQuoteSnapshotReader::class, static fn(): DeliveryQuoteSnapshotReader => new DeliveryQuoteSnapshotReader() );
+		// QuoteReviewRuntime::register() is deliberately not called by this checkpoint.
+	}
+
 	/** The shared guards remain registered independently of all old module flags. */
 	private function register_emergency_control_services(): void {
 		$this->container->singleton( EmergencyControlService::class,
@@ -488,6 +506,7 @@ final class Plugin {
 
 	private function register_services(): void {
 		$this->register_emergency_control_services();
+		$this->register_quote_review_services();
 		$this->container->singleton(
 			FeatureFlags::class,
 			static fn (): FeatureFlags => new FeatureFlags()

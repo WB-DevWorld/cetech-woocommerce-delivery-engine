@@ -1,3 +1,7 @@
+## Q05 owner authorization — 2026-10-07
+
+The owner approved W2-Q04 integration and W2-Q05 implementation. Qualified PR90 candidate `108853048a42e119a0ed01395657ee63f9c3d9a7` merged normally as `70e2330e6bbb15a3cf5175c33e6a706f7315659c`, unchanged tree `1c55a72039b0b2f6412020e4c253f5876e02159a`. Separate actual-master CI37629393060 attempt1 passed all8 substantive jobs/native442/HTTP98/browser/smoke/cleanup and691 exact source hashes. Issue89 is completed; [Issue91](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/91) tracks Q05. The cart/readers boundary below is now authorized. Q05 has its own implementation and immutable-candidate qualification; Q06 placement remains separate. Earlier authorization/status paragraphs describe historical checkpoints.
+
 ## Q04 owner authorization — 2026-10-07
 
 The owner approved W2-Q03 for integration and W2-Q04 implementation. Q03 PR88 merged normally at `1555d5ec19052eac4d9f1a019dbdc9aa058cf487`, tree `2b5ef07c37979e10e0eec3c84d45274d6e535363`; separate actual-master CI37589028902 qualified all8jobs/native412/HTTP98/666-source map. Issue87 completed; Issue89 tracks Q04. This authorizes the retained existing-price provider checkpoint below; Q05 cart/readers and Q06 placement remain separate checkpoints. Q04 integration will have its own owner acceptance after immutable-candidate qualification.

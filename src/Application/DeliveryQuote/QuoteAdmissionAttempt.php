@@ -10,9 +10,17 @@ final class QuoteAdmissionAttempt implements \JsonSerializable {
 	private ?string $namespace = null;
 	private ?string $intent = null;
 	private ?string $owner = null;
+	private ?string $preparation_intent = null;
 	private function __construct( private readonly string $digest ) {}
 	public static function generate(): self { return new self( hash( 'sha256', 'cetech-quote-attempt-v1:' . random_bytes( 32 ) ) ); }
+	/** Receives the one-use live handoff; the original durable admission intent stays unchanged. */
+	public static function from_preparation( QuotePreparationAttempt $preparation, QuoteIssueCommand $command ): self {
+		[ $digest, $early_intent ] = $preparation->consume_issue_binding( $command ); $attempt = new self( $digest );
+		if ( ! $attempt->begin( $command ) || ! $attempt->confirm() ) { throw new \LogicException( 'Quote preparation handoff failed.' ); }
+		$attempt->preparation_intent = $early_intent; return $attempt;
+	}
 	public function digest(): string { return $this->digest; }
+	public function admission_intent_digest(): ?string { return $this->preparation_intent ?? $this->intent; }
 	public function begin( QuoteIssueCommand $command ): bool {
 		if ( 'new' !== $this->phase ) { return false; }
 		$this->namespace = $command->identity()->namespace_digest(); $this->intent = $command->intent_digest(); $this->owner = $command->owner()->digest(); $this->phase = 'acquiring'; return true;

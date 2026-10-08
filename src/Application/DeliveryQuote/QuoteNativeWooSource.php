@@ -12,6 +12,8 @@ final class QuoteNativeWooSource implements QuoteNativeCaptureSource, \JsonSeria
  public const OPTIONS=['woocommerce_currency','woocommerce_price_num_decimals','woocommerce_calc_taxes','woocommerce_prices_include_tax','woocommerce_tax_round_at_subtotal','woocommerce_shipping_tax_class','woocommerce_tax_classes','woocommerce_default_country','woocommerce_default_customer_address','woocommerce_tax_based_on','woocommerce_store_address','woocommerce_store_address_2','woocommerce_store_city','woocommerce_store_postcode','woocommerce_shipping_cost_requires_address'];
  private array $objects=[];private array $hook_objects=[];private ?string $binding=null;private ?object $wc=null;private int $user=0;private int $site=0;private array $option_names=[];
  public function current_owner():QuoteOwner{return (new QuoteNativeOwnerResolver())->current();}
+ /** Existing finite policy, checked before read-only native package reconstruction. */
+ public static function supports_current_hooks():bool {try{return self::hooks_supported(self::OPTIONS);}catch(\Throwable){return false;}}
  public function capture():QuoteNativeState {
   $owner=$this->current_owner();$identity_keys=QuoteNativeContextIdentity::from_server();if($identity_keys->key_epoch()!==$owner->key_epoch()){self::refuse();}$wc=WC();$cart=$wc->cart??null;$customer=$wc->customer??null;$session=$wc->session??null;
   if(!$cart instanceof \WC_Cart||get_class($cart)!=='WC_Cart'||!$customer instanceof \WC_Customer||get_class($customer)!=='WC_Customer'||get_class($session)!=='WC_Session_Handler'||!$cart->has_calculated_shipping()){self::refuse();}

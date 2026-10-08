@@ -22,7 +22,8 @@ PRIVATE="$WORK/opening-http-private"
 RECEIPT="$WORK/opening-http-qualification-results.json"
 MU="$SITE/wp-content/mu-plugins/cetech-opening-http-fixture.php"
 EMERGENCY_MU="$SITE/wp-content/mu-plugins/cetech-opening-emergency-fixture.php"
-if [[ -e "$PRIVATE" || -L "$PRIVATE" || -e "$MU" || -L "$MU" || -e "$EMERGENCY_MU" || -L "$EMERGENCY_MU" || -e "$RECEIPT" || -L "$RECEIPT" ]]; then
+QUOTE_CART_MU="$SITE/wp-content/mu-plugins/cetech-opening-quote-cart-fixture.php"
+if [[ -e "$PRIVATE" || -L "$PRIVATE" || -e "$MU" || -L "$MU" || -e "$EMERGENCY_MU" || -L "$EMERGENCY_MU" || -e "$QUOTE_CART_MU" || -L "$QUOTE_CART_MU" || -e "$RECEIPT" || -L "$RECEIPT" ]]; then
     echo "BLOCKED: HTTP qualification refuses an existing credential, MU, or receipt allocation" >&2
     exit 1
 fi
@@ -54,16 +55,20 @@ WP=("$PHP_EXECUTABLE" "$WORK/wp-cli.phar" --allow-root --path="$SITE" --require=
 IMPORT_BRIDGE="$ROOT/scripts/qualification/opening-http-fixture.php"
 CONFIG_BRIDGE="$ROOT/scripts/qualification/opening-http-configuration-fixture.php"
 EMERGENCY_BRIDGE="$ROOT/scripts/qualification/opening-http-emergency-fixture.php"
+QUOTE_CART_BRIDGE="$ROOT/scripts/qualification/opening-http-quote-cart-fixture.php"
 IMPORT_STATE="$PRIVATE/import-state.json"
 CONFIG_STATE="$PRIVATE/config-state.json"
 EMERGENCY_STATE="$PRIVATE/emergency-state.json"
+QUOTE_CART_STATE="$PRIVATE/quote-cart-state.json"
 export CETECH_DE_HTTP_EMERGENCY_STATE="$EMERGENCY_STATE"
+export CETECH_DE_HTTP_QUOTE_CART_STATE="$QUOTE_CART_STATE"
 IMPORT_PREPARE="$PRIVATE/import-prepare-output.json"
 SERVER_PID=""
 SERVER_STARTED=0
 LISTENER_ATTESTED=0
 MU_CREATED=0
 EMERGENCY_MU_CREATED=0
+QUOTE_CART_MU_CREATED=0
 MU_REMOVED=0
 ROW_CLEANUP=1
 QUALIFICATION_STAGE="allocated"
@@ -139,6 +144,10 @@ finish_http_fixture() {
     fi
     # Stop the listener and restore core handling before database cleanup can
     # wait on any fixture locks. Touch only identity-tracked fixture rows.
+    if [[ -f "$QUOTE_CART_STATE" && -f "$QUOTE_CART_BRIDGE" ]]; then
+        "${WP[@]}" eval-file "$QUOTE_CART_BRIDGE" cleanupquotecart "$QUOTE_CART_STATE" "$PRIVATE/quote-cart-trap-cleanup.json" >"$PRIVATE/quote-cart-cleanup-command.log" 2>&1
+        if [[ "$?" != "0" ]]; then ROW_CLEANUP=0; fi
+    fi
     if [[ -f "$EMERGENCY_STATE" && -f "$EMERGENCY_BRIDGE" ]]; then
         "${WP[@]}" eval-file "$EMERGENCY_BRIDGE" cleanupemergency "$EMERGENCY_STATE" "$PRIVATE/emergency-trap-cleanup.json" >"$PRIVATE/emergency-cleanup-command.log" 2>&1
         if [[ "$?" != "0" ]]; then ROW_CLEANUP=0; fi
@@ -165,8 +174,14 @@ finish_http_fixture() {
         fi
         if [[ -e "$EMERGENCY_MU" ]]; then MU_REMOVED=0; fi
     fi
+    if [[ "$QUOTE_CART_MU_CREATED" == "1" && -f "$QUOTE_CART_MU" ]]; then
+        if cmp -s "$ROOT/scripts/qualification/opening-http-quote-cart-mu.php" "$QUOTE_CART_MU"; then
+            rm "$QUOTE_CART_MU"
+        fi
+        if [[ -e "$QUOTE_CART_MU" ]]; then MU_REMOVED=0; fi
+    fi
     # Presence is the final cleanup truth, even when allocation/copy was refused.
-    if [[ -e "$MU" || -L "$MU" || -e "$EMERGENCY_MU" || -L "$EMERGENCY_MU" ]]; then MU_REMOVED=0; fi
+    if [[ -e "$MU" || -L "$MU" || -e "$EMERGENCY_MU" || -L "$EMERGENCY_MU" || -e "$QUOTE_CART_MU" || -L "$QUOTE_CART_MU" ]]; then MU_REMOVED=0; fi
     local db_connect="absent"
     local db_wait_ms=""
     if [[ -n "${CETECH_DE_WP_DB_PORT:-}" ]]; then
@@ -435,6 +450,8 @@ MU_CREATED=1
 cp "$ROOT/scripts/qualification/opening-http-mu.php" "$MU"
 EMERGENCY_MU_CREATED=1
 cp "$ROOT/scripts/qualification/opening-http-emergency-mu.php" "$EMERGENCY_MU"
+QUOTE_CART_MU_CREATED=1
+cp "$ROOT/scripts/qualification/opening-http-quote-cart-mu.php" "$QUOTE_CART_MU"
 QUALIFICATION_STAGE="import_prepare"
 "${WP[@]}" eval-file "$IMPORT_BRIDGE" prepare "$IMPORT_STATE" "$IMPORT_PREPARE" >"$PRIVATE/import-prepare-command.log" 2>&1
 
@@ -526,7 +543,9 @@ python3 "$ROOT/scripts/qualification/opening-http-driver.py" \
     --configuration-driver "$ROOT/scripts/qualification/opening-http-configuration-driver.py" \
     --configuration-bridge "$CONFIG_BRIDGE" --configuration-state "$CONFIG_STATE" \
     --emergency-driver "$ROOT/scripts/qualification/opening-http-emergency-driver.py" \
-    --emergency-bridge "$EMERGENCY_BRIDGE" --emergency-state "$EMERGENCY_STATE"
+    --emergency-bridge "$EMERGENCY_BRIDGE" --emergency-state "$EMERGENCY_STATE" \
+    --quote-cart-driver "$ROOT/scripts/qualification/opening-http-quote-cart-driver.py" \
+    --quote-cart-bridge "$QUOTE_CART_BRIDGE" --quote-cart-state "$QUOTE_CART_STATE"
 QUALIFICATION_STAGE="complete"
 
 # EXIT performs final owned-listener/MU/private-file cleanup and appends its
