@@ -22,12 +22,13 @@ use CetechDeliveryEngine\Domain\Operation\OperationRefusal;
 use CetechDeliveryEngine\Domain\Operation\OperationSchema;
 use CetechDeliveryEngine\Domain\Operation\OperationSession;
 use CetechDeliveryEngine\Domain\Operation\OperationTarget;
+use CetechDeliveryEngine\Domain\Operation\OperationTerminalRejectionProfile;
 use CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteSchema;
 use CetechDeliveryEngine\Infrastructure\Persistence\EmergencyControlStore;
 
 /** Finite lifecycle profiles. No provider capture, Woo CRUD or external IO in this unit. */
-final class QuoteOperationProfile implements OperationProfile {
+final class QuoteOperationProfile implements OperationProfile, OperationTerminalRejectionProfile {
 	public const OPERATIONS = [ 'delivery_quote.issue', 'delivery_quote.accept', 'delivery_quote.invalidate', 'delivery_quote.bind', 'delivery_quote.verify_binding', 'delivery_quote.seal' ];
 	private ?\Closure $authorizer;
 	private ?OperationSession $session = null;
@@ -40,6 +41,14 @@ final class QuoteOperationProfile implements OperationProfile {
 	public static function registry(): OperationProfileRegistry { return new OperationProfileRegistry( [ ...array_map( static fn( string $operation ): self => new self( $operation ), self::OPERATIONS ), new self( 'delivery_quote.seal', profile_version: 2 ) ] ); }
 	public function operation(): string { return $this->name; }
 	public function version(): int { return $this->profile_version; }
+	/** Shopper placement refusals retain their original finite receipt; legacy internal v1 remains retryable. */
+	public function rejects_are_terminal(): bool {
+		if ( null === $this->bound || $this->bound->identity->operation !== $this->name || $this->bound->identity->operation_version !== $this->version() ) { return false; }
+		if ( 'delivery_quote.verify_binding' === $this->name || 'delivery_quote.seal' === $this->name && 2 === $this->version() ) { return true; }
+		if ( 'delivery_quote.bind' !== $this->name || null === $this->bound->binding() || null === $this->bound->header() ) { return false; }
+		$b = $this->bound->binding()->row(); $names = QuoteDurableCommand::binding_namespaces( $this->bound->owner(), $this->bound->header(), $b['placement_uuid'], true );
+		return $b['bind_namespace_hash'] === $names['bind'] && $b['seal_namespace_hash'] === $names['seal'];
+	}
 	public function authorize( OperationIdentity $identity ): bool {
 		try { return null !== $this->bound && null !== $this->authorizer && $identity->operation === $this->name && $identity->operation_version === $this->profile_version && $identity->site_id === $this->bound->owner()->site_id() && hash_equals( $identity->namespace_digest(), $this->bound->identity->namespace_digest() ) && true === ( $this->authorizer )( $this->bound->owner(), $this->name ); } catch ( \Throwable ) { return false; }
 	}

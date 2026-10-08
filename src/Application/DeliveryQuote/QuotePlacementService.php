@@ -4,14 +4,18 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Application\DeliveryQuote;
 
 use CetechDeliveryEngine\Domain\Contracts\RequestContext;
-use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteBinding,QuoteId,QuoteJson,QuoteTime};
+use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteBinding,QuoteHeader,QuoteId,QuoteJson,QuoteOwner,QuoteTime};
 
 /** Ordered private prepare/verify/final receipt orchestration; Woo is staged separately. */
 final readonly class QuotePlacementService {
 	public function __construct( private QuoteDurableService $durable, private QuotePlacementEvidence $evidence ) {}
 	/** Retry namespaces are finite and original even after a process is replaced. */
 	public function placement_id(): string {
-		$h = hash( 'sha256', 'cetech-quote-placement-v1:' . $this->evidence->owner()->digest() . ':' . $this->evidence->header()->id()->value() . ':' . $this->evidence->header()->body_digest() );
+		return self::placement_id_for( $this->evidence->owner(), $this->evidence->header() );
+	}
+	public static function placement_id_for( QuoteOwner $owner, QuoteHeader $header ): string {
+		if ( ! $header->owner()->equals( $owner ) ) { throw new \InvalidArgumentException( 'Original quote owner is required.' ); }
+		$h = hash( 'sha256', 'cetech-quote-placement-v1:' . $owner->digest() . ':' . $header->id()->value() . ':' . $header->body_digest() );
 		return QuoteId::from_string( substr( $h, 0, 8 ) . '-' . substr( $h, 8, 4 ) . '-4' . substr( $h, 13, 3 ) . '-8' . substr( $h, 17, 3 ) . '-' . substr( $h, 20, 12 ) )->value();
 	}
 	public function prepare( int $order_id, array $mapping, RequestContext $request ): QuoteDurableResult {

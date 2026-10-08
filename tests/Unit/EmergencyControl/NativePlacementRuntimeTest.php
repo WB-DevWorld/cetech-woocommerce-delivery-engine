@@ -60,6 +60,29 @@ final class NativePlacementRuntimeTest extends TestCase {
 		self::assertTrue( $runtime->owns_order( $order ) ); self::assertFalse( $runtime->validate_order( $order, 'order_pay' ) ); self::assertSame( 0, $legacy->calls );
 		$binding = EmergencyCheckoutLocalBinding::capture( $order ); self::assertNotNull( $binding ); self::assertFalse( $runtime->complete( $order, 'order_pay', 1, $binding ) ); self::assertFalse( $runtime->admitted( $order, 'order_pay', 1, $binding ) );
 	}
+	public function test_early_quote_line_marker_cannot_enter_legacy_payment_when_adoption_is_off(): void {
+		$legacy = new CheckoutQuoteFixture(); $runtime = $this->runtime( false, false, $legacy ); $item = new \WC_Order_Item_Product( [ 'product_id' => 10, 'quantity' => 1 ] );
+		$item->update_meta_data( QuoteNativeOrderFacts::META_LINE_KEY, 'original-quote-line' ); $order = new \WC_Order( [ 'id' => 19, 'items' => [ $item ] ] );
+		self::assertFalse( \CetechDeliveryEngine\Application\Order\QuoteNativeOrderHistory::owned( $order ) ); self::assertTrue( $runtime->owns_order( $order ) );
+		self::assertFalse( $runtime->validate_order( $order, 'order_pay' ) ); self::assertSame( 0, $legacy->calls );
+		$binding = EmergencyCheckoutLocalBinding::capture( $order ); self::assertNotNull( $binding ); self::assertFalse( $runtime->complete( $order, 'order_pay', 1, $binding ) ); self::assertFalse( $runtime->admitted( $order, 'order_pay', 1, $binding ) );
+	}
+	public function test_ordinary_legacy_mapping_key_does_not_become_an_early_quote_attempt(): void {
+		$legacy = new CheckoutQuoteFixture(); $runtime = $this->runtime( false, false, $legacy ); $item = new \WC_Order_Item_Product( [ 'product_id' => 10, 'quantity' => 1 ] );
+		$item->update_meta_data( \CetechDeliveryEngine\Application\Order\OrderDeliverySnapshot::META_CART_ITEM_KEY, 'ordinary-legacy-line' ); $order = new \WC_Order( [ 'id' => 19, 'items' => [ $item ] ] );
+		self::assertFalse( $runtime->owns_order( $order ) ); self::assertTrue( $runtime->validate_order( $order, 'order_pay' ) ); self::assertSame( 1, $legacy->calls );
+	}
+	public function test_attempt_marker_does_not_interrupt_the_second_native_line_annotation(): void {
+		$runtime = $this->runtime( true, true ); $first = new \WC_Order_Item_Product( [ 'product_id' => 10, 'quantity' => 1 ] ); $second = new \WC_Order_Item_Product( [ 'product_id' => 11, 'quantity' => 1 ] );
+		$order = new \WC_Order( [ 'id' => 19, 'items' => [ $first, $second ] ] ); $runtime->bind_native_line( $first, 'first-original-line', [], $order ); $runtime->bind_native_line( $second, 'second-original-line', [], $order );
+		self::assertSame( 'first-original-line', $first->get_meta( QuoteNativeOrderFacts::META_LINE_KEY, true ) ); self::assertSame( 'second-original-line', $second->get_meta( QuoteNativeOrderFacts::META_LINE_KEY, true ) );
+	}
+	public function test_live_unmanaged_catalog_still_checks_an_unpaid_early_quote_attempt(): void {
+		$source = new CheckoutSourceFixture(); $source->managed = false; $control = new CheckoutControlFixture(); $legacy = new CheckoutQuoteFixture(); $runtime = $this->runtime( false, false, $legacy );
+		$service = new \CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutAdmissionService( $control, new \CetechDeliveryEngine\Application\EmergencyControl\EmergencyOwnershipClassifier( [ $source ] ), $runtime, new \CetechDeliveryEngine\Application\EmergencyControl\EmergencyOwnershipLatch(), $runtime );
+		$item = new \WC_Order_Item_Product( [ 'product_id' => 10, 'quantity' => 1 ] ); $item->update_meta_data( QuoteNativeOrderFacts::META_LINE_KEY, null ); $order = new \WC_Order( [ 'id' => 19, 'items' => [ $item ] ] );
+		$decision = $service->final_order( $order, 'order_pay' ); self::assertFalse( $decision->allowed ); self::assertSame( 1, $control->reads ); self::assertSame( 0, $legacy->calls ); self::assertSame( 0, $control->confirms );
+	}
 	public function test_logged_in_guest_order_requires_exact_key_and_native_payment_capability(): void {
 		$runtime = $this->runtime( false, false ); $GLOBALS['cetech_de_test_user_id'] = 9; $GLOBALS['cetech_de_test_caps'] = [ 'pay_for_order' => true ]; $_GET = [ 'key' => 'retained-native-order-key' ]; $_POST = [];
 		$order = new PlacementPayOrderFixture( 0 ); self::assertTrue( $runtime->authorize_saved_order( $order ) );

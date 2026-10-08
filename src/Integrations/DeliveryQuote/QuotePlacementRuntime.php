@@ -71,7 +71,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 
 	/** Persister guard: a quote-owned group never falls back to the legacy writer. */
 	public function owns_order( \WC_Order $order ): bool {
-		try { return QuoteNativeOrderHistory::owned( $order ) || $this->new_cart_owned(); }
+		try { return QuoteNativeOrderHistory::attempted( $order ) || $this->new_cart_owned(); }
 		catch ( \Throwable ) { return true; }
 	}
 	public function fingerprint( \WC_Order $order ): ?string { return EmergencyCheckoutFacts::order_fingerprint( $order ); }
@@ -137,6 +137,10 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 			if ( ! is_string( $nonce ) || strlen( $nonce ) > 128 || ! function_exists( 'wp_verify_nonce' ) || ! wp_verify_nonce( $nonce, 'wc_store_api' ) || '' !== (string) $request->get_header( 'Cart-Token' ) || ! $native->has_session() ) { return $this->store_recovery_error(); }
 			$order = function_exists( 'wc_get_order' ) ? wc_get_order( $original['order_id'] ) : null;
 			if ( ! $order instanceof \WC_Order || ! $this->authorize_checkout_pointer( $order, $native ) ) { return $this->store_recovery_error(); }
+			// This dispatch seam precedes Woo's handler. Load the same native session
+			// cart once, after authorization and before capturing any quote evidence.
+			if ( ! class_exists( '\Automattic\WooCommerce\StoreApi\Utilities\CartController' ) ) { return $this->store_recovery_error(); }
+			( new \Automattic\WooCommerce\StoreApi\Utilities\CartController() )->load_cart();
 			$evidence = $this->cart->current( RequestContext::create() );
 			if ( null === $evidence ) { return $this->store_recovery_error(); }
 			if ( $evidence->header()->id()->value() !== $original['quote_id'] ) {
@@ -159,6 +163,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 			$entry = $this->stages[$this->coordinate( $order )] ?? null;
 			if ( null !== $entry ) { return $this->stage_matches( $order, $entry ) && ( $entry['route'] === $route || 'order_pay' === $route && 'sealed' === $entry['binding']->state() && $this->authorize_saved_order( $order ) ) && QuoteNativeOrderHistory::verify( $order ); }
 			if ( ! QuoteNativeOrderHistory::owned( $order ) ) {
+				if ( QuoteNativeOrderHistory::attempted( $order ) ) { return false; }
 				return 'order_pay' === $route || ! $this->new_cart_owned() ? $this->legacy->validate_order( $order, $route ) : false;
 			}
 			// A saved, empty-cart payment is resolved only after native exact-order auth.
@@ -208,7 +213,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 				if ( null !== $guard ) { $guard = $this->saved_authorization_guard( $order, $guard ); }
 				if ( null === $binding || null === $guard || ! $this->durable( $evidence )->admit_sealed_placement( $evidence->owner(), $evidence->reference(), $evidence->header(), $binding, RequestContext::create(), $evidence->current_context(), $control_revision, $local, $guard )
 					|| ! $this->authorize_saved_order( $order ) || ! $local->unchanged() ) { return false; }
-			} else { return ! $this->new_cart_owned() || 'order_pay' === $route; }
+			} else { return ! QuoteNativeOrderHistory::attempted( $order ) && ( ! $this->new_cart_owned() || 'order_pay' === $route ); }
 			if ( 'order_pay' !== $route || isset( $_POST['woocommerce_pay'] ) ) {
 				$pay_binding = null !== $entry ? $this->stages[$this->coordinate( $order )]['binding'] : $binding;
 				$pay_guard = null !== $entry ? $entry['guard'] : $evidence->saved_guard();
@@ -228,7 +233,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 		try {
 			$entry = $this->continuations[$order] ?? null;
 			if ( null !== $entry ) { return $entry['route'] === $route && $entry['revision'] === $control_revision && $entry['local'] === $binding && $binding->unchanged(); }
-			return ! QuoteNativeOrderHistory::owned( $order ) && ( 'order_pay' === $route || ! $this->new_cart_owned() );
+			return ! QuoteNativeOrderHistory::attempted( $order ) && ( 'order_pay' === $route || ! $this->new_cart_owned() );
 		} catch ( \Throwable ) { return false; }
 	}
 
@@ -415,7 +420,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 		try {
 			if ( ! self::valid_continuation( $original ) || $original['quote_id'] === $current->header()->id()->value() || $native->get( self::SESSION_CONTINUATION ) !== $original || ! $current->authorize( $current->owner(), 'delivery_quote.read' ) ) { return false; }
 			$order = function_exists( 'wc_get_order' ) ? wc_get_order( $original['order_id'] ) : null;
-			if ( ! $order instanceof \WC_Order || ! $this->authorize_checkout_pointer( $order, $native ) || ! QuoteNativeOrderHistory::verify( $order ) ) { return false; }
+			if ( ! $order instanceof \WC_Order || ! $this->authorize_checkout_pointer( $order, $native ) ) { return false; }
 			$session = $this->factory->open(); ( new \CetechDeliveryEngine\Application\Operation\DatabaseOperationReadiness() )->assert_ready( $session );
 			if ( $session->site_id() !== $current->owner()->site_id() || $session->in_transaction() || $session->is_retired() || ! $session->begin() ) { return false; } $begun = true;
 			$repository = new \CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteRepository( $session );
@@ -423,9 +428,14 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 			if ( null === $quote || ! $quote->header()->owner()->equals( $current->owner() ) ) { return false; }
 			$binding = $repository->find_binding( $quote ); $verifier = new \CetechDeliveryEngine\Application\DeliveryQuote\QuoteReceiptVerifier(); $receipts = $verifier->lock( $session, $quote->header(), $binding );
 			$fresh = $repository->find_quote( $quote->header()->id(), true ); $latest = null === $fresh ? null : $repository->find_binding( $fresh, true );
-			if ( null === $fresh || null === $latest || $latest->row()['order_id'] !== $original['order_id'] || $latest->row()['placement_uuid'] !== $original['placement_id'] || ! ( 'sealed' === $latest->state() && 3 === $latest->revision() || 'prepared' === $latest->state() && 2 === $latest->revision() ) || ! $fresh->header()->owner()->equals( $current->owner() ) || ! $verifier->verify( $fresh, $receipts, $latest ) || ! $session->rollback() ) { return false; }
+			if ( null === $fresh || $fresh->row() !== $quote->row() || $latest?->row() !== $binding?->row() || null !== $latest && ( $latest->row()['order_id'] !== $original['order_id'] || $latest->row()['placement_uuid'] !== $original['placement_id'] || ! ( 'sealed' === $latest->state() && 3 === $latest->revision() || 'prepared' === $latest->state() && in_array( $latest->revision(), [ 1, 2 ], true ) ) ) || ! $fresh->header()->owner()->equals( $current->owner() ) || ! $verifier->verify( $fresh, $receipts, $latest ) || ! $session->rollback() ) { return false; }
 			$begun = false; if ( ! $session->retire() || $native->get( self::SESSION_CONTINUATION ) !== $original || ! $this->authorize_checkout_pointer( $order, $native ) || ! $current->authorize( $current->owner(), 'delivery_quote.read' ) ) { return false; }
-			if ( 'sealed' === $latest->state() ) { return true; }
+			if ( null !== $latest && 'sealed' === $latest->state() ) { return QuoteNativeOrderHistory::verify( $order ); }
+			if ( null === $latest || 1 === $latest->revision() ) {
+				$guard = QuotePlacementNoEffectNativeGuard::capture( $this->factory, $this->stager, $order, $fresh, $latest );
+				return null !== $guard && $this->durable( $current )->known_rejected_original_placement( $current, $fresh, $original['order_id'], $original['placement_id'], $latest, $guard ) && $guard->unchanged() && $native->get( self::SESSION_CONTINUATION ) === $original && $this->authorize_checkout_pointer( $order, $native ) && $current->authorize( $current->owner(), 'delivery_quote.read' );
+			}
+			if ( ! QuoteNativeOrderHistory::verify( $order ) ) { return false; }
 			$reference_json = $order->get_meta( QuoteNativeOrderFacts::META_REFERENCE, true ); if ( ! is_string( $reference_json ) || strlen( $reference_json ) > 4096 ) { return false; }
 			$reference = \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteReference::from_array( \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteJson::decode( $reference_json, 4096 ) );
 			$guard = $this->stager->saved_guard( $order, $fresh, $latest );

@@ -29,6 +29,16 @@ final readonly class QuoteNativeOrderStageResult implements QuotePlacementSavedE
 			return $this->physical === self::read_physical( $session, $this->id, $this->hpos, true );
 		} catch ( \Throwable ) { return false; }
 	}
+	/** Prepared1 has no verified digests yet; only disposition may use these fixed saved facts. */
+	public function verify_unconfirmed_placement( OperationSession $session, QuoteBinding $binding ): bool {
+		try {
+			$row = $binding->row();
+			return ! $session->is_retired() && $session->in_transaction() && $session->site_id() === $this->site && $binding->site_id() === $this->site
+				&& 'prepared' === $binding->state() && 1 === $binding->revision() && null === $row['snapshot_digest'] && null === $row['context_digest'] && null === $row['verified_at']
+				&& $row['order_id'] === $this->id && $binding->mapping() === $this->coordinates
+				&& $this->physical === self::read_physical( $session, $this->id, $this->hpos, true );
+		} catch ( \Throwable ) { return false; }
+	}
 	/** Outside capture and lock-time comparison share exactly these finite local SQL reads. */
 	public static function read_physical( OperationSession $session, int $id, bool $hpos, bool $current = false ): array {
 		if ( $id < 1 ) { throw new \UnexpectedValueException( 'Saved quote facts unavailable.' ); }

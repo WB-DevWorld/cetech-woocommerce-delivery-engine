@@ -88,6 +88,10 @@ final class QuoteDurableService {
 		return $this->execute( $command, $request );
 	}
 	/** A terminal no-effect placement may release its native pointer for explicit new review. */
+	public function known_rejected_original_placement( QuotePlacementEvidence $replacement, QuoteStoredRow $original, int $order_id, string $placement_id, ?QuoteBinding $expected, QuotePlacementNoEffectEvidenceGuard $native ): bool {
+		return ( new QuotePlacementNoEffectDisposition( $this->factory, $this->readiness, $this->authorizer ) )->known( $replacement, $original, $order_id, $placement_id, $expected, $native );
+	}
+	/** A terminal final no-effect placement retains the original prepared-two contract. */
 	public function known_rejected_placement( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, QuoteBinding $expected, QuotePlacementSavedEvidenceGuard $saved ): bool {
 		if ( ! $this->authorized( $owner, 'delivery_quote.read' ) || ! $opened->owner()->equals( $owner ) || ! $opened->matches_reference( $reference ) || 'prepared' !== $expected->state() || 2 !== $expected->revision() || $expected->site_id() !== $owner->site_id() || $expected->row()['quote_uuid'] !== $opened->id()->value() ) { return false; }
 		$session = null; $begun = false;

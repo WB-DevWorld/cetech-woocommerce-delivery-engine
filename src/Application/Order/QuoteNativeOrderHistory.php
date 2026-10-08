@@ -5,6 +5,14 @@ namespace CetechDeliveryEngine\Application\Order;
 
 /** Quote ownership survives malformed or missing mandatory history; legacy cannot reclaim it. */
 final class QuoteNativeOrderHistory {
+	/** A saved quote-only line key survives refusal before binding/snapshot publication. */
+	public static function attempted( \WC_Order $order ): bool {
+		if ( self::owned( $order ) ) { return true; }
+		foreach ( $order->get_items( 'line_item' ) as $item ) {
+			if ( ! $item instanceof \WC_Order_Item_Product || false !== self::meta_present( $item, QuoteNativeOrderFacts::META_LINE_KEY ) ) { return true; }
+		}
+		return false;
+	}
 	/** Loaded native metadata preserves null values and distinguishes absence from corruption. */
 	public static function meta_present( object $object, string $key ): ?bool {
 		try {

@@ -58,14 +58,14 @@ final class QuoteDurableFixtureSession implements OperationSession {
 		try { return $this->f->pdo->exec( $this->sql( $sql ) ); } catch ( \Throwable $e ) { $this->error = str_contains( $e->getMessage(), 'UNIQUE' ) ? 1062 : 1; return false; }
 	}
 	public function get_row( string $sql ): array|null|false {
-		$this->f->statements[] = $sql;
+		$this->f->statements[] = $sql; $this->error = 0;
 		if ( 'SELECT UTC_TIMESTAMP(6) AS utc' === $sql ) { return [ 'utc' => $this->f->utc ]; }
 		if ( str_starts_with( $sql, 'SHOW TABLE STATUS' ) ) { return [ 'Engine' => 'InnoDB', 'Collation' => 'utf8mb4_unicode_ci' ]; }
 		if ( str_contains( $sql, SchemaVersion::OPTION_NAME ) ) { return [ 'option_value' => $this->f->wrong_schema ? '8' : '9' ]; }
 		if ( str_contains( $sql, MigrationStatus::OPTION_NAME ) ) { return [ 'option_value' => serialize( [ 'status' => 'success', 'to_version' => '9', 'migration_id' => DeliveryQuoteReadiness::MIGRATION_ID ] ) ]; }
 		try { return $this->f->pdo->query( $this->sql( $sql ) )->fetch( \PDO::FETCH_ASSOC ) ?: null; } catch ( \Throwable ) { return false; }
 	}
-	public function get_results( string $sql ): array|false { $this->f->statements[] = $sql; if ( str_starts_with( $sql, 'SHOW FULL COLUMNS' ) || str_starts_with( $sql, 'SHOW INDEX' ) ) { return $this->metadata( $sql ); } try { return $this->f->pdo->query( $this->sql( $sql ) )->fetchAll( \PDO::FETCH_ASSOC ); } catch ( \Throwable ) { return false; } }
+	public function get_results( string $sql ): array|false { $this->f->statements[] = $sql; $this->error = 0; if ( str_starts_with( $sql, 'SHOW FULL COLUMNS' ) || str_starts_with( $sql, 'SHOW INDEX' ) ) { return $this->metadata( $sql ); } try { return $this->f->pdo->query( $this->sql( $sql ) )->fetchAll( \PDO::FETCH_ASSOC ); } catch ( \Throwable ) { return false; } }
 	public function prepare( string $sql, mixed ...$args ): string { if ( 1 === count( $args ) && is_array( $args[0] ) ) { $args = $args[0]; } $i = 0; return preg_replace_callback( '/%[ds]/', function( array $m ) use ( &$i, $args ): string { $v = $args[$i++]; return '%d' === $m[0] ? (string) (int) $v : $this->f->pdo->quote( (string) $v ); }, $sql ); }
 	public function errno(): int { return $this->error; } public function insert_id(): int { return (int) $this->f->pdo->lastInsertId(); }
 	private function sql( string $sql ): string { return str_replace( [ ' FOR UPDATE', 'BINARY ', 'UTC_TIMESTAMP(6)' ], [ '', '', 'UTC_NOW()' ], $sql ); }

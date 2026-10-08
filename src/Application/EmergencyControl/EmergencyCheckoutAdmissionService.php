@@ -54,7 +54,7 @@ final class EmergencyCheckoutAdmissionService {
 			}
 			$ownership = $this->classifier->order( $order );
 			// Even a malformed mandatory quote marker is ownership evidence after rollback.
-			if ( \CetechDeliveryEngine\Application\Order\QuoteNativeOrderHistory::owned( $order ) ) { $ownership = EmergencyOwnership::Managed; }
+			if ( \CetechDeliveryEngine\Application\Order\QuoteNativeOrderHistory::attempted( $order ) ) { $ownership = EmergencyOwnership::Managed; }
 			// Paying an existing order uses that order's facts, independently of the live cart draft.
 			$uses_cart_latch = 'order_pay' !== $route && $this->latch->has_possible_ownership();
 			if ( $uses_cart_latch ) {

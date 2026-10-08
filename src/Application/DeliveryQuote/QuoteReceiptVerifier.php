@@ -20,6 +20,16 @@ final class QuoteReceiptVerifier {
 	public function prerequisites( OperationSession $session, QuoteHeader $header, ?QuoteBinding $binding, array $purposes ): array {
 		return $this->collect( $session, $header, $binding, $purposes, false );
 	}
+	/** One finite, globally ordered receipt set for the original no-effect attempt and explicit new review. */
+	public function lock_original_disposition( OperationSession $session, QuoteHeader $original, string $placement_id, QuoteHeader $replacement ): array {
+		$old = $original->namespace_hashes() + QuoteDurableCommand::binding_namespaces( $original->owner(), $original, $placement_id, true )
+			+ [ 'verify_binding' => QuoteDurableCommand::verification_namespace( $original->owner(), $original, $placement_id ) ];
+		$names = []; foreach ( [ 'original' => $old, 'replacement' => $replacement->namespace_hashes() ] as $side => $set ) { foreach ( $set as $purpose => $namespace ) { $names[$side . ':' . $purpose] = $namespace; } }
+		if ( 9 !== count( $names ) || count( array_unique( $names ) ) !== count( $names ) ) { throw new OperationStorageException(); }
+		asort( $names, SORT_STRING ); $out = [ 'original' => [], 'replacement' => [] ];
+		foreach ( $names as $key => $namespace ) { [ $side, $purpose ] = explode( ':', $key, 2 ); $out[$side][$purpose] = $this->read( $session, $namespace, 'delivery_quote.' . $purpose, true, true ); }
+		return $out;
+	}
 	private function collect( OperationSession $session, QuoteHeader $header, ?QuoteBinding $binding, ?array $purposes, bool $lock ): array {
 		$names = $header->namespace_hashes(); if ( null !== $binding ) { $b = $binding->row(); $names += [ 'bind' => $b['bind_namespace_hash'], 'seal' => $b['seal_namespace_hash'], 'verify_binding' => QuoteDurableCommand::verification_namespace( $header->owner(), $header, $b['placement_uuid'] ) ]; }
 		if ( null !== $purposes ) { $names = array_intersect_key( $names, array_flip( $purposes ) ); }
@@ -68,6 +78,23 @@ final class QuoteReceiptVerifier {
 			&& 'rejected' === $record->state && 'rejected' === $record->completion?->state && null === $record->completion->result && null === $record->completion->publication
 			&& null === $record->audit_id && null === $record->event && 'none' === $record->publication_state;
 	}
+	/** Original bind/verification is terminal no-effect; no later placement namespace may exist. */
+	public function original_placement_rejected( QuoteStoredRow $quote, array $records, string $placement_id, ?QuoteBinding $binding ): bool {
+		if ( null === $quote->accepted_at() || null === $quote->context() || null === $quote->terms() || ! $this->verify( $quote, $records, $binding ) || null !== ( $records['seal'] ?? null ) ) { return false; }
+		$names = QuoteDurableCommand::binding_namespaces( $quote->header()->owner(), $quote->header(), $placement_id, true );
+		if ( null === $binding ) {
+			return null === ( $records['verify_binding'] ?? null ) && $this->terminal_placement_rejection( $records['bind'] ?? null, $quote, $placement_id, 'bind' );
+		}
+		$b = $binding->row();
+		return 'prepared' === $binding->state() && 1 === $binding->revision() && $b['placement_uuid'] === $placement_id
+			&& $b['bind_namespace_hash'] === $names['bind'] && $b['seal_namespace_hash'] === $names['seal']
+			&& $this->terminal_placement_rejection( $records['verify_binding'] ?? null, $quote, $placement_id, 'verify_binding' );
+	}
+	private function terminal_placement_rejection( mixed $record, QuoteStoredRow $quote, string $placement_id, string $purpose ): bool {
+		$identity = new \CetechDeliveryEngine\Domain\Contracts\OperationIdentity( $quote->site_id(), 'delivery_quote_customer', $quote->header()->owner()->digest(), 'delivery_quote.' . $purpose, 1, 'placement:' . $placement_id, $quote->header()->namespace_hashes()['issue'] );
+		return $record instanceof OperationRecord && $record->matches_identity( $identity ) && 'rejected' === $record->state && 'rejected' === $record->completion?->state
+			&& null === $record->completion->result && null === $record->completion->publication && null === $record->audit_id && null === $record->event && 'none' === $record->publication_state;
+	}
 	private function link( mixed $record, QuoteStoredRow $quote, string $purpose, int $revision, string $state, ?int $at = null ): bool {
 		if ( ! $record instanceof OperationRecord || 'accepted' !== $record->state || ! $this->common( $record, $quote, $quote->header()->namespace_hashes()[$purpose] ) ) { return false; }
 		$r = $record->completion->result; return $r['quote_revision'] === $revision && $r['state'] === $state && ( null === $at || $r['completed_at'] === $at );
@@ -75,13 +102,13 @@ final class QuoteReceiptVerifier {
 	private function common( OperationRecord $record, QuoteStoredRow $quote, string $namespace ): bool {
 		$r = $record->completion?->result; return null !== $r && $record->site_id === $quote->site_id() && $record->namespace_hash === $namespace && $r['namespace_hash'] === $namespace && $r['quote_id'] === $quote->header()->id()->value() && $r['body_digest'] === $quote->header()->body_digest() && $r['owner_digest'] === $quote->header()->owner()->digest() && $record->completion->publication['site_id'] === $quote->site_id();
 	}
-	private function read( OperationSession $s, string $namespace, string $operation, bool $lock ): ?OperationRecord {
+	private function read( OperationSession $s, string $namespace, string $operation, bool $lock, bool $lock_event = false ): ?OperationRecord {
 		if ( ! $s->in_transaction() || $s->is_retired() ) { throw new OperationStorageException(); }
 		$table = WpdbOperationRecordRepository::table_name( $s, 'operation_records' ); $events = WpdbOperationRecordRepository::table_name( $s, 'operation_changes' );
 		$sql = "SELECT id,site_id,namespace_hash,intent_hash,namespace_format,intent_format,record_format,operation,operation_version,target_hash,state,publication_state,CASE WHEN OCTET_LENGTH(completion_json)<=16384 THEN completion_json ELSE NULL END AS completion_json,audit_id,row_version,created_at,updated_at,completed_at,CASE WHEN completion_json IS NOT NULL AND OCTET_LENGTH(completion_json)>16384 THEN 1 ELSE 0 END AS oversized FROM `{$table}` WHERE site_id=%d AND namespace_hash=%s LIMIT 2" . ( $lock ? ' FOR UPDATE' : '' );
 		$rows = $s->get_results( $s->prepare( $sql, $s->site_id(), $namespace ) ); if ( ! is_array( $rows ) || count( $rows ) > 1 ) { throw new OperationStorageException(); } if ( [] === $rows ) { return null; }
 		$row = $rows[0]; if ( ! is_array( $row ) || ! array_key_exists( 'oversized', $row ) || '0' !== (string) $row['oversized'] ) { throw new OperationStorageException(); } unset( $row['oversized'] );
-		$sql = "SELECT id,site_id,operation_id,event_format,CASE WHEN OCTET_LENGTH(event_json)<=16384 THEN event_json ELSE NULL END AS event_json,created_at,CASE WHEN OCTET_LENGTH(event_json)>16384 THEN 1 ELSE 0 END AS oversized FROM `{$events}` WHERE site_id=%d AND operation_id=%d LIMIT 2";
+		$sql = "SELECT id,site_id,operation_id,event_format,CASE WHEN OCTET_LENGTH(event_json)<=16384 THEN event_json ELSE NULL END AS event_json,created_at,CASE WHEN OCTET_LENGTH(event_json)>16384 THEN 1 ELSE 0 END AS oversized FROM `{$events}` WHERE site_id=%d AND operation_id=%d LIMIT 2" . ( $lock_event ? ' FOR UPDATE' : '' );
 		$rows = $s->get_results( $s->prepare( $sql, $s->site_id(), WpdbOperationRecordRepository::positive_integer( $row['id'] ) ) ); if ( ! is_array( $rows ) || count( $rows ) > 1 ) { throw new OperationStorageException(); } $event = $rows[0] ?? null;
 		if ( null !== $event ) { if ( ! is_array( $event ) || ! array_key_exists( 'oversized', $event ) || '0' !== (string) $event['oversized'] ) { throw new OperationStorageException(); } unset( $event['oversized'] ); }
 		try { return OperationRecord::from_row( $row, QuoteOperationProfile::registry()->get( $operation, WpdbOperationRecordRepository::positive_integer( $row['operation_version'] ) ), $event ); } catch ( \Throwable ) { throw new OperationStorageException(); }
