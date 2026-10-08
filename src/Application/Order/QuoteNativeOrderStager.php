@@ -7,6 +7,8 @@ use CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuotePreparation;
 use CetechDeliveryEngine\Application\DeliveryQuote\QuoteCartDraft;
 use CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementEvidence;
 use CetechDeliveryEngine\Application\DeliveryQuote\QuoteNativeTaxSource;
+use CetechDeliveryEngine\Application\DeliveryQuote\QuoteNativeShippingTaxProjection;
+use CetechDeliveryEngine\Application\DeliveryQuote\QuoteSavedOrderNativeEvidence;
 use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
 use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
 use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteBinding,QuoteId,QuoteJson,QuoteMoney,QuoteOwner,QuoteStoredRow};
@@ -132,10 +134,9 @@ final class QuoteNativeOrderStager {
 		$term_facts = []; foreach ( $terms->private_facts()['groups'] as $term ) { $term_facts[$term['component_key']] = $term; }
 		$native = $this->native_facts( $order ); $currency = $context->private_facts()['currency']['charged'];
 		if ( $native['currency'] !== $currency ) { self::fail(); }
-		$this->assert_tax_lines( $native, $term_facts, $currency );
 		foreach ( [ 'country', 'state', 'city', 'postcode', 'address_2' ] as $field ) { if ( $native['address'][$field] !== ( $draft['customer_destination'][$field] ?? null ) ) { self::fail(); } }
 		if ( $native['address']['address_1'] !== ( $draft['customer_destination']['address'] ?? null ) ) { self::fail(); }
-		$shipping = []; $total = self::money( '0', $currency ); $tax_total = self::money( '0', $currency ); $package_groups = [];
+		$shipping = []; $total = self::money( '0', $currency ); $tax_total = self::money( '0', $currency ); $package_groups = []; $projection = null; $native_zero_maps = [];
 		foreach ( $native['shipping'] as $item ) {
 			if ( 'delivery_engine_selected_offer' !== $item['method_id'] || ! is_string( $item['group_id'] ) ) { self::fail(); }
 			$component = NativeCartQuotePreparation::component_key( $item['group_id'] ); $term = $term_facts[$component] ?? null;
@@ -143,10 +144,17 @@ final class QuoteNativeOrderStager {
 			$rates = []; foreach ( $term['native_tax_receipt']['rates'] as $rate ) { $rates[(string) $rate['rate_id']] = self::money( $rate['amount']['amount'], $currency )->amount(); }
 			$actual = []; foreach ( $item['taxes']['total'] ?? [] as $id => $amount ) { $actual[(string) $id] = self::money( $amount, $currency )->amount(); } ksort( $rates, SORT_STRING ); ksort( $actual, SORT_STRING );
 			$tax = 'subtotal' === $term['native_tax_receipt']['rounding'] ? $term['tax']['amount'] : $term['native_tax_receipt']['rounded_tax']['amount'];
-			if ( $actual !== $rates || ! self::money( $item['tax'], $currency )->equals( self::money( $tax, $currency ) ) ) { self::fail(); }
+			if ( $actual !== $rates ) {
+				if ( ! QuoteNativeShippingTaxProjection::eligible( $term ) || ! QuoteNativeShippingTaxProjection::is_native_zero_candidate( $item['taxes']['total'] ?? [] ) ) { self::fail(); }
+				$projection ??= QuoteSavedOrderNativeEvidence::prewarm_tax( $order, $quote, $tax_source );
+				if ( ! $projection->accepts_zero_map( $term, $item['taxes']['total'] ?? [] ) ) { self::fail(); }
+				$native_zero_maps[$component] = $projection->zero_map( $term );
+			}
+			if ( ! self::money( $item['tax'], $currency )->equals( self::money( $tax, $currency ) ) ) { self::fail(); }
 			$total = $total->add( self::money( $item['total'], $currency ) ); $tax_total = $tax_total->add( self::money( $item['tax'], $currency ) ); $shipping[$component] = $item;
 			$package_groups[] = [ 'group_id' => $item['group_id'], 'shipping_method_id' => $item['method_id'], 'shipping_method_label' => $term['customer_label'], 'package_total_delivery_amount' => $term['final']['amount'], 'fulfilment_choice' => 'delivery', 'is_pickup' => false, 'display_index' => count( $package_groups ) + 1 ];
 		}
+		$this->assert_tax_lines( $native, $term_facts, $currency, $native_zero_maps );
 		if ( count( $shipping ) !== count( $term_facts ) || ! $total->equals( self::money( $native['shipping_total'], $currency ) ) || ! $tax_total->equals( self::money( $native['shipping_tax'], $currency ) ) ) { self::fail(); }
 		$core_lines = []; $line_keys = [];
 		foreach ( $binding->mapping()['groups'] as $group ) { foreach ( $group['lines'] as $member ) {
@@ -187,13 +195,14 @@ final class QuoteNativeOrderStager {
 		foreach ( [ 'lines', 'shipping', 'tax' ] as $type ) { usort( $facts[$type], static fn( array $a, array $b ): int => $a['id'] <=> $b['id'] ); } QuoteNativeOrderFacts::encode( $facts ); return $facts;
 	}
 	/** Native tax rows match accepted shipping rates and saved product tax maps; no tax engine is called. */
-	private function assert_tax_lines( array $native, array $terms, string $currency ): void {
+	private function assert_tax_lines( array $native, array $terms, string $currency, array $native_zero_maps = [] ): void {
 		$shipping = []; $products = []; $rounding = null; $precision = null;
 		foreach ( $terms as $term ) {
 			$receipt = $term['native_tax_receipt'];
 			if ( null !== $rounding && ( $rounding !== $receipt['rounding'] || $precision !== $receipt['display_precision'] ) ) { self::fail(); }
 			$rounding = $receipt['rounding']; $precision = $receipt['display_precision'];
 			foreach ( $receipt['rates'] as $rate ) { $amount = 'per_line' === $rounding ? self::rounded( $rate['amount']['amount'], $precision ) : $rate['amount']['amount']; $shipping[$rate['rate_id']] = ( $shipping[$rate['rate_id']] ?? self::money( '0', $currency ) )->add( self::money( $amount, $currency ) ); }
+			foreach ( $native_zero_maps[$term['component_key']] ?? [] as $rate => $_zero ) { $shipping[$rate] ??= self::money( '0', $currency ); }
 		}
 		foreach ( $native['lines'] as $line ) { foreach ( $line['taxes']['total'] ?? [] as $rate => $amount ) { if ( ! is_int( $rate ) && ( ! is_string( $rate ) || ! ctype_digit( $rate ) ) || (int) $rate < 1 ) { self::fail(); } $amount = self::decimal( (string) $amount ); if ( 'per_line' === $rounding ) { $amount = self::rounded( $amount, $precision ); } $products[(int) $rate] = ( $products[(int) $rate] ?? self::money( '0', $currency ) )->add( self::money( $amount, $currency ) ); } }
 		$rates = array_values( array_unique( [ ...array_keys( $shipping ), ...array_keys( $products ) ] ) ); sort( $rates, SORT_NUMERIC ); $seen = []; $aggregate = self::money( '0', $currency );
