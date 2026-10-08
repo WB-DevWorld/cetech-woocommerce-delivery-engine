@@ -261,6 +261,22 @@ if (defined('WP_CLI') && WP_CLI && isset($args) && count($args) >= 3) {
     if ('prepareplacement' === $mode) {
         if (isset($state['q06'])) { throw new RuntimeException('Q06 refuses to replace its prior fixture.'); }
         $native = CetechQuoteCartHttpFixture::hydrate_native($wpdb, $state['native']);
+        // Full native checkout activation consumes ECR, while the retained Q04
+        // fixture authored legacy rules. Author only these exact owned products;
+        // persist each allocated row's cleanup authority before the next write.
+        $insert = new ReflectionMethod(CetechNativeQuoteProviderFixture::class, 'insert');
+        $owned_insert = static function(string $suffix, array $row) use ($insert, $native, &$state, $state_path): int {
+            $id = $insert->invoke($native, $suffix, $row);
+            if (!is_int($id) || $id < 1) { throw new RuntimeException('Q06 owned ECR fixture allocation refused.'); }
+            $state['native'] = CetechQuoteCartHttpFixture::export_native($native); opening_http_write_json($state_path, $state, true);
+            return $id;
+        };
+        foreach ($state['native']['products'] as $product_id) {
+            if (!wc_get_product($product_id) instanceof WC_Product || 0 !== (int)$wpdb->get_var($wpdb->prepare('SELECT COUNT(*) FROM `' . TableNames::for('configuration_scopes') . '` WHERE scope_type=%s AND scope_id=%d', 'product', $product_id)) || '' !== $wpdb->last_error) { throw new RuntimeException('Q06 refuses a missing or previously configured fixture product.'); }
+            $scope = $owned_insert('configuration_scopes', ['scope_type' => 'product', 'scope_id' => $product_id, 'slice_key' => 'in_warehouse', 'status' => 'active', 'config_version' => 1, 'source' => 'native']);
+            foreach (['fulfilment_availability' => ['string', 'in_warehouse'], 'fulfilment_choice' => ['string', 'delivery'], 'priority' => ['int', '1']] as $field => [$type, $value]) { $owned_insert('configuration_fields', ['scope_row_id' => $scope, 'field_key' => $field, 'mode' => 'override', 'value_type' => $type, 'value_text' => $value]); }
+            $owned_insert('configuration_collections', ['scope_row_id' => $scope, 'field_key' => 'delivery_offer_ids', 'mode' => 'replace', 'members_json' => CetechDeliveryEngine\Domain\DeliveryQuote\QuoteJson::encode([$state['native']['offer']])]);
+        }
         foreach ([...CetechDeliveryEngine\Application\Configuration\ClassicCheckoutRuntimeActivation::CHAIN, 'enable_blocks_adapter'] as $flag) { $native->set_option('cetech_de_' . $flag, '1'); }
         $native->set_option(CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementActivation::OPTION, CetechDeliveryEngine\Domain\DeliveryQuote\QuoteJson::encode(['format' => 1, 'profile' => CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementActivation::PROFILE, 'enabled' => true, 'revision' => 1]));
         $state['native'] = CetechQuoteCartHttpFixture::export_native($native);
