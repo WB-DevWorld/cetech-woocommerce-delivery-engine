@@ -114,6 +114,9 @@ final class OperationCoordinator {
 			if ( null !== $session && $session->in_transaction() && ! $this->try_rollback( $session ) ) {
 				return $this->unknown( $context );
 			}
+			if ( null !== $session && $session->is_retired() ) {
+				return $this->unknown( $context );
+			}
 			if ( $effect_started && ! in_array( $refusal->error( $context )->code, [ 'not_authorized', 'intent_conflict' ], true ) ) {
 				return $this->record_rejection( $profile, $identity, $intent, $context, $refusal->error( $context ) );
 			}

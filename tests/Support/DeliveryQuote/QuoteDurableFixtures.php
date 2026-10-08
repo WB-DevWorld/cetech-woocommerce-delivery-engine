@@ -16,7 +16,7 @@ require_once __DIR__ . '/QuoteFixtures.php';
 final class QuoteDurableFixtureFactory implements OperationConnectionFactory {
 	public readonly \PDO $pdo;
 	public string $utc = '2026-10-07 05:00:00.000000'; public bool $authorized = true; public bool $paused = false; public bool $guard_ok = true; public bool $reject_audit = false; public bool $wrong_schema = false;
-	public string $effect_fault = ''; public string $gate_fault = ''; public int $captures = 0; public int $opens = 0; public array $statements = []; public array $sessions = []; public ?\Closure $on_retire = null; public ?\Closure $before_guard = null; public ?\Closure $before_capture = null;
+	public bool $lose_read_rollback_ack = false; public string $effect_fault = ''; public string $gate_fault = ''; public int $captures = 0; public int $opens = 0; public array $statements = []; public array $sessions = []; public ?\Closure $on_retire = null; public ?\Closure $before_guard = null; public ?\Closure $before_capture = null;
 	public function __construct() {
 		$this->pdo = new \PDO( 'sqlite::memory:', null, null, [ \PDO::ATTR_ERRMODE => \PDO::ERRMODE_EXCEPTION ] ); $this->pdo->sqliteCreateFunction( 'OCTET_LENGTH', static fn( ?string $v ): ?int => null === $v ? null : strlen( $v ), 1 ); $this->pdo->sqliteCreateFunction( 'UTC_NOW', fn(): string => $this->utc );
 		foreach ( DeliveryQuoteSchema::SUFFIXES as $suffix ) {
@@ -46,14 +46,14 @@ final class QuoteDurableFixtureSession implements OperationSession {
 		if ( 'not_sent' === $fault ) { return OperationCommitResult::NotSent; } $this->f->pdo->commit(); $this->quote_write = false; $this->admission_write = false;
 		if ( 'lost_ack' === $fault ) { $this->retire(); return OperationCommitResult::Unconfirmed; } return OperationCommitResult::Acknowledged;
 	}
-	public function rollback(): bool { $this->quote_write = false; $this->admission_write = false; return ! $this->retired && $this->f->pdo->inTransaction() && $this->f->pdo->rollBack(); }
+	public function rollback(): bool { $read = ! $this->quote_write && ! $this->admission_write; $this->quote_write = false; $this->admission_write = false; $ok = ! $this->retired && $this->f->pdo->inTransaction() && $this->f->pdo->rollBack(); if ( $ok && $read && $this->f->lose_read_rollback_ack ) { $this->f->lose_read_rollback_ack = false; $this->retire(); return false; } return $ok; }
 	public function retire(): bool { if ( $this->f->pdo->inTransaction() ) { $this->f->pdo->rollBack(); } $this->retired = true; if ( null !== $this->f->on_retire ) { ($this->f->on_retire)(); } return true; }
 	public function is_retired(): bool { return $this->retired; } public function in_transaction(): bool { return ! $this->retired && $this->f->pdo->inTransaction(); }
 	public function validate_tables( array $names ): bool { if ( ! $this->in_transaction() ) { return false; } foreach ( $names as $name ) { if ( ! str_starts_with( $name, 'durable_' ) ) { return false; } } return true; }
 	public function query( string $sql ): int|false {
 		$this->f->statements[] = $sql; $this->error = 0;
 		if ( $this->f->reject_audit && str_starts_with( $sql, 'INSERT INTO `durable_delivery_engine_operation_changes`' ) ) { $this->f->reject_audit = false; return false; }
-		$this->quote_write = $this->quote_write || preg_match( '/\A(?:INSERT INTO|UPDATE) `durable_delivery_engine_delivery_quotes`/', $sql ) === 1;
+		$this->quote_write = $this->quote_write || preg_match( '/\A(?:INSERT INTO|UPDATE) `durable_delivery_engine_delivery_quote(?:s|_bindings)`/', $sql ) === 1;
 		$this->admission_write = $this->admission_write || preg_match( '/\A(?:INSERT INTO|UPDATE) `durable_delivery_engine_delivery_quote_budget_windows`/', $sql ) === 1;
 		try { return $this->f->pdo->exec( $this->sql( $sql ) ); } catch ( \Throwable $e ) { $this->error = str_contains( $e->getMessage(), 'UNIQUE' ) ? 1062 : 1; return false; }
 	}

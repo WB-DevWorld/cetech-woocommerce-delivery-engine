@@ -134,7 +134,9 @@ final class BlocksCheckoutAdapterTest extends TestCase {
 		$plugin = (string) file_get_contents( dirname( __DIR__, 4 ) . '/src/Bootstrap/Plugin.php' );
 		self::assertStringContainsString( 'BlocksCheckoutAdapter::class', $plugin );
 		self::assertStringContainsString( 'IntegrationStatusCatalog::class', $plugin );
-		self::assertStringNotContainsString( "is_enabled( 'enable_blocks_adapter' )", $plugin );
+		// Native adapter registration remains unconditional; quote adoption separately
+		// requires the complete Blocks and Classic chain.
+		self::assertStringContainsString( '$integrations->detect();', $plugin );
 	}
 
 	public function test_address_change_triggers_shipping_recalculation(): void {

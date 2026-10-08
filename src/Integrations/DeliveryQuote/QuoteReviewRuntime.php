@@ -17,16 +17,19 @@ final class QuoteReviewRuntime {
 	public const SCRIPT_HANDLE = 'cetech-de-delivery-quote-review';
 	private bool $registered = false;
 	private bool $store_registered = false;
+	private ?\Closure $adoption_gate;
 
 	/** The trusted server composition supplies this gate; browser fields cannot mount it. */
 	public function __construct(
 		private readonly CartQuoteReviewService $service,
 		private readonly bool $prepared_review_enabled = false,
-		private readonly QuoteReviewRenderer $renderer = new QuoteReviewRenderer()
-	) {}
+		private readonly QuoteReviewRenderer $renderer = new QuoteReviewRenderer(),
+		?callable $adoption_gate = null
+	) { $this->adoption_gate = null === $adoption_gate ? null : \Closure::fromCallable( $adoption_gate ); }
+	private function enabled(): bool { try { return $this->prepared_review_enabled && ( null === $this->adoption_gate || true === ( $this->adoption_gate )() ); } catch ( \Throwable ) { return false; } }
 
 	public function register(): void {
-		if ( ! $this->prepared_review_enabled || $this->registered ) { return; }
+		if ( ! $this->enabled() || $this->registered ) { return; }
 		$this->registered = true;
 		add_action( 'wc_ajax_' . self::AJAX_ACTION, [ $this, 'handle_classic_post' ] );
 		add_action( 'woocommerce_blocks_loaded', [ $this, 'register_store_api' ], 5 );
@@ -37,7 +40,7 @@ final class QuoteReviewRuntime {
 	}
 
 	public function register_store_api(): void {
-		if ( ! $this->prepared_review_enabled || $this->store_registered
+		if ( ! $this->enabled() || $this->store_registered
 			|| ! function_exists( 'woocommerce_store_api_register_endpoint_data' )
 			|| ! function_exists( 'woocommerce_store_api_register_update_callback' ) ) { return; }
 		foreach ( [ 'cart', 'checkout' ] as $endpoint ) {
@@ -51,7 +54,7 @@ final class QuoteReviewRuntime {
 	/** Read callbacks never capture, issue or accept; native totals re-read current authority. */
 	public function current_facts(): array {
 		$request = RequestContext::create();
-		if ( ! $this->prepared_review_enabled ) { return self::unavailable( $request ); }
+		if ( ! $this->enabled() ) { return self::unavailable( $request ); }
 		try { return $this->service->current( $request )->shopper_facts(); }
 		catch ( \Throwable ) { return self::unavailable( $request ); }
 	}
@@ -61,7 +64,7 @@ final class QuoteReviewRuntime {
 
 	/** Exact caller fields; references, owners, prices and arbitrary context are never command inputs. */
 	public function dispatch( array $data ): array {
-		if ( ! $this->prepared_review_enabled ) { self::refuse(); }
+		if ( ! $this->enabled() ) { self::refuse(); }
 		$action = $data['action'] ?? null;
 		$keys = 'refresh' === $action ? [ 'action', 'generation', 'review_token' ] : [ 'action', 'generation' ];
 		if ( ! is_string( $action ) || ! in_array( $action, [ 'refresh', 'confirm', 'retry' ], true )
@@ -93,7 +96,7 @@ final class QuoteReviewRuntime {
 
 	/** Same native handler boundary, exposed separately for finite transport tests. */
 	public function classic_response( array $data, string $method ): array {
-		if ( 'POST' !== $method || ! $this->prepared_review_enabled ) { self::refuse( 405 ); }
+		if ( 'POST' !== $method || ! $this->enabled() ) { self::refuse( 405 ); }
 		if ( ! is_array( $data ) || ! is_string( $data['_wpnonce'] ?? null )
 			|| ! wp_verify_nonce( $data['_wpnonce'], self::NONCE_ACTION ) ) { self::refuse( 403 ); }
 		unset( $data['_wpnonce'] );
@@ -104,7 +107,7 @@ final class QuoteReviewRuntime {
 	}
 
 	public function render_classic(): void {
-		if ( ! $this->prepared_review_enabled ) { return; }
+		if ( ! $this->enabled() ) { return; }
 		try {
 			$result = $this->service->current( RequestContext::create() );
 			echo $this->renderer->table_row( $result ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- explicit renderer escapes each field.
@@ -114,7 +117,7 @@ final class QuoteReviewRuntime {
 	}
 
 	public function enqueue_assets(): void {
-		if ( ! $this->prepared_review_enabled || ! ( function_exists( 'is_cart' ) && is_cart() || function_exists( 'is_checkout' ) && is_checkout() ) ) { return; }
+		if ( ! $this->enabled() || ! ( function_exists( 'is_cart' ) && is_cart() || function_exists( 'is_checkout' ) && is_checkout() ) ) { return; }
 		$base = defined( 'CETECH_DE_URL' ) ? CETECH_DE_URL : '';
 		$version = defined( 'CETECH_DE_VERSION' ) ? CETECH_DE_VERSION : '0';
 		wp_enqueue_script( self::SCRIPT_HANDLE, $base . 'assets/frontend/delivery-quote-review.js', [ 'wp-data' ], $version, true );

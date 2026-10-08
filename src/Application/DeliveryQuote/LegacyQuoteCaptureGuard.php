@@ -12,4 +12,5 @@ final readonly class LegacyQuoteCaptureGuard implements QuoteCurrentEvidenceGuar
 	public function __construct( private QuoteCurrentEvidenceGuard $source, private QuoteCurrentEvidenceGuard $native ) {}
 	public function tables( OperationSession $session ): array { $tables = array_values( array_unique( [ ...$this->source->tables( $session ), ...$this->native->tables( $session ) ] ) ); sort( $tables, SORT_STRING ); return $tables; }
 	public function verify( OperationSession $session, QuoteOwner $owner, QuoteContext $context ): bool { return $this->source->verify( $session, $owner, $context ) && $this->native->verify( $session, $owner, $context ); }
+	public function tax_source(): ?QuoteNativeTaxSource { return $this->native instanceof QuoteNativeReceiptGuard ? $this->native->tax_source() : null; }
 }

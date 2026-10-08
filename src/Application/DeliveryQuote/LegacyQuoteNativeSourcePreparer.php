@@ -101,6 +101,21 @@ final class LegacyQuoteNativeSourcePreparer {
 		} catch ( \Throwable $error ) { throw new \RuntimeException( 'Delivery quote source unavailable.', 0, $error ); }
 	}
 
+	/** Exact-order authorized revalidation. The original private draft replaces no live cart. */
+	public function prepare_saved( QuoteOwner $owner, QuoteContext $context, QuoteCartDraft $draft, callable $authorized ): LegacyQuoteSourceSnapshot {
+		try {
+			if ( true !== $authorized() || ! $owner->equals( $draft->owner() ) || ! $context->checkout_acceptable() ) { self::fail(); }
+			$local = LegacyQuoteSourceLocalBinding::capture();
+			$seed = $this->capture( $owner, $context, $this->seed_plan( $owner, $context ) ); $this->supported_geography( $seed );
+			if ( true !== $authorized() ) { self::fail(); }
+			$first = $this->capture( $owner, $context, $this->derive( $owner, $context, $seed, $draft ) );
+			if ( true !== $authorized() ) { self::fail(); }
+			$second = $this->capture( $owner, $context, $this->derive( $owner, $context, $first, $draft ) );
+			if ( ! $first->matches( $second ) || ! $local->unchanged() || true !== $authorized() ) { self::fail(); }
+			$this->supported_geography( $second ); return $second->bind_context( $context )->with_local_binding( $local );
+		} catch ( \Throwable $error ) { throw new \RuntimeException( 'Delivery quote source unavailable.', 0, $error ); }
+	}
+
 	/** Exact internal receipt grammar shared with native server-context construction. */
 	public static function source_facts( ProductDeliveryRuntimeResolution $runtime, ResolvedProductDeliveryRule $rule ): array {
 		$ecr = RuntimeConfigurationSource::ECR === $runtime->source;
@@ -123,15 +138,24 @@ final class LegacyQuoteNativeSourcePreparer {
 		} catch ( \Throwable ) { return false; }
 	}
 
-	private function derive( QuoteOwner $owner, QuoteContext $context, LegacyQuoteSourceSnapshot $captured ): LegacyQuoteSourcePlan {
+	private function derive( QuoteOwner $owner, QuoteContext $context, LegacyQuoteSourceSnapshot $captured, ?QuoteCartDraft $saved_draft = null ): LegacyQuoteSourcePlan {
 		if ( ! function_exists( 'WC' ) || ! function_exists( 'wp_cache_delete' ) || ! class_exists( '\WC_Cache_Helper' ) || ! isset( $GLOBALS['wpdb'] ) || ! $GLOBALS['wpdb'] instanceof \wpdb ) { self::fail(); }
-		$db = $GLOBALS['wpdb']; $wc = WC(); $cart = $wc->cart ?? null; if ( ! $cart instanceof \WC_Cart || ! $cart->has_calculated_shipping() ) { self::fail(); }
-		$facts = $context->private_facts(); $items = $cart->get_cart(); if ( ! is_array( $items ) || count( $items ) !== count( $facts['lines'] ) || count( $items ) > 200 ) { self::fail(); }
+		$db = $GLOBALS['wpdb']; $wc = WC(); $cart = $wc->cart ?? null; $items = []; $destinations = [];
+		if ( null === $saved_draft ) { if ( ! $cart instanceof \WC_Cart || ! $cart->has_calculated_shipping() ) { self::fail(); } $items = $cart->get_cart(); }
+		else {
+			if ( ! $saved_draft->owner()->equals( $owner ) ) { self::fail(); }
+			foreach ( $saved_draft->private_facts()['lines'] as $line ) {
+				$customer = CustomerCartContext::fromArray( $line['customer_context'] ); if ( null === $customer || ! $customer->hasCompleteDeliveryAddress() ) { self::fail(); }
+				$items[$line['line_key']] = [ 'product_id' => $line['product_id'], 'variation_id' => $line['variation_id'] ?? 0, 'quantity' => (int) $line['quantity'], CartDeliverySelectionCapture::CART_SELECTION_KEY => $line['selection'], CartDeliverySelectionCapture::CART_HASH_KEY => $line['selection_hash'], CustomerCartContext::CART_KEY => $line['customer_context'] ];
+				$destinations[$line['line_key']] = $customer->delivery_address->toWcPackageDestination();
+			}
+		}
+		$facts = $context->private_facts(); if ( ! is_array( $items ) || count( $items ) !== count( $facts['lines'] ) || count( $items ) > 200 ) { self::fail(); }
 		$product_ids = []; foreach ( $facts['lines'] as $line ) { foreach ( array_filter( [ $line['product_id'], $line['variation_id'], $line['parent_id'] ] ) as $id ) { $product_ids[$id] = $id; } } if ( count( $product_ids ) > 600 ) { self::fail(); }
 		foreach ( $product_ids as $id ) { foreach ( [ 'posts', 'post_meta', 'product_cat_relationships', 'product_type_relationships' ] as $group ) { wp_cache_delete( $id, $group ); } \WC_Cache_Helper::invalidate_cache_group( 'product_' . $id ); }
 		foreach ( LegacyQuoteSourcePlan::OPTIONS as $name ) { wp_cache_delete( $name, 'options' ); } wp_cache_delete( 'alloptions', 'options' ); wp_cache_delete( 'notoptions', 'options' );
 		$view = new LegacyQuoteCapturedSourceView( $captured ); $runtime = $this->router( $view ); $validator = new ProductDeliverySelectionValidator( new FeatureFlags(), new Requirements(), $runtime, new ProductDeliveryOptionsBuilder( $view->offers() ) );
-		$destinations = []; foreach ( $wc->shipping()->get_packages() as $package ) { if ( ! is_array( $package['contents'] ?? null ) || ! is_array( $package['destination'] ?? null ) ) { self::fail(); } foreach ( $package['contents'] as $key => $_ ) { if ( isset( $destinations[$key] ) ) { self::fail(); } $destinations[$key] = $package['destination']; } }
+		if ( null === $saved_draft ) { foreach ( $wc->shipping()->get_packages() as $package ) { if ( ! is_array( $package['contents'] ?? null ) || ! is_array( $package['destination'] ?? null ) ) { self::fail(); } foreach ( $package['contents'] as $key => $_ ) { if ( isset( $destinations[$key] ) ) { self::fail(); } $destinations[$key] = $package['destination']; } } }
 		$identity = QuoteNativeContextIdentity::from_server(); if ( $owner->key_epoch() !== $identity->key_epoch() ) { self::fail(); }
 		$matcher = new PackageDestinationZoneResolver( new DestinationZoneMatcher( $view->zones(), $view->zone_rules(), new RegionCodeLabelMatcher( new WooCommerceStateCatalog() ) ) );
 		$groups = []; foreach ( $facts['groups'] as $group ) { foreach ( $group['line_keys'] as $key ) { $groups[$key] = $group; } }

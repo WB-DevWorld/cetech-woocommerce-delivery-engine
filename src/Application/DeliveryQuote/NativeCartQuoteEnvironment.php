@@ -27,7 +27,7 @@ final class NativeCartQuoteEnvironment implements CartQuoteEnvironment {
 		} catch ( \Throwable ) { return null; }
 	}
 	public function authorize( QuoteOwner $owner, string $operation ): bool {
-		try { return in_array( $operation, [ 'delivery_quote.issue', 'delivery_quote.read', 'delivery_quote.accept', 'delivery_quote.invalidate', 'delivery_quote.session' ], true ) && $owner->equals( self::loaded_owner()[0] ); } catch ( \Throwable ) { return false; }
+		try { return in_array( $operation, [ 'delivery_quote.issue', 'delivery_quote.read', 'delivery_quote.accept', 'delivery_quote.invalidate', 'delivery_quote.session', 'delivery_quote.bind', 'delivery_quote.verify_binding', 'delivery_quote.seal' ], true ) && $owner->equals( self::loaded_owner()[0] ); } catch ( \Throwable ) { return false; }
 	}
 	public function prepare( QuoteCartDraft $draft ): LegacyQuotePreparedCapture {
 		if ( ! $this->same_draft( $draft ) || ! $this->authorize( $draft->owner(), 'delivery_quote.issue' ) ) { self::fail(); }

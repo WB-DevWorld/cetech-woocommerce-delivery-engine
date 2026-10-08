@@ -56,6 +56,7 @@ IMPORT_BRIDGE="$ROOT/scripts/qualification/opening-http-fixture.php"
 CONFIG_BRIDGE="$ROOT/scripts/qualification/opening-http-configuration-fixture.php"
 EMERGENCY_BRIDGE="$ROOT/scripts/qualification/opening-http-emergency-fixture.php"
 QUOTE_CART_BRIDGE="$ROOT/scripts/qualification/opening-http-quote-cart-fixture.php"
+QUOTE_PLACEMENT_BRIDGE="$ROOT/scripts/qualification/opening-http-quote-placement-support.php"
 IMPORT_STATE="$PRIVATE/import-state.json"
 CONFIG_STATE="$PRIVATE/config-state.json"
 EMERGENCY_STATE="$PRIVATE/emergency-state.json"
@@ -144,6 +145,20 @@ finish_http_fixture() {
     fi
     # Stop the listener and restore core handling before database cleanup can
     # wait on any fixture locks. Touch only identity-tracked fixture rows.
+    if [[ -f "$QUOTE_CART_STATE" && -f "$QUOTE_PLACEMENT_BRIDGE" ]]; then
+        # The placement module shares the tracked Q05 state. Run its cleanup
+        # first only if allocation occurred, including an interrupted driver.
+        if python3 - "$QUOTE_CART_STATE" <<'PY'
+import json, sys
+from pathlib import Path
+state = json.loads(Path(sys.argv[1]).read_text(encoding="utf-8"))
+sys.exit(0 if "q06" in state else 1)
+PY
+        then
+            "${WP[@]}" eval-file "$QUOTE_PLACEMENT_BRIDGE" --use-include cleanupplacement "$QUOTE_CART_STATE" "$PRIVATE/quote-placement-trap-cleanup.json" >"$PRIVATE/quote-placement-cleanup-command.log" 2>&1
+            if [[ "$?" != "0" ]]; then ROW_CLEANUP=0; fi
+        fi
+    fi
     if [[ -f "$QUOTE_CART_STATE" && -f "$QUOTE_CART_BRIDGE" ]]; then
         "${WP[@]}" eval-file "$QUOTE_CART_BRIDGE" cleanupquotecart "$QUOTE_CART_STATE" "$PRIVATE/quote-cart-trap-cleanup.json" >"$PRIVATE/quote-cart-cleanup-command.log" 2>&1
         if [[ "$?" != "0" ]]; then ROW_CLEANUP=0; fi
@@ -545,7 +560,9 @@ python3 "$ROOT/scripts/qualification/opening-http-driver.py" \
     --emergency-driver "$ROOT/scripts/qualification/opening-http-emergency-driver.py" \
     --emergency-bridge "$EMERGENCY_BRIDGE" --emergency-state "$EMERGENCY_STATE" \
     --quote-cart-driver "$ROOT/scripts/qualification/opening-http-quote-cart-driver.py" \
-    --quote-cart-bridge "$QUOTE_CART_BRIDGE" --quote-cart-state "$QUOTE_CART_STATE"
+    --quote-cart-bridge "$QUOTE_CART_BRIDGE" --quote-cart-state "$QUOTE_CART_STATE" \
+    --quote-placement-driver "$ROOT/scripts/qualification/opening-http-quote-placement.py" \
+    --quote-placement-bridge "$ROOT/scripts/qualification/opening-http-quote-placement-support.php"
 QUALIFICATION_STAGE="complete"
 
 # EXIT performs final owned-listener/MU/private-file cleanup and appends its

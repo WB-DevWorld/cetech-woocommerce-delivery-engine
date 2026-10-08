@@ -26,6 +26,7 @@ final class QuoteLifecycleProofTransport implements OperationConnectionTransport
 	public bool $reject_quote = false;
 	public bool $miss_quote_cas = false;
 	public bool $reject_rollback = false;
+	public bool $lose_rollback_ack = false;
 	public bool $reject_close = false;
 	public ?\Closure $before = null;
 	public ?\Closure $after = null;
@@ -53,6 +54,7 @@ final class QuoteLifecycleProofTransport implements OperationConnectionTransport
 			++$this->sent_commits; $result = $this->native->execute( $sql );
 			if ( $this->fault_commit === $this->commits && 'lost_ack' === $this->commit_fault && $result->acknowledged ) { $this->failed = true; $result = new OperationConnectionResult( false, true, errno: 2013 ); }
 		} else { $result = $this->native->execute( $sql ); }
+		if ( $this->lose_rollback_ack && $result->acknowledged && 1 === preg_match( '/\A\s*ROLLBACK\b/i', $sql ) ) { $this->lose_rollback_ack = false; $result = new OperationConnectionResult( false, true, errno: 2013 ); }
 		if ( $result->acknowledged ) { $this->quote_writes += $quote ? 1 : 0; $this->budget_writes += $budget ? 1 : 0; $this->record_writes += $record ? 1 : 0; $this->audit_appends += $audit ? 1 : 0; }
 		if ( 1205 === $result->errno ) { ++$this->lock_timeouts; } if ( 1213 === $result->errno ) { ++$this->deadlocks; $trace=$this->native->execute('SHOW ENGINE INNODB STATUS');$this->deadlock_trace=$trace->rows[0]['Status']??null; }
 		if ( null !== $this->after ) { ( $this->after )( $sql, $this, $result ); }

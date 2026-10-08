@@ -256,10 +256,33 @@ $required_classes = [
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteRetentionResult',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteRetentionService',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteRetentionUnknownReferences',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePlacementActivation',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePlacementPolicyFence',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePlacementCompositeGuard',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePlacementService',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePlacementProof',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePlacementEvidence',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteNativeTaxSource',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteCartPlacementEvidenceReader',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteSavedOrderPlacementEvidenceReader',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteSavedOrderAuthorization',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteSavedOrderNativeEvidence',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteSavedOrderNativeTaxGuard',
+	'CetechDeliveryEngine\\Application\\Order\\QuoteNativeOrderStager',
+	'CetechDeliveryEngine\\Application\\Order\\QuoteNativeOrderStageResult',
+	'CetechDeliveryEngine\\Application\\Order\\QuoteNativeOrderFacts',
+	'CetechDeliveryEngine\\Application\\Order\\QuoteNativeOrderHistory',
+	'CetechDeliveryEngine\\Integrations\\DeliveryQuote\\QuotePlacementRuntime',
+	'CetechDeliveryEngine\\Integrations\\DeliveryQuote\\QuoteOrderPayLocalBinding',
+	'CetechDeliveryEngine\\Integrations\\DeliveryQuote\\QuoteNativeOrderPayContinuation',
+	'CetechDeliveryEngine\\Integrations\\DeliveryQuote\\QuoteRateReferenceRuntime',
+	'CetechDeliveryEngine\\Presentation\\Admin\\QuotePlacementSettings',
 	'CetechDeliveryEngine\\Infrastructure\\Persistence\\QuoteRetentionStore',
 ];
 
 $required_interfaces = [
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePlacementSavedEvidenceGuard',
+	'CetechDeliveryEngine\\Application\\EmergencyControl\\EmergencyFinalPlacementGuard',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteNativeCaptureSource',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePreparationAccess',
 	'CetechDeliveryEngine\\Application\\Runtime\\VariationRelationshipInspectorInterface',
@@ -407,7 +430,8 @@ $is_schema5_release = str_contains( $header_source, '1.0.0-dev.bulk' )
 $is_schema9_release = str_contains( $header_source, '1.0.0-dev.wave2-quote-storage' )
 	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-lifecycle' )
 	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-provider' )
-	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-cart' );
+	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-cart' )
+	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-placement' );
 $is_schema8_release = str_contains( $header_source, '1.0.0-dev.wave1-rule-lifecycle' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-snapshot-readers' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-data-lifecycle' )

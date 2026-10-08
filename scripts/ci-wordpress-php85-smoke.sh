@@ -298,11 +298,14 @@ export CETECH_DE_QUALIFICATION_HEAD="$(git -C "$ROOT" rev-parse HEAD)"
 export CETECH_DE_QUALIFICATION_CANDIDATE_HEAD="${CETECH_DE_QUALIFICATION_CANDIDATE_HEAD:-$CETECH_DE_QUALIFICATION_HEAD}"
 export CETECH_DE_QUALIFICATION_TREE="$(git -C "$ROOT" rev-parse HEAD^{tree})"
 "${WP[@]}" --require="$ROOT/scripts/qualification/admin-context.php" \
-	eval-file "$ROOT/scripts/qualification/opening-runner.php" \
+	eval-file "$ROOT/scripts/qualification/opening-runner.php" --use-include \
 	"$WORK/opening-qualification-results.json" --path="$NATIVE"
+
+bash "$ROOT/scripts/ci-quote-placement-hpos-off.sh" "$NATIVE" "$WORK/wp-cli.phar" "$WORK/opening-quote-placement-cpt-results.json"
 
 if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
 	bash "$ROOT/scripts/ci-opening-http-qualification.sh" "$WORK" "$NATIVE"
+	python3 "$ROOT/scripts/qualification/verify-quote-placement-receipts.py" "$WORK/opening-qualification-results.json" "$WORK/opening-quote-placement-cpt-results.json" "$WORK/opening-http-qualification-results.json"
 else
 	echo "opening_http_qualification=NOT_REQUESTED"
 fi

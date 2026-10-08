@@ -15,7 +15,7 @@ final class QuoteNativeReceiptCapture {
   $wanted=[];$components=[];foreach($requests as $request){if(!$request instanceof QuoteNativeGroupRequest||isset($wanted[$request->legacy_group_id])||isset($components[$request->component_key])){QuoteShape::invalid();}$wanted[$request->legacy_group_id]=$request;$components[$request->component_key]=true;}
   $state=$source->capture();$s=$state->facts();
   if($s['coupons']!==0||$s['unsupported_effects']||$s['key_epoch']!==$owner->key_epoch()||count($s['packages'])!==count($requests)){throw new \RuntimeException('Native quote context unavailable.');}
-  $context_digest=hash('sha256','native-quote-tax-v1:'.QuoteJson::encode(['currency'=>$s['currency'],'precision'=>$s['display_precision'],'exempt'=>$s['exempt'],'tax_class'=>$s['tax_class'],'location_digest'=>$s['location_digest'],'rounding'=>$s['rounding'],'tax_enabled'=>$s['tax_enabled'],'source'=>$s['source_facts']]));
+  $context_digest=self::tax_context_digest($state);
   $money_digest=hash('sha256','native-quote-money-v1:'.QuoteJson::encode(['currency'=>$s['currency'],'shipping_total'=>$s['cart_shipping_total'],'shipping_tax'=>$s['cart_shipping_tax'],'packages'=>$s['packages']]));
   $groups=[];$members=[];$aggregate_final=self::money('0',$s['currency'],6);$aggregate_tax=self::money('0',$s['currency'],6);
   foreach($s['packages'] as $package){$request=$wanted[$package['group_id']]??null;if(null===$request||$request->expected_ex_tax->currency()!==$s['currency']){throw new \RuntimeException('Native quote context unavailable.');}
@@ -31,6 +31,8 @@ final class QuoteNativeReceiptCapture {
   if(!$aggregate_final->equals(self::money($s['cart_shipping_total'],$s['currency'],6))||!$aggregate_tax->equals(self::money($s['cart_shipping_tax'],$s['currency'],6))||!$owner->equals($source->current_owner())||!$source->unchanged()){throw new \RuntimeException('Native quote context unavailable.');}
   return new QuoteNativeReceipt($owner,$state,$groups,$members,$source,$context_digest,$money_digest);
  }
+ /** Native pointers and cached serialization are fenced physically, separate from the accepted tax material. */
+ public static function tax_context_digest(QuoteNativeState $state):string {return QuoteNativeTaxSource::from_native_state($state)->digest();}
  private static function scale(string $value):int{$pos=strpos($value,'.');return false===$pos?0:strlen($value)-$pos-1;}
  private static function money(string $amount,string $currency,int $precision):QuoteMoney{if(self::scale($amount)>$precision){$trim=rtrim(rtrim($amount,'0'),'.');$amount=''===$trim?'0':$trim;}return QuoteMoney::from_array(['amount'=>$amount,'currency'=>$currency,'precision'=>$precision]);}
 }

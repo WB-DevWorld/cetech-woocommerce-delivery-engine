@@ -12,8 +12,8 @@ use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshot;
  */
 final class EmergencyCheckoutLocalBinding implements \JsonSerializable {
 	private const NATIVE_PROPERTIES = [ 'id', 'data', 'changes', 'meta_data', 'items' ];
-	private const PROPERTY_OWNERS = [ 'WC_Data', 'WC_Abstract_Order', 'WC_Order', 'WC_Order_Item', 'WC_Order_Item_Product', 'WC_Order_Item_Shipping', 'WC_Meta_Data' ];
-	private const META_KEYS = [ OrderDeliverySnapshot::META_LINE_SNAPSHOT, OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION, OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION, OrderDeliverySnapshot::META_CART_ITEM_KEY, 'cetech_de_group_id', 'is_vat_exempt' ];
+	private const PROPERTY_OWNERS = [ 'WC_Data', 'WC_Abstract_Order', 'WC_Order', 'WC_Order_Item', 'WC_Order_Item_Product', 'WC_Order_Item_Shipping', 'WC_Order_Item_Tax', 'WC_Meta_Data' ];
+	private const META_KEYS = [ OrderDeliverySnapshot::META_LINE_SNAPSHOT, OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION, OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION, OrderDeliverySnapshot::META_CART_ITEM_KEY, '_cetech_de_delivery_quote_format', '_cetech_de_quote_native_draft', '_cetech_de_quote_reference', '_cetech_de_quote_line_key', '_cetech_de_quote_native_tax_source', 'cetech_de_group_id', 'is_vat_exempt' ];
 
 	private function __construct( private readonly \WC_Order $order, private readonly string $digest, private readonly mixed $raw_site ) {}
 
@@ -60,7 +60,7 @@ final class EmergencyCheckoutLocalBinding implements \JsonSerializable {
 			// Native date property casting does not invoke overridable format/serialization methods.
 			return [ 'date_type' => $class, 'date' => self::value( (array) $value, $depth + 1, $nodes, $objects ) ];
 		}
-		if ( ! $value instanceof \WC_Order && ! $value instanceof \WC_Order_Item_Product && ! $value instanceof \WC_Order_Item_Shipping ) {
+		if ( ! $value instanceof \WC_Order && ! $value instanceof \WC_Order_Item_Product && ! $value instanceof \WC_Order_Item_Shipping && ! is_a( $value, 'WC_Order_Item_Tax', false ) ) {
 			throw new \UnexpectedValueException( 'Unsupported checkout local object.' );
 		}
 		$id = spl_object_id( $value );
@@ -91,12 +91,17 @@ final class EmergencyCheckoutLocalBinding implements \JsonSerializable {
 					throw new \UnexpectedValueException( 'Checkout items were not prewarmed.' );
 				}
 				$selected = [];
-				foreach ( [ 'line_items', 'shipping_lines' ] as $key ) {
+				$groups = [ 'line_items', 'shipping_lines' ];
+				if ( class_exists( 'WC_Order_Item_Tax', false ) ) { $groups[] = 'tax_lines'; }
+				foreach ( $groups as $key ) {
 					if ( ! isset( $raw[ $key ] ) || ! is_array( $raw[ $key ] ) ) {
 						throw new \UnexpectedValueException( 'Checkout items were not prewarmed.' );
 					}
 					$selected[ $key ] = $raw[ $key ];
 				}
+				// Q06 admits no fee/coupon items. Retain even an unwarmed group's
+				// exact absence so an unsaved unsupported addition cannot evade freeze.
+				foreach ( [ 'fee_lines', 'coupon_lines' ] as $key ) { if ( array_key_exists( $key, $raw ) ) { $selected[$key] = $raw[$key]; } }
 				$result[ $name ] = self::value( $selected, $depth + 1, $nodes, $objects );
 			} else {
 				$result[ $name ] = self::value( $raw, $depth + 1, $nodes, $objects );

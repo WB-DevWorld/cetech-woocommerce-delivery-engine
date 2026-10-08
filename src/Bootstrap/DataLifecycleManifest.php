@@ -79,12 +79,16 @@ final class DataLifecycleManifest {
 		'cetech_de_country_identity_repair_revision', 'cetech_de_country_identity_repair_lock',
 		'cetech_de_country_identity_repair', 'cetech_de_coverage_migration_report', 'cetech_de_geography_revision',
 		...self::FEATURE_FLAG_OPTIONS, self::COORDINATOR_OPTION, self::UNINSTALL_STATUS, self::CHECKOUT_CONTROL_OPTION,
+		'cetech_de_quote_placement_adoption',
 	];
 	public const CONDITIONAL_OPTIONS = [ self::CAPABILITIES_MARKER, self::UNINSTALL_INTENT ];
 	public const OPTIONS = [ ...self::PRESERVED_OPTIONS, ...self::CONDITIONAL_OPTIONS ];
 
 	/** Names describe owned metadata only; Woo/user storage tables remain shared. */
 	public const WOO_META_KEYS = [
+		'_cetech_de_delivery_quote_format', '_cetech_de_quote_native_draft', '_cetech_de_quote_reference', '_cetech_de_quote_line_key',
+		'_cetech_de_quote_native_tax_source',
+		'_cetech_de_quote_id', '_cetech_de_quote_component_handle', '_cetech_de_quote_generation',
 		'_cetech_de_delivery_snapshot', '_cetech_de_delivery_snapshot_version',
 		'_cetech_de_delivery_quote_snapshot', '_cetech_de_order_delivery_snapshot_version',
 		'_cetech_de_cart_item_key', 'cetech_de_group_id', '_cetech_de_shipment_creation_state',
@@ -95,6 +99,7 @@ final class DataLifecycleManifest {
 		'cetech_de_dismissed_notices', '_cetech_de_shipments_reviewed_event_id', 'cetech_de_bulk_list_per_page',
 	];
 	public const WOO_SESSION_KEYS = [
+		'cetech_de_quote_payment_continuation',
 		'cetech_de_browsing_matching_location', 'cetech_de_delivery_selection',
 		'cetech_de_delivery_selection_summary', 'cetech_de_delivery_selection_hash',
 		'cetech_de_needs_reselection', 'cetech_de_customer_context', 'cetech_de_customer_location',

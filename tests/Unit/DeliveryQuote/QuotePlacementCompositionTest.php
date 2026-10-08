@@ -1,0 +1,66 @@
+<?php
+
+declare(strict_types=1);
+namespace CetechDeliveryEngine\Tests\Unit\DeliveryQuote;
+
+require_once __DIR__ . '/../../Support/DeliveryQuote/QuoteActivationFixtures.php';
+require_once __DIR__ . '/../../Support/DeliveryQuote/QuoteStorageFixtures.php';
+use CetechDeliveryEngine\Application\Configuration\ClassicCheckoutRuntimeActivation;
+use CetechDeliveryEngine\Application\DeliveryQuote\{CartQuoteResult,CartQuoteReviewService,QuotePlacementActivation,QuotePlacementPolicyFence};
+use CetechDeliveryEngine\Application\EmergencyControl\{EmergencyCheckoutAdmissionService,EmergencyOrderQuoteValidatorInterface};
+use CetechDeliveryEngine\Application\Operation\OperationReadiness;
+use CetechDeliveryEngine\Application\Order\QuoteNativeOrderFacts;
+use CetechDeliveryEngine\Bootstrap\{FeatureFlags,Plugin,ServiceContainer};
+use CetechDeliveryEngine\Domain\Contracts\RequestContext;
+use CetechDeliveryEngine\Domain\Operation\{OperationConnectionFactory,OperationSession};
+use CetechDeliveryEngine\Integrations\DeliveryQuote\{QuotePlacementRuntime,QuoteReviewRuntime};
+use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
+use CetechDeliveryEngine\Presentation\Admin\{AdminActionHandler,AdminNoticeService,AdminPageAccess,DeliverySettingsPage,QuotePlacementSettings};
+use CetechDeliveryEngine\Tests\Support\DeliveryQuote\{QuoteActivationFactory,QuoteActivationGuard,QuoteStorageFixtures};
+use PHPUnit\Framework\TestCase;
+
+/** Compiled service graph and native admin boundaries, without a Woo/SQL deployment claim. */
+final class QuotePlacementCompositionTest extends TestCase {
+	private array $globals; private array $post;
+	protected function setUp(): void { $this->globals = []; foreach ( [ 'cetech_de_test_options', 'cetech_de_test_caps', 'cetech_de_test_is_admin', 'cetech_de_test_logged_in', 'cetech_de_test_actions', 'cetech_de_test_transients' ] as $key ) { $this->globals[$key] = $GLOBALS[$key] ?? null; } $this->post = $_POST; $GLOBALS['cetech_de_test_options'] = []; $GLOBALS['cetech_de_test_caps'] = [ 'manage_delivery_settings' => true ]; $GLOBALS['cetech_de_test_is_admin'] = true; $GLOBALS['cetech_de_test_logged_in'] = true; $GLOBALS['cetech_de_test_actions'] = []; $GLOBALS['cetech_de_test_transients'] = []; AdminPageAccess::bind( null ); }
+	protected function tearDown(): void { foreach ( $this->globals as $key => $value ) { $GLOBALS[$key] = $value; } $_POST = $this->post; }
+	private function container(): ServiceContainer { $reflection = new \ReflectionClass( Plugin::class ); $plugin = $reflection->newInstanceWithoutConstructor(); $container = new ServiceContainer(); $reflection->getProperty( 'container' )->setValue( $plugin, $container ); $reflection->getMethod( 'register_services' )->invoke( $plugin ); return $container; }
+	private function activation( QuoteActivationFactory $factory, ?callable $ready = null ): QuotePlacementActivation { return new QuotePlacementActivation( $factory, $ready ?? static fn(): bool => true, new class implements OperationReadiness { public function assert_ready( OperationSession $session ): void {} } ); }
+	private function submit( QuotePlacementSettings $settings ): void { try { $settings->handle_actions(); } catch ( \RuntimeException $error ) { self::assertSame( 'cetech_de_test_redirect', $error->getMessage() ); } }
+	public function test_actual_compiled_graph_resolves_without_eager_cycle_and_preserves_existing_flag_defaults(): void {
+		$c = $this->container(); $factory = new QuoteCompositionNoDatabase(); $c->bind( OperationConnectionFactory::class, static fn() => $factory ); $before = $c->get( FeatureFlags::class )->all(); self::assertCount( 23, $before ); self::assertTrue( $before['enable_classic_checkout_adapter'] ); self::assertFalse( $before['enable_blocks_adapter'] );
+		foreach ( [ QuotePlacementRuntime::class, EmergencyCheckoutAdmissionService::class, EmergencyControlRuntime::class, QuoteReviewRuntime::class, QuotePlacementSettings::class, DeliverySettingsPage::class ] as $id ) { self::assertSame( $c->get( $id ), $c->get( $id ) ); } self::assertSame( 0, $factory->opens ); self::assertSame( $before, $c->get( FeatureFlags::class )->all() ); self::assertSame( [], $GLOBALS['cetech_de_test_options'] );
+	}
+	public function test_actual_default_off_gate_blocks_shopper_effects_but_keeps_saved_order_protection_installed(): void {
+		$c = $this->container(); $factory = new QuoteCompositionNoDatabase(); $c->bind( OperationConnectionFactory::class, static fn() => $factory ); $spy = new QuoteCompositionReviewSpy(); $c->bind( CartQuoteReviewService::class, static fn() => $spy ); $review = $c->get( QuoteReviewRuntime::class );
+		self::assertFalse( $c->get( QuotePlacementActivation::class )->active() ); self::assertSame( 'unavailable', $review->current_facts()['status'] ); self::assertSame( 0, $spy->calls ); try { $review->dispatch( [ 'action' => 'confirm', 'generation' => 0 ] ); self::fail( 'Default-off compiled transport executed.' ); } catch ( \RuntimeException ) {} self::assertSame( 0, $spy->calls );
+		$runtime = $c->get( QuotePlacementRuntime::class ); $runtime->register(); self::assertArrayHasKey( 'woocommerce_checkout_order_created', $GLOBALS['cetech_de_test_actions'] ); self::assertArrayHasKey( 'woocommerce_resume_order', $GLOBALS['cetech_de_test_actions'] );
+		$owned = new \WC_Order( [ 'id' => 701, 'meta' => [ QuoteNativeOrderFacts::META_REFERENCE => 'corrupt-private-reference' ] ] ); self::assertTrue( $runtime->owns_order( $owned ) ); self::assertFalse( $runtime->validate_order( $owned, 'order_pay' ) ); self::assertFalse( $runtime->validate_order( $owned, 'classic' ) );
+	}
+	public function test_compiled_prerequisites_refuse_partial_flags_and_native_readiness_without_changing_flags(): void {
+		$c = $this->container(); $factory = new QuoteCompositionNoDatabase(); $c->bind( OperationConnectionFactory::class, static fn() => $factory ); foreach ( ClassicCheckoutRuntimeActivation::CHAIN as $flag ) { $GLOBALS['cetech_de_test_options']['cetech_de_' . $flag] = 1; } $before = $GLOBALS['cetech_de_test_options']; self::assertFalse( $c->get( QuotePlacementActivation::class )->change( true, 0 ) ); self::assertSame( 0, $factory->opens ); self::assertSame( $before, $GLOBALS['cetech_de_test_options'] );
+		$GLOBALS['cetech_de_test_options']['cetech_de_enable_blocks_adapter'] = 1; $before = $GLOBALS['cetech_de_test_options']; self::assertFalse( $c->get( QuotePlacementActivation::class )->change( true, 0 ) ); self::assertSame( 0, $factory->opens ); self::assertSame( $before, $GLOBALS['cetech_de_test_options'] );
+	}
+	public function test_requested_adoption_with_lost_prerequisites_never_falls_back_to_legacy_but_explicit_off_does(): void {
+		$c = $this->container(); $f = new QuoteActivationFactory(); $ready = true; $a = $this->activation( $f, static function() use ( &$ready ): bool { return $ready; } ); self::assertTrue( $a->change( true, 0 ) ); $ready = false; self::assertFalse( $a->active() ); self::assertTrue( $a->requested() ); $c->bind( OperationConnectionFactory::class, static fn() => $f ); $c->bind( QuotePlacementActivation::class, static fn() => $a ); $runtime = $c->get( QuotePlacementRuntime::class ); ( new \ReflectionProperty( $runtime, 'managed_cart' ) )->setValue( $runtime, static fn(): bool => true ); $legacy = new class implements EmergencyOrderQuoteValidatorInterface { public int $calls = 0; public function fingerprint( \WC_Order $order ): ?string { return null; } public function validate_order( \WC_Order $order, string $route ): bool { ++$this->calls; return true; } }; ( new \ReflectionProperty( $runtime, 'legacy' ) )->setValue( $runtime, $legacy ); $order = new \WC_Order( [ 'id' => 701 ] ); self::assertTrue( $runtime->owns_order( $order ) ); self::assertFalse( $runtime->validate_order( $order, 'classic' ) ); self::assertSame( 0, $legacy->calls );
+		$f->pdo->exec( "UPDATE activation_options SET option_value='0' WHERE option_name='cetech_de_enable_blocks_adapter'" ); self::assertFalse( $a->active() ); self::assertTrue( $a->requested() ); self::assertFalse( $runtime->validate_order( $order, 'classic' ) ); self::assertSame( 0, $legacy->calls ); self::assertTrue( $a->change( false, 1 ) ); self::assertFalse( $a->requested() ); self::assertFalse( $runtime->owns_order( $order ) ); self::assertTrue( $runtime->validate_order( $order, 'classic' ) ); self::assertSame( 1, $legacy->calls );
+		$f->pdo->exec( "UPDATE activation_options SET option_value='{\"format\":999}' WHERE option_name='" . QuotePlacementActivation::OPTION . "'" ); self::assertFalse( $a->active() ); self::assertTrue( $a->requested() ); self::assertFalse( $runtime->validate_order( $order, 'classic' ) ); self::assertSame( 1, $legacy->calls );
+	}
+	public function test_compiled_final_decorator_uses_physical_current_flags_and_adoption_revision(): void {
+		$c = $this->container(); $f = new QuoteActivationFactory(); $a = $this->activation( $f ); self::assertTrue( $a->change( true, 0 ) ); $c->bind( OperationConnectionFactory::class, static fn() => $f ); $c->bind( QuotePlacementActivation::class, static fn() => $a ); $runtime = $c->get( QuotePlacementRuntime::class ); $decorate = ( new \ReflectionProperty( $runtime, 'decorate_guard' ) )->getValue( $runtime ); $native = new QuoteActivationGuard( true ); $guard = $decorate( $native ); $binding = QuoteStorageFixtures::binding( QuoteStorageFixtures::quote( state: 'accepted' ) ); $session = $f->open(); $session->begin(); self::assertTrue( $guard->verify( $session, $binding ) ); self::assertSame( 1, $native->calls );
+		$f->pdo->exec( "UPDATE activation_options SET option_value='0' WHERE option_name='cetech_de_enable_blocks_adapter'" ); self::assertFalse( $guard->verify( $session, $binding ) ); self::assertSame( 1, $native->calls ); $session->retire();
+	}
+	public function test_admin_form_has_purpose_nonce_and_cas_revision_and_can_disable_with_unready_prerequisites(): void {
+		$f = new QuoteActivationFactory(); $a = $this->activation( $f ); $settings = new QuotePlacementSettings( $a, new AdminActionHandler( new AdminNoticeService() ) ); ob_start(); $settings->render(); $html = ob_get_clean(); self::assertStringContainsString( 'name="cetech_de_nonce" value="test-nonce-' . QuotePlacementSettings::ACTION . '"', $html ); self::assertStringContainsString( 'name="quote_adoption_revision" value="0"', $html ); self::assertStringContainsString( 'name="quote_adoption_enabled" value="1"', $html );
+		self::assertTrue( $a->change( true, 0 ) ); $settings = new QuotePlacementSettings( $this->activation( $f, static fn(): bool => false ), new AdminActionHandler( new AdminNoticeService() ) ); ob_start(); $settings->render(); $html = ob_get_clean(); self::assertStringContainsString( 'name="quote_adoption_enabled" value="0"', $html ); self::assertStringContainsString( 'name="quote_adoption_revision" value="1"', $html );
+	}
+	public function test_admin_nonce_capability_and_stale_revision_cannot_enable_or_replace_adoption(): void {
+		$f = new QuoteActivationFactory(); $a = $this->activation( $f ); $settings = new QuotePlacementSettings( $a, new AdminActionHandler( new AdminNoticeService() ) ); $valid = [ 'cetech_de_action' => QuotePlacementSettings::ACTION, 'cetech_de_nonce' => 'test-nonce-' . QuotePlacementSettings::ACTION, 'quote_adoption_revision' => '0', 'quote_adoption_enabled' => '1' ]; $_POST = array_replace( $valid, [ 'cetech_de_nonce' => 'unrelated-purpose' ] ); $this->submit( $settings ); self::assertSame( 0, $f->opens ); self::assertSame( 0, $f->adoption_rows() );
+		$_POST = $valid; $GLOBALS['cetech_de_test_caps']['manage_delivery_settings'] = false; $this->submit( $settings ); self::assertSame( 0, $f->opens ); $GLOBALS['cetech_de_test_caps']['manage_delivery_settings'] = true; $_POST['quote_adoption_revision'] = '00'; $this->submit( $settings ); self::assertSame( 0, $f->opens ); $_POST = $valid; $this->submit( $settings ); self::assertTrue( $a->active() ); $before = $f->pdo->query( 'SELECT option_name,option_value FROM activation_options ORDER BY option_name' )->fetchAll( \PDO::FETCH_KEY_PAIR ); $_POST['quote_adoption_enabled'] = '0'; $this->submit( $settings ); self::assertTrue( $a->active() ); self::assertSame( $before, $f->pdo->query( 'SELECT option_name,option_value FROM activation_options ORDER BY option_name' )->fetchAll( \PDO::FETCH_KEY_PAIR ) );
+	}
+}
+final class QuoteCompositionNoDatabase implements OperationConnectionFactory { public int $opens = 0; public function open(): OperationSession { ++$this->opens; throw new \RuntimeException( 'Native SQL unavailable.' ); } }
+final class QuoteCompositionReviewSpy implements CartQuoteReviewService {
+	public int $calls = 0; private function result( RequestContext $request ): CartQuoteResult { ++$this->calls; return CartQuoteResult::create( 'no_quote', 0, $request ); }
+	public function current( RequestContext $request ): CartQuoteResult { return $this->result( $request ); } public function refresh( string $token, int $generation, RequestContext $request ): CartQuoteResult { return $this->result( $request ); } public function confirm( int $generation, RequestContext $request ): CartQuoteResult { return $this->result( $request ); } public function retry( int $generation, RequestContext $request ): CartQuoteResult { return $this->result( $request ); }
+}

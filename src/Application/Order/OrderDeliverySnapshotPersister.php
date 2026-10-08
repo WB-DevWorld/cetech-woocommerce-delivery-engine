@@ -16,12 +16,22 @@ use WC_Order_Item_Product;
 final class OrderDeliverySnapshotPersister {
 
 	private const SELECTED_OFFER_METHOD_ID = 'delivery_engine_selected_offer';
+	private ?\Closure $quote_ownership = null;
 
 	public function __construct(
 		private OrderDeliverySnapshotGate $gate,
 		private OrderDeliverySnapshotBuilder $builder,
-		private Logger $logger
+		private Logger $logger,
+		?callable $quote_ownership = null
 	) {
+		$this->quote_ownership = null === $quote_ownership ? null : \Closure::fromCallable( $quote_ownership );
+	}
+
+	/** Installed only by the complete quote runtime. Existing quote history always stays owned. */
+	public function set_quote_ownership_guard( callable $guard ): void { $this->quote_ownership = \Closure::fromCallable( $guard ); }
+	private function quote_owns( WC_Order $order ): bool {
+		try { return QuoteNativeOrderHistory::owned( $order ) || null !== $this->quote_ownership && true === ( $this->quote_ownership )( $order ); }
+		catch ( \Throwable ) { return true; }
 	}
 
 	public function register(): void {
@@ -47,6 +57,7 @@ final class OrderDeliverySnapshotPersister {
 			OrderDeliverySnapshot::META_LINE_SNAPSHOT,
 			OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION,
 			OrderDeliverySnapshot::META_CART_ITEM_KEY,
+			QuoteNativeOrderFacts::META_LINE_KEY,
 			'cetech_de_group_id',
 		] as $key ) {
 			if ( ! in_array( $key, $hidden, true ) ) {
@@ -72,6 +83,7 @@ final class OrderDeliverySnapshotPersister {
 			OrderDeliverySnapshot::META_LINE_SNAPSHOT,
 			OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION,
 			OrderDeliverySnapshot::META_CART_ITEM_KEY,
+			QuoteNativeOrderFacts::META_LINE_KEY,
 			'cetech_de_group_id',
 		];
 
@@ -107,6 +119,7 @@ final class OrderDeliverySnapshotPersister {
 		if ( ! $this->is_runtime_active() || ! $item instanceof WC_Order_Item_Product ) {
 			return;
 		}
+		if ( $this->quote_owns( $order ) || QuoteNativeOrderHistory::object_owned( $item, OrderDeliverySnapshot::META_LINE_SNAPSHOT ) ) { return; }
 
 		if ( $this->item_has_line_snapshot( $item ) ) {
 			$this->forget_cart_item_key( $item );
@@ -126,6 +139,11 @@ final class OrderDeliverySnapshotPersister {
 	}
 
 	public function handle_order_created( WC_Order $order ): void {
+		if ( $this->quote_owns( $order ) ) {
+			try { if ( QuoteNativeOrderHistory::owned( $order ) && ! QuoteNativeOrderHistory::verify( $order ) ) { $this->logger->warning( 'Protected delivery quote history is unavailable.' ); } }
+			catch ( \Throwable ) { $this->logger->warning( 'Protected delivery quote history is unavailable.' ); }
+			return;
+		}
 		if ( ! $this->is_runtime_active() ) {
 			return;
 		}

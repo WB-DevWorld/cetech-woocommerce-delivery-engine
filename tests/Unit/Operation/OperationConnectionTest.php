@@ -50,14 +50,17 @@ final class OperationConnectionTest extends TestCase {
 		$tables = array_map( static fn( string $suffix ): string => 'op_' . $suffix, $common );
 		self::assertTrue( $connection->validate_tables( $tables ) );
 		foreach ( $tables as $table ) { self::assertContains( 'SELECT 1 FROM `' . $table . '` LIMIT 0', $transport->statements ); }
-		$ceiling = [ ...$tables, ...array_map( static fn( int $id ): string => 'op_finite_' . $id, range( 1, 9 ) ) ];
+		// Q06 also fences six native HPOS order/item tables before placement.
+		$native = array_map( static fn( string $suffix ): string => 'op_' . $suffix, [ 'wc_orders', 'wc_orders_meta', 'wc_order_addresses', 'wc_order_operational_data', 'woocommerce_order_items', 'woocommerce_order_itemmeta' ] );
+		self::assertTrue( $connection->validate_tables( [ ...$tables, ...$native ] ) );
+		$ceiling = [ ...$tables, ...$native, ...array_map( static fn( int $id ): string => 'op_finite_' . $id, range( 1, 11 ) ) ];
 		self::assertTrue( $connection->validate_tables( $ceiling ) );
 		$before = count( $transport->statements );
-		self::assertFalse( $connection->validate_tables( [ ...$ceiling, 'op_finite_33' ] ) );
+		self::assertFalse( $connection->validate_tables( [ ...$ceiling, 'op_finite_41' ] ) );
 		self::assertSame( $before, count( $transport->statements ) );
-		self::assertFalse( $connection->validate_tables( [ 'op_finite_33' ] ) );
+		self::assertFalse( $connection->validate_tables( [ 'op_finite_41' ] ) );
 		self::assertSame( $before, count( $transport->statements ) );
-		self::assertFalse( $connection->validate_tables( [ ...array_slice( $ceiling, 0, 31 ), 'foreign_options' ] ) );
+		self::assertFalse( $connection->validate_tables( [ ...array_slice( $ceiling, 0, 39 ), 'foreign_options' ] ) );
 		self::assertSame( $before, count( $transport->statements ) );
 		self::assertTrue( $connection->rollback() ); self::assertTrue( $connection->retire() );
 	}

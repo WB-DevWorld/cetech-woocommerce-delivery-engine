@@ -185,6 +185,10 @@ final class OperationCoordinatorTest extends TestCase {
 		self::assertSame( 5, $this->resource()['value'] );
 		self::assertSame( 0, $this->count_events() );
 	}
+	public function test_refusal_after_unknown_owner_loss_remains_pending_without_a_replacement_connection(): void {
+		$this->profile->lose_owner_on_lock = true; $result = $this->coordinator->attempt( $this->identity(), $this->command(), RequestContext::create() );
+		self::assertSame( 'unconfirmed', $result->outcome->state ); self::assertSame( 'reconcile_original_request', $result->outcome->error->recovery_action ); self::assertNull( $result->completion ); self::assertSame( 1, $this->factory->opens ); self::assertTrue( $this->factory->sessions[0]->is_retired() ); self::assertSame( 'pending', $this->stored_state() ); self::assertSame( 0, $this->profile->mutations ); self::assertSame( 5, $this->resource()['value'] ); self::assertSame( 0, $this->count_events() );
+	}
 
 	public function test_rejection_bookkeeping_preserves_a_concurrent_terminal_no_change_record(): void {
 		$this->factory->reject_audit = true;
@@ -380,6 +384,7 @@ final readonly class CoordinatorFixtureCommand implements OperationCommand {
 
 final class CoordinatorFixtureProfile implements OperationProfile {
 	public bool $authorized = true;
+	public bool $lose_owner_on_lock = false;
 	public bool $revoke_on_lock = false;
 	public bool $reject_after_write = false;
 	public bool $publication_enabled = false;
@@ -396,6 +401,7 @@ final class CoordinatorFixtureProfile implements OperationProfile {
 	}
 	public function transactional_tables( OperationSession $session ): array { return [ $session->table_prefix() . 'counter' ]; }
 	public function lock_target( OperationSession $session, OperationIdentity $identity, OperationCommand $command ): OperationTarget {
+		if ( $this->lose_owner_on_lock ) { $session->retire(); throw new OperationRefusal( 'temporarily_unavailable', 'retry_original_request' ); }
 		$row = $session->get_row( 'SELECT * FROM unit_counter WHERE id=1 FOR UPDATE' );
 		if ( ! is_array( $row ) || $row['revision'] !== $command->revision ) { throw new OperationRefusal( 'stale_revision', 'reload_and_submit' ); }
 		if ( $this->revoke_on_lock ) { $this->authorized = false; }

@@ -31,7 +31,7 @@ final class OperationConnectionMysqliTransport implements OperationConnectionTra
 		$handle = null;
 		try {
 			$handle = mysqli_init();
-			if ( false === $handle || ! $handle->options( MYSQLI_OPT_CONNECT_TIMEOUT, 5 ) || ! @$handle->real_connect( $host, $user, $password, $database, $port, $socket, $flags ) || ! @$handle->set_charset( $charset ) ) {
+			if ( false === $handle || ! $handle->options( MYSQLI_OPT_CONNECT_TIMEOUT, 5 ) || ! $handle->options( MYSQLI_OPT_READ_TIMEOUT, 5 ) || ! @$handle->real_connect( $host, $user, $password, $database, $port, $socket, $flags ) || ! @$handle->set_charset( $charset ) ) {
 				throw new \RuntimeException( 'Operation connection is unavailable.' );
 			}
 			$transport = new self( $handle );

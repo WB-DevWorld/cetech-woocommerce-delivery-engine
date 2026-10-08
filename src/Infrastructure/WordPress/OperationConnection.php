@@ -130,7 +130,7 @@ final class OperationConnection implements OperationSession {
 
 	/** @param list<string> $table_names */
 	public function validate_tables( array $table_names ): bool {
-		if ( ! $this->guard_owner() || ! array_is_list( $table_names ) || [] === $table_names || count( $table_names ) > 32 ) {
+		if ( ! $this->guard_owner() || ! array_is_list( $table_names ) || [] === $table_names || count( $table_names ) > 40 ) {
 			return false;
 		}
 		foreach ( $table_names as $table ) {
@@ -140,7 +140,7 @@ final class OperationConnection implements OperationSession {
 		}
 		// Q04 adds finite product, native tax/session and price-source participants.
 		// The ceiling applies to the entire owned unit, including later declarations.
-		if ( count( array_unique( [ ...array_keys( $this->tables ), ...$table_names ] ) ) > 32 ) { return false; }
+		if ( count( array_unique( [ ...array_keys( $this->tables ), ...$table_names ] ) ) > 40 ) { return false; }
 		foreach ( array_unique( $table_names ) as $table ) {
 			// Acquire and hold the actual participant's metadata lock before
 			// checking engine. A later DDL conversion cannot invalidate this unit.
