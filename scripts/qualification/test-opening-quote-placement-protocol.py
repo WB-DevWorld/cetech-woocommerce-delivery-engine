@@ -95,7 +95,76 @@ echo json_encode(['prior_retained'=>true,'prior_called_first'=>true,'exact_produ
     return json.loads(result.stdout)
 
 
+def checkout_target_probe():
+    code = r'''
+require $argv[1];
+$source=file_get_contents($argv[2]);$start=strpos($source,'final class CetechQuotePlacementHttpFixture {');$end=strpos($source,"\nif (!class_exists('CetechOpeningQuotePlacementGateway'",$start);
+if(false===$start||false===$end){throw new RuntimeException('Fixture class boundary unavailable.');}eval(substr($source,$start,$end-$start));
+$state=['base_url'=>'http://127.0.0.1:8085','classic_page_id'=>11,'blocks_page_id'=>12,'classic_page_url'=>'http://127.0.0.1:8085/?page_id=11','blocks_page_url'=>'http://127.0.0.1:8085/?page_id=12'];
+$expected=['classic'=>CetechQuotePlacementHttpFixture::checkout_target($state,11,$state['classic_page_url'])===$state['classic_page_url'],'blocks'=>CetechQuotePlacementHttpFixture::checkout_target($state,'12',$state['blocks_page_url'])===$state['blocks_page_url']];
+foreach([[13,$state['blocks_page_url']],[11,$state['blocks_page_url']],['011',$state['classic_page_url']],[true,$state['classic_page_url']],[12,'http://127.0.0.1:8085/?page_id=12&extra=PRIVATE'],[12,'http://foreign.invalid/?page_id=12'],[12,'http://127.0.0.1:8085/?page_id=12#fragment']]as[$page,$url]){
+    $refused=false;try{CetechQuotePlacementHttpFixture::checkout_target($state,$page,$url);}catch(RuntimeException){$refused=true;}if(!$refused){throw new RuntimeException('Unowned checkout target accepted.');}
+}
+foreach(['http://127.0.0.1:8086/?page_id=12','https://127.0.0.1:8085/?page_id=12','http://actor:PRIVATE@127.0.0.1:8085/?page_id=12']as$url){$changed=$state;$changed['blocks_page_url']=$url;$refused=false;try{CetechQuotePlacementHttpFixture::checkout_target($changed,12,$url);}catch(RuntimeException){$refused=true;}if(!$refused){throw new RuntimeException('Wrong checkout origin accepted.');}}
+echo json_encode($expected+['foreign_selection_refused'=>true,'wrong_selected_page_refused'=>true,'unowned_url_refused'=>true,'wrong_origin_credentials_fragment_refused'=>true],JSON_THROW_ON_ERROR);
+'''
+    result = subprocess.run([os.environ.get('CETECH_DE_QUALIFICATION_PHP', 'php'), '-r', code, str(ROOT.parent.parent / 'vendor/autoload.php'), str(ROOT / 'opening-http-quote-placement-support.php')], capture_output=True, timeout=20, check=False)
+    if result.returncode != 0:
+        raise AssertionError('Owned native checkout target refused: ' + result.stderr.decode(errors='replace')[:1000])
+    return json.loads(result.stdout)
+
+
+def foreign_restoration_probe():
+    code = r'''
+require $argv[1]; require $argv[3];
+$source=file_get_contents($argv[2]);$start=strpos($source,'final class CetechQuotePlacementHttpFixture {');$end=strpos($source,"\nif (!class_exists('CetechOpeningQuotePlacementGateway'",$start);
+if(false===$start||false===$end){throw new RuntimeException('Fixture class boundary unavailable.');}eval(substr($source,$start,$end-$start));
+$quote=CetechDeliveryEngine\Tests\Support\DeliveryQuote\QuoteStorageFixtures::quote(state:'accepted');
+$row=CetechDeliveryEngine\Tests\Support\DeliveryQuote\QuoteStorageFixtures::binding($quote,order:10)->row();
+$binding=CetechDeliveryEngine\Domain\DeliveryQuote\QuoteBinding::from_row(array_replace($row,['state'=>'sealed','revision'=>3,'snapshot_digest'=>hash('sha256','snapshot'),'context_digest'=>hash('sha256','context'),'verified_at'=>$row['created_at'],'sealed_at'=>$row['created_at']]),$quote);
+$foreign=['id'=>21,'login'=>'q06_foreign_aaaaaaaaaaaa'];
+$authority=['order_id'=>10,'original_customer_id'=>20,'foreign_customer'=>$foreign,'snapshot_hash'=>hash('sha256','protected'),'quote'=>$quote->row(),'binding'=>$binding->row()];
+$state=['site_id'=>1,'user_id'=>20,'owners'=>[$quote->header()->owner()->digest()=>true],'q06'=>['active'=>true,'orders'=>[10],'foreign_order_id'=>10,'foreign_user'=>$foreign,'foreign_restoration'=>$authority]];
+$current=['order_id'=>10,'customer_id'=>21,'needs_payment'=>true,'paid'=>false,'history_supported'=>true,'snapshot_hash'=>$authority['snapshot_hash'],'quote'=>$authority['quote'],'binding'=>$authority['binding']];
+function match_restore(array $state,array $authority,array $current,bool $restored=false):bool{return CetechQuotePlacementHttpFixture::foreign_restoration_matches($state,$authority,$current,$restored);}
+if(!match_restore($state,$authority,$current)){throw new RuntimeException('Exact temporary foreign transfer refused.');}
+$restored=$current;$restored['customer_id']=20;
+if(!match_restore($state,$authority,$restored,true)||match_restore($state,$authority,$restored)||match_restore($state,$authority,$current,true)){throw new RuntimeException('Restoration phase owner mismatch.');}
+$variants=[];
+foreach(['order_id'=>11,'customer_id'=>22,'needs_payment'=>false,'paid'=>true,'history_supported'=>false,'snapshot_hash'=>hash('sha256','changed')]as$key=>$value){$changed=$current;$changed[$key]=$value;$variants[]=[$state,$authority,$changed];}
+$changed=$current;$changed['order_id']='10';$variants[]=[$state,$authority,$changed];
+$changed=$current;$changed['quote']['revision']++;$variants[]=[$state,$authority,$changed];
+$changed=$current;$changed['binding']['revision']=2;$variants[]=[$state,$authority,$changed];
+$changed=$current;$changed['binding']['snapshot_digest']=hash('sha256','changed');$variants[]=[$state,$authority,$changed];
+$changed=$state;$changed['q06']['orders']=[11];$variants[]=[$changed,$authority,$current];
+$changed=$state;$changed['q06']['foreign_order_id']=11;$variants[]=[$changed,$authority,$current];
+$changed=$state;$changed['q06']['foreign_user']['login']='q06_foreign_bbbbbbbbbbbb';$variants[]=[$changed,$authority,$current];
+$changed=$state;$changed['user_id']=22;$variants[]=[$changed,$authority,$current];
+$changed=$state;$changed['site_id']=2;$variants[]=[$changed,$authority,$current];
+$changed=$state;$changed['owners']=[];$variants[]=[$changed,$authority,$current];
+$changed=$authority;$changed['original_customer_id']=21;$variants[]=[$state,$changed,$current];
+$changed=$authority;$changed['unexpected']='untrusted';$variants[]=[$state,$changed,$current];
+$changed=$current;$changed['unexpected']='untrusted';$variants[]=[$state,$authority,$changed];
+foreach($variants as[$s,$a,$c]){if(match_restore($s,$a,$c)){throw new RuntimeException('Changed foreign restoration authority accepted.');}}
+echo json_encode(['exact_foreign_owner'=>true,'exact_restored_owner'=>true,'wrong_phase_owner_refused'=>true,'untracked_foreign_paid_history_changes_refused'=>true,'typed_membership_and_closed_authority_refused'=>true],JSON_THROW_ON_ERROR);
+'''
+    result = subprocess.run([os.environ.get('CETECH_DE_QUALIFICATION_PHP', 'php'), '-r', code, str(ROOT.parent.parent / 'vendor/autoload.php'), str(ROOT / 'opening-http-quote-placement-support.php'), str(ROOT.parent.parent / 'tests/Support/DeliveryQuote/QuoteStorageFixtures.php')], capture_output=True, timeout=20, check=False)
+    if result.returncode != 0:
+        raise AssertionError('Exact foreign fixture restoration guard refused: ' + result.stderr.decode(errors='replace')[:1000])
+    return json.loads(result.stdout)
+
+
 class QuotePlacementProtocol(unittest.TestCase):
+    def test_foreign_customer_restore_requires_exact_tracked_unpaid_history(self):
+        observed = foreign_restoration_probe()
+        self.assertEqual({'exact_foreign_owner', 'exact_restored_owner', 'wrong_phase_owner_refused', 'untracked_foreign_paid_history_changes_refused', 'typed_membership_and_closed_authority_refused'}, set(observed))
+        self.assertTrue(all(value is True for value in observed.values()))
+
+    def test_orderpay_redirect_uses_the_single_owned_native_checkout_target(self):
+        observed = checkout_target_probe()
+        self.assertEqual({'classic', 'blocks', 'foreign_selection_refused', 'wrong_selected_page_refused', 'unowned_url_refused', 'wrong_origin_credentials_fragment_refused'}, set(observed))
+        self.assertTrue(all(value is True for value in observed.values()))
+
     def test_late_stimulus_retains_the_exact_production_guard_decorator(self):
         observed = seal_decorator_probe()
         self.assertEqual({'prior_retained', 'prior_called_first', 'exact_produced_guard_retained', 'barrier_once', 'other_modes_inert', 'inactive_foreign_cli_inert', 'missing_invalid_throwing_prior_refused', 'no_stimulus_inside_owned_sql'}, set(observed))

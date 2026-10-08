@@ -32,6 +32,67 @@ final class CetechQuotePlacementHttpFixture {
     }
     public static function active(array $state): bool { return true === ($state['q06']['active'] ?? false); }
     public static function principal(array $state): bool { return self::active($state) && (int)$state['user_id'] === get_current_user_id() && (int)$state['site_id'] === get_current_blog_id(); }
+    /** Bind the expectation to the native selected, exact owned checkout page. */
+    public static function checkout_target(array $state, mixed $selected, mixed $url): string {
+        if (is_string($selected) && preg_match('/\A[1-9][0-9]{0,9}\z/D', $selected)) { $selected = (int)$selected; }
+        if (!is_int($selected) || !is_string($url) || ($state['base_url'] ?? null) !== 'http://127.0.0.1:8085') { throw new RuntimeException('Q06 native checkout destination unavailable.'); }
+        $expected = null;
+        foreach (['classic', 'blocks'] as $type) {
+            if (is_int($state[$type . '_page_id'] ?? null) && $state[$type . '_page_id'] > 0 && $selected === $state[$type . '_page_id']) { $expected = $state[$type . '_page_url'] ?? null; }
+        }
+        $parts = parse_url($url);
+        if (!is_string($expected) || $url !== $expected || !is_array($parts) || ($parts['scheme'] ?? null) !== 'http' || ($parts['host'] ?? null) !== '127.0.0.1' || ($parts['port'] ?? null) !== 8085 || isset($parts['user']) || isset($parts['pass']) || isset($parts['fragment'])) { throw new RuntimeException('Q06 refuses an unowned native checkout destination.'); }
+        return $url;
+    }
+    /** Only the authority recorded before this exact foreign-customer save may restore it. */
+    public static function foreign_restoration_matches(array $state, array $authority, array $current, bool $restored = false): bool {
+        try {
+            $authority_keys = array_keys($authority); sort($authority_keys, SORT_STRING);
+            $current_keys = array_keys($current); sort($current_keys, SORT_STRING);
+            if ($authority_keys !== ['binding', 'foreign_customer', 'order_id', 'original_customer_id', 'quote', 'snapshot_hash']
+                || $current_keys !== ['binding', 'customer_id', 'history_supported', 'needs_payment', 'order_id', 'paid', 'quote', 'snapshot_hash']
+                || !self::active($state) || !is_int($state['user_id'] ?? null) || $state['user_id'] < 1 || !is_int($state['site_id'] ?? null) || $state['site_id'] < 1
+                || !is_int($authority['order_id']) || $authority['order_id'] < 1 || !in_array($authority['order_id'], $state['q06']['orders'] ?? [], true)
+                || ($state['q06']['foreign_order_id'] ?? null) !== $authority['order_id'] || $authority['original_customer_id'] !== $state['user_id']
+                || !is_array($authority['foreign_customer']) || array_keys($authority['foreign_customer']) !== ['id', 'login']
+                || !is_int($authority['foreign_customer']['id']) || $authority['foreign_customer']['id'] < 1 || $authority['foreign_customer']['id'] === $state['user_id']
+                || !is_string($authority['foreign_customer']['login']) || !preg_match('/\Aq06_foreign_[a-f0-9]{12}\z/D', $authority['foreign_customer']['login'])
+                || ($state['q06']['foreign_user'] ?? null) !== $authority['foreign_customer'] || !is_string($authority['snapshot_hash']) || !preg_match('/\A[a-f0-9]{64}\z/D', $authority['snapshot_hash'])
+                || $current['order_id'] !== $authority['order_id'] || $current['customer_id'] !== ($restored ? $authority['original_customer_id'] : $authority['foreign_customer']['id'])
+                || true !== $current['needs_payment'] || false !== $current['paid'] || true !== $current['history_supported']
+                || $current['snapshot_hash'] !== $authority['snapshot_hash'] || $current['quote'] !== $authority['quote'] || $current['binding'] !== $authority['binding']) { return false; }
+            $quote = CetechDeliveryEngine\Domain\DeliveryQuote\QuoteStoredRow::from_row($authority['quote']);
+            $binding = CetechDeliveryEngine\Domain\DeliveryQuote\QuoteBinding::from_row($authority['binding'], $quote);
+            return 'accepted' === $quote->state() && $quote->site_id() === $state['site_id'] && isset($state['owners'][$quote->header()->owner()->digest()])
+                && 'sealed' === $binding->state() && 3 === $binding->revision() && $binding->site_id() === $state['site_id'] && $binding->row()['order_id'] === $authority['order_id'];
+        } catch (Throwable) { return false; }
+    }
+    private static function foreign_customer(array $state): array {
+        $identity = $state['q06']['foreign_user'] ?? null;
+        if (!is_array($identity) || array_keys($identity) !== ['id', 'login'] || !is_int($identity['id']) || $identity['id'] < 1 || $identity['id'] === $state['user_id']
+            || !is_string($identity['login']) || !preg_match('/\Aq06_foreign_[a-f0-9]{12}\z/D', $identity['login'])) { throw new RuntimeException('Q06 foreign customer identity unavailable.'); }
+        $user = get_userdata($identity['id']);
+        if (!$user instanceof WP_User || (int)$user->ID !== $identity['id'] || $user->user_login !== $identity['login']) { throw new RuntimeException('Q06 foreign customer identity changed.'); }
+        return $identity;
+    }
+    /** Read the native customer and complete original private rows independently of Woo caches. */
+    private static function foreign_packet(array $state, WC_Order $order): array {
+        global $wpdb; $id = $order->get_id();
+        if (!in_array($id, $state['q06']['orders'], true)) { throw new RuntimeException('Q06 foreign restoration refuses an untracked order.'); }
+        $sql = Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled()
+            ? $wpdb->prepare("SELECT customer_id FROM `{$wpdb->prefix}wc_orders` WHERE id=%d LIMIT 2", $id)
+            : $wpdb->prepare("SELECT meta_value AS customer_id FROM `{$wpdb->postmeta}` WHERE post_id=%d AND meta_key='_customer_user' LIMIT 2", $id);
+        $customers = $wpdb->get_results($sql, ARRAY_A);
+        if (!is_array($customers) || 1 !== count($customers) || '' !== $wpdb->last_error || !isset($customers[0]['customer_id'])
+            || !preg_match('/\A[1-9][0-9]{0,18}\z/D', (string)$customers[0]['customer_id']) || (string)(int)$customers[0]['customer_id'] !== (string)$customers[0]['customer_id']
+            || $order->get_customer_id('edit') !== (int)$customers[0]['customer_id']) { throw new RuntimeException('Q06 physical native customer unavailable.'); }
+        $bindings = $wpdb->get_results($wpdb->prepare('SELECT * FROM `' . TableNames::for('delivery_quote_bindings') . '` WHERE site_id=%d AND order_id=%d LIMIT 2', $state['site_id'], $id), ARRAY_A);
+        if (!is_array($bindings) || 1 !== count($bindings) || '' !== $wpdb->last_error) { throw new RuntimeException('Q06 original physical binding unavailable.'); }
+        $quotes = $wpdb->get_results($wpdb->prepare('SELECT * FROM `' . TableNames::for('delivery_quotes') . '` WHERE site_id=%d AND quote_uuid=%s LIMIT 2', $state['site_id'], $bindings[0]['quote_uuid']), ARRAY_A);
+        if (!is_array($quotes) || 1 !== count($quotes) || '' !== $wpdb->last_error) { throw new RuntimeException('Q06 original physical quote unavailable.'); }
+        return ['order_id' => $id, 'customer_id' => (int)$customers[0]['customer_id'], 'needs_payment' => $order->needs_payment(), 'paid' => $order->is_paid(),
+            'history_supported' => QuoteNativeOrderHistory::verify($order), 'snapshot_hash' => self::snapshot_hash($order), 'quote' => $quotes[0], 'binding' => $bindings[0]];
+    }
     /** Preserve the mounted production decorator and its exact returned guard. */
     public static function install_seal_barrier(CetechDeliveryEngine\Integrations\DeliveryQuote\QuotePlacementRuntime $runtime, Closure $selected, Closure $barrier): void {
         $property = new ReflectionProperty($runtime, 'decorate_guard');
@@ -121,7 +182,7 @@ final class CetechQuotePlacementHttpFixture {
             });
         });
     }
-    public const MODES = ['inspect', 'seed', 'free', 'refill', 'resume_pending', 'resume_failed', 'hold', 'empty', 'expire', 'change', 'pause', 'resume', 'arm_late_pause', 'arm_late_expiry', 'arm_bind_ack', 'arm_seal_ack', 'arm_snapshot_fault', 'arm_postsave_money', 'arm_postsave_protected', 'arm_validate_billing', 'arm_validate_money', 'restore_mutation', 'foreign', 'legacy', 'release', 'clear_fault', 'historychange'];
+    public const MODES = ['inspect', 'seed', 'free', 'refill', 'resume_pending', 'resume_failed', 'hold', 'empty', 'expire', 'change', 'pause', 'resume', 'arm_late_pause', 'arm_late_expiry', 'arm_bind_ack', 'arm_seal_ack', 'arm_snapshot_fault', 'arm_postsave_money', 'arm_postsave_protected', 'arm_validate_billing', 'arm_validate_money', 'restore_mutation', 'foreign', 'restore_foreign', 'legacy', 'release', 'clear_fault', 'historychange'];
     public static function track(array &$state, int $id): void {
         if ($id < 1 || count($state['q06']['orders']) > 150) { throw new RuntimeException('Q06 tracked native order bound exceeded.'); }
         if (!in_array($id, $state['q06']['orders'], true)) { $state['q06']['orders'][] = $id; } $state['q06']['last_order_id'] = $id;
@@ -184,11 +245,31 @@ final class CetechQuotePlacementHttpFixture {
         } elseif ('refill' === $mode) { $native = CetechQuoteCartHttpFixture::hydrate_native($wpdb, $state['native']); $native->cart(); WC()->cart->set_session(); WC()->session->save_data();
         } elseif (in_array($mode, ['resume_pending', 'resume_failed', 'foreign'], true)) {
             if ('foreign' === $mode && null === $state['q06']['foreign_user']) { $login = 'q06_foreign_' . bin2hex(random_bytes(6)); $user = wp_create_user($login, bin2hex(random_bytes(24)), $login . '@example.invalid'); if (!is_int($user) || $user < 1 || $user === $state['user_id']) { throw new RuntimeException('Q06 exact foreign customer allocation refused.'); } (new WP_User($user))->set_role('customer'); $state['q06']['foreign_user'] = ['id' => $user, 'login' => $login]; cetech_q05_write($state); }
-            if ('foreign' === $mode) { $order = wc_get_order($state['q06']['last_order_id']); if (!$order instanceof WC_Order || !in_array($order->get_id(), $state['q06']['orders'], true) || !$order->needs_payment() || !self::sealed($order)) { throw new RuntimeException('Q06 foreign authorization requires its existing unpaid sealed quote order.'); } $history = self::snapshot_hash($order); $order->set_customer_id($state['q06']['foreign_user']['id']); $order->save(); if ($history !== self::snapshot_hash($order) || !QuoteNativeOrderHistory::owned($order)) { throw new RuntimeException('Q06 foreign authority setup changed quote history.'); } $state['q06']['foreign_order_id'] = $order->get_id(); return; }
+            if ('foreign' === $mode) {
+                if (!self::principal($state) || null !== ($state['q06']['foreign_restoration'] ?? null)) { throw new RuntimeException('Q06 refuses to replace foreign restoration authority.'); }
+                $foreign = self::foreign_customer($state); $order = wc_get_order($state['q06']['last_order_id']);
+                if (!$order instanceof WC_Order) { throw new RuntimeException('Q06 foreign authorization requires its existing unpaid sealed quote order.'); }
+                $before = self::foreign_packet($state, $order);
+                $authority = ['order_id' => $order->get_id(), 'original_customer_id' => $before['customer_id'], 'foreign_customer' => $foreign, 'snapshot_hash' => $before['snapshot_hash'], 'quote' => $before['quote'], 'binding' => $before['binding']];
+                $state['q06']['foreign_order_id'] = $order->get_id();
+                if (!self::foreign_restoration_matches($state, $authority, $before, true)) { throw new RuntimeException('Q06 foreign setup original ownership refused.'); }
+                $state['q06']['foreign_restoration'] = $authority; cetech_q05_write($state);
+                $order->set_customer_id($foreign['id']); $order->save(); $saved = wc_get_order($authority['order_id']);
+                if (!$saved instanceof WC_Order || !self::foreign_restoration_matches($state, $authority, self::foreign_packet($state, $saved))) { throw new RuntimeException('Q06 foreign authority setup changed original history.'); }
+                return;
+            }
             $order = wc_create_order(['customer_id' => 'foreign' === $mode ? $state['q06']['foreign_user']['id'] : $state['user_id']]); if (!$order instanceof WC_Order) { throw new RuntimeException('Q06 native draft allocation failed.'); }
             self::track($state, $order->get_id()); $order->set_status('resume_failed' === $mode ? 'failed' : 'pending'); $order->set_cart_hash(WC()->cart->get_cart_hash()); $order->set_currency('GHS'); $order->set_total('67.70'); $item = new WC_Order_Item_Product(); $item->set_product_id($state['native']['products'][0]); $item->set_name('Q06 old native draft member'); $item->set_quantity(1); $item->set_subtotal('20.00'); $item->set_total('20.00'); $order->add_item($item); $order->save();
             $state['q06']['reuse_order_id'] = $order->get_id(); $state['q06']['reuse_old_item_ids'] = array_keys($order->get_items('line_item'));
             if ('foreign' !== $mode) { WC()->session->set('order_awaiting_payment', $order->get_id()); WC()->session->save_data(); } else { $state['q06']['foreign_order_id'] = $order->get_id(); }
+        } elseif ('restore_foreign' === $mode) {
+            $authority = $state['q06']['foreign_restoration'] ?? null;
+            if (!self::principal($state) || !is_array($authority) || self::foreign_customer($state) !== ($authority['foreign_customer'] ?? null)) { throw new RuntimeException('Q06 foreign restoration authority unavailable.'); }
+            $order = wc_get_order($authority['order_id'] ?? 0);
+            if (!$order instanceof WC_Order || !self::foreign_restoration_matches($state, $authority, self::foreign_packet($state, $order))) { throw new RuntimeException('Q06 foreign restoration original facts changed.'); }
+            $order->set_customer_id($authority['original_customer_id']); $order->save(); $saved = wc_get_order($authority['order_id']);
+            if (!$saved instanceof WC_Order || self::foreign_customer($state) !== $authority['foreign_customer'] || !self::foreign_restoration_matches($state, $authority, self::foreign_packet($state, $saved), true)) { throw new RuntimeException('Q06 native customer restoration did not preserve original history.'); }
+            $state['q06']['foreign_restoration'] = null;
         } elseif ('hold' === $mode || 'release' === $mode) { $state['q06']['hold_gateway'] = 'hold' === $mode; }
         elseif ('restore_mutation' === $mode) { $mutation = $state['q06']['mutation']; if (!is_array($mutation) || !in_array($mutation['order_id'], $state['q06']['orders'], true)) { throw new RuntimeException('Q06 refuses a foreign mutation restoration.'); } $order = wc_get_order($mutation['order_id']); if (!$order instanceof WC_Order) { throw new RuntimeException('Q06 marked native mutation owner unavailable.'); } if ('monetary' === $mutation['kind']) { $order->set_total($mutation['original']); } else { $order->update_meta_data(OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, $mutation['original']); } $order->save(); $state['q06']['mutation'] = null; }
         elseif ('clear_fault' === $mode) { $state['q06']['fault'] = null; $state['q06']['clock'] = null; $state['q06']['barrier'] = null; }
@@ -248,7 +329,8 @@ final class CetechQuotePlacementHttpFixture {
             $orders[(string)$id] = ['id' => $id, 'status' => $order->get_status(), 'payment_method' => $order->get_payment_method(), 'paid' => $order->is_paid(), 'binding_state' => $binding['state'] ?? null, 'binding_revision' => isset($binding['revision']) ? (int)$binding['revision'] : 0, 'history_supported' => QuoteNativeOrderHistory::verify($order), 'shipment_reader_supported' => self::shipment_supported($order), 'snapshot_hash' => self::snapshot_hash($order), 'line_count' => count($order->get_items('line_item')), 'line_ids' => array_keys($order->get_items('line_item')), 'shipping_count' => count($order->get_items('shipping')), 'total' => $order->get_total(), 'order_pay_url' => $order->get_checkout_payment_url(), 'order_key' => $order->get_order_key()];
         }
         $facts = $GLOBALS['cetech_q05_review_runtime']->current_facts();
-        return ['history_counts' => CetechQuoteCartHttpFixture::counts($wpdb), 'budget_attempts' => (int)$attempts, 'budget_window_remaining_ms' => (int)ceil((60000000 - $epoch % 60000000) / 1000), 'counts' => ['orders' => count($orders), 'paid' => $paid, 'sealed' => $sealed, 'prepared' => $prepared, 'gateway_calls' => $state['q06']['gateway_calls'], 'payment_complete_calls' => $state['q06']['payment_complete_calls'], 'free_completion_calls' => $state['q06']['free_completion_calls']], 'orders' => $orders, 'last_order_id' => $state['q06']['last_order_id'], 'reuse_order_id' => $state['q06']['reuse_order_id'], 'reuse_old_item_ids' => $state['q06']['reuse_old_item_ids'], 'foreign_order_id' => $state['q06']['foreign_order_id'], 'foreign_native_authorized' => $state['q06']['foreign_order_id'] > 0 && current_user_can('pay_for_order', $state['q06']['foreign_order_id']), 'foreign_payment_private_reads' => $state['q06']['foreign_payment_private_reads'], 'native_pay_nonce' => wp_create_nonce('woocommerce-pay'), 'gateway_before_seal' => $state['q06']['gateway_before_seal'], 'completion_before_seal' => $state['q06']['completion_before_seal'], 'barrier_triggered' => $state['q06']['barrier_triggered'], 'acknowledged_before_mutation' => $state['q06']['acknowledged_before_mutation'], 'gateway_validation_calls' => $state['q06']['gateway_validation_calls'], 'unsaved_native_change_detected' => $state['q06']['unsaved_native_change_detected'], 'inert_component_references_present' => self::inert_references_present(), 'masked_binding_acks' => $state['q06']['masked_binding_acks'], 'verified_sql_clocks' => $state['q06']['verified_sql_clocks'], 'uncertain_connection_retired' => $state['q06']['uncertain_connection_retired'], 'facts' => $facts, 'nonce' => wp_create_nonce('cetech_q06_fixture'), 'review_nonce' => wp_create_nonce(CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteReviewRuntime::NONCE_ACTION), 'store_nonce' => wp_create_nonce('wc_store_api'), 'chosen_methods' => WC()->session->get('chosen_shipping_methods', []), 'draft_pointer' => (int)WC()->session->get('store_api_draft_order', 0), 'hpos' => Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled(), 'source_identity' => array_intersect_key($state['identity'], array_flip(['source_head', 'candidate_head', 'source_tree', 'installed_php_sources_hash']))];
+        $native_checkout_url = self::checkout_target($state, get_option('woocommerce_checkout_page_id'), wc_get_checkout_url());
+        return ['native_checkout_url' => $native_checkout_url, 'history_counts' => CetechQuoteCartHttpFixture::counts($wpdb), 'budget_attempts' => (int)$attempts, 'budget_window_remaining_ms' => (int)ceil((60000000 - $epoch % 60000000) / 1000), 'counts' => ['orders' => count($orders), 'paid' => $paid, 'sealed' => $sealed, 'prepared' => $prepared, 'gateway_calls' => $state['q06']['gateway_calls'], 'payment_complete_calls' => $state['q06']['payment_complete_calls'], 'free_completion_calls' => $state['q06']['free_completion_calls']], 'orders' => $orders, 'last_order_id' => $state['q06']['last_order_id'], 'reuse_order_id' => $state['q06']['reuse_order_id'], 'reuse_old_item_ids' => $state['q06']['reuse_old_item_ids'], 'foreign_order_id' => $state['q06']['foreign_order_id'], 'foreign_native_authorized' => $state['q06']['foreign_order_id'] > 0 && current_user_can('pay_for_order', $state['q06']['foreign_order_id']), 'foreign_payment_private_reads' => $state['q06']['foreign_payment_private_reads'], 'native_pay_nonce' => wp_create_nonce('woocommerce-pay'), 'gateway_before_seal' => $state['q06']['gateway_before_seal'], 'completion_before_seal' => $state['q06']['completion_before_seal'], 'barrier_triggered' => $state['q06']['barrier_triggered'], 'acknowledged_before_mutation' => $state['q06']['acknowledged_before_mutation'], 'gateway_validation_calls' => $state['q06']['gateway_validation_calls'], 'unsaved_native_change_detected' => $state['q06']['unsaved_native_change_detected'], 'inert_component_references_present' => self::inert_references_present(), 'masked_binding_acks' => $state['q06']['masked_binding_acks'], 'verified_sql_clocks' => $state['q06']['verified_sql_clocks'], 'uncertain_connection_retired' => $state['q06']['uncertain_connection_retired'], 'facts' => $facts, 'nonce' => wp_create_nonce('cetech_q06_fixture'), 'review_nonce' => wp_create_nonce(CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteReviewRuntime::NONCE_ACTION), 'store_nonce' => wp_create_nonce('wc_store_api'), 'chosen_methods' => WC()->session->get('chosen_shipping_methods', []), 'draft_pointer' => (int)WC()->session->get('store_api_draft_order', 0), 'hpos' => Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled(), 'source_identity' => array_intersect_key($state['identity'], array_flip(['source_head', 'candidate_head', 'source_tree', 'installed_php_sources_hash']))];
     }
 }
 
