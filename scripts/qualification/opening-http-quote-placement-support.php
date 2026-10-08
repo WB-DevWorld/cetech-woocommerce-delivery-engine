@@ -32,10 +32,30 @@ final class CetechQuotePlacementHttpFixture {
     }
     public static function active(array $state): bool { return true === ($state['q06']['active'] ?? false); }
     public static function principal(array $state): bool { return self::active($state) && (int)$state['user_id'] === get_current_user_id() && (int)$state['site_id'] === get_current_blog_id(); }
+    /** Preserve the mounted production decorator and its exact returned guard. */
+    public static function install_seal_barrier(CetechDeliveryEngine\Integrations\DeliveryQuote\QuotePlacementRuntime $runtime, Closure $selected, Closure $barrier): void {
+        $property = new ReflectionProperty($runtime, 'decorate_guard');
+        $prior = $property->getValue($runtime);
+        if (!$prior instanceof Closure) { throw new RuntimeException('Q06 final stimulus requires the production guard decorator.'); }
+        $property->setValue($runtime, static function(CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementSavedEvidenceGuard $guard) use ($prior, $selected, $barrier): CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementSavedEvidenceGuard {
+            $produced = $prior($guard);
+            if (!$produced instanceof CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementSavedEvidenceGuard) { throw new RuntimeException('Q06 production guard decorator refused.'); }
+            if ($selected()) { $barrier(); }
+            return $produced;
+        });
+    }
+    /** Pause/expiry must occur after C07 confirmation and before the first seal. */
+    public static function seal_barrier_selected(array $state, bool $principal, bool $cli): bool {
+        return !$cli && $principal && self::active($state) && false === ($state['q06']['barrier_triggered'] ?? null) && in_array($state['q06']['barrier'] ?? null, ['pause', 'expiry'], true);
+    }
     public static function register(): void {
         if (self::$registered || !function_exists('cetech_q05_state')) { return; }
         $state = cetech_q05_state(); self::guard($state); self::$registered = true;
         self::register_gateway();
+        if (self::active($state) && !(defined('WP_CLI') && WP_CLI)) {
+            $runtime = CetechDeliveryEngine\Bootstrap\Plugin::instance()->container()->get(CetechDeliveryEngine\Integrations\DeliveryQuote\QuotePlacementRuntime::class);
+            self::install_seal_barrier($runtime, static function(): bool { $state = cetech_q05_state(); self::guard($state); return self::seal_barrier_selected($state, self::principal($state), defined('WP_CLI') && WP_CLI); }, static function(): void { self::barrier(); });
+        }
         $track = static function(mixed $order): void { if (!$order instanceof WC_Order || defined('WP_CLI') && WP_CLI) { return; } $state = cetech_q05_state(); if (self::principal($state)) { self::track($state, $order->get_id()); cetech_q05_write($state); } };
         add_action('woocommerce_checkout_order_created', $track, 900000);
         add_action('woocommerce_store_api_checkout_order_created', $track, 900000);
@@ -64,7 +84,7 @@ final class CetechQuotePlacementHttpFixture {
         }, 18);
         // The hook is a controlled last-boundary stimulus, never a replacement final coordinator.
         foreach (['woocommerce_checkout_order_processed', 'woocommerce_store_api_checkout_order_processed'] as $hook) {
-            add_action($hook, static function(): void { $state = cetech_q05_state(); if (!in_array($state['q06']['barrier'] ?? null, ['monetary', 'protected'], true)) { self::barrier(); } }, PHP_INT_MAX - 1);
+            add_action($hook, static function(): void { $state = cetech_q05_state(); if (!in_array($state['q06']['barrier'] ?? null, ['pause', 'expiry', 'monetary', 'protected'], true)) { self::barrier(); } }, PHP_INT_MAX - 1);
             // Registered after real C07: this mutation must lose to its known seal receipt.
             add_action($hook, static function(): void { $state = cetech_q05_state(); if (in_array($state['q06']['barrier'] ?? null, ['monetary', 'protected'], true)) { self::barrier(); } }, PHP_INT_MAX);
         }

@@ -46,7 +46,61 @@ def operational_plan(rows):
     return json.loads(result.stdout)
 
 
+def seal_decorator_probe():
+    code = r'''
+require $argv[1];
+$source=file_get_contents($argv[2]);
+$start=strpos($source,'final class CetechQuotePlacementHttpFixture {');
+$end=strpos($source,"\nif (!class_exists('CetechOpeningQuotePlacementGateway'",$start);
+if(false===$start||false===$end){throw new RuntimeException('Fixture class boundary unavailable.');}
+eval(substr($source,$start,$end-$start));
+function expect(bool $condition):void{if(!$condition){throw new RuntimeException('Native seal decorator regression.');}}
+function native_runtime(?Closure $prior):object{
+    $runtime=(new ReflectionClass(CetechDeliveryEngine\Integrations\DeliveryQuote\QuotePlacementRuntime::class))->newInstanceWithoutConstructor();
+    (new ReflectionProperty($runtime,'decorate_guard'))->setValue($runtime,$prior);return $runtime;
+}
+function native_guard():object{
+    return new class implements CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementSavedEvidenceGuard {
+        public function tables(CetechDeliveryEngine\Domain\Operation\OperationSession $session):array{return [];}
+        public function verify(CetechDeliveryEngine\Domain\Operation\OperationSession $session,CetechDeliveryEngine\Domain\DeliveryQuote\QuoteBinding $binding):bool{return true;}
+    };
+}
+$input=native_guard();$produced=native_guard();$inside_sql=false;$sequence=[];$calls=0;
+$state=['q06'=>['active'=>true,'barrier'=>'pause','barrier_triggered'=>false]];
+$prior=static function($guard)use(&$sequence,&$inside_sql,$input,$produced){expect(!$inside_sql&&$guard===$input);$sequence[]='prior';return $produced;};
+$selected=static function()use(&$state,&$sequence,&$inside_sql){expect(!$inside_sql);$sequence[]='selected';return CetechQuotePlacementHttpFixture::seal_barrier_selected($state,true,false);};
+$barrier=static function()use(&$state,&$sequence,&$inside_sql,&$calls){expect(!$inside_sql&&array_slice($sequence,-2)===['prior','selected']);++$calls;$sequence[]='barrier';$state['q06']['barrier_triggered']=true;};
+$runtime=native_runtime($prior);CetechQuotePlacementHttpFixture::install_seal_barrier($runtime,$selected,$barrier);
+$decorator=(new ReflectionProperty($runtime,'decorate_guard'))->getValue($runtime);
+expect($decorator instanceof Closure&&$decorator!==$prior&&(new ReflectionFunction($decorator))->getStaticVariables()['prior']===$prior);
+expect($decorator($input)===$produced&&$calls===1&&$sequence===['prior','selected','barrier']);
+expect($decorator($input)===$produced&&$calls===1&&$sequence===['prior','selected','barrier','prior','selected']);
+// Pure owned-SQL guard use must not run a fixture/native stimulus callback.
+$inside_sql=true;$session=(new ReflectionClass(CetechDeliveryEngine\Infrastructure\WordPress\OperationConnection::class))->newInstanceWithoutConstructor();
+$binding=(new ReflectionClass(CetechDeliveryEngine\Domain\DeliveryQuote\QuoteBinding::class))->newInstanceWithoutConstructor();
+expect([]===$produced->tables($session)&&$produced->verify($session,$binding)&&$calls===1&&count($sequence)===5);$inside_sql=false;
+foreach(['expiry','pause']as$mode){$s=['q06'=>['active'=>true,'barrier'=>$mode,'barrier_triggered'=>false]];expect(CetechQuotePlacementHttpFixture::seal_barrier_selected($s,true,false));}
+foreach(['seal_ack','monetary','protected','snapshot',null,'unknown']as$mode){$state['q06']['barrier']=$mode;$state['q06']['barrier_triggered']=false;$before=$calls;expect($decorator($input)===$produced&&$calls===$before);}
+foreach([[false,true,false],[true,false,false],[true,true,true]]as[$active,$principal,$cli]){$s=['q06'=>['active'=>$active,'barrier'=>'pause','barrier_triggered'=>false]];expect(!CetechQuotePlacementHttpFixture::seal_barrier_selected($s,$principal,$cli));}
+foreach([null,static function(){return new stdClass();},static function(){throw new RuntimeException('Prior refused.');}]as$invalid){
+    $r=native_runtime($invalid);$effects=0;$observed=false;
+    try{CetechQuotePlacementHttpFixture::install_seal_barrier($r,static fn()=>true,static function()use(&$effects){++$effects;});$d=(new ReflectionProperty($r,'decorate_guard'))->getValue($r);$d($input);}catch(RuntimeException){$observed=true;}
+    expect($observed&&0===$effects);
+}
+echo json_encode(['prior_retained'=>true,'prior_called_first'=>true,'exact_produced_guard_retained'=>true,'barrier_once'=>true,'other_modes_inert'=>true,'inactive_foreign_cli_inert'=>true,'missing_invalid_throwing_prior_refused'=>true,'no_stimulus_inside_owned_sql'=>true],JSON_THROW_ON_ERROR);
+'''
+    result = subprocess.run([os.environ.get('CETECH_DE_QUALIFICATION_PHP', 'php'), '-r', code, str(ROOT.parent.parent / 'vendor/autoload.php'), str(ROOT / 'opening-http-quote-placement-support.php')], capture_output=True, timeout=20, check=False)
+    if result.returncode != 0:
+        raise AssertionError('Native production seal decorator identity/timing refused: ' + result.stderr.decode(errors='replace')[:1000])
+    return json.loads(result.stdout)
+
+
 class QuotePlacementProtocol(unittest.TestCase):
+    def test_late_stimulus_retains_the_exact_production_guard_decorator(self):
+        observed = seal_decorator_probe()
+        self.assertEqual({'prior_retained', 'prior_called_first', 'exact_produced_guard_retained', 'barrier_once', 'other_modes_inert', 'inactive_foreign_cli_inert', 'missing_invalid_throwing_prior_refused', 'no_stimulus_inside_owned_sql'}, set(observed))
+        self.assertTrue(all(value is True for value in observed.values()))
+
     def test_preparation_failure_discloses_no_private_cause(self):
         class Recorder:
             def check(self, case_id, condition, facts):
