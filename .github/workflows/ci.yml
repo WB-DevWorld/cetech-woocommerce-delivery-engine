@@ -218,6 +218,9 @@ jobs:
           --health-retries=12
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Receipt authority checks ancestry against the integrated Q05 baseline.
+          fetch-depth: 0
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.5.11'
