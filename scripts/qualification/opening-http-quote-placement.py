@@ -182,7 +182,7 @@ def run_quote_placement(client, state, bridge, recorder, Page=None, login=None):
             time.sleep(min(1.0, max(0.05, seeded["budget_window_remaining_ms"] / 1000)))
             seeded = inspect()
         stage = "review"
-        response = client.request(state["classic_url"], {"nonce": seeded["review_nonce"], "action": "refresh", "generation": seeded["facts"]["generation"], "review_token": str(uuid.uuid4())})
+        response = client.request(state["classic_url"], {"_wpnonce": seeded["review_nonce"], "action": "refresh", "generation": seeded["facts"]["generation"], "review_token": str(uuid.uuid4())})
         value = request_json(response)
         facts = value.get("data")
         if response.status != 200 or value.get("success") is not True or not isinstance(facts, dict) or facts.get("status") != "review_required" or facts.get("can_confirm") is not True:
@@ -190,7 +190,7 @@ def run_quote_placement(client, state, bridge, recorder, Page=None, login=None):
         if free and any((part.get("display_total") or part.get("total") or {}).get("amount") not in ("0.00", "0") for part in facts["quote"]["money"]):
             raise RuntimeError("Q06 configured zero quote did not show native zero")
         stage = "confirm"
-        response = client.request(state["classic_url"], {"nonce": inspect()["review_nonce"], "action": "confirm", "generation": facts["generation"]})
+        response = client.request(state["classic_url"], {"_wpnonce": inspect()["review_nonce"], "action": "confirm", "generation": facts["generation"]})
         value = request_json(response)
         if response.status != 200 or value.get("success") is not True or value.get("data", {}).get("status") != "confirmed":
             raise RuntimeError("Q06 actual shopper Confirm was not acknowledged")
@@ -398,6 +398,12 @@ def run_browser(client, state, recorder):
 
 
 CLEANUP_KEYS = ("cleanup_restored", "owned_native_orders_removed", "exact_owned_placement_namespaces_removed", "no_gateway_before_seal", "no_completion_before_seal", "owned_connections_retired")
+
+def record_preparation_failure(recorder, error):
+    """A failed native fixture setup is a missing first required case, with no raw cause."""
+    name = type(error).__name__
+    allowed = {"RuntimeError", "ValueError", "TypeError", "KeyError", "TimeoutError"}
+    recorder.check(DIRECT_IDS[0], False, {"stage": "ownership", "error_class": name if name in allowed else "OtherError", "required_case_incomplete": True})
 
 def cleanup_valid(value):
     return isinstance(value, dict) and set(value) == set(CLEANUP_KEYS) and all(type(value[key]) is bool for key in CLEANUP_KEYS)

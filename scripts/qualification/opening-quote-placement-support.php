@@ -79,7 +79,7 @@ final class CetechQuotePlacementTransport implements OperationConnectionTranspor
 
 /** Native receipt protocol discloses only typed observations, never raw rows/keys/tokens. */
 final class CetechQuotePlacementObservation {
-	public const BOOLS = [ 'actual_installed_native_wp', 'actual_native_woo_order', 'actual_native_checkout_create_order', 'actual_hpos_enabled', 'acknowledged', 'binding_prepared', 'binding_verified', 'binding_sealed', 'same_original_binding', 'snapshot_bytes_unchanged', 'quote_body_unchanged', 'historical_reader_supported', 'native_logical_mapping_matches', 'native_items_saved', 'original_envelope_reconciled', 'uncertain_connection_retired', 'final_admission_denied', 'no_payment_invoked', 'no_second_binding_effect', 'local_mutation_detected', 'physical_mutation_detected', 'late_pause_won', 'late_expiry_won', 'owned_connections_retired', 'cleanup_restored', 'owned_orders_removed', 'quote_operation_history_restored', 'native_shipping_cache_hit', 'rate_references_attached', 'native_rate_money_unchanged', 'native_rate_objects_unchanged', 'original_rejection_receipt_unchanged' ];
+	public const BOOLS = [ 'actual_installed_native_wp', 'actual_native_woo_order', 'actual_native_checkout_create_order', 'actual_hpos_enabled', 'acknowledged', 'binding_prepared', 'binding_verified', 'binding_sealed', 'same_original_binding', 'snapshot_bytes_unchanged', 'quote_body_unchanged', 'historical_reader_supported', 'native_logical_mapping_matches', 'native_items_saved', 'original_envelope_reconciled', 'uncertain_connection_retired', 'final_admission_denied', 'no_payment_invoked', 'no_second_binding_effect', 'local_mutation_detected', 'physical_mutation_detected', 'late_pause_won', 'late_expiry_won', 'owned_connections_retired', 'cleanup_restored', 'owned_orders_removed', 'quote_operation_history_restored', 'native_shipping_cache_hit', 'rate_references_attached', 'native_rate_money_unchanged', 'native_rate_objects_unchanged', 'native_current_read_succeeded', 'native_session_bytes_unchanged', 'original_rejection_receipt_unchanged' ];
 	public const COUNTERS = [ 'native_line_count', 'native_shipping_count', 'binding_writes', 'binding_commits', 'masked_binding_acks', 'verified_sql_clocks', 'gateway_calls', 'free_completion_calls' ];
 	public static function valid( array $facts ): bool {
 		if ( [] === $facts || count( $facts ) > count( self::BOOLS ) + count( self::COUNTERS ) ) { return false; }
@@ -91,6 +91,34 @@ final class CetechQuotePlacementObservation {
 		return true;
 	}
 	public static function error_class( Throwable $error ): string { return $error instanceof Error ? 'Error' : ( $error instanceof InvalidArgumentException ? 'InvalidArgumentException' : 'RuntimeException' ); }
+}
+
+/** Observe the restored native packet, then delegate the actual production projection. */
+final class CetechQuotePlacementRateProjectionObservation implements CetechDeliveryEngine\Application\DeliveryQuote\CartQuoteRateProjection {
+	public int $calls = 0;
+	public array $before = [];
+	public array $after = [];
+	public function __construct( private CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteRateReferenceRuntime $runtime ) {}
+	public function reset(): void { $this->calls = 0; $this->before = []; $this->after = []; }
+	public function project_loaded_rates(): void {
+		++$this->calls; $this->before = self::packet();
+		$this->runtime->project_loaded_rates();
+		$this->after = self::packet();
+	}
+	private static function packet(): array {
+		$shipping = WC()->shipping();
+		if ( WC_Shipping::class !== get_class( $shipping ) ) { throw new RuntimeException( 'Native Q06 restored shipping packet unavailable.' ); }
+		$packages = ( new ReflectionProperty( $shipping, 'packages' ) )->getValue( $shipping ); $out = [];
+		if ( ! is_array( $packages ) || count( $packages ) > 200 ) { throw new RuntimeException( 'Native Q06 restored shipping packet unavailable.' ); }
+		foreach ( $packages as $package_key => $package ) {
+			if ( ! is_array( $package ) || ! is_array( $package['rates'] ?? null ) || count( $package['rates'] ) > 200 ) { throw new RuntimeException( 'Native Q06 restored rate packet unavailable.' ); }
+			foreach ( $package['rates'] as $rate_key => $rate ) {
+				if ( ! is_object( $rate ) || WC_Shipping_Rate::class !== get_class( $rate ) ) { throw new RuntimeException( 'Native Q06 restored rate unavailable.' ); }
+				$out[$package_key][$rate_key] = [ 'object' => $rate, 'data' => ( new ReflectionProperty( $rate, 'data' ) )->getValue( $rate ), 'meta' => ( new ReflectionProperty( $rate, 'meta_data' ) )->getValue( $rate ) ];
+			}
+		}
+		return $out;
+	}
 }
 
 if ( class_exists( 'WC_Payment_Gateway' ) && ! class_exists( 'CetechQuotePlacementNativeGateway', false ) ) {
@@ -145,6 +173,7 @@ final class CetechQuotePlacementOperationalCleanup {
 final class CetechQuotePlacementFixture {
 	public CetechQuoteCartFixture $cart;
 	public CetechQuotePlacementFactory $factory;
+	public CetechQuotePlacementRateProjectionObservation $rate_projection;
 	public array $orders = [];
 	private array $commands = [];
 	private array $placement_namespaces = [];
@@ -165,7 +194,10 @@ final class CetechQuotePlacementFixture {
 				if ( $property->isInitialized( $callback[0] ) && $property->getValue( $callback[0] ) !== WC()->cart ) { remove_action( 'woocommerce_after_calculate_totals', $callback, 1000 ); }
 			}
 		}
-		( new CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteRateReferenceRuntime( $this->cart->environment, $this->cart->sessions, true ) )->register();
+		$rate_runtime = new CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteRateReferenceRuntime( $this->cart->environment, $this->cart->sessions, true );
+		$this->rate_projection = new CetechQuotePlacementRateProjectionObservation( $rate_runtime );
+		$this->cart->environment->set_rate_projection( $this->rate_projection );
+		$rate_runtime->register();
 		$this->cart->native->set_option( CetechDeliveryEngine\Infrastructure\Persistence\EmergencyControlStore::OPTION_NAME, CetechDeliveryEngine\Domain\EmergencyControl\EmergencyControlState::record_json( get_current_blog_id(), 'enabled', 990001, 'resume_verified', 1, time() ) );
 		$this->cart->native->recalculate();
 	}

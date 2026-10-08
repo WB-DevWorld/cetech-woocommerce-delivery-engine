@@ -551,6 +551,7 @@ def main() -> int:
     emergency_bridge = None
     quote_cart_bridge = None
     quote_placement_bridge = None
+    quote_placement_module = None
     if any((options.configuration_driver, options.configuration_bridge, options.configuration_state)):
         if not all((options.configuration_driver, options.configuration_bridge, options.configuration_state)):
             raise RuntimeError("Configuration HTTP qualification requires all three explicit paths")
@@ -635,14 +636,22 @@ def main() -> int:
             module_spec = importlib.util.spec_from_file_location("opening_http_quote_placement", options.quote_placement_driver)
             if module_spec is None or module_spec.loader is None:
                 raise RuntimeError("Could not load the quote placement qualification module")
-            module = importlib.util.module_from_spec(module_spec)
-            module_spec.loader.exec_module(module)
-            placement_prepared = quote_placement_bridge.call("prepareplacement")
-            if placement_prepared.get("ready") is not True or placement_prepared.get("identity") != quote_identity:
-                raise RuntimeError("Quote placement source identity does not match its live fixture")
-            quote_state = json.loads(Path(options.quote_cart_state).read_text(encoding="utf-8"))
+            quote_placement_module = importlib.util.module_from_spec(module_spec)
+            module_spec.loader.exec_module(quote_placement_module)
+            try:
+                placement_prepared = quote_placement_bridge.call("prepareplacement")
+                if placement_prepared.get("ready") is not True or placement_prepared.get("identity") != quote_identity:
+                    raise RuntimeError("Quote placement source identity does not match its live fixture")
+                quote_state = json.loads(Path(options.quote_cart_state).read_text(encoding="utf-8"))
+            except Exception as failure:
+                try:
+                    quote_placement_module.record_preparation_failure(recorder, failure)
+                except RuntimeError:
+                    # Recorder.check records a failed case before raising.
+                    pass
+                raise
             quote_setup_stage = "placement_requests"
-            module.run_quote_placement(HttpClient(quote_state["base_url"]), quote_state, quote_placement_bridge, recorder, Page, login)
+            quote_placement_module.run_quote_placement(HttpClient(quote_state["base_url"]), quote_state, quote_placement_bridge, recorder, Page, login)
     except Exception as failure:
         error = type(failure).__name__ + ": HTTP qualification failed; inspect recorded case status and private runner logs"
         if quote_setup_stage is not None:
@@ -659,7 +668,7 @@ def main() -> int:
                 state = json.loads(quote_placement_bridge.state_path.read_text(encoding="utf-8"))
                 if "q06" in state:
                     cleaned = quote_placement_bridge.call("cleanupplacement")
-                    module.record_cleanup(recorder, cleaned)
+                    quote_placement_module.record_cleanup(recorder, cleaned)
             except Exception as failure:
                 error = error or (type(failure).__name__ + ": quote placement fixture cleanup failed")
         if quote_cart_bridge is not None and quote_cart_bridge.state_path.is_file():

@@ -47,6 +47,21 @@ def operational_plan(rows):
 
 
 class QuotePlacementProtocol(unittest.TestCase):
+    def test_preparation_failure_discloses_no_private_cause(self):
+        class Recorder:
+            def check(self, case_id, condition, facts):
+                self.case = {'id': case_id, 'status': 'PASS' if condition else 'FAIL', 'evidence': facts}
+        class PrivateSqlCredentialError(Exception):
+            pass
+        for error, expected in ((ValueError('PRIVATE SQL credential payload'), 'ValueError'), (PrivateSqlCredentialError('PRIVATE raw session token'), 'OtherError')):
+            recorder = Recorder(); DRIVER.record_preparation_failure(recorder, error)
+            self.assertEqual(DRIVER.DIRECT_IDS[0], recorder.case['id'])
+            self.assertEqual('FAIL', recorder.case['status'])
+            self.assertEqual({'stage': 'ownership', 'error_class': expected, 'required_case_incomplete': True}, recorder.case['evidence'])
+            self.assertTrue(DRIVER.case_valid(recorder.case))
+            self.assertNotIn('PRIVATE', json.dumps(recorder.case))
+            self.assertNotIn('PrivateSqlCredentialError', json.dumps(recorder.case))
+
     def test_late_unrelated_operational_rows_never_gain_cleanup_authority(self):
         import hashlib
         rows = {

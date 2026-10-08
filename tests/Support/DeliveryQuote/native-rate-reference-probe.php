@@ -22,12 +22,14 @@ class WC_Shipping_Rate {
 	public function change_group(): void { $this->meta_data['cetech_de_group_id'] = 'wrong-group'; }
 }
 class ForeignRate extends WC_Shipping_Rate {}
-class WC_Cart {}
-class WC_Shipping { protected static ?self $_instance = null; public function __construct( public array $packages ) { self::$_instance = $this; } }
+class NativeCalls { public static int $unexpected = 0; }
+class WC_Cart { public function calculate_totals(): never { ++NativeCalls::$unexpected; throw new LogicException( 'Projection recalculated native totals.' ); } public function get_cart(): never { ++NativeCalls::$unexpected; throw new LogicException( 'Projection invoked a cart getter.' ); } }
+class ForeignCart extends WC_Cart {}
+class WC_Shipping { protected static ?self $_instance = null; public function __construct( public array $packages ) { self::$_instance = $this; } public function get_packages(): never { ++NativeCalls::$unexpected; throw new LogicException( 'Projection invoked a shipping getter.' ); } }
 class WC_Cart_Session { public function __construct( protected WC_Cart $cart ) {} public function set_session(): never { throw new LogicException( 'Hook inspection invoked session callback.' ); } }
 class WP_Hook { public array $callbacks = []; }
 
-$mode = $argv[1] ?? 'issued'; $factory = new QuoteDurableFixtureFactory(); $factory->utc = QuoteTime::now()->sql();
+$mode = $argv[1] ?? 'issued'; $project = str_starts_with( $mode, 'project_' ); if ( $project ) { $mode = substr( $mode, 8 ); } $factory = new QuoteDurableFixtureFactory(); $factory->utc = QuoteTime::now()->sql();
 $environment = new CartQuoteFixtureEnvironment( $factory ); $backing = new CartQuoteFixtureSessions();
 $sessions = new class( $backing ) implements CartQuoteSessionStore {
 	public function __construct( private CartQuoteFixtureSessions $store ) {}
@@ -73,10 +75,17 @@ if ( str_starts_with( $mode, 'hook_' ) ) {
 	$hook = new WP_Hook(); $hook->callbacks = [ ( 'hook_wrong_priority' === $mode ? 901 : 900 ) => [ [ 'function' => [ 'hook_static' === $mode ? QuoteRateReferenceRuntime::class : $runtime, 'annotate_loaded_rates' ], 'accepted_args' => 'hook_wrong_args' === $mode ? 2 : 1 ] ], 1000 => [ [ 'function' => [ new WC_Cart_Session( $session_cart ), 'set_session' ], 'accepted_args' => 1 ] ] ]; $GLOBALS['wp_filter'] = [ 'woocommerce_after_calculate_totals' => $hook ];
 	$hooks_supported = \CetechDeliveryEngine\Application\DeliveryQuote\QuoteNativeWooSource::supports_current_hooks();
 }
-if ( 'cache_hit' === $mode ) { $native_cart = new WC_Cart(); $GLOBALS['woocommerce'] = new class( $native_cart ) { public function __construct( public WC_Cart $cart ) {} }; $shipping = new WC_Shipping( [ array_replace( $package, [ 'rates' => [ $id => $rate ] ] ) ] ); $runtime->annotate_loaded_rates( $native_cart ); $rates = $shipping->packages[0]['rates']; }
+if ( $project || 'cache_hit' === $mode ) {
+	$native_cart = 'foreign_cart' === $mode ? new ForeignCart() : new WC_Cart();
+	$GLOBALS['woocommerce'] = 'uninitialized_cart' === $mode ? new class { public WC_Cart $cart; } : new class( $native_cart ) { public function __construct( public WC_Cart $cart ) {} };
+	if ( 'absent_global' === $mode ) { unset( $GLOBALS['woocommerce'] ); }
+	$shipping = 'absent_shipping' === $mode ? null : new WC_Shipping( [ array_replace( $package, [ 'rates' => [ $id => $rate ] ] ) ] );
+	if ( $project ) { $runtime->project_loaded_rates(); $runtime->project_loaded_rates(); } else { $runtime->annotate_loaded_rates( $native_cart ); }
+	$rates = null === $shipping ? [ $id => $rate ] : $shipping->packages[0]['rates'];
+}
 else { $rates = $runtime->filter_rates( [ $id => $rate ], $package ); }
 $meta = $rate->meta(); $public = []; foreach ( $meta as $key => $value ) { if ( str_starts_with( $key, QuoteRateReferenceRuntime::META_PREFIX ) ) { $public[$key] = $value; } }
 $expected = null; foreach ( $backing->current->rate_references() as $reference ) { if ( $reference->component_key() === $component ) { $expected = $reference->public_fields(); } }
 $second_metadata = null; $second_packet_unchanged = true;
 if ( null !== $second_package ) { $second_rate = new WC_Shipping_Rate( $second_group ); $second_packet = $second_rate->packet(); $second_id = $second_packet['id']; $runtime->filter_rates( [ $second_id => $second_rate ], $second_package ); $second_metadata = array_filter( $second_rate->meta(), static fn( string $key ): bool => str_starts_with( $key, QuoteRateReferenceRuntime::META_PREFIX ), ARRAY_FILTER_USE_KEY ); $second_packet_unchanged = $second_packet === $second_rate->packet(); }
-echo json_encode( [ 'rates_count' => count( $rates ), 'same_object' => ( $rates[$id] ?? null ) === $rate, 'same_packet' => $rate->packet() === $packet && $second_packet_unchanged, 'metadata' => $public, 'second_metadata' => $second_metadata, 'hooks_supported' => $hooks_supported, 'expected' => $expected, 'foreign_note' => $meta['foreign_note'], 'getters' => WC_Shipping_Rate::$getters, 'session_unchanged' => $before === $backing->current->to_private_json() && $writes === $backing->writes, 'no_prepare' => $preparations === $environment->preparations, 'no_evidence' => $evidence === $environment->evidence_reads, 'no_operation' => $operations === $factory->count( 'operation_records' ) ], JSON_THROW_ON_ERROR );
+echo json_encode( [ 'rates_count' => count( $rates ), 'same_object' => ( $rates[$id] ?? null ) === $rate, 'same_packet' => $rate->packet() === $packet && $second_packet_unchanged, 'metadata' => $public, 'second_metadata' => $second_metadata, 'hooks_supported' => $hooks_supported, 'expected' => $expected, 'foreign_note' => $meta['foreign_note'], 'getters' => WC_Shipping_Rate::$getters, 'native_calls' => NativeCalls::$unexpected, 'session_unchanged' => $before === $backing->current->to_private_json() && $writes === $backing->writes, 'no_prepare' => $preparations === $environment->preparations, 'no_evidence' => $evidence === $environment->evidence_reads, 'no_operation' => $operations === $factory->count( 'operation_records' ) ], JSON_THROW_ON_ERROR );

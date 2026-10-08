@@ -135,11 +135,13 @@ final class QuoteReviewRuntime {
 			'list_price' => $money, 'promotion' => [ 'type' => 'object', 'additionalProperties' => false, 'properties' => [ 'state' => $readonly( 'string' ), 'amount' => [ ...$money, 'type' => [ 'object', 'null' ] ] ] ],
 			'final_price' => $money, 'tax' => $money, 'rounded_tax' => [ ...$money, 'type' => [ 'object', 'null' ] ], 'total' => $money, 'display_total' => [ ...$money, 'type' => [ 'object', 'null' ] ] ] ];
 		return [ 'contract_version' => $readonly( 'integer' ), 'status' => $readonly( 'string' ), 'generation' => $readonly( 'integer' ),
-			'quote' => [ 'type' => [ 'object', 'null' ], 'readonly' => true, 'additionalProperties' => false, 'properties' => [
+			// Woo derives request defaults from direct object properties even when
+			// readonly. oneOf preserves this response shape without inventing input.
+			'quote' => [ 'type' => [ 'object', 'null' ], 'readonly' => true, 'oneOf' => [ [ 'type' => 'object', 'additionalProperties' => false, 'properties' => [
 				'contract_version' => $readonly( 'integer' ), 'decision_kind' => $readonly( 'string' ), 'quote_id' => $readonly( 'string' ), 'status' => $readonly( 'string' ),
 				'currently_applicable' => $readonly( 'boolean' ), 'expires_at' => $readonly( 'string' ), 'customer_label' => $readonly( 'string' ),
 				'money' => [ 'type' => 'array', 'maxItems' => 200, 'items' => $component, 'readonly' => true ], 'reason_code' => $readonly( [ 'string', 'null' ] ),
-				'recovery_action' => $readonly( [ 'string', 'null' ] ), 'correlation_id' => $readonly( 'string' ) ] ],
+				'recovery_action' => $readonly( [ 'string', 'null' ] ), 'correlation_id' => $readonly( 'string' ) ] ], [ 'type' => 'null' ] ] ],
 			'can_refresh' => $readonly( 'boolean' ), 'can_confirm' => $readonly( 'boolean' ), 'can_retry' => $readonly( 'boolean' ),
 			'message_code' => $readonly( 'string' ), 'correlation_id' => $readonly( 'string' ) ];
 	}

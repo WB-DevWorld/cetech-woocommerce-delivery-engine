@@ -4,14 +4,14 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Integrations\DeliveryQuote;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
-use CetechDeliveryEngine\Application\DeliveryQuote\{CartQuoteEnvironment,CartQuoteSessionStore,NativeCartQuotePreparation,QuoteCartDraft};
+use CetechDeliveryEngine\Application\DeliveryQuote\{CartQuoteEnvironment,CartQuoteRateProjection,CartQuoteSessionStore,NativeCartQuotePreparation,QuoteCartDraft};
 use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
 use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
 use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime;
 use CetechDeliveryEngine\Infrastructure\WooCommerce\Shipping\SelectedOfferShippingMethod;
 
 /** Inert per-component identifiers. Prices, taxes and placement authority stay native. */
-final class QuoteRateReferenceRuntime {
+final class QuoteRateReferenceRuntime implements CartQuoteRateProjection {
 
 	public const META_PREFIX = '_cetech_de_quote_';
 	public const META_QUOTE_ID = self::META_PREFIX . 'id';
@@ -25,6 +25,18 @@ final class QuoteRateReferenceRuntime {
 	public function __construct( private readonly CartQuoteEnvironment $environment, private readonly CartQuoteSessionStore $sessions, private readonly bool $mounted = false, ?callable $adoption_gate = null ) { $this->adoption_gate = null === $adoption_gate ? null : \Closure::fromCallable( $adoption_gate ); }
 	private function enabled(): bool { try { return $this->mounted && ( null === $this->adoption_gate || true === ( $this->adoption_gate )() ); } catch ( \Throwable ) { return false; } }
 	public function register(): void { if ( ! $this->registered && $this->enabled() ) { add_filter( 'woocommerce_package_rates', [ $this, 'filter_rates' ], self::PRIORITY, 2 ); add_action( 'woocommerce_after_calculate_totals', [ $this, 'annotate_loaded_rates' ], self::LOADED_PRIORITY, 1 ); $this->registered = true; } }
+
+	/** Cached quote reads bypass native calculation hooks. Use their loaded packet only. */
+	public function project_loaded_rates(): void {
+		if ( ! $this->enabled() ) { return; }
+		try {
+			$wc = $GLOBALS['woocommerce'] ?? null;
+			if ( ! is_object( $wc ) ) { return; }
+			$cart = self::raw( $wc, 'cart' );
+			if ( ! is_object( $cart ) || 'WC_Cart' !== get_class( $cart ) ) { return; }
+			$this->annotate_loaded_rates( $cart );
+		} catch ( \Throwable ) { return; }
+	}
 
 	/** Cache hits skip package_rates. Decorate the already-loaded exact native packet. */
 	public function annotate_loaded_rates( mixed $cart ): void {

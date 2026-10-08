@@ -293,6 +293,7 @@ $required_interfaces = [
 	'CetechDeliveryEngine\\Application\\Bulk\\Queue\\ActionSchedulerGateway',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteCurrentEvidenceGuard',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePrivatePublication',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\CartQuoteRateProjection',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteRetentionControl',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteRetentionReferenceInspector',
 ];

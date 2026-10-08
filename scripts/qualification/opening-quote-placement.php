@@ -32,16 +32,31 @@ return static function ( callable $check, string $mode = 'hpos_on' ): void {
 		$fixture->prepare();
 		$case( 'NATIVE-W2Q06-PLACEMENT-ENVIRONMENT', true, [ 'actual_installed_native_wp' => true, 'actual_hpos_enabled' => $hpos ] );
 		$phase = 'NATIVE-W2Q06-NATIVE-CACHED-RATE-REFERENCES'; $flow = new CetechQuotePlacementNativeFlow( $fixture );
-		$cached = WC()->session->get( 'shipping_for_package_0' ); $rates_before = [];
-		foreach ( WC()->cart->get_shipping_methods() as $rate ) { $rates_before[$rate->get_id()] = [ $rate, $rate->get_cost(), $rate->get_taxes(), $rate->get_label() ]; }
+		$cached = WC()->session->get( 'shipping_for_package_0' );
 		$rate_history = $fixture->cart->history(); $rate_quote = $fixture->cart->row( $flow->evidence->header()->id()->value() )['private_body_json'];
-		$loaded_rates = []; $original_hook = clone $GLOBALS['wp_filter']['woocommerce_after_calculate_totals'];
-		add_action( 'woocommerce_after_calculate_totals', static function ( WC_Cart $cart ) use ( &$loaded_rates ): void { foreach ( $cart->get_shipping_methods() as $rate ) { $loaded_rates[$rate->get_id()] = $rate; } }, 899, 1 );
-		try { WC()->cart->calculate_totals(); WC()->session->save_data(); } finally { $GLOBALS['wp_filter']['woocommerce_after_calculate_totals'] = $original_hook; }
-		$current_cache = WC()->session->get( 'shipping_for_package_0' ); $refs = true; $money = true; $objects = [] !== $loaded_rates;
-		foreach ( WC()->cart->get_shipping_methods() as $rate ) { $original = $rates_before[$rate->get_id()] ?? null; $meta = $rate->get_meta_data(); $refs = $refs && ( $meta[CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteRateReferenceRuntime::META_QUOTE_ID] ?? null ) === $flow->evidence->header()->id()->value() && is_string( $meta[CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteRateReferenceRuntime::META_COMPONENT_HANDLE] ?? null ) && is_int( $meta[CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteRateReferenceRuntime::META_GENERATION] ?? null ); $objects = $objects && $rate === ( $loaded_rates[$rate->get_id()] ?? null ); $money = $money && null !== $original && [ $rate->get_cost(), $rate->get_taxes(), $rate->get_label() ] === array_slice( $original, 1 ); }
+		$native_session_row = static function () use ( $wpdb ): array {
+			$row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM `{$wpdb->prefix}woocommerce_sessions` WHERE session_key=%s", WC()->session->get_customer_id() ), ARRAY_A );
+			if ( ! is_array( $row ) || '' !== $wpdb->last_error ) { throw new RuntimeException( 'Native Q06 original session observation unavailable.' ); }
+			return $row;
+		};
+		$session_before = $native_session_row(); $fixture->rate_projection->reset();
+		// A genuine current read restores the cached native calculation and applies
+		// its production projection. No recalculation or session save completes it.
+		$current = ( new CetechDeliveryEngine\Application\DeliveryQuote\QuoteCartPlacementEvidenceReader( $fixture->cart->environment, $fixture->cart->sessions, $fixture->factory ) )->current( RequestContext::create() );
+		$current_read = null !== $current && $current->header()->id()->value() === $flow->evidence->header()->id()->value();
+		$current_cache = WC()->session->get( 'shipping_for_package_0' ); $projected = $fixture->rate_projection->after; $restored = $fixture->rate_projection->before;
+		$refs = 1 === $fixture->rate_projection->calls && [] !== $projected; $money = [] !== $restored; $objects = [] !== $restored && array_keys( $restored ) === array_keys( $projected );
+		foreach ( $projected as $package_key => $rates ) {
+			$objects = $objects && array_keys( $rates ) === array_keys( $restored[$package_key] ?? [] );
+			foreach ( $rates as $rate_key => $rate ) {
+				$original = $restored[$package_key][$rate_key] ?? null; $meta = $rate['meta'];
+				$refs = $refs && ( $meta[CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteRateReferenceRuntime::META_QUOTE_ID] ?? null ) === $flow->evidence->header()->id()->value() && is_string( $meta[CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteRateReferenceRuntime::META_COMPONENT_HANDLE] ?? null ) && is_int( $meta[CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteRateReferenceRuntime::META_GENERATION] ?? null );
+				$objects = $objects && null !== $original && $original['object'] === $rate['object']; $money = $money && null !== $original && $original['data'] === $rate['data'];
+			}
+		}
 		$cache_hit = is_array( $cached ) && is_array( $current_cache ) && is_string( $cached['package_hash'] ?? null ) && $cached['package_hash'] === ( $current_cache['package_hash'] ?? null );
-		$case( 'NATIVE-W2Q06-NATIVE-CACHED-RATE-REFERENCES', $cache_hit && $refs && $objects && $money && $rate_history === $fixture->cart->history() && $rate_quote === $fixture->cart->row( $flow->evidence->header()->id()->value() )['private_body_json'], [ 'native_shipping_cache_hit' => $cache_hit, 'rate_references_attached' => $refs, 'native_rate_objects_unchanged' => $objects, 'native_rate_money_unchanged' => $money, 'quote_body_unchanged' => $rate_quote === $fixture->cart->row( $flow->evidence->header()->id()->value() )['private_body_json'], 'no_second_binding_effect' => $rate_history === $fixture->cart->history() ] );
+		$session_unchanged = $session_before === $native_session_row();
+		$case( 'NATIVE-W2Q06-NATIVE-CACHED-RATE-REFERENCES', $current_read && $cache_hit && $refs && $objects && $money && $session_unchanged && $rate_history === $fixture->cart->history() && $rate_quote === $fixture->cart->row( $flow->evidence->header()->id()->value() )['private_body_json'], [ 'native_current_read_succeeded' => $current_read, 'native_shipping_cache_hit' => $cache_hit, 'rate_references_attached' => $refs, 'native_rate_objects_unchanged' => $objects, 'native_rate_money_unchanged' => $money, 'native_session_bytes_unchanged' => $session_unchanged, 'quote_body_unchanged' => $rate_quote === $fixture->cart->row( $flow->evidence->header()->id()->value() )['private_body_json'], 'no_second_binding_effect' => $rate_history === $fixture->cart->history() ] );
 		$phase = 'NATIVE-W2Q06-CLASSIC-PREFREEZE-EXACT-SAVED-CONTEXT'; $native_gateway = $fixture->register_gateway(); $flow->payment_method = $native_gateway->id; $flow->create();
 		$order = $flow->order; $before = $fixture->snapshot_bytes( $order ); $quote_id = $flow->evidence->header()->id()->value(); $body = $fixture->cart->row( $quote_id )['private_body_json'];
 		$case( 'NATIVE-W2Q06-CLASSIC-PREFREEZE-EXACT-SAVED-CONTEXT', $flow->prefreeze_staged && $known( $flow->prepared ) && $known( $flow->verified ) && QuoteNativeOrderHistory::verify( $order ) && [] !== $before['order'] && 2 === count( $order->get_items( 'line_item' ) ), [ 'actual_native_woo_order' => true, 'actual_native_checkout_create_order' => true, 'binding_prepared' => 'prepared' === $flow->prepared?->binding?->state(), 'binding_verified' => 2 === $flow->verified?->binding?->revision(), 'historical_reader_supported' => QuoteNativeOrderHistory::verify( $order ), 'native_logical_mapping_matches' => $flow->mapping === $flow->saved?->mapping(), 'native_items_saved' => [] !== $before['items'], 'native_line_count' => count( $order->get_items( 'line_item' ) ), 'native_shipping_count' => count( $order->get_items( 'shipping' ) ) ] );

@@ -6,7 +6,7 @@ namespace CetechDeliveryEngine\Integrations\DeliveryQuote;
 
 use CetechDeliveryEngine\Application\DeliveryQuote\{QuoteCartPlacementEvidenceReader,QuoteDurableService,QuotePlacementEvidence,QuotePlacementProof,QuotePlacementSavedEvidenceGuard,QuotePlacementService,QuoteProviderRegistry,QuoteSavedOrderAuthorization};
 use CetechDeliveryEngine\Application\EmergencyControl\{EmergencyCheckoutFacts,EmergencyCheckoutLocalBinding,EmergencyFinalPlacementGuard,EmergencyOrderQuoteValidatorInterface};
-use CetechDeliveryEngine\Application\Order\{QuoteNativeOrderFacts,QuoteNativeOrderHistory,QuoteNativeOrderStager};
+use CetechDeliveryEngine\Application\Order\{QuoteNativeOrderFacts,QuoteNativeOrderHistory,QuoteNativeOrderStager,QuoteNativeOrderStageResult};
 use CetechDeliveryEngine\Domain\Contracts\RequestContext;
 use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteBinding,QuoteTime};
 use CetechDeliveryEngine\Domain\Operation\{OperationConnectionFactory,OperationSession};
@@ -63,6 +63,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 		// Pinned Woo synchronizes the request and changes status to pending first.
 		// Legacy processed writer (10) and final C07 admission (PHP_INT_MAX) follow.
 		add_action( 'woocommerce_store_api_checkout_order_processed', [ $this, 'stage_store_post' ], 9, 1 );
+		add_action( 'woocommerce_after_order_object_save', [ $this, 'observe_native_logging_save' ], PHP_INT_MAX, 2 );
 		add_filter( 'rest_dispatch_request', [ $this, 'recover_store_post' ], -100, 4 );
 		add_action( 'woocommerce_pre_payment_complete', [ $this, 'guard_free_payment_continuation' ], PHP_INT_MAX, 1 );
 		add_action( 'woocommerce_rest_checkout_process_payment_with_context', [ $this, 'guard_store_payment_context' ], -PHP_INT_MAX, 2 );
@@ -86,6 +87,21 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 		if ( ! $order instanceof \WC_Order ) { if ( $this->new_cart_owned() ) { self::refuse( 'classic' ); } return; }
 		if ( ! $this->new_cart_owned() ) { return; }
 		try { $this->stage( $order, 'classic' ); } catch ( \Throwable $error ) { throw new \RuntimeException( EmergencyControlResponse::message(), 0, $error ); }
+	}
+	/** Read the completed pinned native logger save outside all owned SQL. */
+	public function observe_native_logging_save( mixed $order, mixed $store = null ): void {
+		if ( ! $order instanceof \WC_Order ) { return; }
+		try {
+			$coordinate = $this->coordinate( $order ); $entry = $this->stages[$coordinate] ?? null;
+			if ( null === $entry || 'classic' !== $entry['route'] || ! ( $entry['logging'] ?? null ) instanceof QuoteNativeCheckoutLoggingEvidence ) { return; }
+			$receipt = $entry['logging']->observe_saved( $order ); if ( null === $receipt ) { return; }
+			$before = $entry['logger_receipt'] ?? null;
+			if ( 4 === $receipt->phase() && null === $before ) { $this->stages[$coordinate]['logger_receipt'] = $receipt; return; }
+			if ( 5 === $receipt->phase() && $before instanceof QuoteNativeCheckoutLoggingEvidence && $receipt->successor_of( $before ) && null !== $this->pay_continuation ) {
+				$this->pay_continuation->observe_logging( $receipt ); $this->stages[$coordinate]['logger_receipt'] = $receipt; return;
+			}
+			throw new \RuntimeException( 'Native logger observation was not unique.' );
+		} catch ( \Throwable ) { if ( isset( $coordinate, $this->stages[$coordinate] ) ) { $this->stages[$coordinate]['logging_failed'] = true; } if ( null !== $this->pay_continuation ) { $this->pay_continuation->reject_logging(); } }
 	}
 	/** This native hook runs after cookie/session/nonce permission checks and sync. */
 	public function remember_store_post( mixed $order, mixed $request ): void {
@@ -164,6 +180,8 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 				if ( ! $this->stage_matches( $order, $entry ) ) { return false; }
 				if ( ( $entry['route'] !== $route && ( 'order_pay' !== $route || 'sealed' !== $entry['binding']->state() || ! $this->authorize_saved_order( $order ) ) ) || ! QuoteNativeOrderHistory::verify( $order ) ) { return false; }
 				$guard = $entry['guard'];
+				$logging = $entry['logger_receipt'] ?? null;
+				if ( $logging instanceof QuoteNativeCheckoutLoggingEvidence ) { if ( 'classic' !== $route || 4 !== $logging->phase() || ! $logging->is_current() ) { return false; } $guard = $logging->with_saved( $guard ); }
 				if ( 'store_api' === $route ) { $guard = $this->detach_store_pointer( $order, $entry['evidence'], $entry['binding'], $guard ); }
 				elseif ( 'classic' === $route ) { $guard = $this->retain_classic_pointer( $order, $entry['evidence'], $entry['binding'], $guard ); }
 				elseif ( 'order_pay' === $route ) { $guard = $this->saved_authorization_guard( $order, $guard ); }
@@ -182,6 +200,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 						|| 'sealed' !== $result->binding->state() || 3 !== $result->binding->revision() || ! $proof->unchanged() || ! $local->unchanged() ) { return false; }
 					$this->stages[$this->coordinate( $order )]['binding'] = $result->binding;
 				}
+				if ( $logging instanceof QuoteNativeCheckoutLoggingEvidence && ! $logging->is_current() ) { return false; }
 			} elseif ( QuoteNativeOrderHistory::owned( $order ) ) {
 				$evidence = $this->saved[$order] ?? null;
 				if ( 'order_pay' !== $route || ! $evidence instanceof QuotePlacementEvidence || ! $this->authorize_saved_order( $order ) ) { return false; }
@@ -196,7 +215,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 				$method = 'order_pay' === $route ? ( $_POST['payment_method'] ?? '_missing_native_method' ) : $order->get_payment_method( 'edit' ); if ( '' === $method ) { $method = '_free_native_method'; }
 				if ( ! is_string( $method ) || null === $pay_binding || null === $pay_guard ) { return false; }
 				$authorization = QuoteSavedOrderAuthorization::capture( $order, [ $this, 'authorize_saved_order' ] );
-				$this->pay_continuation = new QuoteNativeOrderPayContinuation( $this->factory, $order, $pay_binding, $pay_guard, $authorization, $method, 'order_pay' === $route );
+				$this->pay_continuation = new QuoteNativeOrderPayContinuation( $this->factory, $order, $pay_binding, $pay_guard, $authorization, $method, 'order_pay' === $route, 'classic' === $route && null !== $entry ? ( $entry['logger_receipt'] ?? null ) : null );
 				// Append only once the actual native order-pay request has acknowledged.
 				add_filter( 'woocommerce_available_payment_gateways', [ $this, 'guard_payment_gateways' ], PHP_INT_MAX, 1 );
 				remove_action( 'woocommerce_pre_payment_complete', [ $this, 'guard_free_payment_continuation' ], PHP_INT_MAX );
@@ -318,6 +337,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 	private function stage( \WC_Order $order, string $route ): void {
 		$coordinate = $this->coordinate( $order );
 		if ( isset( $this->stages[$coordinate] ) ) { if ( $this->stages[$coordinate]['route'] !== $route || ! QuoteNativeOrderHistory::verify( $order ) ) { self::refuse( $route ); } return; }
+		$logging = 'classic' === $route ? QuoteNativeCheckoutLoggingEvidence::begin_classic() : null;
 		$evidence = $this->cart->current( RequestContext::create() ); if ( null === $evidence ) { throw new \RuntimeException( 'Quote placement accepted evidence unavailable.' ); }
 		$service = new QuotePlacementService( $this->durable( $evidence ), $evidence );
 		$this->preserve_original_pointer( $order, $evidence, $service->placement_id(), $route );
@@ -326,21 +346,44 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 		if ( 'accepted' !== $prepared->attempt->outcome->state || null === $prepared->binding || ! in_array( $prepared->binding->revision(), [ 1, 2, 3 ], true ) ) { throw new \RuntimeException( 'Quote placement preparation did not acknowledge: ' . $prepared->attempt->outcome->state . '/' . ( $prepared->attempt->outcome->error?->code ?? 'none' ) ); }
 		if ( 1 === $prepared->binding->revision() ) {
 			$stage = $this->stager->stage( $order, $evidence, $prepared->binding, $route );
+			$bindings = $this->stage_bindings( $order, $stage );
 			$binding = $service->verified_binding( $prepared->binding, $stage->snapshot_digest(), $stage->context_digest(), QuoteTime::now() );
 			$verified = $service->verify( $binding, $stage->guard(), RequestContext::create() );
 			if ( 'accepted' !== $verified->attempt->outcome->state || null === $verified->binding || 'prepared' !== $verified->binding->state() || 2 !== $verified->binding->revision() ) { throw new \RuntimeException( 'Quote placement verification did not acknowledge: ' . $verified->attempt->outcome->state . '/' . ( $verified->attempt->outcome->error?->code ?? 'none' ) ); }
 			$binding = $verified->binding;
 		} else {
 			$binding = $prepared->binding; $stage = $this->stager->saved_guard( $order, $evidence->quote_record(), $binding );
+			$bindings = $this->stage_bindings( $order, $stage );
 		}
-		EmergencyCheckoutFacts::order_fingerprint( $order );
+		if ( ! $bindings['local']->unchanged() || ! $bindings['original']->unchanged() ) { throw new \RuntimeException( 'Native staged placement changed before verification acknowledged.' ); }
+		$this->stages[$coordinate] = [ 'route' => $route, 'evidence' => $evidence, 'service' => $service, 'binding' => $binding, 'guard' => $stage->guard(), ...$bindings, 'method' => $order->get_payment_method( 'edit' ), 'title' => $order->get_payment_method_title( 'edit' ), 'logging' => $logging, 'logger_receipt' => null, 'logging_failed' => false ];
+	}
+	/** Freeze the created object and the independently verified persisted readback. */
+	private function stage_bindings( \WC_Order $order, QuoteNativeOrderStageResult $stage ): array {
+		$this->prewarm_native_order( $order );
 		$local = EmergencyCheckoutLocalBinding::capture( $order ); if ( null === $local ) { throw new \RuntimeException( 'Native staged placement binding unavailable.' ); }
-		$this->stages[$coordinate] = [ 'route' => $route, 'evidence' => $evidence, 'service' => $service, 'binding' => $binding, 'guard' => $stage->guard(), 'local' => $local, 'native' => QuoteOrderPayLocalBinding::capture( $order ), 'method' => $order->get_payment_method( 'edit' ), 'title' => $order->get_payment_method_title( 'edit' ) ];
+		$original = QuoteOrderPayLocalBinding::capture( $order );
+		$saved = $stage->fresh_order();
+		$this->prewarm_native_order( $saved );
+		$native = QuoteOrderPayLocalBinding::capture( $saved );
+		if ( ! $local->unchanged() || ! $original->unchanged() ) { throw new \RuntimeException( 'Native staged placement changed while capturing saved readback.' ); }
+		return [ 'created' => $order, 'local' => $local, 'original' => $original, 'native' => $native ];
+	}
+	/** Only native metadata/group loading; called before any owned final SQL. */
+	private function prewarm_native_order( \WC_Order $order ): void {
+		$order->get_meta_data();
+		foreach ( [ 'line_item', 'shipping', 'tax', 'fee', 'coupon' ] as $type ) {
+			foreach ( $order->get_items( $type ) as $item ) { if ( is_object( $item ) && method_exists( $item, 'get_meta_data' ) ) { $item->get_meta_data(); } }
+		}
 	}
 	private function stage_matches( \WC_Order $order, array $entry ): bool {
-		if ( ! $entry['local']->unchanged() || ! $entry['native']->same_native_facts( $order ) || $order->get_payment_method( 'edit' ) !== $entry['method'] || $order->get_payment_method_title( 'edit' ) !== $entry['title'] ) { return false; }
+		if ( true === ( $entry['logging_failed'] ?? false ) || ! $entry['local']->unchanged() || ! $entry['original']->unchanged() || $order->get_payment_method( 'edit' ) !== $entry['method'] || $order->get_payment_method_title( 'edit' ) !== $entry['title'] ) { return false; }
+		// Classic reloads the saved order before its final hook. Verify the exact
+		// saved plan and prewarm all native item groups before comparing raw facts.
 		$guard = $this->stager->saved_guard( $order, $entry['evidence']->quote_record(), $entry['binding'] );
-		return $guard->snapshot_digest() === $entry['binding']->row()['snapshot_digest'] && $guard->context_digest() === $entry['binding']->row()['context_digest'];
+		$logging = $entry['logger_receipt'] ?? null;
+		if ( $logging instanceof QuoteNativeCheckoutLoggingEvidence && ( 'classic' !== $entry['route'] || 4 !== $logging->phase() || ! $logging->is_current() || ! $logging->matches_saved( $guard->fresh_order() ) ) ) { return false; }
+		return $entry['local']->unchanged() && $entry['original']->unchanged() && $order->get_payment_method( 'edit' ) === $entry['method'] && $order->get_payment_method_title( 'edit' ) === $entry['title'] && ( $entry['created'] === $order || $entry['native']->same_native_facts( $order ) || $logging instanceof QuoteNativeCheckoutLoggingEvidence && $entry['native']->same_native_facts( $order, $logging ) ) && $guard->snapshot_digest() === $entry['binding']->row()['snapshot_digest'] && $guard->context_digest() === $entry['binding']->row()['context_digest'];
 	}
 	private function durable( QuotePlacementEvidence $evidence ): QuoteDurableService { return new QuoteDurableService( $this->factory, new QuoteProviderRegistry(), [ $evidence, 'authorize' ], evidence: $evidence->guard() ); }
 	private function refresh_evidence( QuotePlacementEvidence $original ): QuotePlacementEvidence {

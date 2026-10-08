@@ -486,7 +486,12 @@ final class Plugin {
 			null, null, static fn( \WC_Order $order, string $route ) => $c->get( EmergencyControlRuntime::class )->final_order_decision( $order, $route )
 		) );
 		$this->container->singleton( QuoteReviewRuntime::class, static fn( ServiceContainer $c ) => new QuoteReviewRuntime( $c->get( CartQuoteReviewService::class ), true, new \CetechDeliveryEngine\Presentation\Frontend\QuoteReviewRenderer(), [ $c->get( QuotePlacementActivation::class ), 'active' ] ) );
-		$this->container->singleton( QuoteRateReferenceRuntime::class, static fn( ServiceContainer $c ) => new QuoteRateReferenceRuntime( $c->get( NativeCartQuoteEnvironment::class ), $c->get( NativeCartQuoteSessionStore::class ), true, [ $c->get( QuotePlacementActivation::class ), 'active' ] ) );
+		$this->container->singleton( QuoteRateReferenceRuntime::class, static function ( ServiceContainer $c ): QuoteRateReferenceRuntime {
+			$environment = $c->get( NativeCartQuoteEnvironment::class );
+			$runtime = new QuoteRateReferenceRuntime( $environment, $c->get( NativeCartQuoteSessionStore::class ), true, [ $c->get( QuotePlacementActivation::class ), 'active' ] );
+			$environment->set_rate_projection( $runtime );
+			return $runtime;
+		} );
 		$this->container->singleton( QuotePlacementSettings::class, static fn( ServiceContainer $c ) => new QuotePlacementSettings( $c->get( QuotePlacementActivation::class ), $c->get( AdminActionHandler::class ) ) );
 	}
 
