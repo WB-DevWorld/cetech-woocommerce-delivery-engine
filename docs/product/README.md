@@ -1,6 +1,6 @@
 # CETECH Delivery Standalone Alignment Audit
 
-Current checkpoint2026-10-09: W2-SERVICE-PROMISE-POLICY-1 is owner-accepted and integrated through PR #98 as6814210. [W2-P01 internal contracts](W2-P01-INTERNAL-PROMISE-CONTRACT-2026-10-09.md), [Issue #99](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/99), are implemented with exact qualification pending. P02–P06 retain their bounded acceptance sequence; registry classifications and site adoption are unchanged.
+Current checkpoint2026-10-09 09:11:24 UTC: owner-approved [W2-P01](W2-P01-INTERNAL-PROMISE-CONTRACT-2026-10-09.md) integrated unchanged through PR100/master`d07b8eb4dd1153b629a62b800d165c5ca92bc102`; its separate master run37909827326 and two original-artifact audits pass. [W2-P02 immutable storage](W2-P02-IMMUTABLE-PROMISE-STORAGE-2026-10-09.md), [Issue101](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/101), is authorized and in implementation, with qualification pending. Schema9→10 adds private preserved policy/calendar/version/assignment storage. P03–P06 remain later checkpoints; runtime consumers, registry classifications and site adoption are unchanged.
 
 
 ## Current proposal — 2026-10-09

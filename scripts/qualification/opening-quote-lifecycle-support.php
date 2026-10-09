@@ -172,15 +172,14 @@ final class CetechNativeQuoteLifecycleFixture {
 		$this->factory = new CetechNativeQuoteLifecycleFactory( $main, $this->site, $this->prefix );
 	}
 	public function install(): void {
-		if ( 0 !== $this->table_count() || 35 !== count( DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES ) ) { throw new RuntimeException( 'Native quote lifecycle namespace is unavailable.' ); }
-		foreach ( DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES as $suffix ) { $this->clone_table( $this->prefix . 'delivery_engine_' . $suffix, $this->main->prefix . 'delivery_engine_' . $suffix ); }
+		if ( 0 !== $this->table_count() || 35 !== count( DataLifecycleManifest::RETAINED_QUOTE_DOMAIN_TABLE_SUFFIXES ) ) { throw new RuntimeException( 'Native quote lifecycle namespace is unavailable.' ); }
+		foreach ( DataLifecycleManifest::RETAINED_QUOTE_DOMAIN_TABLE_SUFFIXES as $suffix ) { $this->clone_table( $this->prefix . 'delivery_engine_' . $suffix, $this->main->prefix . 'delivery_engine_' . $suffix ); }
 		$this->clone_table( $this->prefix . 'options', $this->main->options );
-		$names = [ SchemaVersion::OPTION_NAME, MigrationStatus::OPTION_NAME ];
-		foreach ( $names as $name ) {
-			$rows = $this->rows( "SELECT option_value,autoload FROM `{$this->main->options}` WHERE option_name=" . $this->literal( $name ) );
-			if ( 1 !== count( $rows ) || ( SchemaVersion::OPTION_NAME === $name && '9' !== $rows[0]['option_value'] ) ) { throw new RuntimeException( 'Native quote lifecycle source publication is unavailable.' ); }
-			$this->write_option( $name, $rows[0]['option_value'], $rows[0]['autoload'] );
-		}
+		// Retained Q03 profile remains an explicit historical schema9 fixture.
+		$source = $this->rows( "SELECT option_value FROM `{$this->main->options}` WHERE option_name=" . $this->literal( SchemaVersion::OPTION_NAME ) );
+		if ( 1 !== count( $source ) || SchemaVersion::TARGET !== $source[0]['option_value'] || '10' !== SchemaVersion::TARGET ) { throw new RuntimeException( 'Native quote lifecycle source publication is unavailable.' ); }
+		$this->write_option( SchemaVersion::OPTION_NAME, '9' );
+		$this->write_option( MigrationStatus::OPTION_NAME, serialize( [ 'status' => 'success', 'from_version' => '8', 'to_version' => '9', 'migration_id' => \CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteReadiness::MIGRATION_ID ] ) );
 	}
 	private function clone_table( string $table, string $source ): void {
 		foreach ( [ $table, $source ] as $name ) { if ( strlen( $name ) > 64 || 1 !== preg_match( '/\A[A-Za-z0-9_]+\z/D', $name ) ) { throw new RuntimeException( 'Native quote lifecycle table identity is invalid.' ); } }

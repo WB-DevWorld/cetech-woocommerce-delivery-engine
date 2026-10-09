@@ -40,16 +40,16 @@ final class CetechNativeDataLifecycleFixture {
 
 	public function install(): void {
 		if ( 0 !== (int) $this->scalar( "SELECT COUNT(*) FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND LEFT(TABLE_NAME,LENGTH('{$this->prefix}'))='{$this->prefix}'" ) ) { throw new RuntimeException( 'Lifecycle fixture prefix is occupied.' ); }
-		foreach ( DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES as $suffix ) { if ( strlen( $this->prefix . 'delivery_engine_' . $suffix ) > 64 ) { throw new RuntimeException( 'Lifecycle fixture table identity exceeds the native limit.' ); } }
+		foreach ( DataLifecycleManifest::RETAINED_QUOTE_DOMAIN_TABLE_SUFFIXES as $suffix ) { if ( strlen( $this->prefix . 'delivery_engine_' . $suffix ) > 64 ) { throw new RuntimeException( 'Lifecycle fixture table identity exceeds the native limit.' ); } }
 		$charset = 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';
 		foreach ( OperationStoreSchema::create_table_statements( $charset, $this->prefix . 'delivery_engine_' ) as $suffix => $sql ) { $this->create_table( $this->prefix . 'delivery_engine_' . $suffix, $sql ); }
 		$this->create_table( $this->prefix . 'options', "CREATE TABLE `{$this->prefix}options` (option_id bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY, option_name varchar(191) NOT NULL UNIQUE, option_value longtext NOT NULL, autoload varchar(20) NOT NULL DEFAULT 'off') ENGINE=InnoDB {$charset}" );
 		$this->create_table( $this->prefix . 'operation_fixture_counter', "CREATE TABLE `{$this->prefix}operation_fixture_counter` (id bigint unsigned NOT NULL PRIMARY KEY, revision bigint unsigned NOT NULL, value bigint NOT NULL, published_revision bigint unsigned NOT NULL DEFAULT 0) ENGINE=InnoDB {$charset}" );
 		$this->execute( "INSERT INTO `{$this->prefix}operation_fixture_counter` (id,revision,value) VALUES (1,1,0)" );
 		foreach ( RuleLifecycleSchema::create_table_statements( $charset, $this->prefix . 'delivery_engine_' ) as $suffix => $sql ) { $this->create_table( $this->prefix . 'delivery_engine_' . $suffix, $sql ); }
-		$this->write_option( 'cetech_de_db_version', SchemaVersion::TARGET );
-		$this->write_option( 'cetech_de_last_migration_status', serialize( [ 'status' => 'success', 'to_version' => SchemaVersion::TARGET, 'migration_id' => DeliveryQuoteReadiness::MIGRATION_ID ] ) );
-		foreach ( DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES as $suffix ) {
+		$this->write_option( 'cetech_de_db_version', '9' );
+		$this->write_option( 'cetech_de_last_migration_status', serialize( [ 'status' => 'success', 'to_version' => '9', 'migration_id' => DeliveryQuoteReadiness::MIGRATION_ID ] ) );
+		foreach ( DataLifecycleManifest::RETAINED_QUOTE_DOMAIN_TABLE_SUFFIXES as $suffix ) {
 			$table = $this->prefix . 'delivery_engine_' . $suffix;
 			if ( in_array( $suffix, [ 'operation_records', 'operation_changes', 'rule_family_guards', 'logical_rules', 'rule_versions' ], true ) ) { continue; }
 			$source = $this->main->prefix . 'delivery_engine_' . $suffix;
@@ -127,7 +127,7 @@ final class CetechNativeDataLifecycleFixture {
 
 	public function domain_rows(): array {
 		$result = [];
-		foreach ( DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES as $suffix ) { $result[ $suffix ] = $this->rows( "SELECT * FROM `{$this->prefix}delivery_engine_{$suffix}` ORDER BY id ASC" ); }
+		foreach ( DataLifecycleManifest::RETAINED_QUOTE_DOMAIN_TABLE_SUFFIXES as $suffix ) { $result[ $suffix ] = $this->rows( "SELECT * FROM `{$this->prefix}delivery_engine_{$suffix}` ORDER BY id ASC" ); }
 		return $result;
 	}
 

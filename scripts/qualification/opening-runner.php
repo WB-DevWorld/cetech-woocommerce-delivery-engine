@@ -106,7 +106,7 @@ try {
 	}
 	$lifecycle( $check );
 	$emergency( $check );
-	$check( 'NATIVE-FIXTURE-SCHEMA-RESTORED', '9' === (string) get_option( 'cetech_de_db_version' ), array( 'schema_after' => (string) get_option( 'cetech_de_db_version' ) ) );
+	$check( 'NATIVE-FIXTURE-SCHEMA-RESTORED', '10' === (string) get_option( 'cetech_de_db_version' ), array( 'schema_after' => (string) get_option( 'cetech_de_db_version' ) ) );
 	$report['status'] = 'PASS';
 	$write();
 	echo 'opening_native_qualification=PASS cases=' . count( $report['cases'] ) . PHP_EOL;

@@ -14,20 +14,25 @@ use CetechDeliveryEngine\Infrastructure\Persistence\ConfigurationTables;
 use CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteSchema;
 use CetechDeliveryEngine\Infrastructure\Persistence\OperationStoreSchema;
 use CetechDeliveryEngine\Infrastructure\Persistence\RuleLifecycleSchema;
+use CetechDeliveryEngine\Infrastructure\Persistence\PromiseStorageSchema;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
 final class DataLifecycleRegistryTest extends TestCase {
 
-	public function test_complete_inventory_matches_original32_and_three_quote_stores(): void {
+	public function test_complete_inventory_matches_retained35_and_three_promise_stores(): void {
 		$original = array_merge( ConfigurationTables::all_suffixes(), OperationStoreSchema::SUFFIXES, RuleLifecycleSchema::SUFFIXES );
-		$expected = array_merge( $original, DeliveryQuoteSchema::SUFFIXES );
+		$retained = array_merge( $original, DeliveryQuoteSchema::SUFFIXES );
+		$expected = array_merge( $retained, PromiseStorageSchema::SUFFIXES );
 		$registry = DataLifecycleRegistry::standard();
 		$tables = array_values( array_filter( $registry->classes(), static fn( DataLifecycleClass $class ): bool => 'plugin_table' === $class->storage_adapter ) );
 		self::assertCount( 32, $original );
 		self::assertSame( $this->sorted( $original ), $this->sorted( DataLifecycleManifest::ORIGINAL_DOMAIN_TABLE_SUFFIXES ) );
 		self::assertSame( DeliveryQuoteSchema::SUFFIXES, DataLifecycleManifest::QUOTE_TABLE_SUFFIXES );
-		self::assertCount( 35, $expected );
+		self::assertCount( 35, $retained );
+		self::assertSame( $this->sorted( $retained ), $this->sorted( DataLifecycleManifest::RETAINED_QUOTE_DOMAIN_TABLE_SUFFIXES ) );
+		self::assertSame( PromiseStorageSchema::SUFFIXES, DataLifecycleManifest::PROMISE_TABLE_SUFFIXES );
+		self::assertCount( 38, $expected );
 		self::assertSame( $this->sorted( $expected ), $this->sorted( array_column( $tables, 'storage_key' ) ) );
 		foreach ( $tables as $class ) {
 			self::assertSame( [ DataLifecyclePolicy::Preserve, DataLifecyclePolicy::Preserve, DataLifecyclePolicy::Preserve, null ],
@@ -41,6 +46,12 @@ final class DataLifecycleRegistryTest extends TestCase {
 			self::assertSame( 'schema9', $class->accepted_format );
 			self::assertFalse( $class->cleanup_eligible() );
 			self::assertContains( 'no_quote_cleanup_or_admission_grant', $class->protections );
+		}
+		foreach ( PromiseStorageSchema::SUFFIXES as $suffix ) {
+			$class = $registry->get( 'table.' . $suffix );
+			self::assertSame( 'schema10', $class->accepted_format );
+			self::assertFalse( $class->cleanup_eligible() );
+			self::assertContains( 'no_promise_cleanup_calculation_or_writer_grant', $class->protections );
 		}
 		self::assertContains( 'preserve_immutable_header_body_namespaces_and_tombstones', $registry->get( 'table.delivery_quotes' )->protections );
 		self::assertContains( 'preserve_order_group_native_snapshot_and_seal_references', $registry->get( 'table.delivery_quote_bindings' )->protections );
@@ -194,7 +205,7 @@ final class DataLifecycleRegistryTest extends TestCase {
 		$list = $standard->classes();
 		array_pop( $list );
 		self::assertSame( $standard->policy_digest(), DataLifecycleRegistry::standard()->policy_digest() );
-		self::assertCount( 137, $standard->classes() );
+		self::assertCount( 140, $standard->classes() );
 	}
 
 	public function test_diagnostics_do_not_emit_selectors_paths_storage_names_or_caller_content(): void {
@@ -224,6 +235,8 @@ final class DataLifecycleRegistryTest extends TestCase {
 			foreach ( $class->proof_cases as $case ) {
 				if ( in_array( $class->storage_key, DataLifecycleManifest::QUOTE_TABLE_SUFFIXES, true ) && 'plugin_table' === $class->storage_adapter ) {
 					self::assertContains( $case, [ 'W2Q-09', 'W2Q-39' ] );
+				} elseif ( in_array( $class->storage_key, DataLifecycleManifest::PROMISE_TABLE_SUFFIXES, true ) && 'plugin_table' === $class->storage_adapter ) {
+					self::assertContains( $case, [ 'W2P-18', 'W2P-32' ] );
 				} else {
 					self::assertMatchesRegularExpression( '/^C06-(?:0[1-9]|[12][0-9]|30)$/D', $case );
 				}
@@ -244,7 +257,7 @@ final class DataLifecycleRegistryTest extends TestCase {
 		$error = stream_get_contents( $pipes[2] );
 		fclose( $pipes[1] ); fclose( $pipes[2] );
 		self::assertSame( 0, proc_close( $process ), $error );
-		self::assertSame( [ 35, 44, 18, 137, false, false, false, true, true, false ], json_decode( $output, true, 16, JSON_THROW_ON_ERROR ) );
+		self::assertSame( [ 38, 44, 18, 140, false, false, false, true, true, false ], json_decode( $output, true, 16, JSON_THROW_ON_ERROR ) );
 	}
 
 	private function sorted( array $values ): array {

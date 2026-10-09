@@ -46,7 +46,10 @@ final class DataLifecycleManifest {
 	];
 	/** Q02 only registers preservation; quote cleanup and admission are not granted here. */
 	public const QUOTE_TABLE_SUFFIXES = [ 'delivery_quotes', 'delivery_quote_bindings', 'delivery_quote_budget_windows' ];
-	public const DOMAIN_TABLE_SUFFIXES = [ ...self::ORIGINAL_DOMAIN_TABLE_SUFFIXES, ...self::QUOTE_TABLE_SUFFIXES ];
+	public const RETAINED_QUOTE_DOMAIN_TABLE_SUFFIXES = [ ...self::ORIGINAL_DOMAIN_TABLE_SUFFIXES, ...self::QUOTE_TABLE_SUFFIXES ];
+	/** P02 registers preservation only; no policy cleanup, calculator or writer grant. */
+	public const PROMISE_TABLE_SUFFIXES = [ 'promise_objects', 'promise_versions', 'promise_assignments' ];
+	public const DOMAIN_TABLE_SUFFIXES = [ ...self::RETAINED_QUOTE_DOMAIN_TABLE_SUFFIXES, ...self::PROMISE_TABLE_SUFFIXES ];
 
 	public const CAPABILITIES = [
 		'view_delivery_engine', 'manage_delivery_settings', 'manage_site_wide_defaults',
@@ -120,6 +123,7 @@ final class DataLifecycleManifest {
 		'operation_records' => 'operation', 'operation_changes' => 'operation',
 		'rule_family_guards' => 'rule_lifecycle', 'logical_rules' => 'rule_lifecycle', 'rule_versions' => 'rule_lifecycle',
 		'delivery_quotes' => 'delivery_quote', 'delivery_quote_bindings' => 'delivery_quote', 'delivery_quote_budget_windows' => 'delivery_quote',
+		'promise_objects' => 'promise_storage', 'promise_versions' => 'promise_storage', 'promise_assignments' => 'promise_storage',
 	];
 
 	private function __construct() {
@@ -136,9 +140,10 @@ final class DataLifecycleManifest {
 		foreach ( self::DOMAIN_TABLE_SUFFIXES as $suffix ) {
 			$owner = self::TABLE_OWNERS[$suffix];
 			$quote = in_array( $suffix, self::QUOTE_TABLE_SUFFIXES, true );
-			$entries[] = self::entry( 'table.' . $suffix, $owner, 'plugin_table', $suffix, 'observe_domain_table_v1', $quote ? 'schema9' : 'schema8',
+			$promise = in_array( $suffix, self::PROMISE_TABLE_SUFFIXES, true );
+			$entries[] = self::entry( 'table.' . $suffix, $owner, 'plugin_table', $suffix, 'observe_domain_table_v1', $promise ? 'schema10' : ( $quote ? 'schema9' : 'schema8' ),
 				protections: self::table_protections( $suffix ),
-				sources: [ self::table_source( $owner, $suffix ) ], proofs: $quote ? [ 'W2Q-09', 'W2Q-39' ] : [ 'C06-01', 'C06-02', 'C06-24' ] );
+				sources: [ self::table_source( $owner, $suffix ) ], proofs: $promise ? [ 'W2P-18', 'W2P-32' ] : ( $quote ? [ 'W2Q-09', 'W2Q-39' ] : [ 'C06-01', 'C06-02', 'C06-24' ] ) );
 		}
 		foreach ( self::OPTIONS as $name ) {
 			$policy = match ( $name ) {
@@ -262,12 +267,20 @@ final class DataLifecycleManifest {
 			'operation' => 'src/Infrastructure/Persistence/OperationStoreSchema.php',
 			'rule_lifecycle' => 'src/Infrastructure/Persistence/RuleLifecycleSchema.php',
 			'delivery_quote' => 'src/Infrastructure/Persistence/DeliveryQuoteSchema.php',
+			'promise_storage' => 'src/Infrastructure/Persistence/PromiseStorageSchema.php',
 			default => 'database/migrations/20260705160000_create_configuration_tables.php',
 		};
 	}
 
 	/** @return list<string> */
 	private static function table_protections( string $suffix ): array {
+		$promise_reference = match ( $suffix ) {
+			'promise_objects' => 'preserve_native_opaque_site_guards_and_all_version_heads',
+			'promise_versions' => 'preserve_immutable_body_create_publication_receipts_and_retired_history',
+			'promise_assignments' => 'preserve_exact_assignment_generations_and_source_receipts',
+			default => null,
+		};
+		if ( null !== $promise_reference ) { return [ 'preserve_all_rows_and_identities', $promise_reference, 'no_promise_cleanup_calculation_or_writer_grant' ]; }
 		$quote_reference = match ( $suffix ) {
 			'delivery_quotes' => 'preserve_immutable_header_body_namespaces_and_tombstones',
 			'delivery_quote_bindings' => 'preserve_order_group_native_snapshot_and_seal_references',
