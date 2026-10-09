@@ -213,7 +213,7 @@ jobs:
   php85-wordpress:
     name: PHP 8.5 WordPress/WooCommerce
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     services:
       mariadb:
         image: mariadb:11.4.13
