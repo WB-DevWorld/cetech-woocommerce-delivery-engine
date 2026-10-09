@@ -25,7 +25,7 @@ final class CustomerOrderDeliverySummaryBuilder {
 		$line_summaries = [];
 		$package_read = $this->reader->read_package( $order );
 		$expected_quote = $package_read->delivery_quote?->envelope;
-		$quote_owned = $order->meta_exists( DeliveryQuoteSnapshotEnvelope::META_FORMAT ) || null !== $package_read->delivery_quote;
+		$quote_owned = QuoteNativeOrderHistory::object_owned( $order, OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT ) || null !== $package_read->delivery_quote;
 		if ( $quote_owned && ( null === $expected_quote || OrderDeliveryPackageReadResult::ERROR_NONE !== $package_read->error ) ) { return null; }
 
 		foreach ( $order->get_items() as $item ) {

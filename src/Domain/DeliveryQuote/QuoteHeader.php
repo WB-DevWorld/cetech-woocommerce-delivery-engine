@@ -15,13 +15,16 @@ final readonly class QuoteHeader implements \JsonSerializable {
 	public static function issue( QuoteId $id, QuoteOwner $owner, QuoteContext $context, QuoteTerms $terms, QuoteTime $created, array $namespace_hashes, string $profile = 'fixture_v1', int $profile_version = 1, ?QuoteReference $reference = null ): self {
 		$reference ??= QuoteReference::generate( $id ); if ( ! $reference->id()->equals( $id ) ) { QuoteShape::invalid(); }
 		$context_facts = $context->private_facts(); $body = self::checked_body( $owner, $context, $terms );
-		return self::from_array( [ 'format_version' => self::FORMAT, 'quote_id' => $id->value(), 'owner' => $owner->facts(), 'profile' => $profile, 'profile_version' => $profile_version, 'purpose' => $context_facts['kind'], 'material_digest' => $context->digest(), 'body_digest' => hash( 'sha256', 'cetech-quote-body-v1:' . $body ), 'namespace_hashes' => $namespace_hashes, 'acceptance_handle_hash' => self::handle_digest( $reference ), 'created_at' => $created->sql(), 'expires_at' => $created->plus_seconds( self::TTL_SECONDS )->sql(), 'revision' => 1 ] );
+		$format = $context->format_version(); $expires = $created->plus_seconds( self::TTL_SECONDS );
+		$terms->promise_packet()?->assert_clock( $created, $expires );
+		return self::from_array( [ 'format_version' => $format, 'quote_id' => $id->value(), 'owner' => $owner->facts(), 'profile' => $profile, 'profile_version' => $profile_version, 'purpose' => $context_facts['kind'], 'material_digest' => $context->digest(), 'body_digest' => hash( 'sha256', 'cetech-quote-body-v' . $format . ':' . $body ), 'namespace_hashes' => $namespace_hashes, 'acceptance_handle_hash' => self::handle_digest( $reference ), 'created_at' => $created->sql(), 'expires_at' => $expires->sql(), 'revision' => 1 ] );
 	}
 	public static function from_array( array $data ): self {
 		$data = QuoteJson::detach( $data, self::MAX_BYTES ); QuoteShape::fields( $data, [ 'format_version', 'quote_id', 'owner', 'profile', 'profile_version', 'purpose', 'material_digest', 'body_digest', 'namespace_hashes', 'acceptance_handle_hash', 'created_at', 'expires_at', 'revision' ] );
-		if ( self::FORMAT !== $data['format_version'] || 1 !== $data['revision'] || ! is_string( $data['quote_id'] ) || ! is_string( $data['created_at'] ) || ! is_string( $data['expires_at'] ) ) { QuoteShape::invalid(); }
+		if ( ! in_array( $data['format_version'], [ 1, 2 ], true ) || 1 !== $data['revision'] || ! is_string( $data['quote_id'] ) || ! is_string( $data['created_at'] ) || ! is_string( $data['expires_at'] ) ) { QuoteShape::invalid(); }
 		$id = QuoteId::from_string( $data['quote_id'] ); $owner = QuoteOwner::from_array( QuoteShape::object( $data['owner'] ) ); QuoteShape::machine( $data['profile'] ); QuoteShape::integer( $data['profile_version'], 1, 1000000 ); QuoteShape::choice( $data['purpose'], [ 'checkout', 'estimate' ] );
-		if ( ! in_array( $data['profile'], [ self::SUPPORTED_PROFILE, 'legacy_fixed_base_v1' ], true ) || self::SUPPORTED_PROFILE_VERSION !== $data['profile_version'] ) { QuoteShape::invalid(); }
+		$profiles = 2 === $data['format_version'] ? [ 'service_promise_v1' ] : [ self::SUPPORTED_PROFILE, 'legacy_fixed_base_v1' ];
+		if ( ! in_array( $data['profile'], $profiles, true ) || self::SUPPORTED_PROFILE_VERSION !== $data['profile_version'] ) { QuoteShape::invalid(); }
 		foreach ( [ 'material_digest', 'body_digest', 'acceptance_handle_hash' ] as $field ) { QuoteShape::digest( $data[$field] ); }
 		$namespaces = QuoteShape::object( $data['namespace_hashes'] ); QuoteShape::fields( $namespaces, [ 'issue', 'accept', 'invalidate' ] ); foreach ( $namespaces as $value ) { QuoteShape::digest( $value ); } if ( 3 !== count( array_unique( $namespaces ) ) ) { QuoteShape::invalid(); }
 		$created = QuoteTime::parse( $data['created_at'] ); $expires = QuoteTime::parse( $data['expires_at'] ); if ( ! $created->plus_seconds( self::TTL_SECONDS )->equals( $expires ) ) { QuoteShape::invalid(); }
@@ -34,6 +37,7 @@ final readonly class QuoteHeader implements \JsonSerializable {
 	public function owner(): QuoteOwner { return $this->quote_owner; }
 	public function created_at(): QuoteTime { return $this->created; }
 	public function expires_at(): QuoteTime { return $this->expires; }
+	public function format_version(): int { return $this->private_facts()['format_version']; }
 	public function material_digest(): string { return $this->private_facts()['material_digest']; }
 	public function body_digest(): string { return $this->private_facts()['body_digest']; }
 	public function profile(): string { return $this->private_facts()['profile']; }
@@ -46,12 +50,15 @@ final readonly class QuoteHeader implements \JsonSerializable {
 	/** Hydration must prove semantic links as well as recomputable checksums. */
 	public function assert_body( QuoteContext $context, QuoteTerms $terms ): void {
 		$body = self::checked_body( $this->quote_owner, $context, $terms );
-		if ( ! hash_equals( $this->material_digest(), $context->digest() ) || ! hash_equals( $this->body_digest(), hash( 'sha256', 'cetech-quote-body-v1:' . $body ) ) || $this->purpose() !== $context->private_facts()['kind'] ) { QuoteShape::invalid(); }
+		if ( $this->format_version() !== $context->format_version() || ! hash_equals( $this->material_digest(), $context->digest() ) || ! hash_equals( $this->body_digest(), hash( 'sha256', 'cetech-quote-body-v' . $this->format_version() . ':' . $body ) ) || $this->purpose() !== $context->private_facts()['kind'] ) { QuoteShape::invalid(); }
+		$terms->promise_packet()?->assert_quote_capture( $this, $context );
 	}
 	public function jsonSerialize(): never { throw new \LogicException( 'An explicit authorized delivery quote header projection is required.' ); }
 	private static function handle_digest( QuoteReference $reference ): string { return hash( 'sha256', 'cetech-quote-accept-handle-v1:' . $reference->handle() ); }
 	private static function checked_body( QuoteOwner $owner, QuoteContext $context, QuoteTerms $terms ): string {
 		$context_facts = $context->private_facts(); $terms_facts = $terms->private_facts(); $groups = [];
+		if ( $context->format_version() !== $terms->format_version() ) { QuoteShape::invalid(); }
+		$terms->promise_packet()?->assert_context_capture( $context, $owner );
 		foreach ( $context_facts['groups'] as $group ) { $groups[$group['component_key']] = $group; }
 		if ( count( $terms_facts['groups'] ) !== count( $groups ) || $owner->key_epoch() !== $context_facts['destination']['key_epoch'] ) { QuoteShape::invalid(); }
 		foreach ( $terms_facts['groups'] as $term ) {

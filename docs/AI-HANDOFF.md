@@ -1,3 +1,9 @@
+# AI handoff — W2-P04 authorized implementation
+
+Continue only [Issue105](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/105), branchws3/wave2-p04-handoff based on actual P03 merged masterc625a59/tree22c37. Owner explicitly approved P03 integration and requested P04 at2026-10-09 12:45:25UTC. PR104/Issue103 completed; actual-master CI37932348440/two original audits PASS (PR104/comment6081516744), separately from qualified candidate37928818620/37928757232. Use [P04 frozen transition](product/W2-P04-PROMISE-HANDOFF-2026-10-09.md) and current central leases. First exact reader/readiness commit independently reviewed with new promise writesOFF; then guarded profile/packet/payment boundary. Preserve v1/schema10/23flags/372classifications and495/20/143+19+49 proof. Do not start P05/P06 or activate a live site. Historical pending descriptions below are previous execution freezes, not current integration truth.
+
+## Historical P03 handoff
+
 # P03 current handoff — 2026-10-09
 
 Local source freeze: six reviewed pure production classes,799total production PHP files/map`ce61ac5bf6144636a14eef7ed646e736083d78c07202f02fb8f23374b87b3932`. Comparative PHP8.3.6 full4617tests/27654assertions/no skips; new100tests/525assertions; production-only autoload/all799lint;49 authored pure vectors;9P03+9P02+16retained strict negative protocol tests and both control checks pass. Finite independent acceptance audit14manualcases/466pointwise probes passes. These local results are separate from the required pinned exact-candidate CI/original artifact audit.

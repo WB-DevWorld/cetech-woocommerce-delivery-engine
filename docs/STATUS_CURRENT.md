@@ -1,3 +1,9 @@
+# Current status — approved P03 integrated; P04 implementation
+
+Owner authorization2026-10-09 12:45:25UTC accepts P03 integration and implements bounded P04. Actual master `c625a59bb61493e00d10b2802a08bac852b27b26` has unchanged qualified P03 tree22c37; PR104/Issue103 completed. Separate actual-master CI37932348440 and two original audits PASS (PR104/comment6081516744), independently of accepted PR/push qualification37928818620/37928757232 (all8jobs,495/20/143+19+49,799exactproduction sources/mapce61). P04 tracked by [Issue105](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/105) on ws3/wave2-p04-handoff. [Frozen transition](product/W2-P04-PROMISE-HANDOFF-2026-10-09.md): new strict forward readers/required-promise readiness first with writesOFF, then separate gated immutable promise profile and acknowledged saved-order handoff. No new profile is qualified or adopted yet. Schema10,23flags,372classifications and all retained v1 guarantees remain unchanged. No later P05/P06/UI/live release work is authorized.
+
+## Historical P03 status
+
 # Current status — P02 integrated / P03 calculation in progress
 
 Local source freeze: six reviewed pure production classes,799total production PHP files/map`ce61ac5bf6144636a14eef7ed646e736083d78c07202f02fb8f23374b87b3932`. Comparative PHP8.3.6 full4617tests/27654assertions/no skips; new100tests/525assertions; production-only autoload/all799lint;49 authored pure vectors;9P03+9P02+16retained strict negative protocol tests and both control checks pass. Finite independent acceptance audit14manualcases/466pointwise probes passes. These local results are separate from the required pinned exact-candidate CI/original artifact audit.

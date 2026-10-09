@@ -9,6 +9,7 @@ final readonly class QuoteTerms implements \JsonSerializable {
 	public const FORMAT = 1;
 	private function __construct( private string $json, private bool $acceptable ) {}
 	public static function from_array( array $data ): self {
+		if ( 2 === ( $data['format_version'] ?? null ) ) { return self::from_v2( QuoteJson::detach( $data ) ); }
 		$data = QuoteJson::detach( $data ); QuoteShape::fields( $data, [ 'format_version', 'groups' ] ); if ( self::FORMAT !== $data['format_version'] ) { QuoteShape::invalid(); }
 		$groups = QuoteShape::list( $data['groups'], 200, 1 ); $seen = []; $acceptable = true;
 		foreach ( $groups as &$group ) {
@@ -33,9 +34,19 @@ final readonly class QuoteTerms implements \JsonSerializable {
 		return new self( QuoteJson::encode( $data ), $acceptable );
 	}
 	public static function from_json( string $json ): self { return self::from_array( QuoteJson::decode( $json ) ); }
+	public static function from_base_promises( self $base, array $packets ): self { if ( 1 !== $base->format_version() ) { QuoteShape::invalid(); } $data = $base->private_facts(); $data['format_version'] = 2; $data['promise_packets'] = $packets; return self::from_array( $data ); }
+	private static function from_v2( array $data ): self {
+		QuoteShape::fields( $data, [ 'format_version', 'groups', 'promise_packets' ] ); $base_data = $data; unset( $base_data['promise_packets'] ); $base_data['format_version'] = 1; $base = self::from_array( $base_data ); $packet = \CetechDeliveryEngine\Domain\ServicePromise\Handoff\PromiseQuotePacket::from_array( [ 'format' => 1, 'groups' => $data['promise_packets'] ] ); $packet->assert_component_keys( array_column( $base->private_facts()['groups'], 'component_key' ) );
+		foreach ( $base->private_facts()['groups'] as $group ) { if ( $group['provider'] !== [ 'code' => 'legacy_fixed_base_v1', 'version' => 1 ] || $group['promotion']['provider'] !== [ 'code' => 'native_no_delivery_promotion_v1', 'version' => 1 ] || 'none' !== $group['promotion']['state'] ) { QuoteShape::invalid(); } }
+		$data['groups'] = $base->private_facts()['groups']; $data['promise_packets'] = $packet->private_facts()['groups']; return new self( QuoteJson::encode( $data ), $base->checkout_acceptable() );
+	}
+	public function format_version(): int { return $this->private_facts()['format_version']; }
+	public function base_terms(): self { if ( 1 === $this->format_version() ) { return $this; } $data = $this->private_facts(); unset( $data['promise_packets'] ); $data['format_version'] = 1; return self::from_array( $data ); }
+	public function promise_packet(): ?\CetechDeliveryEngine\Domain\ServicePromise\Handoff\PromiseQuotePacket { return 2 === $this->format_version() ? \CetechDeliveryEngine\Domain\ServicePromise\Handoff\PromiseQuotePacket::from_array( [ 'format' => 1, 'groups' => $this->private_facts()['promise_packets'] ] ) : null; }
+	public function feasibility_at( QuoteTime $at ): bool { return $this->promise_packet()?->feasibility_at( $at ) ?? true; }
 	public function private_facts(): array { return QuoteJson::decode( $this->json ); }
 	public function to_private_json(): string { return $this->json; }
-	public function digest(): string { return hash( 'sha256', 'cetech-quote-terms-v1:' . $this->json ); }
+	public function digest(): string { return hash( 'sha256', 'cetech-quote-terms-v' . $this->format_version() . ':' . $this->json ); }
 	public function checkout_acceptable(): bool { return $this->acceptable; }
 	/** Explicit display whitelist; caller must authorize the containing quote. */
 	public function display_money(): array {
