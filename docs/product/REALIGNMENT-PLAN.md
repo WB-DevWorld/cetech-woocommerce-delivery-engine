@@ -1,5 +1,9 @@
 # CETECH Delivery Standalone Realignment Plan
 
+## Current authorized dependency — 2026-10-09
+
+DeliveryQuote closeout PR #96 is owner-accepted and integrated unchanged as 62fc5d00f93b2d651b4e20ab7ad4019b92fc82dc; Issue #95 completed. Under the owner's next “proceed”, accepted Wave 2 work package2 now has the concrete [W2-SERVICE-PROMISE-POLICY-1 proposal](W2-SERVICE-PROMISE-POLICY-DESIGN-2026-10-09.md) and [bounded P01–P06 implementation/quote gap plan](W2-SERVICE-PROMISE-IMPLEMENTATION-PLAN-2026-10-09.md), tracked by [Issue #97](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/97). This is design only; runtime checkpoints, seven registry promotion recommendations, quote observation/adoption scopes and live-site effects retain their separately recorded boundaries. The planned first implementation is internal P01 only after design acceptance; no Q07. The earlier current checkpoint below is historical; preserve its original Q06/master evidence.
+
 ## Current execution checkpoint — 2026-10-09
 
 Q01–Q06 are integrated through Q06 actual master `e81db297bb550d420269bc905402eaffcc428aeb`, separately qualified by all eight actual jobs and original 495/20/143 receipts. The owner authorized the [DeliveryQuote conformance closeout](W2-DELIVERYQUOTE-CLOSEOUT-2026-10-09.md), which maps 48 design observations and all 12 atomic quote rows while retaining named operational/evidence/provider gaps and the frozen canonical registry. [Adoption readiness](W2-DELIVERYQUOTE-ADOPTION-READINESS-2026-10-09.md) remains a separate target-stack/physical/pilot decision; site adoption remains OFF. After closeout disposition, Wave 2 work package 2 below supplies the next bounded **service/promise-policy design proposal**; this note creates no Q07, new promise runtime, classification acceptance or deployment authority. The historical predecessor planning prose below remains preserved.
