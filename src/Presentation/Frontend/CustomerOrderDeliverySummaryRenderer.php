@@ -125,24 +125,24 @@ final class CustomerOrderDeliverySummaryRenderer {
 	}
 
 	private function render_line_block( CustomerOrderDeliveryLineSummary $line, bool $show_product ): void {
-		if ( $show_product ) {
-			echo '<p class="cetech-de-order-delivery-summary__product">' . esc_html( $line->product_name ) . '</p>';
-		}
-
 		$rows = $this->compact_rows( $line );
 
 		if ( [] === $rows ) {
 			return;
 		}
 
+		echo '<div class="cetech-de-order-delivery-summary__line">';
+		if ( $show_product ) {
+			echo '<p class="cetech-de-order-delivery-summary__product">' . esc_html( $line->product_name ) . '</p>';
+		}
 		echo '<ul class="cetech-de-order-delivery-summary__compact">';
 
 		foreach ( $rows as $row ) {
 			echo '<li><span class="label">' . esc_html( $row['key'] ) . ':</span> ';
-			echo esc_html( $row['value'] ) . '</li>';
+			echo '<span class="cetech-de-order-delivery-summary__value">' . esc_html( $row['value'] ) . '</span></li>';
 		}
 
-		echo '</ul>';
+		echo '</ul></div>';
 	}
 
 	/**

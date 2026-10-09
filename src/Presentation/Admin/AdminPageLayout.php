@@ -171,7 +171,7 @@ final class AdminPageLayout {
 		foreach ( $steps as $index => $step ) {
 			$number = (int) $step['number'];
 			$class  = $number === $current ? ' is-current' : ( $number < $current ? ' is-complete' : '' );
-			echo '<li class="' . esc_attr( trim( $class ) ) . '">';
+			echo '<li class="' . esc_attr( trim( $class ) ) . '"' . ( $number === $current ? ' aria-current="step"' : '' ) . '>';
 			echo '<span class="cetech-de-wizard-step-number">' . esc_html( (string) $number ) . '</span>';
 			echo '<span class="cetech-de-wizard-step-label">' . esc_html( $step['label'] ) . '</span>';
 			if ( $index < count( $steps ) - 1 ) {
@@ -368,15 +368,20 @@ final class AdminPageLayout {
 			.cetech-de-page-header {
 				display: flex;
 				flex-wrap: wrap;
-				gap: 20px;
+				gap: 16px;
 				justify-content: space-between;
-				align-items: flex-start;
+				align-items: center;
 				margin-bottom: 20px;
-				padding: 24px;
+				padding: 20px;
 				background: var(--cetech-de-bg);
 				border: 1px solid var(--cetech-de-border);
 				border-radius: var(--cetech-de-radius);
 				box-shadow: var(--cetech-de-shadow);
+			}
+			.cetech-de-dashboard-header-text {
+				flex: 1 1 320px;
+				min-width: 0;
+				overflow-wrap: anywhere;
 			}
 			.cetech-de-dashboard-eyebrow {
 				margin: 0 0 6px;
@@ -405,7 +410,8 @@ final class AdminPageLayout {
 				flex-direction: column;
 				gap: 10px;
 				align-items: flex-end;
-				min-width: min(100%, 420px);
+				min-width: 0;
+				max-width: 100%;
 			}
 			.cetech-de-button-group {
 				display: flex;
@@ -416,7 +422,7 @@ final class AdminPageLayout {
 			.cetech-de-header-button { margin: 0 !important; }
 			.cetech-de-section,
 			.cetech-de-admin-section {
-				margin-top: 28px;
+				margin-top: 24px;
 				padding-top: 4px;
 			}
 			.cetech-de-section-head { margin-bottom: 14px; }
@@ -438,18 +444,18 @@ final class AdminPageLayout {
 			.cetech-de-admin-example { margin: 0 0 20px; }
 			.cetech-de-summary-grid {
 				display: grid;
-				grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+				grid-template-columns: repeat(auto-fit, minmax(min(100%, 150px), 1fr));
 				gap: 12px;
 			}
 			.cetech-de-summary-stat {
 				background: var(--cetech-de-bg);
 				border: 1px solid var(--cetech-de-border);
 				border-radius: var(--cetech-de-radius);
-				padding: 18px 16px;
-				text-align: center;
+				padding: 16px;
+				text-align: start;
 				box-shadow: var(--cetech-de-shadow);
 			}
-			.cetech-de-summary-stat--empty .cetech-de-summary-value { color: #a7aaad; }
+			.cetech-de-summary-stat--empty .cetech-de-summary-value { color: var(--cetech-de-muted); }
 			.cetech-de-summary-value {
 				display: block;
 				font-size: 28px;
@@ -493,9 +499,9 @@ final class AdminPageLayout {
 				grid-template-columns: auto 1fr;
 				gap: 14px;
 				align-items: start;
-				background: #fffaf0;
-				border: 1px solid #f0d58a;
-				border-left: 4px solid #dba617;
+				background: var(--cetech-de-warning-bg, #fcf9e8);
+				border: 1px solid var(--cetech-de-warning-border, #f0e6b8);
+				border-inline-start: 4px solid var(--cetech-de-warning-text, #765b15);
 				border-radius: var(--cetech-de-radius);
 				padding: 16px 18px;
 				margin: 0 0 20px;
@@ -504,7 +510,7 @@ final class AdminPageLayout {
 				width: 28px;
 				height: 28px;
 				border-radius: 999px;
-				background: #dba617;
+				background: var(--cetech-de-warning-text, #765b15);
 				color: #fff;
 				display: inline-flex;
 				align-items: center;
@@ -604,7 +610,7 @@ final class AdminPageLayout {
 				background: var(--cetech-de-bg);
 				border: 1px solid var(--cetech-de-border);
 				border-radius: var(--cetech-de-radius);
-				overflow: hidden;
+				overflow-x: auto;
 				box-shadow: var(--cetech-de-shadow);
 				margin-bottom: 20px;
 			}
@@ -617,21 +623,6 @@ final class AdminPageLayout {
 				font-weight: 600;
 				color: var(--cetech-de-text);
 			}
-			.cetech-de-badge {
-				display: inline-flex;
-				align-items: center;
-				padding: 4px 10px;
-				border-radius: 999px;
-				font-size: 11px;
-				font-weight: 600;
-				line-height: 1.4;
-				white-space: nowrap;
-				border: 1px solid transparent;
-			}
-			.cetech-de-badge--ready { background: #edfaef; color: #007017; border-color: #b8e6bf; }
-			.cetech-de-badge--needs_setup { background: #fcf9e8; color: #8a6d1d; border-color: #f0e6b8; }
-			.cetech-de-badge--not_active { background: #f6f7f7; color: #50575e; border-color: #dcdcde; }
-			.cetech-de-badge--attention { background: #fcf0f1; color: #8a2424; border-color: #f1aeb5; }
 			.cetech-de-advanced {
 				margin-top: 28px;
 				background: var(--cetech-de-bg);
@@ -673,7 +664,7 @@ final class AdminPageLayout {
 			}
 			.cetech-de-contact-line + .cetech-de-contact-line { margin-top: 2px; }
 			.cetech-de-setting-code {
-				color: #a7aaad;
+				color: var(--cetech-de-muted);
 				font-family: Consolas, Monaco, monospace;
 				font-size: 11px;
 				margin-top: 6px;
@@ -725,7 +716,7 @@ final class AdminPageLayout {
 				.cetech-de-dashboard-header,
 				.cetech-de-page-header { padding: 18px; }
 				.cetech-de-page-header--sticky-actions {
-					top: 46px;
+					position: static;
 				}
 				.cetech-de-dashboard-header-actions {
 					align-items: stretch;
@@ -733,7 +724,7 @@ final class AdminPageLayout {
 				}
 				.cetech-de-button-group { justify-content: flex-start; }
 				.cetech-de-form-table th,
-				.cetech-de-form-table td { display: block; width: 100%; }
+				.cetech-de-form-table td { display: block; width: 100%; box-sizing: border-box; }
 				.cetech-de-form-table th { padding-bottom: 4px; }
 			}
 		</style>';

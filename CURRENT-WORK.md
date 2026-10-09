@@ -983,3 +983,14 @@ Issue #45 — `[REPO] Post-#32 repository truth sync and branch retirement`
 
 ## Explicit non-actions
 Do not create RC.13. Do not move `v1.0.0-rc.12` or overwrite its ZIP. Do not overwrite frozen development artifacts. Do not start CETECH Pilot. Do not deploy FLAIROC or production. Do not touch POS. Do not start Stage 15. Do not rename Ashanti Region. Do not mutate geography, coverage, rates, shipment lifecycle, COD semantics, or the Bulk stale threshold.
+
+
+## Parallel UI/UX branch authorization — 2026-10-09
+
+The owner explicitly requested implementation of the discussed interface improvements on another branch, without affecting the current active branch, for later integration. This is a separate presentation task on `ws1/ui-ux-refinement-2026-10`, based on integrated `master` `c625a59bb61493e00d10b2802a08bac852b27b26` (W2-P03 merge). It does not supersede the active engine checkpoint recorded above or authorize integration now. The newer owner instruction assigns Codex and its finite agents this branch's administration/customer presentation work; existing human workstream assignments and other branches remain unchanged.
+
+Root owns this branch's task notes, the append-only authorization here, publication and final review. Disjoint file leases: `ui_admin_design` owns AdminPageLayout/AdminOperationsDashboard styling and the two admin stylesheets; `ui_admin_interactions` owns StaffDeliveryCustomizeView/scoped configuration JS and the narrow existing compatibility handler in general admin JS plus focused new tests; `ui_customer_presentation` owns existing frontend CSS and the existing product/checkout/order/shipment renderers; root owns NeedsAttention/BulkTools/ScopedConfigurationPage presentation changes. `ui_scope_review` is independent/read-only. `ui_qa_runtime` owns disposable local QA runtime and exact-baseline comparison, without repository-source edits.
+
+Authorized environments are this isolated checkout, disposable exact-baseline fixtures and existing repository CI. Permitted mutations are existing presentation PHP/JS/CSS, proportional tests and branch task documentation. Resolver/pricing/persistence, native cart/order/payment/selection contracts, schema/migrations, feature flags/adoption, bootstrap/version identity, dependency/lock files, release tags/packages and product registry classifications remain unchanged. No live site/database/customer session/payment, training, Pilot or production mutation is included. An isolated Git checkout does not itself authorize a shared WordPress environment.
+
+The finite scope and acceptance/remaining-evidence ledger are `docs/ui/UI-UX-REFINEMENT-2026-10.md`. Source implementation, local verification, CI results, target-stack visual acceptance and eventual integration are separate claims. Before integration, refresh from then-current master, resolve any overlap deliberately, repeat affected checks and retain the exact tested commit.
