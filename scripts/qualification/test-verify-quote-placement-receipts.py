@@ -33,7 +33,7 @@ def packet_set():
     native_old = [
         case("LEGACY-NATIVE-NEGATIVE-OBSERVATION", {"role_exists": False, "cleanup_restored": True}),
         case("NATIVE-W2Q05-READER-CLEANUP", {key: True for key in VERIFIER.RETAINED_CLEANUP_KEYS["NATIVE-W2Q05-READER-CLEANUP"]}),
-        case("NATIVE-FIXTURE-SCHEMA-RESTORED", {"schema_after": "10"}),
+        case("NATIVE-FIXTURE-SCHEMA-RESTORED", {"schema_after": "11"}),
     ]
     http_old = [
         case("LEGACY-HTTP-NEGATIVE-OBSERVATION", {"user_exists": False, "cleanup_restored": True}),
@@ -80,7 +80,7 @@ def packet_set():
     def envelope(kind, cases):
         environment = {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "database_version": "11.4.13-MariaDB-ubu2404", "hpos": "no" if kind == "cpt" else "yes", **VERIFIER.ENVIRONMENT_SCOPE[kind]}
         if kind != "cpt":
-            environment["schema" if kind == "http" else "schema_before"] = "10"
+            environment["schema" if kind == "http" else "schema_before"] = "11"
         result = {"format": "cetech-opening-http-qualification-v1" if kind == "http" else "cetech-opening-native-qualification-v1", "source_head": expected.source_head, "candidate_head": expected.candidate_head, "source_tree": expected.source_tree, "installed_php_sources": sources.copy(), "installed_php_sources_hash": VERIFIER.canonical_hash(sources), "environment": environment, "status": "PASS", "cases": cases}
         if kind != "http":
             result["limits"] = (VERIFIER.CPT_LIMITS if kind == "cpt" else VERIFIER.NATIVE_LIMITS).copy()

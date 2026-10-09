@@ -35,6 +35,7 @@ final class QuoteReviewRenderer {
 			$html .= '</ul><p class="cetech-de-quote-review-expiry">' . esc_html__( 'Delivery price is held until', 'cetech-woocommerce-delivery-engine' )
 				. ' <time datetime="' . esc_attr( $facts['quote']['expires_at'] ) . '">' . esc_html( $facts['quote']['expires_at'] ) . '</time>. '
 				. esc_html__( 'Delivery details and price rules must stay unchanged.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			if ( isset( $facts['quote']['promise'] ) ) { $html .= PromisePublicRenderer::original( $facts['quote']['promise'] ); }
 		}
 		$html .= '<div class="cetech-de-quote-review-actions">';
 		foreach ( [ 'refresh' => 'Refresh delivery', 'confirm' => 'Confirm delivery price', 'retry' => 'Retry same request' ] as $action => $label ) {

@@ -21,11 +21,14 @@ use CetechDeliveryEngine\Domain\Pickup\PickupLocationRepositoryInterface;
  * Fulfilment choice on the resolved rule is the default preselection, not a path lock.
  */
 final class ProductDeliveryOptionsBuilder {
+	private ?\Closure $promise_presenter;
 
 	public function __construct(
 		private DeliveryOfferRepositoryInterface $delivery_offer_repository,
-		private ?PickupLocationRepositoryInterface $pickup_locations = null
+		private ?PickupLocationRepositoryInterface $pickup_locations = null,
+		?callable $promise_presenter = null
 	) {
+		$this->promise_presenter = null === $promise_presenter ? null : \Closure::fromCallable( $promise_presenter );
 	}
 
 	/**
@@ -98,6 +101,12 @@ final class ProductDeliveryOptionsBuilder {
 			}
 		}
 
+		if ( null !== $this->promise_presenter ) {
+			foreach ( $options as $index => $option ) {
+				try { $presented = ( $this->promise_presenter )( $option, $result ); if ( ! $presented instanceof ProductDeliveryOption || $presented->display_key !== $option->display_key ) { throw new \RuntimeException( 'Invalid promise presentation.' ); } $options[$index] = $presented; }
+				catch ( \Throwable ) { $options[$index] = $option->withPromiseEstimate( null, false, __( 'Delivery estimate unavailable. Review delivery again at checkout.', 'cetech-woocommerce-delivery-engine' ) ); }
+			}
+		}
 		return $this->mark_default( $options, $preferred_choice );
 	}
 

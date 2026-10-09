@@ -222,6 +222,12 @@ final class ShipmentsPage {
 			$this->actions->redirect( self::SLUG, [ 'shipment' => (string) max( 0, $shipment_id ) ] );
 		}
 
+		$detail = $this->query->detail( $shipment_id );
+		if ( null === $detail || ! PromiseShipmentLegacyEtaGuard::allows_text_edit( $detail->shipment ) ) {
+			$this->actions->notices()->flash_error( __( 'This shipment requires the protected current estimate editor under Service Promises.', 'cetech-woocommerce-delivery-engine' ) );
+			$this->actions->redirect( self::SLUG, [ 'shipment' => (string) max( 0, $shipment_id ) ] );
+		}
+
 		$result = $this->eta->update_current( $shipment_id, $eta, $reason, $this->actor_id() );
 
 		if ( $result->ok ) {
@@ -1057,6 +1063,12 @@ final class ShipmentsPage {
 
 	private function render_eta_form( Shipment $shipment ): void {
 		AdminPageLayout::open_section( __( 'Estimated delivery', 'cetech-woocommerce-delivery-engine' ) );
+		if ( ! PromiseShipmentLegacyEtaGuard::allows_text_edit( $shipment ) ) {
+			echo '<p>' . esc_html__( 'Read the original recorded delivery estimate and update its separate current estimate in the protected Service Promises editor.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			echo '<p><a class="button" href="' . esc_url( add_query_arg( [ 'page' => PromiseConfigurationPage::SLUG, 'shipment_id' => (string) $shipment->id ], admin_url( 'admin.php' ) ) ) . '">' . esc_html__( 'Open protected shipment estimate editor', 'cetech-woocommerce-delivery-engine' ) . '</a></p>';
+			AdminPageLayout::close_section();
+			return;
+		}
 		echo '<p><strong>' . esc_html__( 'Original estimate', 'cetech-woocommerce-delivery-engine' ) . ':</strong> ';
 		echo esc_html( '' !== trim( (string) $shipment->eta_original ) ? (string) $shipment->eta_original : '—' );
 		echo '</p>';

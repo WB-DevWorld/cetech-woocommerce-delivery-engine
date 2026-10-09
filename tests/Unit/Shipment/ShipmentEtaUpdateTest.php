@@ -25,9 +25,12 @@ final class ShipmentEtaUpdateTest extends TestCase {
 	private WpdbShipmentRepository $repository;
 
 	private ShipmentEtaService $eta;
+	private array $persisted_orders_before;
 
 	protected function setUp(): void {
 		parent::setUp();
+		$this->persisted_orders_before = [ array_key_exists( 'cetech_de_test_persisted_wc_orders', $GLOBALS ), $GLOBALS['cetech_de_test_persisted_wc_orders'] ?? null ];
+		$GLOBALS['cetech_de_test_persisted_wc_orders'] = [];
 
 		$GLOBALS['cetech_de_test_options'] = [
 			'cetech_de_enable_shipment_records' => 1,
@@ -48,6 +51,7 @@ final class ShipmentEtaUpdateTest extends TestCase {
 		$this->repository = ShipmentCreationFixtures::repository();
 		$this->eta        = new ShipmentEtaService( $this->repository );
 	}
+	protected function tearDown(): void { [ $exists, $value ] = $this->persisted_orders_before; if ( $exists ) { $GLOBALS['cetech_de_test_persisted_wc_orders'] = $value; } else { unset( $GLOBALS['cetech_de_test_persisted_wc_orders'] ); } parent::tearDown(); }
 
 	public function test_current_eta_can_change_while_original_stays_immutable(): void {
 		$shipment = $this->store_shipment( 4301 );
@@ -118,6 +122,8 @@ final class ShipmentEtaUpdateTest extends TestCase {
 
 	public function test_eta_form_does_not_offer_original_eta_editing(): void {
 		$shipment = $this->store_shipment( 4305 );
+		$GLOBALS['cetech_de_test_wc_orders'][4305] = new \WC_Order( [ 'id' => 4305 ] );
+		$GLOBALS['cetech_de_test_persisted_wc_orders'][4305] = new \WC_Order( [ 'id' => 4305 ] );
 		$page     = new ShipmentsPage(
 			new FeatureFlags(),
 			new ShipmentWorkspaceQuery( $this->repository ),

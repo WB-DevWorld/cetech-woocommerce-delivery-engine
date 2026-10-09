@@ -8,9 +8,16 @@ declare(strict_types=1);
 
 if ( ! class_exists( 'WC_Order', false ) ) {
 	class WC_Order {
+		private array $data;
 
-		/** @param array<string, mixed> $data */
-		public function __construct( private array $data = [] ) {
+		/** @param int|array<string, mixed> $data */
+		public function __construct( int|array $data = [] ) {
+			if ( is_int( $data ) ) {
+				$saved = $GLOBALS['cetech_de_test_persisted_wc_orders'][$data] ?? $GLOBALS['cetech_de_test_wc_orders'][$data] ?? null;
+				$data = $saved instanceof self ? $saved->data : [ 'id' => 0 ];
+				foreach ( [ 'items', 'shipping_items' ] as $type ) { if ( is_array( $data[$type] ?? null ) ) { $data[$type] = array_map( static fn( mixed $item ): mixed => is_object( $item ) ? clone $item : $item, $data[$type] ); } }
+			}
+			$this->data = $data;
 			$this->data['meta']            = is_array( $this->data['meta'] ?? null ) ? $this->data['meta'] : [];
 			$this->data['items']           = is_array( $this->data['items'] ?? null ) ? $this->data['items'] : [];
 			$this->data['shipping_items']  = is_array( $this->data['shipping_items'] ?? null ) ? $this->data['shipping_items'] : [];

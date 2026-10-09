@@ -493,6 +493,7 @@ $is_schema9_release = str_contains( $header_source, '1.0.0-dev.wave2-quote-stora
 	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-placement' )
 	|| 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-contract\.1\'\s*\);\s*$/m', $header_source );
 $is_schema10_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-(?:storage|calculation|handoff)\.1\'\s*\);\s*$/m', $header_source );
+$is_schema11_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-native\.1\'\s*\);\s*$/m', $header_source );
 $is_schema8_release = str_contains( $header_source, '1.0.0-dev.wave1-rule-lifecycle' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-snapshot-readers' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-data-lifecycle' )
@@ -510,11 +511,11 @@ $is_schema6_release = str_contains( $header_source, '1.0.0-dev.geo' )
 $target = 'unknown';
 if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 	$target = ( new ReflectionClass( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) )->getConstant( 'TARGET' );
-	if ( $is_schema8_release || $is_schema9_release || $is_schema10_release ) {
-		if ( ( $is_schema10_release ? '10' : ( $is_schema9_release ? '9' : '8' ) ) !== $target ) {
-			$failures[] = 'SchemaVersion::TARGET does not match this schema-8/9/10 package.';
+	if ( $is_schema8_release || $is_schema9_release || $is_schema10_release || $is_schema11_release ) {
+		if ( ( $is_schema11_release ? '11' : ( $is_schema10_release ? '10' : ( $is_schema9_release ? '9' : '8' ) ) ) !== $target ) {
+			$failures[] = 'SchemaVersion::TARGET does not match this schema-8/9/10/11 package.';
 		}
-		if ( $is_schema9_release || $is_schema10_release ) {
+		if ( $is_schema9_release || $is_schema10_release || $is_schema11_release ) {
 			foreach ( \CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteSchema::SUFFIXES as $suffix ) {
 				if ( ! str_contains( implode( "\n", \CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteSchema::create_table_statements( 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' ) ), $suffix ) ) {
 					$failures[] = 'Missing schema-9 quote table definition.';
@@ -524,11 +525,16 @@ if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 				$failures[] = 'Missing schema-9 rate candidate range index.';
 			}
 		}
-		if ( $is_schema10_release ) {
+		if ( $is_schema10_release || $is_schema11_release ) {
 			foreach ( \CetechDeliveryEngine\Infrastructure\Persistence\PromiseStorageSchema::SUFFIXES as $suffix ) {
 				if ( ! str_contains( implode( "\n", \CetechDeliveryEngine\Infrastructure\Persistence\PromiseStorageSchema::create_table_statements( 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' ) ), $suffix ) ) {
 					$failures[] = 'Missing schema-10 promise storage table definition.';
 				}
+			}
+		}
+		if ( $is_schema11_release ) {
+			if ( 39 !== count( \CetechDeliveryEngine\Bootstrap\DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES ) || 38 !== count( \CetechDeliveryEngine\Bootstrap\DataLifecycleManifest::RETAINED_PROMISE_DOMAIN_TABLE_SUFFIXES ) || [ 'shipment_promises' ] !== \CetechDeliveryEngine\Infrastructure\Persistence\ShipmentPromiseSchema::SUFFIXES || ! str_contains( implode( "\n", \CetechDeliveryEngine\Infrastructure\Persistence\ShipmentPromiseSchema::create_table_statements( 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' ) ), 'shipment_promises' ) ) {
+				$failures[] = 'Schema-11 shipment promise storage or retained store partition differs.';
 			}
 		}
 		foreach ( [ 'rule_family_guards', 'logical_rules', 'rule_versions' ] as $suffix ) {
@@ -564,9 +570,9 @@ if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 }
 
 $bulk_js = $package_root . '/assets/admin/bulk-tools.js';
-if ( ( $is_schema5_release || $is_schema6_release || $is_schema7_release || $is_schema8_release || $is_schema9_release || $is_schema10_release ) && ! is_readable( $bulk_js ) ) {
+if ( ( $is_schema5_release || $is_schema6_release || $is_schema7_release || $is_schema8_release || $is_schema9_release || $is_schema10_release || $is_schema11_release ) && ! is_readable( $bulk_js ) ) {
 	$failures[] = 'Missing assets/admin/bulk-tools.js';
-} elseif ( is_readable( $bulk_js ) && ( $is_schema5_release || $is_schema6_release || $is_schema7_release || $is_schema8_release || $is_schema9_release || $is_schema10_release ) ) {
+} elseif ( is_readable( $bulk_js ) && ( $is_schema5_release || $is_schema6_release || $is_schema7_release || $is_schema8_release || $is_schema9_release || $is_schema10_release || $is_schema11_release ) ) {
 	$bulk_js_source = (string) file_get_contents( $bulk_js );
 	if ( ! str_contains( $bulk_js_source, "body.set('advance', '1')" ) ) {
 		$failures[] = 'bulk-tools.js missing bounded AJAX continue (advance=1).';

@@ -259,7 +259,7 @@ def report_common(report, expected, kind):
         require(environment.get(key) == value, "Pinned native runtime differs")
     require(isinstance(environment.get("database_version"), str) and re.fullmatch(r"11\.4\.13-MariaDB(?:-[A-Za-z0-9_.]+)*", environment["database_version"]), "Pinned database runtime differs")
     if kind != "cpt":
-        require(environment.get("schema" if kind == "http" else "schema_before") == "10", "Installed schema differs")
+        require(environment.get("schema" if kind == "http" else "schema_before") == "11", "Installed schema differs")
     if kind != "http":
         require(report["limits"] == (CPT_LIMITS if kind == "cpt" else NATIVE_LIMITS), "Invalid native scope")
     return cases
@@ -278,7 +278,7 @@ def baseline(cases, prefix, count, digest):
             require(facts["cleanup_restored"] is True, "Retained fixture cleanup failed")
     for case in retained:
         if case["id"] == "NATIVE-FIXTURE-SCHEMA-RESTORED":
-            require(case["evidence"] == {"schema_after": "10"}, "Retained schema cleanup differs")
+            require(case["evidence"] == {"schema_after": "11"}, "Retained schema cleanup differs")
         if case["id"] == "HTTP-FIXTURE-MU-AND-CREDENTIAL-FILES-REMOVED":
             require(case["evidence"] == {"fixture_mu_removed": True, "private_directory_removed": True}, "Retained HTTP cleanup differs")
 

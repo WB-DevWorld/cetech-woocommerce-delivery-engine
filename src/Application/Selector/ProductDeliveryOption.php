@@ -153,4 +153,9 @@ final class ProductDeliveryOption {
 			$public['price_basis']
 		);
 	}
+
+	/** Read-only hypothetical copy cannot supply cart or quote acceptance authority. */
+	public function withPromiseEstimate( ?string $text, bool $available, ?string $reason = null ): self {
+		return new self( $this->display_key, $this->fulfilment_availability, $this->fulfilment_availability_label, $this->fulfilment_choice, $this->fulfilment_choice_label, $this->delivery_offer_id, $this->delivery_offer_public_label, $this->delivery_offer_public_description, $text, $this->is_available && $available, $reason ?? $this->unavailable_reason, $this->contract_version, $available && $this->is_default, $this->pickup_location_label, $this->pickup_address, $this->pickup_instructions, $this->pickup_location_id, $this->price_amount, $this->price_currency, $this->price_text, $this->price_basis );
+	}
 }

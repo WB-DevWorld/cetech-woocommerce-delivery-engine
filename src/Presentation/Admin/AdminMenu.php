@@ -46,7 +46,8 @@ final class AdminMenu {
 		private BulkToolsPage $bulk_tools_page,
 		private ?NeedsAttentionCountQuery $needs_attention_count = null,
 		private ?ShipmentActivityCursor $shipment_activity = null,
-		private ?LocationPacksPage $location_packs_page = null
+		private ?LocationPacksPage $location_packs_page = null,
+		private ?PromiseConfigurationPage $promise_configuration_page = null
 	) {
 	}
 
@@ -71,6 +72,9 @@ final class AdminMenu {
 		add_action( 'admin_init', [ $this->bulk_tools_page, 'handle_actions' ] );
 		if ( $this->location_packs_page instanceof LocationPacksPage ) {
 			add_action( 'admin_init', [ $this->location_packs_page, 'handle_actions' ] );
+		}
+		if ( $this->promise_configuration_page instanceof PromiseConfigurationPage ) {
+			add_action( 'admin_init', [ $this->promise_configuration_page, 'handle_actions' ] );
 		}
 		add_action( 'admin_init', [ $this->overview_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->setup_wizard_page, 'handle_actions' ] );
@@ -125,6 +129,11 @@ final class AdminMenu {
 			$parent_slug,
 			$parent_cb
 		);
+
+		if ( $this->promise_configuration_page instanceof PromiseConfigurationPage && ( current_user_can( 'manage_delivery_settings' ) || current_user_can( 'manage_product_delivery_rules' ) || current_user_can( 'manage_shipments' ) ) ) {
+			$capability = current_user_can( 'manage_delivery_settings' ) ? 'manage_delivery_settings' : ( current_user_can( 'manage_product_delivery_rules' ) ? 'manage_product_delivery_rules' : 'manage_shipments' );
+			add_submenu_page( $parent_slug, __( 'Delivery promises', 'cetech-woocommerce-delivery-engine' ), __( 'Delivery promises', 'cetech-woocommerce-delivery-engine' ), $capability, PromiseConfigurationPage::SLUG, [ $this->promise_configuration_page, 'render' ] );
+		}
 
 		if ( $setup_open ) {
 			add_submenu_page(

@@ -21,6 +21,7 @@ use CetechDeliveryEngine\Application\Selector\CustomerVisibleDeliveryOptionGate;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryFulfilmentCapabilities;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
+use CetechDeliveryEngine\Application\ServicePromise\Presentation\PromisePublicProjection;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\CustomerContext\MatchingLocation;
@@ -391,6 +392,15 @@ final class ProductDeliverySelectorRenderer {
 			echo '<p class="cetech-de-matching-location__prompt">' . esc_html( CustomerStorefrontCopy::where_do_you_want_this_item() ) . '</p>';
 			echo MatchingLocationFieldRenderer::render( $browsing, 'cetech-de-matching', false, false, false, $force_locality ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns escaped HTML.
 			echo '</div>';
+		}
+		if ( [] === $groups[ FulfilmentChoice::Delivery->value ] ) {
+			$notice = PromisePublicProjection::hypothetical( [], false )['notice'];
+			foreach ( $available as $option ) {
+				if ( FulfilmentChoice::Delivery->value === $option->fulfilment_choice && $option->estimate_text === $notice ) {
+					echo '<p role="note" data-cetech-de-promise-preliminary="1"><span class="cetech-de-delivery-option__estimate">' . esc_html( $notice ) . '</span></p>';
+					break;
+				}
+			}
 		}
 
 		echo $this->pdp_context_input(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped

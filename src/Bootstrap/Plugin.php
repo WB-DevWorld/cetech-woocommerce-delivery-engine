@@ -33,6 +33,14 @@ use CetechDeliveryEngine\Integrations\DeliveryQuote\QuotePlacementRuntime;
 use CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteRateReferenceRuntime;
 use CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory;
 use CetechDeliveryEngine\Presentation\Admin\QuotePlacementSettings;
+use CetechDeliveryEngine\Integrations\ServicePromise\Configuration\NativePromiseConfigurationAuthority;
+use CetechDeliveryEngine\Integrations\ServicePromise\Presentation\NativePromisePdpRuntime;
+use CetechDeliveryEngine\Integrations\ServicePromise\Shipment\NativeShipmentPromiseRuntime;
+use CetechDeliveryEngine\Application\ServicePromise\Configuration\PromiseConfigurationService;
+use CetechDeliveryEngine\Application\ServicePromise\Configuration\PromiseShipmentConfigurationService;
+use CetechDeliveryEngine\Presentation\Admin\PromiseConfigurationPage;
+use CetechDeliveryEngine\Presentation\Frontend\PromiseShipmentSummaryRenderer;
+
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionReconciler;
@@ -443,12 +451,14 @@ final class Plugin {
 		$this->container->get( CartFulfilmentPackagePresentation::class )->register();
 		$this->container->get( SelectedOfferShippingIntegration::class )->register();
 		$this->container->get( OrderDeliverySnapshotPersister::class )->register();
+		$this->container->get( NativeShipmentPromiseRuntime::class )->register();
 		$this->container->get( PaidOrderShipmentSubscriber::class )->register();
 		$this->container->get( CodAwaitingShipmentSubscriber::class )->register();
 		$this->container->get( OrderShipmentOperationsSubscriber::class )->register();
 		$this->container->get( OrderShippingItemPresentationGuard::class )->register();
 		$this->container->get( CustomerOrderDeliverySummaryRenderer::class )->register();
 		$this->container->get( CustomerShipmentRenderer::class )->register();
+		$this->container->get( PromiseShipmentSummaryRenderer::class )->register();
 		$this->container->get( CustomerOrderDeliveryEmailSummaryRenderer::class )->register();
 
 		if ( is_admin() ) {
@@ -465,6 +475,11 @@ final class Plugin {
 	/** Review and native placement share one complete, explicit store adoption. */
 	private function register_quote_review_services(): void {
 		$this->container->singleton( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class, static fn() => new \CetechDeliveryEngine\Infrastructure\WordPress\OperationConnectionFactory() );
+		$this->container->singleton( NativePromisePdpRuntime::class,
+			static fn( ServiceContainer $c ) => new NativePromisePdpRuntime(
+				$c->get( OperationConnectionFactory::class ), $c->get( PromiseQuotePlacementActivation::class ),
+				$c->get( CustomerBrowsingLocationStore::class ), $c->get( ShopperDeliveryLocationPrecision::class )
+			) );
 		$this->container->singleton( PromiseQuoteComposition::class, static fn( ServiceContainer $c ) => new PromiseQuoteComposition( $c->get( OperationConnectionFactory::class ), $c->get( PromiseQuotePlacementActivation::class ) ) );
 		$this->container->singleton( NativeCartQuoteEnvironment::class, static fn( ServiceContainer $c ) => $c->get( PromiseQuoteComposition::class )->environment() );
 		$this->container->singleton( NativeCartQuoteSessionStore::class, static fn( ServiceContainer $c ) => new NativeCartQuoteSessionStore( $c->get( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class ), [ $c->get( NativeCartQuoteEnvironment::class ), 'authorize' ] ) );
@@ -538,7 +553,7 @@ final class Plugin {
 			) );
 		$this->container->singleton( EmergencyCheckoutQuoteValidator::class,
 			static fn( ServiceContainer $container ): EmergencyCheckoutQuoteValidator => new EmergencyCheckoutQuoteValidator(
-				$container->get( ProductDeliveryConfigurationSourceInterface::class ), $container->get( ProductDeliveryOptionsBuilder::class ),
+				$container->get( ProductDeliveryConfigurationSourceInterface::class ), new ProductDeliveryOptionsBuilder( $container->get( DeliveryOfferRepositoryInterface::class ), $container->get( PickupLocationRepositoryInterface::class ) ),
 				$container->get( PackageDestinationZoneResolver::class ), $container->get( RateQuoteEngine::class ), $container->get( OrderDeliverySnapshotReader::class ),
 				static function () use ( $container ): void {
 					$container->get( EffectiveConfigurationResolver::class )->clearMemoization();
@@ -571,9 +586,33 @@ final class Plugin {
 			) );
 	}
 
+	/** Protected P05 admin adapters reuse immutable lifecycle and current C07 truth. */
+	private function register_promise_configuration_services(): void {
+		$this->container->singleton( NativeShipmentPromiseRuntime::class,
+			static fn( ServiceContainer $c ) => new NativeShipmentPromiseRuntime( $c->get( OperationConnectionFactory::class ), $c->get( ShipmentRepositoryInterface::class ), static fn(): bool => $c->get( FeatureFlags::class )->is_enabled( 'enable_shipment_records' ) ) );
+		$this->container->singleton( PromiseShipmentSummaryRenderer::class,
+			static fn( ServiceContainer $c ) => new PromiseShipmentSummaryRenderer( $c->get( ShipmentRepositoryInterface::class ), [ $c->get( NativeShipmentPromiseRuntime::class ), 'service_for_order' ], static fn(): bool => $c->get( FeatureFlags::class )->is_enabled( 'enable_shipment_records' ) && $c->get( FeatureFlags::class )->is_enabled( CustomerOrderDeliverySummaryBuilder::SUMMARY_FLAG ) ) );
+		$this->container->singleton( NativePromiseConfigurationAuthority::class,
+			static fn( ServiceContainer $c ) => new NativePromiseConfigurationAuthority(
+				static function() use ( $c ): bool {
+					$result = $c->get( EmergencyControlService::class )->read( function_exists( 'get_current_blog_id' ) ? get_current_blog_id() : 1 );
+					return $result->available && null !== $result->state && $result->state->enabled();
+				} ) );
+		$this->container->singleton( PromiseConfigurationService::class,
+			static fn( ServiceContainer $c ) => new PromiseConfigurationService(
+				$c->get( OperationConnectionFactory::class ),
+				$c->get( NativePromiseConfigurationAuthority::class ),
+				$c->get( PromiseQuotePlacementActivation::class ) ) );
+		$this->container->singleton( PromiseConfigurationPage::class,
+			static fn( ServiceContainer $c ) => new PromiseConfigurationPage(
+				$c->get( PromiseConfigurationService::class ), $c->get( AdminActionHandler::class ),
+				new PromiseShipmentConfigurationService( $c->get( ShipmentRepositoryInterface::class ), [ $c->get( NativeShipmentPromiseRuntime::class ), 'service_for_order' ] ) ) );
+	}
+
 	private function register_services(): void {
 		$this->register_emergency_control_services();
 		$this->register_quote_review_services();
+		$this->register_promise_configuration_services();
 		$this->container->singleton(
 			FeatureFlags::class,
 			static fn (): FeatureFlags => new FeatureFlags()
@@ -887,6 +926,13 @@ final class Plugin {
 				$container->get( PickupLocationRepositoryInterface::class )
 			)
 		);
+		$this->container->singleton(
+			'promise.public_options_builder',
+			static fn( ServiceContainer $container ): ProductDeliveryOptionsBuilder => new ProductDeliveryOptionsBuilder(
+				$container->get( DeliveryOfferRepositoryInterface::class ), $container->get( PickupLocationRepositoryInterface::class ),
+				[ $container->get( NativePromisePdpRuntime::class ), 'decorate' ]
+			)
+		);
 
 		$this->container->singleton(
 			ProductDeliverySelectionValidator::class,
@@ -946,6 +992,18 @@ final class Plugin {
 			)
 		);
 
+		// Read-only option presenters have a separate instance; only the base capture registers hooks.
+		$this->container->singleton(
+			'promise.public_options_assessment',
+			static fn( ServiceContainer $container ): CartDeliverySelectionCapture => new CartDeliverySelectionCapture(
+				$container->get( FeatureFlags::class ), $container->get( Requirements::class ),
+				$container->get( ProductDeliveryConfigurationSourceInterface::class ), $container->get( 'promise.public_options_builder' ),
+				$container->get( ProductDeliverySelectionValidator::class ), $container->get( CustomerBrowsingLocationStore::class ),
+				$container->get( LocationOfferQuoteProbe::class ), $container->get( ShopperDeliveryLocationPrecision::class ),
+				$container->get( EmergencyControlRuntime::class )
+			)
+		);
+
 		$this->container->singleton(
 			CartDeliverySelectionRevalidator::class,
 			static fn ( ServiceContainer $container ): CartDeliverySelectionRevalidator => new CartDeliverySelectionRevalidator(
@@ -1000,7 +1058,7 @@ final class Plugin {
 			static fn ( ServiceContainer $container ): MatchingLocationOptionsEndpoint => new MatchingLocationOptionsEndpoint(
 				$container->get( FeatureFlags::class ),
 				$container->get( Requirements::class ),
-				$container->get( CartDeliverySelectionCapture::class ),
+				$container->get( 'promise.public_options_assessment' ),
 				$container->get( LocationAwareDeliveryOptions::class ),
 				$container->get( CustomerBrowsingLocationStore::class ),
 				$container->get( CanonicalLocationResolver::class ),
@@ -1213,7 +1271,8 @@ final class Plugin {
 				$container->get( ShipmentCreationFailureStore::class ),
 				$container->get( AuditLogRepositoryInterface::class ),
 				$container->get( Logger::class ),
-				$container->get( CodAwaitingShipmentEvaluator::class )
+				$container->get( CodAwaitingShipmentEvaluator::class ),
+				$container->get( NativeShipmentPromiseRuntime::class )
 			)
 		);
 
@@ -1231,7 +1290,8 @@ final class Plugin {
 		$this->container->singleton(
 			PaidOrderShipmentSubscriber::class,
 			static fn ( ServiceContainer $container ): PaidOrderShipmentSubscriber => new PaidOrderShipmentSubscriber(
-				$container->get( ShipmentService::class )
+				$container->get( ShipmentService::class ),
+				$container->get( NativeShipmentPromiseRuntime::class )
 			)
 		);
 
@@ -1387,7 +1447,7 @@ final class Plugin {
 				$container->get( FeatureFlags::class ),
 				$container->get( Requirements::class ),
 				$container->get( ProductDeliveryConfigurationSourceInterface::class ),
-				$container->get( ProductDeliveryOptionsBuilder::class ),
+				$container->get( 'promise.public_options_builder' ),
 				$container->get( CustomerBrowsingLocationStore::class ),
 				$container->get( LocationAwareDeliveryOptions::class ),
 				$container->get( ShopperDeliveryLocationPrecision::class ),
@@ -1409,7 +1469,7 @@ final class Plugin {
 				$container->get( FeatureFlags::class ),
 				$container->get( Requirements::class ),
 				$container->get( ProductDeliveryConfigurationSourceInterface::class ),
-				$container->get( ProductDeliveryOptionsBuilder::class ),
+				$container->get( 'promise.public_options_builder' ),
 				$container->get( VariationRelationshipInspectorInterface::class ),
 				$container->get( LocationAwareDeliveryOptions::class ),
 				$container->get( ShopperDeliveryLocationPrecision::class ),
@@ -1987,7 +2047,8 @@ final class Plugin {
 				$container->get( BulkToolsPage::class ),
 				$container->get( NeedsAttentionCountQuery::class ),
 				$container->get( ShipmentActivityCursor::class ),
-				$container->get( LocationPacksPage::class )
+				$container->get( LocationPacksPage::class ),
+				$container->get( PromiseConfigurationPage::class )
 			)
 		);
 	}

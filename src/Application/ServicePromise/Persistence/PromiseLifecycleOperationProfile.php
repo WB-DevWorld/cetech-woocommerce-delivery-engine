@@ -11,7 +11,7 @@ use CetechDeliveryEngine\Domain\Operation\OperationSchema;
 use CetechDeliveryEngine\Domain\RuleLifecycle\RuleTime;
 use CetechDeliveryEngine\Domain\ServicePromise\{PromiseCalendarReference, ServicePromisePolicy};
 use CetechDeliveryEngine\Domain\ServicePromise\Persistence\{PromiseAssignmentCommand, PromisePermissionGrant, PromiseSiteBinding, PromiseSourceReceipt, PromiseStoredAssignment, PromiseStoredObject, PromiseStoredVersion, PromiseVersionCommand};
-use CetechDeliveryEngine\Infrastructure\Persistence\{PromiseStorageSchema, WpdbPromiseRepository};
+use CetechDeliveryEngine\Infrastructure\Persistence\{EmergencyControlStore, PromiseStorageSchema, WpdbPromiseRepository};
 
 /** Explicit unmounted C03 adopter; parse-only receipt profiles never read current source facts. */
 final class PromiseLifecycleOperationProfile implements OperationProfile {
@@ -31,10 +31,18 @@ final class PromiseLifecycleOperationProfile implements OperationProfile {
 	public function version(): int { return 1; }
 	public function authorize( OperationIdentity $identity ): bool { return null !== $this->command && null !== $this->grant && $this->grant->permits( $identity, $this->command ); }
 	public function validate_command( OperationIdentity $identity, mixed $command ): OperationCommand { if ( $command !== $this->command || ! $this->authorize( $identity ) ) { self::refuse( 'not_authorized' ); } return $command; }
-	public function transactional_tables( OperationSession $session ): array { return array_values( PromiseStorageSchema::tables( $session->table_prefix() ) ); }
+	public function transactional_tables( OperationSession $session ): array {
+		$tables = array_values( PromiseStorageSchema::tables( $session->table_prefix() ) );
+		if ( 'service_promise.configuration' === $this->command?->identity->authority ) { $tables[] = ( new EmergencyControlStore() )->options_table( $session ); }
+		return $tables;
+	}
 	public function lock_target( OperationSession $session, OperationIdentity $identity, OperationCommand $command ): OperationTarget {
 		if ( $command !== $this->command || ! $this->authorize( $identity ) ) { self::refuse( 'not_authorized' ); }
 		$binding = $this->command->binding; $binding->assert_session( $session ); $data = $this->command->private_facts(); $repo = new WpdbPromiseRepository( $session, $binding ); $this->repository = $repo; $this->owner = $session;
+		if ( 'service_promise.configuration' === $identity->authority ) {
+			$control = new EmergencyControlStore(); $control->assert_ready( $session, $identity->site_id );
+			if ( ! $control->current( $session )->enabled() ) { self::refuse( 'not_authorized' ); }
+		}
 		if ( $command instanceof PromiseAssignmentCommand ) {
 			$row = $repo->lock_assignment( self::assignment_key( $binding, $data['key'] ), 0 === $data['expected_revision'] );
 			if ( null === $row ) { self::refuse( 'stale_revision' ); }
@@ -51,7 +59,13 @@ final class PromiseLifecycleOperationProfile implements OperationProfile {
 		$repo->assert_object_ack( $object );
 		if ( ( $object['published_version_id'] ?? 0 ) !== $data['preconditions']['published_version_id'] ) { self::refuse( 'stale_revision' ); }
 		$versions = $repo->lock_versions_for_object( $object['id'] ); if ( count( $versions ) > 1000 ) { self::refuse( 'temporarily_unavailable' ); }
-		foreach ( $versions as $row ) { PromiseStoredVersion::from_row( $row, $binding )->assert_parent( PromiseStoredObject::from_row( $object, $binding ) ); }
+		foreach ( $versions as $row ) {
+			$stored = PromiseStoredVersion::from_row( $row, $binding ); $stored->assert_parent( PromiseStoredObject::from_row( $object, $binding ) );
+			// Native configuration may not turn a guessed logical identity into cross-scope
+			// replacement authority. These are pure already-locked bodies, not host grants.
+			if ( 'service_promise.configuration' === $identity->authority && $stored->body() instanceof ServicePromisePolicy
+				&& PromiseVersionCommand::policy_scope( $stored->body() ) !== $data['scope'] ) { self::refuse( 'not_authorized' ); }
+		}
 		$version = $repo->lock_version( $data['kind'], $data['logical_id'], $data['domain_version'] );
 		if ( 'promise.version.create' === $this->action ) {
 			if ( null !== $version || null !== $object['draft_version_id'] || null !== $object['scheduled_version_id'] || $data['domain_version'] !== $object['last_sequence'] + 1 ) { self::refuse( 'stale_revision' ); }

@@ -75,8 +75,8 @@ return static function ( callable $check ): void {
 	$check( 'NATIVE-C03-schema-seven-target', '7' === $legacy_seven->get_version(), [ 'historical_schema_version' => $legacy_seven->get_version(), 'historical_cor010_fixture_versions' => 'unchanged' ] );
 	$legacy_eight = require dirname( __DIR__, 2 ) . '/database/migrations/20261006214731_create_rule_lifecycle_tables.php';
 	// Retain the historical case ID and schema8 migration proof while checking
-	// the current schema10 candidate explicitly.
-	$check( 'NATIVE-C04-schema-eight-target', '8' === $legacy_eight->get_version() && '10' === SchemaVersion::target(), [ 'historical_schema_version' => $legacy_eight->get_version(), 'schema_target' => SchemaVersion::target() ] );
+	// the current schema11 candidate explicitly.
+	$check( 'NATIVE-C04-schema-eight-target', '8' === $legacy_eight->get_version() && '11' === SchemaVersion::target(), [ 'historical_schema_version' => $legacy_eight->get_version(), 'schema_target' => SchemaVersion::target() ] );
 	$keys = [ SchemaVersion::OPTION_NAME, MigrationStatus::OPTION_NAME ];
 	$raw_row = static function ( string $key ) use ( $wpdb ): ?array {
 		$row = $wpdb->get_row( $wpdb->prepare( "SELECT option_id,option_name,option_value,autoload FROM {$wpdb->options} WHERE option_name=%s", $key ), ARRAY_A );

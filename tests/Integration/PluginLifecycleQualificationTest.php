@@ -232,8 +232,8 @@ final class PluginLifecycleQualificationTest extends TestCase {
 
 		Uninstaller::uninstall();
 
-		self::assertCount( 38, $tables_before );
-		self::assertCount( 32, array_filter( $tables_before, static fn ( string $table ): bool => ! in_array( $table, [ ...\CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteSchema::tables( 'wp_' ), ...\CetechDeliveryEngine\Infrastructure\Persistence\PromiseStorageSchema::tables( 'wp_' ) ], true ) ) );
+		self::assertCount( 39, $tables_before );
+		self::assertCount( 33, array_filter( $tables_before, static fn ( string $table ): bool => ! in_array( $table, [ ...\CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteSchema::tables( 'wp_' ), ...\CetechDeliveryEngine\Infrastructure\Persistence\PromiseStorageSchema::tables( 'wp_' ) ], true ) ) );
 		self::assertSame( $tables_before, $GLOBALS['wpdb']->table_names() );
 		foreach ( $operation_sentinels as $table => $sentinel ) {
 			self::assertSame( [ $sentinel ], $GLOBALS['wpdb']->table_rows( $table ), 'Explicit uninstall preserves operation and rule history, including an unknown format.' );

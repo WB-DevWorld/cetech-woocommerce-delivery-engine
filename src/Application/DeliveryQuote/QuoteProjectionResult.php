@@ -28,6 +28,7 @@ final class QuoteProjectionResult implements JsonSerializable {
 			'currently_applicable' => $quote->usable_at( $at ), 'expires_at' => $quote->header()->expires_at()->iso_utc(),
 			'customer_label' => self::label( $quote->customer_label() ), 'money' => self::money( $quote ),
 			'reason_code' => $reason, 'recovery_action' => self::recovery( $reason ), 'correlation_id' => $request->correlation_id,
+			...( null === $quote->terms()?->promise_packet() ? [] : [ 'promise' => \CetechDeliveryEngine\Application\ServicePromise\Presentation\PromisePublicProjection::quote( $quote->terms()->promise_packet() ) ] ),
 		] );
 	}
 

@@ -125,6 +125,8 @@ jobs:
           python3 scripts/qualification/test-verify-promise-calculation-receipts.py
           python3 scripts/qualification/test-verify-promise-handoff-receipts.py
           python3 scripts/qualification/test-opening-http-promise-handoff.py
+          python3 scripts/qualification/test-opening-promise-native-configuration-browser.py
+          python3 scripts/qualification/test-verify-opening-promise-native-configuration.py
       - name: Production tree autoload and extracted PHP lint
         shell: bash
         run: bash scripts/ci-stage-production-tree.sh "${RUNNER_TEMP}/cetech-de-prod-tree"
@@ -213,7 +215,8 @@ jobs:
   php85-wordpress:
     name: PHP 8.5 WordPress/WooCommerce
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    # P05 appends separate native/CPT/browser proofs to the unchanged retained suite.
+    timeout-minutes: 60
     services:
       mariadb:
         image: mariadb:11.4.13
@@ -341,6 +344,30 @@ jobs:
         with:
           name: opening-promise-handoff-http-qualification
           path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-promise-handoff-results.json
+          if-no-files-found: warn
+
+      - name: Retain native promise configuration and shipment HPOS receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-promise-native-configuration-qualification
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-native-configuration-results.json
+          if-no-files-found: warn
+
+      - name: Retain fresh-process promise configuration and shipment CPT receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-promise-native-configuration-cpt-qualification
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-native-configuration-cpt-results.json
+          if-no-files-found: warn
+
+      - name: Retain authenticated promise configuration HTTP and browser receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-promise-native-configuration-http-qualification
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-promise-native-configuration-results.json
           if-no-files-found: warn
 
   javascript-tests:

@@ -102,12 +102,35 @@ function safeMoney(value) { return exact(value,['amount','currency','precision']
 function exact(value,keys) { return value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every(key => Object.hasOwn(value,key)); }
 function plain(value) { return typeof value === 'string' && value.length > 0 && value.length <= 120 && !/[\u0000-\u001f\u007f<>]/.test(value); }
 function uuid(value) { return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(value); }
+function safePromiseView(view) {
+  if (!view || typeof view !== 'object' || Array.isArray(view) || !['absolute_window','relative_window','unavailable','ineligible'].includes(view.state)) return false;
+  const keys=['format_version','service_label','state','display_timezone','reason_codes'];
+  if (view.state==='absolute_window') keys.push('from','until');
+  if (view.state==='relative_window') keys.push('relative_explanation','min','max','unit','known_zero');
+  const text=value=>typeof value==='string' && value.length>0 && value.length<=160 && !/[\u0000-\u001f\u007f<>]/.test(value);
+  const reasons=['estimate_unavailable','missing_source','unsupported_policy','capacity_unknown','capacity_unavailable','capacity_stale','outside_service_window','missing_destination','unsupported_anchor','budget_exceeded','unknown_timezone','source_changed','acceptance_expired'];
+  if (!exact(view,keys) || view.format_version!==1 || !text(view.service_label) || typeof view.display_timezone!=='string' || view.display_timezone.length>128 || !/^[A-Za-z0-9_+\-/]+$/.test(view.display_timezone) || !Array.isArray(view.reason_codes) || view.reason_codes.length>reasons.length || view.reason_codes.some(reason=>!reasons.includes(reason)) || new Set(view.reason_codes).size!==view.reason_codes.length || JSON.stringify(view.reason_codes)!==JSON.stringify([...view.reason_codes].sort())) return false;
+  try { new Intl.DateTimeFormat('en',{timeZone:view.display_timezone}); } catch (_) { return false; }
+  if (['absolute_window','relative_window'].includes(view.state) !== (view.reason_codes.length===0)) return false;
+  if (view.state==='absolute_window') {
+    const instant=value=>{ if(typeof value!=='string' || !/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}$/.test(value)) return false; const epoch=Date.parse(value.replace(' ','T')+'Z'); return Number.isFinite(epoch) && new Date(epoch).toISOString().slice(0,19)===value.slice(0,19).replace(' ','T'); };
+    if (!instant(view.from) || !instant(view.until) || view.from>view.until) return false;
+  }
+  if (view.state==='relative_window' && (view.relative_explanation!=='after_payment_confirmation' || !Number.isSafeInteger(view.min) || !Number.isSafeInteger(view.max) || view.min<0 || view.max<view.min || !['elapsed_minutes','calendar_days','business_minutes','business_days'].includes(view.unit) || typeof view.known_zero!=='boolean' || view.known_zero!==(view.min===0 && view.max===0))) return false;
+  return true;
+}
+function safePromise(promise) {
+  if (!exact(promise,['contract_version','original','groups']) || promise.contract_version!==1 || promise.original!==true || !Array.isArray(promise.groups) || promise.groups.length<1 || promise.groups.length>200) return false;
+  return promise.groups.every(group=>exact(group,['views','customer_text']) && Array.isArray(group.views) && group.views.length>0 && group.views.length<=16 && group.views.every(safePromiseView) && typeof group.customer_text==='string' && group.customer_text.length>0 && Buffer.byteLength(group.customer_text)<=2048 && !/[\u0000-\u001f\u007f<>]/.test(group.customer_text));
+}
 function safeFacts(value) {
   const keys=['contract_version','status','generation','quote','can_refresh','can_confirm','can_retry','message_code','correlation_id'];
   if (!exact(value,keys) || value.contract_version !== 1 || !['no_quote','review_required','confirmed','expired','changed','unconfirmed','unavailable'].includes(value.status) || value.message_code !== value.status || !Number.isSafeInteger(value.generation) || value.generation < 0 || !uuid(value.correlation_id) || ['can_refresh','can_confirm','can_retry'].some(key => typeof value[key] !== 'boolean')) return false;
   if (value.quote !== null) {
     const quote=value.quote;
-    if (!exact(quote,['contract_version','decision_kind','quote_id','status','currently_applicable','expires_at','customer_label','money','reason_code','recovery_action','correlation_id']) || quote.contract_version !== 1 || quote.decision_kind !== 'delivery_quote' || !['issued','accepted','invalidated','expired','stripped'].includes(quote.status) || typeof quote.currently_applicable !== 'boolean' || !uuid(quote.quote_id) || !uuid(quote.correlation_id) || !plain(quote.customer_label) || typeof quote.expires_at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(quote.expires_at) || ![null,'quote_expired','quote_invalidated','quote_unavailable'].includes(quote.reason_code) || ![null,'refresh_and_review','retry_later'].includes(quote.recovery_action) || !Array.isArray(quote.money) || quote.money.length > 200) return false;
+    const quoteKeys=['contract_version','decision_kind','quote_id','status','currently_applicable','expires_at','customer_label','money','reason_code','recovery_action','correlation_id'];
+    if (Object.hasOwn(quote,'promise')) quoteKeys.push('promise');
+    if (!exact(quote,quoteKeys) || Object.hasOwn(quote,'promise') && !safePromise(quote.promise) || quote.contract_version !== 1 || quote.decision_kind !== 'delivery_quote' || !['issued','accepted','invalidated','expired','stripped'].includes(quote.status) || typeof quote.currently_applicable !== 'boolean' || !uuid(quote.quote_id) || !uuid(quote.correlation_id) || !plain(quote.customer_label) || typeof quote.expires_at !== 'string' || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,6})?Z$/.test(quote.expires_at) || ![null,'quote_expired','quote_invalidated','quote_unavailable'].includes(quote.reason_code) || ![null,'refresh_and_review','retry_later'].includes(quote.recovery_action) || !Array.isArray(quote.money) || quote.money.length > 200) return false;
     for (const part of quote.money) {
       if (!exact(part,['customer_label','list_price','promotion','final_price','tax','rounded_tax','total','display_total']) || !plain(part.customer_label) || ['list_price','final_price','tax','total'].some(key => !safeMoney(part[key])) || ['rounded_tax','display_total'].some(key => part[key] !== null && !safeMoney(part[key])) || !exact(part.promotion,['state','amount']) || !['none','applied','unavailable'].includes(part.promotion.state) || (part.promotion.state === 'unavailable' ? part.promotion.amount !== null : !safeMoney(part.promotion.amount))) return false;
     }
