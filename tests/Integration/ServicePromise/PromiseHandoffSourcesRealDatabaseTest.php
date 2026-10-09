@@ -149,7 +149,10 @@ final class PromiseHandoffSourcesRealDatabaseTest extends TestCase {
 		$directory = OperationProofBarrier::directory(); $worker = null;
 		try {
 			$worker = new OperationProofProcess( [ dirname( __DIR__, 2 ) . '/Support/ServicePromise/Handoff/source-overlap-worker.php', json_encode( [ 'prefix' => $this->prefix, 'operation' => $operation, 'payload' => $payload, 'material_started' => $directory . '/material-started' ], JSON_THROW_ON_ERROR ) ] ); OperationProofProcess::wait_for( $directory . '/material-started' ); $blocked = false; $end = hrtime( true ) + 1000000000;
-			do { $blocked = (int) DB::scalar( $this->database, "SELECT COUNT(*) FROM information_schema.INNODB_LOCK_WAITS waits JOIN information_schema.INNODB_TRX blocker ON blocker.trx_id=waits.blocking_trx_id WHERE blocker.trx_mysql_thread_id={$owner}" ) > 0; if ( $blocked ) { break; } usleep( 10000 ); } while ( hrtime( true ) < $end );
+			// MariaDB 11.4 trx0i_s.cc refreshes this cache only after 100 ms without a read;
+			// every read resets that idle timer, so 10 ms polling can preserve a pre-wait snapshot.
+			// https://github.com/MariaDB/server/blob/mariadb-11.4.13/storage/innobase/trx/trx0i_s.cc
+			do { $blocked = (int) DB::scalar( $this->database, "SELECT COUNT(*) FROM information_schema.INNODB_LOCK_WAITS waits JOIN information_schema.INNODB_TRX blocker ON blocker.trx_id=waits.blocking_trx_id WHERE blocker.trx_mysql_thread_id={$owner}" ) > 0; if ( $blocked ) { break; } usleep( 150000 ); } while ( hrtime( true ) < $end );
 			self::assertTrue( $blocked, 'Actual source mutation did not wait on the original fence owner.' ); self::assertTrue( $session->rollback() ); self::assertTrue( $session->retire() ); $result = $worker->finish(); self::assertSame( 'accepted', $result['state'] ); self::assertTrue( $result['all_retired'] ); self::assertFalse( $this->verify( $context ) );
 		} finally { if ( $session->in_transaction() ) { $session->rollback(); } $session->retire(); unset( $worker ); OperationProofBarrier::cleanup( $directory ); }
 	}
