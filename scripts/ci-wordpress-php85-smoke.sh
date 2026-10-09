@@ -166,27 +166,27 @@ if ( ! $active ) {
 	exit( 1 );
 }
 $expected_schema = 'rc12_before_upgrade' === $label ? '6' : \CetechDeliveryEngine\Core\Versioning\SchemaVersion::TARGET;
-if ( 'rc12_before_upgrade' !== $label && '10' !== $expected_schema ) { fwrite( STDERR, "current candidate schema authority differs\n" ); exit( 1 ); }
+if ( 'rc12_before_upgrade' !== $label && '11' !== $expected_schema ) { fwrite( STDERR, "current candidate schema authority differs\n" ); exit( 1 ); }
 if ( $expected_schema !== $schema ) {
 	fwrite( STDERR, "schema does not match this installation's expected version\n" );
 	exit( 1 );
 }
-if ( '10' === $expected_schema && ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\OperationStoreReadiness() )->get_status()['ready'] ) {
+if ( '11' === $expected_schema && ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\OperationStoreReadiness() )->get_status()['ready'] ) {
 	fwrite( STDERR, "retained operation storage is not verified ready\n" );
 	exit( 1 );
 }
-if ( '10' === $expected_schema && ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\RuleLifecycleReadiness() )->get_status()['ready'] ) {
+if ( '11' === $expected_schema && ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\RuleLifecycleReadiness() )->get_status()['ready'] ) {
 	fwrite( STDERR, "schema-8 rule lifecycle storage is not verified ready\n" );
 	exit( 1 );
 }
-if ( '10' === $expected_schema && ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteReadiness() )->get_status()['ready'] ) {
+if ( '11' === $expected_schema && ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteReadiness() )->get_status()['ready'] ) {
 	fwrite( STDERR, "schema-9 quote storage is not verified ready\n" );
 	exit( 1 );
 }
-if ( '10' === $expected_schema ) {
+if ( '11' === $expected_schema ) {
 	$expected_tables = array_map( static fn( string $suffix ): string => $wpdb->prefix . 'delivery_engine_' . $suffix, \CetechDeliveryEngine\Bootstrap\DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES );
 	sort( $expected_tables, SORT_STRING ); sort( $tables, SORT_STRING );
-	if ( 38 !== count( $expected_tables ) || $tables !== $expected_tables || ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\PromiseStorageReadiness() )->get_status()['ready'] ) { fwrite( STDERR, "schema-10 promise storage or exact current table census differs\n" ); exit( 1 ); }
+	if ( 39 !== count( $expected_tables ) || $tables !== $expected_tables || ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\PromiseStorageReadiness() )->get_status()['ready'] || ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\ShipmentPromiseReadiness() )->get_status()['ready'] ) { fwrite( STDERR, "schema-11 promise storage or exact current table census differs\n" ); exit( 1 ); }
 }
 if ( count( $tables ) < 10 ) {
 	fwrite( STDERR, "too few Delivery Engine tables\n" );
@@ -339,6 +339,20 @@ if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
 		"$WORK/opening-promise-storage-results.json" "$WORK/opening-qualification-results.json" \
 		"$WORK/opening-quote-placement-cpt-results.json" "$WORK/opening-http-qualification-results.json" \
 		"$WORK/opening-http-promise-handoff-results.json"
+	# P05 has separate native/CPT/customer receipts, after every retained original proof.
+	P05_PRIORS=( "$WORK/opening-qualification-results.json" "$WORK/opening-quote-placement-cpt-results.json" \
+		"$WORK/opening-http-qualification-results.json" "$WORK/opening-promise-storage-results.json" \
+		"$WORK/opening-promise-calculation-results.json" "$WORK/opening-promise-handoff-results.json" \
+		"$WORK/opening-promise-handoff-cpt-results.json" "$WORK/opening-http-promise-handoff-results.json" )
+	"${WP[@]}" --require="$ROOT/scripts/qualification/admin-context.php" \
+		eval-file "$ROOT/scripts/qualification/opening-promise-native-configuration-runner.php" --use-include \
+		"$WORK/opening-promise-native-configuration-results.json" hpos_on "${P05_PRIORS[@]}" --path="$NATIVE"
+	bash "$ROOT/scripts/ci-promise-native-configuration-hpos-off.sh" "$NATIVE" "$WORK/wp-cli.phar" \
+		"$WORK/opening-promise-native-configuration-cpt-results.json" "${P05_PRIORS[@]}"
+	bash "$ROOT/scripts/ci-promise-native-configuration-http-qualification.sh" "$WORK" "$NATIVE"
+	python3 "$ROOT/scripts/qualification/verify-opening-promise-native-configuration.py" \
+		"$WORK/opening-promise-native-configuration-results.json" "$WORK/opening-promise-native-configuration-cpt-results.json" \
+		"${P05_PRIORS[@]}" "$WORK/opening-http-promise-native-configuration-results.json"
 else
 	echo "opening_http_qualification=NOT_REQUESTED"
 fi

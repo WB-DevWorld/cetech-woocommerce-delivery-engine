@@ -33,6 +33,9 @@ final class DataLifecycleRegistryTest extends TestCase {
 		self::assertSame( $this->sorted( $retained ), $this->sorted( DataLifecycleManifest::RETAINED_QUOTE_DOMAIN_TABLE_SUFFIXES ) );
 		self::assertSame( PromiseStorageSchema::SUFFIXES, DataLifecycleManifest::PROMISE_TABLE_SUFFIXES );
 		self::assertCount( 38, $expected );
+		self::assertSame( $this->sorted( $expected ), $this->sorted( DataLifecycleManifest::RETAINED_PROMISE_DOMAIN_TABLE_SUFFIXES ) );
+		$expected[] = \CetechDeliveryEngine\Infrastructure\Persistence\ShipmentPromiseSchema::SUFFIX;
+		self::assertCount( 39, $expected );
 		self::assertSame( $this->sorted( $expected ), $this->sorted( array_column( $tables, 'storage_key' ) ) );
 		foreach ( $tables as $class ) {
 			self::assertSame( [ DataLifecyclePolicy::Preserve, DataLifecyclePolicy::Preserve, DataLifecyclePolicy::Preserve, null ],
@@ -206,7 +209,7 @@ final class DataLifecycleRegistryTest extends TestCase {
 		$list = $standard->classes();
 		array_pop( $list );
 		self::assertSame( $standard->policy_digest(), DataLifecycleRegistry::standard()->policy_digest() );
-		self::assertCount( 141, $standard->classes() );
+		self::assertCount( 142, $standard->classes() );
 	}
 
 	public function test_diagnostics_do_not_emit_selectors_paths_storage_names_or_caller_content(): void {
@@ -238,6 +241,8 @@ final class DataLifecycleRegistryTest extends TestCase {
 					self::assertContains( $case, [ 'W2Q-09', 'W2Q-39' ] );
 				} elseif ( in_array( $class->storage_key, DataLifecycleManifest::PROMISE_TABLE_SUFFIXES, true ) && 'plugin_table' === $class->storage_adapter ) {
 					self::assertContains( $case, [ 'W2P-18', 'W2P-32' ] );
+				} elseif ( in_array( $class->storage_key, DataLifecycleManifest::SHIPMENT_PROMISE_TABLE_SUFFIXES, true ) && 'plugin_table' === $class->storage_adapter ) {
+					self::assertContains( $case, [ 'W2P-28', 'W2P-32' ] );
 				} else {
 					self::assertMatchesRegularExpression( '/^C06-(?:0[1-9]|[12][0-9]|30)$/D', $case );
 				}
@@ -258,7 +263,7 @@ final class DataLifecycleRegistryTest extends TestCase {
 		$error = stream_get_contents( $pipes[2] );
 		fclose( $pipes[1] ); fclose( $pipes[2] );
 		self::assertSame( 0, proc_close( $process ), $error );
-		self::assertSame( [ 38, 45, 18, 141, false, false, false, true, true, false ], json_decode( $output, true, 16, JSON_THROW_ON_ERROR ) );
+		self::assertSame( [ 39, 45, 18, 142, false, false, false, true, true, false ], json_decode( $output, true, 16, JSON_THROW_ON_ERROR ) );
 	}
 
 	private function sorted( array $values ): array {

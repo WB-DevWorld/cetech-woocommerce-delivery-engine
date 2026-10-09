@@ -17,7 +17,8 @@ use WC_Order;
 final class PaidOrderShipmentSubscriber {
 
 	public function __construct(
-		private readonly ShipmentService $service
+		private readonly ShipmentService $service,
+		private readonly ?\CetechDeliveryEngine\Application\ServicePromise\Shipment\ShipmentPromisePort $promises = null
 	) {
 	}
 
@@ -39,6 +40,7 @@ final class PaidOrderShipmentSubscriber {
 		}
 
 		$this->service->create_for_paid_order( $order, ShipmentEventSource::System, true );
+		$this->promises?->predict_paid_order( $order );
 	}
 
 	public function handle_paid_status( mixed $order_id, mixed $order = null ): void {

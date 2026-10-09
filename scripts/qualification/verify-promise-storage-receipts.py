@@ -59,7 +59,7 @@ def authority():
     for name in PRODUCERS:
         require((SOURCE / name).read_bytes() == placement.git("show", retained.source_head + ":scripts/qualification/" + name), "Uncommitted P02 producer authority")
     schema = placement.git("show", retained.source_head + ":src/Core/Versioning/SchemaVersion.php").decode()
-    require(len(re.findall(r"public const TARGET\s*=\s*'10'\s*;", schema)) == 1, "P02 schema authority differs")
+    require(len(re.findall(r"public const TARGET\s*=\s*'11'\s*;", schema)) == 1, "P02 schema authority differs")
     return Authority(retained, protocol())
 
 
@@ -75,7 +75,7 @@ def verify(report, retained_reports, retained_hashes, expected):
     require(report["limits"] == LIMITS, "P02 scope differs")
     environment = report["environment"]
     closed(environment, {"php", "wordpress", "woocommerce", "database_version", "hpos", "schema_before", "context", "background_requests"}, "Unknown P02 runtime")
-    for key, value in {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "hpos": "yes", "schema_before": "10", "context": CONTEXT, "background_requests": BACKGROUND}.items():
+    for key, value in {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "hpos": "yes", "schema_before": "11", "context": CONTEXT, "background_requests": BACKGROUND}.items():
         require(environment[key] == value, "Pinned P02 runtime differs")
     require(isinstance(environment["database_version"], str) and re.fullmatch(r"11\.4\.13-MariaDB(?:-[A-Za-z0-9_.]+)*", environment["database_version"]), "Pinned P02 database differs")
     closed(report["retained_receipts"], {"native", "cpt", "http"}, "Unknown preceding receipts")

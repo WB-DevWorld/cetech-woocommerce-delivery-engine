@@ -101,7 +101,7 @@ def authority():
     for name in PRODUCERS:
         require((SOURCE.parent.parent / name).read_bytes() == placement.git("show", retained.source_head + ":" + name), "Uncommitted P04 producer authority")
     schema = placement.git("show", retained.source_head + ":src/Core/Versioning/SchemaVersion.php").decode()
-    require(len(re.findall(r"public const TARGET\s*=\s*'10'\s*;", schema)) == 1, "P04 schema authority differs")
+    require(len(re.findall(r"public const TARGET\s*=\s*'11'\s*;", schema)) == 1, "P04 schema authority differs")
     http_cases, http_scope = http_protocol()
     return Authority(prior, protocol(), http_cases, http_scope)
 
@@ -120,7 +120,7 @@ def verify(reports, p03_report, p02_report, retained_reports, hashes, expected):
         require(report["limits"] == LIMITS, "P04 native scope differs")
         environment = report["environment"]
         closed(environment, {"php", "wordpress", "woocommerce", "database_version", "hpos", "schema_before", "context", "background_requests"}, "Unknown P04 runtime")
-        for key, value in {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "hpos": native_mode, "schema_before": "10", "context": CONTEXT, "background_requests": BACKGROUND}.items():
+        for key, value in {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "hpos": native_mode, "schema_before": "11", "context": CONTEXT, "background_requests": BACKGROUND}.items():
             require(environment[key] == value, "Pinned P04 native runtime or fresh storage mode differs")
         require(isinstance(environment["database_version"], str) and re.fullmatch(r"11\.4\.13-MariaDB(?:-[A-Za-z0-9_.]+)*", environment["database_version"]), "Pinned P04 database differs")
         closed(report["preceding_receipts"], {"native", "cpt", "http", "p02", "p03"}, "Unknown P04 preceding receipts")
@@ -151,7 +151,7 @@ def verify_http(report, native_reports, prior_reports, hashes, expected):
     require(report["limits"] == expected.http_scope["LIMITS"], "P04 HTTP scope differs")
     environment = report["environment"]
     closed(environment, {"php", "wordpress", "woocommerce", "database_version", "hpos", "schema_before", "context", "background_requests"}, "Unknown P04 HTTP runtime")
-    for key, value in {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "hpos": "yes", "schema_before": "10", "context": expected.http_scope["CONTEXT"], "background_requests": expected.http_scope["BACKGROUND"]}.items():
+    for key, value in {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "hpos": "yes", "schema_before": "11", "context": expected.http_scope["CONTEXT"], "background_requests": expected.http_scope["BACKGROUND"]}.items():
         require(environment[key] == value, "Pinned P04 HTTP runtime differs")
     require(isinstance(environment["database_version"], str) and re.fullmatch(r"11\.4\.13-MariaDB(?:-[A-Za-z0-9_.]+)*", environment["database_version"]), "Pinned P04 HTTP database differs")
     closed(report["browser_runtime"], {"playwright", "chromium"}, "Unknown P04 browser runtime")

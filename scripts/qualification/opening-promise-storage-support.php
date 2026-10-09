@@ -48,9 +48,9 @@ final class CetechNativePromiseStorageFixture {
 		$this->factory = new CetechNativeQuoteLifecycleFactory( $main, $this->site, $this->prefix );
 	}
 	public function install_schema9(): void {
-		if ( 0 !== $this->table_count() || 35 !== count( DataLifecycleManifest::RETAINED_QUOTE_DOMAIN_TABLE_SUFFIXES ) || 38 !== count( DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES ) || 3 !== count( PromiseStorageSchema::SUFFIXES ) ) { throw new RuntimeException( 'P02 fixture namespace or source inventory differs.' ); }
+		if ( 0 !== $this->table_count() || 35 !== count( DataLifecycleManifest::RETAINED_QUOTE_DOMAIN_TABLE_SUFFIXES ) || 38 !== count( DataLifecycleManifest::RETAINED_PROMISE_DOMAIN_TABLE_SUFFIXES ) || 3 !== count( PromiseStorageSchema::SUFFIXES ) ) { throw new RuntimeException( 'P02 fixture namespace or source inventory differs.' ); }
 		// Register all names before the first write, including partially created migration tables.
-		foreach ( DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES as $suffix ) { $this->register( $this->prefix . 'delivery_engine_' . $suffix ); }
+		foreach ( DataLifecycleManifest::RETAINED_PROMISE_DOMAIN_TABLE_SUFFIXES as $suffix ) { $this->register( $this->prefix . 'delivery_engine_' . $suffix ); }
 		$this->register( $this->prefix . 'options' );
 		foreach ( DataLifecycleManifest::RETAINED_QUOTE_DOMAIN_TABLE_SUFFIXES as $suffix ) {
 			$table = $this->prefix . 'delivery_engine_' . $suffix; $source = $this->main->prefix . 'delivery_engine_' . $suffix; self::identifier( $source );
@@ -69,11 +69,11 @@ final class CetechNativePromiseStorageFixture {
 	public function execute( string $sql ): void { if ( false === $this->physical->query( $sql ) ) { throw new RuntimeException( 'P02 fixture native write failed.', $this->physical->errno ); } }
 	public function rows( string $sql ): array { $result = $this->physical->query( $sql ); if ( ! $result instanceof mysqli_result ) { throw new RuntimeException( 'P02 fixture native read failed.', $this->physical->errno ); } $rows = $result->fetch_all( MYSQLI_ASSOC ); $result->free(); return $rows; }
 	public function table_count(): int { return (int) $this->rows( "SELECT COUNT(*) AS total FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND LEFT(TABLE_NAME," . strlen( $this->prefix ) . ")='{$this->prefix}'" )[0]['total']; }
-	public function snapshot( array $suffixes = DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES ): array {
-		$result = []; foreach ( $suffixes as $suffix ) { if ( ! in_array( $suffix, DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES, true ) ) { throw new RuntimeException( 'P02 fixture snapshot scope is invalid.' ); } $result[$suffix] = $this->rows( "SELECT * FROM `{$this->prefix}delivery_engine_{$suffix}` ORDER BY id" ); } return $result;
+	public function snapshot( array $suffixes = DataLifecycleManifest::RETAINED_PROMISE_DOMAIN_TABLE_SUFFIXES ): array {
+		$result = []; foreach ( $suffixes as $suffix ) { if ( ! in_array( $suffix, DataLifecycleManifest::RETAINED_PROMISE_DOMAIN_TABLE_SUFFIXES, true ) ) { throw new RuntimeException( 'P02 fixture snapshot scope is invalid.' ); } $result[$suffix] = $this->rows( "SELECT * FROM `{$this->prefix}delivery_engine_{$suffix}` ORDER BY id" ); } return $result;
 	}
 	public function definitions( array $suffixes ): array {
-		$result = []; foreach ( $suffixes as $suffix ) { if ( ! in_array( $suffix, DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES, true ) ) { throw new RuntimeException( 'P02 fixture definition scope is invalid.' ); } $table = $this->prefix . 'delivery_engine_' . $suffix; $rows = $this->rows( "SHOW CREATE TABLE `{$table}`" ); if ( 1 !== count( $rows ) ) { throw new RuntimeException( 'P02 fixture definition is unavailable.' ); } $result[$suffix] = array_values( $rows[0] )[1]; } return $result;
+		$result = []; foreach ( $suffixes as $suffix ) { if ( ! in_array( $suffix, DataLifecycleManifest::RETAINED_PROMISE_DOMAIN_TABLE_SUFFIXES, true ) ) { throw new RuntimeException( 'P02 fixture definition scope is invalid.' ); } $table = $this->prefix . 'delivery_engine_' . $suffix; $rows = $this->rows( "SHOW CREATE TABLE `{$table}`" ); if ( 1 !== count( $rows ) ) { throw new RuntimeException( 'P02 fixture definition is unavailable.' ); } $result[$suffix] = array_values( $rows[0] )[1]; } return $result;
 	}
 	public function select(): void {
 		$this->selected = new wpdb( DB_USER, DB_PASSWORD, DB_NAME, DB_HOST ); $this->selected->set_prefix( $this->prefix ); $this->selected->suppress_errors( true ); $this->selected->hide_errors();

@@ -39,7 +39,8 @@ final class ShipmentService {
 		private readonly ShipmentCreationFailureStore $failures,
 		private readonly AuditLogRepositoryInterface $audit,
 		private readonly Logger $logger,
-		private readonly ?CodAwaitingShipmentEvaluator $cod_awaiting = null
+		private readonly ?CodAwaitingShipmentEvaluator $cod_awaiting = null,
+		private readonly ?\CetechDeliveryEngine\Application\ServicePromise\Shipment\ShipmentPromisePort $promise_service = null
 	) {
 	}
 
@@ -84,7 +85,8 @@ final class ShipmentService {
 		}
 
 		if ( [] === $plan_result->plans ) {
-			$this->failures->mark_succeeded( $order );
+			$metadata_order = $this->metadata_order( $order );
+			if ( null !== $metadata_order ) { $this->failures->mark_succeeded( $metadata_order ); }
 			$this->refresh_cod_awaiting( $order );
 			$this->audit_success( $order, ShipmentCreationOutcome::ZeroShipmentsPickupOnly, $source, [] );
 
@@ -96,12 +98,13 @@ final class ShipmentService {
 			$statuses  = [];
 
 			foreach ( $plan_result->plans as $plan ) {
-				$write       = $this->persist_plan( $plan, $source, null );
+				$write       = $this->persist_plan( $plan, $source, null, $order );
 				$shipments[] = $write->shipment;
 				$statuses[]  = $write->status;
 			}
 
-			$this->failures->mark_succeeded( $order );
+			$metadata_order = $this->metadata_order( $order );
+			if ( null !== $metadata_order ) { $this->failures->mark_succeeded( $metadata_order ); }
 			$this->refresh_cod_awaiting( $order );
 
 			$outcome = $this->outcome_from_writes( $statuses );
@@ -163,7 +166,8 @@ final class ShipmentService {
 		}
 
 		if ( [] === $plan_result->plans ) {
-			$this->failures->mark_succeeded( $order );
+			$metadata_order = $this->metadata_order( $order );
+			if ( null !== $metadata_order ) { $this->failures->mark_succeeded( $metadata_order ); }
 			$this->refresh_cod_awaiting( $order );
 			$this->audit_success( $order, ShipmentCreationOutcome::ZeroShipmentsPickupOnly, ShipmentEventSource::Staff, [] );
 
@@ -175,12 +179,13 @@ final class ShipmentService {
 			$statuses  = [];
 
 			foreach ( $plan_result->plans as $plan ) {
-				$write       = $this->persist_plan( $plan, ShipmentEventSource::Staff, $actor_user_id );
+				$write       = $this->persist_plan( $plan, ShipmentEventSource::Staff, $actor_user_id, $order );
 				$shipments[] = $write->shipment;
 				$statuses[]  = $write->status;
 			}
 
-			$this->failures->mark_succeeded( $order );
+			$metadata_order = $this->metadata_order( $order );
+			if ( null !== $metadata_order ) { $this->failures->mark_succeeded( $metadata_order ); }
 			$this->refresh_cod_awaiting( $order );
 
 			$outcome = $this->outcome_from_writes( $statuses );
@@ -209,7 +214,8 @@ final class ShipmentService {
 	private function persist_plan(
 		ShipmentPlan $plan,
 		ShipmentEventSource $source = ShipmentEventSource::System,
-		?int $actor_user_id = null
+		?int $actor_user_id = null,
+		?WC_Order $order = null
 	): ShipmentAggregateWriteResult {
 		$draft = Shipment::create(
 			order_id: $plan->order_id,
@@ -249,10 +255,42 @@ final class ShipmentService {
 			? $actor_user_id
 			: null;
 
+		if ( null !== $this->promise_service && null !== $order ) {
+			$promise = $this->promise_service->create_aggregate( $order, $draft, $items, $created_source, $created_actor );
+			if ( null !== $promise ) { return $promise; }
+		}
+		if ( null === $this->promise_service && null !== $order ) {
+			$package=(new \CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotReader())->read_package($order);
+			if ($package->delivery_quote?->envelope?->is_promise()) { throw new \RuntimeException('Shipment promise runtime unavailable.'); }
+		}
 		return $this->shipments->ensureCompleteAggregate( $draft, $items, $created_source, $created_actor );
 	}
 
+	/** Promise refusals never save incidental mutations on a caller-supplied native object. */
+	private function metadata_order( WC_Order $order ): ?WC_Order {
+		$package = ( new \CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotReader() )->read_package( $order );
+		$declared = $package->delivery_quote?->envelope?->is_promise()
+			|| '3' === (string) $order->get_meta( \CetechDeliveryEngine\Application\Order\OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION, true )
+			|| '2' === (string) $order->get_meta( \CetechDeliveryEngine\Application\Order\DeliveryQuoteSnapshotEnvelope::META_FORMAT, true );
+		// Woo's order cache may return the supplied dirty instance. Loading by ID
+		// creates an independent native data-store read instead of saving that object.
+		try { $fresh = new WC_Order( $order->get_id() ); }
+		catch ( \Throwable ) {
+			$cached = function_exists( 'wc_get_order' ) ? wc_get_order( $order->get_id() ) : null;
+			$cached_promise = $cached instanceof WC_Order && ( '3' === (string) $cached->get_meta( \CetechDeliveryEngine\Application\Order\OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION, true ) || '2' === (string) $cached->get_meta( \CetechDeliveryEngine\Application\Order\DeliveryQuoteSnapshotEnvelope::META_FORMAT, true ) );
+			return $declared || $cached_promise ? null : $order;
+		}
+		if ( $fresh->get_id() !== $order->get_id() ) { return $declared ? null : $order; }
+		$fresh_package = ( new \CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotReader() )->read_package( $fresh );
+		$persisted_promise = $fresh_package->delivery_quote?->envelope?->is_promise()
+			|| '3' === (string) $fresh->get_meta( \CetechDeliveryEngine\Application\Order\OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION, true )
+			|| '2' === (string) $fresh->get_meta( \CetechDeliveryEngine\Application\Order\DeliveryQuoteSnapshotEnvelope::META_FORMAT, true );
+		return $declared || $persisted_promise ? $fresh : $order;
+	}
+
 	private function refresh_cod_awaiting( WC_Order $order ): void {
+		$order = $this->metadata_order( $order );
+		if ( null === $order ) { return; }
 		if ( $this->cod_awaiting instanceof CodAwaitingShipmentEvaluator ) {
 			$this->cod_awaiting->sync( $order );
 		}
@@ -326,7 +364,8 @@ final class ShipmentService {
 	}
 
 	private function record_failure( WC_Order $order, ShipmentCreationErrorCode $error, ShipmentEventSource $source ): void {
-		$this->failures->mark_failed( $order, $error );
+		$metadata_order = $this->metadata_order( $order );
+		if ( null !== $metadata_order ) { $this->failures->mark_failed( $metadata_order, $error ); }
 		$this->audit->append(
 			[
 				'action'       => 'shipment_creation_failed',

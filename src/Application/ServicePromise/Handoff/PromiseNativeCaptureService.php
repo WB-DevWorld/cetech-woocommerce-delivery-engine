@@ -87,13 +87,10 @@ final readonly class PromiseNativeCaptureService {
 		return [ 'local_date' => $local->format( 'Y-m-d' ), 'timezone' => $policy['promise_timezone'], 'start_at' => $start->setTimezone( new \DateTimeZone( 'UTC' ) )->format( 'Y-m-d H:i:s.u' ), 'end_at' => $end->setTimezone( new \DateTimeZone( 'UTC' ) )->format( 'Y-m-d H:i:s.u' ) ];
 	}
 	private function customer_text( PromiseResult $result ): string {
+		$formatter = new \CetechDeliveryEngine\Application\ServicePromise\Presentation\PublicPromiseFormatter();
 		$parts = [];
 		foreach ( $result->input()->policy()->endpoint_terminal_component_ids() as $terminal ) {
-			$view = PublicPromiseView::from_result( $result, $terminal )->fields(); $prefix = $view['service_label'] . ': ';
-			if ( 'absolute_window' === $view['state'] ) {
-				$zone = new \DateTimeZone( $view['display_timezone'] ); $from = \DateTimeImmutable::createFromFormat( '!Y-m-d H:i:s.u', $view['from'], new \DateTimeZone( 'UTC' ) )->setTimezone( $zone )->format( 'Y-m-d H:i' ); $until = \DateTimeImmutable::createFromFormat( '!Y-m-d H:i:s.u', $view['until'], new \DateTimeZone( 'UTC' ) )->setTimezone( $zone )->format( 'Y-m-d H:i' ); $parts[] = $prefix . $from . ' to ' . $until . ' (' . $view['display_timezone'] . ')';
-			} elseif ( 'relative_window' === $view['state'] ) { $parts[] = $prefix . $view['min'] . ' to ' . $view['max'] . ' ' . str_replace( '_', ' ', $view['unit'] ) . ' after payment confirmation'; }
-			else { $parts[] = $prefix . 'estimate unavailable'; }
+			$parts[] = $formatter->text( PublicPromiseView::from_result( $result, $terminal ) );
 		}
 		$text = implode( '; ', $parts ); PromiseShape::text( $text, 2048 ); return $text;
 	}

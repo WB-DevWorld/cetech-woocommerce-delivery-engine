@@ -124,7 +124,12 @@ final class QuoteReviewRuntime {
 		wp_enqueue_style( self::SCRIPT_HANDLE, $base . 'assets/frontend/delivery-quote-review.css', [], $version );
 		wp_localize_script( self::SCRIPT_HANDLE, 'cetechDeQuoteReview', [ 'namespace' => self::NAMESPACE,
 			'ajaxUrl' => class_exists( '\WC_AJAX' ) ? \WC_AJAX::get_endpoint( self::AJAX_ACTION ) : '',
-			'nonce' => wp_create_nonce( self::NONCE_ACTION ) ] );
+			'nonce' => wp_create_nonce( self::NONCE_ACTION ), 'i18n' => [
+				'messages' => array_combine( \CetechDeliveryEngine\Application\DeliveryQuote\CartQuoteResult::STATUSES, array_map( QuoteReviewRenderer::message( ... ), \CetechDeliveryEngine\Application\DeliveryQuote\CartQuoteResult::STATUSES ) ),
+				'heldUntil' => __( 'Delivery price is held until', 'cetech-woocommerce-delivery-engine' ), 'unchanged' => __( 'Delivery details and price rules must stay unchanged.', 'cetech-woocommerce-delivery-engine' ),
+				'refresh' => __( 'Refresh delivery', 'cetech-woocommerce-delivery-engine' ), 'confirm' => __( 'Confirm delivery price', 'cetech-woocommerce-delivery-engine' ), 'retry' => __( 'Retry same request', 'cetech-woocommerce-delivery-engine' ),
+				'originalPromise' => __( 'Original recorded delivery estimate', 'cetech-woocommerce-delivery-engine' ), 'reviewLabel' => __( 'Delivery price review', 'cetech-woocommerce-delivery-engine' ),
+			] ] );
 	}
 
 	public function schema(): array {
@@ -134,6 +139,7 @@ final class QuoteReviewRuntime {
 		$component = [ 'type' => 'object', 'additionalProperties' => false, 'properties' => [ 'customer_label' => $readonly( 'string' ),
 			'list_price' => $money, 'promotion' => [ 'type' => 'object', 'additionalProperties' => false, 'properties' => [ 'state' => $readonly( 'string' ), 'amount' => [ ...$money, 'type' => [ 'object', 'null' ] ] ] ],
 			'final_price' => $money, 'tax' => $money, 'rounded_tax' => [ ...$money, 'type' => [ 'object', 'null' ] ], 'total' => $money, 'display_total' => [ ...$money, 'type' => [ 'object', 'null' ] ] ] ];
+		$promise = self::promise_schema( $readonly );
 		return [ 'contract_version' => $readonly( 'integer' ), 'status' => $readonly( 'string' ), 'generation' => $readonly( 'integer' ),
 			// Woo derives request defaults from direct object properties even when
 			// readonly. oneOf preserves this response shape without inventing input.
@@ -141,9 +147,15 @@ final class QuoteReviewRuntime {
 				'contract_version' => $readonly( 'integer' ), 'decision_kind' => $readonly( 'string' ), 'quote_id' => $readonly( 'string' ), 'status' => $readonly( 'string' ),
 				'currently_applicable' => $readonly( 'boolean' ), 'expires_at' => $readonly( 'string' ), 'customer_label' => $readonly( 'string' ),
 				'money' => [ 'type' => 'array', 'maxItems' => 200, 'items' => $component, 'readonly' => true ], 'reason_code' => $readonly( [ 'string', 'null' ] ),
-				'recovery_action' => $readonly( [ 'string', 'null' ] ), 'correlation_id' => $readonly( 'string' ) ] ], [ 'type' => 'null' ] ] ],
+				'recovery_action' => $readonly( [ 'string', 'null' ] ), 'correlation_id' => $readonly( 'string' ), 'promise' => $promise ] ], [ 'type' => 'null' ] ] ],
 			'can_refresh' => $readonly( 'boolean' ), 'can_confirm' => $readonly( 'boolean' ), 'can_retry' => $readonly( 'boolean' ),
 			'message_code' => $readonly( 'string' ), 'correlation_id' => $readonly( 'string' ) ];
+	}
+	private static function promise_schema( callable $readonly ): array {
+		$base = [ 'format_version' => $readonly( 'integer' ), 'service_label' => $readonly( 'string' ), 'state' => $readonly( 'string' ), 'display_timezone' => $readonly( 'string' ), 'reason_codes' => [ 'type' => 'array', 'readonly' => true, 'items' => $readonly( 'string' ) ] ];
+		$object = static fn( array $properties ): array => [ 'type' => 'object', 'readonly' => true, 'additionalProperties' => false, 'properties' => $properties ];
+		$view = [ 'readonly' => true, 'oneOf' => [ $object( $base + [ 'from' => $readonly( 'string' ), 'until' => $readonly( 'string' ) ] ), $object( $base + [ 'relative_explanation' => $readonly( 'string' ), 'min' => $readonly( 'integer' ), 'max' => $readonly( 'integer' ), 'unit' => $readonly( 'string' ), 'known_zero' => $readonly( 'boolean' ) ] ), $object( $base ) ] ];
+		return $object( [ 'contract_version' => $readonly( 'integer' ), 'original' => $readonly( 'boolean' ), 'groups' => [ 'type' => 'array', 'readonly' => true, 'maxItems' => 200, 'items' => $object( [ 'views' => [ 'type' => 'array', 'readonly' => true, 'maxItems' => 16, 'items' => $view ], 'customer_text' => $readonly( 'string' ) ] ) ] ] );
 	}
 
 	private static function unavailable( RequestContext $request ): array {

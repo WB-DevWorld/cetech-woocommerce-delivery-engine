@@ -15,6 +15,8 @@
 		unconfirmed: 'We could not confirm this quote. Retry the same request.',
 		unavailable: 'Delivery quoting is temporarily unavailable. Try again.'
 	};
+	if (config.i18n && config.i18n.messages) { statuses.forEach(function (status) { if (text(config.i18n.messages[status], 2048)) { messages[status] = config.i18n.messages[status]; } }); }
+	function copy(key, fallback) { return config.i18n && text(config.i18n[key], 2048) ? config.i18n[key] : fallback; }
 
 	function exact(value, keys) {
 		return value && typeof value === 'object' && !Array.isArray(value)
@@ -39,7 +41,9 @@
 			&& (value.promotion.state === 'unavailable' ? value.promotion.amount === null : money(value.promotion.amount));
 	}
 	function quote(value) {
-		return exact(value, ['contract_version', 'decision_kind', 'quote_id', 'status', 'currently_applicable', 'expires_at', 'customer_label', 'money', 'reason_code', 'recovery_action', 'correlation_id'])
+		var keys = ['contract_version', 'decision_kind', 'quote_id', 'status', 'currently_applicable', 'expires_at', 'customer_label', 'money', 'reason_code', 'recovery_action', 'correlation_id'];
+		if (value && Object.prototype.hasOwnProperty.call(value, 'promise')) { keys.push('promise'); if (!promise(value.promise)) { return false; } }
+		return exact(value, keys)
 			&& value.contract_version === 1 && ['delivery_quote', 'delivery_estimate'].indexOf(value.decision_kind) !== -1 && uuid(value.quote_id)
 			&& ['issued', 'accepted', 'invalidated', 'expired', 'stripped'].indexOf(value.status) !== -1
 			&& typeof value.currently_applicable === 'boolean' && text(value.customer_label, 120)
@@ -47,6 +51,23 @@
 			&& Array.isArray(value.money) && value.money.length <= 200 && value.money.every(component)
 			&& [null, 'quote_expired', 'quote_invalidated', 'quote_unavailable'].indexOf(value.reason_code) !== -1
 			&& [null, 'refresh_and_review', 'retry_later'].indexOf(value.recovery_action) !== -1 && uuid(value.correlation_id);
+	}
+	function publicView(value) {
+		if (!value || typeof value !== 'object') { return false; }
+		var keys = ['format_version', 'service_label', 'state', 'display_timezone', 'reason_codes'];
+		if (value.state === 'absolute_window') { keys = keys.concat(['from', 'until']); }
+		else if (value.state === 'relative_window') { keys = keys.concat(['relative_explanation', 'min', 'max', 'unit', 'known_zero']); }
+		else if (['unavailable', 'ineligible'].indexOf(value.state) === -1) { return false; }
+		if (!exact(value, keys) || value.format_version !== 1 || !text(value.service_label, 160) || !text(value.display_timezone, 128) || !Array.isArray(value.reason_codes) || value.reason_codes.length > 13) { return false; }
+		var reasons = ['estimate_unavailable', 'missing_source', 'unsupported_policy', 'capacity_unknown', 'capacity_unavailable', 'capacity_stale', 'outside_service_window', 'missing_destination', 'unsupported_anchor', 'budget_exceeded', 'unknown_timezone', 'source_changed', 'acceptance_expired'];
+		if (!value.reason_codes.every(function (reason) { return reasons.indexOf(reason) !== -1; })) { return false; }
+		if (value.state === 'absolute_window') { return value.reason_codes.length === 0 && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}$/.test(value.from) && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}$/.test(value.until) && value.from <= value.until; }
+		if (value.state === 'relative_window') { return value.reason_codes.length === 0 && value.relative_explanation === 'after_payment_confirmation' && Number.isSafeInteger(value.min) && Number.isSafeInteger(value.max) && value.min >= 0 && value.max >= value.min && ['elapsed_minutes', 'calendar_days', 'business_minutes', 'business_days'].indexOf(value.unit) !== -1 && value.known_zero === (value.min === 0 && value.max === 0); }
+		return value.reason_codes.length > 0;
+	}
+	function promise(value) {
+		return exact(value, ['contract_version', 'original', 'groups']) && value.contract_version === 1 && value.original === true && Array.isArray(value.groups) && value.groups.length >= 1 && value.groups.length <= 200
+			&& value.groups.every(function (group) { return exact(group, ['views', 'customer_text']) && text(group.customer_text, 2048) && Array.isArray(group.views) && group.views.length >= 1 && group.views.length <= 16 && group.views.every(publicView); });
 	}
 	function validFacts(value) {
 		return exact(value, ['contract_version', 'status', 'generation', 'quote', 'can_refresh', 'can_confirm', 'can_retry', 'message_code', 'correlation_id'])
@@ -69,17 +90,21 @@
 				var item = document.createElement('li'); var amount = part.display_total || part.total; var bold = document.createElement('strong');
 				item.appendChild(document.createTextNode(part.customer_label + ': ')); bold.textContent = amount.currency + ' ' + amount.amount; item.appendChild(bold); prices.appendChild(item);
 			}); mount.appendChild(prices);
+			if (facts.quote.promise) {
+				var promises = document.createElement('ul'); promises.className = 'cetech-de-promise-original'; promises.setAttribute('aria-label', copy('originalPromise', 'Original recorded delivery estimate'));
+				facts.quote.promise.groups.forEach(function (group) { var item = document.createElement('li'); item.dataset.cetechDeOriginalPromise = '1'; item.textContent = group.customer_text; promises.appendChild(item); }); mount.appendChild(promises);
+			}
 			var hold = document.createElement('p'); hold.className = 'cetech-de-quote-review-expiry';
-			hold.appendChild(document.createTextNode('Delivery price is held until ')); var time = document.createElement('time'); time.dateTime = facts.quote.expires_at;
+			hold.appendChild(document.createTextNode(copy('heldUntil', 'Delivery price is held until') + ' ')); var time = document.createElement('time'); time.dateTime = facts.quote.expires_at;
 			time.textContent = new Date(facts.quote.expires_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' }); hold.appendChild(time);
-			hold.appendChild(document.createTextNode('. Delivery details and price rules must stay unchanged.')); mount.appendChild(hold);
+			hold.appendChild(document.createTextNode('. ' + copy('unchanged', 'Delivery details and price rules must stay unchanged.'))); mount.appendChild(hold);
 		}
 		var actions = document.createElement('div'); actions.className = 'cetech-de-quote-review-actions';
-		if (pendingTransport) { actions.appendChild(button('transport_retry', 'Retry same request', busy)); }
+		if (pendingTransport) { actions.appendChild(button('transport_retry', copy('retry', 'Retry same request'), busy)); }
 		else {
-			if (facts.can_refresh) { actions.appendChild(button('refresh', 'Refresh delivery', busy)); }
-			if (facts.can_confirm && facts.status === 'review_required' && facts.quote && facts.quote.currently_applicable) { actions.appendChild(button('confirm', 'Confirm delivery price', busy || expired(facts))); }
-			if (facts.can_retry) { actions.appendChild(button('retry', 'Retry same request', busy)); }
+			if (facts.can_refresh) { actions.appendChild(button('refresh', copy('refresh', 'Refresh delivery'), busy)); }
+			if (facts.can_confirm && facts.status === 'review_required' && facts.quote && facts.quote.currently_applicable) { actions.appendChild(button('confirm', copy('confirm', 'Confirm delivery price'), busy || expired(facts))); }
+			if (facts.can_retry) { actions.appendChild(button('retry', copy('retry', 'Retry same request'), busy)); }
 		}
 		mount.appendChild(actions); mount._cetechQuoteFacts = facts; return true;
 	}
@@ -95,7 +120,7 @@
 		var host = document.querySelector('.wp-block-woocommerce-checkout-order-summary-block, .wp-block-woocommerce-cart-order-summary-block, .wc-block-components-sidebar');
 		if (!host) { return; }
 		var mount = document.getElementById('cetech-de-quote-review-blocks');
-		if (!mount) { mount = document.createElement('section'); mount.id = 'cetech-de-quote-review-blocks'; mount.className = 'cetech-de-quote-review'; mount.dataset.quoteReviewTransport = 'blocks'; mount.setAttribute('aria-label', 'Delivery price review'); host.appendChild(mount); }
+		if (!mount) { mount = document.createElement('section'); mount.id = 'cetech-de-quote-review-blocks'; mount.className = 'cetech-de-quote-review'; mount.dataset.quoteReviewTransport = 'blocks'; mount.setAttribute('aria-label', copy('reviewLabel', 'Delivery price review')); host.appendChild(mount); }
 		var signature = JSON.stringify(facts) + String(busy) + String(!!pendingTransport);
 		if (signature !== lastSignature) { render(mount, facts); lastSignature = signature; }
 	}

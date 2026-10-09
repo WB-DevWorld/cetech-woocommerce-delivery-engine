@@ -20,7 +20,7 @@ if ( $config['run_lifecycle'] ) {
 	$before = $domain();
 	try {
 		add_filter( 'flush_rewrite_rules_hard', '__return_false', PHP_INT_MAX ); CetechDeliveryEngine\Bootstrap\Deactivator::deactivate();
-		$lifecycle['native_deactivation_preserved'] = 38 === count( $before ) && $before === $domain();
+		$lifecycle['native_deactivation_preserved'] = 39 === count( $before ) && $before === $domain();
 		// Native boot may already own an expired-cache checkpoint. Complete its
 		// exact acknowledged continuation before requesting a different lifecycle mode.
 		$native_site = get_current_blog_id();
