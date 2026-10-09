@@ -1,5 +1,11 @@
 # Reusable WooCommerce Delivery & Fulfilment Engine
 
+## Current implementation supersession — 2026-10-09
+
+Q01–Q06 are owner-accepted and integrated through Q06 master `e81db297bb550d420269bc905402eaffcc428aeb` (PR #94; Issue #93 completed). Separate actual-master run `37868163553`, attempt 1, passed all eight actual jobs and original strict receipts 495 native / 20 CPT / 143 HTTP/browser, actual paid/free Blocks buttons, history, smoke and exact cleanup. Development `1.0.0-dev.wave2-quote-placement.1`, schema 9, 23 flags and 749 immutable production PHP sources remain. [Current status](STATUS_CURRENT.md) and the [DeliveryQuote closeout](product/W2-DELIVERYQUOTE-CLOSEOUT-2026-10-09.md) govern newer implementation truth.
+
+The current owner-authorized work is docs-only conformance/adoption-readiness review (Issue #95). The canonical registry's 372 IDs/classifications/counts remain frozen; promotion recommendations are separate proposals. External persistent object cache is refused by the retained quote path, native retention adoption remains unmounted, and broader product/target-stack evidence stays explicit. Site adoption remains OFF; no site change, new release or Stable 1.0 acceptance follows. The previous current-status block below is historical provenance, including training/release evidence not reread on a live site here.
+
 ## CURRENT IMPLEMENTATION STATUS — V1 RC (read first)
 
 **Last updated:** 2026-09-22  
