@@ -34,5 +34,5 @@ final class QuoteActivationSession implements OperationSession {
 	public function get_row( string $sql ): array|null|false { $rows = $this->get_results( $sql ); return $rows[0] ?? null; }
 	public function prepare( string $sql, mixed ...$args ): string { if ( 1 === count( $args ) && is_array( $args[0] ) ) { $args = $args[0]; } $i = 0; return preg_replace_callback( '/%[ds]/', function( array $match ) use ( &$i, $args ): string { $value = $args[$i++]; return '%d' === $match[0] ? (string) (int) $value : $this->f->pdo->quote( (string) $value ); }, $sql ); }
 	public function errno(): int { return 0; } public function insert_id(): int { return (int) $this->f->pdo->lastInsertId(); }
-	private function translated( string $sql ): string { return str_replace( [ 'LEFT(option_value,1025)', ' FOR UPDATE', 'BINARY ' ], [ 'substr(option_value,1,1025)', '', '' ], $sql ); }
+	private function translated( string $sql ): string { return str_replace( [ 'LEFT(option_value,1025)', 'LEFT(option_value,65537)', ' FOR UPDATE', 'BINARY ' ], [ 'substr(option_value,1,1025)', 'substr(option_value,1,65537)', '', '' ], $sql ); }
 }

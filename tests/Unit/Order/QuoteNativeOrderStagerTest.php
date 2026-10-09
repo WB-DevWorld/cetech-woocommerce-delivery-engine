@@ -15,21 +15,29 @@ use PHPUnit\Framework\TestCase;
 
 require_once dirname( __DIR__, 2 ) . '/Support/DeliveryQuote/CartQuoteFixtures.php';
 require_once dirname( __DIR__, 2 ) . '/Support/DeliveryQuote/QuoteStorageFixtures.php';
+require_once dirname( __DIR__, 2 ) . '/Support/ServicePromise/Handoff/PromiseHandoffFixture.php';
 
 /** Contract/readback models only. Native HPOS and checkout execution have separate qualification. */
 final class QuoteNativeOrderStagerTest extends TestCase {
-	private function fixture(): array {
+	private function fixture( bool $promise = false ): array {
 		$draft = CartQuoteFixtures::draft(); $customer = CustomerCartContext::fromArray( $draft->private_facts()['lines'][0]['customer_context'] );
 		$tax_source = QuoteNativeTaxSource::from_private_facts( [ 'format_version' => 1, 'digest_version' => 2, 'currency' => 'GHS', 'precision' => 2, 'exempt' => true, 'tax_class' => '', 'location_digest' => QuoteFixtures::digest( 'tax_location' ), 'rounding' => 'per_line', 'tax_enabled' => false, 'source' => [ 'option_rows' => [], 'tax_rows' => [], 'tax_class_rows' => [], 'tax_location_rows' => [], 'method_rows' => [], 'customer_rows' => [], 'selectors' => [ 'option_names' => [ 'woocommerce_currency' ], 'tax_class' => '', 'method_instance_ids' => [ 0 ], 'session_key' => 'fixture-session', 'customer_id' => 0, 'site_id' => 1, 'table_prefix' => 'wp_' ] ] ] );
 		$group = DeliveryGroupIdentity::forHistorical( $draft->private_facts()['lines'][0]['selection'], $customer ); $component = NativeCartQuotePreparation::component_key( $group );
 		$data = LegacyQuoteProviderFixtures::context()->private_facts(); $data['tax']['context_digest'] = $tax_source->digest(); $data['destination']['key_epoch'] = $draft->owner()->key_epoch(); $data['lines'][0]['component_key'] = $component; $data['groups'][0]['component_key'] = $component; $context = QuoteContext::from_array( $data );
 		$terms = LegacyQuoteProviderFixtures::terms()->private_facts(); $terms['groups'][0]['component_key'] = $component; $terms['groups'][0]['native_tax_receipt']['context_digest'] = $tax_source->digest(); $terms = \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTerms::from_array( $terms );
+		$issued_at = QuoteFixtures::time();
+		if ( $promise ) {
+			$fixture = \CetechDeliveryEngine\Tests\Support\ServicePromise\Handoff\PromiseHandoffFixture::class; $issued_at = $fixture::time(); $input = $fixture::input()->private_facts(); $input['owner'] = [ ...$draft->owner()->facts(), 'site_id' => $input['site_id'] ]; $input['material'] = [ 'group_id' => $component, 'material_digest' => $context->digest() ]; $input = \CetechDeliveryEngine\Domain\ServicePromise\PromiseInput::from_array( $input );
+			$packet = \CetechDeliveryEngine\Domain\ServicePromise\Handoff\PromiseHistoricalPacket::capture( $fixture::result( $input ), 'Frozen native delivery promise' );
+			$context = QuoteContext::from_base_promises( $context, $input->private_facts()['site_id'], [ [ 'component_key' => $component, 'assignment_receipt_digest' => QuoteFixtures::digest( 'native-stager-assignment' ), 'policy_reference' => $input->policy()->reference()->private_facts(), 'input' => $input->to_private_json(), 'input_digest' => $input->digest() ] ] );
+			$terms = \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTerms::from_base_promises( $terms, [ [ 'component_key' => $component, 'packet' => $packet->private_facts() ] ] );
+		}
 		$old = QuoteStorageFixtures::quote( state: 'accepted' ); $id = $old->header()->id(); $ref = QuoteFixtures::reference( $id );
-		$header = QuoteHeader::issue( $id, $draft->owner(), $context, $terms, QuoteFixtures::time(), $old->header()->namespace_hashes(), 'legacy_fixed_base_v1', 1, $ref );
-		$row = array_replace( $old->row(), [ 'profile_code' => 'legacy_fixed_base_v1', 'owner_digest' => $draft->owner()->digest(), 'principal_hash' => $draft->owner()->facts()['principal_hash'], 'header_json' => $header->to_private_json(), 'material_digest' => $header->material_digest(), 'body_digest' => $header->body_digest(), 'private_body_json' => QuoteJson::encode( [ 'context' => $context->private_facts(), 'terms' => $terms->private_facts() ] ) ] );
+		$profile = $promise ? 'service_promise_v1' : 'legacy_fixed_base_v1'; $header = QuoteHeader::issue( $id, $draft->owner(), $context, $terms, $issued_at, $old->header()->namespace_hashes(), $profile, 1, $ref );
+		$row = array_replace( $old->row(), [ 'format_version' => $promise ? 2 : 1, 'profile_code' => $profile, 'owner_digest' => $draft->owner()->digest(), 'principal_hash' => $draft->owner()->facts()['principal_hash'], 'header_json' => $header->to_private_json(), 'material_digest' => $header->material_digest(), 'body_digest' => $header->body_digest(), 'private_body_json' => QuoteJson::encode( [ 'context' => $context->private_facts(), 'terms' => $terms->private_facts() ] ), 'created_at' => $issued_at->sql(), 'expires_at' => $header->expires_at()->sql(), 'accepted_at' => $issued_at->plus_seconds( 1 )->sql(), 'transition_at' => $issued_at->plus_seconds( 1 )->sql() ] );
 		$quote = QuoteStoredRow::from_row( $row );
 		$guard = new class implements QuoteCurrentEvidenceGuard { public function tables( OperationSession $s ): array { return []; } public function verify( OperationSession $s, QuoteOwner $o, QuoteContext $c ): bool { return true; } };
-		$evidence = new QuotePlacementEvidence( $quote, $ref, $header, $context, $guard, static fn(): bool => true, QuoteFixtures::time()->plus_seconds( 2 ), $draft, native_tax_source: $tax_source );
+		$evidence = new QuotePlacementEvidence( $quote, $ref, $header, $context, $guard, static fn(): bool => true, $issued_at->plus_seconds( 2 ), $draft, native_tax_source: $tax_source );
 		$line = new QuoteStageLine( 901, 100 ); $shipping = new QuoteStageShipping( 902, $group ); $order = new QuoteStageOrder( $line, $shipping ); $factory = new QuoteStageFactory( $order );
 		$stager = new QuoteNativeOrderStager( $factory, static fn(): \WC_Order => clone $factory->order );
 		$binding = QuoteStorageFixtures::binding( $quote );
@@ -43,6 +51,16 @@ final class QuoteNativeOrderStagerTest extends TestCase {
 		self::assertSame( $result->context_digest(), $packet['delivery_quote']['context_digest'] ); self::assertSame( '12.500000', $packet['package_total_delivery_amount'] );
 		self::assertSame( substr( $evidence->accepted_at()->iso_utc(), 0, 19 ) . '+00:00', $packet['snapshotted_at'] ); self::assertSame( $binding->mapping(), $result->mapping() );
 		self::assertSame( 1, $factory->rollbacks ); self::assertSame( 1, $factory->retirements );
+	}
+	public function test_new_profile_physically_stages_the_mandatory_packet_before_seal_with_retained_money_and_frozen_text(): void {
+		[ $stager, $order, $evidence, $binding, $factory ] = $this->fixture( true );
+		$stage = $stager->stage( $order, $evidence, $binding, 'store_api' );
+		self::assertTrue( QuoteNativeOrderHistory::verify( $stage->fresh_order() ) ); $package = QuoteJson::decode( $order->get_meta( OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, true ) ); $line = QuoteJson::decode( $order->lines[0]->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT, true ) );
+		self::assertSame( '3', $package['snapshot_version'] ); self::assertSame( '3', $line['snapshot_version'] ); self::assertSame( '2', $order->get_meta( DeliveryQuoteSnapshotEnvelope::META_FORMAT, true ) ); self::assertSame( '2', $order->lines[0]->get_meta( DeliveryQuoteSnapshotEnvelope::META_FORMAT, true ) ); self::assertSame( 2, $package['delivery_quote']['format'] ); self::assertSame( $package['delivery_quote'], $line['delivery_quote'] ); self::assertSame( $evidence->terms()->promise_packet()->private_facts(), $package['delivery_quote']['promise_packet'] ); self::assertSame( $evidence->terms()->promise_packet()->digest(), $package['delivery_quote']['promise_packet_digest'] ); self::assertSame( 'Frozen native delivery promise', $line['estimate_text'] ); self::assertSame( '12.50', $package['package_total_delivery_amount'] ); self::assertSame( 'prepared', $binding->state() ); self::assertNull( $binding->row()['sealed_at'] ); self::assertArrayNotHasKey( 'final_event', $package['delivery_quote'] ); self::assertSame( 1, $factory->rollbacks ); self::assertSame( 1, $factory->retirements );
+	}
+	public function test_new_profile_retry_and_paid_history_keep_exact_original_packet_and_no_successor_promise(): void {
+		[ $stager, $order, $evidence, $binding ] = $this->fixture( true ); $first = $stager->stage( $order, $evidence, $binding, 'classic' ); $raw = $order->get_meta( OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, true ); $line = $order->lines[0]->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT, true ); $saves = $order->saves;
+		$retry = $stager->stage( $order, $evidence, $binding, 'order_pay' ); $order->state = 'processing'; $history = $stager->saved_guard( $order, $evidence->quote_record(), $binding ); self::assertSame( $raw, $order->get_meta( OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, true ) ); self::assertSame( $line, $order->lines[0]->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT, true ) ); self::assertSame( $saves, $order->saves ); self::assertSame( $first->snapshot_digest(), $retry->snapshot_digest() ); self::assertSame( $first->snapshot_digest(), $history->snapshot_digest() ); self::assertSame( $first->context_digest(), $history->context_digest() );
 	}
 	public function test_read_only_replay_never_changes_original_snapshots_or_timestamps(): void {
 		[ $stager, $order, $evidence, $binding ] = $this->fixture(); $first = $stager->stage( $order, $evidence, $binding, 'classic' );

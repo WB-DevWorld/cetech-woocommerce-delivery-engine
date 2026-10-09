@@ -12,6 +12,10 @@ use CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuoteEnvironment;
 use CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuoteSessionStore;
 use CetechDeliveryEngine\Application\DeliveryQuote\QuotePreparationGate;
 use CetechDeliveryEngine\Application\Order\DeliveryQuoteSnapshotReader;
+use CetechDeliveryEngine\Application\Order\DeliveryQuoteSnapshotEnvelope;
+use CetechDeliveryEngine\Application\Order\RequiredPromiseSnapshotReadiness;
+use CetechDeliveryEngine\Application\Shipment\ShipmentOriginalPromiseReferenceReader;
+use CetechDeliveryEngine\Infrastructure\Persistence\PromiseStorageReadiness;
 use CetechDeliveryEngine\Application\EmergencyControl\EmergencyControlService;
 use CetechDeliveryEngine\Application\EmergencyControl\EmergencyOwnershipClassifier;
 use CetechDeliveryEngine\Application\EmergencyControl\EmergencyOwnershipLatch;
@@ -19,6 +23,7 @@ use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyCheckoutHooks;
 use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
 use CetechDeliveryEngine\Presentation\Admin\EmergencyControlSettings;
 use CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementActivation;
+use CetechDeliveryEngine\Application\DeliveryQuote\PromiseQuotePlacementActivation;
 use CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementCompositeGuard;
 use CetechDeliveryEngine\Application\DeliveryQuote\QuoteCartPlacementEvidenceReader;
 use CetechDeliveryEngine\Application\DeliveryQuote\QuoteSavedOrderPlacementEvidenceReader;
@@ -460,7 +465,8 @@ final class Plugin {
 	/** Review and native placement share one complete, explicit store adoption. */
 	private function register_quote_review_services(): void {
 		$this->container->singleton( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class, static fn() => new \CetechDeliveryEngine\Infrastructure\WordPress\OperationConnectionFactory() );
-		$this->container->singleton( NativeCartQuoteEnvironment::class, static fn( ServiceContainer $c ) => new NativeCartQuoteEnvironment( $c->get( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class ) ) );
+		$this->container->singleton( PromiseQuoteComposition::class, static fn( ServiceContainer $c ) => new PromiseQuoteComposition( $c->get( OperationConnectionFactory::class ), $c->get( PromiseQuotePlacementActivation::class ) ) );
+		$this->container->singleton( NativeCartQuoteEnvironment::class, static fn( ServiceContainer $c ) => $c->get( PromiseQuoteComposition::class )->environment() );
 		$this->container->singleton( NativeCartQuoteSessionStore::class, static fn( ServiceContainer $c ) => new NativeCartQuoteSessionStore( $c->get( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class ), [ $c->get( NativeCartQuoteEnvironment::class ), 'authorize' ] ) );
 		$this->container->singleton( CartQuoteReviewService::class, static function ( ServiceContainer $c ): CartQuoteReviewService {
 			$factory = $c->get( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class );
@@ -475,14 +481,32 @@ final class Plugin {
 					&& $c->get( WooCommerceShippingReadiness::class )->is_ready() && ( new \CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteReadiness() )->get_status()['ready'];
 			}
 		) );
+		$this->container->singleton( PromiseQuotePlacementActivation::class, static fn( ServiceContainer $c ) => new PromiseQuotePlacementActivation(
+			$c->get( OperationConnectionFactory::class ),
+			static fn(): bool => $c->get( QuotePlacementActivation::class )->active()
+				&& RequiredPromiseSnapshotReadiness::supports( '3', 2, DeliveryQuoteSnapshotEnvelope::PROMISE_PROFILE, 1 )
+				&& ( new PromiseStorageReadiness() )->get_status()['ready'],
+			authorize: static fn( \CetechDeliveryEngine\Domain\Contracts\OperationIdentity $actor, \CetechDeliveryEngine\Domain\ServicePromise\Persistence\PromiseSiteBinding $binding, int $revision ): bool => $actor->site_id === $binding->site_id()
+				&& $actor->site_id === ( function_exists( 'get_current_blog_id' ) ? get_current_blog_id() : 1 )
+				&& 'service_promise.settings' === $actor->authority && 'user:' . get_current_user_id() === $actor->principal
+				&& 'service_promise.adoption' === $actor->operation && 1 === $actor->operation_version
+				&& 'promise-adoption:' . $binding->site_key() === $actor->target_key && $revision >= 0
+				&& is_admin() && ! AdminPageAccess::current_user_is_restricted() && current_user_can( 'manage_delivery_settings' )
+		) );
 		$this->container->singleton( QuoteCartPlacementEvidenceReader::class, static fn( ServiceContainer $c ) => new QuoteCartPlacementEvidenceReader( $c->get( NativeCartQuoteEnvironment::class ), $c->get( NativeCartQuoteSessionStore::class ), $c->get( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class ) ) );
 		$this->container->singleton( QuoteNativeOrderStager::class, static fn( ServiceContainer $c ) => new QuoteNativeOrderStager( $c->get( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class ) ) );
+		$this->container->bind( QuoteSavedOrderPlacementEvidenceReader::class, static fn( ServiceContainer $c ) => new QuoteSavedOrderPlacementEvidenceReader( $c->get( OperationConnectionFactory::class ), $c->get( QuoteNativeOrderStager::class ), [ $c->get( QuotePlacementRuntime::class ), 'authorize_saved_order' ], promise_capture: $c->get( PromiseQuoteComposition::class )->capture_service() ) );
+		$this->container->bind( ShipmentOriginalPromiseReferenceReader::class, static fn( ServiceContainer $c ) => new ShipmentOriginalPromiseReferenceReader( $c->get( QuoteSavedOrderPlacementEvidenceReader::class ) ) );
 		$this->container->singleton( QuotePlacementRuntime::class, static fn( ServiceContainer $c ) => new QuotePlacementRuntime(
 			$c->get( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class ), $c->get( QuoteCartPlacementEvidenceReader::class ), $c->get( QuoteNativeOrderStager::class ), $c->get( EmergencyCheckoutQuoteValidator::class ),
-			[ $c->get( QuotePlacementActivation::class ), 'requested' ],
+			static fn(): bool => $c->get( QuotePlacementActivation::class )->requested() || $c->get( PromiseQuotePlacementActivation::class )->requested(),
 			static function () use ( $c ): bool { $cart = function_exists( 'WC' ) ? WC()->cart : null; return \CetechDeliveryEngine\Application\EmergencyControl\EmergencyOwnership::Unmanaged !== $c->get( EmergencyOwnershipClassifier::class )->cart( $cart instanceof \WC_Cart ? $cart->get_cart() : [] ); },
-			static function ( \WC_Order $order, \CetechDeliveryEngine\Domain\Contracts\RequestContext $request ) use ( $c ) { return ( new QuoteSavedOrderPlacementEvidenceReader( $c->get( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class ), $c->get( QuoteNativeOrderStager::class ), [ $c->get( QuotePlacementRuntime::class ), 'authorize_saved_order' ] ) )->read( $order, $request ); },
-			static fn( \CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementSavedEvidenceGuard $guard ) => new QuotePlacementCompositeGuard( $guard, $c->get( QuotePlacementActivation::class )->fence() ),
+			static fn( \WC_Order $order, \CetechDeliveryEngine\Domain\Contracts\RequestContext $request ) => $c->get( QuoteSavedOrderPlacementEvidenceReader::class )->read( $order, $request ),
+			static function ( \CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementSavedEvidenceGuard $guard, \CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementEvidence $evidence ) use ( $c ) {
+				$guard = new QuotePlacementCompositeGuard( $guard, $c->get( QuotePlacementActivation::class )->fence() );
+				return 2 === $evidence->header()->format_version() && PromiseQuotePlacementActivation::PROFILE === $evidence->header()->profile()
+					? new QuotePlacementCompositeGuard( $guard, $c->get( PromiseQuotePlacementActivation::class )->fence() ) : $guard;
+			},
 			null, null, static fn( \WC_Order $order, string $route ) => $c->get( EmergencyControlRuntime::class )->final_order_decision( $order, $route )
 		) );
 		$this->container->singleton( QuoteReviewRuntime::class, static fn( ServiceContainer $c ) => new QuoteReviewRuntime( $c->get( CartQuoteReviewService::class ), true, new \CetechDeliveryEngine\Presentation\Frontend\QuoteReviewRenderer(), [ $c->get( QuotePlacementActivation::class ), 'active' ] ) );

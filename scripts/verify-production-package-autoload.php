@@ -56,6 +56,25 @@ if ( ! str_contains( $health_source, 'namespace CetechDeliveryEngine\\Applicatio
 require_once $autoload;
 
 $required_classes = [
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\PromiseQuotePaymentBoundary',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\PromiseQuotePlacementActivation',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\PromiseQuotePlacementPolicyFence',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\PromiseQuoteSealLinkage',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteCurrentEvidenceValidity',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\ServicePromiseQuoteProvider',
+	'CetechDeliveryEngine\\Application\\ServicePromise\\Handoff\\PromiseCaptureDemand',
+	'CetechDeliveryEngine\\Application\\ServicePromise\\Handoff\\PromiseHandoffSourceFence',
+	'CetechDeliveryEngine\\Application\\ServicePromise\\Handoff\\PromiseNativeCapture',
+	'CetechDeliveryEngine\\Application\\ServicePromise\\Handoff\\PromiseNativeCaptureService',
+	'CetechDeliveryEngine\\Application\\ServicePromise\\Handoff\\PromiseQuoteCurrentEvidenceGuard',
+	'CetechDeliveryEngine\\Application\\Shipment\\ShipmentOriginalPromiseReference',
+	'CetechDeliveryEngine\\Application\\Shipment\\ShipmentOriginalPromiseReferenceReader',
+	'CetechDeliveryEngine\\Bootstrap\\PromiseQuoteComposition',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\WpdbPromiseHandoffSources',
+	'CetechDeliveryEngine\\Integrations\\ServicePromise\\NativePromiseCaptureAuthorizer',
+	'CetechDeliveryEngine\\Integrations\\ServicePromise\\NativePromiseRuntimeCapture',
+	'CetechDeliveryEngine\\Integrations\\ServicePromise\\PromiseNativeServiceRegistry',
+
 	'CetechDeliveryEngine\\Domain\\ServicePromise\\Handoff\\PromiseHistoricalCodec',
 	'CetechDeliveryEngine\\Domain\\ServicePromise\\Handoff\\PromiseHistoricalPacket',
 	'CetechDeliveryEngine\\Domain\\ServicePromise\\Handoff\\PromiseQuotePacket',
@@ -315,6 +334,10 @@ $required_classes = [
 ];
 
 $required_interfaces = [
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\CartQuoteProfileEnvironment',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteNativeTaxEvidenceGuard',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteTimedCurrentEvidenceGuard',
+	'CetechDeliveryEngine\\Application\\ServicePromise\\Handoff\\PromiseCapacityCurrentFence',
 	'CetechDeliveryEngine\\Domain\\ServicePromise\\Persistence\\PromisePersistenceAuthorizer',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePlacementSavedEvidenceGuard',
 	'CetechDeliveryEngine\\Application\\EmergencyControl\\EmergencyFinalPlacementGuard',

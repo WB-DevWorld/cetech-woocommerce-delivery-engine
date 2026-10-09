@@ -22,12 +22,15 @@ use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteOwner;
 use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime;
 use CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory;
 use CetechDeliveryEngine\Infrastructure\WooCommerce\Destination\WooCommerceStateCatalog;
+use CetechDeliveryEngine\Application\ServicePromise\Handoff\{PromiseNativeCaptureService,PromiseQuoteCurrentEvidenceGuard};
+use CetechDeliveryEngine\Domain\RuleLifecycle\RuleTime;
+use CetechDeliveryEngine\Integrations\ServicePromise\PromiseNativeServiceRegistry;
 
 /** Called after the early preparation lease. Current reads never invoke the pricing engine. */
 final class NativeCartQuotePreparation {
 	private LegacyQuoteNativeSourcePreparer $sources;
-	public function __construct( private OperationConnectionFactory $factory, private ?QuoteNativeCaptureSource $native_source = null ) { $this->sources = new LegacyQuoteNativeSourcePreparer( $factory ); }
-	public function prepare( QuoteCartDraft $draft ): LegacyQuotePreparedCapture {
+	public function __construct( private OperationConnectionFactory $factory, private ?QuoteNativeCaptureSource $native_source = null, private ?PromiseNativeCaptureService $promise_capture = null, private ?PromiseNativeServiceRegistry $promise_services = null ) { $this->sources = new LegacyQuoteNativeSourcePreparer( $factory ); }
+	public function prepare( QuoteCartDraft $draft, string $profile = LegacyFixedBaseQuoteProvider::CODE, ?QuoteTime $original_issued_at = null ): LegacyQuotePreparedCapture {
 		try {
 			$facts = $draft->private_facts(); $offers = [];
 			foreach ( $facts['lines'] as $line ) { if ( 'delivery' !== $line['selection']['fulfilment_choice'] || ! is_int( $line['selection']['delivery_offer_id'] ) || $line['selection']['delivery_offer_id'] < 1 ) { self::fail(); } $offers[$line['selection']['delivery_offer_id']] = $line['selection']['delivery_offer_id']; }
@@ -37,12 +40,19 @@ final class NativeCartQuotePreparation {
 			$packages = self::package_facts( WC()->shipping()->get_packages(), $draft );
 			$native = $this->native_receipt( $draft->owner(), $packages );
 			$context = $this->context_from_observed( $draft, $seed, $native, $packages );
-			return ( new LegacyQuoteProviderStack( $this->factory ) )->prepare_current( $draft->owner(), $context, self::legacy_groups( $packages ) );
+			$base = ( new LegacyQuoteProviderStack( $this->factory ) )->prepare_current( $draft->owner(), $context, self::legacy_groups( $packages ) );
+			if ( LegacyFixedBaseQuoteProvider::CODE === $profile ) { return $base; }
+			if ( ServicePromiseQuoteProvider::PROFILE !== $profile || null === $original_issued_at || null === $this->promise_capture || null === $this->promise_services || $this->promise_services->is_empty() ) { self::fail(); }
+			$at = QuoteTime::now(); if ( $at->compare( $original_issued_at ) < 0 || $at->compare( $original_issued_at->plus_seconds( 300 ) ) >= 0 ) { self::fail(); }
+			$captured = $this->promise_capture->capture( $base->context(), $draft->owner(), RuleTime::parse( $original_issued_at->sql() ), $this->promise_services->create_demands( $base->context() ) );
+			$promise_context = $captured->context(); $promise_terms = $captured->terms( $base->terms() );
+			$guard = new PromiseQuoteCurrentEvidenceGuard( $base->guard(), $this->promise_capture->current_fence( $promise_context, RuleTime::parse( QuoteTime::now()->sql() ) ) );
+			return new LegacyQuotePreparedCapture( $draft->owner(), $promise_context, $promise_terms, $guard );
 		} catch ( \Throwable $error ) { throw new \RuntimeException( 'Cart quote preparation unavailable.', 0, $error ); }
 	}
 	public function evidence( QuoteIssueCommand $original, QuoteHeader $header, QuoteCartDraft $draft ): ?QuoteCartCurrentEvidence {
 		try {
-			$owner = $draft->owner(); $context = $original->context();
+			$owner = $draft->owner(); $original_context = $original->context(); $context = $original_context->base_context();
 			if ( ! $this->matches_original( $original, $header, $draft ) ) { return null; }
 			$source = $this->sources->prepare( $owner, $context );
 			// Complete current source facts may differ from the original quote. Preserve
@@ -51,7 +61,13 @@ final class NativeCartQuotePreparation {
 			$packages = self::package_facts( WC()->shipping()->get_packages(), $draft );
 			$native = $this->native_receipt( $owner, $packages ); $current = $native->bind_context( $source_context );
 			if ( ! hash_equals( $source_context->digest(), $current->digest() ) || ! $source->applicable_at( QuoteTime::now() ) || ! $native->unchanged() || ! $source->local_state_unchanged() ) { return null; }
-			return new QuoteCartCurrentEvidence( $current, new LegacyQuoteCaptureGuard( $source->guard(), $native->guard() ) );
+			$guard = new LegacyQuoteCaptureGuard( $source->guard(), $native->guard() );
+			if ( 2 === $original_context->format_version() ) {
+				if ( null === $this->promise_capture || ! hash_equals( $context->digest(), $current->digest() ) ) { return null; }
+				$current = QuoteContext::from_base_promises( $current, $original_context->private_facts()['promise_capture']['site_key'], $original_context->promise_groups() );
+				$guard = new PromiseQuoteCurrentEvidenceGuard( $guard, $this->promise_capture->current_fence( $current, RuleTime::parse( QuoteTime::now()->sql() ) ) );
+			}
+			return new QuoteCartCurrentEvidence( $current, $guard );
 		} catch ( \Throwable ) { return null; }
 	}
 	/** Pure binding of a complete captured source packet; no rate calculation or original mutation. */
@@ -67,7 +83,7 @@ final class NativeCartQuotePreparation {
 	public function matches_original( QuoteIssueCommand $original, QuoteHeader $header, QuoteCartDraft $draft ): bool {
 		try {
 			$owner = $draft->owner(); $context = $original->context();
-			if ( ! $owner->equals( $original->owner() ) || ! $owner->equals( $header->owner() ) || LegacyFixedBaseQuoteProvider::CODE !== $original->provider_code() || 1 !== $original->provider_version() || LegacyFixedBaseQuoteProvider::CODE !== $original->profile() || LegacyFixedBaseQuoteProvider::CODE !== $header->profile() || 1 !== $header->profile_version() || 1 !== $original->profile_version() || ! hash_equals( $header->material_digest(), $context->digest() ) || QuoteJson::encode( $header->namespace_hashes() ) !== QuoteJson::encode( $original->namespace_hashes( $header->id() ) ) || ! self::draft_matches_original( $draft, $context ) ) { return false; }
+			if ( ! $owner->equals( $original->owner() ) || ! $owner->equals( $header->owner() ) || LegacyFixedBaseQuoteProvider::CODE !== $original->provider_code() || 1 !== $original->provider_version() || ! in_array( $original->profile(), [ LegacyFixedBaseQuoteProvider::CODE, ServicePromiseQuoteProvider::PROFILE ], true ) || $original->profile() !== $header->profile() || ( ServicePromiseQuoteProvider::PROFILE === $header->profile() ? 2 : 1 ) !== $context->format_version() || 1 !== $header->profile_version() || 1 !== $original->profile_version() || ! hash_equals( $header->material_digest(), $context->digest() ) || QuoteJson::encode( $header->namespace_hashes() ) !== QuoteJson::encode( $original->namespace_hashes( $header->id() ) ) || ! self::draft_matches_original( $draft, $context->base_context() ) ) { return false; }
 			return true;
 		} catch ( \Throwable ) { return false; }
 	}

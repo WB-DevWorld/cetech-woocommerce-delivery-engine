@@ -7,7 +7,7 @@ use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteJson;
 use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteOwner;
 use CetechDeliveryEngine\Domain\Operation\OperationSession;
 /** Fixed native selectors; all final reads use the coordinator-owned current transaction. */
-final readonly class QuoteNativeReceiptGuard implements QuoteCurrentEvidenceGuard {
+final readonly class QuoteNativeReceiptGuard implements QuoteNativeTaxEvidenceGuard {
  public const CUSTOMER_META=['session_tokens','billing_country','billing_state','billing_city','billing_postcode','shipping_country','shipping_state','shipping_city','shipping_postcode','shipping_address_1','shipping_address_2','is_vat_exempt'];
  public const COLUMNS=[
   'option_rows'=>['option_id','option_name','option_value','autoload'],

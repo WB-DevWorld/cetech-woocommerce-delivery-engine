@@ -98,8 +98,8 @@ final class CetechQuotePlacementHttpFixture {
         $property = new ReflectionProperty($runtime, 'decorate_guard');
         $prior = $property->getValue($runtime);
         if (!$prior instanceof Closure) { throw new RuntimeException('Q06 final stimulus requires the production guard decorator.'); }
-        $property->setValue($runtime, static function(CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementSavedEvidenceGuard $guard) use ($prior, $selected, $barrier): CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementSavedEvidenceGuard {
-            $produced = $prior($guard);
+        $property->setValue($runtime, static function(CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementSavedEvidenceGuard $guard, mixed ...$args) use ($prior, $selected, $barrier): CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementSavedEvidenceGuard {
+            $produced = $prior($guard, ...$args);
             if (!$produced instanceof CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementSavedEvidenceGuard) { throw new RuntimeException('Q06 production guard decorator refused.'); }
             if ($selected()) { $barrier(); }
             return $produced;

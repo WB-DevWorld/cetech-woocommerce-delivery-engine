@@ -46,3 +46,6 @@ desktop.ini
 
 # Stage 3 disposable dry-run WordPress stubs (generated at runtime)
 scripts/stage3-wp-stubs/
+
+# Generated qualification Python bytecode.
+__pycache__/

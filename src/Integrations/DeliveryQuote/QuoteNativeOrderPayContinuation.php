@@ -3,12 +3,12 @@
 declare(strict_types=1);
 namespace CetechDeliveryEngine\Integrations\DeliveryQuote;
 
-use CetechDeliveryEngine\Application\DeliveryQuote\{QuotePlacementSavedEvidenceGuard,QuoteSavedOrderAuthorization};
+use CetechDeliveryEngine\Application\DeliveryQuote\{PromiseQuotePaymentBoundary,QuotePlacementSavedEvidenceGuard,QuoteSavedOrderAuthorization};
 use CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutLocalBinding;
-use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteBinding;
+use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteBinding,QuoteTime};
 use CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory;
 
-/** Same acknowledged native attempt; no second control/source/expiry admission. */
+/** Same native attempt; retained v1 admission and optional promise source/deadline proof stay distinct. */
 final class QuoteNativeOrderPayContinuation {
 	private QuoteOrderPayLocalBinding $local;
 	private ?string $title = null;
@@ -20,7 +20,7 @@ final class QuoteNativeOrderPayContinuation {
 	private bool $logging_failed = false;
 	private string $admitted_method;
 	private string $admitted_title;
-	public function __construct( private OperationConnectionFactory $factory, private \WC_Order $order, private QuoteBinding $binding, private QuotePlacementSavedEvidenceGuard $saved, private QuoteSavedOrderAuthorization $authorization, private string $method, private bool $method_change = false, ?QuoteNativeCheckoutLoggingEvidence $logging = null ) {
+	public function __construct( private OperationConnectionFactory $factory, private \WC_Order $order, private QuoteBinding $binding, private QuotePlacementSavedEvidenceGuard $saved, private QuoteSavedOrderAuthorization $authorization, private string $method, private bool $method_change = false, ?QuoteNativeCheckoutLoggingEvidence $logging = null, private ?PromiseQuotePaymentBoundary $promise = null ) {
 		if ( 'sealed' !== $binding->state() || 3 !== $binding->revision() || $binding->row()['order_id'] !== $order->get_id() || '' === $method || strlen( $method ) > 200 || preg_match( '/[^a-zA-Z0-9_\-]/', $method ) ) { throw new \RuntimeException( 'Native payment continuation unavailable.' ); }
 		if ( null !== $logging && ( $method_change || 4 !== $logging->phase() || ! $logging->is_current() ) ) { throw new \RuntimeException( 'Native logger continuation unavailable.' ); }
 		$this->logging = $logging;
@@ -46,13 +46,19 @@ final class QuoteNativeOrderPayContinuation {
 	public function verify( bool $selected = true ): bool {
 		$session = null; $begun = false;
 		try {
+			// The retained v1 continuation has no second expiry admission. New promise
+			// deadlines are captured before acquiring this existing SQL owner.
+			$promise_at = $this->promise?->capture_time();
+			if ( null !== $promise_at && ! $this->promise->eligible_at( $promise_at ) ) { return false; }
 			$unchanged = fn(): bool => ! $this->logging_failed && ( null === $this->logging ? $this->local->unchanged() && ( $this->method_change || $this->exact->unchanged() ) : $this->local->logging_unchanged( $this->logging ) && $this->logging->raw_unchanged() && $this->local->payment_matches( $this->admitted_method, $this->admitted_title ) ) && $this->authorization->unchanged() && ( ! $selected || null !== $this->title && $this->local->payment_matches( $this->method, $this->title ) );
 			if ( ! $unchanged() || null !== $this->logging && ( 5 !== $this->logging->phase() || ! $this->logging->is_current() ) ) { return false; }
 			$session = $this->factory->open();
 			if ( $session->site_id() !== $this->binding->site_id() || $session->in_transaction() || $session->is_retired() || ! $session->begin() ) { return false; } $begun = true;
-			$tables = array_values( array_unique( [ ...$this->saved->tables( $session ), ...( null === $this->logging ? [] : $this->logging->tables( $session ) ) ] ) ); sort( $tables, SORT_STRING );
-			if ( ! $session->validate_tables( $tables ) || ! $unchanged() || ! $this->saved->verify( $session, $this->binding ) || null !== $this->logging && ! $this->logging->verify( $session, $this->binding ) || $selected && ! $this->selected_physical( $session ) || ! $unchanged() || ! $session->rollback() ) { return false; }
-			$begun = false; return $session->retire() && $unchanged() && ( null === $this->logging || $this->logging->is_current() );
+			$tables = array_values( array_unique( [ ...$this->saved->tables( $session ), ...( null === $this->logging ? [] : $this->logging->tables( $session ) ), ...( null === $this->promise ? [] : $this->promise->tables( $session ) ) ] ) ); sort( $tables, SORT_STRING );
+			if ( ! $session->validate_tables( $tables ) || null !== $this->promise && ! $this->promise->verify_at( $session, $this->binding, $promise_at ) ) { return false; }
+			if ( ! $unchanged() || ! $this->saved->verify( $session, $this->binding ) || null !== $this->logging && ! $this->logging->verify( $session, $this->binding ) || $selected && ! $this->selected_physical( $session ) || ! $unchanged() || ! $session->rollback() ) { return false; }
+			$begun = false; if ( ! $session->retire() ) { return false; }
+			return $unchanged() && ( null === $this->logging || $this->logging->is_current() ) && ( null === $this->promise || $this->promise->eligible_after_read( $this->promise->capture_time() ) );
 		} catch ( \Throwable ) { return false; }
 		finally { if ( null !== $session ) { if ( $begun && ! $session->is_retired() ) { try { $session->rollback(); } catch ( \Throwable ) {} } if ( ! $session->is_retired() ) { try { $session->retire(); } catch ( \Throwable ) {} } } }
 	}

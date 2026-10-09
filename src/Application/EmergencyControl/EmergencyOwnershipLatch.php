@@ -135,7 +135,7 @@ final class EmergencyOwnershipLatch implements \JsonSerializable {
 				if ( $identity === $entry['identity'] ) {
 					$read = $this->reader->read_line( $item );
 					$context_hash = EmergencyCheckoutFacts::bounded_hash( null );
-					if ( null !== $read->snapshot && OrderDeliverySnapshot::VERSION_V2 === $read->snapshot->snapshot_version ) {
+					if ( null !== $read->snapshot && in_array( $read->snapshot->snapshot_version, [ OrderDeliverySnapshot::VERSION_V2, OrderDeliverySnapshot::VERSION_V3 ], true ) ) {
 						$snapshot = $read->snapshot;
 						$context_hash = $this->context_hash( [ 'contract_version' => $snapshot->customer_context_version, 'fulfilment_choice' => $snapshot->fulfilment_choice, 'delivery_offer_id' => $snapshot->delivery_offer_id, 'pickup_location_id' => $snapshot->pickup_location_id, 'matching_location' => $snapshot->matching_location, 'delivery_address' => $snapshot->delivery_address, 'matching_identity' => $snapshot->matching_identity, 'delivery_location_identity' => $snapshot->delivery_location_identity ] );
 					}

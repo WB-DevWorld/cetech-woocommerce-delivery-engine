@@ -2,6 +2,8 @@
 
 Owner authorization2026-10-09 12:45:25UTC accepts P03 integration and implements bounded P04. Actual master `c625a59bb61493e00d10b2802a08bac852b27b26` has unchanged qualified P03 tree22c37; PR104/Issue103 completed. Separate actual-master CI37932348440 and two original audits PASS (PR104/comment6081516744), independently of accepted PR/push qualification37928818620/37928757232 (all8jobs,495/20/143+19+49,799exactproduction sources/mapce61). P04 tracked by [Issue105](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/105) on ws3/wave2-p04-handoff. [Frozen transition](product/W2-P04-PROMISE-HANDOFF-2026-10-09.md): new strict forward readers/required-promise readiness first with writesOFF, then separate gated immutable promise profile and acknowledged saved-order handoff. No new profile is qualified or adopted yet. Schema10,23flags,372classifications and all retained v1 guarantees remain unchanged. No later P05/P06/UI/live release work is authorized.
 
+Reader checkpoint69699ecb/tree9e1d21 is independently accepted (Issue105/comment6082223622); clean root4,731tests/28,139assertions,805 production autoload/lint and both control planes pass. Guarded writers and lazy native composition are implemented and under final native/HTTP qualification. Physical source proof31tests/393assertions includes same-owner ordered absence locks, concurrent P02 mutations, calendar expiry after SQL retirement, capacity-port refusal and actual stalled owner with no replacement. New adoption staysOFF by default, with protected configure-OFF then separate enable; no new UI or live adoption. P04 is pending complete frozen-candidate qualification.
+
 ## Historical P03 status
 
 # Current status — P02 integrated / P03 calculation in progress

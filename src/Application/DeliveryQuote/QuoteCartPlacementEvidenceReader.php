@@ -25,7 +25,7 @@ final class QuoteCartPlacementEvidenceReader {
 			$read = $service->current( $draft->owner(), $reference, $current->current_context, $request );
 			$fresh = $this->environment->draft(); $fresh_envelope = $this->sessions->load( $draft->owner() );
 			if ( 'ready' !== $read->status || null !== $read->reason || null === $read->quote || null === $read->evaluated_at || $read->evaluated_at->epoch_microseconds() >= $envelope->expires_at() * 1000000 || null === $fresh || ! $fresh->owner()->equals( $draft->owner() ) || ! hash_equals( $draft->draft_digest(), $fresh->draft_digest() ) || $fresh_envelope?->to_private_json() !== $envelope->to_private_json() || ! $this->environment->authorize( $draft->owner(), 'delivery_quote.read' ) ) { return null; }
-			$tax_source = $current->guard instanceof LegacyQuoteCaptureGuard || $current->guard instanceof QuoteNativeReceiptGuard ? $current->guard->tax_source() : null; if ( $this->environment instanceof NativeCartQuoteEnvironment && null === $tax_source ) { return null; }
+			$tax_source = $current->guard instanceof QuoteNativeTaxEvidenceGuard ? $current->guard->tax_source() : null; if ( $this->environment instanceof NativeCartQuoteEnvironment && null === $tax_source ) { return null; }
 			return new QuotePlacementEvidence( $read->quote, $reference, $header, $current->current_context, $current->guard, [ $this->environment, 'authorize' ], $read->evaluated_at, $draft, native_tax_source: $tax_source );
 		} catch ( \Throwable ) { return null; }
 	}

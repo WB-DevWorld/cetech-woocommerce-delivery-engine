@@ -8,11 +8,21 @@ use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteOwner;
 use CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory;
 
 /** Native loaded draft first; all source/product/tax work belongs to the admitted preparation. */
-final class NativeCartQuoteEnvironment implements CartQuoteEnvironment {
+final class NativeCartQuoteEnvironment implements CartQuoteProfileEnvironment {
 	private NativeCartQuotePreparation $preparation;
 	private QuotePreparationAccess $current_access;
 	private ?CartQuoteRateProjection $rate_projection = null;
-	public function __construct( OperationConnectionFactory $factory, ?QuotePreparationAccess $current_access = null ) { $this->preparation = new NativeCartQuotePreparation( $factory ); $this->current_access = $current_access ?? new NativeQuotePreparationAccess( $factory ); }
+	private bool $preparation_configured;
+	private bool $preparation_started = false;
+	private ?\Closure $profile_selector;
+	public function __construct( OperationConnectionFactory $factory, ?QuotePreparationAccess $current_access = null, ?NativeCartQuotePreparation $preparation = null, ?callable $profile_selector = null ) { $this->preparation = $preparation ?? new NativeCartQuotePreparation( $factory ); $this->preparation_configured = null !== $preparation; $this->current_access = $current_access ?? new NativeQuotePreparationAccess( $factory ); $this->profile_selector = null === $profile_selector ? null : \Closure::fromCallable( $profile_selector ); }
+	/** One bootstrap handoff breaks native authorization construction cycles before any capture starts. */
+	public function set_preparation( NativeCartQuotePreparation $preparation ): void { if ( $this->preparation_started || $this->preparation_configured ) { throw new \LogicException( 'Native promise preparation is already configured.' ); } $this->preparation = $preparation; $this->preparation_configured = true; }
+	public function profile(): string {
+		$profile = null === $this->profile_selector ? LegacyFixedBaseQuoteProvider::CODE : ( $this->profile_selector )();
+		if ( ! is_string( $profile ) || ! in_array( $profile, [ LegacyFixedBaseQuoteProvider::CODE, ServicePromiseQuoteProvider::PROFILE ], true ) ) { self::fail(); }
+		return $profile;
+	}
 	/** Trusted composition only; replacement cannot change a captured native lifecycle. */
 	public function set_rate_projection( CartQuoteRateProjection $projection ): void {
 		if ( null !== $this->rate_projection && $this->rate_projection !== $projection ) { throw new \LogicException( 'Cart quote rate projection is already installed.' ); }
@@ -36,16 +46,22 @@ final class NativeCartQuoteEnvironment implements CartQuoteEnvironment {
 		try { return in_array( $operation, [ 'delivery_quote.issue', 'delivery_quote.read', 'delivery_quote.accept', 'delivery_quote.invalidate', 'delivery_quote.session', 'delivery_quote.bind', 'delivery_quote.verify_binding', 'delivery_quote.seal' ], true ) && $owner->equals( self::loaded_owner()[0] ); } catch ( \Throwable ) { return false; }
 	}
 	public function prepare( QuoteCartDraft $draft ): LegacyQuotePreparedCapture {
+		return $this->prepare_at( $draft, \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime::now() );
+	}
+	public function prepare_at( QuoteCartDraft $draft, \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime $original_issued_at ): LegacyQuotePreparedCapture {
+		$profile = $this->profile();
+		$this->preparation_started = true;
 		if ( ! $this->same_draft( $draft ) || ! $this->authorize( $draft->owner(), 'delivery_quote.issue' ) ) { self::fail(); }
 		// The caller already owns the early preparation lease. Native totals are never
 		// initialized by draft(), current(), or an unadmitted transport request.
 		NativeCartQuoteShipping::prepare_after_admission();
 		if ( ! $this->same_draft( $draft ) ) { self::fail(); }
-		$prepared = $this->preparation->prepare( $draft );
+		$prepared = $this->preparation->prepare( $draft, $profile, $original_issued_at );
 		if ( ! $this->same_draft( $draft ) || ! $this->authorize( $draft->owner(), 'delivery_quote.issue' ) ) { self::fail(); } return $prepared;
 	}
 	public function evidence( QuoteIssueCommand $original, QuoteHeader $header, QuoteCartDraft $draft ): ?QuoteCartCurrentEvidence {
 		try {
+			if ( 2 === $header->format_version() && ( 'service_promise_v1' !== $header->profile() || 'service_promise_v1' !== $this->profile() ) ) { return null; }
 			if ( ! $this->same_draft( $draft ) || ! $this->preparation->matches_original( $original, $header, $draft ) || ! $this->authorize( $draft->owner(), 'delivery_quote.read' ) ) { return null; }
 			$revision = $this->current_access->observe( $draft->owner() ); if ( null === $revision ) { return null; }
 			// Restore an exact existing native calculation, never calculate new rates.

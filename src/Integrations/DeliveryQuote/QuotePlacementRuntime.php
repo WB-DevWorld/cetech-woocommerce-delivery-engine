@@ -185,8 +185,9 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 				if ( ! $this->stage_matches( $order, $entry ) ) { return false; }
 				if ( ( $entry['route'] !== $route && ( 'order_pay' !== $route || 'sealed' !== $entry['binding']->state() || ! $this->authorize_saved_order( $order ) ) ) || ! QuoteNativeOrderHistory::verify( $order ) ) { return false; }
 				$guard = $entry['guard'];
+				$new_promise = 2 === $entry['evidence']->header()->format_version();
 				$logging = $entry['logger_receipt'] ?? null;
-				if ( $logging instanceof QuoteNativeCheckoutLoggingEvidence ) { if ( 'classic' !== $route || 4 !== $logging->phase() || ! $logging->is_current() ) { return false; } $guard = $logging->with_saved( $guard ); }
+				if ( $logging instanceof QuoteNativeCheckoutLoggingEvidence ) { if ( 'classic' !== $route || 4 !== $logging->phase() || ! $logging->is_current() ) { return false; } if ( ! $new_promise ) { $guard = $logging->with_saved( $guard ); } }
 				if ( 'store_api' === $route ) { $guard = $this->detach_store_pointer( $order, $entry['evidence'], $entry['binding'], $guard ); }
 				elseif ( 'classic' === $route ) { $guard = $this->retain_classic_pointer( $order, $entry['evidence'], $entry['binding'], $guard ); }
 				elseif ( 'order_pay' === $route ) { $guard = $this->saved_authorization_guard( $order, $guard ); }
@@ -194,12 +195,19 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 				// its new physical state only after that independent write acknowledges.
 				$evidence = $this->refresh_evidence( $entry['evidence'] );
 				$service = new QuotePlacementService( $this->durable( $evidence ), $evidence );
-				if ( 'sealed' !== $entry['binding']->state() && null !== $this->decorate_guard ) { $guard = ( $this->decorate_guard )( $guard ); }
+				if ( ( $new_promise || 'sealed' !== $entry['binding']->state() ) && null !== $this->decorate_guard ) { $guard = ( $this->decorate_guard )( $guard, $evidence ); }
 				if ( ! $guard instanceof QuotePlacementSavedEvidenceGuard || ! $local->unchanged() ) { return false; }
+				if ( $new_promise ) {
+					// Preserve this exact adoption/session decision for the payment owner.
+					// The native #5 logger successor is verified separately there.
+					$this->stages[$this->coordinate( $order )]['promise_payment_guard'] = $guard;
+					if ( $logging instanceof QuoteNativeCheckoutLoggingEvidence ) { $guard = $logging->with_saved( $guard ); }
+				}
 				if ( 'sealed' === $entry['binding']->state() ) {
 					if ( ! $this->durable( $evidence )->admit_sealed_placement( $evidence->owner(), $evidence->reference(), $evidence->header(), $entry['binding'], RequestContext::create(), $evidence->current_context(), $control_revision, $local, $guard ) ) { return false; }
 				} else {
-					$proof = QuotePlacementProof::capture( $entry['binding'], $control_revision, $local, $guard );
+					$promise_terms = 2 === $evidence->header()->format_version() ? $evidence->terms() : null;
+					$proof = QuotePlacementProof::capture( $entry['binding'], $control_revision, $local, $guard, $promise_terms, null === $promise_terms ? null : QuoteTime::now() );
 					$result = $service->seal( $entry['binding'], $proof, RequestContext::create() );
 					if ( 'accepted' !== $result->attempt->outcome->state || 'accepted' !== $result->attempt->completion?->state || null === $result->binding
 						|| 'sealed' !== $result->binding->state() || 3 !== $result->binding->revision() || ! $proof->unchanged() || ! $local->unchanged() ) { return false; }
@@ -211,16 +219,25 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 				if ( 'order_pay' !== $route || ! $evidence instanceof QuotePlacementEvidence || ! $this->authorize_saved_order( $order ) ) { return false; }
 				$binding = $evidence->binding(); $guard = $evidence->saved_guard();
 				if ( null !== $guard ) { $guard = $this->saved_authorization_guard( $order, $guard ); }
+				if ( null !== $guard && 2 === $evidence->header()->format_version() && null !== $this->decorate_guard ) { $guard = ( $this->decorate_guard )( $guard, $evidence ); }
 				if ( null === $binding || null === $guard || ! $this->durable( $evidence )->admit_sealed_placement( $evidence->owner(), $evidence->reference(), $evidence->header(), $binding, RequestContext::create(), $evidence->current_context(), $control_revision, $local, $guard )
 					|| ! $this->authorize_saved_order( $order ) || ! $local->unchanged() ) { return false; }
 			} else { return ! QuoteNativeOrderHistory::attempted( $order ) && ( ! $this->new_cart_owned() || 'order_pay' === $route ); }
+			$promise_boundary = null;
+			$promise_evidence = $evidence;
+			$promise_binding = null !== $entry ? $this->stages[$this->coordinate( $order )]['binding'] : $binding;
+			if ( 2 === $promise_evidence->header()->format_version() ) {
+				$linkage = $this->durable( $promise_evidence )->acknowledged_promise_seal( $promise_evidence->owner(), $promise_evidence->reference(), $promise_evidence->header(), $promise_binding, $guard );
+				if ( null === $linkage ) { return false; }
+				$promise_boundary = new \CetechDeliveryEngine\Application\DeliveryQuote\PromiseQuotePaymentBoundary( $promise_evidence->quote_record(), $promise_binding, $linkage, $promise_evidence->guard() );
+			}
 			if ( 'order_pay' !== $route || isset( $_POST['woocommerce_pay'] ) ) {
 				$pay_binding = null !== $entry ? $this->stages[$this->coordinate( $order )]['binding'] : $binding;
-				$pay_guard = null !== $entry ? $entry['guard'] : $evidence->saved_guard();
+				$pay_guard = null !== $entry ? ( 2 === $evidence->header()->format_version() ? ( $this->stages[$this->coordinate( $order )]['promise_payment_guard'] ?? null ) : $entry['guard'] ) : ( 2 === $evidence->header()->format_version() ? $guard : $evidence->saved_guard() );
 				$method = 'order_pay' === $route ? ( $_POST['payment_method'] ?? '_missing_native_method' ) : $order->get_payment_method( 'edit' ); if ( '' === $method ) { $method = '_free_native_method'; }
 				if ( ! is_string( $method ) || null === $pay_binding || null === $pay_guard ) { return false; }
 				$authorization = QuoteSavedOrderAuthorization::capture( $order, [ $this, 'authorize_saved_order' ] );
-				$this->pay_continuation = new QuoteNativeOrderPayContinuation( $this->factory, $order, $pay_binding, $pay_guard, $authorization, $method, 'order_pay' === $route, 'classic' === $route && null !== $entry ? ( $entry['logger_receipt'] ?? null ) : null );
+				$this->pay_continuation = new QuoteNativeOrderPayContinuation( $this->factory, $order, $pay_binding, $pay_guard, $authorization, $method, 'order_pay' === $route, 'classic' === $route && null !== $entry ? ( $entry['logger_receipt'] ?? null ) : null, $promise_boundary );
 				// Append only once the actual native order-pay request has acknowledged.
 				add_filter( 'woocommerce_available_payment_gateways', [ $this, 'guard_payment_gateways' ], PHP_INT_MAX, 1 );
 				remove_action( 'woocommerce_pre_payment_complete', [ $this, 'guard_free_payment_continuation' ], PHP_INT_MAX );

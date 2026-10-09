@@ -323,6 +323,22 @@ if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
 		"$WORK/opening-promise-calculation-results.json" "$NATIVE/wp-content/plugins/cetech-woocommerce-delivery-engine" "$WORK/opening-qualification-results.json" \
 		"$WORK/opening-quote-placement-cpt-results.json" "$WORK/opening-http-qualification-results.json" "$WORK/opening-promise-storage-results.json"
 	python3 "$ROOT/scripts/qualification/verify-promise-calculation-receipts.py" "$WORK/opening-promise-calculation-results.json" "$WORK/opening-promise-storage-results.json" "$WORK/opening-qualification-results.json" "$WORK/opening-quote-placement-cpt-results.json" "$WORK/opening-http-qualification-results.json"
+	# P04 retains its own native and fresh CPT proofs after all five prior primary receipts.
+	"${WP[@]}" --require="$ROOT/scripts/qualification/admin-context.php" \
+		eval-file "$ROOT/scripts/qualification/opening-promise-handoff-runner.php" --use-include \
+		"$WORK/opening-promise-handoff-results.json" hpos_on "$WORK/opening-qualification-results.json" \
+		"$WORK/opening-quote-placement-cpt-results.json" "$WORK/opening-http-qualification-results.json" \
+		"$WORK/opening-promise-storage-results.json" "$WORK/opening-promise-calculation-results.json" --path="$NATIVE"
+	bash "$ROOT/scripts/ci-promise-handoff-hpos-off.sh" "$NATIVE" "$WORK/wp-cli.phar" \
+		"$WORK/opening-promise-handoff-cpt-results.json" "$WORK/opening-qualification-results.json" \
+		"$WORK/opening-quote-placement-cpt-results.json" "$WORK/opening-http-qualification-results.json" \
+		"$WORK/opening-promise-storage-results.json" "$WORK/opening-promise-calculation-results.json"
+	bash "$ROOT/scripts/ci-promise-handoff-http-qualification.sh" "$WORK" "$NATIVE"
+	python3 "$ROOT/scripts/qualification/verify-promise-handoff-receipts.py" "$WORK/opening-promise-handoff-results.json" \
+		"$WORK/opening-promise-handoff-cpt-results.json" "$WORK/opening-promise-calculation-results.json" \
+		"$WORK/opening-promise-storage-results.json" "$WORK/opening-qualification-results.json" \
+		"$WORK/opening-quote-placement-cpt-results.json" "$WORK/opening-http-qualification-results.json" \
+		"$WORK/opening-http-promise-handoff-results.json"
 else
 	echo "opening_http_qualification=NOT_REQUESTED"
 fi

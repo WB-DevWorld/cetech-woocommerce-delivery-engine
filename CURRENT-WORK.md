@@ -6,6 +6,8 @@ Root owns central records, development identity, bootstrap/CI/package/source inv
 
 Permitted mutations: repository code/tests/task records and exact tracked objects in owned disposable local/CI SQL/WordPress fixtures. No live site/database/payment/deployment/tag/release. Existing schema10/current38/retained35 stores, v1 bytes/digests/money/retries/expiry/history,23flags/adoptionOFF,372classifications and retained495/20/143 +P02native19 +P03pure49 inventories remain protected. New service_promise_v1 profile/context-terms-header-row2/envelope2/outer3 use closed explicit dispatch; new adoption decision defaultsOFF. P04 does not start P05/P06, customer UI, capacity holds or current-prediction rewriting. Reader-first exact commit/review and complete pinned exact-candidate qualification remain required. Historical checkpoints below are preserved and superseded only for current task truth.
 
+Reader checkpoint69699ecb/tree9e1d21 is independently accepted (Issue105/comment6082223622); clean root4,731tests/28,139assertions,805 production autoload/lint and both control planes pass. Guarded writers and lazy native composition are implemented and under final native/HTTP qualification. Physical source proof31tests/393assertions includes same-owner ordered absence locks, concurrent P02 mutations, calendar expiry after SQL retirement, capacity-port refusal and actual stalled owner with no replacement. New adoption staysOFF by default, with protected configure-OFF then separate enable; no new UI or live adoption. P04 is pending complete frozen-candidate qualification.
+
 ## Historical P03 checkpoint
 
 # Current work — W2-P03 deterministic calculation

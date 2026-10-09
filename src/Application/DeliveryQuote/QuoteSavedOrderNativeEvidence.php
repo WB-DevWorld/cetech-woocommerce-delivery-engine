@@ -14,11 +14,11 @@ final class QuoteSavedOrderNativeEvidence {
 		try {
 			if ( ! $authorization->unchanged() || ! self::hooks_supported() || null === $quote->context() || null === $quote->terms() || ! $quote->header()->owner()->equals( $draft->owner() ) || ! $original_tax->matches_context( $quote->context() ) ) { return null; }
 			$hooks = QuoteNativeWooSource::capture_hook_fence( $original_tax->private_facts()['source']['selectors']['option_names'] );
-			$context = $quote->context();
+			$context = $quote->context()->base_context();
 			$source = ( new LegacyQuoteNativeSourcePreparer( $this->factory ) )->prepare_saved( $draft->owner(), $context, $draft, [ $authorization, 'unchanged' ] );
 			$physical = $this->native_tax( $order, $quote, $binding, $context, $original_tax, $hooks );
 			if ( ! $authorization->unchanged() || ! self::hooks_supported() || ! $hooks->hooks_unchanged() || ! $source->local_state_unchanged() ) { return null; }
-			return new QuoteCartCurrentEvidence( $context, new LegacyQuoteCaptureGuard( $source->guard(), new QuoteSavedOrderNativeTaxGuard( $draft->owner(), $context, $physical, $authorization, $saved, $binding, $hooks ) ) );
+			return new QuoteCartCurrentEvidence( $quote->context(), new LegacyQuoteCaptureGuard( $source->guard(), new QuoteSavedOrderNativeTaxGuard( $draft->owner(), $context, $physical, $authorization, $saved, $binding, $hooks ) ) );
 		} catch ( \Throwable ) { return null; }
 	}
 	/** Extra native saved-order tax filters are unknown effects, alongside the retained finite policy. */
