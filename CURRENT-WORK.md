@@ -1,4 +1,14 @@
-# Current Work — DeliveryQuote conformance closeout and adoption-readiness review
+# Current Work — service/promise-policy design proposal
+
+## Current authorized checkpoint — 2026-10-09 07:00:51 UTC
+
+The owner instructed “proceed” after the ready DeliveryQuote closeout handoff. PR #96 is owner-accepted and merged unchanged as `62fc5d00f93b2d651b4e20ab7ad4019b92fc82dc`, tree `ebff4a3d8ed24cfcace102a4de975f264552888a`, ordered parents Q06 master `e81db297bb550d420269bc905402eaffcc428aeb` and qualified closeout `ab700dde1e5b3ffd8007ad8ec4bfe7b227ab1a55`; Issue #95 completed. Its separate actual-master run `37896772757` is evaluated on PR #96 after execution; source/candidate/master roles remain separate. The review's 39 covered/nine bounded obligations and seven alignment recommendations/five broader partials are accepted as a documented bounded disposition. Canonical registry promotions remain separately proposed and unapplied.
+
+[Issue #97](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/97) is the next docs-only checkpoint from accepted REALIGNMENT Wave 2 package2: [W2-SERVICE-PROMISE-POLICY-1](docs/product/W2-SERVICE-PROMISE-POLICY-DESIGN-2026-10-09.md) and [bounded implementation/quote follow-up plan](docs/product/W2-SERVICE-PROMISE-IMPLEMENTATION-PLAN-2026-10-09.md). Root is exclusive editor of central docs, branch/ref/PR/issues on `ws3/wave2-promise-policy-design` based on exact 62fc. Finite read-only leases: integration review observes/audits actual-master CI/original artifacts; scope review maps queue; promise contract review checks original requirements/time/calendar/capacity; runtime review checks closed formats/snapshots/source fences. Reviewers write scratch proposals only; root consolidates repository documents.
+
+No production, test, fixture, CI, dependency, schema, flag, registry classification/count or live site/database/payment mutation is authorized here. Development/schema 9/23 flags/749 sources/map 4583 remain unchanged. Local docs/Git metadata and connected GitHub task records are permitted; required CI uses its existing owned disposable environments. No unexplained source edits or governing conflict were found. The first recommended future implementation is P01 internal contracts after explicit design acceptance; no Q07/promise runtime/site adoption/release starts automatically. Site adoption stays OFF.
+
+## Historical DeliveryQuote review authorization
 
 ## Current authorized checkpoint — 2026-10-09
 

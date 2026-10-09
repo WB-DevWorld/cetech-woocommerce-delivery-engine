@@ -1,5 +1,11 @@
 # Decision, Conflict & Negative-Invariant Register
 
+## Owner checkpoint disposition — 2026-10-09
+
+The owner instructed “proceed” at 07:00:51 UTC after the qualified closeout handoff. PR #96's exact reviewed docs-only candidate ab700dde1e5b3ffd8007ad8ec4bfe7b227ab1a55 is accepted/integrated unchanged as 62fc5d00f93b2d651b4e20ab7ad4019b92fc82dc; Issue #95 completed. This accepts the truthful 39 covered/nine bounded review and named follow-ups. Its seven proposed quote alignment recommendations remain separate proposals; no frozen 372-ID row/classification/count is changed by this disposition.
+
+Accepted REALIGNMENT Wave 2 package2 supplies the next docs-only [service/promise-policy proposal](W2-SERVICE-PROMISE-POLICY-DESIGN-2026-10-09.md) under [Issue #97](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/97). Proposed anchor/day-unit/DST/cutoff/capacity/reader and bounds decisions are explicitly unaccepted implementation choices until owner disposition. No promise runtime, Q07, site adoption, physical certification, release or Stable 1.0 acceptance is inferred. The source hierarchy and original decisions below remain authoritative; their audit chronology is retained.
+
 Status: owner accepted and frozen as `PRODUCT-TRUTH-BASELINE-1` on 2026-09-19. Decisions are reconstructed from supplied authoritative product history, repository authority documents, live GitHub chronology, and the six explicit owner resolutions recorded below.
 
 ## Authority rule

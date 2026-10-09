@@ -1,4 +1,10 @@
-# Current Status — integrated DeliveryQuote / conformance closeout
+# Current Status — quote closeout integrated / promise design proposed
+
+Current checkpoint: **PR #96 closeout accepted/integrated; W2-SERVICE-PROMISE-POLICY-1 DESIGN PROPOSED, IMPLEMENTATION UNSTARTED**. Actual closeout master `62fc5d00f93b2d651b4e20ab7ad4019b92fc82dc` has the exact reviewed tree `ebff4a3d8ed24cfcace102a4de975f264552888a`; Issue #95 completed. Separate master run 37896772757 and exact original receipts are recorded on PR #96 after execution, independently of original Q06 master e81/run 37868163553.
+
+[Issue #97](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/97) prepares the accepted Wave 2 package2 [service/promise design](product/W2-SERVICE-PROMISE-POLICY-DESIGN-2026-10-09.md), [six bounded checkpoints and quote follow-ups](product/W2-SERVICE-PROMISE-IMPLEMENTATION-PLAN-2026-10-09.md) and [ten-row traceability](product/W2-SERVICE-PROMISE-TRACEABILITY-2026-10-09.csv). Calendar/closure/cutoff/anchor/graph/capacity/required-history contracts are proposed, not implemented or physically accepted. All32 future observations are UNEXECUTED_DESIGN. Runtime, tests, schema 9,23 flags,749 production sources and all 372 registry rows/classifications/counts are unchanged. Site adoption remains OFF; cache/retention and target-stack gates remain. No deployment/tag/release or Stable 1.0 claim.
+
+The predecessor current block below is historical and superseded by the exact integration above; original implementation evidence remains separately authoritative.
 
 Current checkpoint: **Q01–Q06 integrated and actual-master qualified; conformance closeout under review** (2026-10-09).
 

@@ -1,5 +1,9 @@
 # Reusable WooCommerce Delivery & Fulfilment Engine
 
+## Current checkpoint supersession — 2026-10-09
+
+Owner “proceed” accepts/integrates reviewed docs-only PR #96 unchanged as `62fc5d00f93b2d651b4e20ab7ad4019b92fc82dc` / tree `ebff4a3d8ed24cfcace102a4de975f264552888a`; Issue #95 completed. Original Q06 implementation/master receipts remain separate. Current [Issue #97](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/97) is [W2-SERVICE-PROMISE-POLICY-1 design](product/W2-SERVICE-PROMISE-POLICY-DESIGN-2026-10-09.md) with [bounded implementation and quote gap queue](product/W2-SERVICE-PROMISE-IMPLEMENTATION-PLAN-2026-10-09.md). Root exclusively owns central docs/publication; finite reviewers are read-only. Proposed calendar/clock/cutoff/capacity/reader contracts and 32 future observations await acceptance/implementation. Seven quote registry alignment recommendations remain unapplied. All current runtime/tests/CI/dependencies/schema 9/23 flags/372 classifications are preserved; adoption OFF. Exact master/candidate CI and final freshness are recorded on their PRs after execution. Older status blocks below remain historical.
+
 ## Current implementation supersession — 2026-10-09
 
 Q01–Q06 are owner-accepted and integrated through Q06 master `e81db297bb550d420269bc905402eaffcc428aeb` (PR #94; Issue #93 completed). Separate actual-master run `37868163553`, attempt 1, passed all eight actual jobs and original strict receipts 495 native / 20 CPT / 143 HTTP/browser, actual paid/free Blocks buttons, history, smoke and exact cleanup. Development `1.0.0-dev.wave2-quote-placement.1`, schema 9, 23 flags and 749 immutable production PHP sources remain. [Current status](STATUS_CURRENT.md) and the [DeliveryQuote closeout](product/W2-DELIVERYQUOTE-CLOSEOUT-2026-10-09.md) govern newer implementation truth.
