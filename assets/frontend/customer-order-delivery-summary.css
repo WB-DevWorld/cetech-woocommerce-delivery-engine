@@ -1,9 +1,21 @@
 /**
- * Stage 13F — compact customer Delivery details (thank-you / My Account).
+ * Customer delivery summaries and shipment cards (thank-you / My Account).
  */
 
 .cetech-de-order-delivery-summary {
 	margin: 1.5em 0;
+	max-width: 100%;
+	min-width: 0;
+	line-height: 1.5;
+	overflow-wrap: anywhere;
+}
+
+.cetech-de-order-delivery-summary__line {
+	padding-block: 0.85rem;
+}
+
+.cetech-de-order-delivery-summary__line + .cetech-de-order-delivery-summary__line {
+	border-block-start: 1px solid rgba(0, 0, 0, 0.16);
 }
 
 .cetech-de-order-delivery-summary__compact {
@@ -13,16 +25,19 @@
 }
 
 .cetech-de-order-delivery-summary__compact li {
+	display: grid;
+	grid-template-columns: minmax(8rem, 0.4fr) minmax(0, 1fr);
+	gap: 0.25rem 0.75rem;
 	margin: 0.35em 0;
 }
 
 .cetech-de-order-delivery-summary__compact .label {
 	font-weight: 600;
-	margin-right: 0.35em;
+	margin-inline-end: 0.35em;
 }
 
 .cetech-de-order-delivery-summary__product {
-	margin: 0.75em 0 0.25em;
+	margin: 0 0 0.5em;
 	font-weight: 600;
 }
 
@@ -32,8 +47,11 @@
 
 .cetech-de-customer-shipments {
 	margin: 2.75em 0 1.75em;
-	padding-top: 1.75em;
-	border-top: 1px solid rgba(0, 0, 0, 0.12);
+	padding-block-start: 1.25em;
+	max-width: 100%;
+	min-width: 0;
+	line-height: 1.5;
+	border-block-start: 1px solid rgba(0, 0, 0, 0.16);
 	clear: both;
 }
 
@@ -43,10 +61,13 @@
 
 .cetech-de-customer-shipment {
 	display: block;
-	margin: 1.25em 0 0;
-	padding: 1.25em 1.15em;
+	margin: 0.85em 0 0;
+	padding: 1rem;
 	border: 1px solid rgba(0, 0, 0, 0.12);
-	border-radius: 6px;
+	border-radius: 0.5rem;
+	max-width: 100%;
+	min-width: 0;
+	box-sizing: border-box;
 	background: #fff;
 	overflow-wrap: anywhere;
 	word-break: break-word;
@@ -68,20 +89,38 @@
 }
 
 .cetech-de-customer-shipment__details li {
-	margin: 0.35em 0;
+	display: grid;
+	grid-template-columns: minmax(8rem, 0.4fr) minmax(0, 1fr);
+	gap: 0.25rem 0.75rem;
+	margin: 0.5em 0;
 }
 
 .cetech-de-customer-shipment__details .label {
 	font-weight: 600;
-	margin-right: 0.35em;
+	margin-inline-end: 0.35em;
 }
 
 .cetech-de-customer-shipment__status {
+	justify-self: start;
+	padding: 0.15rem 0.55rem;
+	border: 1px solid currentColor;
+	border-radius: 999px;
+	font-size: 0.95em;
 	font-weight: 600;
+	max-width: 100%;
+	box-sizing: border-box;
 }
 
 .cetech-de-customer-shipment__track {
-	margin: 0.85em 0 0;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 0.5rem 0.75rem;
+	margin: 1rem 0 0;
+}
+
+.cetech-de-customer-shipment__track-hint {
+	font-size: 0.9em;
 }
 
 a.cetech-de-customer-shipment__track-button {
@@ -93,13 +132,15 @@ a.cetech-de-customer-shipment__track-button {
 	min-width: 44px;
 	padding: 0.65em 1.15em;
 	border: 1px solid #1d2327;
-	border-radius: 4px;
+	border-radius: 0.5rem;
 	background: #1d2327;
 	color: #fff;
 	font-weight: 600;
 	line-height: 1.25;
 	text-decoration: none;
 	text-align: center;
+	white-space: normal;
+	max-width: 100%;
 	cursor: pointer;
 }
 
@@ -127,4 +168,16 @@ a.cetech-de-customer-shipment__track-button:focus-visible {
 
 .cetech-de-customer-shipment__note {
 	margin: 0.75em 0 0;
+}
+
+@media (max-width: 600px) {
+	.cetech-de-order-delivery-summary__compact li,
+	.cetech-de-customer-shipment__details li {
+		grid-template-columns: minmax(0, 1fr);
+		gap: 0.1rem;
+	}
+
+	.cetech-de-customer-shipment {
+		padding: 0.85rem;
+	}
 }

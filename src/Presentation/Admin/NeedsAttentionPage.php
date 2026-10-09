@@ -103,7 +103,7 @@ final class NeedsAttentionPage {
 		AdminPageLayout::render_page_header(
 			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Needs Attention', 'cetech-woocommerce-delivery-engine' ),
-			__( 'An operational to-do list for products that are missing a usable delivery setup, stalled Bulk Tools jobs, Cash on Delivery orders that need a shipment created, paid orders whose delivery shipments could not be created, and shipments that need fulfilment review.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Review delivery setup and fulfilment tasks.', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		if ( $op->customers_still_use_previous_rules() && ! $op->sitewide_setup_complete ) {
@@ -124,7 +124,7 @@ final class NeedsAttentionPage {
 		if ( [] === $items && [] === $shipments && [] === $operations && [] === $cod && [] === $bulk ) {
 			AdminPageLayout::render_empty_state(
 				__( 'Nothing needs attention', 'cetech-woocommerce-delivery-engine' ),
-				__( 'Every listed product currently has a usable delivery setup, no stalled Bulk Tools jobs are waiting, and no Cash on Delivery shipment, paid-order shipment creation, or operational shipment problems are waiting.', 'cetech-woocommerce-delivery-engine' )
+				__( 'No items need attention in the sections you can access.', 'cetech-woocommerce-delivery-engine' )
 			);
 			AdminPageLayout::close_page();
 			return;
@@ -135,6 +135,10 @@ final class NeedsAttentionPage {
 			return;
 		}
 
+		AdminPageLayout::open_section(
+			__( 'Products', 'cetech-woocommerce-delivery-engine' ),
+			__( 'Review each problem and update the relevant delivery settings.', 'cetech-woocommerce-delivery-engine' )
+		);
 		$rows = [];
 		foreach ( $items as $item ) {
 			$edit_url = add_query_arg(
@@ -170,6 +174,7 @@ final class NeedsAttentionPage {
 			$rows,
 			true
 		);
+		AdminPageLayout::close_section();
 
 		AdminPageLayout::close_page();
 	}

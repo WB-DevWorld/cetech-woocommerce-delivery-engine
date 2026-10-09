@@ -1,3 +1,24 @@
+/* Shared status colours also cover native product/order panels without a page layout. */
+.cetech-de-admin-page,
+.cetech-de-dashboard,
+.cetech-de-product-panel {
+	--cetech-de-success-bg: #edfaef;
+	--cetech-de-success-text: #007017;
+	--cetech-de-success-border: #b8e6bf;
+	--cetech-de-warning-bg: #fcf9e8;
+	--cetech-de-warning-text: #765b15;
+	--cetech-de-warning-border: #f0e6b8;
+	--cetech-de-error-bg: #fcf0f1;
+	--cetech-de-error-text: #8a2424;
+	--cetech-de-error-border: #f1aeb5;
+	--cetech-de-info-bg: #f0f6fc;
+	--cetech-de-info-text: #0a4b78;
+	--cetech-de-info-border: #c5d9ed;
+	--cetech-de-neutral-bg: #f6f7f7;
+	--cetech-de-neutral-text: #50575e;
+	--cetech-de-neutral-border: #dcdcde;
+}
+
 .cetech-de-admin-page {
 	max-width: 1180px;
 }
@@ -95,18 +116,18 @@
 }
 
 .cetech-de-status-banner--ready {
-	background: #edfaef;
-	border-color: #b8e6bf;
+	background: var(--cetech-de-success-bg, #edfaef);
+	border-color: var(--cetech-de-success-border, #b8e6bf);
 }
 
 .cetech-de-status-banner--attention {
-	background: #fcf9e8;
-	border-color: #f0e6b8;
+	background: var(--cetech-de-warning-bg, #fcf9e8);
+	border-color: var(--cetech-de-warning-border, #f0e6b8);
 }
 
 .cetech-de-status-banner--info {
-	background: #f0f6fc;
-	border-color: #c5d9ed;
+	background: var(--cetech-de-info-bg, #f0f6fc);
+	border-color: var(--cetech-de-info-border, #c5d9ed);
 }
 
 .cetech-de-status-banner-icon {
@@ -116,15 +137,17 @@
 }
 
 .cetech-de-status-banner--ready .cetech-de-status-banner-icon {
-	color: #007017;
+	color: var(--cetech-de-success-text, #007017);
 }
 
 .cetech-de-status-banner--attention .cetech-de-status-banner-icon {
-	color: #8a6d1d;
+	color: var(--cetech-de-warning-text, #765b15);
 }
 
 .cetech-de-status-banner-body {
 	flex: 1 1 240px;
+	min-width: 0;
+	overflow-wrap: anywhere;
 }
 
 .cetech-de-status-banner-title,
@@ -203,6 +226,7 @@
 	border: 1px solid #dcdcde;
 	border-radius: 8px;
 	min-height: 100%;
+	box-sizing: border-box;
 }
 
 .cetech-de-choice-card-mark {
@@ -248,6 +272,11 @@
 	transform: rotate(45deg);
 }
 
+.cetech-de-choice-card input:disabled + .cetech-de-choice-card-body {
+	cursor: not-allowed;
+	border-style: dashed;
+}
+
 .cetech-de-choice-card-icon {
 	display: block;
 	font-size: 22px;
@@ -286,13 +315,13 @@
 }
 
 .cetech-de-info-notice--success {
-	background: #edfaef;
-	border-color: #b8e6bf;
+	background: var(--cetech-de-success-bg, #edfaef);
+	border-color: var(--cetech-de-success-border, #b8e6bf);
 }
 
 .cetech-de-info-notice--warning {
-	background: #fcf9e8;
-	border-color: #f0e6b8;
+	background: var(--cetech-de-warning-bg, #fcf9e8);
+	border-color: var(--cetech-de-warning-border, #f0e6b8);
 }
 
 .cetech-de-info-notice p {
@@ -480,6 +509,7 @@
 }
 
 .cetech-de-customize-field {
+	min-width: 0;
 	margin: 0 0 18px;
 	padding: 14px 16px;
 	border: 1px solid #dcdcde;
@@ -489,6 +519,43 @@
 
 .cetech-de-customize-override {
 	margin: 8px 0 0 24px;
+	padding-inline-start: 12px;
+	border-inline-start: 2px solid #c5d9ed;
+}
+
+.cetech-de-customize-field legend {
+	padding: 0 4px;
+	font-weight: 600;
+}
+
+.cetech-de-customize-state {
+	margin: 8px 0;
+	color: #50575e;
+}
+
+.cetech-de-unsaved-status {
+	margin: 8px 0;
+	color: var(--cetech-de-warning-text, #765b15);
+}
+
+.cetech-de-option-search-controls {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin: 12px 0;
+}
+
+.cetech-de-option-search-controls[hidden],
+.cetech-de-option-search-row[hidden],
+.cetech-de-customize-override[hidden],
+.cetech-de-unsaved-status[hidden] {
+	display: none;
+}
+
+.cetech-de-option-search-controls input[type="search"] {
+	width: min(100%, 24rem);
+	max-width: 100%;
 }
 
 .cetech-de-condition-builder {
@@ -511,39 +578,56 @@
 }
 
 .cetech-de-badge {
-	display: inline-block;
+	display: inline-flex;
+	align-items: center;
 	border-radius: 999px;
 	padding: 2px 8px;
 	font-size: 12px;
+	font-weight: 600;
 	line-height: 1.4;
-	border: 1px solid #c3c4c7;
-	background: #f6f7f7;
-	color: #1d2327;
+	border: 1px solid var(--cetech-de-neutral-border, #dcdcde);
+	background: var(--cetech-de-neutral-bg, #f6f7f7);
+	color: var(--cetech-de-neutral-text, #50575e);
+	max-width: 100%;
+	overflow-wrap: anywhere;
 }
 
 .cetech-de-badge--ready {
-	background: #edfaef;
-	color: #1e4620;
-	border-color: #c3e6cb;
+	background: var(--cetech-de-success-bg, #edfaef);
+	color: var(--cetech-de-success-text, #007017);
+	border-color: var(--cetech-de-success-border, #b8e6bf);
+}
+
+.cetech-de-badge--needs_setup,
+.cetech-de-badge--attention {
+	background: var(--cetech-de-warning-bg, #fcf9e8);
+	color: var(--cetech-de-warning-text, #765b15);
+	border-color: var(--cetech-de-warning-border, #f0e6b8);
+}
+
+.cetech-de-badge--not_active {
+	background: var(--cetech-de-neutral-bg, #f6f7f7);
+	color: var(--cetech-de-neutral-text, #50575e);
+	border-color: var(--cetech-de-neutral-border, #dcdcde);
 }
 
 .cetech-de-badge--awaiting,
 .cetech-de-badge--processing {
-	background: #f0f6fc;
-	color: #1d2327;
-	border-color: #c5d9ed;
+	background: var(--cetech-de-info-bg, #f0f6fc);
+	color: var(--cetech-de-info-text, #0a4b78);
+	border-color: var(--cetech-de-info-border, #c5d9ed);
 }
 
 .cetech-de-badge--transit {
-	background: #f0f6fc;
-	color: #0a4b78;
-	border-color: #c5d9ed;
+	background: var(--cetech-de-info-bg, #f0f6fc);
+	color: var(--cetech-de-info-text, #0a4b78);
+	border-color: var(--cetech-de-info-border, #c5d9ed);
 }
 
 .cetech-de-badge--cancelled {
-	background: #fcf0f1;
-	color: #8a2424;
-	border-color: #f0c6c6;
+	background: var(--cetech-de-error-bg, #fcf0f1);
+	color: var(--cetech-de-error-text, #8a2424);
+	border-color: var(--cetech-de-error-border, #f1aeb5);
 }
 
 .cetech-de-shipment-pagination {
@@ -583,15 +667,6 @@
 
 .cetech-de-list-toolbar select {
 	max-width: 100%;
-}
-
-.cetech-de-badge--attention {
-	background: #fcf9e8;
-	color: #8a6d1d;
-	border: 1px solid #f0e6b8;
-	border-radius: 999px;
-	padding: 2px 8px;
-	font-size: 12px;
 }
 
 .cetech-de-empty-hint {
@@ -644,6 +719,7 @@
 
 .cetech-de-list-toolbar input[type="search"] {
 	min-width: min(100%, 240px);
+	max-width: 100%;
 }
 
 .cetech-de-product-panel {
@@ -1195,3 +1271,325 @@
 	background: #f0f6fc;
 }
 
+
+/* Operations dashboard uses the same layout foundation as the configuration pages. */
+.cetech-de-card-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr));
+	gap: 16px;
+}
+
+.cetech-de-readiness-grid .cetech-de-card {
+	min-height: 190px;
+	display: flex;
+	flex-direction: column;
+}
+
+.cetech-de-card {
+	background: var(--cetech-de-bg);
+	border: 1px solid var(--cetech-de-border);
+	border-radius: var(--cetech-de-radius);
+	padding: 16px;
+	box-shadow: var(--cetech-de-shadow);
+	min-width: 0;
+	overflow-wrap: anywhere;
+	transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+.cetech-de-card:hover {
+	border-color: #c3c4c7;
+	box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.cetech-de-card-head {
+	display: flex;
+	justify-content: space-between;
+	gap: 10px;
+	align-items: flex-start;
+	margin-bottom: 10px;
+}
+
+.cetech-de-card-title {
+	margin: 0;
+	font-size: 15px;
+	font-weight: 600;
+	line-height: 1.35;
+	color: var(--cetech-de-text);
+}
+
+.cetech-de-card-text {
+	margin: 0;
+	color: var(--cetech-de-muted);
+	font-size: 13px;
+	line-height: 1.55;
+	flex: 1;
+}
+
+.cetech-de-card-footer {
+	margin-top: 16px;
+	padding-top: 12px;
+	border-top: 1px solid #f0f0f1;
+}
+
+.cetech-de-card-button { width: 100%; text-align: center; justify-content: center; }
+
+.cetech-de-card--ready { border-top: 3px solid var(--cetech-de-success-text, #007017); }
+
+.cetech-de-card--needs_setup { border-top: 3px solid var(--cetech-de-warning-text, #765b15); }
+
+.cetech-de-card--not_active { border-top: 3px solid #8c8f94; }
+
+.cetech-de-card--attention { border-top: 3px solid var(--cetech-de-warning-text, #765b15); }
+
+.cetech-de-checklist {
+	display: grid;
+	gap: 10px;
+}
+
+.cetech-de-checklist-item {
+	display: grid;
+	grid-template-columns: auto 1fr auto;
+	gap: 14px;
+	align-items: center;
+	background: var(--cetech-de-bg);
+	border: 1px solid var(--cetech-de-border);
+	border-radius: var(--cetech-de-radius);
+	padding: 16px 18px;
+	box-shadow: var(--cetech-de-shadow);
+}
+
+.cetech-de-checklist-item--completed { background: #f6fbf7; border-color: #b8e6bf; }
+
+.cetech-de-checklist-item--pending { background: #fffdf5; }
+
+.cetech-de-checklist-step {
+	width: 32px;
+	height: 32px;
+	border-radius: 999px;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	background: #f0f0f1;
+	color: var(--cetech-de-text);
+	font-size: 13px;
+	font-weight: 700;
+	flex-shrink: 0;
+}
+
+.cetech-de-checklist-item--completed .cetech-de-checklist-step {
+	background: var(--cetech-de-success-text, #007017);
+	color: #fff;
+}
+
+.cetech-de-checklist-title {
+	margin: 0 0 4px;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--cetech-de-text);
+}
+
+.cetech-de-checklist-desc {
+	margin: 0;
+	color: var(--cetech-de-muted);
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.cetech-de-checklist-side {
+	display: flex;
+	flex-direction: column;
+	gap: 8px;
+	align-items: flex-end;
+	min-width: 0;
+}
+
+.cetech-de-checklist-button { white-space: normal; text-align: center; }
+
+.cetech-de-action-card {
+	position: relative;
+	display: block;
+	background: var(--cetech-de-bg);
+	border: 1px solid var(--cetech-de-border);
+	border-radius: var(--cetech-de-radius);
+	padding: 18px 42px 18px 18px;
+	text-decoration: none;
+	color: inherit;
+	box-shadow: var(--cetech-de-shadow);
+	min-height: 108px;
+	box-sizing: border-box;
+	min-width: 0;
+	overflow-wrap: anywhere;
+	transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+
+.cetech-de-action-card:hover {
+	border-color: var(--cetech-de-accent);
+	box-shadow: 0 0 0 1px var(--cetech-de-accent);
+	color: inherit;
+	transform: translateY(-1px);
+}
+
+.cetech-de-action-card-arrow {
+	position: absolute;
+	top: 18px;
+	right: 16px;
+	color: var(--cetech-de-accent);
+	font-size: 18px;
+	line-height: 1;
+}
+
+.cetech-de-action-card-title {
+	display: block;
+	font-size: 14px;
+	font-weight: 600;
+	margin-bottom: 6px;
+	color: var(--cetech-de-text);
+}
+
+.cetech-de-action-card-desc {
+	display: block;
+	color: var(--cetech-de-muted);
+	font-size: 13px;
+	line-height: 1.5;
+}
+
+.cetech-de-warnings { display: grid; gap: 12px; }
+
+.cetech-de-empty-state--success {
+	background: #f6fbf7;
+	border-color: #b8e6bf;
+}
+
+.cetech-de-help-grid {
+	display: grid;
+	grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+	gap: 16px;
+}
+
+.cetech-de-help-subtitle {
+	margin: 0 0 10px;
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--cetech-de-text);
+}
+
+.cetech-de-help-lead {
+	margin: 0 0 8px;
+	color: var(--cetech-de-muted);
+	font-size: 13px;
+}
+
+.cetech-de-warnings .cetech-de-warning-card {
+	margin: 0;
+}
+
+/* Keep keyboard focus clear without changing native controls on unrelated screens. */
+.cetech-de-admin-page :is(a, button, input, select, textarea, summary):focus-visible,
+.cetech-de-dashboard :is(a, button, input, select, textarea, summary):focus-visible,
+.cetech-de-product-panel :is(a, button, input, select, textarea, summary):focus-visible {
+	outline: 2px solid #2271b1;
+	outline-offset: 2px;
+}
+
+.cetech-de-admin-page :is(a, button, input, select, textarea, summary) {
+	scroll-margin-block-start: 180px;
+}
+
+.cetech-de-admin-page .cetech-de-form-table :is(input, select, textarea) {
+	max-width: 100%;
+	box-sizing: border-box;
+}
+
+.cetech-de-admin-page .cetech-de-form-table :is(th, td),
+.cetech-de-admin-page .cetech-de-admin-table-wrap :is(th, td) {
+	overflow-wrap: anywhere;
+}
+
+/* A wrapped header must not cover a large portion of the working viewport. */
+@media (max-width: 960px), (max-height: 600px) {
+	.cetech-de-admin-page .cetech-de-page-header--sticky-actions {
+		position: static;
+	}
+}
+
+@media (max-width: 782px) {
+	.cetech-de-admin-page :is(.button, .button-link),
+	.cetech-de-dashboard :is(.button, .button-link),
+	.cetech-de-product-panel :is(.button, .button-link) {
+		min-height: 40px;
+		white-space: normal;
+	}
+
+	.cetech-de-admin-page .cetech-de-form-panel,
+	.cetech-de-admin-page .cetech-de-advanced {
+		padding-inline: 16px;
+	}
+
+	.cetech-de-customize-override {
+		margin-inline-start: 0;
+	}
+
+	.cetech-de-wizard-steps li + li {
+		margin-top: 8px;
+	}
+
+	.cetech-de-status-banner .button {
+		margin-top: 12px;
+	}
+
+	.cetech-de-checklist-item {
+		grid-template-columns: 1fr;
+	}
+
+	.cetech-de-checklist-side {
+		align-items: flex-start;
+		flex-direction: row;
+		flex-wrap: wrap;
+	}
+
+	.cetech-de-card-button,
+	.cetech-de-checklist-button {
+		width: auto;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.cetech-de-card,
+	.cetech-de-action-card {
+		transition: none;
+	}
+
+	.cetech-de-action-card:hover {
+		transform: none;
+	}
+}
+
+@media (forced-colors: active) {
+	.cetech-de-badge,
+	.cetech-de-status-banner,
+	.cetech-de-info-notice,
+	.cetech-de-choice-card-body {
+		border-color: CanvasText;
+	}
+
+	.cetech-de-choice-card input:checked + .cetech-de-choice-card-body {
+		outline: 2px solid Highlight;
+		outline-offset: -3px;
+	}
+
+	.cetech-de-choice-card input:checked + .cetech-de-choice-card-body .cetech-de-choice-card-mark {
+		forced-color-adjust: none;
+		background: Highlight;
+		border-color: Highlight;
+	}
+
+	.cetech-de-choice-card input:checked + .cetech-de-choice-card-body .cetech-de-choice-card-mark::after {
+		border-color: HighlightText;
+	}
+
+	.cetech-de-admin-page :is(a, button, input, select, textarea, summary):focus-visible,
+	.cetech-de-dashboard :is(a, button, input, select, textarea, summary):focus-visible,
+	.cetech-de-product-panel :is(a, button, input, select, textarea, summary):focus-visible {
+		outline-color: Highlight;
+	}
+}
