@@ -117,11 +117,12 @@ jobs:
         run: bash scripts/ci-lint-php.sh .
       - name: Full PHPUnit suite
         run: vendor/bin/phpunit
-      - name: Quote placement and promise storage qualification protocol boundaries
+      - name: Quote placement, promise storage and calculation protocol boundaries
         run: |
           python3 scripts/qualification/test-opening-quote-placement-protocol.py
           python3 scripts/qualification/test-verify-quote-placement-receipts.py
           python3 scripts/qualification/test-verify-promise-storage-receipts.py
+          python3 scripts/qualification/test-verify-promise-calculation-receipts.py
       - name: Production tree autoload and extracted PHP lint
         shell: bash
         run: bash scripts/ci-stage-production-tree.sh "${RUNNER_TEMP}/cetech-de-prod-tree"
@@ -302,6 +303,14 @@ jobs:
         with:
           name: opening-promise-storage-qualification
           path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-storage-results.json
+          if-no-files-found: warn
+
+      - name: Retain separate pure promise calculation qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-promise-calculation-qualification
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-calculation-results.json
           if-no-files-found: warn
 
   javascript-tests:

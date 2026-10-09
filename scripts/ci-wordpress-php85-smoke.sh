@@ -318,6 +318,11 @@ if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
 		"$WORK/opening-promise-storage-results.json" "$WORK/opening-qualification-results.json" \
 		"$WORK/opening-quote-placement-cpt-results.json" "$WORK/opening-http-qualification-results.json" --path="$NATIVE"
 	python3 "$ROOT/scripts/qualification/verify-promise-storage-receipts.py" "$WORK/opening-promise-storage-results.json" "$WORK/opening-qualification-results.json" "$WORK/opening-quote-placement-cpt-results.json" "$WORK/opening-http-qualification-results.json"
+	# P03 executes in a separate pure CLI process against the installed production package.
+	CETECH_DE_PROMISE_CALCULATION_QUALIFICATION=1 php "$ROOT/scripts/qualification/opening-promise-calculation-runner.php" \
+		"$WORK/opening-promise-calculation-results.json" "$NATIVE/wp-content/plugins/cetech-woocommerce-delivery-engine" "$WORK/opening-qualification-results.json" \
+		"$WORK/opening-quote-placement-cpt-results.json" "$WORK/opening-http-qualification-results.json" "$WORK/opening-promise-storage-results.json"
+	python3 "$ROOT/scripts/qualification/verify-promise-calculation-receipts.py" "$WORK/opening-promise-calculation-results.json" "$WORK/opening-promise-storage-results.json" "$WORK/opening-qualification-results.json" "$WORK/opening-quote-placement-cpt-results.json" "$WORK/opening-http-qualification-results.json"
 else
 	echo "opening_http_qualification=NOT_REQUESTED"
 fi
