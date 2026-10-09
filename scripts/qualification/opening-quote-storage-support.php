@@ -32,7 +32,7 @@ final class CetechNativeQuoteStorageFixture {
 
 	/** Reconstruct schema8 from current native definitions, retaining the old32 tables. */
 	public function install_schema8(): void {
-		if ( 0 !== $this->prefix_table_count() || 32 !== count( DataLifecycleManifest::ORIGINAL_DOMAIN_TABLE_SUFFIXES ) || 35 !== count( DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES ) ) { throw new RuntimeException( 'Native quote fixture namespace is unavailable.' ); }
+		if ( 0 !== $this->prefix_table_count() || 32 !== count( DataLifecycleManifest::ORIGINAL_DOMAIN_TABLE_SUFFIXES ) || 35 !== count( DataLifecycleManifest::RETAINED_QUOTE_DOMAIN_TABLE_SUFFIXES ) ) { throw new RuntimeException( 'Native quote fixture namespace is unavailable.' ); }
 		foreach ( DataLifecycleManifest::ORIGINAL_DOMAIN_TABLE_SUFFIXES as $suffix ) {
 			$table = $this->register_table( $this->prefix . 'delivery_engine_' . $suffix );
 			$source = $this->main->prefix . 'delivery_engine_' . $suffix;

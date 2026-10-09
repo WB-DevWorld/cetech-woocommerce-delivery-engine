@@ -1,6 +1,8 @@
 # Wave 2 — service and delivery-promise policy
 
-Current status: **OWNER ACCEPTED 2026-10-09; original reviewed proposal integrated through PR #98. W2-P01 INTERNAL CONTRACTS IN PROGRESS; later checkpoints unstarted.** The owner continuation and exact accepted source are recorded in CURRENT-WORK.md. All original proposed semantics and unexecuted future observations below are retained as the accepted design record; this overlay does not turn those algorithm/physical observations into P01 test results.
+Current owner checkpoint2026-10-09 09:11:24 UTC: P01 accepted/integrated under PR100/masterd07b8eb; P02 immutable persistence authorized under Issue101. Its [frozen additive schema/reader transition](W2-P02-IMMUTABLE-PROMISE-STORAGE-2026-10-09.md) governs implementation. P03–P06 remain later bounded checkpoints; original design observations below retain their historical/unexecuted meaning.
+
+Historical P01 checkpoint: **OWNER ACCEPTED 2026-10-09; original reviewed proposal integrated through PR #98. W2-P01 INTERNAL CONTRACTS IN PROGRESS; later checkpoints unstarted.** The owner continuation and exact accepted source are recorded in CURRENT-WORK.md. All original proposed semantics and unexecuted future observations below are retained as the accepted design record; this overlay does not turn those algorithm/physical observations into P01 test results.
 
 ## Original reviewed design record
 

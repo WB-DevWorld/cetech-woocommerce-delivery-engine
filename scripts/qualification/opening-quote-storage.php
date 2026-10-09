@@ -52,7 +52,7 @@ return static function ( callable $check ): void {
 	};
 	try {
 		$main_readiness = new DeliveryQuoteReadiness( $main ); $main_readiness->assert_ready();
-		$check( 'NATIVE-W2Q02-MAIN-SCHEMA9-EXACT-STORES-RATE-INDEX', '9' === (string) get_option( SchemaVersion::OPTION_NAME ) && 4 === count( $definitions_before ) && [ 'ready' => true, 'code' => 'ready' ] === $main_readiness->get_status(), [ 'quote_stores' => 3, 'rate_index' => DeliveryQuoteSchema::RATE_INDEX, 'currency_column' => 'base_currency', 'unit_bootstrap' => false ] );
+		$check( 'NATIVE-W2Q02-MAIN-SCHEMA9-EXACT-STORES-RATE-INDEX', '10' === (string) get_option( SchemaVersion::OPTION_NAME ) && 4 === count( $definitions_before ) && [ 'ready' => true, 'code' => 'ready' ] === $main_readiness->get_status(), [ 'quote_stores' => 3, 'rate_index' => DeliveryQuoteSchema::RATE_INDEX, 'currency_column' => 'base_currency', 'unit_bootstrap' => false ] );
 		$fixture = new CetechNativeQuoteStorageFixture( $main, 99175 ); $fixture->install_schema8(); $fixture->select();
 		if ( '8' !== (string) get_option( SchemaVersion::OPTION_NAME ) || 33 !== $fixture->prefix_table_count() ) { throw new RuntimeException( 'Native quote schema8 fixture did not open.' ); }
 		// A compatible partial store must be repaired by actual WordPress
@@ -142,7 +142,7 @@ return static function ( callable $check ): void {
 		foreach ( $original as $key => [ $exists, $value ] ) { if ( $exists ) { $GLOBALS[$key] = $value; } else { unset( $GLOBALS[$key] ); } }
 		if ( null !== $fixture ) { $cleanup = $fixture->cleanup() && $cleanup; }
 		if ( null !== $standalone_path ) { $cleanup = CetechNativeQuoteStorageFixture::remove_standalone( $standalone_path ) && $cleanup; }
-		$condition = $cleanup && $GLOBALS['wpdb'] === $main && $GLOBALS['wp_object_cache'] === $original['wp_object_cache'][1] && get_current_blog_id() === (int) $original['blog_id'][1] && $options_before === $schema_options() && $definitions_before === $main_definitions() && '9' === (string) get_option( SchemaVersion::OPTION_NAME );
+		$condition = $cleanup && $GLOBALS['wpdb'] === $main && $GLOBALS['wp_object_cache'] === $original['wp_object_cache'][1] && get_current_blog_id() === (int) $original['blog_id'][1] && $options_before === $schema_options() && $definitions_before === $main_definitions() && '10' === (string) get_option( SchemaVersion::OPTION_NAME );
 		$cleanup_evidence = [ 'owned_tables_removed' => $cleanup, 'main_schema_options_unchanged' => $options_before === $schema_options(), 'main_definitions_unchanged' => $definitions_before === $main_definitions(), 'native_context_restored' => $GLOBALS['wpdb'] === $main ];
 		if ( null === $failure ) { $check( 'NATIVE-W2Q02-ISOLATED-FIXTURE-AND-MAIN-SOURCE-CLEANUP', $condition, $cleanup_evidence ); }
 		else { try { $check( 'NATIVE-W2Q02-ISOLATED-FIXTURE-AND-MAIN-SOURCE-CLEANUP', $condition, $cleanup_evidence ); } catch ( Throwable ) { /* Preserve the original failed check while recording cleanup. */ } }

@@ -18,7 +18,7 @@ use CetechDeliveryEngine\Infrastructure\Persistence\ShipmentSchema;
 use CetechDeliveryEngine\Tests\Support\Operation\OperationProofDatabase;
 use CetechDeliveryEngine\Tests\Support\RuleLifecycle\RuleProofDatabase;
 
-/** All physical domain DDL comes from current package source, not invented sentinel tables. */
+/** Retained schema-9 physical DDL comes from current package source, not invented sentinel tables. */
 final class DataLifecycleProofDatabase {
 	public static function connect(): \mysqli { return OperationProofDatabase::connect(); }
 	public static function prefix(): string { return 'gc6_' . bin2hex( random_bytes( 6 ) ) . '_'; }
@@ -27,7 +27,7 @@ final class DataLifecycleProofDatabase {
 		self::validate_prefix( $prefix );
 		foreach ( [ OperationStoreSchema::class, RuleLifecycleSchema::class, DeliveryQuoteSchema::class ] as $schema ) { foreach ( $schema::create_table_statements( 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', $prefix . 'delivery_engine_' ) as $sql ) { self::execute( $database, $sql ); } }
 		self::execute( $database, "CREATE TABLE `{$prefix}options` (option_id bigint unsigned NOT NULL AUTO_INCREMENT PRIMARY KEY, option_name varchar(191) NOT NULL UNIQUE, option_value longtext NOT NULL, autoload varchar(20) NOT NULL DEFAULT 'off') ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci" );
-		self::insert_option( $database, $prefix, SchemaVersion::OPTION_NAME, SchemaVersion::TARGET ); self::insert_option( $database, $prefix, MigrationStatus::OPTION_NAME, serialize( [ 'status' => 'success', 'to_version' => SchemaVersion::TARGET, 'migration_id' => DeliveryQuoteReadiness::MIGRATION_ID ] ) );
+		self::insert_option( $database, $prefix, SchemaVersion::OPTION_NAME, '9' ); self::insert_option( $database, $prefix, MigrationStatus::OPTION_NAME, serialize( [ 'status' => 'success', 'to_version' => '9', 'migration_id' => DeliveryQuoteReadiness::MIGRATION_ID ] ) );
 		self::execute( $database, "CREATE TABLE `{$prefix}operation_fixture_counter` (id bigint unsigned NOT NULL PRIMARY KEY, revision bigint unsigned NOT NULL, value bigint NOT NULL, published_revision bigint unsigned NOT NULL DEFAULT 0) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci" );
 		self::execute( $database, "INSERT INTO `{$prefix}operation_fixture_counter` (id,revision,value) VALUES (1,1,0)" );
 		$charset = 'ENGINE=InnoDB DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci';

@@ -117,10 +117,11 @@ jobs:
         run: bash scripts/ci-lint-php.sh .
       - name: Full PHPUnit suite
         run: vendor/bin/phpunit
-      - name: Quote placement qualification protocol boundaries
+      - name: Quote placement and promise storage qualification protocol boundaries
         run: |
           python3 scripts/qualification/test-opening-quote-placement-protocol.py
           python3 scripts/qualification/test-verify-quote-placement-receipts.py
+          python3 scripts/qualification/test-verify-promise-storage-receipts.py
       - name: Production tree autoload and extracted PHP lint
         shell: bash
         run: bash scripts/ci-stage-production-tree.sh "${RUNNER_TEMP}/cetech-de-prod-tree"
@@ -198,6 +199,9 @@ jobs:
             'CetechDeliveryEngine\Tests\Integration\DeliveryQuote\DeliveryQuoteCartReferenceRealDatabaseTest' 32
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryQuote\DeliveryQuotePlacementCoreRealDatabaseTest' 10
+
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+            'CetechDeliveryEngine\Tests\Integration\ServicePromise\ServicePromisePersistenceRealDatabaseTest' 15
 
   php85-wordpress:
     name: PHP 8.5 WordPress/WooCommerce
@@ -290,6 +294,14 @@ jobs:
         with:
           name: opening-http-qualification
           path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-qualification-results.json
+          if-no-files-found: warn
+
+      - name: Retain separate immutable promise storage qualification receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-promise-storage-qualification
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-storage-results.json
           if-no-files-found: warn
 
   javascript-tests:

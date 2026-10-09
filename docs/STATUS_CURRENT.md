@@ -1,6 +1,14 @@
+# Current Status — P01 integrated / P02 persistence in progress
+
+Local pre-publication proof on reviewed793 production files/map`6b8d4d5137d912804209912acdc7f8ddc785d6e7304d5a99eeed5d59b3d98aae`: PHP8.3.6 full4517tests/27129assertions PASS; new physicalSQL15/188 and retained lifecycle/emergency61/1253 PASS on disposable MariaDB10.11.14; warning-free comparative WP7.1.2/Woo11.1.2 P02native19/19 and tracked cleanup PASS; production autoload/all793lint, protocol9+retained16 and control checks PASS. Independent source review approves exact23newproductionfiles; central review approves current38/retained35 preservation and package/CI boundaries. These local/comparative results do not replace pinned CI or original495/20/143 receipts.
+
+Current owner instruction2026-10-09 09:11:24 UTC approves P01 and implements P02 under Issue101. P01 PR100 integrated unchanged as `d07b8eb4dd1153b629a62b800d165c5ca92bc102`, treeb2f3168; its separate actual-master37909827326 all8jobs and independent/root original495/20/143 audits pass. P02 freezes schema10/three preserved promise tables with strict immutable bodies, acknowledged lifecycle/source receipts and revisioned assignments, without a calculator or runtime writer. Development `1.0.0-dev.wave2-promise-storage.1`,23flags/site adoptionOFF/372classifications unchanged. [P02 boundary](product/W2-P02-IMMUTABLE-PROMISE-STORAGE-2026-10-09.md); CURRENT-WORK records finite leases. Implementation and exact-candidate qualification are in progress; this is not a release, activation or completion of promise calculation.
+
+## Historical checkpoint records
+
 # Current Status — quote closeout integrated / promise design proposed
 
-## Current checkpoint — W2-P01 internal contracts, 2026-10-09
+## Historical checkpoint — W2-P01 internal contracts, 2026-10-09
 
 Owner continuation accepts service/promise design PR #98, integrated unchanged as `68142106aa2d7ec226a31a6ccbad1f24ac1b5ad8`; Issue #97 completed. [Issue #99](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/99) authorizes only additive strict internal service/policy/calendar/component/input/result/receipt/privacy values and unmounted ports. Root and parallel finite leases are recorded in CURRENT-WORK.md. P01 implementation and independent review pass. Local PHP8.3.6 focused282/460, full4347/26726/no skips, production autoload/all770lint and control checks pass;770-source map5d95b0d02ca71929354cc617c9a7cfed1eeffcc03fb95b44dc8aaced0d74f4b8. Exact published candidate qualification remains pending. Separate actual design-master CI `37903027773` passed all eight actual jobs, executed Gate113735893384 and independent original495/20/143 receipt audits; it remains distinct from candidate execution.
 

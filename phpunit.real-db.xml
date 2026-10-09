@@ -26,6 +26,7 @@
             <group>quote-lifecycle-real-db</group>
             <group>quote-provider-real-db</group>
             <group>quote-cart-real-db</group>
+            <group>service-promise-persistence-real-db</group>
         </include>
     </groups>
 </phpunit>

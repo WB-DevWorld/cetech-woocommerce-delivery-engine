@@ -1,4 +1,19 @@
-# Current Work — W2-P01 internal promise contracts
+# Current Work — W2-P02 immutable promise persistence
+
+Local pre-publication proof on reviewed793 production files/map`6b8d4d5137d912804209912acdc7f8ddc785d6e7304d5a99eeed5d59b3d98aae`: PHP8.3.6 full4517tests/27129assertions PASS; new physicalSQL15/188 and retained lifecycle/emergency61/1253 PASS on disposable MariaDB10.11.14; warning-free comparative WP7.1.2/Woo11.1.2 P02native19/19 and tracked cleanup PASS; production autoload/all793lint, protocol9+retained16 and control checks PASS. Independent source review approves exact23newproductionfiles; central review approves current38/retained35 preservation and package/CI boundaries. These local/comparative results do not replace pinned CI or original495/20/143 receipts.
+
+## Current authorized checkpoint — 2026-10-09 09:11:24 UTC
+
+The owner explicitly instructed **Approve W2-P01 for integration and implement W2-P02**. PR #100 merged the qualified2633 candidate unchanged as actual master `d07b8eb4dd1153b629a62b800d165c5ca92bc102`, treeb2f3168, ordered parents [6814,2633]. Issue99 completed. Separate actual-master run37909827326 passes all8 actual jobs; independent and root original audits495/20/143/770map5d95 pass. Prior P01 candidate evidence remains distinct.
+
+[Issue #101](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/101) owns bounded P02 on `ws3/wave2-p02-persistence`, based on d07b8eb. [Frozen storage/reader transition](docs/product/W2-P02-IMMUTABLE-PROMISE-STORAGE-2026-10-09.md) is schema9→10 with three owned preserved tables, explicit native/opaque site binding, immutable bodies and original receipts, revisioned assignments and unmounted C03/C04-style services. No current body or accepted promise/quote/history is rewritten.
+
+Root exclusively owns central docs/version/SchemaVersion/global preservation manifest/package/CI/job groups/refs/issues/PR. Finite disjoint leases: p01_contract_foundation owns new schema/readiness/verifiablemigration and persistence row/site/source codecs with unit tests; p01_policy_calendars owns new commands/lifecycle/assignment/current-read services/unmounted profiles and unit tests; p01_evidence_results owns new SQL repository/exact loader adapters and disposable physicalSQL/support/race tests; p01_privacy_review owns separate P02 native receipt/runner/verifier and narrow source-schema/current-census updates in retained qualification scripts, including ci-wordpress-php85-smoke.sh; p01_scope_review performs read-only cross-source/privacy/authority review; p01_integration_review independently audits separate actual-P01-master evidence and reviews central P02 schema/manifest/package/CI wiring. Agents do not commit, mutate refs or edit root central files.
+
+Permitted mutations are repository code/tests/task records and explicitly owned disposable local/CI SQL/WordPress fixtures. Existing schema migrations/retained formats and all23 flags/372 requirements/classifications/counts/seven unapplied promotions remain protected. Default site adoption OFF. No calculator/publicroute/UI/new native promise writer, live site/database/payment, deployment/tag/release or P03–P06 work is authorized. Failed migration retains inherited failclosed readiness until exact recovery.
+
+## Historical P01 checkpoint
+
 
 ## Current authorized checkpoint — 2026-10-09 08:04:41 UTC
 

@@ -118,7 +118,7 @@ return static function ( callable $check ): void {
 		if ( null !== $fixture ) { try { $fixture->factory->fixture_time( null ); $cleanup = $fixture->factory->close_all(); } catch ( Throwable ) { $cleanup = false; } }
 		foreach ( $original as $key => [ $exists, $value ] ) { if ( $exists ) { $GLOBALS[$key] = $value; } else { unset( $GLOBALS[$key] ); } }
 		if ( null !== $fixture ) { $cleanup = $fixture->cleanup() && $cleanup; }
-		$condition = $cleanup && $GLOBALS['wpdb'] === $main && $GLOBALS['wp_object_cache'] === $original['wp_object_cache'][1] && get_current_blog_id() === (int) $original['blog_id'][1] && $options_before === $schema_options() && $history_before === $main_history() && '9' === (string) get_option( SchemaVersion::OPTION_NAME );
+		$condition = $cleanup && $GLOBALS['wpdb'] === $main && $GLOBALS['wp_object_cache'] === $original['wp_object_cache'][1] && get_current_blog_id() === (int) $original['blog_id'][1] && $options_before === $schema_options() && $history_before === $main_history() && '10' === (string) get_option( SchemaVersion::OPTION_NAME );
 		$proof = [ 'all_owned_tables_removed' => $cleanup, 'owned_counter_option_completion_event_stores_removed' => $cleanup, 'main_schema_options_unchanged' => $options_before === $schema_options(), 'main_quote_operation_history_unchanged' => $history_before === $main_history(), 'native_context_restored' => $GLOBALS['wpdb'] === $main ];
 		if ( null === $failure ) { $check( 'NATIVE-W2Q03-ISOLATED-LIFECYCLE-FIXTURE-CLEANUP', $condition, $proof ); }
 		else { try { $check( 'NATIVE-W2Q03-ISOLATED-LIFECYCLE-FIXTURE-CLEANUP', $condition, $proof ); } catch ( Throwable ) {} }

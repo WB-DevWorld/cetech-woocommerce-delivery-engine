@@ -11,8 +11,8 @@ use PHPUnit\Framework\TestCase;
 
 final class SchemaV5InspectionTest extends TestCase {
 
-	public function test_current_schema_target_is_seven(): void {
-		self::assertSame( '9', SchemaVersion::TARGET );
+	public function test_current_schema_target_is_ten(): void {
+		self::assertSame( '10', SchemaVersion::TARGET );
 	}
 
 	public function test_bulk_tables_are_registered_with_required_indexes(): void {
