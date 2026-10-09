@@ -1,5 +1,10 @@
 # Service/promise policy — bounded implementation proposal
 
+Current status: **OWNER ACCEPTED 2026-10-09; W2-P01 internal contracts authorized under Issue #99. P02–P06 remain later separately accepted checkpoints.** The owner continuation and exact accepted source are recorded in CURRENT-WORK.md. All original proposed semantics and unexecuted future observations below are retained as the accepted design record; this overlay does not turn those algorithm/physical observations into P01 test results.
+
+## Original reviewed design record
+
+
 Status: **PROPOSED; NO IMPLEMENTATION CHECKPOINT STARTED**. Governing proposal: [W2-SERVICE-PROMISE-POLICY-1](W2-SERVICE-PROMISE-POLICY-DESIGN-2026-10-09.md), [Issue #97](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/97). These are promise checkpoints `W2-P01`–`W2-P06`, not an invented seventh DeliveryQuote checkpoint. The owner/AI team can execute accepted finite leases; cross-workstream ownership and central edits remain recorded in CURRENT-WORK.md.
 
 ## Dependency and handoff order

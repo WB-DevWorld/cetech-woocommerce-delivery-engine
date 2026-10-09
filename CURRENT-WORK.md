@@ -1,4 +1,14 @@
-# Current Work — service/promise-policy design proposal
+# Current Work — W2-P01 internal promise contracts
+
+## Current authorized checkpoint — 2026-10-09 08:04:41 UTC
+
+The owner instructed “continue from where you stopped” and requested parallel execution after the concrete handoff “Approve W2-SERVICE-PROMISE-POLICY-1 and implement W2-P01.” This continuation accepts that reviewed design and authorizes **W2-P01 internal contracts only**. PR #98 merged unchanged as `68142106aa2d7ec226a31a6ccbad1f24ac1b5ad8`, tree `e18829d9c4cf4e749be8ead6d4831f602d17da76`, ordered parents prior master `62fc5d00f93b2d651b4e20ab7ad4019b92fc82dc` and reviewed candidate `9044301c8551c24d0347b5637decf76091a04875`; Issue #97 completed. Candidate runs and separate actual-master run `37903027773` retain distinct receipt identities. The accepted anchor/day-unit/DST/cutoff/capacity/reader-transition and bounded sequence decisions are those in the unchanged reviewed design.
+
+[Issue #99](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/99) tracks P01 on `ws3/wave2-p01-contracts`, based on exact design master6814. Root exclusively owns central documents, development version identity, source inventory, exact development identity assertions/package classification, refs/PR/issues and publication. Finite disjoint implementation leases: `p01_contract_foundation` owns independent strict validation/JSON/bounds and service/duration/component/graph values plus their tests; `p01_policy_calendars` owns policy/calendar records/references plus their tests; `p01_evidence_results` owns anchor/input/capacity/result/accepted-receipt/public-view values and unmounted ports plus their tests. `p01_scope_review` performs read-only semantic/privacy/adversarial review; `p01_integration_review` independently verifies actual design-master CI and original receipts. Agents do not commit, mutate remote refs or edit central records. The owner and AI agents are the active team, with no human workstream reassignment or conflicting edit found.
+
+Permitted mutations: additive internal domain contracts/tests, proportional local checks, development identity `1.0.0-dev.wave2-promise-contract.1`, repository task records and existing CI's owned disposable environments. Schema 9, 23 feature flags, retained checkout/payment code, quote formats, canonical 372 IDs/classifications/counts and seven unapplied quote recommendations are preserved. No policy persistence, calculator, migration, WordPress/Woo adapter/hook, public endpoint, configuration UI, deployment, release, live database/site/payment or adoption action is authorized. Site adoption remains OFF. P02–P06 require their own accepted bounded handoffs. Typed P01 records express validated immutable facts and linkages; constructing them does not supply native publication, observation, authorization, save, seal or payment authority.
+
+## Historical service/promise design proposal
 
 ## Current authorized checkpoint — 2026-10-09 07:00:51 UTC
 

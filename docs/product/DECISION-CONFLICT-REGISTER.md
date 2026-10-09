@@ -1,5 +1,12 @@
 # Decision, Conflict & Negative-Invariant Register
 
+## 2026-10-09 — W2-SERVICE-PROMISE-POLICY-1 accepted; P01 authorized
+
+Owner continuation at 08:04:41 UTC accepts the previously reviewed design PR #98 and starts only P01 internal contracts. Accepted choices are final Q06 seal versus explicit capture/payment anchors, exclude-start business days, strict IANA/DST gap/fold semantics, literal Same/Next Day feasibility and midnight acceptance cap, required capacity refusal, distinct validity clocks, closed reader-first formats, immutable original promise/current prediction separation, explicit privacy and finite graph/calendar/record/cart budgets. Exact merged design master is `68142106aa2d7ec226a31a6ccbad1f24ac1b5ad8`; [Issue #99](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/99) tracks pure additive P01 implementation and qualification. This decision does not apply seven registry promotions, implement P02–P06 or activate a site. Canonical registry/classifications and prior historical decisions remain unchanged.
+
+## Historical decisions
+
+
 ## Owner checkpoint disposition — 2026-10-09
 
 The owner instructed “proceed” at 07:00:51 UTC after the qualified closeout handoff. PR #96's exact reviewed docs-only candidate ab700dde1e5b3ffd8007ad8ec4bfe7b227ab1a55 is accepted/integrated unchanged as 62fc5d00f93b2d651b4e20ab7ad4019b92fc82dc; Issue #95 completed. This accepts the truthful 39 covered/nine bounded review and named follow-ups. Its seven proposed quote alignment recommendations remain separate proposals; no frozen 372-ID row/classification/count is changed by this disposition.

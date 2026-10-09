@@ -1,5 +1,8 @@
 # CETECH Delivery Standalone Realignment Plan
 
+Current checkpoint2026-10-09: W2-SERVICE-PROMISE-POLICY-1 is owner-accepted and integrated through PR #98 as6814210. [W2-P01 internal contracts](W2-P01-INTERNAL-PROMISE-CONTRACT-2026-10-09.md), [Issue #99](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/99), are implemented with exact qualification pending. P02–P06 retain their bounded acceptance sequence; registry classifications and site adoption are unchanged.
+
+
 ## Current authorized dependency — 2026-10-09
 
 DeliveryQuote closeout PR #96 is owner-accepted and integrated unchanged as 62fc5d00f93b2d651b4e20ab7ad4019b92fc82dc; Issue #95 completed. Under the owner's next “proceed”, accepted Wave 2 work package2 now has the concrete [W2-SERVICE-PROMISE-POLICY-1 proposal](W2-SERVICE-PROMISE-POLICY-DESIGN-2026-10-09.md) and [bounded P01–P06 implementation/quote gap plan](W2-SERVICE-PROMISE-IMPLEMENTATION-PLAN-2026-10-09.md), tracked by [Issue #97](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/97). This is design only; runtime checkpoints, seven registry promotion recommendations, quote observation/adoption scopes and live-site effects retain their separately recorded boundaries. The planned first implementation is internal P01 only after design acceptance; no Q07. The earlier current checkpoint below is historical; preserve its original Q06/master evidence.

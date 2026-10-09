@@ -1,5 +1,14 @@
 # Reusable WooCommerce Delivery & Fulfilment Engine
 
+## Current checkpoint — W2-P01 internal contracts, 2026-10-09
+
+Owner continuation accepts service/promise design PR #98, integrated unchanged as `68142106aa2d7ec226a31a6ccbad1f24ac1b5ad8`; Issue #97 completed. [Issue #99](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/99) authorizes only additive strict internal service/policy/calendar/component/input/result/receipt/privacy values and unmounted ports. Root and parallel finite leases are recorded in CURRENT-WORK.md. P01 implementation and independent review pass. Local PHP8.3.6 focused282/460, full4347/26726/no skips, production autoload/all770lint and control checks pass;770-source map5d95b0d02ca71929354cc617c9a7cfed1eeffcc03fb95b44dc8aaced0d74f4b8. Exact published candidate qualification remains pending. Separate actual design-master CI `37903027773` passed all eight actual jobs, executed Gate113735893384 and independent original495/20/143 receipt audits; it remains distinct from candidate execution.
+
+Development identity is `1.0.0-dev.wave2-promise-contract.1`; schema 9, 23 flags and canonical 372 classifications remain unchanged. No active promise calculator/persistence/shopper or Woo hook is added. Site adoption is OFF. Seven quote promotions and P02–P06, target-stack physical/pilot/payment/release decisions remain separately scoped. Prior statuses below are retained history and do not override this newer checkpoint.
+
+## Historical checkpoint records
+
+
 ## Current checkpoint supersession — 2026-10-09
 
 Owner “proceed” accepts/integrates reviewed docs-only PR #96 unchanged as `62fc5d00f93b2d651b4e20ab7ad4019b92fc82dc` / tree `ebff4a3d8ed24cfcace102a4de975f264552888a`; Issue #95 completed. Original Q06 implementation/master receipts remain separate. Current [Issue #97](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/97) is [W2-SERVICE-PROMISE-POLICY-1 design](product/W2-SERVICE-PROMISE-POLICY-DESIGN-2026-10-09.md) with [bounded implementation and quote gap queue](product/W2-SERVICE-PROMISE-IMPLEMENTATION-PLAN-2026-10-09.md). Root exclusively owns central docs/publication; finite reviewers are read-only. Proposed calendar/clock/cutoff/capacity/reader contracts and 32 future observations await acceptance/implementation. Seven quote registry alignment recommendations remain unapplied. All current runtime/tests/CI/dependencies/schema 9/23 flags/372 classifications are preserved; adoption OFF. Exact master/candidate CI and final freshness are recorded on their PRs after execution. Older status blocks below remain historical.
