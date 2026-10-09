@@ -11,7 +11,13 @@ use CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory;
 final class NativeCartQuoteEnvironment implements CartQuoteEnvironment {
 	private NativeCartQuotePreparation $preparation;
 	private QuotePreparationAccess $current_access;
+	private ?CartQuoteRateProjection $rate_projection = null;
 	public function __construct( OperationConnectionFactory $factory, ?QuotePreparationAccess $current_access = null ) { $this->preparation = new NativeCartQuotePreparation( $factory ); $this->current_access = $current_access ?? new NativeQuotePreparationAccess( $factory ); }
+	/** Trusted composition only; replacement cannot change a captured native lifecycle. */
+	public function set_rate_projection( CartQuoteRateProjection $projection ): void {
+		if ( null !== $this->rate_projection && $this->rate_projection !== $projection ) { throw new \LogicException( 'Cart quote rate projection is already installed.' ); }
+		$this->rate_projection = $projection;
+	}
 	public function draft(): ?QuoteCartDraft {
 		try {
 			[ $owner, $identity, $wc ] = self::loaded_owner(); $cart = self::raw( $wc, 'cart' );
@@ -27,7 +33,7 @@ final class NativeCartQuoteEnvironment implements CartQuoteEnvironment {
 		} catch ( \Throwable ) { return null; }
 	}
 	public function authorize( QuoteOwner $owner, string $operation ): bool {
-		try { return in_array( $operation, [ 'delivery_quote.issue', 'delivery_quote.read', 'delivery_quote.accept', 'delivery_quote.invalidate', 'delivery_quote.session' ], true ) && $owner->equals( self::loaded_owner()[0] ); } catch ( \Throwable ) { return false; }
+		try { return in_array( $operation, [ 'delivery_quote.issue', 'delivery_quote.read', 'delivery_quote.accept', 'delivery_quote.invalidate', 'delivery_quote.session', 'delivery_quote.bind', 'delivery_quote.verify_binding', 'delivery_quote.seal' ], true ) && $owner->equals( self::loaded_owner()[0] ); } catch ( \Throwable ) { return false; }
 	}
 	public function prepare( QuoteCartDraft $draft ): LegacyQuotePreparedCapture {
 		if ( ! $this->same_draft( $draft ) || ! $this->authorize( $draft->owner(), 'delivery_quote.issue' ) ) { self::fail(); }
@@ -44,6 +50,8 @@ final class NativeCartQuoteEnvironment implements CartQuoteEnvironment {
 			$revision = $this->current_access->observe( $draft->owner() ); if ( null === $revision ) { return null; }
 			// Restore an exact existing native calculation, never calculate new rates.
 			NativeCartQuoteShipping::restore_cached_calculation();
+			// Inert handles belong to the restored packet before its raw fence is captured.
+			$this->rate_projection?->project_loaded_rates();
 			$evidence = $this->preparation->evidence( $original, $header, $draft );
 			return null !== $evidence && $this->same_draft( $draft ) && $this->authorize( $draft->owner(), 'delivery_quote.read' ) && $this->current_access->confirm( $draft->owner(), $revision ) ? $evidence : null;
 		} catch ( \Throwable ) { return null; }

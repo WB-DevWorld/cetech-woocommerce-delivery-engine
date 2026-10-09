@@ -353,7 +353,7 @@ def quote_cart_setup_diagnostic(path: Path):
 
 class FixtureBridge:
     def __init__(self, php: str, wpcli: str, site: str, admin_context: str, bridge_path: str, state_path: Path, workdir: Path):
-        self.command = [php, wpcli, "--allow-root", "--path=" + site, "--require=" + admin_context, "eval-file", bridge_path]
+        self.command = [php, wpcli, "--allow-root", "--path=" + site, "--require=" + admin_context, "eval-file", bridge_path, "--use-include"]
         self.state_path = state_path
         self.workdir = workdir
         self.sequence = 0
@@ -536,6 +536,8 @@ def main() -> int:
     parser.add_argument("--quote-cart-driver")
     parser.add_argument("--quote-cart-bridge")
     parser.add_argument("--quote-cart-state")
+    parser.add_argument("--quote-placement-driver")
+    parser.add_argument("--quote-placement-bridge")
     options = parser.parse_args()
     if os.environ.get("CETECH_DE_NATIVE_OPENING_QUALIFICATION") != "1" or os.environ.get("CETECH_DE_HTTP_OPENING_QUALIFICATION") != "1" or os.environ.get("CETECH_DE_WP_DB_HOST") != "127.0.0.1":
         raise RuntimeError("Refusing HTTP qualification without explicit disposable loopback gates")
@@ -548,6 +550,8 @@ def main() -> int:
     configuration_bridge = None
     emergency_bridge = None
     quote_cart_bridge = None
+    quote_placement_bridge = None
+    quote_placement_module = None
     if any((options.configuration_driver, options.configuration_bridge, options.configuration_state)):
         if not all((options.configuration_driver, options.configuration_bridge, options.configuration_state)):
             raise RuntimeError("Configuration HTTP qualification requires all three explicit paths")
@@ -567,6 +571,12 @@ def main() -> int:
         quote_work = workdir / "quote-cart-snapshots"
         quote_work.mkdir(mode=0o700, exist_ok=True)
         quote_cart_bridge = FixtureBridge(options.php, options.wpcli, options.site, options.admin_context, options.quote_cart_bridge, Path(options.quote_cart_state), quote_work)
+    if any((options.quote_placement_driver, options.quote_placement_bridge)):
+        if not all((options.quote_placement_driver, options.quote_placement_bridge)) or quote_cart_bridge is None:
+            raise RuntimeError("Quote placement requires its live quote cart fixture and both module paths")
+        placement_work = workdir / "quote-placement-snapshots"
+        placement_work.mkdir(mode=0o700, exist_ok=True)
+        quote_placement_bridge = FixtureBridge(options.php, options.wpcli, options.site, options.admin_context, options.quote_placement_bridge, Path(options.quote_cart_state), placement_work)
     recorder = Recorder(receipt_path, {"source_head": os.environ.get("CETECH_DE_QUALIFICATION_HEAD", ""), "candidate_head": os.environ.get("CETECH_DE_QUALIFICATION_CANDIDATE_HEAD", ""), "source_tree": os.environ.get("CETECH_DE_QUALIFICATION_TREE", ""), "identity_verified": False})
     error = None
     quote_setup_stage = None
@@ -621,6 +631,27 @@ def main() -> int:
             quote_state = json.loads(Path(options.quote_cart_state).read_text(encoding="utf-8"))
             quote_setup_stage = "requests"
             module.run_quote_cart(HttpClient(quote_state["base_url"]), quote_state, quote_cart_bridge, recorder, Page, login)
+        if quote_placement_bridge is not None:
+            quote_setup_stage = "placement_prepare"
+            module_spec = importlib.util.spec_from_file_location("opening_http_quote_placement", options.quote_placement_driver)
+            if module_spec is None or module_spec.loader is None:
+                raise RuntimeError("Could not load the quote placement qualification module")
+            quote_placement_module = importlib.util.module_from_spec(module_spec)
+            module_spec.loader.exec_module(quote_placement_module)
+            try:
+                placement_prepared = quote_placement_bridge.call("prepareplacement")
+                if placement_prepared.get("ready") is not True or placement_prepared.get("identity") != quote_identity:
+                    raise RuntimeError("Quote placement source identity does not match its live fixture")
+                quote_state = json.loads(Path(options.quote_cart_state).read_text(encoding="utf-8"))
+            except Exception as failure:
+                try:
+                    quote_placement_module.record_preparation_failure(recorder, failure)
+                except RuntimeError:
+                    # Recorder.check records a failed case before raising.
+                    pass
+                raise
+            quote_setup_stage = "placement_requests"
+            quote_placement_module.run_quote_placement(HttpClient(quote_state["base_url"]), quote_state, quote_placement_bridge, recorder, Page, login)
     except Exception as failure:
         error = type(failure).__name__ + ": HTTP qualification failed; inspect recorded case status and private runner logs"
         if quote_setup_stage is not None:
@@ -632,6 +663,14 @@ def main() -> int:
             recorder.report["request_observation"] = {key: value for key, value in REQUEST_OBSERVATION.items() if key in ("ordinal", "method", "route", "phase", "elapsed_ms", "monotonic_ms", "error_class")}
             recorder.write()
     finally:
+        if quote_placement_bridge is not None and quote_placement_bridge.state_path.is_file():
+            try:
+                state = json.loads(quote_placement_bridge.state_path.read_text(encoding="utf-8"))
+                if "q06" in state:
+                    cleaned = quote_placement_bridge.call("cleanupplacement")
+                    quote_placement_module.record_cleanup(recorder, cleaned)
+            except Exception as failure:
+                error = error or (type(failure).__name__ + ": quote placement fixture cleanup failed")
         if quote_cart_bridge is not None and quote_cart_bridge.state_path.is_file():
             try:
                 cleaned = quote_cart_bridge.call("cleanupquotecart")

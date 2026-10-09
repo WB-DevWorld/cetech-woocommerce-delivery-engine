@@ -13,7 +13,8 @@ final class EmergencyCheckoutAdmissionService {
 		private readonly EmergencyAdmissionControlInterface $control,
 		private readonly EmergencyOwnershipClassifier $classifier,
 		private readonly EmergencyOrderQuoteValidatorInterface $quote_validator,
-		private readonly EmergencyOwnershipLatch $latch
+		private readonly EmergencyOwnershipLatch $latch,
+		private readonly ?EmergencyFinalPlacementGuard $placement = null
 	) {
 		$this->stamps = new \WeakMap();
 	}
@@ -47,7 +48,13 @@ final class EmergencyCheckoutAdmissionService {
 			if ( $this->admitted( $order, $route ) ) {
 				return new EmergencyAdmissionResult( true, 'allowed', EmergencyOwnership::Managed, $this->stamps[ $order ]['revision'] );
 			}
+			// A changed acknowledged continuation is never re-stamped from a new view.
+			if ( isset( $this->stamps[ $order ] ) && $this->stamps[ $order ]['route'] === $route ) {
+				return new EmergencyAdmissionResult( false, 'checkout_revalidation_required', EmergencyOwnership::Managed );
+			}
 			$ownership = $this->classifier->order( $order );
+			// Even a malformed mandatory quote marker is ownership evidence after rollback.
+			if ( \CetechDeliveryEngine\Application\Order\QuoteNativeOrderHistory::attempted( $order ) ) { $ownership = EmergencyOwnership::Managed; }
 			// Paying an existing order uses that order's facts, independently of the live cart draft.
 			$uses_cart_latch = 'order_pay' !== $route && $this->latch->has_possible_ownership();
 			if ( $uses_cart_latch ) {
@@ -97,6 +104,12 @@ final class EmergencyCheckoutAdmissionService {
 				|| get_current_blog_id() !== $site || $this->quote_validator->fingerprint( $order ) !== $bound || ! $local->unchanged() ) {
 				return new EmergencyAdmissionResult( false, 'checkout_revalidation_required', $ownership );
 			}
+			// The collaborator must commit/acknowledge its own exact final receipt. Woo
+			// getters and the final C03 transaction are deliberately outside C07's lock.
+			if ( null !== $this->placement && ( ! $this->placement->complete( $order, $route, $confirmed->state->revision, $local )
+				|| get_current_blog_id() !== $site || $this->quote_validator->fingerprint( $order ) !== $bound || ! $local->unchanged() ) ) {
+				return new EmergencyAdmissionResult( false, 'checkout_revalidation_required', $ownership );
+			}
 			$this->stamps[ $order ] = [ 'route' => $route, 'fingerprint' => $bound, 'revision' => $confirmed->state->revision, 'site' => $site, 'binding' => $local ];
 			return new EmergencyAdmissionResult( true, 'allowed', $ownership, $confirmed->state->revision );
 		} catch ( \Throwable ) {
@@ -109,7 +122,8 @@ final class EmergencyCheckoutAdmissionService {
 			return isset( $this->stamps[ $order ] ) && $this->stamps[ $order ]['route'] === $route
 				&& get_current_blog_id() === $this->stamps[ $order ]['site']
 				&& $this->quote_validator->fingerprint( $order ) === $this->stamps[ $order ]['fingerprint']
-				&& $this->stamps[ $order ]['binding']->unchanged();
+				&& $this->stamps[ $order ]['binding']->unchanged()
+				&& ( null === $this->placement || $this->placement->admitted( $order, $route, $this->stamps[ $order ]['revision'], $this->stamps[ $order ]['binding'] ) );
 		} catch ( \Throwable ) {
 			return false;
 		}

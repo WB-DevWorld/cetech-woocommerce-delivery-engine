@@ -115,8 +115,10 @@ final class QuoteReviewRuntimeTest extends TestCase {
 	public function test_store_schema_is_readonly_finite_and_contains_no_private_reference_or_arbitrary_object(): void {
 		$schema = $this->runtime( $this->spy() )->schema();
 		foreach ( $schema as $field ) { self::assertTrue( $field['readonly'] ); }
-		self::assertFalse( $schema['quote']['additionalProperties'] ); self::assertFalse( $schema['quote']['properties']['money']['items']['additionalProperties'] );
-		self::assertSame( 200, $schema['quote']['properties']['money']['maxItems'] );
+		self::assertSame( [ 'object', 'null' ], $schema['quote']['type'] ); self::assertArrayNotHasKey( 'properties', $schema['quote'] );
+		self::assertSame( [ 'type' => 'null' ], $schema['quote']['oneOf'][1] ); $object = $schema['quote']['oneOf'][0];
+		self::assertFalse( $object['additionalProperties'] ); self::assertFalse( $object['properties']['money']['items']['additionalProperties'] );
+		self::assertSame( 200, $object['properties']['money']['maxItems'] );
 		$encoded = json_encode( $schema, JSON_THROW_ON_ERROR ); self::assertStringNotContainsString( 'acceptance_handle', $encoded ); self::assertStringNotContainsString( 'owner_digest', $encoded ); self::assertStringNotContainsString( 'private_body', $encoded );
 	}
 }

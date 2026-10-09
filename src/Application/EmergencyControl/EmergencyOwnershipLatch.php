@@ -75,7 +75,10 @@ final class EmergencyOwnershipLatch implements \JsonSerializable {
 				$used_ids[ $item_id ] = true;
 				$this->reader->read_line( $item ); // Prewarm protected native metadata outside the control lock.
 			}
-			$order->get_items( 'shipping' );
+			$shipping = $order->get_items( 'shipping' );
+			// Prewarm the native tax class and empty/populated group before raw freeze.
+			$taxes = class_exists( 'WC_Order_Item_Tax' ) ? $order->get_items( 'tax' ) : [];
+			foreach ( [ ...$shipping, ...$taxes ] as $item ) { if ( method_exists( $item, 'get_meta_data' ) ) { $item->get_meta_data(); } }
 			$order->get_meta( OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, true );
 			if ( null !== $this->saved_binding ) {
 				if ( ! $this->saved_binding->unchanged() ) { $this->overflow = true; }

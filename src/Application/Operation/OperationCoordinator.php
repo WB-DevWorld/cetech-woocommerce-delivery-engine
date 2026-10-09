@@ -20,6 +20,7 @@ use CetechDeliveryEngine\Domain\Operation\OperationProfileRegistry;
 use CetechDeliveryEngine\Domain\Operation\OperationRecord;
 use CetechDeliveryEngine\Domain\Operation\OperationRefusal;
 use CetechDeliveryEngine\Domain\Operation\OperationSession;
+use CetechDeliveryEngine\Domain\Operation\OperationTerminalRejectionProfile;
 use CetechDeliveryEngine\Infrastructure\Persistence\OperationStoreSchema;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbOperationChangeRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbOperationRecordRepository;
@@ -57,7 +58,7 @@ final class OperationCoordinator {
 			if ( ! $created ) {
 				$this->authorize( $profile, $identity );
 				[ $raw, $record ] = $this->locked_record( $session, $profile, $identity, $intent );
-				if ( in_array( $record->state, [ 'accepted', 'not_applicable' ], true ) ) {
+				if ( in_array( $record->state, [ 'accepted', 'not_applicable' ], true ) || 'rejected' === $record->state && $profile instanceof OperationTerminalRejectionProfile && $profile->rejects_are_terminal() ) {
 					$accepted_committed = 'accepted' === $record->state;
 					$this->authorize( $profile, $identity );
 					$this->rollback( $session );
@@ -73,7 +74,7 @@ final class OperationCoordinator {
 			$this->begin_unit( $session, $profile );
 			$this->authorize( $profile, $identity );
 			[ $raw, $record ] = $this->locked_record( $session, $profile, $identity, $intent );
-			if ( in_array( $record->state, [ 'accepted', 'not_applicable' ], true ) ) {
+			if ( in_array( $record->state, [ 'accepted', 'not_applicable' ], true ) || 'rejected' === $record->state && $profile instanceof OperationTerminalRejectionProfile && $profile->rejects_are_terminal() ) {
 				$accepted_committed = 'accepted' === $record->state;
 				$this->authorize( $profile, $identity );
 				$this->rollback( $session );
@@ -112,6 +113,9 @@ final class OperationCoordinator {
 				return $this->unknown( $context );
 			}
 			if ( null !== $session && $session->in_transaction() && ! $this->try_rollback( $session ) ) {
+				return $this->unknown( $context );
+			}
+			if ( null !== $session && $session->is_retired() ) {
 				return $this->unknown( $context );
 			}
 			if ( $effect_started && ! in_array( $refusal->error( $context )->code, [ 'not_authorized', 'intent_conflict' ], true ) ) {
@@ -296,7 +300,7 @@ final class OperationCoordinator {
 			$this->begin_unit( $session, $profile );
 			[ $raw, $record ] = $this->locked_record( $session, $profile, $identity, $intent );
 			$this->authorize( $profile, $identity );
-			if ( in_array( $record->state, [ 'accepted', 'not_applicable' ], true ) ) {
+			if ( in_array( $record->state, [ 'accepted', 'not_applicable' ], true ) || 'rejected' === $record->state && $profile instanceof OperationTerminalRejectionProfile && $profile->rejects_are_terminal() ) {
 				$this->rollback( $session );
 				return $this->record_result( $record, $context, true );
 			}

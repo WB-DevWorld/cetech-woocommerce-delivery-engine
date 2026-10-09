@@ -15,15 +15,34 @@ function cetech_q05_write( array $state ): void {
 	try { if ( false === file_put_contents( $temporary, json_encode( $state, JSON_THROW_ON_ERROR ) ) || ! chmod( $temporary, 0600 ) || ! rename( $temporary, $path ) ) { throw new RuntimeException( 'Q05 private tracking failed.' ); } } finally { if ( is_file( $temporary ) ) { unlink( $temporary ); } }
 }
 $q05_initial = cetech_q05_state(); if ( true === ( $q05_initial['cleanup_done'] ?? false ) ) { return; }
+// Install the same production composition with an observed native connection.
+// Fault masks affect only this marked, private disposable qualification site.
+add_action( 'cetech_de_services_registered', static function ( $container ): void {
+	if ( defined( 'WP_CLI' ) && WP_CLI ) { return; }
+	$state = cetech_q05_state(); $cart_support = $state['support_file'] ?? null;
+	if ( ! is_string( $cart_support ) || ! is_file( $cart_support ) || is_link( $cart_support ) || 'opening-quote-cart-support.php' !== basename( $cart_support ) ) { throw new RuntimeException( 'Q06 support source is unavailable.' ); }
+	$source = dirname( $cart_support ) . '/opening-http-quote-placement-support.php';
+	if ( ! is_file( $source ) || is_link( $source ) ) { throw new RuntimeException( 'Q06 support source is unavailable.' ); }
+	require_once $source;
+	$container->singleton( CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class, static function () { global $wpdb; return CetechQuotePlacementHttpFixture::factory( $wpdb ); } );
+} );
 add_action( 'init', static function (): void {
 	if ( defined( 'WP_CLI' ) && WP_CLI ) { return; }
 	if ( '1' !== (string) get_option( 'cetech_opening_qualification_disposable' ) || ! class_exists( 'CetechDeliveryEngine\Bootstrap\Plugin' ) ) { throw new RuntimeException( 'Q05 mount requires its marked native site.' ); }
 	$state = cetech_q05_state(); $support = $state['support_file'] ?? null;
 	if ( ! is_string( $support ) || ! is_file( $support ) || is_link( $support ) || 'opening-quote-cart-support.php' !== basename( $support ) ) { throw new RuntimeException( 'Q05 support source is unavailable.' ); }
 	require_once $support; global $wpdb;
-	[ $service, $sessions, $factory, $observed ] = CetechQuoteCartHttpFixture::service( $wpdb ); $runtime = new CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteReviewRuntime( $service, true ); $runtime->register();
+	[ $service, $sessions, $factory, $observed ] = CetechQuoteCartHttpFixture::service( $wpdb );
+	$container = CetechDeliveryEngine\Bootstrap\Plugin::instance()->container();
+	$runtime = $container->get( CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementActivation::class )->active()
+		? $container->get( CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteReviewRuntime::class )
+		: new CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteReviewRuntime( $service, true );
+	$runtime->register();
 	// This explicit fixture-only composition is neither a shopper feature flag nor placement activation.
 	$GLOBALS['cetech_q05_review_runtime'] = $runtime; $GLOBALS['cetech_q05_sessions'] = $sessions; $GLOBALS['cetech_q05_factory'] = $factory;
+	$placement_support = dirname( $support ) . '/opening-http-quote-placement-support.php';
+	if ( ! is_file( $placement_support ) || is_link( $placement_support ) ) { throw new RuntimeException( 'Q06 support source is unavailable.' ); }
+	require_once $placement_support; CetechQuotePlacementHttpFixture::register();
 	add_action( 'shutdown', static function () use ( $sessions, $factory, $observed ): void {
 		try {
 			if ( WC()->session instanceof WC_Session_Handler && WC()->cart instanceof WC_Cart && WC()->customer instanceof WC_Customer ) {

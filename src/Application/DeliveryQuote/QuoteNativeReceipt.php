@@ -20,6 +20,7 @@ final readonly class QuoteNativeReceipt implements \JsonSerializable {
  public function guard():QuoteCurrentEvidenceGuard{return new QuoteNativeReceiptGuard($this);}
  public function matches_owner(QuoteOwner $owner):bool{return $this->owner->equals($owner);}
  public function source_facts():array{return $this->state->facts()['source_facts'];}
+ public function tax_source():QuoteNativeTaxSource{return QuoteNativeTaxSource::from_native_state($this->state);}
  public function bind_context(QuoteContext $context):QuoteContext {
   $facts=$context->private_facts();
   if(QuoteJson::encode($facts['currency'])!==QuoteJson::encode($this->currency_facts())||QuoteJson::encode($facts['destination'])!==QuoteJson::encode($this->destination_facts())||$this->owner->key_epoch()!==$facts['destination']['key_epoch']||count($facts['groups'])!==count($this->groups)){QuoteShape::invalid();}

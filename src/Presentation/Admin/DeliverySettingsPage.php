@@ -66,12 +66,14 @@ final class DeliverySettingsPage {
 		private ?OperationalStateService $operational_state = null,
 		private ?RoleAccessService $role_access = null,
 		private ?IntegrationStatusCatalog $integration_status = null,
-		private ?EmergencyControlSettings $emergency_control = null
+		private ?EmergencyControlSettings $emergency_control = null,
+		private ?QuotePlacementSettings $quote_placement = null
 	) {
 	}
 
 	public function handle_actions(): void {
 		$this->emergency_control?->handle_actions();
+		$this->quote_placement?->handle_actions();
 		if ( $this->action_handler->verify_post( self::ACTION_SAVE, self::ACTION_SAVE, 'manage_delivery_settings', self::SLUG ) ) {
 			$this->handle_save();
 		}
@@ -171,6 +173,7 @@ final class DeliverySettingsPage {
 		AdminPageLayout::close_section();
 
 		$this->emergency_control?->render();
+		$this->quote_placement?->render();
 
 		echo '<form id="cetech-de-settings-form" method="post" action="">';
 		AdminFormHelper::nonce_field( self::ACTION_SAVE );

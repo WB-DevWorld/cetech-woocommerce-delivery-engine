@@ -26,7 +26,7 @@ use CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteSchema;
 use CetechDeliveryEngine\Infrastructure\Persistence\EmergencyControlStore;
 
-/** Internal durable fixture lifecycle. No shopper hooks, provider discovery or native placement. */
+/** Durable lifecycle; native adapters supply prewarmed placement fences. */
 final class QuoteDurableService {
 	private \Closure $authorizer;
 	private QuoteAdmissionGate $gate;
@@ -77,6 +77,49 @@ final class QuoteDurableService {
 	public function invalidate( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, ?QuoteContext $current, RequestContext $request ): QuoteDurableResult { return $this->transition( 'invalidate', $owner, $reference, $opened, $current, $request ); }
 	public function bind( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, QuoteBinding $binding, RequestContext $request, ?QuoteContext $current = null ): QuoteDurableResult { return $this->transition( 'bind', $owner, $reference, $opened, $current, $request, $binding ); }
 	public function seal( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, QuoteBinding $binding, RequestContext $request, ?QuoteContext $current = null ): QuoteDurableResult { return $this->transition( 'seal', $owner, $reference, $opened, $current, $request, $binding ); }
+	public function verify_binding( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, QuoteBinding $binding, RequestContext $request, ?QuoteContext $current, QuotePlacementSavedEvidenceGuard $saved ): QuoteDurableResult {
+		if ( ! $this->authorized( $owner, 'delivery_quote.verify_binding' ) ) { return $this->reject( $request, 'not_authorized' ); }
+		try { $command = QuoteDurableCommand::verify_binding( $owner, $reference, $opened, $binding, $saved, $current ); } catch ( \Throwable ) { return $this->reject( $request, 'not_authorized' ); }
+		return $this->execute( $command, $request );
+	}
+	public function seal_placement( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, QuoteBinding $binding, RequestContext $request, ?QuoteContext $current, QuotePlacementProof $proof ): QuoteDurableResult {
+		if ( ! $this->authorized( $owner, 'delivery_quote.seal' ) || ! $proof->unchanged() ) { return $this->reject( $request, 'not_authorized' ); }
+		try { $command = QuoteDurableCommand::seal_placement( $owner, $reference, $opened, $binding, $proof, $current ); } catch ( \Throwable ) { return $this->reject( $request, 'not_authorized' ); }
+		return $this->execute( $command, $request );
+	}
+	/** A terminal no-effect placement may release its native pointer for explicit new review. */
+	public function known_rejected_original_placement( QuotePlacementEvidence $replacement, QuoteStoredRow $original, int $order_id, string $placement_id, ?QuoteBinding $expected, QuotePlacementNoEffectEvidenceGuard $native ): bool {
+		return ( new QuotePlacementNoEffectDisposition( $this->factory, $this->readiness, $this->authorizer ) )->known( $replacement, $original, $order_id, $placement_id, $expected, $native );
+	}
+	/** A terminal final no-effect placement retains the original prepared-two contract. */
+	public function known_rejected_placement( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, QuoteBinding $expected, QuotePlacementSavedEvidenceGuard $saved ): bool {
+		if ( ! $this->authorized( $owner, 'delivery_quote.read' ) || ! $opened->owner()->equals( $owner ) || ! $opened->matches_reference( $reference ) || 'prepared' !== $expected->state() || 2 !== $expected->revision() || $expected->site_id() !== $owner->site_id() || $expected->row()['quote_uuid'] !== $opened->id()->value() ) { return false; }
+		$session = null; $begun = false;
+		try {
+			$session = $this->factory->open();
+			if ( $session->site_id() !== $owner->site_id() || $session->is_retired() || $session->in_transaction() ) { return false; }
+			$this->readiness->assert_ready( $session ); if ( ! $session->begin() ) { return false; } $begun = true;
+			$tables = array_values( array_unique( [ ...DeliveryQuoteSchema::tables( $session->table_prefix() ), ...$saved->tables( $session ) ] ) );
+			if ( ! $session->validate_tables( $tables ) ) { return false; }
+			$repository = new DeliveryQuoteRepository( $session ); $discovered = $repository->find_quote( $opened->id() );
+			if ( null === $discovered || $discovered->header()->to_private_json() !== $opened->to_private_json() || ! $discovered->header()->matches_reference( $reference ) ) { return false; }
+			$binding = $repository->find_binding( $discovered ); if ( null === $binding || $binding->row() !== $expected->row() ) { return false; }
+			$verifier = new QuoteReceiptVerifier(); $records = $verifier->lock( $session, $discovered->header(), $binding );
+			// Prewarmed native facts precede the quote/binding target locks.
+			if ( ! $saved->verify( $session, $binding ) ) { return false; }
+			$quote = $repository->find_quote( $opened->id(), true ); $current = null === $quote ? null : $repository->find_binding( $quote, true );
+			if ( null === $quote || null === $current || $quote->header()->to_private_json() !== $opened->to_private_json() || $current->row() !== $expected->row()
+				|| ! $verifier->placement_rejected( $quote, $records, $current ) || ! $saved->verify( $session, $current ) || ! $session->rollback() ) { return false; }
+			$begun = false; return $session->retire() && $this->authorized( $owner, 'delivery_quote.read' );
+		} catch ( \Throwable ) { return false; }
+		finally { if ( null !== $session ) { if ( $begun && ! $session->is_retired() ) { try { $session->rollback(); } catch ( \Throwable ) {} } if ( ! $session->is_retired() ) { try { $session->retire(); } catch ( \Throwable ) {} } } }
+	}
+	/** Fresh order-pay admission; historical seal replay alone never admits a payment. */
+	public function admit_sealed_placement( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, QuoteBinding $binding, RequestContext $request, ?QuoteContext $current, int $control_revision, \CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutLocalBinding $local, QuotePlacementSavedEvidenceGuard $saved ): bool {
+		if ( ! $this->authorized( $owner, 'delivery_quote.seal' ) || 'sealed' !== $binding->state() || 3 !== $binding->revision() || $control_revision < 1 || ! $local->unchanged() || ! $opened->owner()->equals( $owner ) || ! $opened->matches_reference( $reference ) ) { return false; }
+		$loaded = $this->load( $owner, $opened->id(), $current, $reference, 'delivery_quote.seal', true, saved: $saved, admission_revision: $control_revision, expected_binding: $binding, local: $local );
+		return null !== $loaded && null === $loaded[2] && null !== $loaded[1] && $loaded[1]->row() === $binding->row() && $loaded[0]->header()->to_private_json() === $opened->to_private_json() && $this->authorized( $owner, 'delivery_quote.seal' ) && $local->unchanged();
+	}
 	public function reconcile( QuoteDurableCommand $command, RequestContext $request ): QuoteDurableResult {
 		if ( ! $this->authorized( $command->owner(), $command->identity->operation ) ) { return $this->reject( $request, 'not_authorized' ); }
 		$attempt = $this->coordinator( $command )->reconcile( $command->identity, $command, $request ); return $this->finish( $attempt, $command, $request );
@@ -101,36 +144,44 @@ final class QuoteDurableService {
 	}
 	private function coordinator( QuoteDurableCommand $command ): OperationCoordinator {
 		$profiles = []; foreach ( QuoteOperationProfile::OPERATIONS as $operation ) { $profiles[] = new QuoteOperationProfile( $operation, $command, $this->authorizer, $this->evidence, $this->control, $this->publication ); }
+		$profiles[] = new QuoteOperationProfile( 'delivery_quote.seal', $command, $this->authorizer, $this->evidence, $this->control, $this->publication, 2 );
 		return new OperationCoordinator( new OperationProfileRegistry( $profiles ), $this->factory, $this->readiness, $this->observer );
 	}
 	private function finish( OperationAttemptResult $attempt, QuoteDurableCommand $command, RequestContext $request ): QuoteDurableResult {
 		if ( ! $this->authorized( $command->owner(), $command->identity->operation ) ) { return $this->unknown( $request, null ); }
 		$loaded = null; $facts = $attempt->completion?->result;
 		if ( null !== $facts && in_array( $attempt->completion->state, [ 'accepted', 'not_applicable' ], true ) && hash_equals( $facts['owner_digest'], $command->owner()->digest() ) && hash_equals( $facts['namespace_hash'], $command->identity->namespace_digest() ) ) {
-			$loaded = $this->load( $command->owner(), QuoteId::from_string( $facts['quote_id'] ), $command->current_context(), $command->reference(), $command->identity->operation );
+			$loaded = $this->load( $command->owner(), QuoteId::from_string( $facts['quote_id'] ), $command->current_context(), $command->reference(), $command->identity->operation, proof: $command->placement_proof(), saved: $command->saved_evidence() );
 			if ( ! $this->authorized( $command->owner(), $command->identity->operation ) ) { return $this->unknown( $request, null ); }
 			if ( null !== $loaded && ! hash_equals( $facts['body_digest'], $loaded[0]->header()->body_digest() ) ) { $loaded = null; }
 			if ( null === $loaded ) { return $this->unknown( $request, $command ); }
+			if ( null !== $command->placement_proof() && ( null === $loaded[1] || ! $command->placement_proof()->matches( $loaded[1] ) || ! $command->placement_proof()->unchanged() || $facts['control_revision'] !== $command->placement_proof()->control_revision() || 'sealed' !== $facts['state'] || 3 !== $facts['binding_revision'] ) ) { return $this->unknown( $request, $command ); }
 		}
 		return new QuoteDurableResult( $attempt, $command, $loaded[0] ?? null, $loaded[1] ?? null, null === $loaded ? 'quote_unavailable' : $loaded[2] );
 	}
 	/** Current reads require current evidence; original completion replay preserves authorized history. */
-	private function load( QuoteOwner $owner, QuoteId $id, ?QuoteContext $current, ?QuoteReference $reference, string $operation, bool $require_current_evidence = false ): ?array {
+	private function load( QuoteOwner $owner, QuoteId $id, ?QuoteContext $current, ?QuoteReference $reference, string $operation, bool $require_current_evidence = false, ?QuotePlacementProof $proof = null, ?QuotePlacementSavedEvidenceGuard $saved = null, ?int $admission_revision = null, ?QuoteBinding $expected_binding = null, ?\CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutLocalBinding $local = null ): ?array {
 		$session = null; $begun = false;
 		try {
 			if ( ! $this->authorized( $owner, $operation ) ) { return null; } $session = $this->factory->open(); if ( $session->site_id() !== $owner->site_id() || $session->is_retired() || $session->in_transaction() ) { return null; }
 			$this->readiness->assert_ready( $session ); if ( ! $session->begin() ) { return null; } $begun = true;
-			$this->control->assert_ready( $session, $owner->site_id() ); if ( ! $session->validate_tables( [ $this->control->options_table( $session ), ...DeliveryQuoteSchema::tables( $session->table_prefix() ), ...($this->evidence?->tables( $session ) ?? []) ] ) ) { return null; }
+			$this->control->assert_ready( $session, $owner->site_id() ); $tables = array_values( array_unique( [ $this->control->options_table( $session ), ...DeliveryQuoteSchema::tables( $session->table_prefix() ), ...($this->evidence?->tables( $session ) ?? []), ...($proof?->tables( $session ) ?? []), ...($saved?->tables( $session ) ?? []) ] ) ); if ( ! $session->validate_tables( $tables ) ) { return null; }
 			$repo = new DeliveryQuoteRepository( $session ); $discovered = $repo->find_quote( $id );
 			if ( null === $discovered || ! $discovered->header()->owner()->equals( $owner ) || ( null !== $reference && ! $discovered->header()->matches_reference( $reference ) ) ) { return null; }
 			$discovered_binding = null === $discovered->accepted_at() ? null : $repo->find_binding( $discovered );
 			$verifier = new QuoteReceiptVerifier(); $receipts = $verifier->lock( $session, $discovered->header(), $discovered_binding );
 			$control = $this->control->current( $session ); $evidence_ok = null !== $current && $current->material_evidence_available() && null !== $this->evidence && $this->evidence->verify( $session, $owner, $current );
+			if ( null !== $admission_revision && ( ! $control->enabled() || $control->revision !== $admission_revision || null === $local || ! $local->unchanged() ) ) { return null; }
+			if ( null !== $proof && ( null === $discovered_binding || ! $proof->verify_saved( $session, $discovered_binding ) ) ) { return null; }
+			if ( null !== $saved && ( null === $discovered_binding || ! $saved->verify( $session, $discovered_binding ) ) ) { return null; }
 			$quote = $repo->find_quote( $id, true );
 			if ( null === $quote || ! $quote->header()->owner()->equals( $owner ) || ( null !== $reference && ! $quote->header()->matches_reference( $reference ) ) || ! $this->authorized( $owner, $operation ) ) { return null; }
 			$binding = null === $quote->accepted_at() ? null : $repo->find_binding( $quote, true );
 			if ( $quote->header()->to_private_json() !== $discovered->header()->to_private_json() || ( null === $binding ) !== ( null === $discovered_binding ) || ( null !== $binding && $binding->row()['placement_uuid'] !== $discovered_binding->row()['placement_uuid'] ) || ! $verifier->verify( $quote, $receipts, $binding ) ) { return null; }
+			if ( null !== $proof && ( null === $binding || ! $proof->matches( $binding ) || ! $proof->unchanged() ) ) { return null; }
+			if ( null !== $admission_revision && ( null === $binding || null === $expected_binding || $binding->row() !== $expected_binding->row() || 'accepted' !== $quote->state() || 'sealed' !== $binding->state() || ! $evidence_ok || null === $current || ! hash_equals( $quote->header()->material_digest(), $current->digest() ) || ! $local->unchanged() ) ) { return null; }
 			$at = QuoteOperationProfile::time( $session );
+			if ( null !== $admission_revision && ( ! $quote->header()->valid_at( $at ) || $at->epoch_microseconds() < ( $control->changed_at_epoch ?? 0 ) * 1000000 ) ) { return null; }
 			$reason = ! $control->enabled() ? 'checkout_suspended' : ( ! $evidence_ok ? 'quote_unavailable' : ( ! hash_equals( $quote->header()->material_digest(), $current->digest() ) ? 'quote_invalidated' : self::reason( $quote, $at ) ) );
 			if ( ! $session->rollback() ) { return null; } $begun = false; if ( ! $session->retire() ) { return null; }
 			if ( ! $this->authorized( $owner, $operation ) ) { return null; }

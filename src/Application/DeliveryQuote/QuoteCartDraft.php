@@ -39,6 +39,20 @@ final readonly class QuoteCartDraft implements \JsonSerializable {
 		return new self( $owner, $json, $identity->cart_draft_digest( $owner->site_id(), $owner->digest(), $json ) );
 	}
 	public function owner(): QuoteOwner { return $this->quote_owner; }
+	/** Private sealed-order restoration; every field passes the original loaded-draft grammar. */
+	public static function from_private_facts( QuoteOwner $owner, array $facts, ?QuoteNativeContextIdentity $identity = null ): self {
+		QuoteShape::fields( $facts, [ 'format_version', 'owner_digest', 'currency', 'lines', 'customer_destination' ] );
+		if ( 1 !== $facts['format_version'] || ! is_string( $facts['owner_digest'] ) || ! hash_equals( $owner->digest(), $facts['owner_digest'] ) ) { QuoteShape::invalid(); }
+		$currency = QuoteShape::object( $facts['currency'] ); QuoteShape::fields( $currency, [ 'code', 'precision' ] ); $items = [];
+		foreach ( QuoteShape::list( $facts['lines'], 200, 1 ) as $line ) {
+			$line = QuoteShape::object( $line ); QuoteShape::fields( $line, [ 'line_key', 'product_id', 'variation_id', 'quantity', 'selection', 'selection_hash', 'customer_context' ] );
+			$key = QuoteShape::machine( $line['line_key'], 128 );
+			if ( isset( $items[$key] ) || ! is_string( $line['quantity'] ) || 1 !== preg_match( '/\A[1-9][0-9]{0,9}\z/D', $line['quantity'] ) || (int) $line['quantity'] > 1000000000 ) { QuoteShape::invalid(); }
+			$items[$key] = [ 'product_id' => $line['product_id'], 'variation_id' => $line['variation_id'] ?? 0, 'quantity' => (int) $line['quantity'], CartDeliverySelectionCapture::CART_SELECTION_KEY => $line['selection'], CartDeliverySelectionCapture::CART_HASH_KEY => $line['selection_hash'], CustomerCartContext::CART_KEY => $line['customer_context'] ];
+		}
+		$draft = self::from_loaded_cart( $owner, $items, QuoteShape::object( $facts['customer_destination'] ), $currency['code'], $currency['precision'], $identity );
+		$nodes = 0; if ( $draft->private_facts() !== self::normalize( $facts, 0, $nodes ) ) { QuoteShape::invalid(); } return $draft;
+	}
 	public function draft_digest(): string { return $this->digest; }
 	public function private_facts(): array { return json_decode( $this->json, true, 16, JSON_THROW_ON_ERROR ); }
 	public function jsonSerialize(): never { throw new \LogicException( 'Cart quote drafts require an explicit private consumer.' ); }

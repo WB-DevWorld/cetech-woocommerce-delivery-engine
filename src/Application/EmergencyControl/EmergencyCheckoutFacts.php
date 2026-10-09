@@ -83,10 +83,13 @@ final class EmergencyCheckoutFacts {
 		try {
 			$items = $order->get_items( 'line_item' );
 			$shipping = $order->get_items( 'shipping' );
-			if ( count( $items ) > self::MAX_LINES || count( $shipping ) > self::MAX_PACKAGES ) {
+			$taxes = class_exists( 'WC_Order_Item_Tax' ) ? $order->get_items( 'tax' ) : [];
+			if ( count( $items ) > self::MAX_LINES || count( $shipping ) > self::MAX_PACKAGES || count( $taxes ) > self::MAX_PACKAGES ) {
 				return null;
 			}
-			$facts = [ 'site' => get_current_blog_id(), 'order' => $order->get_id(), 'paid' => $order->is_paid(), 'status' => $order->get_status(), 'lines' => [], 'shipping' => [] ];
+			// Every native group is prewarmed before the subsequent pure raw capture.
+			foreach ( [ ...$items, ...$shipping, ...$taxes ] as $item ) { if ( is_object( $item ) && method_exists( $item, 'get_meta_data' ) ) { $item->get_meta_data(); } }
+			$facts = [ 'site' => get_current_blog_id(), 'order' => $order->get_id(), 'paid' => $order->is_paid(), 'status' => $order->get_status(), 'lines' => [], 'shipping' => [], 'tax' => [] ];
 			foreach ( [ 'get_currency', 'get_customer_id', 'get_total', 'get_total_tax', 'get_shipping_total', 'get_shipping_tax', 'get_shipping_country', 'get_shipping_state', 'get_shipping_city', 'get_shipping_postcode', 'get_shipping_address_1', 'get_shipping_address_2' ] as $method ) {
 				if ( ! method_exists( $order, $method ) ) {
 					return null;
@@ -96,17 +99,25 @@ final class EmergencyCheckoutFacts {
 			$facts['locale'] = function_exists( 'get_locale' ) ? get_locale() : '';
 			$facts['package'] = $order->get_meta( OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, true );
 			$facts['package_version'] = $order->get_meta( OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION, true );
+			$facts['quote_marker'] = [ \CetechDeliveryEngine\Application\Order\DeliveryQuoteSnapshotMarker::exists( $order ), $order->get_meta( \CetechDeliveryEngine\Application\Order\DeliveryQuoteSnapshotEnvelope::META_FORMAT, true ) ];
+			$facts['quote_draft'] = $order->get_meta( \CetechDeliveryEngine\Application\Order\QuoteNativeOrderFacts::META_DRAFT, true );
+			$facts['quote_reference'] = $order->get_meta( \CetechDeliveryEngine\Application\Order\QuoteNativeOrderFacts::META_REFERENCE, true );
+			$facts['quote_tax_source'] = $order->get_meta( \CetechDeliveryEngine\Application\Order\QuoteNativeOrderFacts::META_TAX_SOURCE, true );
 			foreach ( $items as $key => $item ) {
 				if ( ! $item instanceof \WC_Order_Item_Product ) {
 					return null;
 				}
-				$facts['lines'][ $key ] = [ $item->get_id(), $item->get_product_id(), $item->get_variation_id(), $item->get_quantity(), $item->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT, true ), $item->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION, true ) ];
+				$facts['lines'][ $key ] = [ $item->get_id(), $item->get_product_id(), $item->get_variation_id(), $item->get_quantity(), $item->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT, true ), $item->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION, true ), \CetechDeliveryEngine\Application\Order\DeliveryQuoteSnapshotMarker::exists( $item ), $item->get_meta( \CetechDeliveryEngine\Application\Order\DeliveryQuoteSnapshotEnvelope::META_FORMAT, true ), $item->get_meta( \CetechDeliveryEngine\Application\Order\QuoteNativeOrderFacts::META_LINE_KEY, true ) ];
 			}
 			foreach ( $shipping as $key => $item ) {
 				if ( ! is_object( $item ) || ! method_exists( $item, 'get_total_tax' ) || ! method_exists( $item, 'get_taxes' ) ) {
 					return null;
 				}
 				$facts['shipping'][ $key ] = [ $item->get_method_id(), $item->get_total( 'edit' ), $item->get_total_tax( 'edit' ), $item->get_taxes( 'edit' ), $item->get_meta( 'cetech_de_group_id', true ) ];
+			}
+			foreach ( $taxes as $key => $item ) {
+				if ( ! $item instanceof \WC_Order_Item_Tax ) { return null; }
+				$facts['tax'][$key] = [ $item->get_id(), $item->get_rate_id( 'edit' ), $item->get_name( 'edit' ), $item->get_label( 'edit' ), $item->get_compound( 'edit' ), $item->get_rate_percent( 'edit' ), $item->get_tax_total( 'edit' ), $item->get_shipping_tax_total( 'edit' ) ];
 			}
 			return self::bounded_hash( $facts );
 		} catch ( \Throwable ) {

@@ -19,6 +19,7 @@ final readonly class QuoteNativeReceiptGuard implements QuoteCurrentEvidenceGuar
   'customer_rows'=>['umeta_id','user_id','meta_key','meta_value'],
  ];
  public function __construct(private QuoteNativeReceipt $receipt){}
+ public function tax_source():QuoteNativeTaxSource{return $this->receipt->tax_source();}
  public function tables(OperationSession $session):array{$s=$this->receipt->source_facts()['selectors'];if($s['site_id']!==$session->site_id()||$s['table_prefix']!==$session->table_prefix()){throw new \RuntimeException('Native quote source unavailable.');}$p=$session->table_prefix();return [$p.'options',$p.'woocommerce_tax_rates',$p.'wc_tax_rate_classes',$p.'woocommerce_tax_rate_locations',$p.'woocommerce_shipping_zone_methods',$p.'woocommerce_sessions',$p.'usermeta'];}
  public function verify(OperationSession $session,QuoteOwner $owner,QuoteContext $context):bool {
   try{$expected=$this->receipt->source_facts();$s=$expected['selectors'];if($owner->site_id()!==$session->site_id()||$context->digest()!==$this->receipt->bind_context($context)->digest()||!$this->receipt->matches_owner($owner)||!$this->receipt->unchanged()){return false;}$this->tables($session);$current=self::read($s,$session);return hash_equals(QuoteJson::encode($expected),QuoteJson::encode($current))&&$this->receipt->unchanged();}catch(\Throwable){return false;}
@@ -29,6 +30,8 @@ final readonly class QuoteNativeReceiptGuard implements QuoteCurrentEvidenceGuar
   if(($db->usermeta??null)!==$db->prefix.'usermeta'){throw new \RuntimeException('Native quote source unavailable.');}
   $selectors['site_id']=get_current_blog_id();$selectors['table_prefix']=$db->prefix;return self::read($selectors,$db);
  }
+ /** Fixed saved-order selectors on the current owned unit; no native call is made here. */
+ public static function read_current(array $selectors,OperationSession $session):array {if($session->is_retired()||!$session->in_transaction()||($selectors['site_id']??null)!==$session->site_id()||($selectors['table_prefix']??null)!==$session->table_prefix()){throw new \RuntimeException('Native quote source unavailable.');}return self::read($selectors,$session);}
  private static function read(array $s,object $db):array {
   $owned=$db instanceof OperationSession;$p=$s['table_prefix'];if(!is_string($p)||!preg_match('/\A[a-zA-Z0-9_]+\z/D',$p)||strlen($p)>30){throw new \RuntimeException('Native quote source unavailable.');}
   foreach($s['option_names'] as $name){if(!in_array($name,QuoteNativeWooSource::OPTIONS,true)&&preg_match('/\Awoocommerce_delivery_engine_selected_offer(?:_[0-9]+)?_settings\z/D',$name)!==1){throw new \RuntimeException('Native quote source unavailable.');}}

@@ -18,6 +18,16 @@ use CetechDeliveryEngine\Application\EmergencyControl\EmergencyOwnershipLatch;
 use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyCheckoutHooks;
 use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
 use CetechDeliveryEngine\Presentation\Admin\EmergencyControlSettings;
+use CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementActivation;
+use CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementCompositeGuard;
+use CetechDeliveryEngine\Application\DeliveryQuote\QuoteCartPlacementEvidenceReader;
+use CetechDeliveryEngine\Application\DeliveryQuote\QuoteSavedOrderPlacementEvidenceReader;
+use CetechDeliveryEngine\Application\Order\QuoteNativeOrderStager;
+use CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteReviewRuntime;
+use CetechDeliveryEngine\Integrations\DeliveryQuote\QuotePlacementRuntime;
+use CetechDeliveryEngine\Integrations\DeliveryQuote\QuoteRateReferenceRuntime;
+use CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory;
+use CetechDeliveryEngine\Presentation\Admin\QuotePlacementSettings;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionReconciler;
@@ -312,6 +322,8 @@ final class Plugin {
 		}
 
 		$this->register_services();
+		// Trusted server composition only, before any service or owned unit opens.
+		if ( function_exists( 'do_action' ) ) { do_action( 'cetech_de_services_registered', $this->container ); }
 		$this->container->get( AdminNoticeManager::class )->boot();
 
 		/** @var MigrationRunner $migration_runner */
@@ -402,6 +414,10 @@ final class Plugin {
 		$health->run();
 
 		$this->container->get( EmergencyCheckoutHooks::class )->register();
+		$this->container->get( QuotePlacementRuntime::class )->register();
+		$this->container->get( QuoteReviewRuntime::class )->register();
+		$this->container->get( QuoteRateReferenceRuntime::class )->register();
+		$this->container->get( OrderDeliverySnapshotPersister::class )->set_quote_ownership_guard( [ $this->container->get( QuotePlacementRuntime::class ), 'owns_order' ] );
 
 		$this->container->get( ProductDeliverySelectorRenderer::class )->register();
 		$this->container->get( VariableDeliverySelectorAssets::class )->register();
@@ -441,16 +457,42 @@ final class Plugin {
 		return $this->container;
 	}
 
-	/** Q05 prepares compiled services; Q06 separately owns native placement activation. */
+	/** Review and native placement share one complete, explicit store adoption. */
 	private function register_quote_review_services(): void {
-		$this->container->singleton( CartQuoteReviewService::class, static function (): CartQuoteReviewService {
-			$factory = new \CetechDeliveryEngine\Infrastructure\WordPress\OperationConnectionFactory();
-			$environment = new NativeCartQuoteEnvironment( $factory );
+		$this->container->singleton( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class, static fn() => new \CetechDeliveryEngine\Infrastructure\WordPress\OperationConnectionFactory() );
+		$this->container->singleton( NativeCartQuoteEnvironment::class, static fn( ServiceContainer $c ) => new NativeCartQuoteEnvironment( $c->get( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class ) ) );
+		$this->container->singleton( NativeCartQuoteSessionStore::class, static fn( ServiceContainer $c ) => new NativeCartQuoteSessionStore( $c->get( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class ), [ $c->get( NativeCartQuoteEnvironment::class ), 'authorize' ] ) );
+		$this->container->singleton( CartQuoteReviewService::class, static function ( ServiceContainer $c ): CartQuoteReviewService {
+			$factory = $c->get( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class );
+			$environment = $c->get( NativeCartQuoteEnvironment::class );
 			$authorize = [ $environment, 'authorize' ];
-			return new CartQuoteService( $environment, new QuotePreparationGate( $factory, $authorize ), new NativeCartQuoteSessionStore( $factory, $authorize ), $factory );
+			return new CartQuoteService( $environment, new QuotePreparationGate( $factory, $authorize ), $c->get( NativeCartQuoteSessionStore::class ), $factory );
 		} );
 		$this->container->singleton( DeliveryQuoteSnapshotReader::class, static fn(): DeliveryQuoteSnapshotReader => new DeliveryQuoteSnapshotReader() );
-		// QuoteReviewRuntime::register() is deliberately not called by this checkpoint.
+		$this->container->singleton( QuotePlacementActivation::class, static fn( ServiceContainer $c ) => new QuotePlacementActivation(
+			$c->get( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class ), static function () use ( $c ): bool {
+				return $c->get( ClassicCheckoutRuntimeActivation::class )->is_active() && $c->get( FeatureFlags::class )->is_enabled( 'enable_blocks_adapter' )
+					&& $c->get( WooCommerceShippingReadiness::class )->is_ready() && ( new \CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteReadiness() )->get_status()['ready'];
+			}
+		) );
+		$this->container->singleton( QuoteCartPlacementEvidenceReader::class, static fn( ServiceContainer $c ) => new QuoteCartPlacementEvidenceReader( $c->get( NativeCartQuoteEnvironment::class ), $c->get( NativeCartQuoteSessionStore::class ), $c->get( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class ) ) );
+		$this->container->singleton( QuoteNativeOrderStager::class, static fn( ServiceContainer $c ) => new QuoteNativeOrderStager( $c->get( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class ) ) );
+		$this->container->singleton( QuotePlacementRuntime::class, static fn( ServiceContainer $c ) => new QuotePlacementRuntime(
+			$c->get( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class ), $c->get( QuoteCartPlacementEvidenceReader::class ), $c->get( QuoteNativeOrderStager::class ), $c->get( EmergencyCheckoutQuoteValidator::class ),
+			[ $c->get( QuotePlacementActivation::class ), 'requested' ],
+			static function () use ( $c ): bool { $cart = function_exists( 'WC' ) ? WC()->cart : null; return \CetechDeliveryEngine\Application\EmergencyControl\EmergencyOwnership::Unmanaged !== $c->get( EmergencyOwnershipClassifier::class )->cart( $cart instanceof \WC_Cart ? $cart->get_cart() : [] ); },
+			static function ( \WC_Order $order, \CetechDeliveryEngine\Domain\Contracts\RequestContext $request ) use ( $c ) { return ( new QuoteSavedOrderPlacementEvidenceReader( $c->get( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory::class ), $c->get( QuoteNativeOrderStager::class ), [ $c->get( QuotePlacementRuntime::class ), 'authorize_saved_order' ] ) )->read( $order, $request ); },
+			static fn( \CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementSavedEvidenceGuard $guard ) => new QuotePlacementCompositeGuard( $guard, $c->get( QuotePlacementActivation::class )->fence() ),
+			null, null, static fn( \WC_Order $order, string $route ) => $c->get( EmergencyControlRuntime::class )->final_order_decision( $order, $route )
+		) );
+		$this->container->singleton( QuoteReviewRuntime::class, static fn( ServiceContainer $c ) => new QuoteReviewRuntime( $c->get( CartQuoteReviewService::class ), true, new \CetechDeliveryEngine\Presentation\Frontend\QuoteReviewRenderer(), [ $c->get( QuotePlacementActivation::class ), 'active' ] ) );
+		$this->container->singleton( QuoteRateReferenceRuntime::class, static function ( ServiceContainer $c ): QuoteRateReferenceRuntime {
+			$environment = $c->get( NativeCartQuoteEnvironment::class );
+			$runtime = new QuoteRateReferenceRuntime( $environment, $c->get( NativeCartQuoteSessionStore::class ), true, [ $c->get( QuotePlacementActivation::class ), 'active' ] );
+			$environment->set_rate_projection( $runtime );
+			return $runtime;
+		} );
+		$this->container->singleton( QuotePlacementSettings::class, static fn( ServiceContainer $c ) => new QuotePlacementSettings( $c->get( QuotePlacementActivation::class ), $c->get( AdminActionHandler::class ) ) );
 	}
 
 	/** The shared guards remain registered independently of all old module flags. */
@@ -483,8 +525,9 @@ final class Plugin {
 			static fn( ServiceContainer $container ): EmergencyCheckoutAdmissionService => new EmergencyCheckoutAdmissionService(
 				$container->get( EmergencyControlService::class ),
 				$container->get( EmergencyOwnershipClassifier::class ),
-				$container->get( EmergencyCheckoutQuoteValidator::class ),
-				$container->get( EmergencyOwnershipLatch::class )
+				$container->get( QuotePlacementRuntime::class ),
+				$container->get( EmergencyOwnershipLatch::class ),
+				$container->get( QuotePlacementRuntime::class )
 			) );
 		$this->container->singleton( EmergencyControlRuntime::class,
 			static fn( ServiceContainer $container ): EmergencyControlRuntime => new EmergencyControlRuntime(
@@ -1625,7 +1668,8 @@ final class Plugin {
 				$container->get( OperationalStateService::class ),
 				$container->get( RoleAccessService::class ),
 				$container->get( IntegrationStatusCatalog::class ),
-				$container->get( EmergencyControlSettings::class )
+				$container->get( EmergencyControlSettings::class ),
+				$container->get( QuotePlacementSettings::class )
 			)
 		);
 
