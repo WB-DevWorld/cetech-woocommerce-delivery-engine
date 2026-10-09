@@ -1,3 +1,11 @@
+# P03 current handoff — 2026-10-09
+
+Local source freeze: six reviewed pure production classes,799total production PHP files/map`ce61ac5bf6144636a14eef7ed646e736083d78c07202f02fb8f23374b87b3932`. Comparative PHP8.3.6 full4617tests/27654assertions/no skips; new100tests/525assertions; production-only autoload/all799lint;49 authored pure vectors;9P03+9P02+16retained strict negative protocol tests and both control checks pass. Finite independent acceptance audit14manualcases/466pointwise probes passes. These local results are separate from the required pinned exact-candidate CI/original artifact audit.
+
+P02 integrated unchanged as actual master5d3d17c/tree3759041; candidate all8jobs/original retained495/20/143+P02native19 qualification is recorded on ready-and-mergedPR102. Separate actual-master37926035618 is still executing. Owner continuation accepts the preceding named checkpoint and authorizes only P03 pure bounded deterministic calculation underIssue103. CURRENT-WORK records root/disjoint leases; [P03 boundary](product/W2-P03-DETERMINISTIC-CALCULATION-2026-10-09.md) governs implementation. Schema10/38stores/23flags/adoptionOFF/372classifications and immutable quote/order/history stay unchanged. New calculators remain unmounted. No P04–P06/runtime writer/UI/adoption/release begins automatically. Exact P03 candidate qualification remains pending.
+
+## Historical P02 publication handoff
+
 # P02 current handoff — 2026-10-09
 
 Local pre-publication proof on reviewed793 production files/map`6b8d4d5137d912804209912acdc7f8ddc785d6e7304d5a99eeed5d59b3d98aae`: PHP8.3.6 full4517tests/27129assertions PASS; new physicalSQL15/188 and retained lifecycle/emergency61/1253 PASS on disposable MariaDB10.11.14; warning-free comparative WP7.1.2/Woo11.1.2 P02native19/19 and tracked cleanup PASS; production autoload/all793lint, protocol9+retained16 and control checks PASS. Independent source review approves exact23newproductionfiles; central review approves current38/retained35 preservation and package/CI boundaries. These local/comparative results do not replace pinned CI or original495/20/143 receipts.

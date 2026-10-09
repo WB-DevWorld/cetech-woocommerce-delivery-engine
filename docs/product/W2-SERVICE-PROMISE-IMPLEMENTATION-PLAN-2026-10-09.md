@@ -1,3 +1,5 @@
+Current owner continuation2026-10-09 11:45:15 UTC accepts qualified P02 integration (PR102/master5d3d17c) and implements only P03 pure bounded calculation underIssue103. [P03 boundary](W2-P03-DETERMINISTIC-CALCULATION-2026-10-09.md) governs the new finite leases; P04–P06 remain later checkpoints. Original historical design observations below retain their meaning and are not all claimed executed.
+
 # Service/promise policy — bounded implementation proposal
 
 Current owner checkpoint2026-10-09 09:11:24 UTC: P01 accepted/integrated under PR100/masterd07b8eb; P02 immutable persistence authorized under Issue101. Its [frozen additive schema/reader transition](W2-P02-IMMUTABLE-PROMISE-STORAGE-2026-10-09.md) governs implementation. P03–P06 remain later bounded checkpoints; original design observations below retain their historical/unexecuted meaning.
