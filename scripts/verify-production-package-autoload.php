@@ -56,6 +56,32 @@ if ( ! str_contains( $health_source, 'namespace CetechDeliveryEngine\\Applicatio
 require_once $autoload;
 
 $required_classes = [
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\PromiseQuotePaymentBoundary',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\PromiseQuotePlacementActivation',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\PromiseQuotePlacementPolicyFence',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\PromiseQuoteSealLinkage',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteCurrentEvidenceValidity',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\ServicePromiseQuoteProvider',
+	'CetechDeliveryEngine\\Application\\ServicePromise\\Handoff\\PromiseCaptureDemand',
+	'CetechDeliveryEngine\\Application\\ServicePromise\\Handoff\\PromiseHandoffSourceFence',
+	'CetechDeliveryEngine\\Application\\ServicePromise\\Handoff\\PromiseNativeCapture',
+	'CetechDeliveryEngine\\Application\\ServicePromise\\Handoff\\PromiseNativeCaptureService',
+	'CetechDeliveryEngine\\Application\\ServicePromise\\Handoff\\PromiseQuoteCurrentEvidenceGuard',
+	'CetechDeliveryEngine\\Application\\Shipment\\ShipmentOriginalPromiseReference',
+	'CetechDeliveryEngine\\Application\\Shipment\\ShipmentOriginalPromiseReferenceReader',
+	'CetechDeliveryEngine\\Bootstrap\\PromiseQuoteComposition',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\WpdbPromiseHandoffSources',
+	'CetechDeliveryEngine\\Integrations\\ServicePromise\\NativePromiseCaptureAuthorizer',
+	'CetechDeliveryEngine\\Integrations\\ServicePromise\\NativePromiseRuntimeCapture',
+	'CetechDeliveryEngine\\Integrations\\ServicePromise\\PromiseNativeServiceRegistry',
+
+	'CetechDeliveryEngine\\Domain\\ServicePromise\\Handoff\\PromiseHistoricalCodec',
+	'CetechDeliveryEngine\\Domain\\ServicePromise\\Handoff\\PromiseHistoricalPacket',
+	'CetechDeliveryEngine\\Domain\\ServicePromise\\Handoff\\PromiseQuotePacket',
+	'CetechDeliveryEngine\\Application\\Order\\PromiseSnapshotCore',
+	'CetechDeliveryEngine\\Application\\Order\\RequiredPromiseSnapshotReadiness',
+	'CetechDeliveryEngine\\Application\\Order\\QuoteSnapshotOwnership',
+
 	'CetechDeliveryEngine\\Application\\ServicePromise\\Calculation\\DeterministicPromiseCalculator',
 	'CetechDeliveryEngine\\Application\\ServicePromise\\Calculation\\PromiseCalculationBudget',
 	'CetechDeliveryEngine\\Application\\ServicePromise\\Calculation\\PromiseCalculationException',
@@ -308,6 +334,10 @@ $required_classes = [
 ];
 
 $required_interfaces = [
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\CartQuoteProfileEnvironment',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteNativeTaxEvidenceGuard',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteTimedCurrentEvidenceGuard',
+	'CetechDeliveryEngine\\Application\\ServicePromise\\Handoff\\PromiseCapacityCurrentFence',
 	'CetechDeliveryEngine\\Domain\\ServicePromise\\Persistence\\PromisePersistenceAuthorizer',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuotePlacementSavedEvidenceGuard',
 	'CetechDeliveryEngine\\Application\\EmergencyControl\\EmergencyFinalPlacementGuard',
@@ -462,7 +492,7 @@ $is_schema9_release = str_contains( $header_source, '1.0.0-dev.wave2-quote-stora
 	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-cart' )
 	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-placement' )
 	|| 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-contract\.1\'\s*\);\s*$/m', $header_source );
-$is_schema10_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-(?:storage|calculation)\.1\'\s*\);\s*$/m', $header_source );
+$is_schema10_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-(?:storage|calculation|handoff)\.1\'\s*\);\s*$/m', $header_source );
 $is_schema8_release = str_contains( $header_source, '1.0.0-dev.wave1-rule-lifecycle' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-snapshot-readers' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-data-lifecycle' )

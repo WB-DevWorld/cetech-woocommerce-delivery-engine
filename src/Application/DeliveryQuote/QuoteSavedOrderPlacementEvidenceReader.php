@@ -9,12 +9,33 @@ use CetechDeliveryEngine\Domain\Contracts\RequestContext;
 use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteBinding,QuoteId,QuoteJson,QuoteOwner,QuoteReference};
 use CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory;
 use CetechDeliveryEngine\Infrastructure\Persistence\{DeliveryQuoteRepository,EmergencyControlStore};
+use CetechDeliveryEngine\Application\ServicePromise\Handoff\{PromiseNativeCaptureService,PromiseQuoteCurrentEvidenceGuard};
+use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime;
+use CetechDeliveryEngine\Domain\RuleLifecycle\RuleTime;
 
 /** Native exact-order access precedes all private quote resolution, including empty-cart order-pay. */
 final class QuoteSavedOrderPlacementEvidenceReader {
 	private \Closure $native_authorizer;
 	private OperationReadiness $readiness;
-	public function __construct( private OperationConnectionFactory $factory, private QuoteNativeOrderStager $stager, callable $authorize_order, ?OperationReadiness $readiness = null, private ?EmergencyControlStore $control = null ) { $this->native_authorizer = \Closure::fromCallable( $authorize_order ); $this->readiness = $readiness ?? new DatabaseOperationReadiness(); }
+	public function __construct( private OperationConnectionFactory $factory, private QuoteNativeOrderStager $stager, callable $authorize_order, ?OperationReadiness $readiness = null, private ?EmergencyControlStore $control = null, private ?PromiseNativeCaptureService $promise_capture = null ) { $this->native_authorizer = \Closure::fromCallable( $authorize_order ); $this->readiness = $readiness ?? new DatabaseOperationReadiness(); }
+	/** Authorized originals survive expiry and policy removal; this method never admits payment. */
+	public function read_original_promise_linkage( \WC_Order $order ): ?PromiseQuoteSealLinkage {
+		$session = null; $begun = false;
+		try {
+			$authorization = QuoteSavedOrderAuthorization::capture( $order, $this->native_authorizer );
+			$package = ( new OrderDeliverySnapshotReader() )->read_package( $order );
+			if ( OrderDeliveryPackageReadResult::ERROR_NONE !== $package->error || 'recorded' !== $package->delivery_quote?->status || null === $package->delivery_quote->envelope || ! $package->delivery_quote->envelope->is_promise() ) { return null; }
+			$envelope = $package->delivery_quote->envelope->private_facts(); $raw = $order->get_meta( QuoteNativeOrderFacts::META_REFERENCE, true ); if ( ! is_string( $raw ) || strlen( $raw ) > 4096 ) { return null; } $reference = QuoteReference::from_array( QuoteJson::decode( $raw, 4096 ) );
+			$binding = $this->read_binding( $order ); if ( null === $binding || 'sealed' !== $binding->state() || $binding->row()['order_id'] !== $order->get_id() || ! $authorization->unchanged() ) { return null; }
+			$session = $this->factory->open(); if ( $session->is_retired() || $session->in_transaction() || ! $session->begin() ) { return null; } $begun = true; $this->readiness->assert_ready( $session );
+			$quote = ( new DeliveryQuoteRepository( $session ) )->find_quote( $reference->id() );
+			if ( null === $quote || null === $quote->context() || null === $quote->terms() || 2 !== $quote->header()->format_version() || 'accepted' !== $quote->state() || ! $quote->header()->matches_reference( $reference ) || $quote->header()->id()->value() !== $envelope['quote_id'] || $quote->header()->body_digest() !== $envelope['body_digest'] || ! $authorization->unchanged() || ! $session->rollback() ) { return null; } $begun = false; if ( ! $session->retire() ) { return null; }
+			$saved = $this->stager->saved_guard( $order, $quote, $binding ); $owner = $quote->header()->owner(); $authorize = static fn( QuoteOwner $requested, string $operation ): bool => $requested->equals( $owner ) && 'delivery_quote.read' === $operation && $authorization->unchanged();
+			$linkage = ( new QuoteDurableService( $this->factory, new QuoteProviderRegistry(), $authorize, readiness: $this->readiness, control: $this->control ) )->acknowledged_promise_seal( $owner, $reference, $quote->header(), $binding, $saved );
+			return $authorization->unchanged() && true === ( $this->native_authorizer )( $order ) ? $linkage : null;
+		} catch ( \Throwable ) { return null; }
+		finally { if ( null !== $session ) { if ( $begun && ! $session->is_retired() ) { try { $session->rollback(); } catch ( \Throwable ) {} } try { $session->retire(); } catch ( \Throwable ) {} } }
+	}
 	/** Historical binding state after native exact-order authorization; this is never new admission. */
 	public function read_binding( \WC_Order $order ): ?QuoteBinding {
 		$session = null; $begun = false;
@@ -52,6 +73,7 @@ final class QuoteSavedOrderPlacementEvidenceReader {
 			$reference = QuoteReference::from_array( QuoteJson::decode( $private_reference, 4096 ) ); if ( ! $quote->header()->matches_reference( $reference ) ) { return null; }
 			$draft = $this->stager->load_draft( $order, $quote->header()->owner() ); $tax_source = $this->stager->load_tax_source( $order ); $saved = $this->stager->saved_guard( $order, $quote, $binding );
 			$current = ( new QuoteSavedOrderNativeEvidence( $this->factory ) )->capture( $order, $quote, $binding, $draft, $authorization, $saved, $tax_source ); if ( null === $current ) { return null; }
+			if ( 2 === $quote->header()->format_version() ) { if ( null === $this->promise_capture ) { return null; } $current = new QuoteCartCurrentEvidence( $current->current_context, new PromiseQuoteCurrentEvidenceGuard( $current->guard, $this->promise_capture->current_fence( $current->current_context, RuleTime::parse( QuoteTime::now()->sql() ) ) ) ); }
 			$owner = $quote->header()->owner(); $authorize = static function( QuoteOwner $requested, string $operation ) use ( $owner, $authorization ): bool { return $requested->equals( $owner ) && in_array( $operation, [ 'delivery_quote.read', 'delivery_quote.bind', 'delivery_quote.verify_binding', 'delivery_quote.seal' ], true ) && $authorization->unchanged(); };
 			$read = ( new QuoteDurableService( $this->factory, new QuoteProviderRegistry(), $authorize, null, $this->readiness, null, $this->control, $current->guard ) )->current( $owner, $reference, $current->current_context, $request );
 			if ( 'ready' !== $read->status || null !== $read->reason || null === $read->quote || null === $read->evaluated_at || $read->quote->row() !== $quote->row() || true !== ( $this->native_authorizer )( $order ) || ! $authorization->unchanged() ) { return null; }

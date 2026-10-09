@@ -44,6 +44,7 @@ final readonly class DeliveryQuote implements \JsonSerializable {
 		if ( $at->compare( $this->original_header->created_at() ) < 0 || ( null !== $this->transition_time && $at->compare( $this->transition_time ) < 0 ) ) { return 'quote_unavailable'; }
 		if ( $at->compare( $this->original_header->expires_at() ) >= 0 ) { return 'quote_expired'; }
 		if ( ! $this->original_context?->checkout_acceptable() || ! $this->original_terms?->checkout_acceptable() || ! $this->supported_terms() ) { return 'quote_unavailable'; }
+		if ( ! $this->original_terms->feasibility_at( $at ) ) { return 'quote_unavailable'; }
 		return null;
 	}
 	public function usable_at( QuoteTime $at ): bool { return null === $this->reason_at( $at ); }
@@ -90,8 +91,9 @@ final readonly class DeliveryQuote implements \JsonSerializable {
 	}
 	private function supported_terms(): bool {
 		if ( null === $this->original_terms ) { return false; }
+		if ( 2 === $this->original_header->format_version() && ( 'service_promise_v1' !== $this->original_header->profile() || null === $this->original_terms->promise_packet() ) ) { return false; }
 		foreach ( $this->original_terms->private_facts()['groups'] as $group ) {
-			if ( 'legacy_fixed_base_v1' === $this->original_header->profile() ) {
+			if ( in_array( $this->original_header->profile(), [ 'legacy_fixed_base_v1', 'service_promise_v1' ], true ) ) {
 				if ( $group['provider'] !== [ 'code' => 'legacy_fixed_base_v1', 'version' => 1 ]
 					|| 'none' !== $group['promotion']['state'] || $group['promotion']['provider'] !== [ 'code' => 'native_no_delivery_promotion_v1', 'version' => 1 ]
 					|| 'unavailable' !== $group['cost']['state'] || 'not_recorded' !== $group['route']['state']

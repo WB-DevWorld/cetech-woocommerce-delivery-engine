@@ -1,3 +1,14 @@
+# AI handoff — W2-P04 authorized implementation
+
+Continue only [Issue105](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/105), branchws3/wave2-p04-handoff based on actual P03 merged masterc625a59/tree22c37. Owner explicitly approved P03 integration and requested P04 at2026-10-09 12:45:25UTC. PR104/Issue103 completed; actual-master CI37932348440/two original audits PASS (PR104/comment6081516744), separately from qualified candidate37928818620/37928757232. Use [P04 frozen transition](product/W2-P04-PROMISE-HANDOFF-2026-10-09.md) and current central leases. First exact reader/readiness commit independently reviewed with new promise writesOFF; then guarded profile/packet/payment boundary. Preserve v1/schema10/23flags/372classifications and495/20/143+19+49 proof. Do not start P05/P06 or activate a live site. Historical pending descriptions below are previous execution freezes, not current integration truth.
+
+Reader checkpoint69699ecb/tree9e1d21 is independently accepted (Issue105/comment6082223622); clean root4,731tests/28,139assertions,805 production autoload/lint and both control planes pass. Guarded writers and lazy native composition are implemented and under final native/HTTP qualification. Physical source proof31tests/393assertions includes same-owner ordered absence locks, concurrent P02 mutations, calendar expiry after SQL retirement, capacity-port refusal and actual stalled owner with no replacement. New adoption staysOFF by default, with protected configure-OFF then separate enable; no new UI or live adoption. P04 is pending complete frozen-candidate qualification.
+
+
+Current-master refresh: the separately approved UI PR106 merged as `8129601f8d8a4ebb0326f3815c8312123395fb15`. Its presentation source and task authorization are preserved in the normal two-parent P04 refresh. Combined source remains827 production files, map `49a6a01a08c451855b7a19770f550be8ca46c811b34ab451c626a35be5eeb6b2`; P04 production/protocol bytes, runtime pins and all806 authored observations are unchanged. Final combined-candidate CI and independent original audits remain pending; the current PR evidence comment will record their exact result.
+
+## Historical P03 handoff
+
 # P03 current handoff — 2026-10-09
 
 Local source freeze: six reviewed pure production classes,799total production PHP files/map`ce61ac5bf6144636a14eef7ed646e736083d78c07202f02fb8f23374b87b3932`. Comparative PHP8.3.6 full4617tests/27654assertions/no skips; new100tests/525assertions; production-only autoload/all799lint;49 authored pure vectors;9P03+9P02+16retained strict negative protocol tests and both control checks pass. Finite independent acceptance audit14manualcases/466pointwise probes passes. These local results are separate from the required pinned exact-candidate CI/original artifact audit.

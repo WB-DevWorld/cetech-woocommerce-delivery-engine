@@ -12,6 +12,8 @@ use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteMoney;
 use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteShape;
 use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTerms;
 use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime;
+use CetechDeliveryEngine\Domain\ServicePromise\PromiseJson;
+use CetechDeliveryEngine\Domain\ServicePromise\Handoff\PromiseQuotePacket;
 
 /** Protected captured history. Recognition never proves sealed placement or payment. */
 final readonly class DeliveryQuoteSnapshotEnvelope implements \JsonSerializable {
@@ -20,10 +22,15 @@ final readonly class DeliveryQuoteSnapshotEnvelope implements \JsonSerializable 
 	public const MEMBER = 'delivery_quote';
 	public const MAX_BYTES = 65536;
 	public const PROFILE = [ 'code' => 'legacy_fixed_base_v1', 'version' => 1 ];
+	public const PROMISE_FORMAT = 2;
+	public const PROMISE_PROFILE = [ 'code' => 'service_promise_v1', 'version' => 1 ];
+	public const PROMISE_OUTER_VERSION = '3';
+	public const PROMISE_DIGEST_DOMAIN = 'cetech-required-promise-snapshot-v1:';
 	private function __construct( private string $json ) {}
 
 	public static function from_array( array $data ): self {
 		$data = QuoteJson::detach( $data, self::MAX_BYTES );
+		if ( self::PROMISE_FORMAT === ( $data['format'] ?? null ) ) { return self::from_promise_array( $data ); }
 		QuoteShape::fields( $data, [ 'format', 'quote_id', 'profile', 'issued_at', 'expires_at', 'accepted_at', 'body_digest', 'material_digest', 'placement_id', 'context_digest', 'money_receipt', 'provenance_receipt' ] );
 		if ( self::FORMAT !== $data['format'] || QuoteShape::object( $data['profile'] ) !== self::PROFILE ) { QuoteShape::invalid(); }
 		foreach ( [ 'quote_id', 'placement_id' ] as $field ) { if ( ! is_string( $data[$field] ) ) { QuoteShape::invalid(); } QuoteId::from_string( $data[$field] ); }
@@ -70,6 +77,28 @@ final readonly class DeliveryQuoteSnapshotEnvelope implements \JsonSerializable 
 		return new self( QuoteJson::encode( $data, self::MAX_BYTES ) );
 	}
 
+	/** The retained native money receipt stays distinct from the new promise authority. */
+	private static function from_promise_array( array $data ): self {
+		QuoteShape::fields( $data, [ 'format', 'quote_id', 'profile', 'issued_at', 'expires_at', 'accepted_at', 'body_digest', 'material_digest', 'placement_id', 'context_digest', 'money_receipt', 'provenance_receipt', 'promise_packet', 'promise_packet_digest' ] );
+		if ( QuoteShape::object( $data['profile'] ) !== self::PROMISE_PROFILE ) { QuoteShape::invalid(); }
+		$packet = PromiseQuotePacket::from_array( QuoteShape::object( $data['promise_packet'] ) );
+		if ( ! hash_equals( QuoteShape::digest( $data['promise_packet_digest'] ), self::promise_digest( $packet ) ) ) { QuoteShape::invalid(); }
+		$legacy = $data; unset( $legacy['promise_packet'], $legacy['promise_packet_digest'] );
+		$legacy['format'] = self::FORMAT; $legacy['profile'] = self::PROFILE;
+		self::from_array( $legacy ); // The exact v1 money/provenance validator is unchanged.
+		$keys = array_column( $data['money_receipt']['groups'], 'component_key' ); $packet->assert_component_keys( $keys );
+		$shared = null;
+		foreach ( $packet->private_facts()['groups'] as $group ) {
+			$input = PromiseJson::decode( $group['packet']['input_json'] );
+			if ( $input['evaluated_at'] !== $data['issued_at'] || $input['anchor']['quote_expires_at'] !== $data['expires_at'] || $input['material']['group_id'] !== $group['component_key'] ) { QuoteShape::invalid(); }
+			$facts = [ $input['site_id'], $input['owner'], $input['material']['material_digest'] ];
+			if ( null !== $shared && $facts !== $shared ) { QuoteShape::invalid(); } $shared = $facts;
+		}
+		$data['promise_packet'] = $packet->private_facts();
+		return new self( QuoteJson::encode( $data, self::MAX_BYTES ) );
+	}
+	public static function promise_digest( PromiseQuotePacket $packet ): string { return hash( 'sha256', self::PROMISE_DIGEST_DOMAIN . $packet->to_private_json() ); }
+
 	public static function from_json( string $json ): self {
 		$data = QuoteJson::decode( $json, self::MAX_BYTES );
 		$object = json_decode( $json, false, QuoteJson::MAX_DEPTH + 2, JSON_THROW_ON_ERROR );
@@ -81,13 +110,19 @@ final readonly class DeliveryQuoteSnapshotEnvelope implements \JsonSerializable 
 				if ( 'provenance_receipt' === $name && ( ! ( $group->native_tax_receipt ?? null ) instanceof \stdClass || ! is_array( $group->native_tax_receipt->rates ?? null ) ) ) { QuoteShape::invalid(); }
 			}
 		}
+		if ( self::PROMISE_FORMAT === ( $data['format'] ?? null ) ) {
+			$packet = $object->promise_packet ?? null;
+			if ( ! $packet instanceof \stdClass || ! is_array( $packet->groups ?? null ) ) { QuoteShape::invalid(); }
+			foreach ( $packet->groups as $group ) { if ( ! $group instanceof \stdClass || ! ( $group->packet ?? null ) instanceof \stdClass || ! is_array( $group->packet->public_views ?? null ) ) { QuoteShape::invalid(); } foreach ( $group->packet->public_views as $view ) { if ( ! $view instanceof \stdClass || ! ( $view->fields ?? null ) instanceof \stdClass ) { QuoteShape::invalid(); } } }
+		}
 		return self::from_array( $data );
 	}
 
 	/** Pure packet construction from verified captured facts. This never writes or seals an order. */
 	public static function from_captured( QuoteHeader $header, QuoteContext $context, QuoteTerms $terms, QuoteTime $accepted_at, QuoteId $placement_id, string $context_digest ): self {
 		$header->assert_body( $context, $terms );
-		if ( 'checkout' !== $header->purpose() || ! $context->checkout_acceptable() || ! $terms->checkout_acceptable() || self::PROFILE !== [ 'code' => $header->profile(), 'version' => $header->profile_version() ] ) { QuoteShape::invalid(); }
+		$profile = [ 'code' => $header->profile(), 'version' => $header->profile_version() ]; $promise = self::PROMISE_PROFILE === $profile;
+		if ( 'checkout' !== $header->purpose() || ! $context->checkout_acceptable() || ! $terms->checkout_acceptable() || ( ! $promise && self::PROFILE !== $profile ) ) { QuoteShape::invalid(); }
 		$components = []; foreach ( $context->private_facts()['groups'] as $group ) {
 			if ( $group['service_id'] !== $group['offer_id'] ) { QuoteShape::invalid(); }
 			$components[$group['component_key']] = $group;
@@ -98,11 +133,20 @@ final readonly class DeliveryQuoteSnapshotEnvelope implements \JsonSerializable 
 			$money[] = [ 'component_key' => $term['component_key'], 'customer_label' => $term['customer_label'], 'list' => $term['list'], 'final' => $term['final'], 'tax' => $term['tax'], 'total' => $term['total'], 'promotion' => [ 'state' => $term['promotion']['state'], 'amount' => $term['promotion']['amount'] ?? null ], 'rounded_tax' => $term['native_tax_receipt']['rounded_tax'] ?? null, 'display_total' => $term['native_money_receipt']['display_total'] ?? null ];
 			$provenance[] = [ 'component_key' => $term['component_key'], 'provider' => $term['provider'], 'policy_digest' => $term['policy_digest'], 'candidate_digest' => $group['candidate_digest'], 'native_tax_receipt' => $term['native_tax_receipt'], 'native_money_receipt' => $term['native_money_receipt'], 'promotion_provider' => $term['promotion']['provider'] ?? null, 'cost' => $term['cost'], 'route' => $term['route'] ];
 		}
-		return self::from_array( [ 'format' => 1, 'quote_id' => $header->id()->value(), 'profile' => self::PROFILE, 'issued_at' => $header->created_at()->sql(), 'expires_at' => $header->expires_at()->sql(), 'accepted_at' => $accepted_at->sql(), 'body_digest' => $header->body_digest(), 'material_digest' => $header->material_digest(), 'placement_id' => $placement_id->value(), 'context_digest' => $context_digest, 'money_receipt' => [ 'format' => 1, 'groups' => $money ], 'provenance_receipt' => [ 'format' => 1, 'groups' => $provenance ] ] );
+		$data = [ 'format' => $promise ? self::PROMISE_FORMAT : self::FORMAT, 'quote_id' => $header->id()->value(), 'profile' => $profile, 'issued_at' => $header->created_at()->sql(), 'expires_at' => $header->expires_at()->sql(), 'accepted_at' => $accepted_at->sql(), 'body_digest' => $header->body_digest(), 'material_digest' => $header->material_digest(), 'placement_id' => $placement_id->value(), 'context_digest' => $context_digest, 'money_receipt' => [ 'format' => 1, 'groups' => $money ], 'provenance_receipt' => [ 'format' => 1, 'groups' => $provenance ] ];
+		if ( $promise ) {
+			$packet = PromiseQuotePacket::from_array( [ 'format' => 1, 'groups' => $terms->private_facts()['promise_packets'] ] );
+			$packet->assert_quote_capture( $header, $context );
+			$data['promise_packet'] = $packet->private_facts(); $data['promise_packet_digest'] = self::promise_digest( $packet );
+		}
+		return self::from_array( $data );
 	}
 
 	public function private_facts(): array { return QuoteJson::decode( $this->json, self::MAX_BYTES ); }
 	public function to_private_json(): string { return $this->json; }
+	public function format(): int { return $this->private_facts()['format']; }
+	public function is_promise(): bool { return self::PROMISE_FORMAT === $this->format(); }
+	public function promise_packet(): ?PromiseQuotePacket { return $this->is_promise() ? PromiseQuotePacket::from_array( $this->private_facts()['promise_packet'] ) : null; }
 	public function matches( self $other ): bool { return hash_equals( $this->json, $other->json ); }
 	public function jsonSerialize(): never { throw new \LogicException( 'A safe historical delivery quote projection is required.' ); }
 	public function __serialize(): never { throw new \LogicException( 'Protected delivery quote snapshots cannot be serialized generically.' ); }

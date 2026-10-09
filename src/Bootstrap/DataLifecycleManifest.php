@@ -83,6 +83,7 @@ final class DataLifecycleManifest {
 		'cetech_de_country_identity_repair', 'cetech_de_coverage_migration_report', 'cetech_de_geography_revision',
 		...self::FEATURE_FLAG_OPTIONS, self::COORDINATOR_OPTION, self::UNINSTALL_STATUS, self::CHECKOUT_CONTROL_OPTION,
 		'cetech_de_quote_placement_adoption',
+		'cetech_de_service_promise_adoption',
 	];
 	public const CONDITIONAL_OPTIONS = [ self::CAPABILITIES_MARKER, self::UNINSTALL_INTENT ];
 	public const OPTIONS = [ ...self::PRESERVED_OPTIONS, ...self::CONDITIONAL_OPTIONS ];

@@ -14,6 +14,7 @@ final readonly class QuoteContext implements \JsonSerializable {
 	private function __construct( private string $json, private bool $acceptable ) {}
 	public static function from_array( array $data ): self {
 		$data = QuoteJson::detach( $data );
+		if ( 2 === ( $data['format_version'] ?? null ) ) { return self::from_v2( $data ); }
 		QuoteShape::fields( $data, [ 'format_version', 'kind', 'selection_digest', 'destination', 'currency', 'tax', 'lines', 'groups' ] );
 		if ( self::FORMAT !== $data['format_version'] ) { QuoteShape::invalid(); }
 		QuoteShape::choice( $data['kind'], [ 'checkout', 'estimate' ] ); QuoteShape::digest( $data['selection_digest'] );
@@ -54,9 +55,30 @@ final readonly class QuoteContext implements \JsonSerializable {
 		return new self( QuoteJson::encode( $data ), $acceptable );
 	}
 	public static function from_json( string $json ): self { return self::from_array( QuoteJson::decode( $json ) ); }
+	/** Explicit forward format; the original native material projection is never redefined. */
+	public static function from_base_promises( self $base, string $site_key, array $captures ): self {
+		if ( 1 !== $base->format_version() ) { QuoteShape::invalid(); } $data = $base->private_facts(); $data['format_version'] = 2; $data['promise_capture'] = [ 'format' => 1, 'site_key' => $site_key, 'base_digest' => $base->digest(), 'groups' => $captures ]; return self::from_array( $data );
+	}
+	private static function from_v2( array $data ): self {
+		QuoteShape::fields( $data, [ 'format_version', 'kind', 'selection_digest', 'destination', 'currency', 'tax', 'lines', 'groups', 'promise_capture' ] ); $base_data = $data; unset( $base_data['promise_capture'] ); $base_data['format_version'] = 1; $base = self::from_array( $base_data ); $capture = QuoteShape::object( $data['promise_capture'] );
+		QuoteShape::fields( $capture, [ 'format', 'site_key', 'base_digest', 'groups' ] ); if ( 1 !== $capture['format'] || ! hash_equals( QuoteShape::digest( $capture['base_digest'] ), $base->digest() ) ) { QuoteShape::invalid(); } \CetechDeliveryEngine\Domain\ServicePromise\PromiseShape::id( $capture['site_key'] );
+		$groups = QuoteShape::list( $capture['groups'], 200, 1 ); $seen = []; $first = null;
+		foreach ( $groups as &$group ) {
+			$group = QuoteShape::object( $group ); QuoteShape::fields( $group, [ 'component_key', 'assignment_receipt_digest', 'policy_reference', 'input', 'input_digest' ] ); $key = QuoteShape::digest( $group['component_key'] ); if ( isset( $seen[$key] ) ) { QuoteShape::invalid(); } $seen[$key] = true; QuoteShape::digest( $group['assignment_receipt_digest'] ); if ( ! is_string( $group['input'] ) || ! hash_equals( QuoteShape::digest( $group['input_digest'] ), hash( 'sha256', 'cetech-service-promise-input-v1:' . $group['input'] ) ) ) { QuoteShape::invalid(); }
+			$input = \CetechDeliveryEngine\Domain\ServicePromise\Handoff\PromiseHistoricalCodec::input( $group['input'] ); $reference = \CetechDeliveryEngine\Domain\ServicePromise\PromisePolicyReference::from_array( QuoteShape::object( $group['policy_reference'] ) )->private_facts(); $policy = $input['policy'];
+			$expected = [ 'format_version' => 1, 'site_id' => $policy['site_id'], 'policy_id' => $policy['policy_id'], 'version' => $policy['version'], 'digest' => hash( 'sha256', 'cetech-service-promise-policy-v1:' . \CetechDeliveryEngine\Domain\ServicePromise\PromiseJson::encode( $policy, 32768 ) ) ];
+			if ( QuoteJson::encode( $reference ) !== QuoteJson::encode( $expected ) || $input['site_id'] !== $capture['site_key'] || $input['material']['group_id'] !== $key || $input['material']['material_digest'] !== $base->digest() || $input['owner']['key_epoch'] !== $base_data['destination']['key_epoch'] ) { QuoteShape::invalid(); }
+			$shared = [ $input['owner'], $input['evaluated_at'], $input['anchor']['quote_expires_at'], $input['runtime'] ]; if ( null !== $first && $first !== $shared ) { QuoteShape::invalid(); } $first = $shared;
+		} unset( $group ); usort( $groups, static fn( array $a, array $b ): int => strcmp( $a['component_key'], $b['component_key'] ) );
+		$keys = array_column( $base_data['groups'], 'component_key' ); sort( $keys, SORT_STRING ); if ( array_column( $groups, 'component_key' ) !== $keys ) { QuoteShape::invalid(); } $capture['groups'] = $groups; $data['promise_capture'] = $capture; return new self( QuoteJson::encode( $data ), $base->checkout_acceptable() );
+	}
+	public function format_version(): int { return $this->private_facts()['format_version']; }
+	public function base_context(): self { if ( 1 === $this->format_version() ) { return $this; } $data = $this->private_facts(); unset( $data['promise_capture'] ); $data['format_version'] = 1; return self::from_array( $data ); }
+	public function base_material_digest(): string { return $this->base_context()->digest(); }
+	public function promise_groups(): array { return $this->private_facts()['promise_capture']['groups'] ?? []; }
 	public function private_facts(): array { return QuoteJson::decode( $this->json ); }
 	public function to_private_json(): string { return $this->json; }
-	public function digest(): string { return hash( 'sha256', 'cetech-quote-material-v1:' . $this->json ); }
+	public function digest(): string { return hash( 'sha256', 'cetech-quote-material-v' . $this->format_version() . ':' . $this->json ); }
 	public function checkout_acceptable(): bool { return $this->acceptable; }
 	/** Known ineligibility is conclusive; partial or unknown evidence is not. */
 	public function material_evidence_available(): bool {

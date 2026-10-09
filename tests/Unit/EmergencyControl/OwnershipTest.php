@@ -13,6 +13,9 @@ use CetechDeliveryEngine\Application\EmergencyControl\EmergencyOwnershipClassifi
 use CetechDeliveryEngine\Application\EmergencyControl\EmergencyOwnershipLatch;
 use CetechDeliveryEngine\Application\EmergencyControl\WpdbEmergencyConfigurationOwnershipProbe;
 use CetechDeliveryEngine\Application\Order\OrderDeliverySnapshot;
+use CetechDeliveryEngine\Application\Order\DeliveryQuoteSnapshotEnvelope;
+use CetechDeliveryEngine\Tests\Unit\CustomerContext\PerItemContextFixtures;
+use CetechDeliveryEngine\Tests\Unit\Order\PromiseSnapshotFixtures;
 use PHPUnit\Framework\TestCase;
 
 final class OwnershipTest extends TestCase {
@@ -83,6 +86,44 @@ final class OwnershipTest extends TestCase {
 		$item = new \WC_Order_Item_Product( [ 'product_id' => 10, 'quantity' => 1, 'meta' => [ OrderDeliverySnapshot::META_LINE_SNAPSHOT => json_encode( $raw, JSON_THROW_ON_ERROR ), OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION => '2' ] ] );
 		$order = new \WC_Order( [ 'items' => [ $item ] ] ); self::assertTrue( $latch->matches_order( $order ) );
 		$raw['pickup_location_id'] = 56; $item->update_meta_data( OrderDeliverySnapshot::META_LINE_SNAPSHOT, json_encode( $raw, JSON_THROW_ON_ERROR ) ); self::assertFalse( $latch->matches_order( $order ) );
+	}
+	/** Pure required-reader fixture; this does not establish a native placement receipt. */
+	private function promise_latch(): array {
+		$context = PerItemContextFixtures::deliveryContext( 1, PerItemContextFixtures::deliveryEastLegon() );
+		$latch = new EmergencyOwnershipLatch();
+		$latch->capture_line( 'promise-line', [ 'product_id' => 16, 'variation_id' => 0, 'quantity' => 2, 'cetech_de_customer_context' => $context->toArray() ], EmergencyOwnership::Managed );
+		$raw = PromiseSnapshotFixtures::line();
+		$item = new CheckoutPersistedItemFixture( [ 'id' => 501, 'product_id' => 16, 'quantity' => 2, 'meta' => [ OrderDeliverySnapshot::META_LINE_SNAPSHOT => json_encode( $raw, JSON_THROW_ON_ERROR ), OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION => '3', DeliveryQuoteSnapshotEnvelope::META_FORMAT => '2' ] ], 19 );
+		$order = new \WC_Order( [ 'id' => 19, 'items' => [ $item ] ] );
+		$latch->bind_order_line( 'promise-line', $item ); $latch->freeze_saved_order( $order );
+		return [ $latch, $item, $order, $raw ];
+	}
+	public function test_latch_recognizes_exact_required_promise_customer_context_after_saved_reload(): void {
+		[ $latch, $item, $order ] = $this->promise_latch();
+		$raw = $item->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT, true );
+		self::assertTrue( $latch->matches_order( $order ) );
+		self::assertTrue( $latch->matches_order( new \WC_Order( [ 'id' => 19, 'items' => [ clone $item ] ] ) ) );
+		self::assertSame( $raw, $item->get_meta( OrderDeliverySnapshot::META_LINE_SNAPSHOT, true ) );
+	}
+	public function test_required_promise_context_changes_still_refuse_exact_product_quantity_and_packet(): void {
+		[ $latch, $item, $order, $raw ] = $this->promise_latch();
+		$context = PerItemContextFixtures::deliveryContext( 1, PerItemContextFixtures::deliveryKumasi() );
+		$raw['matching_location'] = $context->matching_location?->toArray(); $raw['delivery_address'] = $context->delivery_address?->toArray();
+		$raw['matching_identity'] = $context->matching_identity; $raw['delivery_location_identity'] = $context->delivery_location_identity;
+		$changed = clone $item; $changed->update_meta_data( OrderDeliverySnapshot::META_LINE_SNAPSHOT, json_encode( $raw, JSON_THROW_ON_ERROR ) );
+		self::assertFalse( $latch->matches_order( new \WC_Order( [ 'id' => 19, 'items' => [ $changed ] ] ) ) );
+		self::assertTrue( $latch->matches_order( $order ) );
+		$GLOBALS['blog_id'] = 2; self::assertFalse( $latch->matches_order( $order ) );
+	}
+	public function test_required_promise_missing_packet_and_future_outer_do_not_project_customer_context(): void {
+		[ $latch, $item, $order, $raw ] = $this->promise_latch();
+		$missing = $raw; unset( $missing['delivery_quote'] );
+		$future = $raw; $future['snapshot_version'] = '9';
+		foreach ( [ $missing, $future ] as $bad ) {
+			$changed = clone $item; $changed->update_meta_data( OrderDeliverySnapshot::META_LINE_SNAPSHOT, json_encode( $bad, JSON_THROW_ON_ERROR ) );
+			self::assertFalse( $latch->matches_order( new \WC_Order( [ 'id' => 19, 'items' => [ $changed ] ] ) ) );
+		}
+		self::assertTrue( $latch->matches_order( $order ) );
 	}
 	public function test_physical_probe_checks_read_failure_before_declaring_absence(): void {
 		$old = $GLOBALS['wpdb'] ?? null;

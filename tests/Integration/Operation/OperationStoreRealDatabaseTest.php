@@ -14,6 +14,9 @@ use CetechDeliveryEngine\Domain\Operation\OperationProfileRegistry;
 use CetechDeliveryEngine\Domain\Operation\OperationSession;
 use CetechDeliveryEngine\Infrastructure\Persistence\OperationStoreReadiness;
 use CetechDeliveryEngine\Infrastructure\Persistence\OperationStoreSchema;
+use CetechDeliveryEngine\Infrastructure\Persistence\PromiseStorageSchema;
+use CetechDeliveryEngine\Infrastructure\WordPress\OperationConnection;
+use CetechDeliveryEngine\Infrastructure\WordPress\OperationConnectionMysqliTransport;
 use CetechDeliveryEngine\Tests\Support\Operation\OperationProofBarrier;
 use CetechDeliveryEngine\Tests\Support\Operation\OperationProofDatabase;
 use CetechDeliveryEngine\Tests\Support\Operation\OperationProofFactory;
@@ -77,6 +80,58 @@ final class OperationStoreRealDatabaseTest extends TestCase {
 			foreach ( $result->fetch_all( MYSQLI_ASSOC ) as $index ) { self::assertNull( $index['Sub_part'] ); }
 		}
 		self::assertSame( 0, $this->row_count( 'operation_records' ) );
+	}
+
+	#[DataProvider( 'literal_modes' )]
+	public function test_native_transport_pins_literal_sql_modes_before_owned_dispatch( string $mode, bool $supported ): void {
+		$native = OperationConnectionMysqliTransport::connect( (string) getenv( 'CETECH_DE_REAL_DB_HOST' ), (string) getenv( 'CETECH_DE_REAL_DB_USER' ), (string) getenv( 'CETECH_DE_REAL_DB_PASSWORD' ), (string) getenv( 'CETECH_DE_REAL_DB_NAME' ), (int) ( getenv( 'CETECH_DE_REAL_DB_PORT' ) ?: 3306 ) );
+		$transport = new OperationProofTransport( $native ); $connection = new OperationConnection( 1, $this->prefix, $transport, 'utf8mb4', 'utf8mb4_unicode_ci' );
+		try {
+			self::assertTrue( $native->execute( "SET SESSION sql_mode='{$mode}'" )->acknowledged );
+			$before = $transport->calls;
+			if ( ! $supported ) {
+				self::assertNull( $native->transaction_state() ); self::assertFalse( $connection->begin() ); self::assertTrue( $connection->is_retired() );
+				self::assertFalse( $connection->get_row( 'SELECT "private"."hidden_effect"(1)' ) ); self::assertSame( $before, $transport->calls ); self::assertSame( 1, $transport->close_calls );
+				return;
+			}
+			self::assertIsArray( $native->transaction_state() ); self::assertTrue( $connection->begin() );
+			$packet = [ 'input_json' => '{"quoted":"private \\"; COMMIT; --"}', 'result_json' => '{"state":"absolute_window"}', 'padding' => '' ]; $encoded = json_encode( $packet, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES ); $packet['padding'] = str_repeat( 'x', 65536 - strlen( $encoded ) ); $value = json_encode( $packet, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES ); self::assertSame( 65536, strlen( $value ) );
+			$row = $connection->get_row( $connection->prepare( 'SELECT %s AS original_packet', $value ) ); self::assertIsArray( $row ); self::assertSame( hash( 'sha256', $value ), hash( 'sha256', $row['original_packet'] ) ); self::assertSame( $before + 2, $transport->calls ); self::assertTrue( $connection->rollback() );
+		} finally { self::assertTrue( $connection->retire() ); }
+	}
+	public static function literal_modes(): array {
+		return [ 'default literals' => [ '', true ], 'strict transactional' => [ 'STRICT_TRANS_TABLES', true ], 'traditional' => [ 'TRADITIONAL', true ], 'ANSI identifiers' => [ 'ANSI_QUOTES', false ], 'ANSI combined mode' => [ 'ANSI', false ], 'backslash disabled' => [ 'NO_BACKSLASH_ESCAPES', false ], 'both unsupported semantics' => [ 'ANSI_QUOTES,NO_BACKSLASH_ESCAPES', false ] ];
+	}
+	#[DataProvider( 'unsupported_literal_modes' )]
+	public function test_native_literal_mode_change_retires_existing_owner_before_any_following_statement( string $mode ): void {
+		$native = OperationConnectionMysqliTransport::connect( (string) getenv( 'CETECH_DE_REAL_DB_HOST' ), (string) getenv( 'CETECH_DE_REAL_DB_USER' ), (string) getenv( 'CETECH_DE_REAL_DB_PASSWORD' ), (string) getenv( 'CETECH_DE_REAL_DB_NAME' ), (int) ( getenv( 'CETECH_DE_REAL_DB_PORT' ) ?: 3306 ) ); $transport = new OperationProofTransport( $native ); $connection = new OperationConnection( 1, $this->prefix, $transport );
+		try {
+			self::assertTrue( $native->execute( "SET SESSION sql_mode=''" )->acknowledged ); self::assertTrue( $connection->begin() ); self::assertTrue( $native->execute( "SET SESSION sql_mode='{$mode}'" )->acknowledged ); $before = $transport->calls;
+			self::assertFalse( $connection->get_row( 'SELECT "private"."hidden_effect"(1)' ) ); self::assertSame( $before, $transport->calls ); self::assertTrue( $connection->is_retired() ); self::assertSame( 1, $transport->close_calls ); self::assertFalse( $connection->begin() );
+		} finally { self::assertTrue( $connection->retire() ); }
+	}
+	public static function unsupported_literal_modes(): array { return [ [ 'ANSI_QUOTES' ], [ 'ANSI' ], [ 'NO_BACKSLASH_ESCAPES' ], [ 'ANSI_QUOTES,NO_BACKSLASH_ESCAPES' ] ]; }
+	public function test_actual_quoted_function_cannot_run_its_native_effect_through_owned_select(): void {
+		$name = $this->prefix . 'effect'; $table = $this->prefix . 'operation_fixture_counter'; $native = null; $connection = null;
+		OperationProofDatabase::execute( $this->database, "CREATE FUNCTION `{$name}`(requested_value INT) RETURNS INT MODIFIES SQL DATA BEGIN UPDATE `{$table}` SET value=requested_value WHERE id=1; RETURN requested_value; END" );
+		try {
+			$native = OperationConnectionMysqliTransport::connect( (string) getenv( 'CETECH_DE_REAL_DB_HOST' ), (string) getenv( 'CETECH_DE_REAL_DB_USER' ), (string) getenv( 'CETECH_DE_REAL_DB_PASSWORD' ), (string) getenv( 'CETECH_DE_REAL_DB_NAME' ), (int) ( getenv( 'CETECH_DE_REAL_DB_PORT' ) ?: 3306 ) ); self::assertTrue( $native->execute( "SET SESSION sql_mode=''" )->acknowledged ); $transport = new OperationProofTransport( $native ); $connection = new OperationConnection( 1, $this->prefix, $transport ); self::assertTrue( $connection->begin() );
+			foreach ( [ "SELECT `{$name}`(7)", "SHOW TABLES WHERE {$name}(7)", "SHOW TABLES WHERE `{$name}`(7)" ] as $sql ) { $before = $transport->calls; self::assertFalse( $connection->get_row( $sql ) ); self::assertSame( $before, $transport->calls ); }
+			self::assertSame( '0', $connection->get_row( "SELECT value FROM `{$table}` WHERE id=1" )['value'] ); self::assertTrue( $connection->rollback() );
+		} finally { if ( null !== $connection ) { $connection->retire(); } elseif ( null !== $native ) { $native->close(); } OperationProofDatabase::execute( $this->database, "DROP FUNCTION `{$name}`" ); }
+		self::assertSame( 0, $this->resource()['value'] );
+	}
+	public function test_actual_promise_union_allows_forty_one_only_after_each_native_participant_exists(): void {
+		$promise = PromiseStorageSchema::tables( $this->prefix ); $base = array_map( fn( int $id ): string => $this->prefix . 'finite_' . $id, range( 1, 38 ) ); $union = [ ...$promise, ...$base ]; $created = []; $connection = null;
+		try {
+			foreach ( PromiseStorageSchema::create_table_statements( 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', $this->prefix . 'delivery_engine_' ) as $suffix => $statement ) { OperationProofDatabase::execute( $this->database, $statement ); $created[] = $this->prefix . 'delivery_engine_' . $suffix; }
+			foreach ( $base as $table ) { OperationProofDatabase::execute( $this->database, 'CREATE TABLE `' . $table . '` (id BIGINT UNSIGNED PRIMARY KEY) ENGINE=InnoDB' ); $created[] = $table; }
+			$native = OperationConnectionMysqliTransport::connect( (string) getenv( 'CETECH_DE_REAL_DB_HOST' ), (string) getenv( 'CETECH_DE_REAL_DB_USER' ), (string) getenv( 'CETECH_DE_REAL_DB_PASSWORD' ), (string) getenv( 'CETECH_DE_REAL_DB_NAME' ), (int) ( getenv( 'CETECH_DE_REAL_DB_PORT' ) ?: 3306 ) ); $transport = new OperationProofTransport( $native ); $connection = new OperationConnection( 1, $this->prefix, $transport );
+			self::assertTrue( $connection->begin() ); self::assertTrue( $connection->validate_tables( [ ...$union, ...$union ] ) ); self::assertSame( '0', $connection->get_row( 'SELECT COUNT(*) AS total FROM `' . $promise[0] . '`' )['total'] );
+			$before = $transport->calls; self::assertFalse( $connection->validate_tables( [ $this->prefix . 'finite_42' ] ) ); self::assertSame( $before, $transport->calls ); self::assertFalse( $connection->query( 'UPDATE `' . $this->prefix . 'finite_42` SET id=1' ) ); self::assertSame( $before, $transport->calls ); self::assertTrue( $connection->rollback() ); self::assertTrue( $connection->retire() );
+			OperationProofDatabase::execute( $this->database, 'DROP TABLE `' . $promise[0] . '`' ); $created = array_values( array_diff( $created, [ $promise[0] ] ) );
+			$native = OperationConnectionMysqliTransport::connect( (string) getenv( 'CETECH_DE_REAL_DB_HOST' ), (string) getenv( 'CETECH_DE_REAL_DB_USER' ), (string) getenv( 'CETECH_DE_REAL_DB_PASSWORD' ), (string) getenv( 'CETECH_DE_REAL_DB_NAME' ), (int) ( getenv( 'CETECH_DE_REAL_DB_PORT' ) ?: 3306 ) ); $connection = new OperationConnection( 1, $this->prefix, $native ); self::assertTrue( $connection->begin() ); self::assertFalse( $connection->validate_tables( $union ) ); self::assertSame( 1146, $connection->errno() ); self::assertFalse( $connection->query( 'UPDATE `' . $promise[0] . '` SET id=1' ) ); self::assertTrue( $connection->rollback() );
+		} finally { if ( null !== $connection ) { $connection->retire(); } foreach ( array_reverse( $created ) as $table ) { OperationProofDatabase::execute( $this->database, 'DROP TABLE `' . $table . '`' ); } }
 	}
 
 	public function test_changed_acceptance_and_replay_preserve_first_effect_audit_and_private_token(): void {

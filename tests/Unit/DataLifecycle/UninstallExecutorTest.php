@@ -250,6 +250,41 @@ final class UninstallExecutorTest extends TestCase {
 		self::assertCount( count( array_unique( DataLifecycleBootstrap::FILES ) ), DataLifecycleBootstrap::FILES );
 	}
 
+	public function test_fresh_standalone_closure_can_validate_the_original_native_options_participant(): void {
+		$root = dirname( __DIR__, 3 );
+		$code = 'require ' . var_export( $root . '/src/Bootstrap/DataLifecycleBootstrap.php', true ) . '; ' . <<<'PHP'
+$loaded=\CetechDeliveryEngine\Bootstrap\DataLifecycleBootstrap::load();
+// Detached transport only: exercise the real owner and its complete standalone
+// dependency closure, without borrowing the parent Composer/unit bootstrap.
+$transport=new class implements \CetechDeliveryEngine\Infrastructure\WordPress\OperationConnectionTransport {
+    public bool $active=false;
+    public bool $closed=false;
+    public array $statements=[];
+    public function execute(string $sql): \CetechDeliveryEngine\Infrastructure\WordPress\OperationConnectionResult {
+        $this->statements[]=$sql;
+        if ('START TRANSACTION'===$sql){$this->active=true;}
+        elseif ('ROLLBACK'===$sql){$this->active=false;}
+        $rows=str_contains($sql,'FROM information_schema.TABLES')?[['engine'=>'InnoDB']]:[];
+        return new \CetechDeliveryEngine\Infrastructure\WordPress\OperationConnectionResult(true,true,$rows);
+    }
+    public function connection_id():int{return 71;}
+    public function transaction_state():?array{return $this->closed?null:['connection_id'=>71,'in_transaction'=>$this->active,'autocommit'=>true];}
+    public function escape(string $value):string{return addslashes($value);}
+    public function close():bool{$this->closed=true;return true;}
+};
+$owner=new \CetechDeliveryEngine\Infrastructure\WordPress\OperationConnection(1,'standalone_',$transport);
+$began=$owner->begin();
+$validated=$owner->validate_tables(['standalone_options']);
+$rolled_back=$owner->rollback();
+$retired=$owner->retire();
+echo json_encode([$loaded,$began,$validated,$rolled_back,$retired,$transport->closed,
+    $transport->statements[1]==='SELECT 1 FROM `standalone_options` LIMIT 0',
+    str_contains($transport->statements[2],'FROM information_schema.TABLES'),
+    class_exists('Composer\\Autoload\\ClassLoader',false),class_exists('WC_Order',false),function_exists('get_option')],JSON_THROW_ON_ERROR);
+PHP;
+		self::assertSame( [ true, true, true, true, true, true, true, true, false, false, false ], $this->fresh_process( $code ) );
+	}
+
 	public function test_missing_standalone_helper_refuses_before_loading_any_dependency(): void {
 		$root = sys_get_temp_dir() . '/cetech-c06-closure-' . bin2hex( random_bytes( 8 ) );
 		mkdir( $root . '/src/Bootstrap', 0777, true );

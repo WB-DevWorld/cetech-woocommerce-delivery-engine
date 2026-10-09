@@ -124,6 +124,13 @@ final class QuoteDurableService {
 		if ( ! $this->authorized( $command->owner(), $command->identity->operation ) ) { return $this->reject( $request, 'not_authorized' ); }
 		$attempt = $this->coordinator( $command )->reconcile( $command->identity, $command, $request ); return $this->finish( $attempt, $command, $request );
 	}
+	/** Only an acknowledged exact physical read of the original Q06 seal supplies this companion. */
+	public function acknowledged_promise_seal( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, QuoteBinding $binding, QuotePlacementSavedEvidenceGuard $saved ): ?PromiseQuoteSealLinkage {
+		if ( 2 !== $opened->format_version() || ! $this->authorized( $owner, 'delivery_quote.read' ) || ! $opened->owner()->equals( $owner ) || ! $opened->matches_reference( $reference ) || 'sealed' !== $binding->state() ) { return null; }
+		$loaded = $this->load( $owner, $opened->id(), null, $reference, 'delivery_quote.read', saved: $saved );
+		if ( null === $loaded || $loaded[0]->header()->to_private_json() !== $opened->to_private_json() || null === $loaded[1] || $loaded[1]->row() !== $binding->row() || ! $this->authorized( $owner, 'delivery_quote.read' ) ) { return null; }
+		return ( new QuoteReceiptVerifier() )->promise_seal( $loaded[0], $loaded[4], $loaded[1] );
+	}
 	public function current( QuoteOwner $owner, QuoteReference $reference, ?QuoteContext $current, RequestContext $request ): QuoteCurrentReadResult {
 		if ( ! $this->authorized( $owner, 'delivery_quote.read' ) ) { return QuoteCurrentReadResult::unavailable(); }
 		$loaded = $this->load( $owner, $reference->id(), $current, $reference, 'delivery_quote.read', true );
@@ -181,12 +188,13 @@ final class QuoteDurableService {
 			if ( null !== $proof && ( null === $binding || ! $proof->matches( $binding ) || ! $proof->unchanged() ) ) { return null; }
 			if ( null !== $admission_revision && ( null === $binding || null === $expected_binding || $binding->row() !== $expected_binding->row() || 'accepted' !== $quote->state() || 'sealed' !== $binding->state() || ! $evidence_ok || null === $current || ! hash_equals( $quote->header()->material_digest(), $current->digest() ) || ! $local->unchanged() ) ) { return null; }
 			$at = QuoteOperationProfile::time( $session );
-			if ( null !== $admission_revision && ( ! $quote->header()->valid_at( $at ) || $at->epoch_microseconds() < ( $control->changed_at_epoch ?? 0 ) * 1000000 ) ) { return null; }
+			if ( 2 === $quote->header()->format_version() && $require_current_evidence && ( ! $this->evidence instanceof QuoteTimedCurrentEvidenceGuard || null === $current || ! $this->evidence->verify_at( $session, $owner, $current, $at ) ) ) { return null; }
+			if ( null !== $admission_revision && ( ! $quote->header()->valid_at( $at ) || ! $quote->terms()->feasibility_at( $at ) || $at->epoch_microseconds() < ( $control->changed_at_epoch ?? 0 ) * 1000000 ) ) { return null; }
 			$reason = ! $control->enabled() ? 'checkout_suspended' : ( ! $evidence_ok ? 'quote_unavailable' : ( ! hash_equals( $quote->header()->material_digest(), $current->digest() ) ? 'quote_invalidated' : self::reason( $quote, $at ) ) );
 			if ( ! $session->rollback() ) { return null; } $begun = false; if ( ! $session->retire() ) { return null; }
 			if ( ! $this->authorized( $owner, $operation ) ) { return null; }
 			if ( $require_current_evidence && ! $evidence_ok ) { return null; }
-			return [ $quote, $binding, $reason, $at ];
+			return [ $quote, $binding, $reason, $at, $receipts ];
 		} catch ( \Throwable ) { return null; }
 		finally { if ( null !== $session ) { if ( $begun && ! $session->is_retired() ) { try { $session->rollback(); } catch ( \Throwable ) {} } try { $session->retire(); } catch ( \Throwable ) {} } }
 	}

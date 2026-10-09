@@ -49,7 +49,7 @@ final class QuotePlacementNoEffectNativeGuardTest extends TestCase {
 	public function test_none_requires_quote_ownership_absent_in_physical_rows_even_when_loaded_order_is_stale( string $store, string $mode ): void {
 		$out = $this->probe( $store, 'none', 'capture_physical_' . $mode ); self::assertFalse( $out['initial_owned'], 'The stale loaded object carries no quote ownership.' ); self::assertFalse( $out['captured'], $mode ); self::assertFalse( $out['verified'] ); self::assertNotContains( false, $out['capture_retired'] );
 	}
-	public static function stale_native_ownership(): array { $out = []; foreach ( [ 'hpos', 'cpt' ] as $store ) { foreach ( [ 'marker', 'reference', 'draft', 'tax_source', 'packet', 'line_marker', 'line_packet', 'unknown' ] as $mode ) { $out[] = [ $store, $mode ]; } } return $out; }
+	public static function stale_native_ownership(): array { $out = []; foreach ( [ 'hpos', 'cpt' ] as $store ) { foreach ( [ 'marker', 'reference', 'draft', 'tax_source', 'packet', 'line_marker', 'line_packet', 'unknown', 'outer3', 'outer_future', 'outer_escaped', 'outer_malformed', 'outer_unknown', 'outer_duplicate', 'version3', 'line_outer3', 'line_outer_future', 'line_outer_escaped', 'line_outer_malformed', 'line_outer_unknown', 'line_outer_duplicate', 'line_version3' ] as $mode ) { $out[] = [ $store, $mode ]; } } return $out; }
 
 	#[DataProvider( 'native_stores' )]
 	public function test_line_key_alone_does_not_claim_quote_ownership_or_prevent_known_no_effect_capture( string $store ): void {

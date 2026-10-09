@@ -10,6 +10,7 @@ final class DataLifecycleBootstrap {
 		'Domain/Operation/OperationJson.php',
 		'Domain/Operation/OperationCommitResult.php', 'Domain/Operation/OperationSession.php', 'Domain/Operation/OperationConnectionFactory.php',
 		'Infrastructure/WordPress/OperationConnectionResult.php', 'Infrastructure/WordPress/OperationConnectionTransport.php',
+		'Infrastructure/Persistence/TableNames.php', 'Infrastructure/Persistence/PromiseStorageSchema.php',
 		'Infrastructure/WordPress/OperationConnectionMysqliTransport.php', 'Infrastructure/WordPress/OperationConnection.php', 'Infrastructure/WordPress/OperationConnectionFactory.php',
 		'Domain/DataLifecycle/DataLifecyclePolicy.php', 'Domain/DataLifecycle/DataLifecycleClass.php', 'Domain/DataLifecycle/DataLifecycleRegistry.php',
 		'Domain/DataLifecycle/DataLifecycleProgress.php', 'Domain/DataLifecycle/DataLifecycleContinuation.php', 'Domain/DataLifecycle/DataLifecycleResult.php',

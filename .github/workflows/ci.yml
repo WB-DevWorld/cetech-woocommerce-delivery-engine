@@ -123,6 +123,8 @@ jobs:
           python3 scripts/qualification/test-verify-quote-placement-receipts.py
           python3 scripts/qualification/test-verify-promise-storage-receipts.py
           python3 scripts/qualification/test-verify-promise-calculation-receipts.py
+          python3 scripts/qualification/test-verify-promise-handoff-receipts.py
+          python3 scripts/qualification/test-opening-http-promise-handoff.py
       - name: Production tree autoload and extracted PHP lint
         shell: bash
         run: bash scripts/ci-stage-production-tree.sh "${RUNNER_TEMP}/cetech-de-prod-tree"
@@ -185,6 +187,8 @@ jobs:
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
             'CetechDeliveryEngine\Tests\Integration\Operation\OperationStoreRealDatabaseTest' 43
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+            'CetechDeliveryEngine\Tests\Integration\Operation\OperationStoreRealDatabaseTest' 56
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
             'CetechDeliveryEngine\Tests\Integration\RuleLifecycle\RuleLifecycleRealDatabaseTest' 44
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
             'CetechDeliveryEngine\Tests\Integration\DataLifecycle\DataLifecycleRealDatabaseTest' 30
@@ -203,11 +207,13 @@ jobs:
 
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
             'CetechDeliveryEngine\Tests\Integration\ServicePromise\ServicePromisePersistenceRealDatabaseTest' 15
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+            'CetechDeliveryEngine\Tests\Integration\ServicePromise\PromiseHandoffSourcesRealDatabaseTest' 16
 
   php85-wordpress:
     name: PHP 8.5 WordPress/WooCommerce
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     services:
       mariadb:
         image: mariadb:11.4.13
@@ -311,6 +317,30 @@ jobs:
         with:
           name: opening-promise-calculation-qualification
           path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-calculation-results.json
+          if-no-files-found: warn
+
+      - name: Retain native promise handoff HPOS receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-promise-handoff-qualification
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-handoff-results.json
+          if-no-files-found: warn
+
+      - name: Retain fresh-process promise handoff CPT receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-promise-handoff-cpt-qualification
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-handoff-cpt-results.json
+          if-no-files-found: warn
+
+      - name: Retain authenticated promise handoff HTTP and browser receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-promise-handoff-http-qualification
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-promise-handoff-results.json
           if-no-files-found: warn
 
   javascript-tests:

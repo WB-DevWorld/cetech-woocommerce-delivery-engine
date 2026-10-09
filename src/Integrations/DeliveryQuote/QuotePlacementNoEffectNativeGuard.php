@@ -5,7 +5,7 @@ namespace CetechDeliveryEngine\Integrations\DeliveryQuote;
 use CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementNoEffectEvidenceGuard;
 use CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutLocalBinding;
 use CetechDeliveryEngine\Application\Operation\DatabaseOperationReadiness;
-use CetechDeliveryEngine\Application\Order\{DeliveryQuoteSnapshotEnvelope,OrderDeliverySnapshot,OrderDeliverySnapshotJson,QuoteNativeOrderFacts,QuoteNativeOrderHistory,QuoteNativeOrderStageResult,QuoteNativeOrderStager};
+use CetechDeliveryEngine\Application\Order\{DeliveryQuoteSnapshotEnvelope,OrderDeliverySnapshot,OrderDeliverySnapshotJson,QuoteNativeOrderFacts,QuoteNativeOrderHistory,QuoteNativeOrderStageResult,QuoteNativeOrderStager,QuoteSnapshotOwnership};
 use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteBinding,QuoteStoredRow};
 use CetechDeliveryEngine\Domain\Operation\{OperationConnectionFactory,OperationSession};
 
@@ -54,11 +54,9 @@ final readonly class QuotePlacementNoEffectNativeGuard implements QuotePlacement
 		foreach ( array_merge( $physical['order_meta'], $physical['item_meta'] ) as $row ) {
 			$key = $row['meta_key']; $raw = $row['meta_value'];
 			if ( DeliveryQuoteSnapshotEnvelope::META_FORMAT === $key || in_array( $key, [ QuoteNativeOrderFacts::META_DRAFT, QuoteNativeOrderFacts::META_REFERENCE, QuoteNativeOrderFacts::META_TAX_SOURCE ], true ) || str_starts_with( $key, '_cetech_de_quote_' ) && QuoteNativeOrderFacts::META_LINE_KEY !== $key ) { return false; }
+			if ( in_array( $key, [ OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION, OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION ], true ) && QuoteSnapshotOwnership::version_owned( $raw ) ) { return false; }
 			if ( ! in_array( $key, [ OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT, OrderDeliverySnapshot::META_LINE_SNAPSHOT ], true ) || ! is_string( $raw ) || '' === $raw ) { continue; }
-			if ( strlen( $raw ) > 4 * 1024 * 1024 ) { return false; }
-			try { $decoded = json_decode( $raw, true, OrderDeliverySnapshotJson::MAX_DEPTH, JSON_THROW_ON_ERROR ); if ( is_array( $decoded ) && array_key_exists( DeliveryQuoteSnapshotEnvelope::MEMBER, $decoded ) ) { return false; } } catch ( \Throwable ) {}
-			$names = preg_replace_callback( '/\\\\u00([0-7][0-9a-fA-F])/', static fn( array $match ): string => chr( hexdec( $match[1] ) ), $raw );
-			if ( null === $names || str_contains( $names, DeliveryQuoteSnapshotEnvelope::MEMBER ) ) { return false; }
+			if ( QuoteSnapshotOwnership::from_raw( $raw ) ) { return false; }
 		}
 		return true;
 	}

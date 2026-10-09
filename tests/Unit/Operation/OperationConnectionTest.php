@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Tests\Unit\Operation;
 
 use CetechDeliveryEngine\Domain\Operation\OperationCommitResult;
+use CetechDeliveryEngine\Infrastructure\Persistence\PromiseStorageSchema;
 use CetechDeliveryEngine\Infrastructure\WordPress\OperationConnection;
 use CetechDeliveryEngine\Infrastructure\WordPress\OperationConnectionResult;
 use CetechDeliveryEngine\Infrastructure\WordPress\OperationConnectionTransport;
@@ -75,6 +76,26 @@ final class OperationConnectionTest extends TestCase {
 		self::assertTrue( $connection->rollback() );
 	}
 
+	public function test_promise_participants_extend_only_the_distinct_owned_union_to_forty_one(): void {
+		$transport = new OperationConnectionTestTransport(); $connection = $this->connection( $transport ); self::assertTrue( $connection->begin() );
+		$promise = PromiseStorageSchema::tables( 'op_' ); $base = array_map( static fn( int $id ): string => 'op_finite_' . $id, range( 1, 38 ) ); $union = [ ...$base, ...$promise ];
+		self::assertCount( 41, $union ); self::assertTrue( $connection->validate_tables( $base ) ); self::assertTrue( $connection->validate_tables( [ ...$union, ...$union ] ) );
+		foreach ( $promise as $table ) { self::assertContains( 'SELECT 1 FROM `' . $table . '` LIMIT 0', $transport->statements ); self::assertSame( 1, $connection->query( 'UPDATE `' . $table . '` SET id=1 WHERE id=1' ) ); }
+		$before = count( $transport->statements ); self::assertFalse( $connection->validate_tables( [ 'op_finite_42' ] ) ); self::assertSame( $before, count( $transport->statements ) );
+		self::assertFalse( $connection->query( 'UPDATE op_finite_42 SET id=1 WHERE id=1' ) ); self::assertSame( $before, count( $transport->statements ) ); self::assertTrue( $connection->rollback() );
+	}
+
+	public function test_promise_ceiling_requires_every_exact_native_table_and_transactional_presence(): void {
+		$promise = PromiseStorageSchema::tables( 'op_' ); $base = array_map( static fn( int $id ): string => 'op_finite_' . $id, range( 1, 38 ) );
+		foreach ( [ [ ...$base, ...array_slice( $promise, 0, 2 ), 'op_promise_assignments' ], [ ...$base, ...$promise, 'op_finite_42' ], array_map( static fn( int $id ): string => 'op_finite_' . $id, range( 1, 41 ) ) ] as $tables ) {
+			$transport = new OperationConnectionTestTransport(); $connection = $this->connection( $transport ); self::assertTrue( $connection->begin() ); $before = count( $transport->statements ); self::assertFalse( $connection->validate_tables( $tables ) ); self::assertSame( $before, count( $transport->statements ) ); self::assertTrue( $connection->rollback() );
+		}
+		foreach ( [ 'missing', 'nontransactional' ] as $failure ) {
+			$transport = new OperationConnectionTestTransport(); if ( 'missing' === $failure ) { $transport->missing_table = $promise[0]; } else { $transport->engine = 'MyISAM'; }
+			$connection = $this->connection( $transport ); self::assertTrue( $connection->begin() ); self::assertFalse( $connection->validate_tables( [ ...$promise, ...$base ] ) ); self::assertFalse( $connection->query( 'UPDATE `' . $promise[0] . '` SET id=1 WHERE id=1' ) ); self::assertTrue( $connection->rollback() );
+		}
+	}
+
 	public function test_implicit_commit_multi_statement_and_external_sql_refuse_before_dispatch(): void {
 		$transport = new OperationConnectionTestTransport();
 		$connection = $this->connection( $transport );
@@ -115,6 +136,39 @@ final class OperationConnectionTest extends TestCase {
 		self::assertSame( 1, $connection->query( $sql ) );
 		self::assertSame( 11, $connection->insert_id() );
 		self::assertTrue( $connection->rollback() );
+	}
+
+	public function test_nested_promise_json_at_native_and_packet_limits_dispatches_without_regex_stack_work(): void {
+		$transport = new OperationConnectionTestTransport(); $connection = $this->connection( $transport );
+		self::assertTrue( $connection->begin() ); self::assertTrue( $connection->validate_tables( [ 'op_woocommerce_sessions' ] ) );
+		$context = \CetechDeliveryEngine\Tests\Support\ServicePromise\Handoff\PromiseHandoffFixture::context()->to_private_json();
+		foreach ( [ 12087, 65536 ] as $bytes ) {
+			$packet = [ 'format' => 1, 'issue_context_json' => $context, 'original_context_json' => $context, 'customer_note' => "quoted ' and \\\"; COMMIT; -- hidden_effect() # /* private */", 'padding' => '' ];
+			$encoded = json_encode( $packet, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES );
+			self::assertLessThan( $bytes, strlen( $encoded ) ); $packet['padding'] = str_repeat( 'x', $bytes - strlen( $encoded ) );
+			$json = json_encode( $packet, JSON_THROW_ON_ERROR | JSON_UNESCAPED_SLASHES ); self::assertSame( $bytes, strlen( $json ) ); self::assertSame( $packet, json_decode( $json, true, 16, JSON_THROW_ON_ERROR ) );
+			$sql = $connection->prepare( 'UPDATE op_woocommerce_sessions SET session_value=%s,session_expiry=%d WHERE session_id=%d AND BINARY session_value=BINARY %s', [ $json, 1791540000, 7, $json ] );
+			self::assertSame( 1, $connection->query( $sql ) ); self::assertTrue( in_array( $sql, $transport->statements, true ) );
+		}
+		self::assertTrue( $connection->rollback() ); self::assertTrue( $connection->retire() );
+	}
+
+	public function test_long_literals_keep_escape_parity_doubled_quotes_and_real_sql_boundaries(): void {
+		$transport = new OperationConnectionTestTransport(); $connection = $this->connection( $transport ); self::assertTrue( $connection->begin() );
+		$long = str_repeat( "escaped \\\" private' \\ ", 3000 ) . 'Aéroport 📦 日本語';
+		$prepared = $connection->prepare( 'SELECT %s AS original', $long . '; COMMIT; -- # /* hidden_effect() INTO OUTFILE */' );
+		self::assertIsArray( $connection->get_row( $prepared ) ); self::assertTrue( in_array( $prepared, $transport->statements, true ) );
+		foreach ( [ "SELECT '" . str_repeat( "text''; COMMIT; -- ", 3000 ) . "end'", 'SELECT "' . str_repeat( 'text""; COMMIT; -- ', 3000 ) . 'end"', "SELECT '" . str_repeat( '\\', 6000 ) . "'" ] as $sql ) { self::assertIsArray( $connection->get_row( $sql ) ); self::assertTrue( in_array( $sql, $transport->statements, true ) ); }
+		$forbidden = [ $prepared . '; COMMIT', $prepared . ' -- hidden', $prepared . ' # hidden', $prepared . ' /* hidden */', $prepared . ',hidden_effect()', $prepared . ' INTO OUTFILE \'/private/file\'', $prepared . ' INTO @private', "SELECT '" . str_repeat( '\\', 6000 ) . "'; COMMIT", "SELECT '" . str_repeat( 'text', 16384 ), "SELECT '" . str_repeat( 'text', 16384 ) . "\\'", "SELECT '" . str_repeat( 'text', 16384 ) . '\\', 'SELECT "' . str_repeat( 'text', 16384 ), "SELECT 'closed' 'unterminated", "SELECT '" . str_repeat( '\\', 6001 ) . "'" ];
+		foreach ( $forbidden as $sql ) { $before = count( $transport->statements ); self::assertFalse( $connection->get_row( $sql ) ); self::assertSame( $before, count( $transport->statements ) ); }
+		self::assertTrue( $connection->rollback() ); self::assertTrue( $connection->retire() );
+	}
+
+	public function test_only_unqualified_ascii_function_tokens_can_use_the_existing_allowlist(): void {
+		$transport = new OperationConnectionTestTransport(); $connection = $this->connection( $transport ); self::assertTrue( $connection->begin() ); self::assertTrue( $connection->validate_tables( [ 'op_counter' ] ) );
+		foreach ( [ 'SELECT NOW()', 'SELECT COUNT(*) FROM `op_counter`', 'SELECT `value` FROM `op_counter`', "SHOW TABLE STATUS LIKE 'op_counter'", 'SHOW INDEX FROM `op_counter`', $connection->prepare( 'SELECT %s AS original', 'Aéroport 📦 日本語 $SUM(1) `hidden_effect`(1)' ) ] as $sql ) { self::assertIsArray( $connection->get_row( $sql ) ); }
+		foreach ( [ 'SELECT `hidden_effect`(1)', 'SELECT `NOW`()', 'SELECT `hidden``effect`(1)', 'SELECT `hidden effect`(1)', 'SELECT `hidden$effect`(1)', 'SELECT `schema`.`hidden_effect`(1)', 'SELECT `$`.NOW()', 'SELECT $SUM(1)', 'SELECT 0hidden_effect(1)', 'SELECT SUMé(1)', 'SELECT éeffect(1)', 'SELECT private.NOW()', 'SHOW TABLES WHERE hidden_effect(1)', 'SHOW TABLES WHERE `hidden_effect`(1)', 'SHOW TABLES WHERE $SUM(1)', 'SHOW TABLES WHERE private.NOW()', 'UPDATE op_counter SET value=`hidden_effect`(1) WHERE id=1' ] as $sql ) { $before = count( $transport->statements ); self::assertFalse( $connection->query( $sql ) ); self::assertSame( $before, count( $transport->statements ) ); }
+		self::assertTrue( $connection->rollback() ); self::assertTrue( $connection->retire() );
 	}
 
 	public function test_fixed_options_unique_index_is_sql_syntax_without_allowing_index_calls(): void {
@@ -274,11 +328,13 @@ final class OperationConnectionTestTransport implements OperationConnectionTrans
 	public bool $failed_rollback = false;
 	public bool $failed_close = false;
 	public string $engine = 'InnoDB';
+	public ?string $missing_table = null;
 	/** @var list<string> */
 	public array $statements = [];
 
 	public function execute( string $sql ): OperationConnectionResult {
 		$this->statements[] = $sql;
+		if ( null !== $this->missing_table && 'SELECT 1 FROM `' . $this->missing_table . '` LIMIT 0' === $sql ) { return new OperationConnectionResult( false, true, errno: 1146 ); }
 		if ( 'START TRANSACTION' === $sql ) {
 			$this->transaction = true;
 		}

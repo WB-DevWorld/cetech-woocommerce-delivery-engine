@@ -35,7 +35,9 @@ final class CartQuoteService implements CartQuoteReviewService {
 			}
 			if ( ( $old?->generation() ?? 0 ) !== $expected_generation ) { return $this->result( 'changed', $old?->generation() ?? 0, $request, refresh: ! ( $old?->pending() ?? false ) ); }
 			if ( null !== $old && $old->pending() ) { return $this->result( 'unconfirmed', $old->generation(), $request, retry: true ); }
-			$preparation = QuotePreparationCommand::create( $draft->owner(), $draft->draft_digest(), $original_token, LegacyFixedBaseQuoteProvider::CODE, 1, LegacyFixedBaseQuoteProvider::CODE, 1 );
+			$profile = $this->environment instanceof CartQuoteProfileEnvironment ? $this->environment->profile() : LegacyFixedBaseQuoteProvider::CODE;
+			if ( ! in_array( $profile, [ LegacyFixedBaseQuoteProvider::CODE, ServicePromiseQuoteProvider::PROFILE ], true ) ) { throw new \RuntimeException( 'Unsupported quote preparation profile.' ); }
+			$preparation = QuotePreparationCommand::create( $draft->owner(), $draft->draft_digest(), $original_token, LegacyFixedBaseQuoteProvider::CODE, 1, $profile, 1 );
 			$envelope = CartQuoteSessionEnvelope::begin( $preparation, $expected_generation + 1, $this->sessions->expires_at( $draft->owner() ) );
 			if ( ! $this->sessions->compare_and_swap( $draft->owner(), $old, $envelope ) ) { return $this->result( 'unconfirmed', $envelope->generation(), $request, retry: true ); }
 			$attempt = QuotePreparationAttempt::generate(); $gate = $this->gate->admit( $preparation, $attempt );
@@ -45,7 +47,7 @@ final class CartQuoteService implements CartQuoteReviewService {
 				return $this->result( 'unconfirmed', $envelope->generation(), $request, retry: true );
 			}
 			$lease = $gate->lease; if ( ! $lease->claim_preparation() ) { return $this->result( 'unconfirmed', $envelope->generation(), $request, retry: true ); }
-			$prepared = $this->environment->prepare( $draft );
+			$prepared = $this->environment instanceof CartQuoteProfileEnvironment ? $this->environment->prepare_at( $draft, $lease->created_at() ) : $this->environment->prepare( $draft );
 			$fresh = $this->draft(); if ( null === $fresh || ! $draft->owner()->equals( $fresh->owner() ) || ! hash_equals( $draft->draft_digest(), $fresh->draft_digest() ) || ! $prepared->owner()->equals( $draft->owner() ) || ! $this->environment->authorize( $draft->owner(), 'delivery_quote.issue' ) ) { throw new \RuntimeException( 'Cart quote preparation unavailable.' ); }
 			$command = $prepared->command( $original_token ); $admission = $lease->bind_issue( $command ); $handoff = true;
 			$durable = $this->durable( $prepared->registry(), $prepared->guard() );

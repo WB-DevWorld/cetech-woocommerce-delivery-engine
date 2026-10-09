@@ -91,9 +91,12 @@ final class OperationConnectionMysqliTransport implements OperationConnectionTra
 	public function transaction_state(): ?array {
 		$result = $this->execute( 'SELECT CONNECTION_ID() AS connection_id, @@in_transaction AS in_transaction, @@autocommit AS autocommit, @@sql_mode AS sql_mode' );
 		$row = $result->rows[0] ?? null;
-		if ( ! $result->acknowledged || ! is_array( $row ) || ! isset( $row['connection_id'], $row['in_transaction'], $row['autocommit'], $row['sql_mode'] ) || (int) $row['connection_id'] < 1 || in_array( 'NO_BACKSLASH_ESCAPES', explode( ',', strtoupper( (string) $row['sql_mode'] ) ), true ) ) {
+		if ( ! $result->acknowledged || ! is_array( $row ) || ! isset( $row['connection_id'], $row['in_transaction'], $row['autocommit'], $row['sql_mode'] ) || (int) $row['connection_id'] < 1 ) {
 			return null;
 		}
+		// The owned literal lexer requires backslash escapes and double-quoted
+		// strings. Identifier-quote modes would hide callable names from it.
+		if ( [] !== array_intersect( [ 'NO_BACKSLASH_ESCAPES', 'ANSI_QUOTES' ], explode( ',', strtoupper( (string) $row['sql_mode'] ) ) ) ) { return null; }
 		return [
 			'connection_id'  => (int) $row['connection_id'],
 			'in_transaction' => 1 === (int) $row['in_transaction'],

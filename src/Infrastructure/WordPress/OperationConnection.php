@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Infrastructure\WordPress;
 
 use CetechDeliveryEngine\Domain\Operation\OperationCommitResult;
 use CetechDeliveryEngine\Domain\Operation\OperationSession;
+use CetechDeliveryEngine\Infrastructure\Persistence\PromiseStorageSchema;
 
 /** Explicit owner of one pinned, dedicated, non-reconnecting native session. */
 final class OperationConnection implements OperationSession {
@@ -130,18 +131,27 @@ final class OperationConnection implements OperationSession {
 
 	/** @param list<string> $table_names */
 	public function validate_tables( array $table_names ): bool {
-		if ( ! $this->guard_owner() || ! array_is_list( $table_names ) || [] === $table_names || count( $table_names ) > 40 ) {
+		if ( ! $this->guard_owner() || ! array_is_list( $table_names ) || [] === $table_names ) {
 			return false;
 		}
+		$requested = [];
 		foreach ( $table_names as $table ) {
 			if ( ! is_string( $table ) || ! str_starts_with( $table, $this->prefix ) || 1 !== preg_match( '/^[a-zA-Z0-9_]{1,64}$/D', $table ) ) {
 				return false;
 			}
+			$requested[$table] = true;
+			if ( count( $requested ) > 41 ) { return false; }
 		}
-		// Q04 adds finite product, native tax/session and price-source participants.
-		// The ceiling applies to the entire owned unit, including later declarations.
-		if ( count( array_unique( [ ...array_keys( $this->tables ), ...$table_names ] ) ) > 40 ) { return false; }
-		foreach ( array_unique( $table_names ) as $table ) {
+		// The total distinct owned unit retains its legacy ceiling. P04's exact
+		// three promise participants permit one additional table; every actual
+		// participant must still pass the held metadata and engine checks below.
+		$union = $this->tables + $requested;
+		$ceiling = 40;
+		try {
+			if ( [] === array_diff( PromiseStorageSchema::tables( $this->prefix ), array_keys( $union ) ) ) { $ceiling = 41; }
+		} catch ( \InvalidArgumentException ) { /* No representable promise tables for this native prefix. */ }
+		if ( count( $union ) > $ceiling ) { return false; }
+		foreach ( array_keys( $requested ) as $table ) {
 			// Acquire and hold the actual participant's metadata lock before
 			// checking engine. A later DDL conversion cannot invalidate this unit.
 			$probe = $this->execute( 'SELECT 1 FROM `' . $table . '` LIMIT 0' );
@@ -232,7 +242,7 @@ final class OperationConnection implements OperationSession {
 	private function allowed_statement( string $sql ): bool {
 		// Ignore escaped literal contents while rejecting comments/multiple
 		// statements/implicit commit and external-file constructs in actual SQL.
-		$structural = preg_replace( "/'(?:''|\\\\.|[^'\\\\])*'|\"(?:\"\"|\\\\.|[^\"\\\\])*\"/s", "''", $sql );
+		$structural = $this->without_literals( $sql );
 		if ( ! is_string( $structural ) || 1 === preg_match( '/;|--|#|\/\*|\b(?:OUTFILE|DUMPFILE|PROCEDURE)\b|\bINTO\s+@/i', $structural ) ) {
 			return false;
 		}
@@ -240,7 +250,7 @@ final class OperationConnection implements OperationSession {
 			return $this->safe_calls( $structural );
 		}
 		if ( 1 === preg_match( '/^\s*SHOW\b/i', $structural ) ) {
-			return true;
+			return $this->safe_calls( $structural );
 		}
 		if ( 1 !== preg_match( '/^\s*(INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+(`?)([a-zA-Z0-9_]+)\2(?:\s+|(?=\())(.*)$/is', $structural, $matches ) || ! isset( $this->tables[$matches[3]] ) ) {
 			return false;
@@ -255,15 +265,42 @@ final class OperationConnection implements OperationSession {
 		return 1 !== preg_match( '/\b(?:JOIN|SELECT|CALL|RETURNING)\b|\bON\s+DUPLICATE\s+KEY\b/i', $structural ) && $this->safe_calls( $tail );
 	}
 
-	private function safe_calls( string $sql ): bool {
-		if ( 1 === preg_match( '/`?[a-zA-Z0-9_]+`?\s*\.\s*`?[a-zA-Z_][a-zA-Z0-9_]*`?\s*\(/', $sql ) ) {
-			return false;
+	/** Linear literal lexer: escaped packet bytes never consume PCRE backtracking/JIT stack. */
+	private function without_literals( string $sql ): ?string {
+		$length = strlen( $sql ); $offset = 0; $parts = [];
+		while ( $offset < $length ) {
+			$run = strcspn( $sql, "'\"", $offset );
+			if ( $run > 0 ) { $parts[] = substr( $sql, $offset, $run ); $offset += $run; }
+			if ( $offset === $length ) { break; }
+			$quote = $sql[$offset++]; $closed = false;
+			while ( $offset < $length ) {
+				$offset += strcspn( $sql, $quote . '\\', $offset );
+				if ( $offset === $length ) { return null; }
+				if ( '\\' === $sql[$offset] ) {
+					// NO_BACKSLASH_ESCAPES is refused by the pinned native transport.
+					if ( $offset + 1 === $length ) { return null; }
+					$offset += 2; continue;
+				}
+				++$offset;
+				if ( $offset < $length && $quote === $sql[$offset] ) { ++$offset; continue; }
+				$closed = true; break;
+			}
+			if ( ! $closed ) { return null; }
+			$parts[] = "''";
 		}
+		return implode( '', $parts );
+	}
+
+	private function safe_calls( string $sql ): bool {
 		// C07 and Q04 pin only their reviewed native unique/range keys.
 		// This exact SQL clause is syntax, not a callable named INDEX. Other
 		// index expressions and every unknown function remain refused.
 		$sql = str_replace( [ ' FORCE INDEX (`option_name`)', ' FORCE INDEX (`quote_candidate_range`)' ], '', $sql );
-		preg_match_all( '/\b([a-zA-Z_][a-zA-Z0-9_]*)\s*\(/', $sql, $calls );
+		// Literal contents are already removed. Native SQL templates use only
+		// unqualified ASCII callable names; quoted, $/digit-leading and Unicode
+		// identifiers cannot borrow a suffix from an allowlisted function.
+		if ( 1 === preg_match( '/[^\x00-\x7f]|`[^`]*`\s*\(|\.\s*[a-zA-Z0-9_$]+\s*\(/s', $sql ) ) { return false; }
+		preg_match_all( '/([a-zA-Z0-9_$]+)\s*\(/', $sql, $calls );
 		foreach ( $calls[1] as $call ) {
 			if ( ! in_array( strtoupper( $call ), [ 'COUNT', 'MIN', 'MAX', 'SUM', 'AVG', 'COALESCE', 'IFNULL', 'CAST', 'CONVERT', 'DATABASE', 'CONNECTION_ID', 'NOW', 'UTC_TIMESTAMP', 'OCTET_LENGTH', 'LENGTH', 'CHAR_LENGTH', 'LEFT', 'IN', 'VALUES', 'WHERE', 'AND', 'OR', 'NOT' ], true ) ) {
 				return false;

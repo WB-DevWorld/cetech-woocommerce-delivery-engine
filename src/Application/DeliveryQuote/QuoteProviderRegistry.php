@@ -34,6 +34,7 @@ final class QuoteProviderRegistry {
 	public function capture( string $code, int $version, string $profile, int $profile_version, QuoteContext $context ): QuoteTerms {
 		$entry = $this->entry( $code, $version, $profile, $profile_version );
 		$terms = QuoteTerms::from_json( $entry['provider']->capture( $context )->to_private_json() );
+		if ( ServicePromiseQuoteProvider::PROFILE === $profile && ( LegacyFixedBaseQuoteProvider::CODE !== $code || 1 !== $version || 1 !== $profile_version || 2 !== $context->format_version() || 2 !== $terms->format_version() ) ) { QuoteShape::invalid(); }
 		$captured = $context->private_facts(); $groups = []; foreach ( $captured['groups'] as $group ) { $groups[$group['component_key']] = $group; }
 		$facts = $terms->private_facts(); if ( count( $facts['groups'] ) !== count( $groups ) ) { QuoteShape::invalid(); }
 		foreach ( $facts['groups'] as $term ) {

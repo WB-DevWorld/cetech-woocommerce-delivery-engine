@@ -47,14 +47,10 @@ final class QuoteNativeOrderHistory {
 	}
 	public static function object_owned( object $object, string $key ): bool {
 		if ( false !== DeliveryQuoteSnapshotMarker::exists( $object ) ) { return true; }
-		$raw = $object->get_meta( $key, true );
-		if ( ! is_string( $raw ) || '' === $raw ) { return false; }
-		if ( strlen( $raw ) > 4 * 1024 * 1024 ) { return true; }
-		try { $decoded = json_decode( $raw, true, OrderDeliverySnapshotJson::MAX_DEPTH, JSON_THROW_ON_ERROR ); if ( is_array( $decoded ) && array_key_exists( DeliveryQuoteSnapshotEnvelope::MEMBER, $decoded ) ) { return true; } } catch ( \Throwable ) {}
-		// A corrupted JSON packet may retain its mandatory name using JSON's
-		// ASCII unicode escape spelling. Ownership still cannot fall to legacy.
-		$names = preg_replace_callback( '/\\\\u00([0-7][0-9a-fA-F])/', static fn( array $match ): string => chr( hexdec( $match[1] ) ), $raw );
-		return null === $names || str_contains( $names, DeliveryQuoteSnapshotEnvelope::MEMBER );
+		$version_key = OrderDeliverySnapshot::META_LINE_SNAPSHOT === $key ? OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION : OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION;
+		$presence = self::meta_present( $object, $version_key );
+		if ( null === $presence || ( true === $presence && QuoteSnapshotOwnership::version_owned( $object->get_meta( $version_key, true ) ) ) ) { return true; }
+		return QuoteSnapshotOwnership::from_raw( $object->get_meta( $key, true ) );
 	}
 	/** Verification only. No current offer/rate/tax/currency configuration is consulted. */
 	public static function verify( \WC_Order $order ): bool {

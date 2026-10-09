@@ -14,6 +14,7 @@ final class OrderDeliverySnapshot {
 	public const VERSION = '1';
 
 	public const VERSION_V2 = '2';
+	public const VERSION_V3 = '3';
 
 	public const META_LINE_SNAPSHOT = '_cetech_de_delivery_snapshot';
 
@@ -123,7 +124,7 @@ final class OrderDeliveryLineSnapshot {
 			$data['pickup_instructions'] = $this->pickup_instructions;
 		}
 
-		if ( OrderDeliverySnapshot::VERSION_V2 === $this->snapshot_version ) {
+		if ( in_array( $this->snapshot_version, [ OrderDeliverySnapshot::VERSION_V2, OrderDeliverySnapshot::VERSION_V3 ], true ) ) {
 			$data['customer_context_version'] = $this->customer_context_version;
 			$data['matching_location'] = $this->matching_location;
 			$data['delivery_address'] = $this->delivery_address;

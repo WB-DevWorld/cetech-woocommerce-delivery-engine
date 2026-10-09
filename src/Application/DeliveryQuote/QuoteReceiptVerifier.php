@@ -12,6 +12,10 @@ use CetechDeliveryEngine\Infrastructure\Persistence\WpdbOperationRecordRepositor
 
 /** Exact producer receipts only, bounded in SQL; no latest-audit/history heuristics. */
 final class QuoteReceiptVerifier {
+	/** Exact original final producer, never Q05 Confirm or a reconstructed current estimate. */
+	public function promise_seal( QuoteStoredRow $quote, array $records, QuoteBinding $binding ): ?PromiseQuoteSealLinkage {
+		try { if ( ! $this->verify( $quote, $records, $binding ) || ! ( $records['seal'] ?? null ) instanceof OperationRecord ) { return null; } return PromiseQuoteSealLinkage::from_verified( $quote, $binding, $records['seal'] ); } catch ( \Throwable ) { return null; }
+	}
 	/** Readers/retention collect all referenced namespaces in one global digest order. */
 	public function lock( OperationSession $session, QuoteHeader $header, ?QuoteBinding $binding = null, ?array $purposes = null ): array {
 		return $this->collect( $session, $header, $binding, $purposes, true );

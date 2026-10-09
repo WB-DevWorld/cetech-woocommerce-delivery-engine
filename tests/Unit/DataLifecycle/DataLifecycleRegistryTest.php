@@ -64,9 +64,10 @@ final class DataLifecycleRegistryTest extends TestCase {
 		self::assertSame( Capabilities::ALL, DataLifecycleManifest::CAPABILITIES );
 		self::assertCount( 18, DataLifecycleManifest::CAPABILITIES );
 		self::assertSame( $this->sorted( $expected_flags ), $this->sorted( DataLifecycleManifest::FEATURE_FLAG_OPTIONS ) );
-		self::assertCount( 44, DataLifecycleManifest::OPTIONS );
-		self::assertCount( 42, DataLifecycleManifest::PRESERVED_OPTIONS );
+		self::assertCount( 45, DataLifecycleManifest::OPTIONS );
+		self::assertCount( 43, DataLifecycleManifest::PRESERVED_OPTIONS );
 		self::assertContains( 'cetech_de_quote_placement_adoption', DataLifecycleManifest::PRESERVED_OPTIONS );
+		self::assertContains( 'cetech_de_service_promise_adoption', DataLifecycleManifest::PRESERVED_OPTIONS );
 		$registry = DataLifecycleRegistry::standard();
 		foreach ( DataLifecycleManifest::PRESERVED_OPTIONS as $key ) {
 			$class = $registry->get( 'option.' . $key );
@@ -205,7 +206,7 @@ final class DataLifecycleRegistryTest extends TestCase {
 		$list = $standard->classes();
 		array_pop( $list );
 		self::assertSame( $standard->policy_digest(), DataLifecycleRegistry::standard()->policy_digest() );
-		self::assertCount( 140, $standard->classes() );
+		self::assertCount( 141, $standard->classes() );
 	}
 
 	public function test_diagnostics_do_not_emit_selectors_paths_storage_names_or_caller_content(): void {
@@ -257,7 +258,7 @@ final class DataLifecycleRegistryTest extends TestCase {
 		$error = stream_get_contents( $pipes[2] );
 		fclose( $pipes[1] ); fclose( $pipes[2] );
 		self::assertSame( 0, proc_close( $process ), $error );
-		self::assertSame( [ 38, 44, 18, 140, false, false, false, true, true, false ], json_decode( $output, true, 16, JSON_THROW_ON_ERROR ) );
+		self::assertSame( [ 38, 45, 18, 141, false, false, false, true, true, false ], json_decode( $output, true, 16, JSON_THROW_ON_ERROR ) );
 	}
 
 	private function sorted( array $values ): array {

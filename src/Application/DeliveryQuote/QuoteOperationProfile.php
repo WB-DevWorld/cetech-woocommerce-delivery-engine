@@ -60,7 +60,11 @@ final class QuoteOperationProfile implements OperationProfile, OperationTerminal
 		$additional = [ ...($this->evidence?->tables( $session ) ?? []), ...($this->bound?->placement_proof()?->tables( $session ) ?? []), ...($this->bound?->saved_evidence()?->tables( $session ) ?? []) ];
 		if ( ! array_is_list( $additional ) ) { throw new OperationStorageException(); }
 		foreach ( $additional as $table ) { if ( ! is_string( $table ) || strlen( $table ) > 64 || 1 !== preg_match( '/\A[a-zA-Z0-9_]+\z/D', $table ) || ! str_starts_with( $table, $session->table_prefix() ) ) { throw new OperationStorageException(); } }
-		$additional = array_values( array_unique( $additional ) ); if ( count( $additional ) > 35 ) { throw new OperationStorageException(); }
+		// P04 adds the three exact P02 source stores to the retained native
+		// source/order census. Shared operation receipts count only once.
+		$header = $this->bound?->header();
+		$limit = null !== $header && 2 === $header->format_version() && 'service_promise_v1' === $header->profile() && 1 === $header->profile_version() ? 38 : 35;
+		$additional = array_values( array_unique( $additional ) ); if ( count( $additional ) > $limit ) { throw new OperationStorageException(); }
 		sort( $additional, SORT_STRING ); return array_values( array_unique( [ $this->control->options_table( $session ), ...$additional, ...DeliveryQuoteSchema::tables( $session->table_prefix() ) ] ) );
 	}
 	public function lock_target( OperationSession $session, OperationIdentity $identity, OperationCommand $command ): OperationTarget {
@@ -102,6 +106,7 @@ final class QuoteOperationProfile implements OperationProfile, OperationTerminal
 		if ( $target->facts !== [ 'control_revision' => $control->revision, 'quote_revision' => $quote?->revision() ?? 0, 'binding_revision' => $binding?->revision() ?? 0 ] ) { throw new OperationStorageException(); }
 		$at = self::time( $session );
 		if ( $at->epoch_microseconds() < ( $control->changed_at_epoch ?? 0 ) * 1000000 ) { $this->refuse( 'temporarily_unavailable' ); }
+		if ( 2 === $c->header()?->format_version() && ( ! $this->evidence instanceof QuoteTimedCurrentEvidenceGuard || null === $c->current_context() || ! $this->evidence->verify_at( $session, $c->owner(), $c->current_context(), $at ) ) ) { $this->refuse( 'temporarily_unavailable' ); }
 		$before = 1; $after = 2; $fields = [ 'quote' ];
 		if ( 'delivery_quote.issue' === $this->name ) {
 			if ( $at->compare( $c->lease()->created_at() ) < 0 || $at->compare( $c->lease()->expires_at() ) >= 0 ) { $this->refuse( 'temporarily_unavailable' ); }
@@ -124,7 +129,7 @@ final class QuoteOperationProfile implements OperationProfile, OperationTerminal
 				$next = QuoteStoredRow::from_row( array_replace( $quote->row(), [ 'state' => 'invalidated', 'revision' => $quote->revision() + 1, 'transition_at' => $at->sql() ] ) );
 				$before = $quote->revision(); $after = $next->revision(); if ( ! $repo->replace_quote( $quote, $next ) ) { throw new OperationStorageException(); } $quote = $next;
 			} else {
-				if ( 'accepted' !== $quote->state() || ! $same || ! $quote->header()->valid_at( $at ) ) { $this->refuse( 'stale_revision' ); }
+				if ( 'accepted' !== $quote->state() || ! $same || ! $quote->header()->valid_at( $at ) || ! $quote->terms()->feasibility_at( $at ) ) { $this->refuse( 'stale_revision' ); }
 				$supplied = $c->binding(); if ( null === $supplied ) { $this->refuse( 'invalid_input' ); }
 				QuoteBinding::from_row( $supplied->row(), $quote );
 				if ( 'delivery_quote.bind' === $this->name ) {
@@ -189,7 +194,7 @@ final class QuoteOperationProfile implements OperationProfile, OperationTerminal
 	private function no_change( QuoteStoredRow $quote, ?QuoteBinding $binding, QuoteTime $at, int $revision ): OperationMutation { return OperationMutation::unchanged( OperationCompletion::not_applicable( $this, $this->result( $quote, $binding, $at, $revision ) ) ); }
 	public static function time( OperationSession $session ): QuoteTime { $r = $session->get_row( 'SELECT UTC_TIMESTAMP(6) AS utc' ); if ( ! is_array( $r ) || ! is_string( $r['utc'] ?? null ) ) { throw new OperationStorageException(); } try { return QuoteTime::parse( $r['utc'] ); } catch ( \Throwable ) { throw new OperationStorageException(); } }
 	private static function issued_row( DeliveryQuote $quote ): QuoteStoredRow {
-		$h = $quote->header(); $o = $h->owner(); return QuoteStoredRow::from_row( [ 'id' => 1, 'site_id' => $o->site_id(), 'quote_uuid' => $h->id()->value(), 'format_version' => 1, 'profile_code' => $h->profile(), 'profile_version' => $h->profile_version(), 'purpose' => $h->purpose(), 'principal_hash' => $o->facts()['principal_hash'], 'owner_digest' => $o->digest(), 'material_digest' => $h->material_digest(), 'body_digest' => $h->body_digest(), 'header_json' => $h->to_private_json(), 'private_body_json' => QuoteJson::encode( [ 'context' => $quote->context()->private_facts(), 'terms' => $quote->terms()->private_facts() ] ), 'issue_namespace_hash' => $h->namespace_hashes()['issue'], 'accept_namespace_hash' => $h->namespace_hashes()['accept'], 'invalidate_namespace_hash' => $h->namespace_hashes()['invalidate'], 'state' => 'issued', 'revision' => 1, 'retention_revision' => 1, 'created_at' => $h->created_at()->sql(), 'expires_at' => $h->expires_at()->sql(), 'accepted_at' => null, 'transition_at' => null ] );
+		$h = $quote->header(); $o = $h->owner(); return QuoteStoredRow::from_row( [ 'id' => 1, 'site_id' => $o->site_id(), 'quote_uuid' => $h->id()->value(), 'format_version' => $h->format_version(), 'profile_code' => $h->profile(), 'profile_version' => $h->profile_version(), 'purpose' => $h->purpose(), 'principal_hash' => $o->facts()['principal_hash'], 'owner_digest' => $o->digest(), 'material_digest' => $h->material_digest(), 'body_digest' => $h->body_digest(), 'header_json' => $h->to_private_json(), 'private_body_json' => QuoteJson::encode( [ 'context' => $quote->context()->private_facts(), 'terms' => $quote->terms()->private_facts() ] ), 'issue_namespace_hash' => $h->namespace_hashes()['issue'], 'accept_namespace_hash' => $h->namespace_hashes()['accept'], 'invalidate_namespace_hash' => $h->namespace_hashes()['invalidate'], 'state' => 'issued', 'revision' => 1, 'retention_revision' => 1, 'created_at' => $h->created_at()->sql(), 'expires_at' => $h->expires_at()->sql(), 'accepted_at' => null, 'transition_at' => null ] );
 	}
 	private function refuse( string $code ): never { throw new OperationRefusal( $code, match ( $code ) { 'not_authorized' => 'contact_support', 'temporarily_unavailable' => 'retry_original_request', default => 'reload_and_submit' } ); }
 }
