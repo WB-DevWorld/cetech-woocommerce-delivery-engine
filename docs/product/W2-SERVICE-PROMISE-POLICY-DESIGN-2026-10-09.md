@@ -1,5 +1,10 @@
 # Wave 2 — service and delivery-promise policy
 
+Current status: **OWNER ACCEPTED 2026-10-09; original reviewed proposal integrated through PR #98. W2-P01 INTERNAL CONTRACTS IN PROGRESS; later checkpoints unstarted.** The owner continuation and exact accepted source are recorded in CURRENT-WORK.md. All original proposed semantics and unexecuted future observations below are retained as the accepted design record; this overlay does not turn those algorithm/physical observations into P01 test results.
+
+## Original reviewed design record
+
+
 Status: **W2-SERVICE-PROMISE-POLICY-1 — DESIGN PROPOSED; IMPLEMENTATION UNSTARTED**. [Issue #97](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/97) tracks this concrete proposal under accepted [Wave 2 work package 2](REALIGNMENT-PLAN.md). The owner instructed “proceed” after the qualified quote closeout handoff; PR #96 is integrated unchanged as `62fc5d00f93b2d651b4e20ab7ad4019b92fc82dc`, tree `ebff4a3d8ed24cfcace102a4de975f264552888a`, parents [Q06 master `e81db297bb550d420269bc905402eaffcc428aeb`, reviewed closeout `ab700dde1e5b3ffd8007ad8ec4bfe7b227ab1a55`]. Issue #95 is completed. Separate merged-master run `37896772757` and this design candidate's exact execution results belong to their PR/issue ledgers after completion.
 
 This proposal changes documentation only. Development `1.0.0-dev.wave2-quote-placement.1`, schema 9, 23 flags, 749 production PHP sources/map `4583a62edf4d90f09aca04f042766b7cf1614df4611a7e41cb0eacd57d36c579`, all tests/fixtures/CI/dependencies and all 372 frozen registry IDs/classifications/counts remain unchanged. Seven quote alignment recommendations remain separately scoped proposals. Site adoption remains OFF. There is no Q07, promise runtime, migration, deployment or release in this candidate.
