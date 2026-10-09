@@ -194,20 +194,24 @@ final class BulkToolsPage {
 		$this->action_handler->notices()->render_notices();
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
 		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( (string) $_GET['tab'] ) ) : 'catalog';
+		if ( ! array_key_exists( $tab, $this->tabs() ) ) {
+			$tab = 'catalog';
+		}
 		AdminPageLayout::open_page( 'cetech-de-bulk-tools' );
 		AdminPageLayout::render_page_header(
 			__( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Bulk Tools', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Preview large catalog changes, then apply them in the background. One command can target many products; the server still processes them in small batches.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Preview catalog changes before applying them in small background batches.', 'cetech-woocommerce-delivery-engine' )
 		);
 
 		echo '<nav class="nav-tab-wrapper wp-clearfix cetech-de-bulk-tabs" aria-label="' . esc_attr__( 'Bulk Tools sections', 'cetech-woocommerce-delivery-engine' ) . '">';
 		foreach ( $this->tabs() as $slug => $label ) {
 			$class = $tab === $slug ? ' nav-tab-active' : '';
 			printf(
-				'<a class="nav-tab%s" href="%s">%s</a>',
+				'<a class="nav-tab%s" href="%s"%s>%s</a>',
 				esc_attr( $class ),
 				esc_url( add_query_arg( [ 'page' => self::SLUG, 'tab' => $slug ], admin_url( 'admin.php' ) ) ),
+				$tab === $slug ? ' aria-current="page"' : '',
 				esc_html( $label )
 			);
 		}

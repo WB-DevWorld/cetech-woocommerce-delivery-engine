@@ -694,6 +694,9 @@ final class ScopedConfigurationPage {
 		AdminFormHelper::nonce_field( self::ACTION_SAVE );
 
 		$this->render_slice_controls( $model );
+		if ( 'global' !== $model->scope_type ) {
+			echo '<p class="description">' . esc_html__( 'If you do not set a different value here, this product uses the Default Settings. A variation uses the product’s delivery setting unless it has its own.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		}
 
 		$advanced_keys = [ 'logistics_profile_id', 'supplier_id', 'origin_id', 'priority' ];
 		foreach ( $model->fields as $field ) {
@@ -828,11 +831,13 @@ final class ScopedConfigurationPage {
 			echo '<p><strong>' . esc_html__( 'Currently using:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ' . esc_html( $field->provenance_label ) . '</p>';
 		}
 		if ( [] !== $field->provenance_lines ) {
+			echo '<details class="cetech-de-field-source"><summary>' . esc_html__( 'Setting source', 'cetech-woocommerce-delivery-engine' ) . '</summary>';
 			echo '<ul class="cetech-de-provenance-lines">';
 			foreach ( $field->provenance_lines as $line ) {
 				echo '<li>' . esc_html( $line ) . '</li>';
 			}
 			echo '</ul>';
+			echo '</details>';
 		}
 		if ( [] !== $field->validation_messages ) {
 			echo '<ul class="cetech-de-validation-messages" role="status">';
@@ -843,7 +848,6 @@ final class ScopedConfigurationPage {
 		}
 
 		if ( ! $field->is_global_root ) {
-			echo '<p class="description">' . esc_html__( 'If you do not set a different value here, this product uses the Default Settings. A variation uses the product’s delivery setting unless it has its own.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 			if ( $field->is_collection ) {
 				echo '<p><strong>' . esc_html__( 'Delivery options that will apply:', 'cetech-woocommerce-delivery-engine' ) . '</strong> ';
 				echo esc_html( [] === $field->effective_members ? __( 'No delivery options for this setup', 'cetech-woocommerce-delivery-engine' ) : implode( ', ', array_map( 'strval', $field->effective_members ) ) );

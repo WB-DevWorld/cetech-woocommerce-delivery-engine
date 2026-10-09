@@ -22,7 +22,7 @@
 }
 
 .cetech-de-cart-context__meta {
-	opacity: 0.9;
+	line-height: 1.5;
 }
 
 .cetech-de-cart-context__status {
@@ -52,13 +52,21 @@
 	max-width: 100%;
 }
 
+.cetech-de-cart-context__editor > summary {
+	display: list-item;
+	list-style-position: inside;
+	padding-block: 0.5rem;
+	box-sizing: border-box;
+}
+
 .cetech-de-cart-context__form {
 	margin-top: 0.75rem;
 	padding: 0.75rem;
-	border: 1px solid rgba(0, 0, 0, 0.12);
+	border: 1px solid rgba(0, 0, 0, 0.16);
+	border-radius: 0.5rem;
 	background: #fff;
 	max-width: 100%;
-	overflow-x: hidden;
+	overflow: visible;
 	box-sizing: border-box;
 }
 
@@ -79,8 +87,10 @@
 .cetech-de-cart-context__disclosure > summary {
 	cursor: pointer;
 	min-height: 2.75rem;
-	display: inline-flex;
-	align-items: center;
+	display: list-item;
+	list-style-position: inside;
+	padding-block: 0.5rem;
+	box-sizing: border-box;
 	font-weight: 600;
 }
 
@@ -164,7 +174,8 @@
 .cetech-de-delivery-plan {
 	margin: 0 0 1.25rem;
 	padding: 1rem;
-	border: 1px solid rgba(0, 0, 0, 0.12);
+	border: 1px solid rgba(0, 0, 0, 0.16);
+	border-radius: 0.5rem;
 	background: #fff;
 	box-sizing: border-box;
 }
@@ -187,11 +198,12 @@
 
 .cetech-de-delivery-plan__product {
 	display: block;
+	font-weight: 600;
 }
 
 .cetech-de-delivery-plan__offer {
 	display: block;
-	opacity: 0.9;
+	line-height: 1.5;
 }
 
 .cetech-de-checkout-keep-address {
@@ -235,7 +247,7 @@
 
 @media (min-width: 769px) {
 	.cetech-de-cart-context__grid {
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 	}
 }
 
@@ -259,4 +271,21 @@
 		width: 100%;
 		margin: 0.35rem 0 0;
 	}
+}
+
+.cetech-de-delivery-plan,
+.cetech-de-cart-context {
+	min-width: 0;
+	overflow-wrap: anywhere;
+	line-height: 1.5;
+}
+
+.cetech-de-delivery-plan__group + .cetech-de-delivery-plan__group {
+	margin-block-start: 0.75rem;
+	padding-block-start: 0.75rem;
+	border-block-start: 1px solid rgba(0, 0, 0, 0.16);
+}
+
+.cetech-de-delivery-plan__line {
+	padding-block: 0.25rem;
 }

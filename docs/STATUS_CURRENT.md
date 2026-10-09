@@ -4,6 +4,9 @@ Owner authorization2026-10-09 12:45:25UTC accepts P03 integration and implements
 
 Reader checkpoint69699ecb/tree9e1d21 is independently accepted (Issue105/comment6082223622); clean root4,731tests/28,139assertions,805 production autoload/lint and both control planes pass. Guarded writers and lazy native composition are implemented and under final native/HTTP qualification. Physical source proof31tests/393assertions includes same-owner ordered absence locks, concurrent P02 mutations, calendar expiry after SQL retirement, capacity-port refusal and actual stalled owner with no replacement. New adoption staysOFF by default, with protected configure-OFF then separate enable; no new UI or live adoption. P04 is pending complete frozen-candidate qualification.
 
+
+Current-master refresh: the separately approved UI PR106 merged as `8129601f8d8a4ebb0326f3815c8312123395fb15`. Its presentation source and task authorization are preserved in the normal two-parent P04 refresh. Combined source remains827 production files, map `49a6a01a08c451855b7a19770f550be8ca46c811b34ab451c626a35be5eeb6b2`; P04 production/protocol bytes, runtime pins and all806 authored observations are unchanged. Final combined-candidate CI and independent original audits remain pending; the current PR evidence comment will record their exact result.
+
 ## Historical P03 status
 
 # Current status — P02 integrated / P03 calculation in progress
