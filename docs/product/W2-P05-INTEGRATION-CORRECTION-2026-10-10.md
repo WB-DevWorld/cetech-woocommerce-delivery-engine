@@ -1,0 +1,13 @@
+# P05 bounded source-read integration correction
+
+This is a conditional correction within the owner-approved P05 integration and P06 implementation. P06 acceptance, release and live adoption remain separate. CURRENT-WORK records exact authority, failed originals, diagnostic scope and finite leases.
+
+The inherited child transport failed on actual P05 master8a7 and again on a source-identical transfer ref. Its old combined exception cannot distinguish deadline, output overflow, exit, JSON or PID failure. Diagnostic0f17 changes one reviewed failure-only fixture probe, retaining exact production/workflow and all879 guards. Until that execution identifies a reason and independent review establishes the repair link, this branch must not be called an attributed failure repair or merged.
+
+The prepared three-class source change is byte-identical to reviewed/qualified P06b01. A synchronous read-only prime materializes all captured groups and memoizes exact SQL only within that call. Ordered source/absence locks, accepted publication receipts, policy/calendar identities and deadlines remain required. Both callers consume its returned groups; an uncached query checks the original owner after materialization. A later prime, rollback/rebegin or commit/rebegin reloads current sources, and a killed owner refuses without replacement.
+
+Seven physical regression cases require successful non-skipped execution: three shared-source/query/capture cases and four transaction lifetime/same-owner mutation/lost-owner cases. CI retains all879 P05 observations in twelve primary receipts and separately uploads the exact clean committed development ZIP/report as one additional archive. The native suite installs the verified extraction. Runtime pins,60-minute WordPress ceiling, original12-second child limit and every money/payment/cleanup assertion remain unchanged.
+
+P05 development version, schema11,39 stores,23flags,372 classifications and default adoption OFF remain unchanged. No P06 pure, native bounds or operational lifecycle receipt is imported. Package helpers are reusable source validators; their reuse does not establish P06 operational acceptance.
+
+Required before correction integration: identified diagnostic reason; independently reviewed source-derived disposition; exact correction879/13/all8 qualification and independent original audit; two bounded freshness passes. Required after its normal approved-P05 correction merge: separate actual-master qualification and audit. Required before P06 handoff: normal current-master refresh, exact933/18 qualification/audits and freshness. Original failed runs remain immutable failures. Actual candidate/run/audit identities belong in the PR/Issue ledger after each execution.
