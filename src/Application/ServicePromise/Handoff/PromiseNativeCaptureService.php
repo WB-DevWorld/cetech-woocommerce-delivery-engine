@@ -73,9 +73,8 @@ final readonly class PromiseNativeCaptureService {
 			$session = $this->connections->open(); $this->binding->assert_session( $session );
 			if ( $session->is_retired() || $session->in_transaction() ) { throw new OperationStorageException(); }
 			( new PromiseOperationReadiness() )->assert_ready( $session ); if ( ! $session->begin() ) { throw new OperationStorageException(); }
-			$repository = new WpdbPromiseHandoffSources( $session, $this->binding ); $captured = [];
-			$services = []; foreach ( $demands as $component => $demand ) { $services[$component] = $demand->service_endpoint(); } $repository->prime( $base, $services, $at );
-			foreach ( $demands as $component => $demand ) { $captured[$component] = $repository->group( $base, $component, $demand->service_endpoint(), $at ); }
+			$repository = new WpdbPromiseHandoffSources( $session, $this->binding );
+			$services = []; foreach ( $demands as $component => $demand ) { $services[$component] = $demand->service_endpoint(); } $captured = $repository->prime( $base, $services, $at );
 			if ( ! $session->rollback() || ! $session->retire() ) { throw new OperationStorageException(); } return $captured;
 		} catch ( \Throwable $error ) { throw new OperationStorageException(); }
 		finally { if ( null !== $session && ! $session->is_retired() ) { if ( $session->in_transaction() ) { try { $session->rollback(); } catch ( \Throwable ) {} } try { $session->retire(); } catch ( \Throwable ) {} } }
