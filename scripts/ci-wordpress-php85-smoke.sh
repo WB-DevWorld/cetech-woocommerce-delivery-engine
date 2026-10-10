@@ -39,7 +39,13 @@ echo "work=${WORK}"
 
 rm -rf "$WORK"
 mkdir -p "$WORK"
-bash "$ROOT/scripts/ci-stage-production-tree.sh" "$PLUGIN_STAGE"
+if [[ -n "${CETECH_DE_P06_CURRENT_PACKAGE:-}" ]]; then
+  python3 "$ROOT/scripts/qualification/extract-promise-qualification-package.py" \
+    "$CETECH_DE_P06_CURRENT_PACKAGE" "${CETECH_DE_P06_CURRENT_PACKAGE%.zip}.json" "$WORK/p06-installed-package" --ref "$(git -C "$ROOT" rev-parse HEAD)"
+  PLUGIN_STAGE="$WORK/p06-installed-package/cetech-woocommerce-delivery-engine"
+else
+  bash "$ROOT/scripts/ci-stage-production-tree.sh" "$PLUGIN_STAGE"
+fi
 
 curl -sSLo "$WORK/wp-cli.phar" https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar
 php "$WORK/wp-cli.phar" --info >/dev/null
