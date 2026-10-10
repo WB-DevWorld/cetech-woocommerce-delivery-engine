@@ -50,13 +50,13 @@ final readonly class PromiseHandoffSourceFence implements QuotePlacementSavedEvi
 		try {
 			$this->tables( $session ); if ( ! $session->in_transaction() || $session->is_retired() ) { return null; }
 			$repository = new WpdbPromiseHandoffSources( $session, $this->site_binding ); $base = $this->context->base_context();
-			$services = []; foreach ( $this->inputs as $component => $input ) { $policy = $input->policy(); $service = $policy->service()->private_facts(); $services[$component] = [ 'service_kind' => $service['kind'], 'service_code' => $service['code'], 'endpoint' => $policy->endpoint(), 'endpoint_kind' => $policy->endpoint_kind() ]; } $repository->prime( $base, $services, $this->at );
+			$services = []; foreach ( $this->inputs as $component => $input ) { $policy = $input->policy(); $service = $policy->service()->private_facts(); $services[$component] = [ 'service_kind' => $service['kind'], 'service_code' => $service['code'], 'endpoint' => $policy->endpoint(), 'endpoint_kind' => $policy->endpoint_kind() ]; } $sources = $repository->prime( $base, $services, $this->at );
 			$until = null;
 			foreach ( $this->context->promise_groups() as $capture ) {
 				$input = $this->inputs[$capture['component_key']]; $facts = $input->private_facts();
 				if ( PromiseJson::encode( $facts['runtime'] ) !== PromiseJson::encode( $this->runtime ) || $this->at->compare( $input->anchor()->evaluated_at() ) < 0 || $this->at->compare( $input->anchor()->quote_expires_at() ) >= 0 || ( null !== $input->anchor()->accept_until() && $this->at->compare( $input->anchor()->accept_until() ) >= 0 ) ) { return null; }
-				$policy = $input->policy(); $service = $policy->service()->private_facts();
-				$current = $repository->group( $base, $capture['component_key'], [ 'service_kind' => $service['kind'], 'service_code' => $service['code'], 'endpoint' => $policy->endpoint(), 'endpoint_kind' => $policy->endpoint_kind() ], $this->at );
+				$policy = $input->policy();
+				$current = $sources[$capture['component_key']];
 				if ( ! hash_equals( $capture['assignment_receipt_digest'], $current['assignment_receipt_digest'] ) || $current['effective']->policy()->to_private_json() !== $policy->to_private_json() || $current['effective']->policy()->reference()->private_facts() !== $capture['policy_reference'] ) { return null; }
 				foreach ( [ $input->anchor()->quote_expires_at(), $input->anchor()->accept_until(), $current['valid_until'] ] as $bound ) { if ( null !== $bound && ( null === $until || $bound->compare( $until ) < 0 ) ) { $until = $bound; } }
 				$observation = $input->capacity();
