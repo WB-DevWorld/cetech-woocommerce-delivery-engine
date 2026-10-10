@@ -255,6 +255,7 @@ jobs:
         run: |
           python3 scripts/qualification/test-opening-http-native-stack.py
           python3 scripts/qualification/test-store-smoke-diagnostic.py
+          python3 scripts/qualification/test-native-payment-transport-diagnostic.py
       - name: Install native crash debugger for the disposable HTTP listener
         run: sudo apt-get update -qq && sudo apt-get install -y -qq gdb
       - name: Install the pinned disposable C07 browser proof tool

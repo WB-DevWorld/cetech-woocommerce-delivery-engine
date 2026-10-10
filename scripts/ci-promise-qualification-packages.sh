@@ -9,7 +9,7 @@ p06_head="$(git -C "$p06_repo" rev-parse HEAD)"
 for p06_kind in current previous reader; do
   case "$p06_kind" in
     current) p06_ref="$p06_head" ;;
-    previous) p06_ref=8a7a7815b249c7bc117a64ffcc36db1dd8f73ee0 ;;
+    previous) p06_ref=543275af6844d649268f9ac02db518420dac9fe6 ;;
     reader) p06_ref=3b57ffc53b64f485aa9ad30e2d9e5d424afc3468 ;;
   esac
   python3 "$p06_repo/scripts/qualification/build-promise-qualification-package.py" "$p06_dest/$p06_kind.zip" --ref "$p06_ref"

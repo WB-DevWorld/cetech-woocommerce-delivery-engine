@@ -18,7 +18,7 @@ spec.loader.exec_module(p05)
 placement = p05.placement
 require, closed, load = placement.require, placement.closed, placement.load
 P04_HEAD = "3b57ffc53b64f485aa9ad30e2d9e5d424afc3468"
-P05_HEAD = "8a7a7815b249c7bc117a64ffcc36db1dd8f73ee0"
+P05_HEAD = "543275af6844d649268f9ac02db518420dac9fe6"
 CONTEXT = "Fresh native P06 sealed promise and original/current shipment operational lifecycle; complete marked disposable physical history"
 BACKGROUND = "WP Cron disabled; Action Scheduler async request runner suppressed in this process"
 LIMITS = [
