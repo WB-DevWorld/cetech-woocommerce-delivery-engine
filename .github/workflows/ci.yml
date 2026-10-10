@@ -127,6 +127,10 @@ jobs:
           python3 scripts/qualification/test-opening-http-promise-handoff.py
           python3 scripts/qualification/test-opening-promise-native-configuration-browser.py
           python3 scripts/qualification/test-verify-opening-promise-native-configuration.py
+          python3 scripts/qualification/test-native-payment-transport-diagnostic.py
+          python3 scripts/qualification/test-promise-qualification-package.py
+          python3 scripts/qualification/test-verify-promise-operational-lifecycle-receipts.py
+          python3 scripts/qualification/test-verify-promise-qualification-bounds.py
       - name: Production tree autoload and extracted PHP lint
         shell: bash
         run: bash scripts/ci-stage-production-tree.sh "${RUNNER_TEMP}/cetech-de-prod-tree"
@@ -211,6 +215,10 @@ jobs:
             'CetechDeliveryEngine\Tests\Integration\ServicePromise\ServicePromisePersistenceRealDatabaseTest' 15
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
             'CetechDeliveryEngine\Tests\Integration\ServicePromise\PromiseHandoffSourcesRealDatabaseTest' 16
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+            'CetechDeliveryEngine\Tests\Integration\ServicePromise\PromisePrimedSourceLifetimeRealDatabaseTest' 4
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+            'CetechDeliveryEngine\Tests\Integration\ServicePromise\PromiseQualificationBoundsRealDatabaseTest' 3
 
   php85-wordpress:
     name: PHP 8.5 WordPress/WooCommerce
@@ -256,6 +264,13 @@ jobs:
             "${RUNNER_TEMP}/cetech-de-c07-browser/node_modules/.bin/playwright" install --with-deps chromium
           echo "CETECH_DE_EMERGENCY_PLAYWRIGHT_MODULE=${RUNNER_TEMP}/cetech-de-c07-browser/node_modules/playwright" >> "$GITHUB_ENV"
           echo "PLAYWRIGHT_BROWSERS_PATH=${RUNNER_TEMP}/cetech-de-c07-browsers" >> "$GITHUB_ENV"
+      - name: Build and replay exact P06 installable and historical reader packages
+        shell: bash
+        run: |
+          bash scripts/ci-promise-qualification-packages.sh "${RUNNER_TEMP}/cetech-de-p06-packages"
+          echo "CETECH_DE_P06_CURRENT_PACKAGE=${RUNNER_TEMP}/cetech-de-p06-packages/current.zip" >> "$GITHUB_ENV"
+          echo "CETECH_DE_P06_PREDECESSOR_PACKAGE=${RUNNER_TEMP}/cetech-de-p06-packages/previous.zip" >> "$GITHUB_ENV"
+          echo "CETECH_DE_P06_READER_PACKAGE=${RUNNER_TEMP}/cetech-de-p06-packages/reader.zip" >> "$GITHUB_ENV"
       - name: WordPress bootstrap, WooCommerce, HPOS, Store API, upgrade from RC.12
         env:
           CETECH_DE_NATIVE_OPENING_QUALIFICATION: '1'
@@ -368,6 +383,56 @@ jobs:
         with:
           name: opening-promise-native-configuration-http-qualification
           path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-promise-native-configuration-results.json
+          if-no-files-found: warn
+
+      - name: Retain independent P06 opening-promise-qualification-bounds receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-promise-qualification-bounds
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-qualification-bounds-results.json
+          if-no-files-found: warn
+
+      - name: Retain independent P06 opening-promise-qualification-native-bounds receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-promise-qualification-native-bounds
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-qualification-native-bounds-results.json
+          if-no-files-found: warn
+
+      - name: Retain independent P06 opening-promise-qualification-native-bounds-cpt receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-promise-qualification-native-bounds-cpt
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-qualification-native-bounds-cpt-results.json
+          if-no-files-found: warn
+
+      - name: Retain independent P06 opening-promise-operational-lifecycle receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-promise-operational-lifecycle
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-operational-lifecycle-results.json
+          if-no-files-found: warn
+
+      - name: Retain independent P06 opening-promise-operational-lifecycle-cpt receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-promise-operational-lifecycle-cpt
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-operational-lifecycle-cpt-results.json
+          if-no-files-found: warn
+
+      - name: Retain original P06 current, predecessor and reader packages
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-promise-qualified-packages
+          path: |
+            ${{ runner.temp }}/cetech-de-p06-packages/*.zip
+            ${{ runner.temp }}/cetech-de-p06-packages/*.json
           if-no-files-found: warn
 
   javascript-tests:
