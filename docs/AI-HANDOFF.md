@@ -1,3 +1,27 @@
+# Current continuation — corrected P05 integrated; refreshed P06 qualification — 2026-10-10
+
+The owner instructed **Approve W2-P05 for integration and implement W2-P06** and explicitly authorized publication: **“i approve.. i authorize you”**. Qualified P05 correction [PR112](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/112) is normally integrated as actual master `543275af6844d649268f9ac02db518420dac9fe6`, unchanged tree `19c237227d9f3fd9d8d16b4c7d136fad23f83b07`, ordered parents `[8a7a7815b249c7bc117a64ffcc36db1dd8f73ee0,e4340bfbeb75e8e96444ee240fff873748c36449]`. Both exact correction candidate runs38019278584/38019308681 passed all eight jobs, all879 observations and13 original archives, with separate root and independent source/package/runtime/cleanup audits. The separate actual-master run38022281912 is executing and remains a distinct required gate.
+
+The old unchanged-master and replay failures remain FAILED. The old-production failure-only diagnostic38018515282 reproduced the 12-second deadline branch (12011ms, running child, zero output, no overflow). The controlled physical comparison38021790390 independently proves old duplicate SELECTs (one exact expected assertion) and corrected seven-test/228-assertion PASS with cleanup. Source review accepts the narrow three-class synchronous read-only repair; the timed-out Woo child's internal phase and a unique historical cause remain unknown and are not claimed. PR112 holds the completed evidence ledger and supersedes earlier conditional source-freeze descriptions.
+
+P06 [draft PR111](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/111), original candidate `b01edcbb227568e7f5d040430b836ee7f05a9342`, already passed push38016282203 and PR38016300134: all eight jobs, all933 observations and18 originals, independently audited. That is historical candidate evidence. This normal refresh carries the exact corrected P05 master into P06, pins its predecessor package in all four producers/verifiers, preserves fixed P04 reader3b57 and the reviewed P06 production map `783af96dd98c233fc817dc5e6b92c4c89c70d854252376ee2d31068955e7b3d9`. Relative to corrected P05, production changes only the development version identity. P06 keeps18 original archives; the P05-only correction archive is not appended. Exact refreshed candidate qualification and independent audits remain pending. Neither prior b01 evidence nor candidate evidence substitutes for separate corrected-master qualification.
+
+Root exclusively owns central records, refs/publication, CI/package/source inventories and serial qualification orchestration. Continuing finite parallel leases are read-only: `p06_candidate_scope` reviews refreshed source, packages and evidence truth; `p05_exact_source_receipt_audit` downloads and independently verifies corrected-master originals; `p06_refreshed_receipt_audit` independently derives and audits fresh P06 originals; `p05_transport_diagnosis` reviews bounded repair evidence. Agents do not commit or mutate refs/central files/services.
+
+Permitted mutations remain repository/code/task records and exactly tracked owned disposable pinned CI fixtures. Preserve schema11/39 business stores,23 flags,372 classifications, original promise/payment/money/history and default adoption OFF. No live activation, site/provider payment, deployment, release or registry promotion is authorized. Unsupported pickup/capacity/cache and separately carried native breadth/retention/OS-kill/target-stack obligations retain their bounded dispositions. A normal approved P05 correction requires its own actual-master879/13 audit. P06 must pass fresh933/18 originals plus two bounded final freshness checks before integration handoff; this task does not integrate P06.
+
+## Historical checkpoints — superseded only for the execution states above
+
+# Current checkpoint — W2-P05 integrated; W2-P06 qualification
+
+Owner authorization2026-10-09 21:42:59UTC accepts P05 integration and implements only bounded P06 under [Issue110](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/issues/110). P05 PR109 integrated unchanged as master `8a7a7815b249c7bc117a64ffcc36db1dd8f73ee0`/tree `89c6fb79bf438fa880bbb3dfa55f0150835da2d4`; accepted candidate runs37974932537/37974937611 and their 24 original audits remain distinct. Separate actual-master run37995201494 attempt1 failed during Docker Hub container startup before SQL/WordPress execution. Attempts2 and3 both passed all 806 retained observations, then failed the first P05 HPOS bounded payment-child transport. Each failed receipt records 20 passing observations including both tracked cleanups. Root and independent downloads verify all ten original archives from each attempt against GitHub digests. Six non-WordPress jobs passed; WordPress and Required Gates failed. The exact child cause is unresolved because the old generic error combines timeout, output overflow, exit, JSON and PID checks. Exactly one unchanged-source retry of the payment-child failure was performed (attempt3); no further retry followed. Full actual-master 879 qualification remains incomplete, and the original failures retain their actual status.
+
+[P06 operational boundary](product/W2-P06-OPERATIONAL-HANDOFF-2026-10-09.md) and [32-observation coverage](product/W2-P06-OBSERVATION-COVERAGE-2026-10-09.md) define exact package/history/lifecycle/bounds/source-read work. Development identity `1.0.0-dev.wave2-promise-qualification.1`; schema11/39 preserved stores/23 flags/372 classifications/adoption OFF remain protected. Qualification and independent original receipts are pending. No live site/database/provider payment/deployment/release or production certification is inferred.
+
+## Historical P05/P04 status
+
+## Historical P05 correction source-freeze checkpoint — superseded by PR112 execution ledger
+
 # P05 integration correction within the authorized P06 checkpoint — 2026-10-10
 
 The owner instructed **Approve W2-P05 for integration and implement W2-P06**, and explicitly authorized GitHub publication: **“i approve.. i authorize you”**. Qualified P05 PR109 integrated unchanged as actual master `8a7a7815b249c7bc117a64ffcc36db1dd8f73ee0` / tree `89c6fb79bf438fa880bbb3dfa55f0150835da2d4`. P06 candidate `b01edcb` / tree `452f567` passes push38016282203 and PR38016300134: all eight jobs, all933 observations and18 original archives per execution, independently verified exact source/packages/runtime/cleanup. P06 remains draft because the separately required P05 actual-master qualification hold is unresolved. This correction does not integrate or accept P06.
@@ -15,6 +39,7 @@ Do not merge this conditional correction or mark P06 integration-ready before th
 Details: [P05 integration correction](product/W2-P05-INTEGRATION-CORRECTION-2026-10-10.md).
 
 The earlier checkpoint below is historical and remains preserved.
+
 
 ## Owner continuation — W2-P05 — 2026-10-09 16:19:41 UTC
 

@@ -359,6 +359,31 @@ if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
 	python3 "$ROOT/scripts/qualification/verify-opening-promise-native-configuration.py" \
 		"$WORK/opening-promise-native-configuration-results.json" "$WORK/opening-promise-native-configuration-cpt-results.json" \
 		"${P05_PRIORS[@]}" "$WORK/opening-http-promise-native-configuration-results.json"
+	# P06 executes new independent numerical bounds and native lifecycle receipts.
+	P06_PRIORS=( "${P05_PRIORS[@]}" "$WORK/opening-promise-native-configuration-results.json" \
+		"$WORK/opening-promise-native-configuration-cpt-results.json" "$WORK/opening-http-promise-native-configuration-results.json" )
+	export CETECH_DE_P06_WP_CLI="$WORK/wp-cli.phar"
+	CETECH_DE_PROMISE_BOUNDS_QUALIFICATION=1 php "$ROOT/scripts/qualification/opening-promise-qualification-bounds-runner.php" \
+		"$WORK/opening-promise-qualification-bounds-results.json" "$NATIVE/wp-content/plugins/cetech-woocommerce-delivery-engine" \
+		"$WORK/opening-promise-native-configuration-results.json" "$WORK/opening-promise-native-configuration-cpt-results.json" \
+		"$WORK/opening-http-promise-native-configuration-results.json"
+	P06_BOUND_PRIORS=( "$WORK/opening-promise-native-configuration-results.json" "$WORK/opening-promise-native-configuration-cpt-results.json" "$WORK/opening-http-promise-native-configuration-results.json" )
+	"${WP[@]}" --require="$ROOT/scripts/qualification/admin-context.php" eval-file "$ROOT/scripts/qualification/opening-promise-qualification-native-bounds-runner.php" --use-include \
+		"$WORK/opening-promise-qualification-native-bounds-results.json" hpos_on "${P06_BOUND_PRIORS[@]}" --path="$NATIVE"
+	bash "$ROOT/scripts/ci-promise-qualification-bounds-hpos-off.sh" "$NATIVE" "$WORK/wp-cli.phar" \
+		"$WORK/opening-promise-qualification-native-bounds-cpt-results.json" "${P06_BOUND_PRIORS[@]}"
+	python3 "$ROOT/scripts/qualification/verify-promise-qualification-bounds.py" \
+		"$WORK/opening-promise-qualification-bounds-results.json" "$WORK/opening-promise-qualification-native-bounds-results.json" \
+		"$WORK/opening-promise-qualification-native-bounds-cpt-results.json" \
+		"$WORK/opening-promise-native-configuration-results.json" "$WORK/opening-promise-native-configuration-cpt-results.json" \
+		"${P05_PRIORS[@]}" "$WORK/opening-http-promise-native-configuration-results.json"
+	"${WP[@]}" --require="$ROOT/scripts/qualification/admin-context.php" eval-file "$ROOT/scripts/qualification/opening-promise-operational-lifecycle-runner.php" --use-include \
+		"$WORK/opening-promise-operational-lifecycle-results.json" hpos_on "${P06_PRIORS[@]}" --path="$NATIVE"
+	bash "$ROOT/scripts/ci-promise-operational-lifecycle-hpos-off.sh" "$NATIVE" "$WORK/wp-cli.phar" \
+		"$WORK/opening-promise-operational-lifecycle-cpt-results.json" "${P06_PRIORS[@]}"
+	python3 "$ROOT/scripts/qualification/verify-promise-operational-lifecycle-receipts.py" \
+		"$WORK/opening-promise-operational-lifecycle-results.json" "$WORK/opening-promise-operational-lifecycle-cpt-results.json" \
+		"${P06_PRIORS[@]}" "$CETECH_DE_P06_CURRENT_PACKAGE" "$CETECH_DE_P06_PREDECESSOR_PACKAGE" "$CETECH_DE_P06_READER_PACKAGE"
 else
 	echo "opening_http_qualification=NOT_REQUESTED"
 fi
