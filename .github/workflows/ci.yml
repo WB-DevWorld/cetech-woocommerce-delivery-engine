@@ -1,232 +1,24 @@
-name: Delivery Engine CI
-
-# PHP policy: docs/PHP-RUNTIME-POLICY.md
-# Supported/certified range today: PHP 8.3 through PHP 8.5.x
-# Minimum supported: PHP 8.3 (blocking)
-# CETECH production target: latest stable PHP 8.5.x (blocking)
-# PHP 8.1 and 8.2 are not supported and must not be advertised.
-# PHP 8.6+ pre-release is not a production target. A later stable PHP
-# line is added only after WordPress, WooCommerce, and Delivery Engine qualification.
+name: P05 Controlled Source Read Proof
 
 on:
-  pull_request:
-    branches:
-      - master
   push:
     branches:
-      - master
-      - 'ws1/**'
-      - 'ws2/**'
-      - 'ws3/**'
-      - 'fix/**'
-      - 'feat/**'
-      - 'batch/**'
+      - 'ws3/p05-source-read-control/20261010-fixture-provenance'
 
 permissions:
   contents: read
 
-concurrency:
-  group: delivery-engine-ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
-  php83-min:
-    name: PHP 8.3 Minimum Supported
+  source-read-control:
+    name: Exact old source RED / corrected source GREEN
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.3'
-          extensions: pdo_sqlite
-          tools: composer:v2
-          coverage: none
-      - name: Show PHP version
-        run: php -v
-      - name: Validate Composer metadata
-        run: composer validate --no-check-publish
-      - name: Install PHP dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
-      - name: Runtime PHP lint
-        shell: bash
-        run: bash scripts/ci-lint-php.sh cetech-woocommerce-delivery-engine.php uninstall.php src database
-      - name: Lint application, tests and tooling
-        shell: bash
-        run: bash scripts/ci-lint-php.sh .
-      - name: PHPUnit
-        run: vendor/bin/phpunit
-      - name: Verify team control plane
-        run: php scripts/verify-control-plane.php
-
-  php84-compat:
-    name: PHP 8.4 Compatibility
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.4'
-          extensions: pdo_sqlite
-          tools: composer:v2
-          coverage: none
-      - name: Show PHP version
-        run: php -v
-      - name: Validate Composer metadata
-        run: composer validate --no-check-publish
-      - name: Install PHP dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
-      - name: Lint application, tests and tooling
-        shell: bash
-        run: bash scripts/ci-lint-php.sh .
-      - name: PHPUnit
-        run: vendor/bin/phpunit
-
-  php85-primary:
-    name: PHP 8.5 CETECH Production Target
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.5'
-          tools: composer:v2
-          coverage: none
-          extensions: zip, mbstring, pdo_sqlite
-      - name: Show PHP version
-        run: |
-          php -v
-          php -r 'echo "php_major_minor=" . PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION, PHP_EOL;'
-      - name: Reject pre-release PHP as this production job
-        shell: bash
-        run: |
-          set -euo pipefail
-          major_minor="$(php -r 'echo PHP_MAJOR_VERSION . "." . PHP_MINOR_VERSION;')"
-          test "$major_minor" = "8.5"
-      - name: Validate Composer metadata
-        run: composer validate --no-check-publish
-      - name: Install PHP dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
-      - name: Production PHP lint
-        shell: bash
-        run: bash scripts/ci-lint-php.sh cetech-woocommerce-delivery-engine.php uninstall.php src database
-      - name: Lint application, tests and tooling
-        shell: bash
-        run: bash scripts/ci-lint-php.sh .
-      - name: Full PHPUnit suite
-        run: vendor/bin/phpunit
-      - name: Quote placement, promise storage and calculation protocol boundaries
-        run: |
-          python3 scripts/qualification/test-opening-quote-placement-protocol.py
-          python3 scripts/qualification/test-verify-quote-placement-receipts.py
-          python3 scripts/qualification/test-verify-promise-storage-receipts.py
-          python3 scripts/qualification/test-verify-promise-calculation-receipts.py
-          python3 scripts/qualification/test-verify-promise-handoff-receipts.py
-          python3 scripts/qualification/test-opening-http-promise-handoff.py
-          python3 scripts/qualification/test-opening-promise-native-configuration-browser.py
-          python3 scripts/qualification/test-verify-opening-promise-native-configuration.py
-      - name: Production tree autoload and extracted PHP lint
-        shell: bash
-        run: bash scripts/ci-stage-production-tree.sh "${RUNNER_TEMP}/cetech-de-prod-tree"
-
-  php85-mariadb:
-    name: PHP 8.5 MariaDB Geography/Operations/Rule Lifecycle/Migrations
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    services:
-      mariadb:
-        image: mariadb:11.4
-        env:
-          MARIADB_ROOT_PASSWORD: geo11pass
-          MARIADB_DATABASE: cetech_geo11
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
-          --health-interval=10s
-          --health-timeout=5s
-          --health-retries=12
-    steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.5'
-          tools: composer:v2
-          coverage: none
-          extensions: mysqli, pdo_mysql, zip
-      - name: Install PHP dependencies
-        run: composer install --no-interaction --prefer-dist --no-progress
-      - name: Fail if MariaDB is not reachable
-        env:
-          CETECH_DE_REAL_DB_HOST: 127.0.0.1
-          CETECH_DE_REAL_DB_PORT: 3306
-          CETECH_DE_REAL_DB_USER: root
-          CETECH_DE_REAL_DB_PASSWORD: geo11pass
-          CETECH_DE_REAL_DB_NAME: cetech_geo11
-        run: |
-          php -r '
-            require "vendor/autoload.php";
-            $db = CetechDeliveryEngine\Tests\Support\RealMysqliWpdb::try_connect();
-            if ( ! $db instanceof CetechDeliveryEngine\Tests\Support\RealMysqliWpdb ) {
-              fwrite(STDERR, "MariaDB preflight failed on PHP 8.5\n");
-              exit(1);
-            }
-            echo "mariadb_preflight=ok\n";
-          '
-      - name: Real MariaDB / geography / operation-store / rule-lifecycle / data-lifecycle / quote-lifecycle / retained-price-provider / cart-reference / migration proofs
-        env:
-          CETECH_DE_REAL_DB_HOST: 127.0.0.1
-          CETECH_DE_REAL_DB_PORT: 3306
-          CETECH_DE_REAL_DB_USER: root
-          CETECH_DE_REAL_DB_PASSWORD: geo11pass
-          CETECH_DE_REAL_DB_NAME: cetech_geo11
-        run: |
-          vendor/bin/phpunit \
-            -c phpunit.real-db.xml \
-            --log-junit "${RUNNER_TEMP}/cetech-de-real-db.junit.xml"
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
-            'CetechDeliveryEngine\Tests\Integration\Operation\OperationStoreRealDatabaseTest' 43
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
-            'CetechDeliveryEngine\Tests\Integration\Operation\OperationStoreRealDatabaseTest' 56
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
-            'CetechDeliveryEngine\Tests\Integration\RuleLifecycle\RuleLifecycleRealDatabaseTest' 44
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
-            'CetechDeliveryEngine\Tests\Integration\DataLifecycle\DataLifecycleRealDatabaseTest' 30
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
-            'CetechDeliveryEngine\Tests\Integration\EmergencyControl\EmergencyControlRealDatabaseTest' 30
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
-            'CetechDeliveryEngine\Tests\Integration\DeliveryQuote\DeliveryQuoteStorageRealDatabaseTest' 30
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
-            'CetechDeliveryEngine\Tests\Integration\DeliveryQuote\DeliveryQuoteLifecycleRealDatabaseTest' 46
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
-            'CetechDeliveryEngine\Tests\Integration\DeliveryQuote\LegacyPriceProviderRealDatabaseTest' 41
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
-            'CetechDeliveryEngine\Tests\Integration\DeliveryQuote\DeliveryQuoteCartReferenceRealDatabaseTest' 32
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
-            'CetechDeliveryEngine\Tests\Integration\DeliveryQuote\DeliveryQuotePlacementCoreRealDatabaseTest' 10
-
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
-            'CetechDeliveryEngine\Tests\Integration\ServicePromise\ServicePromisePersistenceRealDatabaseTest' 15
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
-            'CetechDeliveryEngine\Tests\Integration\ServicePromise\PromiseHandoffSourcesRealDatabaseTest' 16
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
-            'CetechDeliveryEngine\Tests\Integration\ServicePromise\PromisePrimedSourceLifetimeRealDatabaseTest' 4
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
-            'CetechDeliveryEngine\Tests\Integration\ServicePromise\PromiseQualificationBoundsRealDatabaseTest' 3
-
-  php85-wordpress:
-    name: PHP 8.5 WordPress/WooCommerce
-    runs-on: ubuntu-latest
-    # P05 appends separate native/CPT/browser proofs to the unchanged retained suite.
-    timeout-minutes: 60
     services:
       mariadb:
         image: mariadb:11.4.13
         env:
-          MARIADB_ROOT_PASSWORD: wordpress
-          MARIADB_DATABASE: wordpress
+          MARIADB_ROOT_PASSWORD: sourceReadControlCiOnly
+          MARIADB_DATABASE: cetech_operation_source_read_control
         ports:
           - 3306:3306
         options: >-
@@ -237,225 +29,29 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          # Receipt authority checks ancestry against the integrated Q05 baseline.
           fetch-depth: 0
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.5.11'
           tools: composer:v2
+          extensions: mysqli, pdo_mysql, zip
           coverage: none
-          extensions: mysqli, pdo_mysql, zip, mbstring, intl, xml, curl, gd, soap, bcmath
+      - name: Controlled physical source read proof and separate Composer dev installs
         env:
-          debug: 'true'
-      - name: Verify crash diagnostic output boundary
-        run: |
-          python3 scripts/qualification/test-opening-http-native-stack.py
-          python3 scripts/qualification/test-store-smoke-diagnostic.py
-          python3 scripts/qualification/test-native-payment-transport-diagnostic.py
-      - name: Install native crash debugger for the disposable HTTP listener
-        run: sudo apt-get update -qq && sudo apt-get install -y -qq gdb
-      - name: Install the pinned disposable C07 browser proof tool
-        run: |
-          npm install --prefix "${RUNNER_TEMP}/cetech-de-c07-browser" --no-save --package-lock=false playwright@1.58.2
-          PLAYWRIGHT_BROWSERS_PATH="${RUNNER_TEMP}/cetech-de-c07-browsers" \
-            "${RUNNER_TEMP}/cetech-de-c07-browser/node_modules/.bin/playwright" install --with-deps chromium
-          echo "CETECH_DE_EMERGENCY_PLAYWRIGHT_MODULE=${RUNNER_TEMP}/cetech-de-c07-browser/node_modules/playwright" >> "$GITHUB_ENV"
-          echo "PLAYWRIGHT_BROWSERS_PATH=${RUNNER_TEMP}/cetech-de-c07-browsers" >> "$GITHUB_ENV"
-      - name: Build and extract exact P05 integration correction development package
-        run: |
-          mkdir -p "${RUNNER_TEMP}/cetech-de-p05-correction-package"
-          python3 scripts/qualification/build-promise-qualification-package.py \
-            "${RUNNER_TEMP}/cetech-de-p05-correction-package/current.zip" --ref "$(git rev-parse HEAD)"
-          python3 scripts/qualification/extract-promise-qualification-package.py \
-            "${RUNNER_TEMP}/cetech-de-p05-correction-package/current.zip" \
-            "${RUNNER_TEMP}/cetech-de-p05-correction-package/current.json" \
-            "${RUNNER_TEMP}/cetech-de-p05-correction-package/preflight-extract" --ref "$(git rev-parse HEAD)"
-          echo "CETECH_DE_P06_CURRENT_PACKAGE=${RUNNER_TEMP}/cetech-de-p05-correction-package/current.zip" >> "$GITHUB_ENV"
-      - name: WordPress bootstrap, WooCommerce, HPOS, Store API, upgrade from RC.12
-        env:
-          CETECH_DE_NATIVE_OPENING_QUALIFICATION: '1'
-          CETECH_DE_HTTP_OPENING_QUALIFICATION: '1'
-          CETECH_DE_HTTP_CRASH_DIAGNOSTIC: '1'
-          CETECH_DE_HTTP_EXPECT_BINARY_SHA256: '7dda44e554d086c1c4f441796fc19f11f46055c0a276dad66181f6c11566e46a'
-          CETECH_DE_HTTP_LISTENER_JIT: disable
-          CETECH_DE_HTTP_EXPECT_INI_SHA256: '18468a95951fe17444a8e0341c577edba8e28b0e31a33a0892a32d91ce7d973a'
-          CETECH_DE_HTTP_EXPECT_ORIGINAL_INI_SHA256: 'a0e4940c0a48d65a50eca849f62d052a7e3e4727a720308c65d7d9dfc840adaf'
-          CETECH_DE_HTTP_EXPECT_EXTENSIONS_SHA256: '5f6a8290cb266b26630ec6a72299175906d3aeba788610acd3783d36c8cc0ac3'
-          CETECH_DE_WP_VERSION: '7.1.2'
-          CETECH_DE_WOO_VERSION: '11.1.2'
-          CETECH_DE_QUALIFICATION_CANDIDATE_HEAD: ${{ github.event.pull_request.head.sha || github.sha }}
-          CETECH_DE_WP_DB_HOST: 127.0.0.1
-          CETECH_DE_WP_DB_PORT: 3306
-          CETECH_DE_WP_DB_USER: root
-          CETECH_DE_WP_DB_PASSWORD: wordpress
-        shell: bash
-        run: bash scripts/ci-wordpress-php85-smoke.sh
-      - name: Retain exact P05 integration correction package and report
-        if: ${{ always() }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: opening-promise-integration-correction-package
-          path: |
-            ${{ runner.temp }}/cetech-de-p05-correction-package/current.zip
-            ${{ runner.temp }}/cetech-de-p05-correction-package/current.json
-          if-no-files-found: warn
-          retention-days: 7
-      - name: Retain separate Store API smoke diagnostic receipt
+          CETECH_DE_REAL_DB_HOST: 127.0.0.1
+          CETECH_DE_REAL_DB_PORT: 3306
+          CETECH_DE_REAL_DB_USER: root
+          CETECH_DE_REAL_DB_PASSWORD: sourceReadControlCiOnly
+          CETECH_DE_REAL_DB_NAME: cetech_operation_source_read_control
+        run: >-
+          python3 scripts/qualification/run-source-read-control.py
+          --repo "${GITHUB_WORKSPACE}"
+          --report "${RUNNER_TEMP}/source-read-control-safe.json"
+      - name: Upload only the closed safe structural proof
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: store-smoke-diagnostic
-          path: ${{ runner.temp }}/cetech-de-php85-wp/store-smoke-diagnostic.json
-          if-no-files-found: warn
-      - name: Retain targeted native opening qualification receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: opening-native-qualification
-          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-qualification-results.json
-          if-no-files-found: warn
-
-      - name: Retain fresh-process CPT quote placement qualification receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: opening-quote-placement-cpt-qualification
-          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-quote-placement-cpt-results.json
-          if-no-files-found: warn
-
-      - name: Retain authenticated HTTP opening qualification receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: opening-http-qualification
-          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-qualification-results.json
-          if-no-files-found: warn
-
-      - name: Retain separate immutable promise storage qualification receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: opening-promise-storage-qualification
-          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-storage-results.json
-          if-no-files-found: warn
-
-      - name: Retain separate pure promise calculation qualification receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: opening-promise-calculation-qualification
-          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-calculation-results.json
-          if-no-files-found: warn
-
-      - name: Retain native promise handoff HPOS receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: opening-promise-handoff-qualification
-          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-handoff-results.json
-          if-no-files-found: warn
-
-      - name: Retain fresh-process promise handoff CPT receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: opening-promise-handoff-cpt-qualification
-          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-handoff-cpt-results.json
-          if-no-files-found: warn
-
-      - name: Retain authenticated promise handoff HTTP and browser receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: opening-promise-handoff-http-qualification
-          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-promise-handoff-results.json
-          if-no-files-found: warn
-
-      - name: Retain native promise configuration and shipment HPOS receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: opening-promise-native-configuration-qualification
-          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-native-configuration-results.json
-          if-no-files-found: warn
-
-      - name: Retain fresh-process promise configuration and shipment CPT receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: opening-promise-native-configuration-cpt-qualification
-          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promise-native-configuration-cpt-results.json
-          if-no-files-found: warn
-
-      - name: Retain authenticated promise configuration HTTP and browser receipt
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: opening-promise-native-configuration-http-qualification
-          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-promise-native-configuration-results.json
-          if-no-files-found: warn
-
-  javascript-tests:
-    name: JavaScript / Vitest
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: npm
-      - name: Install JavaScript dependencies
-        run: npm ci
-      - name: Vitest
-        run: npm run test:js
-
-  control-plane:
-    name: Control Plane
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-      - uses: shivammathur/setup-php@v2
-        with:
-          php-version: '8.5'
-          coverage: none
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Verify team control plane
-        run: php scripts/verify-control-plane.php
-      - name: Verify product control plane
-        run: node scripts/verify-product-control-plane.mjs --self-test
-
-  ci-required-gates:
-    name: CI Required Gates
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    if: ${{ always() }}
-    needs:
-      - php83-min
-      - php84-compat
-      - php85-primary
-      - php85-mariadb
-      - php85-wordpress
-      - javascript-tests
-      - control-plane
-    steps:
-      - name: Require PHP 8.3 minimum and PHP 8.5 production target
-        run: |
-          set -euo pipefail
-          echo "php83=${{ needs.php83-min.result }}"
-          echo "php84=${{ needs.php84-compat.result }}"
-          echo "php85-primary=${{ needs.php85-primary.result }}"
-          echo "php85-mariadb=${{ needs.php85-mariadb.result }}"
-          echo "php85-wordpress=${{ needs.php85-wordpress.result }}"
-          echo "javascript=${{ needs.javascript-tests.result }}"
-          echo "control-plane=${{ needs.control-plane.result }}"
-          test "${{ needs.php83-min.result }}" = "success"
-          test "${{ needs.php84-compat.result }}" = "success"
-          test "${{ needs.php85-primary.result }}" = "success"
-          test "${{ needs.php85-mariadb.result }}" = "success"
-          test "${{ needs.php85-wordpress.result }}" = "success"
-          test "${{ needs.javascript-tests.result }}" = "success"
-          test "${{ needs.control-plane.result }}" = "success"
+          name: p05-controlled-source-read-proof
+          path: ${{ runner.temp }}/source-read-control-safe.json
+          if-no-files-found: error
+          retention-days: 30
