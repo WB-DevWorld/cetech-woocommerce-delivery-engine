@@ -106,6 +106,14 @@ final class DeliverySettingsPage {
 				'url'   => AdminPageRenderer::list_url( AdminMenu::PARENT_SLUG ),
 			]
 		);
+		echo '<nav class="cetech-de-settings-nav" aria-label="' . esc_attr__( 'Settings sections', 'cetech-woocommerce-delivery-engine' ) . '">';
+		echo '<a href="#cetech-de-settings-status">' . esc_html__( 'Current status', 'cetech-woocommerce-delivery-engine' ) . '</a>';
+		echo '<a href="#cetech-de-settings-everyday">' . esc_html__( 'Everyday settings', 'cetech-woocommerce-delivery-engine' ) . '</a>';
+		echo '<a href="#cetech-de-settings-access">' . esc_html__( 'Staff access', 'cetech-woocommerce-delivery-engine' ) . '</a>';
+		echo '<a href="#cetech-de-settings-compatibility">' . esc_html__( 'Compatibility', 'cetech-woocommerce-delivery-engine' ) . '</a>';
+		echo '<a href="#cetech-de-settings-advanced">' . esc_html__( 'Advanced', 'cetech-woocommerce-delivery-engine' ) . '</a>';
+		echo '</nav>';
+		echo '<style>.cetech-de-settings-nav{display:flex;flex-wrap:wrap;gap:.75rem;margin:1rem 0}.cetech-de-settings-emergency{border-left:4px solid #b32d2e;padding-left:12px;margin:1.5rem 0}</style>';
 
 		$shipping_ready = $this->shipping_readiness?->is_ready() ?? false;
 		$runtime_active = $this->runtime?->is_active() ?? false;
@@ -121,9 +129,10 @@ final class DeliverySettingsPage {
 			? ! $op->customers_use_sitewide_runtime()
 			: ! $runtime_active;
 
+		echo '<div id="cetech-de-settings-status"></div>';
 		AdminPageLayout::open_section(
 			__( 'General', 'cetech-woocommerce-delivery-engine' ),
-			__( 'Delivery Engine status and store setup.', 'cetech-woocommerce-delivery-engine' )
+			__( 'Where the store is now, and the next useful action.', 'cetech-woocommerce-delivery-engine' )
 		);
 		AdminPageLayout::render_summary_stats(
 			[
@@ -155,6 +164,14 @@ final class DeliverySettingsPage {
 		if ( null !== $op ) {
 			echo '<p class="description">' . esc_html( $op->settings_status_detail ) . '</p>';
 		}
+		$next_action = ! $shipping_ready
+			? __( 'Next: configure WooCommerce shipping.', 'cetech-woocommerce-delivery-engine' )
+			: ( ! $setup_complete
+				? __( 'Next: finish store setup, then return here.', 'cetech-woocommerce-delivery-engine' )
+				: ( ! $runtime_active
+					? __( 'Next: activate the Delivery Engine when the checks above are ready.', 'cetech-woocommerce-delivery-engine' )
+					: __( 'Next: review everyday settings below, or open Delivery promises to add a delivery-time rule.', 'cetech-woocommerce-delivery-engine' ) ) );
+		echo '<p role="status"><strong>' . esc_html( $next_action ) . '</strong></p>';
 		if ( ! $shipping_ready ) {
 			AdminPageLayout::render_warning(
 				__( 'WooCommerce shipping needs configuration', 'cetech-woocommerce-delivery-engine' ),
@@ -172,8 +189,13 @@ final class DeliverySettingsPage {
 		}
 		AdminPageLayout::close_section();
 
+		echo '<section id="cetech-de-settings-emergency" class="cetech-de-settings-emergency">';
+		echo '<h2>' . esc_html__( 'Emergency controls', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
+		echo '<p>' . esc_html__( 'These stop customer delivery immediately. They are separate from Save Changes.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 		$this->emergency_control?->render();
+		echo '</section>';
 		$this->quote_placement?->render();
+		echo '<div id="cetech-de-settings-everyday"></div>';
 
 		echo '<form id="cetech-de-settings-form" method="post" action="">';
 		AdminFormHelper::nonce_field( self::ACTION_SAVE );
@@ -227,11 +249,14 @@ final class DeliverySettingsPage {
 		AdminPageLayout::close_form_panel();
 		AdminPageLayout::close_section();
 
+		echo '<div id="cetech-de-settings-access"></div>';
 		$this->render_access_section();
 
+		echo '<div id="cetech-de-settings-compatibility"></div>';
 		$this->render_storefront_status_section( $flags );
 		$this->render_integrations_status_section();
 
+		echo '<div id="cetech-de-settings-advanced"></div>';
 		AdminPageLayout::open_advanced(
 			__( 'Advanced', 'cetech-woocommerce-delivery-engine' )
 		);
