@@ -113,7 +113,7 @@ final class DeliverySettingsPage {
 		echo '<a href="#cetech-de-settings-compatibility">' . esc_html__( 'Compatibility', 'cetech-woocommerce-delivery-engine' ) . '</a>';
 		echo '<a href="#cetech-de-settings-advanced">' . esc_html__( 'Advanced', 'cetech-woocommerce-delivery-engine' ) . '</a>';
 		echo '</nav>';
-		echo '<style>.cetech-de-settings-nav{display:flex;flex-wrap:wrap;gap:.75rem;margin:1rem 0}.cetech-de-settings-emergency{border-left:4px solid #b32d2e;padding-left:12px;margin:1.5rem 0}</style>';
+		echo '<style>.cetech-de-settings-nav{display:flex;flex-wrap:wrap;gap:.75rem;margin:1rem 0}.cetech-de-settings-emergency{border-left:4px solid #b32d2e;padding-left:12px;margin:1.5rem 0}.cetech-de-admin-page{max-width:100%}.cetech-de-access-table-wrap,.cetech-de-integration-status{display:block;max-width:100%;overflow-x:auto}</style>';
 
 		$shipping_ready = $this->shipping_readiness?->is_ready() ?? false;
 		$runtime_active = $this->runtime?->is_active() ?? false;
