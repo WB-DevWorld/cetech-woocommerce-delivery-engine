@@ -24,14 +24,17 @@ final class PromiseConfigurationPage {
 	private string $message = '';
 	private string $message_type = 'info';
 	private ?PromiseShipmentConfigurationSection $shipments;
+	private PromiseStaffGuide $guide;
 
 	public function __construct( private PromiseConfigurationService $service, private AdminActionHandler $actions, ?\CetechDeliveryEngine\Application\ServicePromise\Configuration\PromiseShipmentConfigurationService $shipment_service = null ) {
 		$this->shipments = null === $shipment_service ? null : new PromiseShipmentConfigurationSection( $shipment_service, $actions );
+		$this->guide = new PromiseStaffGuide( $service, $actions );
 	}
 
 	/** Called on admin_init; a closed action and its own nonce gate every POST, including preview. */
 	public function handle_actions(): void {
 		if ( $this->shipments?->handles_action() ) { $this->shipments->handle_actions(); return; }
+		if ( $this->guide->handles() ) { $this->guide->handle(); return; }
 		$action = $_POST['cetech_de_action'] ?? null;
 		if ( ! is_string( $action ) || ! str_starts_with( $action, self::ACTION_PREFIX ) ) { return; }
 		$verb = substr( $action, strlen( self::ACTION_PREFIX ) );
@@ -87,14 +90,14 @@ final class PromiseConfigurationPage {
 		if ( ! $this->service->can_access() && ! $this->shipments?->can_access() ) { AdminPageAccess::require_capability( 'manage_delivery_settings' ); return; }
 		if ( null !== $this->disclosure_binding && null !== $this->disclosure_scope && ! $this->service->can_disclose( $this->disclosure_binding, $this->disclosure_scope ) ) { $this->opened = $this->preview = $this->assignment = null; }
 		AdminPageLayout::open_page( 'cetech-de-promises' );
-		AdminPageLayout::render_page_header( __( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ), __( 'Delivery promises', 'cetech-woocommerce-delivery-engine' ), __( 'Define calendars and delivery policies, preview their results, then publish and assign exact versions.', 'cetech-woocommerce-delivery-engine' ) );
+		AdminPageLayout::render_page_header( __( 'Delivery Engine', 'cetech-woocommerce-delivery-engine' ), __( 'Delivery promises', 'cetech-woocommerce-delivery-engine' ), __( 'Create a delivery-time rule, preview what customers would read, then save a draft. Publication stays a separate protected step and does not turn customer estimates on.', 'cetech-woocommerce-delivery-engine' ) );
 		if ( '' !== $this->message ) { echo '<div class="notice notice-' . esc_attr( $this->message_type ) . '"><p role="status">' . esc_html( $this->message ) . '</p></div>'; }
 		if ( null !== $this->uncertain ) {
 			$this->form_start( 'reconcile' ); foreach ( $this->uncertain as $key => $value ) { $this->hidden( $key, $value ); }
 			echo '<p><button class="button button-primary" type="submit">' . esc_html__( 'Reconcile original request', 'cetech-woocommerce-delivery-engine' ) . '</button></p></form>';
 		}
-		if ( $this->service->can_access() ) { $this->render_inspector(); $this->render_editor(); $this->render_preview(); $this->render_assignment(); $this->render_adoption(); }
-		$this->shipments?->render();
+		if ( $this->service->can_access() ) { $this->guide->render(); echo '<details class="cetech-de-advanced-rules"><summary>' . esc_html__( 'Advanced configuration', 'cetech-woocommerce-delivery-engine' ) . '</summary><p>' . esc_html__( 'Use this for a rule the guided editor cannot represent. Opening it does not change a saved rule.', 'cetech-woocommerce-delivery-engine' ) . '</p>'; $this->render_inspector(); $this->render_editor(); $this->render_preview(); $this->render_assignment(); $this->render_adoption(); echo '</details>'; }
+		if ( isset( $_GET['shipment_id'] ) ) { $this->shipments?->render(); }
 		AdminPageLayout::close_page();
 	}
 

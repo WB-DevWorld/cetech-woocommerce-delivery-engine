@@ -1,3 +1,9 @@
+# Current task — admin usability correction — 2026-10-14
+
+Owner Jane requested an implementation correction after physical testing of isolated copy source `bcfebf7f22da7ea6272fddc096c2b22b67257b87`. Branch `ws3/admin-promise-staff-workflow` is based on that commit. Bounded ownership is the Delivery promises staff workflow and the Settings page presentation. This task does not change schema, capability grants, pricing, promise adoption, or historical orders. Promise adoption remains OFF. The qualified package `63d8749435301d6c0e4fee10715d4da2ab21eaee86bdd407404f1569f6a15f56` stays unchanged. Installation of the resulting candidate is limited to the owned isolated testing copy. No production deployment and no master merge.
+
+The historical checkpoint below remains the record of the qualified P06 source. It does not authorize a later stage.
+
 # Current continuation — corrected P05 integrated; refreshed P06 qualification — 2026-10-10
 
 The owner instructed **Approve W2-P05 for integration and implement W2-P06** and explicitly authorized publication: **“i approve.. i authorize you”**. Qualified P05 correction [PR112](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/112) is normally integrated as actual master `543275af6844d649268f9ac02db518420dac9fe6`, unchanged tree `19c237227d9f3fd9d8d16b4c7d136fad23f83b07`, ordered parents `[8a7a7815b249c7bc117a64ffcc36db1dd8f73ee0,e4340bfbeb75e8e96444ee240fff873748c36449]`. Both exact correction candidate runs38019278584/38019308681 passed all eight jobs, all879 observations and13 original archives, with separate root and independent source/package/runtime/cleanup audits. The separate actual-master run38022281912 is executing and remains a distinct required gate.
