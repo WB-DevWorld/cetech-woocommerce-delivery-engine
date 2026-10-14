@@ -247,10 +247,12 @@ final class PromiseStaffGuide {
 			$prior   = $this->index()[ $facts['policy_id'] ] ?? null;
 			if ( ! is_array( $prior ) ) {
 				try {
-					$this->service->inspect_version( $binding, 'policy', $facts['policy_id'], 1, $scope );
-					$this->type = 'warning';
-					$this->message = __( 'A saved rule already uses this delivery option and scope. It was not overwritten. Your entries are still on this page; use advanced configuration if that rule is not listed here.', 'cetech-woocommerce-delivery-engine' );
-					return;
+					$existing = $this->service->inspect_version( $binding, 'policy', $facts['policy_id'], 1, $scope );
+					if ( is_array( $existing['version'] ?? null ) ) {
+						$this->type = 'warning';
+						$this->message = __( 'A saved rule already uses this delivery option and scope. It was not overwritten. Your entries are still on this page; use advanced configuration if that rule is not listed here.', 'cetech-woocommerce-delivery-engine' );
+						return;
+					}
 				} catch ( \Throwable ) {
 					$prior = null;
 				}
@@ -289,7 +291,7 @@ final class PromiseStaffGuide {
 					$this->message = __( 'The working calendar could not be prepared. Your entries are still on this page.', 'cetech-woocommerce-delivery-engine' );
 					return;
 				}
-				$result = $this->service->version( $binding, 'promise.version.create', RequestContext::create()->request_id, $this->payload( 'calendar', $calendar->private_facts(), $calendar->to_private_json(), $calendar->digest(), $scope, $calendar_pre ), false );
+				$result = $this->service->version( $binding, 'promise.version.create', RequestContext::create()->request_id, $this->payload( 'calendar', $calendar->private_facts(), $calendar->to_private_json(), $calendar->digest(), [ 'kind' => 'global', 'target_id' => 0 ], $calendar_pre ), false );
 				if ( 'accepted' !== $result->outcome->state ) {
 					$this->type = 'unconfirmed' === $result->outcome->state ? 'warning' : 'error';
 					$this->message = __( 'The working calendar was not saved. Your entries are still on this page. Review the current rule before trying again.', 'cetech-woocommerce-delivery-engine' );
