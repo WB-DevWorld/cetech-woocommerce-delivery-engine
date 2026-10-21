@@ -493,7 +493,7 @@ $is_schema9_release = str_contains( $header_source, '1.0.0-dev.wave2-quote-stora
 	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-placement' )
 	|| 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-contract\.1\'\s*\);\s*$/m', $header_source );
 $is_schema10_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-(?:storage|calculation|handoff)\.1\'\s*\);\s*$/m', $header_source );
-$is_schema11_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-(?:native|qualification)\.1\'\s*\);\s*$/m', $header_source );
+$is_schema11_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.(?:wave2-promise-(?:native|qualification)\.1|promise-staff-workflow\.[123])\'\s*\);\s*$/m', $header_source );
 $is_schema8_release = str_contains( $header_source, '1.0.0-dev.wave1-rule-lifecycle' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-snapshot-readers' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-data-lifecycle' )
@@ -695,6 +695,9 @@ if ( ! is_readable( $classmap_file ) ) {
 		$failures[] = 'Composer classmap is not an array.';
 	} else {
 		$required_map = [
+			'CetechDeliveryEngine\\Application\\ServicePromise\\Configuration\\PromiseStaffDraft' => 'src/Application/ServicePromise/Configuration/PromiseStaffDraft.php',
+			'CetechDeliveryEngine\\Application\\ServicePromise\\Configuration\\PromiseStaffIntent' => 'src/Application/ServicePromise/Configuration/PromiseStaffIntent.php',
+			'CetechDeliveryEngine\\Presentation\\Admin\\PromiseStaffGuide' => 'src/Presentation/Admin/PromiseStaffGuide.php',
 			'CetechDeliveryEngine\\Application\\RuleLifecycle\\RuleLifecycleService' => 'src/Application/RuleLifecycle/RuleLifecycleService.php',
 			'CetechDeliveryEngine\\Application\\RuleLifecycle\\RuleLifecycleOperationProfile' => 'src/Application/RuleLifecycle/RuleLifecycleOperationProfile.php',
 			'CetechDeliveryEngine\\Application\\RuleLifecycle\\RuleLifecycleReadService' => 'src/Application/RuleLifecycle/RuleLifecycleReadService.php',

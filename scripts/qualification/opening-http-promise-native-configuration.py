@@ -2,6 +2,7 @@
 """Actual P05 customer requests; retained proofs remain separate prerequisites."""
 import argparse
 import ast
+import base64
 import datetime
 import hashlib
 import importlib.util
@@ -14,6 +15,7 @@ import subprocess
 import sys
 import time
 import uuid
+from urllib.parse import urlencode
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 sys.dont_write_bytecode = True
 
@@ -39,6 +41,53 @@ PRIOR = {
     "p05_cpt": ("opening-promise-native-configuration-cpt-results.json", None),
 }
 IDENTITY_KEYS = ("source_head", "candidate_head", "source_tree", "installed_php_sources_hash")
+FAILURE_PHASES = {'none', 'shopper_inspect_before_seed', 'shopper_seed_post', 'shopper_inspect_after_seed', 'classic_refresh_post', 'shopper_inspect_before_confirm', 'classic_confirm_post', 'classic_page_get'}
+FAILURE_CODES = {'unclassified', 'observer_http_status', 'observer_success_false', 'observer_source_identity_mismatch', 'stimulus_http_status', 'stimulus_success_false', 'json_decode_or_shape', 'refresh_http_status', 'refused_public_state', 'transport_or_unclassified'}
+FAILURE_CLASSES = {'RuntimeError', 'ValueError', 'TypeError', 'KeyError', 'TimeoutExpired', 'JSONDecodeError', 'OtherError'}
+PUBLIC_STATUSES = {'none', 'unknown', 'no_quote', 'review_required', 'confirmed', 'expired', 'changed', 'unconfirmed', 'unavailable'}
+
+
+def failure_error_valid(value):
+    if not isinstance(value, dict) or set(value) != {'class', 'phase', 'code', 'http_status', 'public_status'}: return False
+    if any(not isinstance(value[key], str) for key in ('class', 'phase', 'code', 'public_status')): return False
+    if value['class'] not in FAILURE_CLASSES or value['phase'] not in FAILURE_PHASES or value['code'] not in FAILURE_CODES or value['public_status'] not in PUBLIC_STATUSES: return False
+    if value['http_status'] is not None and (type(value['http_status']) is not int or not 100 <= value['http_status'] <= 599): return False
+    return value['code'] != 'unclassified' if value['phase'] != 'none' else value['code'] == 'unclassified' and value['http_status'] is None and value['public_status'] == 'none'
+
+
+class FailureDiagnostic:
+    """Failure-only scalars for one bounded interval; never retain response bodies."""
+    def __init__(self):
+        self.clear()
+
+    def clear(self):
+        self.phase = 'none'; self.code = 'unclassified'; self.http_status = None; self.public_status = 'none'
+
+    def begin(self, phase, public_status=None):
+        if not isinstance(phase, str) or phase not in FAILURE_PHASES or phase == 'none': raise ValueError('P05 diagnostic phase refused')
+        self.phase = phase; self.code = 'transport_or_unclassified'; self.http_status = None; self.public_status = 'none'
+        self.observe_public(public_status)
+
+    def mark(self, code):
+        if not isinstance(code, str) or code not in FAILURE_CODES or code == 'unclassified': raise ValueError('P05 diagnostic code refused')
+        if self.phase != 'none': self.code = code
+
+    def observe_http(self, status):
+        if self.phase != 'none': self.http_status = status if type(status) is int and 100 <= status <= 599 else None
+
+    def observe_public(self, status):
+        if self.phase != 'none': self.public_status = status if isinstance(status, str) and status in PUBLIC_STATUSES else 'none' if status is None else 'unknown'
+
+    def decode(self, response):
+        self.observe_http(response.status)
+        self.mark('json_decode_or_shape')
+        return json.loads(response.body)
+
+    def error(self, error):
+        name = type(error).__name__
+        result = {'class':name if name in FAILURE_CLASSES else 'OtherError', 'phase':self.phase, 'code':self.code, 'http_status':self.http_status, 'public_status':self.public_status}
+        if not failure_error_valid(result): raise RuntimeError('P05 diagnostic envelope refused')
+        return result
 
 
 def module(name, path):
@@ -158,6 +207,127 @@ def safe_promise(value):
     return not any(marker in json.dumps(value) for marker in ('policy_id','source_id','principal_hash','material_digest','origin_id','supplier_id','input_json','result_json','component_key','capacity_source'))
 
 
+def guide_contract():
+    return module('p05_staff_guide_closed_contract', SOURCE / 'verify-opening-promise-staff-guide-http.py')
+
+
+def guide_path(work):
+    return Path(work) / 'opening-http-promise-staff-guide-results.json'
+
+
+class GuideRecorder:
+    def __init__(self, work):
+        self.path = guide_path(work)
+        self.report = json.loads(self.path.read_text())
+        self.contract = guide_contract()
+
+    def write(self):
+        temporary = self.path.with_suffix('.tmp')
+        if temporary.is_symlink() or self.path.is_symlink(): raise RuntimeError('Guide receipt allocation refused')
+        temporary.write_text(json.dumps(self.report, indent=2) + '\n'); temporary.replace(self.path)
+
+    def check(self, case_id, evidence):
+        expected = dict(self.contract.PROTOCOL)
+        if case_id not in expected or set(evidence) != set(expected[case_id]) or any(type(value) is not bool for value in evidence.values()) or any(case['id'] == case_id for case in self.report['cases']): raise RuntimeError('Guide closed observation differs')
+        case = dict(id=case_id, status='PASS' if all(evidence.values()) else 'FAIL', evidence=evidence)
+        self.report['cases'].append(case); self.write()
+        print('opening_http_staff_guide_case=' + case_id + ' result=' + case['status'], flush=True)
+        if case['status'] != 'PASS': raise RuntimeError('Native guide HTTP observation diverged')
+
+
+def initialize_guide(work, primary):
+    contract = guide_contract(); path = guide_path(work)
+    if path.exists() or path.is_symlink(): raise RuntimeError('Guide receipt already allocated')
+    report = {'format':contract.FORMAT, **{key:primary[key] for key in IDENTITY_KEYS}, 'installed_php_sources':primary['installed_php_sources'], 'environment':primary['environment'], 'limits':contract.LIMITS, 'status':'RUNNING', 'cases':[], 'shared_cleanup':dict.fromkeys(contract.SHARED_CLEANUP_KEYS, False)}
+    path.write_text(json.dumps(report, indent=2) + '\n')
+
+
+def guide_form(response, predicate):
+    forms = [form for form in response.page().forms if predicate(form)]
+    if response.status != 200 or len(forms) != 1 or forms[0].attrs.get('method', '').lower() != 'post' or forms[0].attrs.get('action', '') != '' or not forms[0].fields.get('cetech_de_nonce'): raise RuntimeError('Native guide form missing')
+    return dict(forms[0].fields)
+
+
+def run_guide(options, primary, admin, state, bridge, fixture):
+    """Supplemental real native forms after all retained customer/shipment requests."""
+    guide = GuideRecorder(options.work)
+    fixture('adoption_off', True)
+    prepared = bridge.call('prepareguide')
+    admin_url = state['base_url'] + '/wp-admin/admin.php?page=cetech-de-promises'
+    rendered = admin.get(admin_url)
+    native_form = guide_form(rendered, lambda form: 'cetech-de-guide-form' in form.attrs.get('class', '').split() and form.fields.get('cetech_de_action') == 'cetech_de_promise_guide')
+    guide.check('GUIDE01-OWNED-OFF-PREFLIGHT', {'owned_disposable_site':prepared.get('ready') is True, 'exact_installed_source':prepared.get('identity') == state['identity'] and all(prepared['identity'][key] == primary[key] for key in IDENTITY_KEYS), 'native_admin_cookie':any(cookie.name.startswith('wordpress_') and cookie.path.startswith('/wp-admin') for cookie in admin.cookies), 'predeclared_guide_targets_absent':prepared.get('targets_absent') is True, 'adoption_off_before_guide':prepared.get('adoption_off') is True})
+    fields = dict(native_form, **prepared['fields'], guide_step='draft')
+    before = bridge.call('inspectguide')
+    bad = admin.post(admin_url, dict(fields, cetech_de_nonce='invalid-native-guide-nonce'))
+    after_bad = bridge.call('inspectguide')
+    guide.check('GUIDE02-INVALID-NONCE-NO-WRITE', {'native_form_nonce_present':bool(native_form['cetech_de_nonce']), 'invalid_nonce_post_refused':bad.status in (302,303), 'physical_sources_unchanged':before['physical_hash'] == after_bad['physical_hash'], 'private_guide_options_unchanged':before['private_options_hash'] == after_bad['private_options_hash']})
+    preview = admin.post(admin_url, dict(fields, guide_step='preview'))
+    after_preview = bridge.call('inspectguide')
+    guide.check('GUIDE03-PREVIEW-NO-WRITE', {'actual_guide_preview_post':preview.status == 200, 'hypothetical_wording':'This preview is not shown to customers and does not reserve a delivery date.' in preview.page().text, 'physical_sources_unchanged':before['physical_hash'] == after_preview['physical_hash'] and before['private_options_hash'] == after_preview['private_options_hash'], 'adoption_stays_off':after_preview['adoption_off'] is True})
+    created = admin.post(admin_url, fields); first = bridge.call('inspectguide')
+
+    def review(response):
+        opened = guide_form(response, lambda form: form.fields.get('cetech_de_action') == 'cetech_de_promise_guide' and form.fields.get('guide_step') == 'review' and form.fields.get('review_id') == prepared['policy_id'])
+        return admin.post(admin_url, opened)
+
+    reopened = review(created)
+    editable = guide_form(reopened, lambda form: 'cetech-de-guide-form' in form.attrs.get('class', '').split())
+    edited_fields = dict(editable, processing_min='2', processing_max='3', replace_draft='yes', guide_step='draft')
+    edited = admin.post(admin_url, edited_fields); replacement = bridge.call('inspectguide')
+    fresh = review(admin.get(admin_url)); reopened_fields = guide_form(fresh, lambda form: 'cetech-de-guide-form' in form.attrs.get('class', '').split())
+    stale_repost = admin.post(admin_url, edited_fields); after_repost = bridge.call('inspectguide')
+    first_versions = first['sources']['promise_versions']; replaced_versions = replacement['sources']['promise_versions']
+    expected_pairs = {('calendar',1,'retired'),('calendar',2,'draft'),('policy',1,'retired'),('policy',2,'draft')}
+    guide.check('GUIDE04-DRAFT-REVIEW-EDIT-REPLAY', {'actual_first_draft_post':created.status == 200 and created.page().has_notice('success','Draft saved') and len(first_versions) == 2 and all(row['state'] == 'draft' for row in first_versions), 'actual_review_and_edited_replacement':reopened.status == 200 and edited.status == 200 and editable.get('review_stamp','') != '' and edited.page().has_notice('success','Draft saved'), 'actual_reopen_after_edit':fresh.status == 200 and reopened_fields.get('processing_min') == '2' and reopened_fields.get('processing_max') == '3' and reopened_fields.get('review_id') == prepared['policy_id'], 'original_stale_form_repost_has_no_effect':stale_repost.status == 200 and stale_repost.page().has_notice('warning','draft could not be confirmed') and after_repost == replacement, 'only_expected_draft_versions':len(replaced_versions) == 4 and {(row['kind'],int(row['domain_version']),row['state']) for row in replaced_versions} == expected_pairs and replacement['journal_absent'] is True, 'native_author_and_scope':all(int(row['author_user_id']) == state['p05']['admin']['id'] for row in replaced_versions) and replacement['index']['scope_kind'] == 'product' and int(replacement['index']['scope_id']) == int(prepared['fields']['product_id'])})
+
+    def tracked_post(response, verb, kind=None):
+        def matching(form):
+            if form.fields.get('cetech_de_action') != 'cetech_de_promise_' + verb or form.fields.get('site_key') != 'store': return False
+            if kind is None: return form.fields.get('scope_kind') == 'product' and form.fields.get('scope_id') == prepared['fields']['product_id']
+            try: command = json.loads(form.fields.get('command_json', ''))
+            except (ValueError,TypeError): return False
+            return command.get('kind') == kind and command.get('logical_id') == prepared[kind + '_id'] and command.get('domain_version') == 2
+        command_form = guide_form(response, matching)
+        command_form['reason'] = 'Tracked native guide HTTP ' + verb
+        if kind is None:
+            key = {name:command_form[name] for name in ('scope_kind','scope_id','service_kind','service_code','endpoint','endpoint_kind')}; key['scope_id'] = int(key['scope_id'])
+            payload = dict(key=key, mode=command_form['mode'], policy_reference=json.loads(command_form['policy_reference_json']), expected_revision=int(command_form['expected_revision']), expected_generation=int(command_form['expected_generation']), reason=command_form['reason'])
+            operation = 'promise.assignment.set'
+        else:
+            payload = json.loads(command_form['command_json']); payload['reason'] = command_form['reason']; operation = 'promise.version.' + verb
+        tracking = dict(operation=operation, token=command_form['request_token'], payload=payload)
+        if bridge.call('trackguide:' + base64.b64encode(json.dumps(tracking, separators=(',',':')).encode()).decode()).get('tracked') is not True: raise RuntimeError('Original guide command was not registered')
+        return admin.post(admin_url, command_form), command_form
+
+    page = admin.get(admin_url)
+    sealed_calendar,_ = tracked_post(page, 'seal', 'calendar')
+    published_calendar,_ = tracked_post(sealed_calendar, 'publish', 'calendar')
+    sealed_policy,_ = tracked_post(published_calendar, 'seal', 'policy')
+    published_policy,_ = tracked_post(sealed_policy, 'publish', 'policy')
+    publication = bridge.call('inspectguide')
+    published_rows = {row['kind']:row for row in publication['sources']['promise_versions'] if int(row['domain_version']) == 2}
+    policy_body = json.loads(published_rows['policy']['body_json']); calendar_row = published_rows['calendar']
+    refs = policy_body['calendars']
+    guide.check('GUIDE05-CALENDAR-AND-POLICY-PUBLICATION', {'native_calendar_seal':sealed_calendar.status == 200 and sealed_calendar.page().has_notice('success','immutable audit receipt'), 'native_calendar_publish':published_calendar.status == 200 and published_calendar.page().has_notice('success','immutable audit receipt') and calendar_row['state'] == 'published', 'native_policy_seal':sealed_policy.status == 200 and sealed_policy.page().has_notice('success','immutable audit receipt'), 'native_policy_publish':published_policy.status == 200 and published_policy.page().has_notice('success','immutable audit receipt') and published_rows['policy']['state'] == 'published', 'exact_published_calendar_reference':len(refs) == 1 and refs[0]['calendar_id'] == prepared['calendar_id'] and refs[0]['version'] == 2 and refs[0]['digest'] == calendar_row['body_digest'], 'original_draft_bodies_immutable':{row['version_uuid']:(row['body_json'],row['body_digest']) for row in replaced_versions} == {row['version_uuid']:(row['body_json'],row['body_digest']) for row in publication['sources']['promise_versions']}, 'adoption_stays_off':publication['adoption_off'] is True})
+    assigned, assignment_form = tracked_post(published_policy, 'assignment')
+    assignment = bridge.call('inspectguide')
+    assignment_replay = admin.post(admin_url, assignment_form); after_assignment_replay = bridge.call('inspectguide')
+    assignment_rows = assignment['sources']['promise_assignments']
+    saved_ref = json.loads(assignment_rows[0]['policy_reference_json']) if len(assignment_rows) == 1 else {}
+    expected_ref = json.loads(assignment_form['policy_reference_json'])
+    guide.check('GUIDE06-ASSIGNMENT-OFF', {'native_assignment_form_post':assigned.status == 200 and assigned.page().has_notice('success','immutable audit receipt'), 'exact_published_policy_reference':len(assignment_rows) == 1 and saved_ref == expected_ref and saved_ref.get('policy_id') == prepared['policy_id'] and saved_ref.get('version') == 2 and saved_ref.get('digest') == published_rows['policy']['body_digest'], 'native_original_request_replay_once':assignment_replay.status == 200 and assignment_replay.page().has_notice('success','original request') and assignment == after_assignment_replay, 'adoption_stays_off':assignment['adoption_off'] is True and after_assignment_replay['adoption_off'] is True, 'protected_order_and_shipment_history_unchanged':assignment['orders_unchanged'] is True and after_assignment_replay['orders_unchanged'] is True})
+
+
+def cleanup_http_bridges(bridges):
+    """One refusal must not prevent another independently owned cleanup attempt."""
+    results = {}; failure = None
+    for name, action in (('shipment','cleanuphttpshipment'),('placement','cleanupplacement'),('configuration','cleanupconfiguration'),('promise','cleanuppromise'),('cart','cleanupquotecart')):
+        try: results[name] = bridges[name].call(action)
+        except Exception as error: results[name] = {'cleanup_failed':False}; failure = failure or error
+    return results, failure
+
+
 def run(options, recorder):
     common = module('p05_native_http_client', SOURCE / 'opening-http-driver.py')
     q06 = module('p05_native_http_utilities', SOURCE / 'opening-http-quote-placement.py')
@@ -169,10 +339,11 @@ def run(options, recorder):
     admin = common.HttpClient(state['base_url'])
     denied = common.HttpClient(state['base_url'])
     bridges = {}
-    for name, script in (('cart','opening-http-quote-cart-fixture.php'),('placement','opening-http-quote-placement-support.php'),('promise','opening-http-promise-handoff-support.php'),('configuration','opening-http-promise-native-configuration-support.php'),('shipment','opening-http-promise-native-configuration-shipment-support.php')):
+    for name, script in (('cart','opening-http-quote-cart-fixture.php'),('placement','opening-http-quote-placement-support.php'),('promise','opening-http-promise-handoff-support.php'),('configuration','opening-http-promise-native-configuration-support.php'),('shipment','opening-http-promise-native-configuration-shipment-support.php'),('guide','opening-http-promise-staff-guide-support.php')):
         folder = Path(options.private) / name; folder.mkdir(mode=0o700)
         bridges[name] = common.FixtureBridge(options.php,options.wpcli,options.site,str(SOURCE/'admin-context.php'),str(SOURCE/script),Path(options.state),folder)
     failure = None
+    diagnostic = FailureDiagnostic()
     try:
         response = client.get('/?cetech_opening_http_probe=1', {'X-CETECH-Opening-Probe':state['probe_token']})
         observed = json.loads(response.body); runtime = observed.pop('runtime', None)
@@ -218,12 +389,25 @@ def run(options, recorder):
         recorder.check('HTTP-W2P05-REAL-PREVIEW-LABEL-NO-ADMISSION', preview.status == 200 and published_rows == after_preview and 'Hypothetical preview' in preview.body.decode(errors='replace'), {'actual_nonce_protected_preview_post':preview.status == 200,'hypothetical_label_visible':'Hypothetical preview' in preview.body.decode(errors='replace'),'explicit_no_checkout_acceptance':'Nothing was published or accepted for checkout' in preview.body.decode(errors='replace'),'physical_policy_calendar_unchanged':published_rows == after_preview})
         login(client,state['username'],state['password'],state['classic_page_url'])
         def inspect():
-            response = client.get('/?cetech_p05_fixture=inspect',headers); value=json.loads(response.body)
-            if response.status != 200 or value.get('success') is not True or any(value['data']['source_identity'][key] != state['identity'][key] for key in IDENTITY_KEYS): raise RuntimeError('P05 native shopper observer refused')
-            return value['data']
+            response = client.get('/?cetech_p05_fixture=inspect',headers); value=diagnostic.decode(response)
+            if response.status != 200: diagnostic.mark('observer_http_status')
+            elif value.get('success') is not True: diagnostic.mark('observer_success_false')
+            elif any(value['data']['source_identity'][key] != state['identity'][key] for key in IDENTITY_KEYS): diagnostic.mark('observer_source_identity_mismatch')
+            else: return value['data']
+            raise RuntimeError('P05 native shopper observer refused')
         def fixture(mode, promise=False):
-            before=inspect(); response=client.request('/?cetech_'+('p04' if promise else 'q06')+'_fixture='+mode, {'nonce':before['p04_fixture_nonce' if promise else 'nonce']},headers)
-            if response.status != 200 or json.loads(response.body).get('success') is not True: raise RuntimeError('P05 tracked shopper stimulus refused')
+            seeded_interval = mode == 'seed' and not promise and diagnostic.phase == 'shopper_inspect_before_seed'
+            before=inspect(); nonce=before['p04_fixture_nonce' if promise else 'nonce']
+            if seeded_interval: diagnostic.begin('shopper_seed_post')
+            response=client.request('/?cetech_'+('p04' if promise else 'q06')+'_fixture='+mode, {'nonce':nonce},headers)
+            diagnostic.observe_http(response.status)
+            if response.status != 200:
+                diagnostic.mark('stimulus_http_status')
+                raise RuntimeError('P05 tracked shopper stimulus refused')
+            if diagnostic.decode(response).get('success') is not True:
+                diagnostic.mark('stimulus_success_false')
+                raise RuntimeError('P05 tracked shopper stimulus refused')
+            if seeded_interval: diagnostic.begin('shopper_inspect_after_seed')
             return inspect()
         pdp = client.get(state['p05']['product_url']); pdp_text=pdp.body.decode(errors='replace')
         from html.parser import HTMLParser
@@ -237,10 +421,26 @@ def run(options, recorder):
                 if self.active:self.values.append(data)
         estimates=Estimate();estimates.feed(pdp_text);preliminary=any('Preliminary estimate' in text for text in estimates.values)
         recorder.check('HTTP-W2P05-REAL-PDP-PRELIMINARY-NO-ACCEPTED-PROMISE', pdp.status == 200 and preliminary, {'actual_published_product_page':pdp.status == 200,'preliminary_estimate_label':preliminary,'final_checkout_review_remains_required':any('checkout' in text for text in estimates.values),'no_original_accepted_marker':'data-cetech-de-original-promise="1"' not in pdp_text})
-        seeded=fixture('seed');response=client.request(state['classic_url'],{'_wpnonce':seeded['review_nonce'],'action':'refresh','generation':seeded['facts']['generation'],'review_token':str(uuid.uuid4())});facts=json.loads(response.body).get('data',{})
-        if response.status != 200 or facts.get('status') != 'review_required': raise RuntimeError('P05 actual Classic Refresh refused')
-        confirmed=client.request(state['classic_url'],{'_wpnonce':inspect()['review_nonce'],'action':'confirm','generation':facts['generation']});final=json.loads(confirmed.body).get('data',{});promise=final.get('quote',{}).get('promise');classic=client.get(state['classic_page_url']);classic_text=classic.body.decode(errors='replace')
+        diagnostic.begin('shopper_inspect_before_seed')
+        seeded=fixture('seed')
+        diagnostic.begin('classic_refresh_post')
+        response=client.request(state['classic_url'],{'_wpnonce':seeded['review_nonce'],'action':'refresh','generation':seeded['facts']['generation'],'review_token':str(uuid.uuid4())})
+        facts=diagnostic.decode(response).get('data',{})
+        diagnostic.observe_public(facts.get('status') if isinstance(facts,dict) else None)
+        if response.status != 200 or facts.get('status') != 'review_required':
+            diagnostic.mark('refresh_http_status' if response.status != 200 else 'refused_public_state')
+            raise RuntimeError('P05 actual Classic Refresh refused')
+        diagnostic.begin('shopper_inspect_before_confirm')
+        confirm_nonce=inspect()['review_nonce']
+        diagnostic.begin('classic_confirm_post')
+        confirmed=client.request(state['classic_url'],{'_wpnonce':confirm_nonce,'action':'confirm','generation':facts['generation']})
+        final=diagnostic.decode(confirmed).get('data',{});promise=final.get('quote',{}).get('promise')
+        diagnostic.begin('classic_page_get', final.get('status'))
+        classic=client.get(state['classic_page_url']);diagnostic.observe_http(classic.status);classic_text=classic.body.decode(errors='replace')
+        if confirmed.status != 200 or final.get('status') != 'confirmed':
+            diagnostic.begin('classic_confirm_post', final.get('status'));diagnostic.observe_http(confirmed.status);diagnostic.mark('refused_public_state')
         recorder.check('HTTP-W2P05-REAL-CLASSIC-FINAL-STRUCTURED-ORIGINAL-VIEW', confirmed.status == 200 and final.get('status') == 'confirmed' and safe_promise(promise), {'actual_separate_refresh_confirm_requests':response.status == 200 and confirmed.status == 200,'closed_safe_structured_original_promise':safe_promise(promise),'original_label_markup_visible':'data-cetech-de-original-promise="1"' in classic_text,'captured_customer_text_visible':all(group['customer_text'] in classic_text for group in promise.get('groups',[]))})
+        diagnostic.clear()
         store=client.get(state['store_cart_url'],{'Nonce':inspect()['store_nonce']});store_value=json.loads(store.body);store_facts=store_value.get('extensions',{}).get('cetech-delivery-quote-review',{});store_promise=store_facts.get('quote',{}).get('promise')
         recorder.check('HTTP-W2P05-REAL-STORE-API-SAME-ORIGINAL-PUBLIC-VIEW', store.status == 200 and safe_promise(store_promise) and store_promise == promise, {'actual_native_store_cart_request':store.status == 200,'closed_safe_structured_promise':safe_promise(store_promise),'same_accepted_quote_id':store_facts.get('quote',{}).get('quote_id') == final.get('quote',{}).get('quote_id'),'exact_original_view_and_text_parity':store_promise == promise})
         before_stale=inspect();fixture('normal_policy',True);stale=client.request(state['classic_url'],{'_wpnonce':inspect()['review_nonce'],'action':'confirm','generation':final['generation']});stale_value=json.loads(stale.body).get('data',{});after_stale=inspect()
@@ -256,7 +456,10 @@ def run(options, recorder):
         recorder.check('HTTP-W2P05-BLOCKS-PAID-ACTUAL-FINAL-BUTTON', result.returncode==0 and paid_case['status']=='PASS', {'real_pinned_chromium':paid['real_pinned_chromium'],'actual_blocks_final_button':paid['actual_blocks_final_button'],'actual_original_promise_markup':paid['actual_original_promise_markup'],'exact_original_shopper_saved_parity':paid['exact_original_shopper_saved_parity'],'structured_public_promise_required':paid['structured_public_promise_required'],'gateway_exactly_once_after_seal':paid['gateway_exactly_once_after_seal'],'native_order_paid':paid['native_order_paid'],'same_installed_source':paid['same_installed_source']})
         recorder.check('HTTP-W2P05-BLOCKS-FREE-ACTUAL-FINAL-BUTTON', result.returncode==0 and free_case['status']=='PASS', {'real_pinned_chromium':free['real_pinned_chromium'],'actual_blocks_final_button':free['actual_blocks_final_button'],'actual_original_promise_markup':free['actual_original_promise_markup'],'exact_original_shopper_saved_parity':free['exact_original_shopper_saved_parity'],'structured_public_promise_required':free['structured_public_promise_required'],'free_completion_exactly_once_after_seal':free['free_completion_exactly_once_after_seal'],'native_order_completed':free['native_order_completed'],'same_installed_source':free['same_installed_source']})
         shipment = bridges['shipment'].call('preparehttpafterbrowser')
-        shipment_opened = admin.post(admin_url, dict(action_form('shipment_read', published), shipment_id=str(shipment['shipment_id'])))
+        shipment_url = admin_url + '&' + urlencode({'shipment_id':str(shipment['shipment_id'])})
+        shipment_page = admin.get(shipment_url)
+        shipment_read_form = action_form('shipment_read', shipment_page)
+        shipment_opened = admin.post(shipment_url, dict(shipment_read_form, shipment_id=str(shipment['shipment_id'])))
         shipment_form = action_form('shipment_update', shipment_opened)
         bridges['shipment'].call('trackhttpstaff:' + shipment_form['request_token'])
         earliest = (datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=2)).strftime('%Y-%m-%d %H:%M:%S.000000')
@@ -264,21 +467,29 @@ def run(options, recorder):
         reason = 'Tracked P05 internal shipment scheduling reason'
         current_fields = dict(shipment_form, state='absolute_window', **{'from':earliest, 'until':latest, 'display_timezone':'Africa/Accra', 'reason':reason})
         tampered = dict(current_fields, original_envelope=('A' if current_fields['original_envelope'][0] != 'A' else 'B') + current_fields['original_envelope'][1:])
-        rejected = admin.post(admin_url, tampered); after_tamper = bridges['shipment'].call('inspecthttpshipment')
+        rejected = admin.post(shipment_url, tampered); after_tamper = bridges['shipment'].call('inspecthttpshipment')
         recorder.check('HTTP-W2P05-SIGNED-STAFF-ENVELOPE-TAMPER-REFUSED', shipment_opened.status == 200 and rejected.status == 200 and after_tamper['material_hash'] == shipment['material_hash'], {'actual_protected_native_shipment_read':shipment_opened.status == 200 and shipment['original_text'] in shipment_opened.page().text,'server_signed_original_context_present':bool(shipment_form.get('original_envelope')),'actual_tampered_mac_post_refused':rejected.status == 200 and rejected.page().has_notice('error','could not be confirmed'),'no_current_or_reason_event_effect':after_tamper['material_hash'] == shipment['material_hash']})
-        changed = admin.post(admin_url, current_fields); after_change = bridges['shipment'].call('inspecthttpshipment')
-        replay_fields = action_form('shipment_update',changed); replayed_current = admin.post(admin_url,replay_fields); after_replay = bridges['shipment'].call('inspecthttpshipment')
-        changed_semantic = admin.post(admin_url,dict(replay_fields,reason='Changed same-token semantic command')); after_semantic = bridges['shipment'].call('inspecthttpshipment')
+        changed = admin.post(shipment_url, current_fields); after_change = bridges['shipment'].call('inspecthttpshipment')
+        replay_fields = action_form('shipment_update',changed); replayed_current = admin.post(shipment_url,replay_fields); after_replay = bridges['shipment'].call('inspecthttpshipment')
+        changed_semantic = admin.post(shipment_url,dict(replay_fields,reason='Changed same-token semantic command')); after_semantic = bridges['shipment'].call('inspecthttpshipment')
         recorder.check('HTTP-W2P05-REAL-STAFF-CURRENT-UPDATE-ORIGINAL-REPLAY-ONCE', changed.status == 200 and replayed_current.status == 200 and after_change['revision'] == shipment['revision'] + 1 and after_replay == after_change and after_semantic == after_change, {'actual_nonce_protected_current_post':changed.status == 200 and changed.page().has_notice('success','separate current estimate was saved'),'same_signed_original_command_replay_once':after_replay == after_change,'same_token_changed_semantic_refused':changed_semantic.status == 200 and changed_semantic.page().has_notice('error','could not be confirmed') and after_semantic == after_change,'exact_internal_reason_audited':after_change['reason_sha256'] == hashlib.sha256(reason.encode()).hexdigest(),'original_and_saved_order_bytes_preserved':after_change['snapshot_preserved'] is True and after_change['original_preserved'] is True})
         owned_order_page = client.get(after_change['view_order_url']); owned_order_text = owned_order_page.body.decode(errors='replace')
         recorder.check('HTTP-W2P05-REAL-OWN-CUSTOMER-ORIGINAL-CURRENT-SHIPMENT-VIEW', owned_order_page.status == 200 and after_change['original_text'] in owned_order_page.page().text and after_change['current_text'] in owned_order_page.page().text, {'actual_native_owned_view_order_get':owned_order_page.status == 200,'original_recorded_estimate_visible':'data-cetech-de-shipment-original="1"' in owned_order_text and after_change['original_text'] in owned_order_page.page().text,'separate_current_estimate_visible':'data-cetech-de-shipment-current="1"' in owned_order_text and after_change['current_text'] in owned_order_page.page().text,'internal_reason_and_private_packet_excluded':reason not in owned_order_text and not any(value in owned_order_text for value in ('original_packet_digest','current_json','packet_json','event_key','native-shipment-promise'))})
-        outsider_order_page = denied.get(after_change['view_order_url']); outsider_admin = denied.post(admin_url,dict(action_form('shipment_read', published),shipment_id=str(shipment['shipment_id']))); after_outsider = bridges['shipment'].call('inspecthttpshipment')
+        outsider_order_page = denied.get(after_change['view_order_url']); outsider_admin = denied.post(shipment_url,dict(shipment_read_form,shipment_id=str(shipment['shipment_id']))); after_outsider = bridges['shipment'].call('inspecthttpshipment')
         recorder.check('HTTP-W2P05-OUTSIDER-SHIPMENT-HISTORY-REFUSED', outsider_order_page.status in (200,403) and 'data-cetech-de-shipment-original="1"' not in outsider_order_page.body.decode(errors='replace') and after_outsider == after_change, {'actual_other_native_customer_get':any(cookie.name.startswith('wordpress_logged_in_') for cookie in denied.cookies),'no_original_or_current_private_history':'data-cetech-de-shipment-original="1"' not in outsider_order_page.body.decode(errors='replace') and 'data-cetech-de-shipment-current="1"' not in outsider_order_page.body.decode(errors='replace'),'unprivileged_native_staff_post_denied':outsider_admin.status in (302,303,403) and after_change['original_text'] not in outsider_admin.body.decode(errors='replace'),'stored_current_and_original_history_unchanged':after_outsider == after_change})
+        run_guide(options, recorder.report, admin, state, bridges['guide'], fixture)
     except Exception as error:
-        failure=error;recorder.report['status']='FAIL';recorder.report['error']={'class':type(error).__name__ if type(error).__name__ in {'RuntimeError','ValueError','TypeError','KeyError','TimeoutExpired','JSONDecodeError'} else 'OtherError'};recorder.write()
+        failure=error;recorder.report['status']='FAIL';recorder.report['error']=diagnostic.error(error);recorder.write()
+        guide = GuideRecorder(options.work); guide.report['status'] = 'FAIL'; guide.write()
     finally:
         try:
-            shipment_cleanup=bridges['shipment'].call('cleanuphttpshipment');placement=bridges['placement'].call('cleanupplacement');configuration=bridges['configuration'].call('cleanupconfiguration');promise=bridges['promise'].call('cleanuppromise');cart=bridges['cart'].call('cleanupquotecart')
+            guide_cleanup = bridges['guide'].call('cleanupguide')
+            guide = GuideRecorder(options.work)
+            if guide.report['cases']: guide.check('GUIDE07-EXACT-TRACKED-CLEANUP', guide_cleanup)
+        except Exception as cleanup_error:failure=failure or cleanup_error
+        try:
+            cleaned, cleanup_error = cleanup_http_bridges(bridges); failure = failure or cleanup_error
+            shipment_cleanup,placement,configuration,promise,cart = (cleaned[name] for name in ('shipment','placement','configuration','promise','cart'))
             recorder.check('HTTP-W2P05-TRACKED-FIXTURE-CLEANUP', all(value is True for document in (shipment_cleanup,placement,configuration,promise,cart) for value in document.values()), {'exact_shipment_original_current_audit_history_restored':all(value is True for value in shipment_cleanup.values()),'exact_owned_orders_bindings_removed':placement.get('owned_native_orders_removed') is True and placement.get('exact_owned_placement_namespaces_removed') is True,'native_admin_sources_and_users_restored':configuration.get('cleanup_restored') is True and configuration.get('tracked_users_removed') is True,'original_promise_history_restored':promise.get('original_promise_history_restored') is True,'protected_adoption_restored':promise.get('adoption_restored') is True,'native_sources_users_pages_options_restored':cart.get('cleanup_restored') is True,'all_connections_retired':placement.get('owned_connections_retired') is True and cart.get('all_owned_connections_retired') is True})
         except Exception as cleanup_error:failure=failure or cleanup_error
     recorder.report['status']='FAIL' if failure else 'RUNNING';recorder.write()
@@ -293,12 +504,26 @@ def finalize(receipt,listener_stopped,mu_removed,private_removed,tracked_cleanup
         expected=[case_id for case_id,_ in protocol()];report['status']='PASS' if report.get('status')!='FAIL' and [case['id'] for case in report['cases']]==expected and all(case_valid(case) and case['status']=='PASS' for case in report['cases']) and report['browser_runtime']=={'playwright':'1.58.2','chromium':'145.0.7632.6'} else 'FAIL';recorder.write()
 
 
+def finalize_guide(work, receipt, cleanup):
+    guide = GuideRecorder(work)
+    guide.report['shared_cleanup'] = dict(zip(guide.contract.SHARED_CLEANUP_KEYS, cleanup))
+    guide.report['status'] = 'PASS' if guide.report['status'] != 'FAIL' else 'FAIL'
+    try: guide.contract.verify(guide.report, json.loads(Path(receipt).read_text()))
+    except (RuntimeError,ValueError,TypeError,KeyError,OSError): guide.report['status'] = 'FAIL'
+    guide.write()
+
+
 def main():
     parser=argparse.ArgumentParser();parser.add_argument('--work',required=True);parser.add_argument('--receipt',required=True);parser.add_argument('--initialize',action='store_true');parser.add_argument('--finalize',nargs=4)
     for name in ('php','wpcli','site','state','private'):parser.add_argument('--'+name)
     options=parser.parse_args()
-    if options.initialize:initialize(options.work,options.receipt)
-    elif options.finalize:finalize(options.receipt,*(value=='1' for value in options.finalize));return 0 if json.loads(Path(options.receipt).read_text())['status']=='PASS' else 1
+    if options.initialize:
+        primary = initialize(options.work,options.receipt); initialize_guide(options.work, primary.report)
+    elif options.finalize:
+        cleanup = tuple(value=='1' for value in options.finalize)
+        try: finalize(options.receipt,*cleanup)
+        finally: finalize_guide(options.work, options.receipt, cleanup)
+        return 0 if json.loads(Path(options.receipt).read_text())['status']=='PASS' and json.loads(guide_path(options.work).read_text())['status']=='PASS' else 1
     else:run(options,Recorder(options.receipt,json.loads(Path(options.receipt).read_text())))
     return 0
 if __name__=='__main__':

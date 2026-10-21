@@ -136,6 +136,73 @@ final class PromiseCalendarArithmeticTest extends TestCase {
 		self::assertSame( '2026-03-09 13:10:00.000000', $math->add( $until, 10, 'business_minutes', $calendar, $budget )->sql() );
 		$this->refuses( 'estimate_unavailable', fn() => $math->prove_monotonic( $from, $until, 10, 'business_minutes', $calendar, $budget ) );
 	}
+	public function test_positive_business_day_date_envelope_bounds_dense_interiors_with_variable_hours_and_closures(): void {
+		$facts = self::facts( 'UTC' );
+		$facts['weekly_openings']['mon'] = [ [ 'open' => '12:00', 'close' => '16:00' ] ];
+		$facts['weekly_openings']['tue'] = [ [ 'open' => '08:00', 'close' => '10:00' ], [ 'open' => '14:00', 'close' => '18:00' ] ];
+		$facts['weekly_openings']['wed'] = [ [ 'open' => '09:00', 'close' => '12:00' ], [ 'open' => '14:00', 'close' => '17:00' ] ];
+		$facts['weekly_openings']['thu'] = [ [ 'open' => '10:00', 'close' => '15:00' ] ];
+		$facts['weekly_openings']['fri'] = [ [ 'open' => '08:00', 'close' => '24:00' ] ];
+		$facts['closed_dates'] = [ '2026-10-13' ];
+		$facts['exception_openings'] = [ [ 'date' => '2026-10-11', 'intervals' => [ [ 'open' => '10:00', 'close' => '12:00' ] ] ], [ 'date' => '2026-10-13', 'intervals' => [ [ 'open' => '10:00', 'close' => '12:00' ] ] ] ];
+		$calendar = BusinessCalendarVersion::from_array( $facts ); $math = new PromiseCalendarArithmetic();
+		$from = self::time( '2026-10-09 15:59:59.999999' ); $until = self::time( '2026-10-14 16:59:59.999999' );
+		foreach ( [ 1, 2 ] as $amount ) {
+			$budget = new PromiseCalculationBudget(); $math->prove_monotonic( $from, $until, $amount, 'business_days', $calendar, $budget );
+			$lower = $math->add( $from, $amount, 'business_days', $calendar, $budget ); $upper = $math->add( $until, $amount, 'business_days', $calendar, $budget );
+			self::assertSame( 1 === $amount ? '2026-10-12 12:00:00.000000' : '2026-10-12 15:59:59.999999', $lower->sql() );
+			self::assertSame( 1 === $amount ? '2026-10-16 08:00:00.000000' : '2026-10-16 16:59:59.999999', $upper->sql() );
+			$points = [ $from->epoch_microseconds(), $until->epoch_microseconds() ];
+			for ( $at = $from->epoch_microseconds(); $at < $until->epoch_microseconds(); $at += 15 * 60000000 ) { $points[] = $at; }
+			foreach ( [ '2026-10-10 00:00:00.000000', '2026-10-11 10:00:00.000000', '2026-10-11 12:00:00.000000', '2026-10-12 12:00:00.000000', '2026-10-12 16:00:00.000000', '2026-10-13 00:00:00.000000', '2026-10-14 09:00:00.000000', '2026-10-14 12:00:00.000000', '2026-10-14 14:00:00.000000' ] as $boundary ) {
+				$at = self::time( $boundary )->epoch_microseconds(); foreach ( [ -1, 0, 1 ] as $delta ) { $points[] = $at + $delta; }
+			}
+			sort( $points, SORT_NUMERIC ); $previous = $lower;
+			foreach ( array_unique( $points ) as $at ) {
+				$result = $math->add( RuleTime::from_epoch_microseconds( $at ), $amount, 'business_days', $calendar, new PromiseCalculationBudget() );
+				self::assertGreaterThanOrEqual( 0, $result->compare( $previous ), 'An interior transfer must not reverse at an opening, close or date boundary.' );
+				self::assertLessThanOrEqual( 0, $result->compare( $upper ), 'An interior transfer must stay inside the proved endpoint window.' ); $previous = $result;
+			}
+		}
+	}
+	public function test_new_business_day_date_proof_refuses_a_native_transition_between_valid_endpoints(): void {
+		$math = new PromiseCalendarArithmetic(); $calendar = self::calendar( 'America/New_York', [ [ 'open' => '09:00', 'close' => '18:00' ] ], true );
+		$from = self::time( '2026-03-06 14:00:00.000000' ); $until = self::time( '2026-03-09 13:00:00.000000' );
+		self::assertSame( '2026-03-07 14:00:00.000000', $math->add( $from, 1, 'business_days', $calendar, new PromiseCalculationBudget() )->sql() );
+		self::assertSame( '2026-03-10 13:00:00.000000', $math->add( $until, 1, 'business_days', $calendar, new PromiseCalculationBudget() )->sql() );
+		$this->refuses( 'unsupported_policy', fn() => $math->prove_monotonic( $from, $until, 1, 'business_days', $calendar, new PromiseCalculationBudget() ) );
+	}
+	public function test_new_business_day_date_proof_resolves_interior_openings_even_when_endpoints_are_valid(): void {
+		$facts = self::facts( 'America/New_York', [ [ 'open' => '09:00', 'close' => '18:00' ] ], true );
+		$facts['weekly_openings']['sun'] = [ [ 'open' => '02:30', 'close' => '04:00' ] ]; $calendar = BusinessCalendarVersion::from_array( $facts ); $math = new PromiseCalendarArithmetic();
+		$from = self::time( '2026-03-06 14:00:00.000000' ); $until = self::time( '2026-03-09 13:00:00.000000' );
+		self::assertSame( '2026-03-07 14:00:00.000000', $math->add( $from, 1, 'business_days', $calendar, new PromiseCalculationBudget() )->sql() );
+		self::assertSame( '2026-03-10 13:00:00.000000', $math->add( $until, 1, 'business_days', $calendar, new PromiseCalculationBudget() )->sql() );
+		$this->refuses( 'estimate_unavailable', fn() => $math->prove_monotonic( $from, $until, 1, 'business_days', $calendar, new PromiseCalculationBudget() ) );
+	}
+	public function test_new_business_day_date_proof_refuses_an_interior_target_gap_masked_by_a_later_opening(): void {
+		$facts = self::facts( 'America/New_York', [ [ 'open' => '09:00', 'close' => '18:00' ] ], true );
+		$facts['weekly_openings']['fri'] = $facts['weekly_openings']['sat'] = [ [ 'open' => '00:00', 'close' => '04:00' ] ];
+		$calendar = BusinessCalendarVersion::from_array( $facts ); $math = new PromiseCalendarArithmetic();
+		$from = self::time( '2026-03-06 08:30:00.000000' ); $until = self::time( '2026-03-07 08:30:00.000000' );
+		self::assertSame( '2026-03-07 08:30:00.000000', $math->add( $from, 1, 'business_days', $calendar, new PromiseCalculationBudget() )->sql() );
+		self::assertSame( '2026-03-08 13:00:00.000000', $math->add( $until, 1, 'business_days', $calendar, new PromiseCalculationBudget() )->sql() );
+		// Saturday's 02:30 maps to nonexistent Sunday 02:30 before seek_start can snap to 09:00.
+		$this->refuses( 'estimate_unavailable', fn() => $math->add( self::time( '2026-03-07 07:30:00.000000' ), 1, 'business_days', $calendar, new PromiseCalculationBudget() ) );
+		$this->refuses( 'unsupported_policy', fn() => $math->prove_monotonic( $from, $until, 1, 'business_days', $calendar, new PromiseCalculationBudget() ) );
+	}
+	public function test_new_business_day_date_proof_preserves_full_span_horizon_and_shared_budget(): void {
+		$math = new PromiseCalendarArithmetic(); $calendar = self::calendar( 'UTC', [ [ 'open' => '00:00', 'close' => '24:00' ] ], true ); $from = self::time( '2028-01-01 08:00:00.000000' );
+		$budget = new PromiseCalculationBudget(); $math->prove_monotonic( $from, self::time( '2029-12-30 08:00:00.000000' ), 1, 'business_days', $calendar, $budget ); self::assertGreaterThan( 0, $budget->used_steps() );
+		$this->refuses( 'budget_exceeded', fn() => $math->prove_monotonic( $from, self::time( '2029-12-31 08:00:00.000000' ), 1, 'business_days', $calendar, new PromiseCalculationBudget() ) );
+		$budget = new PromiseCalculationBudget(); $budget->consume( 99999 );
+		$this->refuses( 'budget_exceeded', fn() => $math->prove_monotonic( $from, self::time( '2028-01-02 08:00:00.000000' ), 1, 'business_days', $calendar, $budget ) ); self::assertTrue( $budget->exhausted() );
+	}
+	public function test_cross_date_zero_business_days_and_calendar_days_remain_conservatively_refused(): void {
+		$math = new PromiseCalendarArithmetic(); $calendar = self::calendar(); $from = self::time( '2026-10-09 10:00:00.000000' ); $until = self::time( '2026-10-12 10:00:00.000000' );
+		$this->refuses( 'unsupported_policy', fn() => $math->prove_monotonic( $from, $until, 0, 'business_days', $calendar, new PromiseCalculationBudget() ) );
+		$this->refuses( 'unsupported_policy', fn() => $math->prove_monotonic( $from, $until, 1, 'calendar_days', $calendar, new PromiseCalculationBudget() ) );
+	}
 	private function refuses( string $reason, callable $work ): void {
 		try { $work(); self::fail( 'Expected a finite calculation refusal.' ); }
 		catch ( PromiseCalculationException $error ) { self::assertSame( $reason, $error->reason() ); }

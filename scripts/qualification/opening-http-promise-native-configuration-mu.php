@@ -21,3 +21,7 @@ $p05_support=getenv('CETECH_DE_HTTP_P05_SUPPORT');
 if(!is_string($p05_support)||!is_file($p05_support)||is_link($p05_support)||'opening-http-promise-native-configuration-support.php'!==basename($p05_support))throw new RuntimeException('P05 MU requires exact fixture source.');
 
 add_action('init',static function()use($p05_support):void{if(defined('WP_CLI')&&WP_CLI)return;require_once $p05_support;CetechPromiseNativeConfigurationHttpFixture::register();},103);
+
+$guide_support=dirname($p05_support).'/opening-http-promise-staff-guide-support.php';
+if(!is_file($guide_support)||is_link($guide_support))throw new RuntimeException('P05 guide requires exact fixture source.');
+add_action('init',static function()use($guide_support):void{if(defined('WP_CLI')&&WP_CLI)return;require_once $guide_support;CetechPromiseStaffGuideHttpFixture::register();},104);

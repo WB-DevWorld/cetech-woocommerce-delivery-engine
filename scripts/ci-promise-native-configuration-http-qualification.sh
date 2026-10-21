@@ -12,9 +12,10 @@ if [[ "${CETECH_DE_NATIVE_OPENING_QUALIFICATION:-0}" != 1 || "${CETECH_DE_HTTP_O
 fi
 TASK_PRIVATE="$TASK_WORK/opening-promise-native-configuration-http-private"
 TASK_RECEIPT="$TASK_WORK/opening-http-promise-native-configuration-results.json"
+TASK_GUIDE_RECEIPT="$TASK_WORK/opening-http-promise-staff-guide-results.json"
 TASK_STATE="$TASK_PRIVATE/quote-cart-state.json"
 TASK_MU="$TASK_SITE/wp-content/mu-plugins/cetech-opening-promise-native-configuration-fixture.php"
-for TASK_ALLOCATION in "$TASK_PRIVATE" "$TASK_RECEIPT" "$TASK_MU"; do
+for TASK_ALLOCATION in "$TASK_PRIVATE" "$TASK_RECEIPT" "$TASK_GUIDE_RECEIPT" "$TASK_MU"; do
     if [[ -e "$TASK_ALLOCATION" || -L "$TASK_ALLOCATION" ]]; then
         echo 'BLOCKED: P05 refuses an existing private, receipt or MU allocation.' >&2
         exit 1
@@ -76,6 +77,13 @@ finish_p05_http() {
     fi
     # Original tracked state supplies deletion authority, never an appeared-row diff.
     if [[ -f "$TASK_STATE" && ! -L "$TASK_STATE" ]]; then
+        if python3 - "$TASK_STATE" <<'P05_GUIDE'
+import json,sys
+sys.exit(0 if 'p05_guide' in json.load(open(sys.argv[1])) else 1)
+P05_GUIDE
+        then
+            "${TASK_WP[@]}" eval-file "$TASK_ROOT/scripts/qualification/opening-http-promise-staff-guide-support.php" --use-include cleanupguide "$TASK_STATE" "$TASK_PRIVATE/guide-trap-cleanup.json" >"$TASK_PRIVATE/guide-trap.log" 2>&1 || task_cleanup=0
+        fi
         if python3 - "$TASK_STATE" <<'P05_SHIPMENT'
 import json,sys
 sys.exit(0 if 'p05_http_shipment' in json.load(open(sys.argv[1])) else 1)
