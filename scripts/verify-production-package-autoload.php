@@ -58,7 +58,6 @@ require_once $autoload;
 $required_classes = [
 	'CetechDeliveryEngine\\Domain\\DeliveryPromotion\\FixedDeliveryPromotion',
 	'CetechDeliveryEngine\\Domain\\DeliveryPromotion\\DeliveryPromotionPlan',
-	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\DeliveryPromotionEvidenceProvider',
 	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedDeliveryPromotionCalculator',
 	'CetechDeliveryEngine\\Domain\\DeliveryEconomics\\EconomicAmountFact',
 	'CetechDeliveryEngine\\Domain\\DeliveryEconomics\\QuoteEconomicsFacts',
@@ -341,6 +340,7 @@ $required_classes = [
 ];
 
 $required_interfaces = [
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\DeliveryPromotionEvidenceProvider',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\CartQuoteProfileEnvironment',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteNativeTaxEvidenceGuard',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteTimedCurrentEvidenceGuard',
