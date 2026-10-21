@@ -56,6 +56,13 @@ if ( ! str_contains( $health_source, 'namespace CetechDeliveryEngine\\Applicatio
 require_once $autoload;
 
 $required_classes = [
+	'CetechDeliveryEngine\\Domain\\DeliveryPromotion\\FixedPromotionBudgetRequest',
+	'CetechDeliveryEngine\\Domain\\DeliveryPromotion\\FixedPromotionBudgetState',
+	'CetechDeliveryEngine\\Domain\\DeliveryPromotion\\FixedPromotionBudgetReservation',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionBudgetService',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\FixedPromotionQuoteCurrentEvidenceGuard',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\FixedPromotionSourceValidity',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionBudgetCurrentAuthority',
 	'CetechDeliveryEngine\\Domain\\DeliveryCommercial\\FixedPromotionQuoteCapture',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\FixedPromotionQuoteProvider',
 	'CetechDeliveryEngine\\Application\\Order\\FixedPromotionSnapshotCodec',
@@ -351,6 +358,9 @@ $required_classes = [
 ];
 
 $required_interfaces = [
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionBudgetStore',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionCurrentAuthority',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionEligibilityGuard',
 	'CetechDeliveryEngine\\Application\\DeliveryCurrency\\CurrencyConversionProvider',
 	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\DeliveryPromotionEvidenceProvider',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\CartQuoteProfileEnvironment',
@@ -512,7 +522,7 @@ $is_schema9_release = str_contains( $header_source, '1.0.0-dev.wave2-quote-stora
 	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-placement' )
 	|| 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-contract\.1\'\s*\);\s*$/m', $header_source );
 $is_schema10_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-(?:storage|calculation|handoff)\.1\'\s*\);\s*$/m', $header_source );
-$is_schema11_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.(?:wave2-promise-(?:native|qualification)\.1|economics-facts\.1|delivery-promotion-fixed\.1|currency-convert-once\.1|commercial-handoff\.1|fixed-promotion-format\.1)\'\s*\);\s*$/m', $header_source );
+$is_schema11_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.(?:wave2-promise-(?:native|qualification)\.1|economics-facts\.1|delivery-promotion-fixed\.1|currency-convert-once\.1|commercial-handoff\.1|fixed-promotion-format\.1|promotion-authority\.1)\'\s*\);\s*$/m', $header_source );
 $is_schema8_release = str_contains( $header_source, '1.0.0-dev.wave1-rule-lifecycle' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-snapshot-readers' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-data-lifecycle' )
