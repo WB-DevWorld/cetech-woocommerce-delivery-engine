@@ -38,7 +38,7 @@ final class PromotionBudgetInstallationSqlFixture {
 	public static function domain_tables( \mysqli $db, string $prefix ): array {
 		DB::validate_prefix( $prefix ); $stem = $prefix . 'delivery_engine_'; $escaped = $db->real_escape_string( $stem );
 		$rows = $db->query( "SELECT TABLE_NAME FROM information_schema.TABLES WHERE TABLE_SCHEMA=DATABASE() AND LEFT(TABLE_NAME," . strlen( $stem ) . ")='{$escaped}' ORDER BY TABLE_NAME" );
-		if ( ! $rows instanceof \mysqli_result ) { throw new \RuntimeException(); } return array_column( $rows->fetch_all( MYSQLI_ASSOC ), 'TABLE_NAME' );
+		if ( ! $rows instanceof \mysqli_result ) { throw new \RuntimeException(); } $tables = array_column( $rows->fetch_all( MYSQLI_ASSOC ), 'TABLE_NAME' ); sort( $tables, SORT_STRING ); return $tables;
 	}
 	/** DDL, exact raw rows and native checksums cover all retained source stores. */
 	public static function snapshot( \mysqli $db, array $tables ): array {
