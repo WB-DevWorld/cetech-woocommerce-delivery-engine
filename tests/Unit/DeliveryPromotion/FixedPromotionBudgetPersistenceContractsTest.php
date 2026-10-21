@@ -33,12 +33,16 @@ final class FixedPromotionBudgetPersistenceContractsTest extends TestCase {
 		self::assertSame( [ 'site_id', 'account_key' ], Schema::indexes( Schema::ACCOUNTS_SUFFIX )['site_account']['columns'] ); self::assertSame( [ 'site_id', 'claim_key' ], Schema::indexes( Schema::RESERVATIONS_SUFFIX )['site_claim']['columns'] );
 		self::assertSame( [ 'site_id', 'account_key', 'id' ], Schema::indexes( Schema::RESERVATIONS_SUFFIX )['account_claims']['columns'] );
 	}
-	public function test_unregistered_ddl_cannot_be_discovered_by_normal_activation_or_lifecycle(): void {
-		self::assertSame( '11', SchemaVersion::TARGET ); self::assertCount( 39, DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES ); self::assertCount( 23, DataLifecycleManifest::FEATURE_FLAG_OPTIONS );
+	public function test_budget_installation_is_registered_only_in_its_coordinated_migration_and_manifest(): void {
+		self::assertSame( '12', SchemaVersion::TARGET ); self::assertCount( 41, DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES ); self::assertCount( 39, DataLifecycleManifest::RETAINED_SHIPMENT_PROMISE_DOMAIN_TABLE_SUFFIXES ); self::assertCount( 23, DataLifecycleManifest::FEATURE_FLAG_OPTIONS );
 		$root = dirname( __DIR__, 3 ); $activation = (string) file_get_contents( $root . '/src/Bootstrap/Activator.php' );
-		foreach ( Schema::SUFFIXES as $suffix ) { self::assertNotContains( $suffix, DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES ); self::assertStringNotContainsString( $suffix, $activation ); }
+		foreach ( Schema::SUFFIXES as $suffix ) { self::assertContains( $suffix, DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES ); self::assertNotContains( $suffix, DataLifecycleManifest::RETAINED_SHIPMENT_PROMISE_DOMAIN_TABLE_SUFFIXES ); self::assertStringNotContainsString( $suffix, $activation ); }
 		self::assertStringNotContainsString( 'FixedPromotionBudgetSchema', $activation );
-		foreach ( glob( $root . '/database/migrations/*.php' ) as $file ) { $source = (string) file_get_contents( $file ); self::assertStringNotContainsString( 'FixedPromotionBudget', $source ); foreach ( Schema::SUFFIXES as $suffix ) { self::assertStringNotContainsString( $suffix, $source ); } }
+		$matches = [];
+		foreach ( glob( $root . '/database/migrations/*.php' ) as $file ) { if ( str_contains( (string) file_get_contents( $file ), 'FixedPromotionBudget' ) ) { $matches[] = basename( $file ); } }
+		self::assertSame( [ '20261021213000_create_promotion_budget_tables.php' ], $matches );
+		$migration = require $root . '/database/migrations/' . $matches[0];
+		self::assertInstanceOf( \CetechDeliveryEngine\Core\Versioning\VerifiableMigrationInterface::class, $migration ); self::assertSame( '12', $migration->get_version() );
 	}
 	public static function invalid_prefixes(): array { return [ 'empty' => [ '' ], 'SQL' => [ 'wp_;DROP' ], 'dot' => [ 'db.wp_' ], 'backtick' => [ 'wp_`' ], 'oversized' => [ str_repeat( 'a', 30 ) ] ]; }
 	#[DataProvider( 'invalid_prefixes' )]

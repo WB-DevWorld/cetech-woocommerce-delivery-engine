@@ -23,7 +23,7 @@ CONTEXT = "Fresh native P06 sealed promise and original/current shipment operati
 BACKGROUND = "WP Cron disabled; Action Scheduler async request runner suppressed in this process"
 LIMITS = [
     "Disposable native HPOS/CPT qualification only; all eleven retained primary receipts remain separately mandatory.",
-    "The sealed fixture is authored by current candidate; code-only exact accepted P05 to current package transition preserves it. Schema11 remains11; no reverse migration.",
+    "The sealed fixture is authored by current candidate; code-only exact accepted P05 to current package transition preserves it. The installed schema12 and retained schema11 partition remain unchanged; no reverse migration.",
     "Supported P04 rollback is an isolated forward historical reader with exact production autoload and old plugin writers unmounted; compatible base storage readiness is observed, P05 shipment capabilities are absent, and P05/unknown bytes are preserved.",
     "No live activation, deployment, release, target-stack cache/payment/pilot certification or destructive retention grant."
 ]
@@ -58,6 +58,15 @@ def protocol():
         result.append((args[0][1:-1], tuple(fields)))
     require(result and len(result) <= 64 and len({item[0] for item in result}) == len(result), "Ambiguous P06 source inventory")
     require(result[-1][0] == "NATIVE-W2P06-TRACKED-OPERATIONAL-LIFECYCLE-CLEANUP", "P06 cleanup inventory missing")
+    required_budget = {
+        "NATIVE-W2P06-SEALED-ORIGINAL-CURRENT-UNKNOWN-HISTORY-SEEDED": {"retained_schema11_39", "schema12_current41", "positive_known_and_unknown_budget_stimuli"},
+        "NATIVE-W2P06-TRACKED-OPERATIONAL-LIFECYCLE-CLEANUP": {"all39_original_business_rows_restored", "original_two_budget_stores_restored"},
+    }
+    for case_id in ("NATIVE-W2P06-FRESH-PACKAGE-REINSTALL-NATIVE-UPGRADE-PRESERVES-HISTORY", "NATIVE-W2P06-DISABLE-PRESERVES-KNOWN-UNKNOWN-AND-SHIPMENT-HISTORY", "NATIVE-W2P06-DEACTIVATION-PRESERVES-SEALED-HISTORY", "NATIVE-W2P06-COMPOSER-UNINSTALL-PRESERVES-SEALED-HISTORY", "NATIVE-W2P06-STANDALONE-UNINSTALL-PRESERVES-SEALED-HISTORY", "NATIVE-W2P06-SUPPORTED-P04-FORWARD-READER-PRESERVES-P05-UNKNOWN-DATA"):
+        required_budget[case_id] = {"all39_business_stores_preserved", "opaque_promotion_budget_stores_preserved"}
+    actual = dict(result)
+    for case_id, fields in required_budget.items():
+        require(fields <= set(actual.get(case_id, ())), "P06 retained39 and opaque2 preservation proofs are mandatory")
     return tuple(result)
 
 
@@ -114,7 +123,7 @@ def verify(reports, priors, hashes, expected):
         require(report["limits"] == LIMITS and report["package_inputs"] == expected.packages, "P06 scope or original package authority differs")
         environment = report["environment"]
         closed(environment, {"php", "wordpress", "woocommerce", "database_version", "hpos", "schema_before", "context", "background_requests"}, "Unknown P06 runtime")
-        for key, value in {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "hpos": mode, "schema_before": "11", "context": CONTEXT, "background_requests": BACKGROUND}.items():
+        for key, value in {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "hpos": mode, "schema_before": "12", "context": CONTEXT, "background_requests": BACKGROUND}.items():
             require(environment[key] == value, "Pinned P06 native runtime differs")
         require(isinstance(environment["database_version"], str) and re.fullmatch(r"11\.4\.13-MariaDB(?:-[A-Za-z0-9_.]+)*", environment["database_version"]), "Pinned P06 database differs")
         closed(report["preceding_receipts"], KINDS, "Unknown P06 preceding receipts")

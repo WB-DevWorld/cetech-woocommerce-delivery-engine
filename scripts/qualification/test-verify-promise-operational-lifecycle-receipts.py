@@ -39,7 +39,7 @@ def packets():
     for mode in ("yes", "no"):
         report = {key: deepcopy(p05[0][key]) for key in ("source_head", "candidate_head", "source_tree", "installed_php_sources", "installed_php_sources_hash")}
         report.update({"format": "cetech-opening-promise-operational-lifecycle-v1", "status": "PASS", "limits": deepcopy(V.LIMITS), "package_inputs": deepcopy(packages),
-                       "environment": {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "database_version": "11.4.13-MariaDB-ubu2404", "hpos": mode, "schema_before": "11", "context": V.CONTEXT, "background_requests": V.BACKGROUND},
+                       "environment": {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "database_version": "11.4.13-MariaDB-ubu2404", "hpos": mode, "schema_before": "12", "context": V.CONTEXT, "background_requests": V.BACKGROUND},
                        "preceding_receipts": {kind: {"sha256": hashes[kind], "cases": count} for kind, count in zip(V.KINDS, counts)},
                        "cases": [{"id": case_id, "status": "PASS", "evidence": dict.fromkeys(fields, True)} for case_id, fields in expected.cases]})
         reports.append(report)
@@ -88,6 +88,19 @@ class LifecycleReceiptControls(unittest.TestCase):
                 self.assertNotIn("new_schema_writer_readiness_refused", fields)
                 self.assertIs(True, fields[field])
                 fields[field] = False
+                with self.assertRaises((RuntimeError, ValueError)): self.check()
+
+    def test_retained39_and_positive_opaque2_proofs_are_distinct_and_mandatory(self):
+        for mode in range(2):
+            for field in ("retained_schema11_39", "schema12_current41", "positive_known_and_unknown_budget_stimuli", "opaque_promotion_budget_stores_preserved", "original_two_budget_stores_restored"):
+                self.setUp()
+                fields = next(case["evidence"] for case in self.reports[mode]["cases"] if field in case["evidence"])
+                self.assertIs(True, fields[field])
+                fields[field] = False
+                with self.assertRaises((RuntimeError, ValueError)): self.check()
+                self.setUp()
+                fields = next(case["evidence"] for case in self.reports[mode]["cases"] if field in case["evidence"])
+                fields.pop(field)
                 with self.assertRaises((RuntimeError, ValueError)): self.check()
 
     def test_changed_original_package_refs_maps_zip_hashes_and_report_hashes_refuse(self):

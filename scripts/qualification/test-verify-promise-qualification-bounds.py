@@ -28,7 +28,7 @@ def packet():
     for index in range(3):
         pure = index == 0; report = {key: deepcopy(priors[0][key]) for key in ("source_head", "candidate_head", "source_tree", "installed_php_sources", "installed_php_sources_hash")}
         report.update({"format": "cetech-opening-promise-qualification-bounds-v1" if pure else "cetech-opening-promise-qualification-native-bounds-v1", "status": "PASS", "limits": V.PURE_LIMITS.copy() if pure else V.NATIVE_LIMITS.copy(), "preceding_receipts": {kind: {"sha256": hashes[kind], "cases": len(prior["cases"])} for kind, prior in zip(hashes, priors)}, "cases": []})
-        report["environment"] = {"php": "8.5.11", "timezone_data_version": "0.system", "context": V.PURE_CONTEXT} if pure else {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "database_version": "11.4.13-MariaDB-ubu2404", "hpos": "yes" if index == 1 else "no", "schema_before": "11", "context": V.NATIVE_CONTEXT, "background_requests": V.BACKGROUND}
+        report["environment"] = {"php": "8.5.11", "timezone_data_version": "0.system", "context": V.PURE_CONTEXT} if pure else {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "database_version": "11.4.13-MariaDB-ubu2404", "hpos": "yes" if index == 1 else "no", "schema_before": "12", "context": V.NATIVE_CONTEXT, "background_requests": V.BACKGROUND}
         for (case_id, evidence, fields), row in zip(expected.pure if pure else expected.native, pure_rows if pure else native_rows):
             assert len(fields) == len(row)
             report["cases"].append({"id": case_id, "status": "PASS", "evidence": dict.fromkeys(evidence, True), "observations": dict(zip(fields, row))})

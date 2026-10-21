@@ -20,7 +20,8 @@ use PHPUnit\Framework\TestCase;
 
 final class DataLifecycleRegistryTest extends TestCase {
 
-	public function test_complete_inventory_matches_retained35_and_three_promise_stores(): void {
+	/** E08-01: exact historical/current partitions and unconditional budget preservation. */
+	public function test_complete_inventory_preserves_historical_partitions_and_registers_two_budget_stores(): void {
 		$original = array_merge( ConfigurationTables::all_suffixes(), OperationStoreSchema::SUFFIXES, RuleLifecycleSchema::SUFFIXES );
 		$retained = array_merge( $original, DeliveryQuoteSchema::SUFFIXES );
 		$expected = array_merge( $retained, PromiseStorageSchema::SUFFIXES );
@@ -36,6 +37,10 @@ final class DataLifecycleRegistryTest extends TestCase {
 		self::assertSame( $this->sorted( $expected ), $this->sorted( DataLifecycleManifest::RETAINED_PROMISE_DOMAIN_TABLE_SUFFIXES ) );
 		$expected[] = \CetechDeliveryEngine\Infrastructure\Persistence\ShipmentPromiseSchema::SUFFIX;
 		self::assertCount( 39, $expected );
+		self::assertSame( $this->sorted( $expected ), $this->sorted( DataLifecycleManifest::RETAINED_SHIPMENT_PROMISE_DOMAIN_TABLE_SUFFIXES ) );
+		self::assertSame( \CetechDeliveryEngine\Infrastructure\Persistence\FixedPromotionBudgetSchema::SUFFIXES, DataLifecycleManifest::PROMOTION_BUDGET_TABLE_SUFFIXES );
+		$expected = [ ...$expected, ...DataLifecycleManifest::PROMOTION_BUDGET_TABLE_SUFFIXES ];
+		self::assertCount( 41, $expected );
 		self::assertSame( $this->sorted( $expected ), $this->sorted( array_column( $tables, 'storage_key' ) ) );
 		foreach ( $tables as $class ) {
 			self::assertSame( [ DataLifecyclePolicy::Preserve, DataLifecyclePolicy::Preserve, DataLifecyclePolicy::Preserve, null ],
@@ -55,6 +60,14 @@ final class DataLifecycleRegistryTest extends TestCase {
 			self::assertSame( 'schema10', $class->accepted_format );
 			self::assertFalse( $class->cleanup_eligible() );
 			self::assertContains( 'no_promise_cleanup_calculation_or_writer_grant', $class->protections );
+		}
+		foreach ( DataLifecycleManifest::PROMOTION_BUDGET_TABLE_SUFFIXES as $suffix ) {
+			$class = $registry->get( 'table.' . $suffix );
+			self::assertSame( 'promotion_budget', $class->owner );
+			self::assertSame( 'schema12', $class->accepted_format );
+			self::assertFalse( $class->cleanup_eligible() );
+			self::assertContains( 'preserve_known_and_unknown_budget_formats_and_all_money_and_claim_history', $class->protections );
+			self::assertContains( 'no_promotion_budget_cleanup_release_redemption_or_rewrite_grant', $class->protections );
 		}
 		self::assertContains( 'preserve_immutable_header_body_namespaces_and_tombstones', $registry->get( 'table.delivery_quotes' )->protections );
 		self::assertContains( 'preserve_order_group_native_snapshot_and_seal_references', $registry->get( 'table.delivery_quote_bindings' )->protections );
@@ -209,7 +222,7 @@ final class DataLifecycleRegistryTest extends TestCase {
 		$list = $standard->classes();
 		array_pop( $list );
 		self::assertSame( $standard->policy_digest(), DataLifecycleRegistry::standard()->policy_digest() );
-		self::assertCount( 142, $standard->classes() );
+		self::assertCount( 144, $standard->classes() );
 	}
 
 	public function test_diagnostics_do_not_emit_selectors_paths_storage_names_or_caller_content(): void {
@@ -243,6 +256,8 @@ final class DataLifecycleRegistryTest extends TestCase {
 					self::assertContains( $case, [ 'W2P-18', 'W2P-32' ] );
 				} elseif ( in_array( $class->storage_key, DataLifecycleManifest::SHIPMENT_PROMISE_TABLE_SUFFIXES, true ) && 'plugin_table' === $class->storage_adapter ) {
 					self::assertContains( $case, [ 'W2P-28', 'W2P-32' ] );
+				} elseif ( in_array( $class->storage_key, DataLifecycleManifest::PROMOTION_BUDGET_TABLE_SUFFIXES, true ) && 'plugin_table' === $class->storage_adapter ) {
+					self::assertContains( $case, [ 'E08-01', 'E08-02', 'E08-03' ] );
 				} else {
 					self::assertMatchesRegularExpression( '/^C06-(?:0[1-9]|[12][0-9]|30)$/D', $case );
 				}
@@ -250,12 +265,13 @@ final class DataLifecycleRegistryTest extends TestCase {
 		}
 	}
 
+	/** E08-03: the cold manifest preserves budget declarations without loading their runtime. */
 	public function test_manifest_loads_without_composer_wordpress_woo_or_domain_dependencies(): void {
 		$path = dirname( __DIR__, 3 ) . '/src/Bootstrap/DataLifecycleManifest.php';
 		$code = 'require ' . var_export( $path, true ) . '; $m = \\CetechDeliveryEngine\\Bootstrap\\DataLifecycleManifest::class; '
 			. 'echo json_encode([count($m::DOMAIN_TABLE_SUFFIXES),count($m::OPTIONS),count($m::CAPABILITIES),count($m::definitions()),'
 			. 'function_exists("get_option"),class_exists("WC_Order",false),class_exists("CetechDeliveryEngine\\\\Domain\\\\DataLifecycle\\\\DataLifecycleRegistry",false),'
-			. '$m::supports_uninstall_intent(1),$m::supports_uninstall_intent("1"),$m::supports_uninstall_intent(true)],JSON_THROW_ON_ERROR);';
+			. '$m::supports_uninstall_intent(1),$m::supports_uninstall_intent("1"),$m::supports_uninstall_intent(true),count($m::RETAINED_SHIPMENT_PROMISE_DOMAIN_TABLE_SUFFIXES),count($m::PROMOTION_BUDGET_TABLE_SUFFIXES),class_exists("CetechDeliveryEngine\\\\Infrastructure\\\\Persistence\\\\FixedPromotionBudgetSchema",false)],JSON_THROW_ON_ERROR);';
 		$process = proc_open( [ PHP_BINARY, '-n', '-r', $code ], [ 0 => [ 'pipe', 'r' ], 1 => [ 'pipe', 'w' ], 2 => [ 'pipe', 'w' ] ], $pipes );
 		self::assertIsResource( $process );
 		fclose( $pipes[0] );
@@ -263,7 +279,7 @@ final class DataLifecycleRegistryTest extends TestCase {
 		$error = stream_get_contents( $pipes[2] );
 		fclose( $pipes[1] ); fclose( $pipes[2] );
 		self::assertSame( 0, proc_close( $process ), $error );
-		self::assertSame( [ 39, 45, 18, 142, false, false, false, true, true, false ], json_decode( $output, true, 16, JSON_THROW_ON_ERROR ) );
+		self::assertSame( [ 41, 45, 18, 144, false, false, false, true, true, false, 39, 2, false ], json_decode( $output, true, 16, JSON_THROW_ON_ERROR ) );
 	}
 
 	private function sorted( array $values ): array {

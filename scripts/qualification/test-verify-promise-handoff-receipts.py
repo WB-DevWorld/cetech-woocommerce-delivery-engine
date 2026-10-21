@@ -30,7 +30,7 @@ def packet():
         reports.append({
             "format": "cetech-opening-promise-handoff-v1", "source_head": p03["source_head"], "candidate_head": p03["candidate_head"], "source_tree": p03["source_tree"],
             "installed_php_sources": p03["installed_php_sources"].copy(), "installed_php_sources_hash": p03["installed_php_sources_hash"],
-            "environment": {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "database_version": "11.4.13-MariaDB-ubu2404", "hpos": mode, "schema_before": "11", "context": V.CONTEXT, "background_requests": V.BACKGROUND},
+            "environment": {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "database_version": "11.4.13-MariaDB-ubu2404", "hpos": mode, "schema_before": "12", "context": V.CONTEXT, "background_requests": V.BACKGROUND},
             "limits": V.LIMITS.copy(), "status": "PASS",
             "preceding_receipts": {kind: {"sha256": hashes[kind], "cases": len(prior_report["cases"])} for kind, prior_report in zip(("native", "cpt", "http", "p02", "p03"), list(retained) + [p02, p03])},
             "cases": [{"id": case_id, "status": "PASS", "evidence": dict.fromkeys(fields, True)} for case_id, fields in expected.cases],
@@ -54,6 +54,15 @@ class HandoffReceiptTests(unittest.TestCase):
     def http_check(self, report, hashes, expected):
         self.check()
         return V.verify_http(report, self.reports, list(self.retained) + [self.p02, self.p03], hashes, expected)
+
+    def test_opaque_budget_preservation_proof_is_required_in_both_native_modes(self):
+        for mode in range(2):
+            for change in ("false", "missing"):
+                self.setUp()
+                fields = next(case["evidence"] for case in self.reports[mode]["cases"] if "opaque_promotion_budget_stores_preserved" in case["evidence"])
+                if change == "false": fields["opaque_promotion_budget_stores_preserved"] = False
+                else: fields.pop("opaque_promotion_budget_stores_preserved")
+                with self.assertRaises(RuntimeError): self.check()
 
     def test_separate_closed_new_http_inventory_accepts(self):
         report, hashes, expected = self.http_packet()

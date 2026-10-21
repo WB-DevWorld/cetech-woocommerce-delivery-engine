@@ -232,8 +232,8 @@ final class PluginLifecycleQualificationTest extends TestCase {
 
 		Uninstaller::uninstall();
 
-		self::assertCount( 39, $tables_before );
-		self::assertCount( 33, array_filter( $tables_before, static fn ( string $table ): bool => ! in_array( $table, [ ...\CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteSchema::tables( 'wp_' ), ...\CetechDeliveryEngine\Infrastructure\Persistence\PromiseStorageSchema::tables( 'wp_' ) ], true ) ) );
+		self::assertCount( 41, $tables_before );
+		self::assertCount( 35, array_filter( $tables_before, static fn ( string $table ): bool => ! in_array( $table, [ ...\CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteSchema::tables( 'wp_' ), ...\CetechDeliveryEngine\Infrastructure\Persistence\PromiseStorageSchema::tables( 'wp_' ) ], true ) ) );
 		self::assertSame( $tables_before, $GLOBALS['wpdb']->table_names() );
 		foreach ( $operation_sentinels as $table => $sentinel ) {
 			self::assertSame( [ $sentinel ], $GLOBALS['wpdb']->table_rows( $table ), 'Explicit uninstall preserves operation and rule history, including an unknown format.' );
@@ -249,6 +249,39 @@ final class PluginLifecycleQualificationTest extends TestCase {
 			get_option( ShipmentOperationsIssueStore::INDEX_OPTION ),
 			'The approved manifest preserves the shipment issue index.'
 		);
+	}
+
+	/** E08-02: lifecycle actions never interpret or rewrite campaign money or unknown history. */
+	public function test_known_and_unknown_budget_rows_survive_uninstall_and_same_version_reinstallation(): void {
+		Activator::activate();
+		$wpdb = $GLOBALS['wpdb'];
+		$schema = \CetechDeliveryEngine\Infrastructure\Persistence\FixedPromotionBudgetSchema::class;
+		$codec = \CetechDeliveryEngine\Infrastructure\Persistence\FixedPromotionBudgetRecordCodec::class;
+		require_once dirname( __DIR__ ) . '/Support/DeliveryCommercial/FixedPromotionQuoteFixture.php';
+		$fixture = \CetechDeliveryEngine\Tests\Support\DeliveryCommercial\FixedPromotionQuoteFixture::class;
+		$provider = $fixture::provider();
+		$request = \CetechDeliveryEngine\Domain\DeliveryPromotion\FixedPromotionBudgetRequest::from_captured( $fixture::header( $provider ), $provider->context(), $provider->terms(), $fixture::key(), hash( 'sha256', 'lifecycle owned budget' ) );
+		$state = \CetechDeliveryEngine\Domain\DeliveryPromotion\FixedPromotionBudgetState::create( 1, $request->account_key(), $request->funding_source(), $request->amount() )->reserve( $request->amount() );
+		$reservation = \CetechDeliveryEngine\Domain\DeliveryPromotion\FixedPromotionBudgetReservation::hold( $request, $request->quote_created_at(), $request->quote_created_at()->plus_seconds( 60 ) );
+		$account_table = $schema::table( 'wp_', $schema::ACCOUNTS_SUFFIX );
+		$claim_table = $schema::table( 'wp_', $schema::RESERVATIONS_SUFFIX );
+		$wpdb->insert( $account_table, $codec::account_values( $state ) );
+		$wpdb->insert( $claim_table, $codec::reservation_values( $reservation ) );
+		$future_account = hash( 'sha256', 'future lifecycle budget' );
+		$wpdb->insert( $account_table, [ 'site_id' => 1, 'account_key' => $future_account, 'format_version' => 99, 'revision' => 7, 'state_json' => '{"future_money":"opaque"}', 'state_digest' => hash( 'sha256', 'unknown account' ) ] );
+		$wpdb->insert( $claim_table, [ 'site_id' => 1, 'claim_key' => hash( 'sha256', 'future claim' ), 'account_key' => $future_account, 'format_version' => 99, 'state' => 'unknown', 'revision' => 7, 'reservation_json' => '{"future_claim":"opaque"}', 'reservation_digest' => hash( 'sha256', 'unknown claim' ) ] );
+		$before = [ $account_table => $wpdb->table_rows( $account_table ), $claim_table => $wpdb->table_rows( $claim_table ) ];
+		foreach ( [ 0, 1 ] as $intent ) {
+			update_option( Uninstaller::DELETE_DATA_OPTION, $intent, false );
+			Uninstaller::uninstall();
+			foreach ( $before as $table => $rows ) { self::assertSame( $rows, $wpdb->table_rows( $table ) ); }
+			self::assertSame( $intent, get_option( Uninstaller::DELETE_DATA_OPTION ) );
+		}
+		Deactivator::deactivate();
+		Activator::activate();
+		self::assertSame( 'success', MigrationStatus::get()['status'] ?? null );
+		self::assertSame( SchemaVersion::TARGET, SchemaVersion::get() );
+		foreach ( $before as $table => $rows ) { self::assertSame( $rows, $wpdb->table_rows( $table ) ); self::assertCount( 2, $rows ); }
 	}
 
 	public function test_wordpress_runner_preserves_default_and_refuses_an_unsupported_explicit_owner(): void {
