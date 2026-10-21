@@ -76,6 +76,34 @@ final readonly class DeliveryPromotionPlan implements \JsonSerializable {
 		return new self( QuoteJson::encode( $data ) );
 	}
 
+	/**
+	 * Replay frozen facts only. Representable refusal records do not authenticate their origin;
+	 * neither successful decoding nor a digest grants eligibility, budget or admission authority.
+	 */
+	public static function from_array( QuoteTerms $terms, FixedDeliveryPromotion $rule, array $data ): self {
+		$data = QuoteJson::detach( $data );
+		$state = QuoteShape::choice( $data['state'] ?? null, [ 'planned', 'refused' ] );
+		$fields = [ 'format_version', 'scope', 'terms_digest', 'component_key', 'rule_digest', 'rule', 'provider', 'evidence', 'state', 'reason_code' ];
+		QuoteShape::fields( $data, 'planned' === $state ? [ ...$fields, 'funding_source', 'money' ] : $fields );
+		if ( 1 !== $data['format_version'] || 'hypothetical_pre_tax' !== $data['scope'] ) { QuoteShape::invalid(); }
+		$key = QuoteShape::digest( $data['component_key'] );
+		if ( null === $data['provider'] && null === $data['evidence'] ) {
+			if ( 'refused' !== $state ) { QuoteShape::invalid(); }
+			$replayed = self::refused( $terms, $key, $rule, QuoteShape::choice( $data['reason_code'], self::REASONS ) );
+		} else {
+			$provider = QuoteShape::object( $data['provider'] );
+			QuoteShape::fields( $provider, [ 'code', 'version' ] );
+			$code = QuoteShape::machine( $provider['code'] );
+			$version = QuoteShape::integer( $provider['version'], 1, 1000000 );
+			$replayed = self::from_evidence( $terms, $key, $rule, $code, $version, QuoteShape::object( $data['evidence'] ) );
+		}
+		if ( ! hash_equals( $replayed->to_private_json(), QuoteJson::encode( $data ) ) ) { QuoteShape::invalid(); }
+		return $replayed;
+	}
+	public static function from_json( QuoteTerms $terms, FixedDeliveryPromotion $rule, string $json ): self {
+		return self::from_array( $terms, $rule, QuoteJson::decode( $json ) );
+	}
+
 	public function planned(): bool { return 'planned' === $this->private_facts()['state']; }
 	public function reason_code(): ?string { return $this->private_facts()['reason_code']; }
 	/** Explicit preview whitelist. Native tax, display totals and private funding never enter it. */

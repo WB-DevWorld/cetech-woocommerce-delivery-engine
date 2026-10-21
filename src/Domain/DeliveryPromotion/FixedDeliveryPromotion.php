@@ -25,6 +25,9 @@ final readonly class FixedDeliveryPromotion implements \JsonSerializable {
 		return new self( QuoteJson::encode( $data ) );
 	}
 
+	/** Decode the frozen rule body, without looking up current merchant configuration. */
+	public static function from_json( string $json ): self { return self::from_array( QuoteJson::decode( $json ) ); }
+
 	public function code(): string { return $this->private_facts()['code']; }
 	public function version(): int { return $this->private_facts()['version']; }
 	public function discount(): QuoteMoney { return QuoteMoney::from_array( $this->private_facts()['discount'] ); }

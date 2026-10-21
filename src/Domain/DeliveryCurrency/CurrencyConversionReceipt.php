@@ -88,6 +88,28 @@ final readonly class CurrencyConversionReceipt implements \JsonSerializable {
 		$data['state'] = 'unavailable'; $data['reason_code'] = $reason;
 		return new self( QuoteJson::encode( $data ) );
 	}
+	/**
+	 * Restore captured evidence without invoking an adapter or consulting a current rate.
+	 * Structural replay does not authenticate provenance, establish freshness or prevent duplicates.
+	 */
+	public static function from_array( array $data ): self {
+		$data = QuoteJson::detach( $data );
+		QuoteShape::fields( $data, [ 'format_version', 'request_digest', 'source', 'context', 'conversion', 'state', 'reason_code' ] );
+		if ( 1 !== $data['format_version'] ) { QuoteShape::invalid(); }
+		$state = QuoteShape::choice( $data['state'], [ 'converted', 'unavailable' ] );
+		$source = QuoteMoney::from_array( QuoteShape::object( $data['source'] ) );
+		$context = self::context( QuoteShape::object( $data['context'] ) );
+		if ( null === $data['conversion'] ) {
+			if ( 'unavailable' !== $state ) { QuoteShape::invalid(); }
+			$replayed = self::unavailable( $source, $context, QuoteShape::choice( $data['reason_code'], self::REASONS ) );
+		} else {
+			$replayed = self::from_provider( $source, $context, $context['provider']['code'], $context['provider']['version'], QuoteShape::object( $data['conversion'] ) );
+		}
+		if ( ! hash_equals( $replayed->to_private_json(), QuoteJson::encode( $data ) ) ) { QuoteShape::invalid(); }
+		return $replayed;
+	}
+	public static function from_json( string $json ): self { return self::from_array( QuoteJson::decode( $json ) ); }
+
 	public function converted(): bool { return 'converted' === $this->private_facts()['state']; }
 	public function reason_code(): ?string { return $this->private_facts()['reason_code']; }
 	public function target_money(): ?QuoteMoney { return $this->converted() ? QuoteMoney::from_array( $this->private_facts()['conversion']['target'] ) : null; }
