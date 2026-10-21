@@ -341,8 +341,8 @@ final class BlocksPerItemCustomerUxTest extends TestCase {
 		self::assertStringNotContainsString( 'per-destination tax', $js );
 	}
 
-	public function test_current_schema_target_is_eleven(): void {
-		self::assertSame( '11', \CetechDeliveryEngine\Core\Versioning\SchemaVersion::TARGET );
+	public function test_current_schema_target_is_twelve(): void {
+		self::assertSame( '12', \CetechDeliveryEngine\Core\Versioning\SchemaVersion::TARGET );
 	}
 
 	/**

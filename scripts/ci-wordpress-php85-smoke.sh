@@ -172,27 +172,30 @@ if ( ! $active ) {
 	exit( 1 );
 }
 $expected_schema = 'rc12_before_upgrade' === $label ? '6' : \CetechDeliveryEngine\Core\Versioning\SchemaVersion::TARGET;
-if ( 'rc12_before_upgrade' !== $label && '11' !== $expected_schema ) { fwrite( STDERR, "current candidate schema authority differs\n" ); exit( 1 ); }
+if ( 'rc12_before_upgrade' !== $label && '12' !== $expected_schema ) { fwrite( STDERR, "current candidate schema authority differs\n" ); exit( 1 ); }
 if ( $expected_schema !== $schema ) {
 	fwrite( STDERR, "schema does not match this installation's expected version\n" );
 	exit( 1 );
 }
-if ( '11' === $expected_schema && ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\OperationStoreReadiness() )->get_status()['ready'] ) {
+if ( '12' === $expected_schema && ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\OperationStoreReadiness() )->get_status()['ready'] ) {
 	fwrite( STDERR, "retained operation storage is not verified ready\n" );
 	exit( 1 );
 }
-if ( '11' === $expected_schema && ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\RuleLifecycleReadiness() )->get_status()['ready'] ) {
+if ( '12' === $expected_schema && ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\RuleLifecycleReadiness() )->get_status()['ready'] ) {
 	fwrite( STDERR, "schema-8 rule lifecycle storage is not verified ready\n" );
 	exit( 1 );
 }
-if ( '11' === $expected_schema && ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteReadiness() )->get_status()['ready'] ) {
+if ( '12' === $expected_schema && ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteReadiness() )->get_status()['ready'] ) {
 	fwrite( STDERR, "schema-9 quote storage is not verified ready\n" );
 	exit( 1 );
 }
-if ( '11' === $expected_schema ) {
+if ( '12' === $expected_schema ) {
 	$expected_tables = array_map( static fn( string $suffix ): string => $wpdb->prefix . 'delivery_engine_' . $suffix, \CetechDeliveryEngine\Bootstrap\DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES );
 	sort( $expected_tables, SORT_STRING ); sort( $tables, SORT_STRING );
-	if ( 39 !== count( $expected_tables ) || $tables !== $expected_tables || ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\PromiseStorageReadiness() )->get_status()['ready'] || ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\ShipmentPromiseReadiness() )->get_status()['ready'] ) { fwrite( STDERR, "schema-11 promise storage or exact current table census differs\n" ); exit( 1 ); }
+	if ( 41 !== count( $expected_tables ) || $tables !== $expected_tables || ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\PromiseStorageReadiness() )->get_status()['ready'] || ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\ShipmentPromiseReadiness() )->get_status()['ready'] || ! ( new \CetechDeliveryEngine\Infrastructure\Persistence\FixedPromotionBudgetInstallationReadiness() )->get_status()['ready'] ) { fwrite( STDERR, "schema-12 current storage or exact table census differs\n" ); exit( 1 ); }
+	foreach ( \CetechDeliveryEngine\Bootstrap\DataLifecycleManifest::PROMOTION_BUDGET_TABLE_SUFFIXES as $suffix ) {
+		if ( '0' !== (string) $wpdb->get_var( 'SELECT COUNT(*) FROM `' . $wpdb->prefix . 'delivery_engine_' . $suffix . '`' ) || '' !== $wpdb->last_error ) { fwrite( STDERR, "installation created promotion budget rows\n" ); exit( 1 ); }
+	}
 }
 if ( count( $tables ) < 10 ) {
 	fwrite( STDERR, "too few Delivery Engine tables\n" );

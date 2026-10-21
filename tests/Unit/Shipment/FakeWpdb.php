@@ -611,6 +611,19 @@ final class FakeWpdb {
 			return $this->table_metadata[ $metadata[1] ]['indexes'] ?? [];
 		}
 
+		// Installation-only budget census: the general shipment SELECT parser requires WHERE.
+		// Keep this finite empty-store path explicit; populated ledger inspection needs its
+		// focused codec fixture or physical SQL proof, never invented projected rows here.
+		if ( preg_match( '/^SELECT (.+) FROM `([a-z0-9_]+delivery_engine_promotion_budget_(?:accounts|reservations))` ORDER BY id ASC LIMIT 1001$/i', trim( $sql ), $budget ) ) {
+			foreach ( explode( ', ', $budget[1] ) as $expression ) {
+				if ( ! preg_match( '/^`[a-z_]+`$/D', $expression )
+					&& ! preg_match( '/^CASE WHEN OCTET_LENGTH\(`([a-z_]+)`\) <= (?:4096|16384) THEN `\1` ELSE NULL END AS `\1`$/D', $expression )
+					&& ! preg_match( '/^OCTET_LENGTH\(`([a-z_]+)`\) AS `__[a-z_]+_bytes`$/D', $expression ) ) { throw new \RuntimeException( 'Unsupported budget census projection.' ); }
+			}
+			if ( [] !== ( $this->tables[$budget[2]] ?? [] ) ) { throw new \RuntimeException( 'Populated budget census requires the focused ledger fixture.' ); }
+			return [];
+		}
+
 		$grouped = $this->grouped_counts( $sql );
 
 		if ( null !== $grouped ) {
