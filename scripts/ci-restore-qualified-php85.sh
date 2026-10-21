@@ -3,39 +3,11 @@
 # setup-php truncates X.Y.Z to X.Y; debug=true also forces its moving cache update.
 set -euo pipefail
 
-check_qualified_ppa() {
- /usr/bin/python3 - <<'PPA_SOURCE'
-from pathlib import Path
-import re
-root = Path('/etc/apt/sources.list.d')
-uri = 'https://ppa.launchpadcontent.net/ondrej/php/ubuntu'
-if (root / 'ubuntu.sources').exists():
-    for path in root.glob('*.sources'):
-        for block in re.split(r'\n\s*\n', path.read_text()):
-            fields = dict(re.findall(r'^([A-Za-z-]+):[ \t]*(.*)$', block, re.M))
-            # Match setup-php's exact URI recognition, then require an active noble/main stanza.
-            if (re.search(r'^URIs: ' + re.escape(uri) + r'$', block, re.M)
-                    and fields.get('Suites') == 'noble'
-                    and 'main' in fields.get('Components', '').split()
-                    and fields.get('Enabled', 'yes').lower() != 'no'):
-                raise SystemExit(0)
-else:
-    pattern = r'^deb\s+(?:\[[^]]*\]\s+)?' + re.escape(uri) + r'\s+noble\s+([^#]+)'
-    for path in root.glob('*.list'):
-        for line in path.read_text().splitlines():
-            match = re.match(pattern, line)
-            if match and 'main' in match.group(1).split():
-                raise SystemExit(0)
-raise SystemExit('Qualified PHP requires an active recognized noble/main PPA source')
-PPA_SOURCE
-}
-
 [[ "${GITHUB_ACTIONS:-}" == true && "${RUNNER_OS:-}" == Linux ]]
 source /etc/os-release
 [[ "$ID" == ubuntu && "$VERSION_ID" == 24.04 && "$(dpkg --print-architecture)" == amd64 ]]
 [[ -n "${RUNNER_TEMP:-}" && -d "$RUNNER_TEMP" ]]
 [[ ! -e /var/lib/dpkg/status-orig && ! -e /tmp/sp_update ]]
-check_qualified_ppa
 
 if ! command -v zstd >/dev/null || ! /usr/bin/python3 -c 'import apt' 2>/dev/null; then
 	sudo apt-get update -qq
@@ -67,9 +39,8 @@ for qualified_tool in php phpize php-config phpdbg php-cgi phar.phar phar; do
 	sudo update-alternatives --set "$qualified_tool" "/usr/bin/${qualified_tool}8.5"
 done
 
-# These conditions keep the following normal setup-php step from updating PHP.
+# The action uses its explicit installed-runtime mode; exact checks still run afterward.
 [[ ! -e /tmp/sp_update ]]
-check_qualified_ppa
 [[ "$(php -r 'echo PHP_VERSION;')" == 8.5.11 ]]
 printf '%s  %s\n' '7dda44e554d086c1c4f441796fc19f11f46055c0a276dad66181f6c11566e46a' /usr/bin/php8.5 | sha256sum --check --status
 echo 'qualified_php85_archive_and_binary=PASS'
