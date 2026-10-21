@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Domain\DeliveryQuote;
 
+use CetechDeliveryEngine\Domain\DeliveryCommercial\FixedPromotionQuoteCapture;
+
 /** Complete immutable server capture; submitted fingerprints never reconstruct it. */
 final readonly class QuoteContext implements \JsonSerializable {
 	public const FORMAT = 1;
@@ -15,6 +17,7 @@ final readonly class QuoteContext implements \JsonSerializable {
 	public static function from_array( array $data ): self {
 		$data = QuoteJson::detach( $data );
 		if ( 2 === ( $data['format_version'] ?? null ) ) { return self::from_v2( $data ); }
+		if ( 3 === ( $data['format_version'] ?? null ) ) { return self::from_v3( $data ); }
 		QuoteShape::fields( $data, [ 'format_version', 'kind', 'selection_digest', 'destination', 'currency', 'tax', 'lines', 'groups' ] );
 		if ( self::FORMAT !== $data['format_version'] ) { QuoteShape::invalid(); }
 		QuoteShape::choice( $data['kind'], [ 'checkout', 'estimate' ] ); QuoteShape::digest( $data['selection_digest'] );
@@ -59,6 +62,19 @@ final readonly class QuoteContext implements \JsonSerializable {
 	public static function from_base_promises( self $base, string $site_key, array $captures ): self {
 		if ( 1 !== $base->format_version() ) { QuoteShape::invalid(); } $data = $base->private_facts(); $data['format_version'] = 2; $data['promise_capture'] = [ 'format' => 1, 'site_key' => $site_key, 'base_digest' => $base->digest(), 'groups' => $captures ]; return self::from_array( $data );
 	}
+	/** New fixed-promotion format, independent of the existing promise capture. */
+	public static function from_base_fixed_promotion( self $base, FixedPromotionQuoteCapture $capture ): self {
+		if ( 1 !== $base->format_version() ) { QuoteShape::invalid(); }
+		$capture->assert_context( $base ); $data = $base->private_facts(); $data['format_version'] = 3; $data['promotion_capture'] = $capture->private_facts();
+		return self::from_array( $data );
+	}
+	private static function from_v3( array $data ): self {
+		QuoteShape::fields( $data, [ 'format_version', 'kind', 'selection_digest', 'destination', 'currency', 'tax', 'lines', 'groups', 'promotion_capture' ] );
+		$base_data = $data; unset( $base_data['promotion_capture'] ); $base_data['format_version'] = 1; $base = self::from_array( $base_data );
+		$capture = FixedPromotionQuoteCapture::from_array( QuoteShape::object( $data['promotion_capture'] ) ); $capture->assert_context( $base );
+		$data = $base->private_facts(); $data['format_version'] = 3; $data['promotion_capture'] = $capture->private_facts();
+		return new self( QuoteJson::encode( $data ), $base->checkout_acceptable() );
+	}
 	private static function from_v2( array $data ): self {
 		QuoteShape::fields( $data, [ 'format_version', 'kind', 'selection_digest', 'destination', 'currency', 'tax', 'lines', 'groups', 'promise_capture' ] ); $base_data = $data; unset( $base_data['promise_capture'] ); $base_data['format_version'] = 1; $base = self::from_array( $base_data ); $capture = QuoteShape::object( $data['promise_capture'] );
 		QuoteShape::fields( $capture, [ 'format', 'site_key', 'base_digest', 'groups' ] ); if ( 1 !== $capture['format'] || ! hash_equals( QuoteShape::digest( $capture['base_digest'] ), $base->digest() ) ) { QuoteShape::invalid(); } \CetechDeliveryEngine\Domain\ServicePromise\PromiseShape::id( $capture['site_key'] );
@@ -73,7 +89,15 @@ final readonly class QuoteContext implements \JsonSerializable {
 		$keys = array_column( $base_data['groups'], 'component_key' ); sort( $keys, SORT_STRING ); if ( array_column( $groups, 'component_key' ) !== $keys ) { QuoteShape::invalid(); } $capture['groups'] = $groups; $data['promise_capture'] = $capture; return new self( QuoteJson::encode( $data ), $base->checkout_acceptable() );
 	}
 	public function format_version(): int { return $this->private_facts()['format_version']; }
-	public function base_context(): self { if ( 1 === $this->format_version() ) { return $this; } $data = $this->private_facts(); unset( $data['promise_capture'] ); $data['format_version'] = 1; return self::from_array( $data ); }
+	public function base_context(): self {
+		if ( 1 === $this->format_version() ) { return $this; }
+		$data = $this->private_facts();
+		if ( 2 === $this->format_version() ) { unset( $data['promise_capture'] ); }
+		elseif ( 3 === $this->format_version() ) { unset( $data['promotion_capture'] ); }
+		else { QuoteShape::invalid(); }
+		$data['format_version'] = 1; return self::from_array( $data );
+	}
+	public function fixed_promotion_capture(): ?FixedPromotionQuoteCapture { return 3 === $this->format_version() ? FixedPromotionQuoteCapture::from_array( $this->private_facts()['promotion_capture'] ) : null; }
 	public function base_material_digest(): string { return $this->base_context()->digest(); }
 	public function promise_groups(): array { return $this->private_facts()['promise_capture']['groups'] ?? []; }
 	public function private_facts(): array { return QuoteJson::decode( $this->json ); }
@@ -89,6 +113,21 @@ final readonly class QuoteContext implements \JsonSerializable {
 		return true;
 	}
 	public function jsonSerialize(): never { throw new \LogicException( 'An explicit authorized delivery quote context projection is required.' ); }
+	/** Preserve the original private property representation for existing formats only. */
+	public function __serialize(): array {
+		if ( 3 === $this->format_version() ) { throw new \LogicException( 'Private promotion context cannot be serialized implicitly.' ); }
+		return [ "\0" . self::class . "\0json" => $this->json, "\0" . self::class . "\0acceptable" => $this->acceptable ];
+	}
+	public function __unserialize( array $data ): void {
+		$json_key = "\0" . self::class . "\0json"; $acceptable_key = "\0" . self::class . "\0acceptable";
+		if ( array_keys( $data ) !== [ $json_key, $acceptable_key ] || ! is_string( $data[$json_key] ) || ! is_bool( $data[$acceptable_key] ) ) { QuoteShape::invalid(); }
+		$restored = self::from_json( $data[$json_key] );
+		if ( ! in_array( $restored->format_version(), [ 1, 2 ], true ) || $restored->to_private_json() !== $data[$json_key] || $restored->acceptable !== $data[$acceptable_key] ) { QuoteShape::invalid(); }
+		$this->json = $restored->json; $this->acceptable = $restored->acceptable;
+	}
+	public function __debugInfo(): array {
+		return 3 === $this->format_version() ? [ 'format_version' => 3, 'material_digest' => $this->digest(), 'promotion_capture' => 'redacted' ] : [ 'json' => $this->json, 'acceptable' => $this->acceptable ];
+	}
 	private static function dimension( mixed $value ): array {
 		$data = QuoteShape::object( $value ); QuoteShape::fields( $data, [ 'state', 'id' ] ); QuoteShape::choice( $data['state'], [ 'known', 'absent', 'unknown' ] );
 		if ( 'known' === $data['state'] ) { QuoteShape::integer( $data['id'] ); }
