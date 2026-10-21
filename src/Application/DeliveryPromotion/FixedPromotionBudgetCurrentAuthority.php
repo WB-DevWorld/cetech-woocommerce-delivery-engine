@@ -50,7 +50,9 @@ final readonly class FixedPromotionBudgetCurrentAuthority implements FixedPromot
 			if ( ! $this->owned( $session, $prefix ) || $session->site_id() !== $owner->site_id() || ! $owner->equals( $this->header->owner() )
 				|| $header->to_private_json() !== $this->header->to_private_json() || $context->to_private_json() !== $this->context->to_private_json() || $terms->to_private_json() !== $this->terms->to_private_json() || ! $this->header->valid_at( $at ) ) { return null; }
 			if ( ! $session->validate_tables( $this->tables( $session ) ) || ! $this->owned( $session, $prefix ) ) { return null; }
-			$eligible = $this->eligibility->validity_at( $session, $owner, $this->header, $this->context, $this->terms, $at );
+			$eligible = $this->eligibility instanceof FixedPromotionEligibilityBudgetGuard
+				? $this->eligibility->validity_for_requests_at( $session, $owner, $this->header, $this->context, $this->terms, $this->requests, $at )
+				: $this->eligibility->validity_at( $session, $owner, $this->header, $this->context, $this->terms, $at );
 			if ( ! $this->owned( $session, $prefix ) || null === $eligible || ! $eligible->valid_at( $at ) ) { return null; }
 			$keys = []; foreach ( $this->requests as $request ) { $keys[$request->account_key()] = true; } $keys = array_keys( $keys ); sort( $keys, SORT_STRING );
 			$accounts = []; foreach ( $keys as $key ) { $account = $this->store->lock_account( $session, $key ); if ( ! $this->owned( $session, $prefix ) || null === $account || $account->account_key() !== $key || $account->site_id() !== $owner->site_id() ) { return null; } $accounts[$key] = $account; }
@@ -63,7 +65,9 @@ final readonly class FixedPromotionBudgetCurrentAuthority implements FixedPromot
 			foreach ( $totals as $key => $amount ) { if ( $accounts[$key]->held()->compare( $amount ) < 0 ) { return null; } }
 			$intervals = [ $eligible, QuoteCurrentEvidenceValidity::capture( $at, $this->header->expires_at() ) ];
 			foreach ( $this->requests as $request ) {
-				$claim = $this->store->lock_reservation( $session, $request->claim_key() );
+				$claim = $this->store instanceof FixedPromotionBudgetAccountStore
+					? $this->store->lock_reservation_for_account( $session, $request->claim_key(), $request->account_key() )
+					: $this->store->lock_reservation( $session, $request->claim_key() );
 				if ( ! $this->owned( $session, $prefix ) || null === $claim || ! $claim->matches( $request ) || 'held' !== $claim->state() || ! $claim->is_held_at( $at ) ) { return null; }
 				$intervals[] = QuoteCurrentEvidenceValidity::capture( $at, $claim->expires_at() );
 			}

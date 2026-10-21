@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Tests\Unit\DeliveryPromotion;
 
-use CetechDeliveryEngine\Application\DeliveryPromotion\{FixedPromotionBudgetCurrentAuthority, FixedPromotionBudgetStore, FixedPromotionEligibilityGuard, FixedPromotionNativeCapture, FixedPromotionNativeRequests};
+use CetechDeliveryEngine\Application\DeliveryPromotion\{FixedPromotionBudgetAccountStore, FixedPromotionBudgetCurrentAuthority, FixedPromotionBudgetStore, FixedPromotionEligibilityBudgetGuard, FixedPromotionEligibilityGuard, FixedPromotionNativeCapture, FixedPromotionNativeRequests};
 use CetechDeliveryEngine\Application\DeliveryQuote\{FixedPromotionQuoteProvider, QuoteCurrentEvidenceValidity};
 use CetechDeliveryEngine\Domain\DeliveryPromotion\{DeliveryPromotionPlan, FixedPromotionBudgetRequest, FixedPromotionBudgetReservation, FixedPromotionBudgetState};
 use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteContext, QuoteHeader, QuoteMoney, QuoteOwner, QuoteTerms, QuoteTime};
@@ -165,6 +165,47 @@ final class FixedPromotionBudgetCurrentAuthorityTest extends TestCase {
 		foreach ( [ static fn( object $value ) => json_encode( $value, JSON_THROW_ON_ERROR ), static fn( object $value ) => serialize( $value ) ] as $encode ) { try { $encode( $this->authority ); self::fail( 'Private authority was exposed.' ); } catch ( \LogicException ) { self::assertTrue( true ); } }
 		ob_start(); var_dump( $this->authority ); $dump = ob_get_clean(); self::assertStringNotContainsString( 'private_fixed_funder', $dump ); self::assertStringContainsString( 'redacted', $dump ); $this->quiet();
 	}
+	public function test_request_aware_eligibility_receives_the_exact_frozen_quote_account_and_never_falls_back(): void {
+		$guard = new CurrentBudgetBoundEligibilityFixture( $this->request );
+		$authority = FixedPromotionBudgetCurrentAuthority::from_captured( $this->header, $this->provider->context(), $this->provider->terms(), [ [ 'component_key' => F::key(), 'account_key' => $this->account ] ], $this->store, $guard );
+		self::assertNotNull( $authority->validity_at( $this->session, F::owner(), $this->header, $this->provider->context(), $this->provider->terms(), Q::time()->plus_seconds( 10 ) ) );
+		self::assertSame( 1, $guard->bound_calls ); self::assertSame( 0, $guard->legacy_calls ); self::assertSame( $this->request->to_private_json(), $guard->seen[0]->to_private_json() ); $this->quiet();
+	}
+	public function test_selected_merchant_pool_denial_stops_before_ledger_reads_without_a_legacy_retry(): void {
+		$other = FixedPromotionBudgetRequest::from_captured( $this->header, $this->provider->context(), $this->provider->terms(), F::key(), Q::digest( 'another merchant selected pool' ) );
+		$guard = new CurrentBudgetBoundEligibilityFixture( $other );
+		$authority = FixedPromotionBudgetCurrentAuthority::from_captured( $this->header, $this->provider->context(), $this->provider->terms(), [ [ 'component_key' => F::key(), 'account_key' => $this->account ] ], $this->store, $guard );
+		self::assertNull( $authority->validity_at( $this->session, F::owner(), $this->header, $this->provider->context(), $this->provider->terms(), Q::time()->plus_seconds( 10 ) ) );
+		self::assertSame( 1, $guard->bound_calls ); self::assertSame( 0, $guard->legacy_calls ); self::assertSame( [], $this->store->locks ); $this->quiet();
+	}
+	public function test_current_authority_uses_the_account_aware_claim_read_when_available(): void {
+		$store = new CurrentBudgetAccountStoreFixture( $this->store );
+		$authority = FixedPromotionBudgetCurrentAuthority::from_captured( $this->header, $this->provider->context(), $this->provider->terms(), [ [ 'component_key' => F::key(), 'account_key' => $this->account ] ], $store, $this->eligibility );
+		self::assertNotNull( $authority->validity_at( $this->session, F::owner(), $this->header, $this->provider->context(), $this->provider->terms(), Q::time()->plus_seconds( 10 ) ) );
+		self::assertSame( [ [ $this->request->claim_key(), $this->account ] ], $store->bound_reads ); $this->quiet();
+	}
+}
+
+final class CurrentBudgetBoundEligibilityFixture implements FixedPromotionEligibilityBudgetGuard {
+	public int $bound_calls = 0; public int $legacy_calls = 0; public array $seen = [];
+	public function __construct( private FixedPromotionBudgetRequest $expected ) {}
+	public function tables( OperationSession $session ): array { return [ 'wp_campaigns' ]; }
+	public function validity_at( OperationSession $session, QuoteOwner $owner, QuoteHeader $header, QuoteContext $context, QuoteTerms $terms, QuoteTime $at ): ?QuoteCurrentEvidenceValidity { ++$this->legacy_calls; throw new \LogicException( 'A bound refusal cannot fall back to unbound eligibility.' ); }
+	public function validity_for_requests_at( OperationSession $session, QuoteOwner $owner, QuoteHeader $header, QuoteContext $context, QuoteTerms $terms, array $requests, QuoteTime $at ): ?QuoteCurrentEvidenceValidity {
+		++$this->bound_calls; $this->seen = $requests;
+		return 1 === count( $requests ) && $requests[0]->to_private_json() === $this->expected->to_private_json() ? QuoteCurrentEvidenceValidity::capture( $at, $header->expires_at() ) : null;
+	}
+}
+final class CurrentBudgetAccountStoreFixture implements FixedPromotionBudgetAccountStore {
+	public array $bound_reads = [];
+	public function __construct( private FixedPromotionBudgetStore $store ) {}
+	public function tables( OperationSession $session ): array { return $this->store->tables( $session ); }
+	public function lock_account( OperationSession $session, string $key ): ?FixedPromotionBudgetState { return $this->store->lock_account( $session, $key ); }
+	public function lock_reservation( OperationSession $session, string $key ): ?FixedPromotionBudgetReservation { throw new \LogicException( 'Use the known account for a current claim read.' ); }
+	public function lock_reservation_for_account( OperationSession $session, string $claim_key, string $account_key ): ?FixedPromotionBudgetReservation { $this->bound_reads[] = [ $claim_key, $account_key ]; return $this->store->lock_reservation( $session, $claim_key ); }
+	public function replace_account( OperationSession $session, FixedPromotionBudgetState $expected, FixedPromotionBudgetState $next ): bool { return $this->store->replace_account( $session, $expected, $next ); }
+	public function insert_reservation( OperationSession $session, FixedPromotionBudgetReservation $reservation ): bool { return $this->store->insert_reservation( $session, $reservation ); }
+	public function replace_reservation( OperationSession $session, FixedPromotionBudgetReservation $expected, FixedPromotionBudgetReservation $next ): bool { return $this->store->replace_reservation( $session, $expected, $next ); }
 }
 
 final class CurrentBudgetEligibilityFixture implements FixedPromotionEligibilityGuard {

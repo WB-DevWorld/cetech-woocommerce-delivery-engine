@@ -220,6 +220,11 @@ jobs:
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
             'CetechDeliveryEngine\Tests\Integration\ServicePromise\PromiseQualificationBoundsRealDatabaseTest' 3
 
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+            'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionBudgetRealDatabaseTest' 9
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+            'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionRuleEligibilityRealDatabaseTest' 6
+
   php85-wordpress:
     name: PHP 8.5 WordPress/WooCommerce
     runs-on: ubuntu-24.04

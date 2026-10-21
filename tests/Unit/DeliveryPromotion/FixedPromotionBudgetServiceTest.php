@@ -3,7 +3,7 @@
 declare(strict_types=1);
 namespace CetechDeliveryEngine\Tests\Unit\DeliveryPromotion;
 
-use CetechDeliveryEngine\Application\DeliveryPromotion\{FixedPromotionBudgetService, FixedPromotionBudgetStore};
+use CetechDeliveryEngine\Application\DeliveryPromotion\{FixedPromotionBudgetAccountStore, FixedPromotionBudgetService, FixedPromotionBudgetStore};
 use CetechDeliveryEngine\Application\DeliveryQuote\FixedPromotionQuoteProvider;
 use CetechDeliveryEngine\Application\Operation\OperationStorageException;
 use CetechDeliveryEngine\Domain\DeliveryPromotion\{FixedPromotionBudgetRequest, FixedPromotionBudgetReservation, FixedPromotionBudgetState};
@@ -181,6 +181,25 @@ final class FixedPromotionBudgetServiceTest extends TestCase {
 		$this->storage_failure( fn() => $service->commit( $this->session, $this->request, $this->at( 1 ) ) );
 		self::assertSame( '3.00', $this->store->account->spent()->amount() ); self::assertSame( 'held', $this->store->claims[$this->request->claim_key()]->state() ); self::assertSame( $before, $this->session->lifecycle );
 		$this->session->rollback(); self::assertSame( '3.00', $this->store->account->held()->amount() ); self::assertSame( '0.00', $this->store->account->spent()->amount() );
+	}
+	public function test_account_aware_store_is_used_for_reserve_replay_and_terminal_transition(): void {
+		$store = new class( $this->store ) implements FixedPromotionBudgetAccountStore {
+			public array $reads = [];
+			public function __construct( private FixedPromotionBudgetStore $delegate ) {}
+			public function tables( OperationSession $session ): array { return $this->delegate->tables( $session ); }
+			public function lock_account( OperationSession $session, string $key ): ?FixedPromotionBudgetState { return $this->delegate->lock_account( $session, $key ); }
+			public function lock_reservation( OperationSession $session, string $key ): ?FixedPromotionBudgetReservation { throw new \LogicException( 'A known account must not use stale discovery.' ); }
+			public function lock_reservation_for_account( OperationSession $session, string $claim, string $account ): ?FixedPromotionBudgetReservation { $this->reads[] = [ $claim, $account ]; return $this->delegate->lock_reservation( $session, $claim ); }
+			public function replace_account( OperationSession $session, FixedPromotionBudgetState $expected, FixedPromotionBudgetState $next ): bool { return $this->delegate->replace_account( $session, $expected, $next ); }
+			public function insert_reservation( OperationSession $session, FixedPromotionBudgetReservation $reservation ): bool { return $this->delegate->insert_reservation( $session, $reservation ); }
+			public function replace_reservation( OperationSession $session, FixedPromotionBudgetReservation $expected, FixedPromotionBudgetReservation $next ): bool { return $this->delegate->replace_reservation( $session, $expected, $next ); }
+		};
+		$service = new FixedPromotionBudgetService( $store, static fn(): bool => true );
+		$first = $service->reserve( $this->session, $this->request, $this->at(), $this->at( 60 ) );
+		self::assertSame( $first, $service->reserve( $this->session, $this->request, $this->at( 1 ), $this->at( 60 ) ) );
+		self::assertSame( 'committed', $service->commit( $this->session, $this->request, $this->at( 2 ) )->state() );
+		self::assertSame( array_fill( 0, 3, [ $this->request->claim_key(), $this->request->account_key() ] ), $store->reads );
+		self::assertSame( '3.00', $this->store->account->spent()->amount() ); self::assertSame( '0.00', $this->store->account->held()->amount() );
 	}
 }
 
