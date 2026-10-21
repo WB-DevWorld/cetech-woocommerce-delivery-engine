@@ -187,6 +187,10 @@ jobs:
           CETECH_DE_REAL_DB_PASSWORD: geo11pass
           CETECH_DE_REAL_DB_NAME: cetech_geo11
         run: |
+          # Exercise the repaired exact-lock-wait proof before the longer retained SQL suite.
+          vendor/bin/phpunit -c phpunit.real-db.xml \
+            tests/Integration/DeliveryPromotion/PromotionBudgetRealDatabaseTest.php \
+            --filter test_two_actual_processes_compete_for_last_funds_without_overspend
           vendor/bin/phpunit \
             -c phpunit.real-db.xml \
             --log-junit "${RUNNER_TEMP}/cetech-de-real-db.junit.xml"
@@ -219,6 +223,11 @@ jobs:
             'CetechDeliveryEngine\Tests\Integration\ServicePromise\PromisePrimedSourceLifetimeRealDatabaseTest' 4
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
             'CetechDeliveryEngine\Tests\Integration\ServicePromise\PromiseQualificationBoundsRealDatabaseTest' 3
+
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+            'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionBudgetRealDatabaseTest' 9
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+            'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionRuleEligibilityRealDatabaseTest' 6
 
   php85-wordpress:
     name: PHP 8.5 WordPress/WooCommerce

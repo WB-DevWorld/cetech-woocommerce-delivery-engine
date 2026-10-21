@@ -55,7 +55,9 @@ final readonly class FixedPromotionBudgetService {
 	private function locked( OperationSession $session, FixedPromotionBudgetRequest $request, string $prefix ): array {
 		try {
 			$account = $this->store->lock_account( $session, $request->account_key() ); $this->assert_session( $session, $request, $prefix );
-			$claim = null === $account ? null : $this->store->lock_reservation( $session, $request->claim_key() ); $this->assert_session( $session, $request, $prefix );
+			$claim = null === $account ? null : ( $this->store instanceof FixedPromotionBudgetAccountStore
+				? $this->store->lock_reservation_for_account( $session, $request->claim_key(), $request->account_key() )
+				: $this->store->lock_reservation( $session, $request->claim_key() ) ); $this->assert_session( $session, $request, $prefix );
 		}
 		catch ( \Throwable ) { throw new OperationStorageException(); }
 		if ( null === $account || $account->site_id() !== $request->site_id() || $account->account_key() !== $request->account_key() || $account->funding_source() !== $request->funding_source()
