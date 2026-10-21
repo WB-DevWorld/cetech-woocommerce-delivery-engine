@@ -56,6 +56,12 @@ if ( ! str_contains( $health_source, 'namespace CetechDeliveryEngine\\Applicatio
 require_once $autoload;
 
 $required_classes = [
+	'CetechDeliveryEngine\\Domain\\DeliveryPromotion\\FixedPromotionBudgetAllocationSet',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionBudgetAllocationService',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionBudgetWriteTrackingStore',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionQuotePreparationService',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionQuotePreparation',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\FixedPromotionBudgetOperationReadiness',
 	'CetechDeliveryEngine\\Infrastructure\\Persistence\\FixedPromotionBudgetInstallationReadiness',
 	'CetechDeliveryEngine\\Infrastructure\\Persistence\\FixedPromotionBudgetSchema',
 	'CetechDeliveryEngine\\Infrastructure\\Persistence\\FixedPromotionBudgetReadiness',
@@ -533,7 +539,7 @@ $is_schema9_release = str_contains( $header_source, '1.0.0-dev.wave2-quote-stora
 	|| 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-contract\.1\'\s*\);\s*$/m', $header_source );
 $is_schema10_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-(?:storage|calculation|handoff)\.1\'\s*\);\s*$/m', $header_source );
 $is_schema11_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.(?:wave2-promise-(?:native|qualification)\.1|economics-facts\.1|delivery-promotion-fixed\.1|currency-convert-once\.1|commercial-handoff\.1|fixed-promotion-format\.1|promotion-authority\.1|promotion-sql\.1)\'\s*\);\s*$/m', $header_source );
-$is_schema12_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.promotion-install\.1\'\s*\);\s*$/m', $header_source );
+$is_schema12_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.promotion-(?:install|preparation)\.1\'\s*\);\s*$/m', $header_source );
 $is_schema8_release = str_contains( $header_source, '1.0.0-dev.wave1-rule-lifecycle' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-snapshot-readers' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-data-lifecycle' )

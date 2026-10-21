@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Tests\Unit\DeliveryQuote;
 
-use CetechDeliveryEngine\Application\DeliveryPromotion\{FixedPromotionCurrentAuthority, FixedPromotionNativeCapture, FixedPromotionNativeRequests};
+use CetechDeliveryEngine\Application\DeliveryPromotion\{FixedPromotionBudgetCurrentAuthority, FixedPromotionBudgetStore, FixedPromotionCurrentAuthority, FixedPromotionEligibilityBudgetGuard, FixedPromotionNativeCapture, FixedPromotionNativeRequests};
 use CetechDeliveryEngine\Application\DeliveryQuote\{FixedPromotionQuoteCurrentEvidenceGuard, FixedPromotionQuoteProvider, LegacyQuoteSourcePlan, LegacyQuoteSourceSnapshot, QuoteCurrentEvidenceValidity};
-use CetechDeliveryEngine\Domain\DeliveryPromotion\DeliveryPromotionPlan;
-use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteContext, QuoteHeader, QuoteJson, QuoteOwner, QuoteTerms, QuoteTime};
+use CetechDeliveryEngine\Domain\DeliveryPromotion\{DeliveryPromotionPlan, FixedPromotionBudgetRequest, FixedPromotionBudgetState};
+use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteContext, QuoteHeader, QuoteJson, QuoteMoney, QuoteOwner, QuoteTerms, QuoteTime};
 use CetechDeliveryEngine\Domain\Operation\{OperationCommitResult, OperationSession};
 use CetechDeliveryEngine\Infrastructure\Persistence\LegacyQuoteSourceSnapshotReader;
 use CetechDeliveryEngine\Tests\Support\DeliveryCommercial\FixedPromotionQuoteFixture as F;
@@ -63,6 +63,41 @@ final class FixedPromotionCurrentEvidenceGuardTest extends TestCase {
 	}
 	public function test_unconfirmed_campaign_has_no_usable_interval(): void {
 		$f = $this->fixture(); $f->campaign->available = false; self::assertNull( $f->guard->validity_at( $f->session, F::owner(), $f->provider->context(), QuoteFixtures::time() ) ); self::assertCount( 1, $f->campaign->seen );
+	}
+	public function test_source_only_proof_precedes_budget_authority_and_never_calls_its_validity(): void {
+		$f = $this->fixture(); $f->campaign->available = false; $reads = $f->native_source->reads;
+		$v = $f->guard->source_validity_at( $f->session, F::owner(), $f->provider->context(), QuoteFixtures::time() );
+		self::assertNotNull( $v ); self::assertTrue( $v->valid_at( QuoteFixtures::time()->plus_seconds( 299 ) ) ); self::assertFalse( $v->valid_at( $f->header->expires_at() ) );
+		self::assertSame( [], $f->campaign->seen ); self::assertSame( 0, $f->session->clocks ); self::assertSame( $reads, $f->native_source->reads );
+		self::assertNull( $f->guard->validity_at( $f->session, F::owner(), $f->provider->context(), QuoteFixtures::time() ) ); self::assertCount( 1, $f->campaign->seen );
+	}
+	public function test_current_sources_cannot_substitute_for_a_missing_held_budget_claim(): void {
+		$f = $this->fixture(); $key = QuoteFixtures::digest( 'explicit preallocation pool' );
+		$r = FixedPromotionBudgetRequest::from_captured( $f->header, $f->provider->context(), $f->provider->terms(), F::key(), $key );
+		$store = $this->createMock( FixedPromotionBudgetStore::class ); $store->method( 'tables' )->willReturn( [ 'wp_promotion_budget' ] );
+		$store->expects( $this->once() )->method( 'lock_account' )->with( $f->session, $key )->willReturn( FixedPromotionBudgetState::create( 1, $key, $r->funding_source(), QuoteMoney::from_array( [ 'amount' => '9.00', 'currency' => 'GHS', 'precision' => 2 ] ) ) );
+		$store->expects( $this->never() )->method( 'insert_reservation' ); $store->expects( $this->never() )->method( 'replace_account' ); $store->expects( $this->never() )->method( 'replace_reservation' );
+		$eligibility = $this->createMock( FixedPromotionEligibilityBudgetGuard::class ); $eligibility->method( 'tables' )->willReturn( [ 'wp_promotion_policy' ] );
+		$eligibility->expects( $this->once() )->method( 'validity_for_requests_at' )->willReturn( QuoteCurrentEvidenceValidity::capture( QuoteFixtures::time(), QuoteFixtures::time()->plus_seconds( 60 ) ) );
+		$campaign = FixedPromotionBudgetCurrentAuthority::from_captured( $f->header, $f->provider->context(), $f->provider->terms(), [ [ 'component_key' => F::key(), 'account_key' => $key ] ], $store, $eligibility );
+		$guard = FixedPromotionQuoteCurrentEvidenceGuard::from_captured( $f->header, $f->provider->context(), $f->provider->terms(), $f->snapshot, $f->native, $campaign );
+		self::assertNotNull( $guard->source_validity_at( $f->session, F::owner(), $f->provider->context(), QuoteFixtures::time() ) );
+		self::assertNull( $guard->validity_at( $f->session, F::owner(), $f->provider->context(), QuoteFixtures::time() ) );
+	}
+	public function test_full_proof_does_not_repeat_the_extracted_source_reads(): void {
+		$source = $this->fixture(); self::assertNotNull( $source->guard->source_validity_at( $source->session, F::owner(), $source->provider->context(), QuoteFixtures::time() ) );
+		$full = $this->fixture(); self::assertNotNull( $full->guard->validity_at( $full->session, F::owner(), $full->provider->context(), QuoteFixtures::time() ) );
+		self::assertSame( $source->session->sql, $full->session->sql ); self::assertSame( [], $source->campaign->seen ); self::assertCount( 1, $full->campaign->seen );
+	}
+	public static function source_only_refusals(): array { return array_map( static fn( string $kind ): array => [ $kind ], [ 'retired', 'transaction', 'site', 'prefix', 'owner', 'context', 'expired', 'backwards', 'source', 'native' ] ); }
+	#[DataProvider( 'source_only_refusals' )]
+	public function test_source_only_proof_retains_owner_context_time_and_physical_source_refusals( string $kind ): void {
+		$f = $this->fixture(); $owner = F::owner(); $context = $f->provider->context(); $at = QuoteFixtures::time();
+		if ( 'retired' === $kind ) { $f->session->retired = true; } elseif ( 'transaction' === $kind ) { $f->session->transaction = false; } elseif ( 'site' === $kind ) { $f->session->site = 2; } elseif ( 'prefix' === $kind ) { $f->session->prefix = 'wp_other_'; }
+		elseif ( 'owner' === $kind ) { $facts = $owner->facts(); $facts['principal_hash'] = QuoteFixtures::digest( 'different source reader' ); $owner = QuoteOwner::from_array( $facts ); }
+		elseif ( 'context' === $kind ) { $context = F::original_context(); } elseif ( 'expired' === $kind ) { $at = $f->header->expires_at(); } elseif ( 'backwards' === $kind ) { $at = $at->plus_seconds( -1 ); }
+		elseif ( 'source' === $kind ) { $f->session->rows['wp_posts'][0]['post_modified_gmt'] = '2026-10-07 05:00:01'; } else { $f->session->native_rows['wp_wc_tax_rate_classes'] = [ [ 'tax_rate_class_id' => '1', 'name' => 'Changed', 'slug' => 'changed' ] ]; }
+		self::assertNull( $f->guard->source_validity_at( $f->session, $owner, $context, $at ) ); self::assertSame( [], $f->campaign->seen ); self::assertSame( 0, $f->session->clocks );
 	}
 	public function test_earliest_source_boundary_and_quote_expiry_cap_campaign_validity(): void {
 		$f = $this->fixture( [ L::card(), L::card( overrides: [ 'id' => 2, 'effective_from' => '2026-10-07 05:00:20' ] ) ] );
