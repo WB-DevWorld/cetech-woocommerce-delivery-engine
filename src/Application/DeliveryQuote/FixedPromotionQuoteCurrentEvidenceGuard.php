@@ -56,15 +56,23 @@ final readonly class FixedPromotionQuoteCurrentEvidenceGuard implements QuoteNat
 	public function verify_at( OperationSession $session, QuoteOwner $owner, QuoteContext $context, QuoteTime $at ): bool { return null !== $this->validity_at( $session, $owner, $context, $at ); }
 	public function validity_at( OperationSession $session, QuoteOwner $owner, QuoteContext $context, QuoteTime $at ): ?QuoteCurrentEvidenceValidity {
 		try {
+			$source_validity = $this->source_validity_at( $session, $owner, $context, $at );
+			if ( null === $source_validity ) { return null; }
+			$campaign = $this->campaign->validity_at( $session, $owner, $this->header, $this->context, $this->terms, $at );
+			if ( null === $campaign || ! $this->matches( $session, $owner, $context ) ) { return null; }
+			return QuoteCurrentEvidenceValidity::intersection( $at, $source_validity, $campaign );
+		} catch ( \Throwable ) { return null; }
+	}
+	/** Original and fresh-native source proof only; it grants no held-budget or admission authority. */
+	public function source_validity_at( OperationSession $session, QuoteOwner $owner, QuoteContext $context, QuoteTime $at ): ?QuoteCurrentEvidenceValidity {
+		try {
 			if ( ! $this->matches( $session, $owner, $context ) || ! $this->header->valid_at( $at ) ) { return null; }
 			$source_validity = FixedPromotionSourceValidity::validity_at( $this->source, $at, $this->header->expires_at() );
 			if ( null === $source_validity || ! $session->validate_tables( $this->tables( $session ) ) || ! $this->matches( $session, $owner, $context ) ) { return null; }
 			$capture = $context->fixed_promotion_capture();
 			if ( null === $capture || ! $this->source->guard()->verify_at( $session, $owner, $capture->original_context(), $at ) || ! $this->matches( $session, $owner, $context ) ) { return null; }
 			if ( ! $this->native->native_receipt()->guard()->verify( $session, $owner, $context->base_context() ) || ! $this->matches( $session, $owner, $context ) ) { return null; }
-			$campaign = $this->campaign->validity_at( $session, $owner, $this->header, $this->context, $this->terms, $at );
-			if ( null === $campaign || ! $this->matches( $session, $owner, $context ) ) { return null; }
-			return QuoteCurrentEvidenceValidity::intersection( $at, $source_validity, $campaign );
+			return $source_validity;
 		} catch ( \Throwable ) { return null; }
 	}
 	private function owned( OperationSession $session ): bool { return ! $session->is_retired() && $session->in_transaction() && $session->site_id() === $this->header->owner()->site_id() && $session->table_prefix() === $this->native->native_receipt()->source_facts()['selectors']['table_prefix']; }
