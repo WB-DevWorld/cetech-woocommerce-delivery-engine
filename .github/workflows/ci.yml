@@ -254,6 +254,8 @@ jobs:
         env:
           debug: 'false'
           update: 'false'
+          # Installer policy only: the real runner remains GitHub-hosted.
+          runner: self-hosted
       - name: Assert exact qualified PHP survived tool configuration
         run: |
           test "$(php -r 'echo PHP_VERSION;')" = '8.5.11'
