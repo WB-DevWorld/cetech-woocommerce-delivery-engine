@@ -223,7 +223,7 @@ jobs:
 
   php85-wordpress:
     name: PHP 8.5 WordPress/WooCommerce
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     # P05 appends separate native/CPT/browser proofs to the unchanged retained suite.
     timeout-minutes: 60
     services:
@@ -244,14 +244,21 @@ jobs:
         with:
           # Receipt authority checks ancestry against the integrated Q05 baseline.
           fetch-depth: 0
-      - uses: shivammathur/setup-php@v2
+      - name: Restore exact qualified PHP archive and debug symbols
+        run: bash scripts/ci-restore-qualified-php85.sh
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # v2, reviewed installer behavior
         with:
           php-version: '8.5.11'
           tools: composer:v2
           coverage: none
           extensions: mysqli, pdo_mysql, zip, mbstring, intl, xml, curl, gd, soap, bcmath
         env:
-          debug: 'true'
+          debug: 'false'
+          update: 'false'
+      - name: Assert exact qualified PHP survived tool configuration
+        run: |
+          test "$(php -r 'echo PHP_VERSION;')" = '8.5.11'
+          printf '%s  %s\n' '7dda44e554d086c1c4f441796fc19f11f46055c0a276dad66181f6c11566e46a' "$(command -v php8.5)" | sha256sum --check --status
       - name: Verify crash diagnostic output boundary
         run: |
           python3 scripts/qualification/test-opening-http-native-stack.py
