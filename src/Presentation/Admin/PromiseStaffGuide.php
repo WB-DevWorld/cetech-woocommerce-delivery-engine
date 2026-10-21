@@ -108,7 +108,7 @@ final class PromiseStaffGuide {
 			echo '<p>' . esc_html__( 'No delivery-time rule has been created here yet. A rule that already exists only in advanced configuration is left as it is.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 			return;
 		}
-		echo '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Rule', 'cetech-woocommerce-delivery-engine' ) . '</th><th>' . esc_html__( 'Applies to', 'cetech-woocommerce-delivery-engine' ) . '</th><th>' . esc_html__( 'Saved state', 'cetech-woocommerce-delivery-engine' ) . '</th><th>' . esc_html__( 'Next action', 'cetech-woocommerce-delivery-engine' ) . '</th></tr></thead><tbody>';
+		echo '<table class="widefat striped cetech-de-guide-rules" role="table" aria-labelledby="cetech-de-saved-rules"><thead role="rowgroup"><tr role="row"><th scope="col" role="columnheader">' . esc_html__( 'Rule', 'cetech-woocommerce-delivery-engine' ) . '</th><th scope="col" role="columnheader">' . esc_html__( 'Applies to', 'cetech-woocommerce-delivery-engine' ) . '</th><th scope="col" role="columnheader">' . esc_html__( 'Saved state', 'cetech-woocommerce-delivery-engine' ) . '</th><th scope="col" role="columnheader">' . esc_html__( 'Next action', 'cetech-woocommerce-delivery-engine' ) . '</th></tr></thead><tbody role="rowgroup">';
 		foreach ( $index as $id => $row ) {
 			if ( ! is_string( $id ) || ! is_array( $row ) ) {
 				continue;
@@ -116,7 +116,7 @@ final class PromiseStaffGuide {
 			try { $binding = $this->service->binding( PromiseStaffDraft::SITE_KEY ); if ( ! $this->service->can_disclose( $binding, $this->row_scope( $row ) ) ) { continue; } } catch ( \Throwable ) { continue; }
 			$opened = $this->confirm( $row );
 			if ( ! $this->service->can_disclose( $binding, $this->row_scope( $row ) ) ) { continue; }
-			echo '<tr><td>' . esc_html( (string) ( $row['label'] ?? $id ) ) . '</td><td>' . esc_html( (string) ( $row['applies'] ?? '' ) ) . '</td><td>' . esc_html( $opened['label'] ) . '</td><td>';
+			echo '<tr role="row"><th scope="row" role="rowheader">' . esc_html( (string) ( $row['label'] ?? $id ) ) . '</th><td role="cell"><span class="cetech-de-guide-cell-label" aria-hidden="true">' . esc_html__( 'Applies to', 'cetech-woocommerce-delivery-engine' ) . '</span>' . esc_html( (string) ( $row['applies'] ?? '' ) ) . '</td><td role="cell"><span class="cetech-de-guide-cell-label" aria-hidden="true">' . esc_html__( 'Saved state', 'cetech-woocommerce-delivery-engine' ) . '</span>' . esc_html( $opened['label'] ) . '</td><td role="cell"><span class="cetech-de-guide-cell-label" aria-hidden="true">' . esc_html__( 'Next action', 'cetech-woocommerce-delivery-engine' ) . '</span>';
 			if ( $opened['editable'] ) {
 				echo '<form method="post" action="">';
 				AdminFormHelper::nonce_field( self::ACTION );
@@ -752,6 +752,38 @@ final class PromiseStaffGuide {
 	}
 
 	private function styles(): void {
-		echo '<style>.cetech-de-guide{max-width:46rem}.cetech-de-guide form,.cetech-de-guide select,.cetech-de-guide input,.cetech-de-guide textarea{max-width:100%}.cetech-de-guide fieldset{margin:1rem 0;padding:1rem}.cetech-de-guide label,.cetech-de-guide select,.cetech-de-guide input,.cetech-de-guide textarea{display:block;margin:.4rem 0}.cetech-de-day{display:flex;flex-wrap:wrap;gap:.75rem;align-items:end}.cetech-de-guide .cetech-de-products{margin-top:.75rem}.cetech-de-guide-form:not(:has(input[name=scope][value=product]:checked)):not(:has(input[name=scope][value=variation]:checked)) .cetech-de-products{display:none}.cetech-de-guide-form:not(:has(input[name=scope][value=variation]:checked)) #cetech-de-variation{display:none}@media (max-width:782px){.cetech-de-guide .button{display:block;margin:.5rem 0}}.cetech-de-guide{max-width:min(46rem,100%);overflow-wrap:anywhere}.cetech-de-guide fieldset{min-width:0;max-width:100%;box-sizing:border-box}.cetech-de-guide select,.cetech-de-guide input,.cetech-de-guide textarea{min-width:0;width:100%;max-width:100%;box-sizing:border-box}.cetech-de-guide table{display:block;max-width:100%;overflow-x:auto}.cetech-de-day label{width:auto;min-width:8rem;flex:1 1 8rem}</style>';
+		echo <<<'CSS'
+<style>
+.cetech-de-guide{max-width:min(46rem,100%);overflow-wrap:anywhere}
+.cetech-de-guide form,.cetech-de-guide select,.cetech-de-guide input,.cetech-de-guide textarea{max-width:100%}
+.cetech-de-guide fieldset{margin:1rem 0;padding:1rem;min-width:0;max-width:100%;box-sizing:border-box}
+.cetech-de-guide label,.cetech-de-guide select,.cetech-de-guide input,.cetech-de-guide textarea{display:block;margin:.4rem 0}
+.cetech-de-guide select,.cetech-de-guide input,.cetech-de-guide textarea{min-width:0;width:100%;max-width:100%;box-sizing:border-box}
+.cetech-de-day{display:flex;flex-wrap:wrap;gap:.75rem;align-items:end}
+.cetech-de-day label{width:auto;min-width:8rem;flex:1 1 8rem}
+.cetech-de-guide .cetech-de-products{margin-top:.75rem}
+.cetech-de-guide-form:not(:has(input[name=scope][value=product]:checked)):not(:has(input[name=scope][value=variation]:checked)) .cetech-de-products{display:none}
+.cetech-de-guide-form:not(:has(input[name=scope][value=variation]:checked)) #cetech-de-variation{display:none}
+.cetech-de-guide-rules{width:100%;table-layout:fixed}
+.cetech-de-guide-rules th,.cetech-de-guide-rules td{vertical-align:top;overflow-wrap:anywhere;box-sizing:border-box}
+.cetech-de-guide-rules thead th:nth-child(1){width:22%}
+.cetech-de-guide-rules thead th:nth-child(2){width:20%}
+.cetech-de-guide-rules thead th:nth-child(3){width:18%}
+.cetech-de-guide-rules thead th:nth-child(4){width:40%}
+.cetech-de-guide-rules .button{max-width:100%;white-space:normal;height:auto;text-align:center}
+.cetech-de-guide-cell-label{display:none}
+@media (max-width:782px){
+ .cetech-de-guide .button{display:block;margin:.5rem 0}
+ .cetech-de-guide .cetech-de-guide-rules{display:block;border:0;background:transparent}
+ .cetech-de-guide-rules thead{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+ .cetech-de-guide-rules tbody{display:block}
+ .cetech-de-guide .cetech-de-guide-rules tbody tr{display:block;margin:0 0 1rem;padding:.5rem 1rem;border:1px solid #c3c4c7;background:#fff}
+ .cetech-de-guide-rules tbody th,.cetech-de-guide-rules tbody td{display:block;width:auto;padding:.5rem 0;border:0}
+ .cetech-de-guide-rules tbody th{font-size:1.1rem;font-weight:600}
+ .cetech-de-guide-rules .cetech-de-guide-cell-label{display:block;margin-bottom:.25rem;font-weight:600}
+ .cetech-de-guide-rules .button{width:100%;min-height:2.75rem;padding:.5rem .75rem;line-height:1.5;box-sizing:border-box}
+}
+</style>
+CSS;
 	}
 }

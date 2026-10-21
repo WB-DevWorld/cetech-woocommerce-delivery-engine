@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Tests\Unit\ServicePromise\Configuration;
 
 use CetechDeliveryEngine\Application\DeliveryQuote\PromiseQuotePlacementActivation;
-use CetechDeliveryEngine\Application\ServicePromise\Configuration\PromiseConfigurationService;
+use CetechDeliveryEngine\Application\ServicePromise\Configuration\{PromiseConfigurationService, PromiseStaffDraft};
 use CetechDeliveryEngine\Domain\Contracts\OperationIdentity;
 use CetechDeliveryEngine\Domain\Operation\{OperationConnectionFactory, OperationRefusal};
 use CetechDeliveryEngine\Domain\ServicePromise\Persistence\PromiseSiteBinding;
@@ -64,6 +64,22 @@ final class NativePromiseConfigurationTest extends TestCase {
 		$service = new PromiseConfigurationService( $factory, new A(), new PromiseQuotePlacementActivation( $factory, static fn(): bool => false ) );
 		$result = $service->preview( $service->binding( 'site-1' ), F::policy( [ 'capacity_mode' => 'required', 'capacity_source' => F::source( 'capacity' ) ] )->to_private_json(), [] );
 		self::assertSame( 'ineligible', $result['views'][0]['state'] ); self::assertSame( [ 'capacity_unknown' ], $result['views'][0]['reason_codes'] ); self::assertFalse( $result['admission'] );
+	}
+	public function test_native_staff_business_day_preview_calculates_dates_on_the_real_clock_without_sql_or_admission(): void {
+		$fields = [ 'unit' => 'business_days', 'processing_min' => '1', 'processing_max' => '2', 'delivery_min' => '1', 'delivery_max' => '2', 'estimate_required' => 'no', 'scope' => 'product', 'target_id' => '10', 'timezone' => 'Africa/Accra' ];
+		foreach ( [ 'mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun' ] as $day ) { $fields[$day . '_open'] = '09:00'; $fields[$day . '_close'] = '17:00'; }
+		$draft = PromiseStaffDraft::assemble( $fields, [ 'public_label' => 'Review test delivery', 'internal_code' => 'review-test', 'route' => 'local_delivery' ] );
+		self::assertSame( [], $draft['missing'] );
+		$factory = $this->createMock( OperationConnectionFactory::class ); $factory->expects( self::never() )->method( 'open' );
+		$service = new PromiseConfigurationService( $factory, new A(), new PromiseQuotePlacementActivation( $factory, static fn(): bool => false ) );
+		$before = new \DateTimeImmutable( 'now', new \DateTimeZone( 'UTC' ) );
+		$result = $service->preview( $service->binding( 'store' ), $draft['policy']->to_private_json(), [ $draft['calendar']->private_facts() ] );
+		$view = $result['views'][0]; self::assertSame( 'absolute_window', $view['state'] ); self::assertSame( [], $view['reason_codes'] );
+		self::assertTrue( $result['hypothetical'] ); self::assertFalse( $result['admission'] );
+		self::assertSame( 'Africa/Accra', $view['display_timezone'] );
+		$from = new \DateTimeImmutable( $view['from'], new \DateTimeZone( 'UTC' ) ); $until = new \DateTimeImmutable( $view['until'], new \DateTimeZone( 'UTC' ) );
+		self::assertGreaterThan( $before->modify( '+1 day' ), $from );
+		self::assertEquals( $from->modify( '+2 days' ), $until, 'Both serial ranged legs must contribute to the calculated customer window.' );
 	}
 	public function test_preview_wrong_site_or_current_global_permission_discloses_no_result(): void {
 		$factory = $this->createMock( OperationConnectionFactory::class ); $factory->expects( self::never() )->method( 'open' ); $service = new PromiseConfigurationService( $factory, new A(), new PromiseQuotePlacementActivation( $factory, static fn(): bool => false ) );

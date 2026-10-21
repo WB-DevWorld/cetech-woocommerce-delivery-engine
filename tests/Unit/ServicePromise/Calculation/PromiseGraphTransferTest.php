@@ -132,6 +132,17 @@ final class PromiseGraphTransferTest extends TestCase {
 		$result = self::transfer( $input, [ $calendar ], '2026-10-09 10:04:59.999999' );
 		self::assertSame( '2026-10-12 10:00:00.000000', $result['terminal_windows'][0]['from'] ); self::assertSame( '2026-10-12 10:04:59.999999', $result['terminal_windows'][0]['until'] );
 	}
+	public function test_serial_ranged_business_day_legs_propagate_a_real_calendar_window_without_flattening(): void {
+		$calendar = Fixture::calendar( [ 'weekly_openings' => self::weekdays() ] );
+		$components = [
+			Fixture::component( 'prepare', [ 'duration' => self::duration( 1, 2, 'business_days', $calendar ) ] ),
+			Fixture::component( 'delivery', [ 'predecessors' => [ 'prepare' ], 'duration' => self::duration( 1, 2, 'business_days', $calendar ) ] ),
+		];
+		$result = self::transfer( self::input( $components, [ 'delivery' ], [ $calendar ] ), [ $calendar ] );
+		self::assertSame( '2026-10-13 10:00:00.000000', $result['terminal_windows'][0]['from'] );
+		self::assertSame( '2026-10-15 10:00:00.000000', $result['terminal_windows'][0]['until'] );
+		self::assertCount( 2, $result['components'] );
+	}
 	public function test_graph_order_changes_do_not_change_the_complete_transfer(): void {
 		$components = [ Fixture::component( 'z-first', [ 'duration' => self::duration( 30, 60 ) ] ), Fixture::component( 'a-first', [ 'duration' => self::duration( 60, 90 ) ] ), Fixture::component( 'delivery', [ 'predecessors' => [ 'z-first', 'a-first' ], 'duration' => self::duration( 10, 20 ) ] ) ];
 		$first = self::transfer( self::input( $components, [ 'delivery' ] ) ); $second = self::transfer( self::input( array_reverse( $components ), [ 'delivery' ] ) );

@@ -110,7 +110,11 @@ final class PromiseCalendarArithmetic {
 		if ( ! in_array( $unit, [ 'calendar_days', 'business_days' ], true ) || null === $calendar ) { throw new PromiseCalculationException( 'unsupported_policy' ); }
 		$timezone = $this->timezone( $calendar->timezone() );
 		$from_local = $this->local( $from, $timezone, $budget ); $until_local = $this->local( $until, $timezone, $budget );
-		if ( $from_local->format( 'Y-m-d' ) !== $until_local->format( 'Y-m-d' ) ) { throw new PromiseCalculationException( 'unsupported_policy' ); }
+		if ( $from_local->format( 'Y-m-d' ) !== $until_local->format( 'Y-m-d' ) ) {
+			if ( 'business_days' !== $unit || 0 === $amount ) { throw new PromiseCalculationException( 'unsupported_policy' ); }
+			$this->prove_business_day_date_envelope( $from, $until, $amount, $calendar, $budget );
+			return;
+		}
 		$this->transition_free( $from, $until, $timezone, $budget );
 		if ( 'business_days' === $unit ) {
 			$a = $this->next_start( $from, $calendar, $budget ); $b = $this->next_start( $until, $calendar, $budget );
@@ -120,6 +124,26 @@ final class PromiseCalendarArithmetic {
 		$a = $this->add( $from, $amount, $unit, $calendar, $budget ); $b = $this->add( $until, $amount, $unit, $calendar, $budget );
 		if ( $a->compare( $b ) > 0 ) { throw new PromiseCalculationException( 'unsupported_policy' ); }
 		$this->transition_free( $a, $b, $timezone, $budget );
+	}
+
+	/**
+	 * With no offset change, seeking an opening is nondecreasing in civil time.
+	 * An eligible date j transfers to date j + amount, or at most the first
+	 * opening of j + amount + 1 if its preserved time is after the last close.
+	 * The next eligible source date cannot transfer before that opening.
+	 * Validate the entire visited calendar, not merely the successful endpoints:
+	 * an interior target time or opening must never conceal an undefined transfer.
+	 */
+	private function prove_business_day_date_envelope( RuleTime $from, RuleTime $until, int $amount, BusinessCalendarVersion $calendar, PromiseCalculationBudget $budget ): void {
+		$this->horizon( $from, $until, $calendar->timezone(), $budget );
+		$a = $this->add( $from, $amount, 'business_days', $calendar, $budget ); $b = $this->add( $until, $amount, 'business_days', $calendar, $budget );
+		if ( $a->compare( $b ) > 0 ) { throw new PromiseCalculationException( 'unsupported_policy' ); }
+		$this->validate_calendar_envelope( $from, $b, $calendar, $budget );
+		$timezone = $this->timezone( $calendar->timezone() );
+		$first_date = $this->local( $from, $timezone, $budget )->format( 'Y-m-d' ); $last_date = $this->local( $b, $timezone, $budget )->format( 'Y-m-d' );
+		$span_start = $this->resolve_local( $first_date, '00:00', $calendar->timezone(), null, $budget );
+		$span_end = $this->resolve_local( $this->shift_date( $last_date, 1, $budget ), '00:00', $calendar->timezone(), null, $budget );
+		$this->transition_free( $span_start, $span_end, $timezone, $budget );
 	}
 
 	/** Endpoint-only success cannot conceal an undefined interior transfer. */
