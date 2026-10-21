@@ -12,13 +12,20 @@ use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteShape;
 
 /** Original cheap, server-owned request; it makes no claim about resolved material facts. */
 final readonly class QuotePreparationCommand implements \JsonSerializable {
-	private function __construct( private QuoteOwner $quote_owner, private string $draft, private string $token, private string $provider, private int $provider_revision, private string $quote_profile, private int $profile_revision, private OperationIdentity $issue_identity, private CanonicalIntent $intent ) {}
+	private function __construct( private QuoteOwner $quote_owner, private string $draft, private string $token, private string $provider, private int $provider_revision, private string $quote_profile, private int $profile_revision, private OperationIdentity $issue_identity, private CanonicalIntent $intent, private int $envelope_format = 1 ) {}
 	public static function create( QuoteOwner $owner, string $draft_digest, string $original_token, string $provider_code, int $provider_version, string $profile, int $profile_version ): self {
 		QuoteShape::digest( $draft_digest ); QuoteId::from_string( $original_token );
 		QuoteShape::machine( $provider_code ); QuoteShape::integer( $provider_version, 1, 1000000 ); QuoteShape::machine( $profile ); QuoteShape::integer( $profile_version, 1, 1000000 );
 		$identity = new OperationIdentity( $owner->site_id(), 'delivery_quote_customer', $owner->digest(), 'delivery_quote.issue', 1, 'cart:' . $owner->digest(), $original_token );
 		$intent = CanonicalIntent::from_command( $identity, $owner->facts(), [ 'format_version' => 1, 'stage' => 'cart_preparation' ], [ 'draft_digest' => $draft_digest, 'provider' => [ 'code' => $provider_code, 'version' => $provider_version ], 'profile' => $profile, 'profile_version' => $profile_version ] );
 		return new self( $owner, $draft_digest, $original_token, $provider_code, $provider_version, $profile, $profile_version, $identity, $intent );
+	}
+	/** Cheap explicit promotion lane; final allocation choices remain in the bound v2 issue. */
+	public static function fixed_promotion( QuoteOwner $owner, string $draft_digest, string $original_token ): self {
+		QuoteShape::digest( $draft_digest ); QuoteId::from_string( $original_token );
+		$identity = new OperationIdentity( $owner->site_id(), 'delivery_quote_customer', $owner->digest(), 'delivery_quote.issue', 2, 'cart:' . $owner->digest(), $original_token );
+		$intent = CanonicalIntent::from_command( $identity, $owner->facts(), [ 'format_version' => 2, 'stage' => 'cart_preparation' ], [ 'draft_digest' => $draft_digest, 'provider' => [ 'code' => 'fixed_promotion_native_v1', 'version' => 1 ], 'profile' => 'fixed_promotion_native_v1', 'profile_version' => 1 ] );
+		return new self( $owner, $draft_digest, $original_token, 'fixed_promotion_native_v1', 1, 'fixed_promotion_native_v1', 1, $identity, $intent, 2 );
 	}
 	public function owner(): QuoteOwner { return $this->quote_owner; }
 	public function draft_digest(): string { return $this->draft; }
@@ -33,11 +40,15 @@ final readonly class QuotePreparationCommand implements \JsonSerializable {
 		return $this->quote_owner->equals( $command->owner() ) && hash_equals( $this->issue_identity->namespace_digest(), $command->identity()->namespace_digest() ) && $this->provider === $command->provider_code() && $this->provider_revision === $command->provider_version() && $this->quote_profile === $command->profile() && $this->profile_revision === $command->profile_version();
 	}
 	/** Only a trusted session adapter persists this original envelope; it contains no capability. */
-	public function to_private_array(): array { return [ 'format_version' => 1, 'owner' => $this->quote_owner->facts(), 'draft_digest' => $this->draft, 'original_token' => $this->token, 'provider_code' => $this->provider, 'provider_version' => $this->provider_revision, 'profile' => $this->quote_profile, 'profile_version' => $this->profile_revision ]; }
+	public function to_private_array(): array { return [ 'format_version' => $this->envelope_format, 'owner' => $this->quote_owner->facts(), 'draft_digest' => $this->draft, 'original_token' => $this->token, 'provider_code' => $this->provider, 'provider_version' => $this->provider_revision, 'profile' => $this->quote_profile, 'profile_version' => $this->profile_revision ]; }
 	public static function from_private_array( array $facts ): self {
 		QuoteShape::fields( $facts, [ 'format_version', 'owner', 'draft_digest', 'original_token', 'provider_code', 'provider_version', 'profile', 'profile_version' ] );
-		QuoteShape::integer( $facts['format_version'], 1, 1 );
+		QuoteShape::integer( $facts['format_version'], 1, 2 );
 		if ( ! is_string( $facts['original_token'] ) ) { QuoteShape::invalid(); }
+		if ( 2 === $facts['format_version'] ) {
+			if ( 'fixed_promotion_native_v1' !== $facts['provider_code'] || 1 !== $facts['provider_version'] || 'fixed_promotion_native_v1' !== $facts['profile'] || 1 !== $facts['profile_version'] ) { QuoteShape::invalid(); }
+			return self::fixed_promotion( QuoteOwner::from_array( QuoteShape::object( $facts['owner'] ) ), QuoteShape::digest( $facts['draft_digest'] ), $facts['original_token'] );
+		}
 		return self::create( QuoteOwner::from_array( QuoteShape::object( $facts['owner'] ) ), QuoteShape::digest( $facts['draft_digest'] ), $facts['original_token'], QuoteShape::machine( $facts['provider_code'] ), QuoteShape::integer( $facts['provider_version'], 1, 1000000 ), QuoteShape::machine( $facts['profile'] ), QuoteShape::integer( $facts['profile_version'], 1, 1000000 ) );
 	}
 	public function jsonSerialize(): never { throw new \LogicException( 'An explicit authorized quote preparation projection is required.' ); }

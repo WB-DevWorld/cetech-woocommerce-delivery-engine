@@ -38,7 +38,7 @@ final class QuoteOperationProfile implements OperationProfile, OperationTerminal
 		$this->authorizer = null === $authorize ? null : \Closure::fromCallable( $authorize );
 	}
 	/** Hydration-only finite registry; none of these unbound profiles authorizes a write. */
-	public static function registry(): OperationProfileRegistry { return new OperationProfileRegistry( [ ...array_map( static fn( string $operation ): self => new self( $operation ), self::OPERATIONS ), new self( 'delivery_quote.seal', profile_version: 2 ) ] ); }
+	public static function registry(): OperationProfileRegistry { return new OperationProfileRegistry( [ ...array_map( static fn( string $operation ): self => new self( $operation ), self::OPERATIONS ), new self( 'delivery_quote.seal', profile_version: 2 ), new FixedPromotionQuoteIssueProfile() ] ); }
 	public function operation(): string { return $this->name; }
 	public function version(): int { return $this->profile_version; }
 	/** Shopper placement refusals retain their original finite receipt; legacy internal v1 remains retryable. */

@@ -40,6 +40,7 @@ final class QuoteReceiptVerifier {
 		asort( $names, SORT_STRING ); $out = []; foreach ( $names as $purpose => $namespace ) { $out[$purpose] = $this->read( $session, $namespace, 'delivery_quote.' . $purpose, $lock ); } return $out;
 	}
 	public function verify( QuoteStoredRow $quote, array $records, ?QuoteBinding $binding = null ): bool {
+		if ( 3 === $quote->header()->format_version() ) { return false; }
 		if ( ! $this->link( $records['issue'] ?? null, $quote, 'issue', 1, 'issued' ) ) { return false; }
 		// Immutable completions cannot be contradicted by a syntactically valid rollback.
 		if ( ( $records['accept'] ?? null ) instanceof OperationRecord && 'accepted' === $records['accept']->state && null === $quote->accepted_at() ) { return false; }
@@ -71,7 +72,25 @@ final class QuoteReceiptVerifier {
 		foreach ( [ 'binding_id' => $binding->id(), 'placement_id' => $b['placement_uuid'], 'order_id' => $b['order_id'], 'manifest_digest' => $b['managed_group_manifest_digest'], 'binding_revision' => $revision, 'state' => $state, 'snapshot_digest' => $b['snapshot_digest'], 'context_digest' => $b['context_digest'], 'native_money_digest' => $b['native_money_digest'] ] as $field => $value ) { if ( ( $r[$field] ?? null ) !== $value ) { return false; } }
 		return true;
 	}
-	public function issue_verified( QuoteStoredRow $quote, array $records ): bool { return $this->link( $records['issue'] ?? null, $quote, 'issue', 1, 'issued' ); }
+	public function issue_verified( QuoteStoredRow $quote, array $records ): bool { return 3 !== $quote->header()->format_version() && $this->link( $records['issue'] ?? null, $quote, 'issue', 1, 'issued' ); }
+	/** Historical issued-only acknowledgement; it grants no current acceptance or budget authority. */
+	public function promotion_issue_verified( QuoteStoredRow $quote, array $records, FixedPromotionQuoteIssueCommand $expected ): bool {
+		try {
+			$header = $quote->header(); $context = $quote->context(); $terms = $quote->terms(); $record = $records['issue'] ?? null;
+			if ( 3 !== $header->format_version() || 'fixed_promotion_native_v1' !== $header->profile() || 1 !== $header->profile_version() || 'checkout' !== $header->purpose()
+				|| 'issued' !== $quote->state() || 1 !== $quote->revision() || null !== $quote->accepted_at() || null !== $quote->row()['transition_at'] || null === $context || null === $terms
+				|| 2 !== $expected->identity->operation_version || ! $expected->owner()->equals( $header->owner() ) || $header->to_private_json() !== $expected->header()->to_private_json()
+				|| $context->to_private_json() !== $expected->context()->to_private_json() || $terms->to_private_json() !== $expected->terms()->to_private_json() || ! $header->matches_reference( $expected->reference() )
+				|| ! $record instanceof OperationRecord || 2 !== $record->operation_version || ! $record->matches( $expected->identity, $expected->intent() ) || 'accepted' !== $record->state
+				|| ! $this->common( $record, $quote, $header->namespace_hashes()['issue'] ) || null === $record->event || null === $record->completed_at ) { return false; }
+			$r = $record->completion->result; $event = $record->event;
+			$facts = [ 'allocation_digest' => $expected->allocation_digest(), 'allocation_count' => count( $expected->allocation_set()->requests() ), 'hold_until' => $expected->hold_until()->epoch_microseconds() ];
+			foreach ( $facts as $field => $value ) { if ( ( $r[$field] ?? null ) !== $value || ( $event->target[$field] ?? null ) !== $value ) { return false; } }
+			$completed = \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime::from_epoch_microseconds( $r['completed_at'] );
+			return 1 === $r['quote_revision'] && 'issued' === $r['state'] && \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime::parse( $record->completed_at )->compare( $completed ) >= 0 && $header->valid_at( $completed ) && $completed->compare( $expected->hold_until() ) < 0
+				&& $event->operation === $expected->identity->operation && 2 === $event->operation_version && 'quote_issued' === $event->reason_code && 1 === $event->before_revision && 2 === $event->after_revision && [ 'quote', 'admission', 'promotion_budget' ] === $event->changed_fields;
+		} catch ( \Throwable ) { return false; }
+	}
 	/** Original final namespace is terminal no-effect; this never admits or replays payment. */
 	public function placement_rejected( QuoteStoredRow $quote, array $records, QuoteBinding $binding ): bool {
 		if ( 'prepared' !== $binding->state() || 2 !== $binding->revision() || null === $quote->accepted_at() || ! $this->verify( $quote, $records, $binding ) ) { return false; }
@@ -100,7 +119,7 @@ final class QuoteReceiptVerifier {
 			&& null === $record->completion->result && null === $record->completion->publication && null === $record->audit_id && null === $record->event && 'none' === $record->publication_state;
 	}
 	private function link( mixed $record, QuoteStoredRow $quote, string $purpose, int $revision, string $state, ?int $at = null ): bool {
-		if ( ! $record instanceof OperationRecord || 'accepted' !== $record->state || ! $this->common( $record, $quote, $quote->header()->namespace_hashes()[$purpose] ) ) { return false; }
+		if ( ! $record instanceof OperationRecord || ( 'issue' === $purpose && ( 1 !== $record->operation_version || 'delivery_quote.issue' !== $record->operation ) ) || 'accepted' !== $record->state || ! $this->common( $record, $quote, $quote->header()->namespace_hashes()[$purpose] ) ) { return false; }
 		$r = $record->completion->result; return $r['quote_revision'] === $revision && $r['state'] === $state && ( null === $at || $r['completed_at'] === $at );
 	}
 	private function common( OperationRecord $record, QuoteStoredRow $quote, string $namespace ): bool {
