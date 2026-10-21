@@ -1,4 +1,12 @@
-# Current implementation — E01 private economics facts — 2026-10-21
+# Current implementation — E02 fixed delivery promotion planning — 2026-10-21
+
+The renewed owner continuation implements approved Wave2 package3's single-fixed promotion subset on its own branch above E01, with development identity `1.0.0-dev.delivery-promotion-fixed.1`. Four pure classes calculate an explicit fixed discount without changing base Rate Cards, native taxes, current quote terms or E01 cost/subsidy observations. A 12.50 list price and 3.00 discount produce 9.50; zero and full-list discounts remain explicit. No clamp, stacking winner, percentage rounding or merchant default is introduced.
+
+Only completely bound terms/component/rule/provider evidence and affirmative eligibility/budget planning states produce a hypothetical pre-tax plan. Unknown, exhausted, ineligible, malformed, changed-context, already-promoted or incompatible-money inputs refuse. Private funding and evidence never enter preview_money. Provider capture owns current planning freshness; the record makes no independent time-age, budget reservation, settlement or native admission claim.
+
+Independent source/test review passes; E02 tests66/199, retained E01 67/111 and retained quote tests115/543 pass on PHP8.3.6; all six leased PHP files lint. Fresh committed CI remains separate. Native quote providers stay promotion-none. Promotion rule matching, durable campaign budgets/reservation, stacking/percentages, native tax and quote integration, persistence/admin and merchant enablement remain unfinished. Schema11/39 stores/23 flags/372 classifications and adoption OFF are unchanged; no site/SSH, history/queue write, merge or deployment.
+
+# Historical implementation — E01 private economics facts — 2026-10-21
 
 Current CI repair: both final candidates passed six non-WordPress jobs but failed HTTP readiness because setup-php truncated the requested8.5.11 to8.5 and installed8.5.12. No runtime guard was waived. The official archived8.5.11 debug build was independently downloaded and verified against archive SHA25647cb0511350e18579f95af9cfd7d2e47ed2ce5e8d88a7df140a4f5e54ed8140b and the existing executable SHA2567dda44e554d086c1c4f441796fc19f11f46055c0a276dad66181f6c11566e46a. The owned Ubuntu24.04 CI runner now restores that exact archive before a pinned normal setup step with updates disabled, then asserts the exact version/binary before qualification. Original listener binary/INI/extension/JIT checks and all native acceptance predicates remain unchanged. Failed executions remain failed; fresh exact-source CI is required. No product bytes, package identity or merchant/site state changes in this repair. Root exclusively owns the installer/workflow and this checkpoint.
 
