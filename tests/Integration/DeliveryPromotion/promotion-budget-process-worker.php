@@ -11,7 +11,18 @@ use CetechDeliveryEngine\Tests\Support\DeliveryQuote\QuoteLifecycleProofFactory 
 require dirname( __DIR__, 3 ) . '/vendor/autoload.php';
 require dirname( __DIR__, 2 ) . '/Support/DeliveryCommercial/PromotionBudgetSqlFixture.php';
 try {
-	$args = json_decode( $argv[1] ?? '', true, 16, JSON_THROW_ON_ERROR ); $factory = new Factory( $args['prefix'] ); $s = $factory->open();
+	$args = json_decode( $argv[1] ?? '', true, 16, JSON_THROW_ON_ERROR ); $factory = new Factory( $args['prefix'] );
+	if ( isset( $args['lock_dispatch'] ) ) {
+		$factory->configure = static function( $transport ) use ( $args ): void {
+			$signaled = false;
+			$transport->before = static function( string $sql, $transport ) use ( $args, &$signaled ): void {
+				if ( $signaled || ! str_starts_with( $sql, 'SELECT ' ) || ! str_contains( $sql, 'promotion_budget_accounts`' ) || ! str_ends_with( $sql, 'FOR UPDATE' ) ) { return; }
+				$signaled = true; $bytes = json_encode( [ 'process_id' => getmypid(), 'connection_id' => $transport->connection_id() ], JSON_THROW_ON_ERROR );
+				if ( false === file_put_contents( $args['lock_dispatch'] . '.pending', $bytes, LOCK_EX ) || ! rename( $args['lock_dispatch'] . '.pending', $args['lock_dispatch'] ) ) { throw new RuntimeException(); }
+			};
+		};
+	}
+	$s = $factory->open();
 	if ( ! $s->begin() ) { throw new RuntimeException(); }
 	$connection = $s->get_row( 'SELECT CONNECTION_ID() AS id' );
 	if ( isset( $args['ready'], $args['release'] ) ) { $bytes = json_encode( [ 'process_id' => getmypid(), 'connection_id' => (int) $connection['id'] ], JSON_THROW_ON_ERROR ); if ( false === file_put_contents( $args['ready'] . '.pending', $bytes, LOCK_EX ) || ! rename( $args['ready'] . '.pending', $args['ready'] ) ) { throw new RuntimeException(); } \CetechDeliveryEngine\Tests\Support\Operation\OperationProofProcess::wait_for( $args['release'] ); }
