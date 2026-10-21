@@ -22,7 +22,7 @@ final class PromiseStaffDraft {
 	 * @param array<string, mixed>  $offer
 	 * @return array{missing: list<string>, calendar: ?BusinessCalendarVersion, policy: ?ServicePromisePolicy, summary: string}
 	 */
-	public static function assemble( array $input, array $offer, int $version = 1 ): array {
+	public static function assemble( array $input, array $offer, int $version = 1, ?int $calendar_version = null, ?string $effective_from = null ): array {
 		$missing = [];
 		$label   = trim( (string) ( $offer['public_label'] ?? '' ) );
 		$code    = trim( (string) ( $offer['internal_code'] ?? '' ) );
@@ -76,7 +76,7 @@ final class PromiseStaffDraft {
 		if ( $closed['invalid'] ) {
 			$missing[] = __( 'Enter each closure as a calendar date, one per line.', 'cetech-woocommerce-delivery-engine' );
 		}
-		if ( $version < 1 ) {
+		if ( $version < 1 || ( null !== $calendar_version && $calendar_version < 1 ) ) {
 			$missing[] = __( 'The saved rule could not be confirmed. Review it before saving another draft.', 'cetech-woocommerce-delivery-engine' );
 		}
 		if ( [] !== $missing ) {
@@ -84,7 +84,7 @@ final class PromiseStaffDraft {
 		}
 
 		try {
-			return self::documents( $input, $label, $code, $route, $unit, $processing, $delivery, $required, $scope, $target, $timezone, $weekly, $closed['dates'], $cutoff, $needs_calendar, $version );
+			return self::documents( $input, $label, $code, $route, $unit, $processing, $delivery, $required, $scope, $target, $timezone, $weekly, $closed['dates'], $cutoff, $needs_calendar, $version, $calendar_version ?? $version, $effective_from );
 		} catch ( \InvalidArgumentException ) {
 			return [
 				'missing'  => [ __( 'These entries cannot be saved by the guided editor. Any existing advanced rule is left unchanged.', 'cetech-woocommerce-delivery-engine' ) ],
@@ -102,8 +102,8 @@ final class PromiseStaffDraft {
 	 * @param list<string> $closed
 	 * @return array{missing: list<string>, calendar: ?BusinessCalendarVersion, policy: ?ServicePromisePolicy, summary: string}
 	 */
-	private static function documents( array $input, string $label, string $code, string $route, string $unit, array $processing, array $delivery, string $required, string $scope, ?int $target, string $timezone, array $weekly, array $closed, string $cutoff, bool $needs_calendar, int $version ): array {
-		$now      = gmdate( 'Y-m-d H:i:s' ) . '.000000';
+	private static function documents( array $input, string $label, string $code, string $route, string $unit, array $processing, array $delivery, string $required, string $scope, ?int $target, string $timezone, array $weekly, array $closed, string $cutoff, bool $needs_calendar, int $version, int $calendar_version, ?string $effective_from ): array {
+		$now      = $effective_from ?? gmdate( 'Y-m-d H:i:s' ) . '.000000';
 		$identity = self::identity( $code );
 		$suffix   = $identity . ( 'global' === $scope ? '-store' : '-' . $scope . '-' . (string) $target );
 		$calendar = null;
@@ -114,7 +114,7 @@ final class PromiseStaffDraft {
 					'format_version'     => 1,
 					'site_id'            => self::SITE_KEY,
 					'calendar_id'        => 'hours-' . $suffix,
-					'version'            => $version,
+					'version'            => $calendar_version,
 					'timezone'           => $timezone,
 					'tzdata_version'     => timezone_version_get(),
 					'weekly_openings'    => $weekly,

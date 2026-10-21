@@ -1,4 +1,12 @@
-# Current continuation — corrected P05 integrated; refreshed P06 qualification — 2026-10-10
+# Current task — staff workflow repair, qualification pending — 2026-10-21
+
+Protected master remains `bcfebf7f22da7ea6272fddc096c2b22b67257b87`; its qualified P06 package `63d8749435301d6c0e4fee10715d4da2ab21eaee86bdd407404f1569f6a15f56` is unchanged. [Draft PR114](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/114) owns the separately authorized guided Delivery promises workflow and Settings presentation. Its original `.1` candidate `5b893862b70a807b509b734f3ce66e5a3febd1c1` is not CI green: both October 14 runs38566187148/38566194312 failed WordPress qualification after thirteen P05 HTTP cases and two passing cleanup cases; four shipment cases were not reached. Other six validation jobs passed. Physical testing-copy observations do not replace the missing exact-candidate CI.
+
+Continuation repairs the protected shipment-editor HTTP route plus guided draft replacement, calendar publication ordering, independent calendar version/CAS, and exact-command partial-save recovery. The new development identity is `1.0.0-dev.promise-staff-workflow.2`. Source review, comparative tests, fresh exact committed CI and Cursor-only physical acceptance are separate gates; qualification remains pending. Schema11, capability grants, pricing, historical order/payment/shipment facts and adoption OFF are protected. No master merge, source-site operation, deployment, release or promise enablement is included.
+
+Earlier pending-source narratives below are historical. The accepted P06 master and its separate original qualification ledger supersede them for integration status only; later operational gaps in Issue113 remain open.
+
+# Historical continuation — corrected P05 integrated; refreshed P06 qualification — 2026-10-10
 
 The owner instructed **Approve W2-P05 for integration and implement W2-P06** and explicitly authorized publication: **“i approve.. i authorize you”**. Qualified P05 correction [PR112](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/112) is normally integrated as actual master `543275af6844d649268f9ac02db518420dac9fe6`, unchanged tree `19c237227d9f3fd9d8d16b4c7d136fad23f83b07`, ordered parents `[8a7a7815b249c7bc117a64ffcc36db1dd8f73ee0,e4340bfbeb75e8e96444ee240fff873748c36449]`. Both exact correction candidate runs38019278584/38019308681 passed all eight jobs, all879 observations and13 original archives, with separate root and independent source/package/runtime/cleanup audits. The separate actual-master run38022281912 is executing and remains a distinct required gate.
 

@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\ServicePromise\Configuration\PromiseConfigurationService;
 use CetechDeliveryEngine\Application\ServicePromise\Configuration\PromiseStaffDraft;
+use CetechDeliveryEngine\Application\ServicePromise\Configuration\PromiseStaffIntent;
 use CetechDeliveryEngine\Application\ServicePromise\Presentation\PublicPromiseFormatter;
 use CetechDeliveryEngine\Domain\Contracts\RequestContext;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
@@ -43,6 +44,8 @@ final class PromiseStaffGuide {
 			return;
 		}
 		$this->values = self::fields( $_POST );
+		if ( 'resume' === $this->values['guide_step'] || 'retry' === $this->values['guide_step'] ) { $this->resume( 'retry' === $this->values['guide_step'] ); return; }
+		if ( 'acknowledge' === $this->values['guide_step'] ) { $this->acknowledge(); return; }
 		if ( 'review' === $this->values['guide_step'] ) {
 			$this->review( $this->values['review_id'] );
 			return;
@@ -77,6 +80,7 @@ final class PromiseStaffGuide {
 		if ( '' !== $this->message ) {
 			echo '<div class="notice notice-' . esc_attr( $this->type ) . '"><p role="status">' . esc_html( $this->message ) . '</p></div>';
 		}
+		$this->pending_form();
 		$this->saved_rules();
 		echo '<p><a class="button button-primary" href="#cetech-de-create-rule">' . esc_html__( 'Create delivery rule', 'cetech-woocommerce-delivery-engine' ) . '</a></p>';
 		$this->form();
@@ -87,6 +91,7 @@ final class PromiseStaffGuide {
 	private function adoption(): void {
 		try {
 			$status = $this->service->adoption_status();
+			if ( true !== ( $status['available'] ?? null ) ) { throw new \RuntimeException( 'Customer estimate status is unavailable.' ); }
 		} catch ( \Throwable ) {
 			echo '<p role="status">' . esc_html__( 'Customer estimates: status could not be confirmed. No change was made.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 			return;
@@ -97,7 +102,7 @@ final class PromiseStaffGuide {
 	}
 
 	private function saved_rules(): void {
-		$index = $this->index();
+		try { $index = $this->index(); } catch ( \Throwable ) { $index = []; }
 		echo '<h2 id="cetech-de-saved-rules">' . esc_html__( 'Saved rules', 'cetech-woocommerce-delivery-engine' ) . '</h2>';
 		if ( [] === $index ) {
 			echo '<p>' . esc_html__( 'No delivery-time rule has been created here yet. A rule that already exists only in advanced configuration is left as it is.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
@@ -108,16 +113,20 @@ final class PromiseStaffGuide {
 			if ( ! is_string( $id ) || ! is_array( $row ) ) {
 				continue;
 			}
+			try { $binding = $this->service->binding( PromiseStaffDraft::SITE_KEY ); if ( ! $this->service->can_disclose( $binding, $this->row_scope( $row ) ) ) { continue; } } catch ( \Throwable ) { continue; }
 			$opened = $this->confirm( $row );
+			if ( ! $this->service->can_disclose( $binding, $this->row_scope( $row ) ) ) { continue; }
 			echo '<tr><td>' . esc_html( (string) ( $row['label'] ?? $id ) ) . '</td><td>' . esc_html( (string) ( $row['applies'] ?? '' ) ) . '</td><td>' . esc_html( $opened['label'] ) . '</td><td>';
 			if ( $opened['editable'] ) {
 				echo '<form method="post" action="">';
 				AdminFormHelper::nonce_field( self::ACTION );
 				echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION ) . '" />';
 				echo '<input type="hidden" name="guide_step" value="review" /><input type="hidden" name="review_id" value="' . esc_attr( $id ) . '" />';
-				echo '<button class="button" type="submit">' . esc_html__( 'Review draft', 'cetech-woocommerce-delivery-engine' ) . '</button></form>';
+				echo '<button class="button" type="submit">' . esc_html__( 'Review saved rule', 'cetech-woocommerce-delivery-engine' ) . '</button></form>';
+			}
+			if ( 'draft' === $opened['code'] && $this->calendar_action( $row ) ) {
 				$this->protected_action( $row, 'seal', __( 'Mark ready to publish', 'cetech-woocommerce-delivery-engine' ) );
-			} elseif ( 'sealed' === $opened['code'] ) {
+			} elseif ( 'sealed' === $opened['code'] && $this->calendar_action( $row ) ) {
 				$this->protected_action( $row, 'publish', __( 'Publish this rule', 'cetech-woocommerce-delivery-engine' ) );
 			} elseif ( 'published' === $opened['code'] ) {
 				$this->assignment_action( $row );
@@ -154,6 +163,8 @@ final class PromiseStaffGuide {
 		echo '<form method="post" action="" class="cetech-de-guide-form">';
 		AdminFormHelper::nonce_field( self::ACTION );
 		echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION ) . '" />';
+		echo '<input type="hidden" name="review_id" value="' . esc_attr( $this->values['review_id'] ?? '' ) . '" /><input type="hidden" name="review_stamp" value="' . esc_attr( $this->values['review_stamp'] ?? '' ) . '" />';
+		if ( '' !== ( $this->values['review_id'] ?? '' ) ) { echo '<label><input type="checkbox" name="replace_draft" value="yes" /> ' . esc_html__( 'Retire any existing draft of this rule or its working calendar and create a new immutable version with these entries.', 'cetech-woocommerce-delivery-engine' ) . '</label>'; }
 		echo '<fieldset><legend>' . esc_html__( '1. Delivery option', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
 		echo '<label for="cetech-de-offer">' . esc_html__( 'Which existing delivery option does this rule describe?', 'cetech-woocommerce-delivery-engine' ) . '</label>';
 		echo '<select id="cetech-de-offer" name="offer_code"><option value="">' . esc_html__( 'Select a delivery option', 'cetech-woocommerce-delivery-engine' ) . '</option>';
@@ -236,150 +247,302 @@ final class PromiseStaffGuide {
 
 	/** @param array{missing: list<string>, calendar: mixed, policy: mixed, summary: string} $draft @param array<string, mixed> $offer */
 	private function save( array $draft, array $offer ): void {
-		$policy = $draft['policy'];
-		if ( ! $policy instanceof ServicePromisePolicy ) {
-			return;
-		}
+		if ( ! $draft['policy'] instanceof ServicePromisePolicy ) { return; }
 		try {
 			$binding = $this->service->binding( PromiseStaffDraft::SITE_KEY );
-			$facts   = $policy->private_facts();
-			$scope   = [ 'kind' => $facts['scope']['kind'], 'target_id' => (int) ( $facts['scope']['target_id'] ?? 0 ) ];
-			$prior   = $this->index()[ $facts['policy_id'] ] ?? null;
-			if ( ! is_array( $prior ) ) {
-				try {
-					$existing = $this->service->inspect_version( $binding, 'policy', $facts['policy_id'], 1, $scope );
-					if ( is_array( $existing['version'] ?? null ) ) {
-						$this->type = 'warning';
-						$this->message = __( 'A saved rule already uses this delivery option and scope. It was not overwritten. Your entries are still on this page; use advanced configuration if that rule is not listed here.', 'cetech-woocommerce-delivery-engine' );
-						return;
-					}
-				} catch ( \Throwable ) {
-					$prior = null;
+			$store = new PromiseStaffIntent();
+			if ( null !== $store->read( $this->intent_name() ) ) { throw new \RuntimeException( 'Resolve the previous request first.' ); }
+			$facts = $draft['policy']->private_facts();
+			$id = $facts['policy_id'];
+			$scope = [ 'kind' => $facts['scope']['kind'], 'target_id' => (int) ( $facts['scope']['target_id'] ?? 0 ) ];
+			$prior = $this->index()[ $id ] ?? null;
+			$prior = is_array( $prior ) ? $prior : null;
+			$opened = $this->service->inspect_version( $binding, 'policy', $id, max( 1, (int) ( $prior['version'] ?? 1 ) ), $scope );
+			$calendar_opened = null;
+			if ( null === $prior ) {
+				if ( 0 !== $opened['object_revision'] || null !== $opened['version'] ) { throw new \RuntimeException( 'An existing document is not owned by this guide.' ); }
+			} else {
+				$this->assert_owned( $prior, $opened );
+				$calendar_opened = $this->open_calendar( $prior, $opened );
+				if ( $id !== $this->values['review_id'] || ! hash_equals( $this->review_stamp( $opened, $calendar_opened ), $this->values['review_stamp'] ) ) {
+					throw new \RuntimeException( 'Reopen the saved rule before replacing it; its revisions may have changed.' );
 				}
 			}
-			$version = 1;
-			$saved_calendar_version = 0;
-			$preconditions = [ 'object_revision' => 0, 'version_revision' => 0, 'published_version_id' => 0 ];
-			if ( is_array( $prior ) ) {
-				$opened = $this->service->inspect_version( $binding, 'policy', $facts['policy_id'], (int) $prior['version'], $scope );
-				$saved  = is_array( $opened['version'] ?? null ) ? $opened['version'] : [];
-				if ( ( $saved['body_digest'] ?? '' ) !== ( $prior['digest'] ?? '' ) ) {
-					$this->type = 'warning';
-					$this->message = __( 'This rule changed outside the guided editor. Your entries are still on this page, and the saved rule was not overwritten.', 'cetech-woocommerce-delivery-engine' );
-					return;
-				}
-				$version = (int) $opened['next_version'];
-				$preconditions['object_revision'] = (int) $opened['object_revision'];
-				$preconditions['published_version_id'] = (int) $opened['published_version_id'];
-				$draft = PromiseStaffDraft::assemble( $this->values, $offer, $version );
-				if ( [] !== $draft['missing'] || ! $draft['policy'] instanceof ServicePromisePolicy ) {
-					$this->missing = $draft['missing'];
-					$this->type = 'warning';
-					$this->message = __( 'The next draft could not be prepared. Your entries are still on this page.', 'cetech-woocommerce-delivery-engine' );
-					return;
-				}
-				$policy = $draft['policy'];
-				$facts  = $policy->private_facts();
+			$calendar = $draft['calendar'];
+			if ( $calendar instanceof BusinessCalendarVersion && null === $calendar_opened ) {
+				// Calendar authority, sequence and CAS are independent of the policy's scope/head.
+				$calendar_opened = $this->service->inspect_version( $binding, 'calendar', $calendar->private_facts()['calendar_id'], 1, [ 'kind' => 'global', 'target_id' => 0 ] );
+				if ( 0 !== $calendar_opened['object_revision'] || null !== $calendar_opened['version'] ) { throw new \RuntimeException( 'An existing calendar is not owned by this guide.' ); }
 			}
-			if ( $draft['calendar'] instanceof BusinessCalendarVersion ) {
-				$calendar_prior = is_array( $prior ) ? (int) ( $prior['calendar_version'] ?? 0 ) : 0;
-				$calendar_version = $calendar_prior > 0 ? $version : 1;
-				$calendar_pre = 1 === $calendar_version ? [ 'object_revision' => 0, 'version_revision' => 0, 'published_version_id' => 0 ] : $preconditions;
-				$calendar = $calendar_version === $version ? $draft['calendar'] : PromiseStaffDraft::assemble( $this->values, $offer, $calendar_version )['calendar'];
-				if ( ! $calendar instanceof BusinessCalendarVersion ) {
-					$this->type = 'warning';
-					$this->message = __( 'The working calendar could not be prepared. Your entries are still on this page.', 'cetech-woocommerce-delivery-engine' );
-					return;
-				}
-				$result = $this->service->version( $binding, 'promise.version.create', RequestContext::create()->request_id, $this->payload( 'calendar', $calendar->private_facts(), $calendar->to_private_json(), $calendar->digest(), [ 'kind' => 'global', 'target_id' => 0 ], $calendar_pre ), false );
-				if ( 'accepted' !== $result->outcome->state ) {
-					$this->type = 'unconfirmed' === $result->outcome->state ? 'warning' : 'error';
-					$this->message = __( 'The working calendar was not saved. Your entries are still on this page. Review the current rule before trying again.', 'cetech-woocommerce-delivery-engine' );
-					return;
-				}
-				$saved_calendar_version = $calendar_version;
+			$version = $opened['next_version'];
+			$calendar_version = $calendar instanceof BusinessCalendarVersion ? $calendar_opened['next_version'] : null;
+			$draft = PromiseStaffDraft::assemble( $this->values, $offer, $version, $calendar_version );
+			if ( [] !== $draft['missing'] || ! $draft['policy'] instanceof ServicePromisePolicy ) { throw new \RuntimeException( 'The draft cannot be represented.' ); }
+			$steps = [];
+			$policy_pre = $this->create_preconditions( $opened );
+			$calendar = $draft['calendar'];
+			if ( $calendar instanceof BusinessCalendarVersion ) {
+				$calendar_pre = $this->create_preconditions( $calendar_opened );
+				$this->replacement_step( $steps, 'calendar', $calendar->private_facts()['calendar_id'], [ 'kind' => 'global', 'target_id' => 0 ], $calendar_opened, $calendar_pre );
+				$steps[] = $this->step( 'promise.version.create', $this->payload( 'calendar', $calendar->private_facts(), $calendar->to_private_json(), $calendar->digest(), [ 'kind' => 'global', 'target_id' => 0 ], $calendar_pre ) );
 			}
-			$result = $this->service->version( $binding, 'promise.version.create', RequestContext::create()->request_id, $this->payload( 'policy', $facts, $policy->to_private_json(), $policy->digest(), $scope, $preconditions ), false );
-			if ( 'accepted' !== $result->outcome->state ) {
-				$this->type = 'unconfirmed' === $result->outcome->state ? 'warning' : 'error';
-				$this->message = __( 'The draft was not saved. Your entries are still on this page. Review the current rule before trying again.', 'cetech-woocommerce-delivery-engine' );
+			$this->replacement_step( $steps, 'policy', $id, $scope, $opened, $policy_pre );
+			$policy = $draft['policy']; $facts = $policy->private_facts();
+			$steps[] = $this->step( 'promise.version.create', $this->payload( 'policy', $facts, $policy->to_private_json(), $policy->digest(), $scope, $policy_pre ) );
+			$row = $this->index_row( $facts, $policy->digest(), $calendar, $prior, (string) ( $offer['public_label'] ?? '' ) );
+			$plan = [ 'format_version' => 1, 'owner' => get_current_user_id(), 'site_id' => $binding->site_id(), 'site_key' => $binding->site_key(), 'scope' => $scope,
+				'intent_id' => RequestContext::create()->request_id, 'state' => 'ready', 'cursor' => 0, 'steps' => $steps, 'row' => $row, 'prior' => $prior, 'fields' => $this->values ];
+			if ( ! $store->insert( $this->intent_name(), PromiseStaffIntent::encode( $plan ) ) ) { throw new \RuntimeException( 'A previous or concurrent request needs review.' ); }
+			$this->resume();
+		} catch ( \Throwable ) {
+			$this->type = 'warning';
+			$this->message = __( 'The draft could not be confirmed. Reopen the saved rule and explicitly confirm replacement of a draft, or resolve the retained request below. Existing advanced documents are preserved.', 'cetech-woocommerce-delivery-engine' );
+		}
+	}
+
+	/** @param array<string, mixed> $opened @return array<string, int> */
+	private function create_preconditions( array $opened ): array {
+		return [ 'object_revision' => (int) $opened['object_revision'], 'version_revision' => 0, 'published_version_id' => (int) $opened['published_version_id'] ];
+	}
+
+	/** Retiring a draft is an explicit immutable lifecycle operation, never an in-place edit. */
+	private function replacement_step( array &$steps, string $kind, string $id, array $scope, array $opened, array &$pre ): void {
+		$saved = $opened['version'];
+		if ( ! is_array( $saved ) ) { return; }
+		if ( ! in_array( $saved['state'], [ 'draft', 'sealed', 'published', 'retired' ], true ) ) { throw new \RuntimeException( 'This state cannot be edited here.' ); }
+		if ( in_array( $saved['state'], [ 'draft', 'sealed' ], true ) ) {
+			if ( 'yes' !== $this->values['replace_draft'] ) { throw new \RuntimeException( 'Draft replacement was not confirmed.' ); }
+			$payload = $this->lifecycle_payload( $kind, $id, $scope, $opened );
+			$payload['reason'] = __( 'Staff explicitly replaced the saved draft from the delivery rule guide.', 'cetech-woocommerce-delivery-engine' );
+			$steps[] = $this->step( 'promise.version.retire', $payload );
+			++$pre['object_revision'];
+		}
+	}
+
+	private function step( string $operation, array $payload ): array {
+		return [ 'operation' => $operation, 'token' => RequestContext::create()->request_id, 'payload' => $payload ];
+	}
+
+	private function intent_name(): string {
+		$site = function_exists( 'get_current_blog_id' ) ? get_current_blog_id() : 1;
+		return 'cetech_de_staff_intent_' . hash( 'sha256', $site . ':' . PromiseStaffDraft::SITE_KEY . ':' . get_current_user_id() );
+	}
+
+	/** Only the current native owner/site may disclose or execute its private UI journal. */
+	private function pending( ?PromiseStaffIntent $store = null ): ?array {
+		$bytes = ( $store ?? new PromiseStaffIntent() )->read( $this->intent_name() );
+		if ( null === $bytes ) { return null; }
+		$plan = PromiseStaffIntent::decode( $bytes );
+		$binding = $this->service->binding( PromiseStaffDraft::SITE_KEY );
+		if ( $plan['owner'] !== get_current_user_id() || $plan['site_id'] !== $binding->site_id() || $plan['site_key'] !== $binding->site_key() || ! $this->service->can_disclose( $binding, $plan['scope'] ) ) { throw new \RuntimeException( 'Staff intent is not currently available.' ); }
+		foreach ( $plan['steps'] as $step ) {
+			if ( ! $this->service->can_disclose( $binding, $step['payload']['scope'] ) ) { throw new \RuntimeException( 'Staff intent scope is not currently available.' ); }
+		}
+		return [ 'bytes' => $bytes, 'plan' => $plan ];
+	}
+
+	private function resume( bool $retry_original = false ): void {
+		try {
+			$store = new PromiseStaffIntent();
+			$store->locked( $this->intent_name(), function () use ( $store, $retry_original ): void {
+			$pending = $this->pending( $store );
+			if ( null === $pending ) { throw new \RuntimeException( 'No retained request.' ); }
+			$binding = $this->service->binding( PromiseStaffDraft::SITE_KEY );
+			$state = $store->run( $this->intent_name(), $pending['bytes'], fn( array $step, bool $reconcile ) => $this->service->version( $binding, $step['operation'], $step['token'], $step['payload'], $reconcile ), $retry_original );
+			$pending = $this->pending( $store );
+			if ( null === $pending ) { throw new \RuntimeException( 'Retained request changed.' ); }
+			$plan = $pending['plan'];
+			if ( 'complete' === $state && 'complete' === $plan['state'] ) {
+				if ( ! $store->merge_index( self::INDEX, $plan['row']['policy_id'], $plan['prior'], $plan['row'] ) || ! $store->replace( $this->intent_name(), $pending['bytes'], null ) ) { throw new \RuntimeException( 'Saved projection is pending.' ); }
+				$this->type = 'success';
+				$this->message = __( 'Draft saved. Customer estimates remain unchanged. Review and publish the working calendar first, then the rule, using the separate protected actions below.', 'cetech-woocommerce-delivery-engine' );
 				return;
 			}
-			$this->remember( $facts, $policy->digest(), $version, $saved_calendar_version, (string) ( $offer['public_label'] ?? '' ) );
-			$this->type = 'success';
-			$this->message = __( 'Draft saved. Customer estimates were not turned on. Review it below, then use the protected publication actions when it is ready.', 'cetech-woocommerce-delivery-engine' );
+			$this->type = 'warning';
+			$this->message = 'rejected' === $plan['state']
+				? __( 'The request was refused. Earlier accepted steps are retained. Acknowledge the stopped request below before preparing a new draft.', 'cetech-woocommerce-delivery-engine' )
+				: __( 'The outcome is not confirmed. The exact original request is retained below. Reconcile it before making another draft.', 'cetech-woocommerce-delivery-engine' );
+			} );
 		} catch ( \Throwable ) {
-			$this->type = 'error';
-			$this->message = __( 'The draft could not be confirmed. Your entries are still on this page, and no saved rule was overwritten.', 'cetech-woocommerce-delivery-engine' );
+			$this->type = 'warning';
+			$this->message = __( 'The retained request could not be confirmed. It was kept for reconciliation; no replacement request was created.', 'cetech-woocommerce-delivery-engine' );
+		}
+	}
+
+	/** A known rejection can be acknowledged; accepted calendar/retirement steps remain recoverable. */
+	private function acknowledge(): void {
+		try {
+			$store = new PromiseStaffIntent();
+			$store->locked( $this->intent_name(), function () use ( $store ): void {
+			$pending = $this->pending( $store );
+			if ( null === $pending || 'rejected' !== $pending['plan']['state'] || ! empty( $pending['plan']['had_uncertainty'] ) ) { throw new \RuntimeException( 'Only a known refusal can be acknowledged.' ); }
+			$plan = $pending['plan'];
+			if ( 0 === $plan['cursor'] ) {
+				if ( ! $store->replace( $this->intent_name(), $pending['bytes'], null ) ) { throw new \RuntimeException( 'Stopped request acknowledgement was not confirmed.' ); }
+				$this->message = __( 'Stopped request acknowledged. No accepted step needed a saved-rule projection.', 'cetech-woocommerce-delivery-engine' );
+				return;
+			}
+			$row = $plan['prior'] ?? $plan['row'];
+			if ( null === $plan['prior'] ) { $row['version'] = 0; $row['digest'] = ''; $row['uses_calendar'] = false; $row['calendar_id'] = ''; $row['calendar_version'] = 0; $row['calendar_digest'] = ''; }
+			for ( $i = 0; $i < $plan['cursor']; ++$i ) {
+				$step = $plan['steps'][ $i ]; $payload = $step['payload'];
+				if ( 'calendar' === $payload['kind'] && 'promise.version.create' === $step['operation'] ) {
+					$row['calendar_id'] = $payload['logical_id']; $row['calendar_version'] = $payload['domain_version']; $row['calendar_digest'] = $payload['body_digest'];
+				}
+			}
+			$row['fields'] = $plan['fields'];
+			if ( ! $store->merge_index( self::INDEX, $row['policy_id'], $plan['prior'], $row ) || ! $store->replace( $this->intent_name(), $pending['bytes'], null ) ) { throw new \RuntimeException( 'Recovery projection remains pending.' ); }
+			$this->message = __( 'Stopped request acknowledged. Accepted steps are preserved below. Reopen the rule to prepare a new draft against its current native revisions.', 'cetech-woocommerce-delivery-engine' );
+			} );
+		} catch ( \Throwable ) {
+			$this->type = 'warning'; $this->message = __( 'The stopped request remains retained. Nothing was discarded.', 'cetech-woocommerce-delivery-engine' );
+		}
+	}
+
+	private function pending_form(): void {
+		try {
+			$pending = $this->pending();
+			if ( null === $pending ) { return; }
+			$rejected = 'rejected' === $pending['plan']['state'];
+			echo '<div class="notice notice-warning"><p>' . esc_html__( 'A saved draft request needs reconciliation or acknowledgement. Another save is blocked until it is resolved.', 'cetech-woocommerce-delivery-engine' ) . '</p><form method="post" action="">';
+			AdminFormHelper::nonce_field( self::ACTION );
+			echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION ) . '" /><input type="hidden" name="guide_step" value="' . ( $rejected ? 'acknowledge' : 'resume' ) . '" />';
+			echo '<button class="button" type="submit">' . esc_html( $rejected ? __( 'Acknowledge stopped request', 'cetech-woocommerce-delivery-engine' ) : __( 'Reconcile original request', 'cetech-woocommerce-delivery-engine' ) ) . '</button></form>';
+			if ( ! $rejected && in_array( $pending['plan']['state'], [ 'inflight', 'uncertain' ], true ) ) {
+				echo '<form method="post" action="">'; AdminFormHelper::nonce_field( self::ACTION );
+				echo '<input type="hidden" name="cetech_de_action" value="' . esc_attr( self::ACTION ) . '" /><input type="hidden" name="guide_step" value="retry" /><button class="button" type="submit">' . esc_html__( 'Retry the exact original request', 'cetech-woocommerce-delivery-engine' ) . '</button></form>';
+			}
+			echo '</div>';
+		} catch ( \Throwable ) {
+			echo '<p>' . esc_html__( 'Private draft recovery is unavailable under the current permissions or storage state.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 		}
 	}
 
 	private function review( string $id ): void {
-		$row = $this->index()[ $id ] ?? null;
-		if ( ! is_array( $row ) || ! is_array( $row['fields'] ?? null ) ) {
-			$this->type = 'warning';
-			$this->message = __( 'That rule is not available to review here.', 'cetech-woocommerce-delivery-engine' );
-			return;
-		}
-		$confirmed = $this->confirm( $row );
-		if ( ! $confirmed['editable'] ) {
-			$this->type = 'warning';
-			$this->message = 'preserved' === $confirmed['code']
-				? __( 'This saved rule uses settings the guided editor cannot change. It was left as saved.', 'cetech-woocommerce-delivery-engine' )
-				: __( 'This saved rule could not be confirmed, so the form was not filled from it.', 'cetech-woocommerce-delivery-engine' );
-			return;
-		}
-		foreach ( $row['fields'] as $key => $value ) {
-			if ( is_string( $key ) && is_string( $value ) ) {
-				$this->values[ $key ] = $value;
+		try {
+			$row = $this->index()[ $id ] ?? null;
+			if ( ! is_array( $row ) || ! is_array( $row['fields'] ?? null ) ) { throw new \RuntimeException( 'No guided rule.' ); }
+			$binding = $this->service->binding( PromiseStaffDraft::SITE_KEY );
+			$scope = $this->row_scope( $row );
+			$opened = $this->service->inspect_version( $binding, 'policy', $id, max( 1, (int) $row['version'] ), $scope );
+			$this->assert_owned( $row, $opened );
+			$calendar = $this->open_calendar( $row, $opened );
+			if ( is_array( $opened['version'] ) && ! in_array( $opened['version']['state'], [ 'draft', 'published', 'retired' ], true ) ) { throw new \RuntimeException( 'This saved state cannot be edited here.' ); }
+			if ( ! $this->service->can_disclose( $binding, $scope ) || ( null !== $calendar && ! $this->service->can_disclose( $binding, [ 'kind' => 'global', 'target_id' => 0 ] ) ) ) { throw new \RuntimeException( 'Current disclosure permission changed.' ); }
+			foreach ( $row['fields'] as $key => $value ) {
+				if ( is_string( $key ) && is_string( $value ) ) { $this->values[ $key ] = $value; }
 			}
+			$this->values['review_id'] = $id;
+			$this->values['review_stamp'] = $this->review_stamp( $opened, $calendar );
+			$this->values['replace_draft'] = '';
+			$this->message = __( 'Saved rule reopened. Changed entries create a new immutable version. Confirm retirement of an existing draft before saving its replacement.', 'cetech-woocommerce-delivery-engine' );
+		} catch ( \Throwable ) {
+			$this->type = 'warning';
+			$this->message = __( 'This rule could not be confirmed under the current permissions and revisions. No saved values were copied into the form.', 'cetech-woocommerce-delivery-engine' );
 		}
-		$this->message = __( 'Draft reopened. Check the entries, preview the customer wording, then save another draft if you change them.', 'cetech-woocommerce-delivery-engine' );
 	}
 
-	/** @param array<string, mixed> $row @return array{label: string, code: string, editable: bool, next: string} */
+	private function row_scope( array $row ): array {
+		return [ 'kind' => (string) ( $row['scope_kind'] ?? '' ), 'target_id' => (int) ( $row['scope_id'] ?? 0 ) ];
+	}
+
+	/** An index entry proves no authority: confirm exact current owned native content and sequence. */
+	private function assert_owned( array $row, array $opened ): void {
+		$version = (int) ( $row['version'] ?? 0 );
+		$saved = $opened['version'];
+		if ( 0 === $version ) {
+			if ( 0 !== $opened['object_revision'] || null !== $saved || 1 !== $opened['next_version'] ) { throw new \RuntimeException( 'Policy absence was not confirmed.' ); }
+			return;
+		}
+		if ( ! is_array( $saved ) || $saved['body_digest'] !== ( $row['digest'] ?? '' ) || $saved['domain_version'] !== $version || $opened['next_version'] !== $version + 1 ) { throw new \RuntimeException( 'Guided content changed outside its saved receipt.' ); }
+	}
+
+	/** @return array<string, mixed>|null */
+	private function open_calendar( array $row, array $policy_opened ): ?array {
+		$version = (int) ( $row['calendar_version'] ?? 0 );
+		if ( $version < 1 ) { return null; }
+		$id = (string) ( $row['calendar_id'] ?? '' );
+		$digest = (string) ( $row['calendar_digest'] ?? '' );
+		// Older guide projections can be rebuilt only from their exact policy reference.
+		if ( '' === $id || '' === $digest ) {
+			$body = ServicePromisePolicy::from_json( $policy_opened['version']['body_json'] );
+			$refs = $body->private_facts()['calendars'];
+			if ( 1 !== count( $refs ) || $refs[0]['version'] !== $version ) { throw new \RuntimeException( 'Calendar ownership is unavailable.' ); }
+			$id = $refs[0]['calendar_id']; $digest = $refs[0]['digest'];
+		}
+		$binding = $this->service->binding( PromiseStaffDraft::SITE_KEY );
+		$opened = $this->service->inspect_version( $binding, 'calendar', $id, $version, [ 'kind' => 'global', 'target_id' => 0 ] );
+		if ( ! is_array( $opened['version'] ) || $opened['version']['body_digest'] !== $digest || $opened['next_version'] !== $version + 1 ) { throw new \RuntimeException( 'Calendar changed outside its saved receipt.' ); }
+		return $opened;
+	}
+
+	private function review_stamp( array $opened, ?array $calendar ): string {
+		return hash( 'sha256', PromiseStaffIntent::encode( [ 'policy' => $opened, 'calendar' => $calendar ] ) );
+	}
+
+	/** @return array{label: string, code: string, editable: bool, next: string} */
 	private function confirm( array $row ): array {
 		try {
 			$binding = $this->service->binding( PromiseStaffDraft::SITE_KEY );
-			$scope   = [ 'kind' => (string) ( $row['scope_kind'] ?? 'global' ), 'target_id' => (int) ( $row['scope_id'] ?? 0 ) ];
-			$opened  = $this->service->inspect_version( $binding, 'policy', (string) $row['policy_id'], (int) $row['version'], $scope );
-			$saved   = is_array( $opened['version'] ?? null ) ? $opened['version'] : null;
-			if ( null === $saved || ( $saved['body_digest'] ?? '' ) !== ( $row['digest'] ?? '' ) ) {
-				return [ 'label' => __( 'Preserved outside this guide', 'cetech-woocommerce-delivery-engine' ), 'code' => 'preserved', 'editable' => false, 'next' => '' ];
-			}
-			$state = (string) ( $saved['state'] ?? '' );
-			return [
-				'label'    => $this->state_label( $state ),
-				'code'     => $state,
-				'editable' => 'draft' === $state,
-				'next'     => match ( $state ) {
-					'draft' => __( 'Review the draft, then seal it for publication.', 'cetech-woocommerce-delivery-engine' ),
-					'sealed' => __( 'Publish this sealed rule from advanced configuration.', 'cetech-woocommerce-delivery-engine' ),
-					'published' => __( 'Assign the published rule from advanced configuration. Customers still do not see it until estimates are turned on.', 'cetech-woocommerce-delivery-engine' ),
-					default => __( 'Review this rule in advanced configuration.', 'cetech-woocommerce-delivery-engine' ),
-				},
-			];
+			$opened = $this->service->inspect_version( $binding, 'policy', (string) $row['policy_id'], max( 1, (int) $row['version'] ), $this->row_scope( $row ) );
+			$this->assert_owned( $row, $opened );
+			$state = null === $opened['version'] ? 'incomplete' : (string) $opened['version']['state'];
+			return [ 'label' => 'incomplete' === $state ? __( 'Stopped request; accepted steps preserved', 'cetech-woocommerce-delivery-engine' ) : $this->state_label( $state ), 'code' => $state,
+				'editable' => in_array( $state, [ 'draft', 'published', 'retired', 'incomplete' ], true ), 'next' => __( 'Review this state in advanced configuration.', 'cetech-woocommerce-delivery-engine' ) ];
 		} catch ( \Throwable ) {
-			return [ 'label' => __( 'Not confirmed', 'cetech-woocommerce-delivery-engine' ), 'code' => 'unknown', 'editable' => false, 'next' => __( 'Refresh this page before trying again.', 'cetech-woocommerce-delivery-engine' ) ];
+			return [ 'label' => __( 'Not confirmed', 'cetech-woocommerce-delivery-engine' ), 'code' => 'unknown', 'editable' => false, 'next' => __( 'Refresh before trying again. Existing documents are preserved.', 'cetech-woocommerce-delivery-engine' ) ];
 		}
 	}
 
 	/** @param array<string, mixed> $row */
-	private function protected_action( array $row, string $verb, string $label ): void {
+	private function calendar_action( array $row ): bool {
 		try {
 			$binding = $this->service->binding( PromiseStaffDraft::SITE_KEY );
-			$scope   = [ 'kind' => (string) ( $row['scope_kind'] ?? 'global' ), 'target_id' => (int) ( $row['scope_id'] ?? 0 ) ];
-			$opened  = $this->service->inspect_version( $binding, 'policy', (string) $row['policy_id'], (int) $row['version'], $scope );
-			$saved   = is_array( $opened['version'] ?? null ) ? $opened['version'] : null;
-			if ( null === $saved || ( $saved['body_digest'] ?? '' ) !== ( $row['digest'] ?? '' ) ) {
-				return;
+			$opened = $this->service->inspect_version( $binding, 'policy', (string) $row['policy_id'], (int) $row['version'], $this->row_scope( $row ) );
+			$this->assert_owned( $row, $opened );
+			$policy = ServicePromisePolicy::from_json( $opened['version']['body_json'] );
+			$refs = $policy->private_facts()['calendars'];
+			if ( [] === $refs ) { return true; }
+			$calendar = $this->open_calendar( $row, $opened );
+			if ( null === $calendar || 1 !== count( $refs ) || $refs[0]['version'] !== $calendar['version']['domain_version'] || $refs[0]['digest'] !== $calendar['version']['body_digest'] ) { throw new \RuntimeException( 'Dependent calendar is not owned.' ); }
+			$state = $calendar['version']['state'];
+			if ( 'published' === $state ) { return true; }
+			echo '<p>' . esc_html__( 'Publish the working calendar before marking this rule ready.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			if ( 'draft' === $state || 'sealed' === $state ) {
+				$this->protected_action( $row, 'draft' === $state ? 'seal' : 'publish', 'draft' === $state ? __( 'Mark working calendar ready', 'cetech-woocommerce-delivery-engine' ) : __( 'Publish working calendar', 'cetech-woocommerce-delivery-engine' ), 'calendar' );
 			}
-			$payload = [
-				'kind' => 'policy', 'logical_id' => (string) $row['policy_id'], 'domain_version' => (int) $saved['domain_version'], 'version_uuid' => (string) $saved['version_uuid'],
-				'body_digest' => (string) $saved['body_digest'], 'scope' => $scope, 'body_json' => null, 'declared_from' => $saved['declared_from'], 'declared_until' => $saved['declared_until'],
-				'reason' => '', 'scheduled_author_user_id' => null,
-				'preconditions' => [ 'object_revision' => (int) $opened['object_revision'], 'version_revision' => (int) $saved['row_revision'], 'published_version_id' => (int) $opened['published_version_id'] ],
-			];
+			return false;
+		} catch ( \Throwable ) {
+			echo '<p>' . esc_html__( 'The dependent working calendar cannot currently be confirmed. No publication is offered.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+			return false;
+		}
+	}
+
+	private function lifecycle_payload( string $kind, string $id, array $scope, array $opened ): array {
+		$saved = $opened['version'];
+		return [ 'kind' => $kind, 'logical_id' => $id, 'domain_version' => (int) $saved['domain_version'], 'version_uuid' => (string) $saved['version_uuid'],
+			'body_digest' => (string) $saved['body_digest'], 'scope' => $scope, 'body_json' => null, 'declared_from' => $saved['declared_from'], 'declared_until' => $saved['declared_until'],
+			'reason' => '', 'scheduled_author_user_id' => null,
+			'preconditions' => [ 'object_revision' => (int) $opened['object_revision'], 'version_revision' => (int) $saved['row_revision'], 'published_version_id' => (int) $opened['published_version_id'] ] ];
+	}
+
+	/** @param array<string, mixed> $row */
+	private function protected_action( array $row, string $verb, string $label, string $kind = 'policy' ): void {
+		try {
+			$binding = $this->service->binding( PromiseStaffDraft::SITE_KEY );
+			$scope = $this->row_scope( $row );
+			$opened = $this->service->inspect_version( $binding, 'policy', (string) $row['policy_id'], (int) $row['version'], $scope );
+			$this->assert_owned( $row, $opened );
+			$id = (string) $row['policy_id'];
+			if ( 'calendar' === $kind ) {
+				$policy = ServicePromisePolicy::from_json( $opened['version']['body_json'] );
+				$refs = $policy->private_facts()['calendars'];
+				$opened = $this->open_calendar( $row, $opened );
+				if ( null === $opened || 1 !== count( $refs ) || $refs[0]['digest'] !== $opened['version']['body_digest'] ) { return; }
+				$id = $refs[0]['calendar_id']; $scope = [ 'kind' => 'global', 'target_id' => 0 ];
+			}
+			$payload = $this->lifecycle_payload( $kind, $id, $scope, $opened );
+			if ( ! $this->service->can_disclose( $binding, $this->row_scope( $row ) ) || ! $this->service->can_disclose( $binding, $scope ) ) { return; }
 			$action = PromiseConfigurationPage::ACTION_PREFIX . $verb;
 			echo '<form method="post" action="">';
 			AdminFormHelper::nonce_field( $action );
@@ -407,14 +570,9 @@ final class PromiseStaffGuide {
 			$policy = ServicePromisePolicy::from_json( $saved['body_json'] );
 			$facts  = $policy->private_facts();
 			$key    = [ 'scope_kind' => $scope['kind'], 'scope_id' => $scope['target_id'], 'service_kind' => (string) $facts['service']['kind'], 'service_code' => (string) $facts['service']['code'], 'endpoint' => (string) $facts['endpoint'], 'endpoint_kind' => (string) $facts['endpoint_kind'] ];
-			$current = [ 'revision' => 0, 'generation' => 0 ];
-			try {
-				$assignment = $this->service->inspect_assignment( $binding, $key );
-				$current['revision'] = (int) ( $assignment['revision'] ?? 0 );
-				$current['generation'] = (int) ( $assignment['generation'] ?? 0 );
-			} catch ( \Throwable ) {
-				$current = [ 'revision' => 0, 'generation' => 0 ];
-			}
+			$assignment = $this->service->inspect_assignment( $binding, $key );
+			$current = [ 'revision' => (int) $assignment['revision'], 'generation' => (int) $assignment['generation'] ];
+			if ( ! $this->service->can_disclose( $binding, $scope ) ) { return; }
 			$action = PromiseConfigurationPage::ACTION_PREFIX . 'assignment';
 			echo '<form method="post" action="">';
 			AdminFormHelper::nonce_field( $action );
@@ -460,30 +618,27 @@ final class PromiseStaffGuide {
 		];
 	}
 
-	/** @param array<string, mixed> $facts */
-	private function remember( array $facts, string $digest, int $version, int $calendar_version, string $label ): void {
-		if ( ! function_exists( 'get_option' ) || ! function_exists( 'update_option' ) ) {
-			return;
-		}
-		$index = $this->index();
-		$scope = (string) $facts['scope']['kind'];
-		$target = (int) ( $facts['scope']['target_id'] ?? 0 );
-		$index[ (string) $facts['policy_id'] ] = [
-			'policy_id' => (string) $facts['policy_id'], 'version' => $version, 'calendar_version' => $calendar_version,
+	/** The index is a rebuildable projection of confirmed commands, never lifecycle authority. */
+	private function index_row( array $facts, string $digest, ?BusinessCalendarVersion $calendar, ?array $prior, string $label ): array {
+		$scope = (string) $facts['scope']['kind']; $target = (int) ( $facts['scope']['target_id'] ?? 0 );
+		$fields = $this->values;
+		foreach ( [ 'guide_step', 'review_id', 'review_stamp', 'replace_draft' ] as $key ) { unset( $fields[ $key ] ); }
+		return [ 'policy_id' => (string) $facts['policy_id'], 'version' => (int) $facts['version'],
+			'calendar_id' => null === $calendar ? ( $prior['calendar_id'] ?? '' ) : $calendar->private_facts()['calendar_id'],
+			'calendar_version' => null === $calendar ? (int) ( $prior['calendar_version'] ?? 0 ) : $calendar->private_facts()['version'],
+			'calendar_digest' => null === $calendar ? ( $prior['calendar_digest'] ?? '' ) : $calendar->digest(), 'uses_calendar' => null !== $calendar,
 			'scope_kind' => $scope, 'scope_id' => $target, 'label' => '' !== $label ? $label : (string) $facts['service']['customer_label'],
 			'applies' => 'global' === $scope ? __( 'Whole store', 'cetech-woocommerce-delivery-engine' ) : ( 'product' === $scope ? __( 'One product', 'cetech-woocommerce-delivery-engine' ) : __( 'One variation', 'cetech-woocommerce-delivery-engine' ) ),
-			'digest' => $digest, 'fields' => $this->values,
-		];
-		update_option( self::INDEX, $index, false );
+			'digest' => $digest, 'fields' => $fields ];
 	}
 
 	/** @return array<string, mixed> */
 	private function index(): array {
-		if ( ! function_exists( 'get_option' ) ) {
-			return [];
-		}
-		$index = get_option( self::INDEX, [] );
-		return is_array( $index ) ? $index : [];
+		$bytes = ( new PromiseStaffIntent() )->read( self::INDEX );
+		if ( null === $bytes ) { return []; }
+		$index = unserialize( $bytes, [ 'allowed_classes' => false ] );
+		if ( ! is_array( $index ) ) { throw new \RuntimeException( 'The guided projection is unavailable.' ); }
+		return $index;
 	}
 
 	/** @return array<string, mixed>|null */
@@ -575,7 +730,7 @@ final class PromiseStaffGuide {
 
 	/** @param array<string, mixed> $post @return array<string, string> */
 	private static function fields( array $post ): array {
-		$keys = [ 'guide_step', 'review_id', 'offer_code', 'processing_min', 'processing_max', 'delivery_min', 'delivery_max', 'unit', 'timezone', 'closures', 'cutoff', 'cutoff_miss', 'scope', 'product_id', 'variation_id', 'estimate_required', 'mon_open', 'mon_close', 'tue_open', 'tue_close', 'wed_open', 'wed_close', 'thu_open', 'thu_close', 'fri_open', 'fri_close', 'sat_open', 'sat_close', 'sun_open', 'sun_close' ];
+		$keys = [ 'guide_step', 'review_id', 'review_stamp', 'replace_draft', 'offer_code', 'processing_min', 'processing_max', 'delivery_min', 'delivery_max', 'unit', 'timezone', 'closures', 'cutoff', 'cutoff_miss', 'scope', 'product_id', 'variation_id', 'estimate_required', 'mon_open', 'mon_close', 'tue_open', 'tue_close', 'wed_open', 'wed_close', 'thu_open', 'thu_close', 'fri_open', 'fri_close', 'sat_open', 'sat_close', 'sun_open', 'sun_close' ];
 		$out = [];
 		foreach ( $keys as $key ) {
 			$value = $post[ $key ] ?? '';
