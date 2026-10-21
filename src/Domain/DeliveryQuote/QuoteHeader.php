@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Domain\DeliveryQuote;
 
+use CetechDeliveryEngine\Domain\DeliveryCommercial\FixedPromotionQuoteCapture;
+
 /** Minimal original immutable command references; no private body or self-hash. */
 final readonly class QuoteHeader implements \JsonSerializable {
 	public const FORMAT = 1;
@@ -21,10 +23,11 @@ final readonly class QuoteHeader implements \JsonSerializable {
 	}
 	public static function from_array( array $data ): self {
 		$data = QuoteJson::detach( $data, self::MAX_BYTES ); QuoteShape::fields( $data, [ 'format_version', 'quote_id', 'owner', 'profile', 'profile_version', 'purpose', 'material_digest', 'body_digest', 'namespace_hashes', 'acceptance_handle_hash', 'created_at', 'expires_at', 'revision' ] );
-		if ( ! in_array( $data['format_version'], [ 1, 2 ], true ) || 1 !== $data['revision'] || ! is_string( $data['quote_id'] ) || ! is_string( $data['created_at'] ) || ! is_string( $data['expires_at'] ) ) { QuoteShape::invalid(); }
+		if ( ! in_array( $data['format_version'], [ 1, 2, 3 ], true ) || 1 !== $data['revision'] || ! is_string( $data['quote_id'] ) || ! is_string( $data['created_at'] ) || ! is_string( $data['expires_at'] ) ) { QuoteShape::invalid(); }
 		$id = QuoteId::from_string( $data['quote_id'] ); $owner = QuoteOwner::from_array( QuoteShape::object( $data['owner'] ) ); QuoteShape::machine( $data['profile'] ); QuoteShape::integer( $data['profile_version'], 1, 1000000 ); QuoteShape::choice( $data['purpose'], [ 'checkout', 'estimate' ] );
-		$profiles = 2 === $data['format_version'] ? [ 'service_promise_v1' ] : [ self::SUPPORTED_PROFILE, 'legacy_fixed_base_v1' ];
+		$profiles = match ( $data['format_version'] ) { 1 => [ self::SUPPORTED_PROFILE, 'legacy_fixed_base_v1' ], 2 => [ 'service_promise_v1' ], 3 => [ FixedPromotionQuoteCapture::PROFILE ] };
 		if ( ! in_array( $data['profile'], $profiles, true ) || self::SUPPORTED_PROFILE_VERSION !== $data['profile_version'] ) { QuoteShape::invalid(); }
+		if ( 3 === $data['format_version'] && 'checkout' !== $data['purpose'] ) { QuoteShape::invalid(); }
 		foreach ( [ 'material_digest', 'body_digest', 'acceptance_handle_hash' ] as $field ) { QuoteShape::digest( $data[$field] ); }
 		$namespaces = QuoteShape::object( $data['namespace_hashes'] ); QuoteShape::fields( $namespaces, [ 'issue', 'accept', 'invalidate' ] ); foreach ( $namespaces as $value ) { QuoteShape::digest( $value ); } if ( 3 !== count( array_unique( $namespaces ) ) ) { QuoteShape::invalid(); }
 		$created = QuoteTime::parse( $data['created_at'] ); $expires = QuoteTime::parse( $data['expires_at'] ); if ( ! $created->plus_seconds( self::TTL_SECONDS )->equals( $expires ) ) { QuoteShape::invalid(); }
@@ -58,6 +61,11 @@ final readonly class QuoteHeader implements \JsonSerializable {
 	private static function checked_body( QuoteOwner $owner, QuoteContext $context, QuoteTerms $terms ): string {
 		$context_facts = $context->private_facts(); $terms_facts = $terms->private_facts(); $groups = [];
 		if ( $context->format_version() !== $terms->format_version() ) { QuoteShape::invalid(); }
+		if ( 3 === $context->format_version() ) {
+			$capture = $context->fixed_promotion_capture();
+			if ( null === $capture || ! $owner->equals( $capture->original_header()->owner() ) || ! hash_equals( $capture->digest(), $terms_facts['promotion_capture_digest'] ) ) { QuoteShape::invalid(); }
+			$capture->assert_context( $context->base_context() ); $capture->assert_terms( $terms->base_terms() );
+		}
 		$terms->promise_packet()?->assert_context_capture( $context, $owner );
 		foreach ( $context_facts['groups'] as $group ) { $groups[$group['component_key']] = $group; }
 		if ( count( $terms_facts['groups'] ) !== count( $groups ) || $owner->key_epoch() !== $context_facts['destination']['key_epoch'] ) { QuoteShape::invalid(); }

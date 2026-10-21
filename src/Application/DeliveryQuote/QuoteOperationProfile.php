@@ -50,6 +50,8 @@ final class QuoteOperationProfile implements OperationProfile, OperationTerminal
 		return $b['bind_namespace_hash'] === $names['bind'] && $b['seal_namespace_hash'] === $names['seal'];
 	}
 	public function authorize( OperationIdentity $identity ): bool {
+		// Format 3 is a reader-first contract; no campaign reservation authority is mounted.
+		if ( 3 === $this->bound?->header()?->format_version() || 3 === $this->bound?->current_context()?->format_version() || 'fixed_promotion_native_v1' === $this->bound?->original_issue()?->profile() || 'fixed_promotion_native_v1' === $this->bound?->original_issue()?->provider_code() ) { return false; }
 		try { return null !== $this->bound && null !== $this->authorizer && $identity->operation === $this->name && $identity->operation_version === $this->profile_version && $identity->site_id === $this->bound->owner()->site_id() && hash_equals( $identity->namespace_digest(), $this->bound->identity->namespace_digest() ) && true === ( $this->authorizer )( $this->bound->owner(), $this->name ); } catch ( \Throwable ) { return false; }
 	}
 	public function validate_command( OperationIdentity $identity, mixed $command ): OperationCommand {

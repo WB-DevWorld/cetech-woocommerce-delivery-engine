@@ -28,6 +28,8 @@ final class QuoteAdmissionGate {
 		$this->control = $control ?? new EmergencyControlStore(); $this->standard_route = null === $control;
 	}
 	public function admit( QuoteIssueCommand $command, QuoteAdmissionAttempt $attempt ): QuoteAdmissionResult {
+		// Reader-first promotion formats cannot charge counters or acquire a capture lease.
+		if ( 3 === $command->context()->format_version() || 'fixed_promotion_native_v1' === $command->profile() || 'fixed_promotion_native_v1' === $command->provider_code() ) { return new QuoteAdmissionResult( 'denied', 'storage_unavailable' ); }
 		if ( ! $this->authorized( $command->owner() ) ) { $attempt->deny(); return new QuoteAdmissionResult( 'denied', 'not_authorized' ); }
 		if ( ! $attempt->begin( $command ) ) { return $this->inspect( $command ); }
 		return $this->owned( $command, function( OperationSession $session, string $table ) use ( $command, $attempt ): array {
@@ -77,6 +79,7 @@ final class QuoteAdmissionGate {
 
 	/** Unit result is withheld until rollback/commit and retirement are acknowledged. */
 	private function owned( QuoteIssueCommand $command, callable $work, ?QuoteAdmissionAttempt $attempt = null ): QuoteAdmissionResult {
+		if ( 3 === $command->context()->format_version() || 'fixed_promotion_native_v1' === $command->profile() || 'fixed_promotion_native_v1' === $command->provider_code() ) { return new QuoteAdmissionResult( 'denied', 'storage_unavailable' ); }
 		if ( ! $this->authorized( $command->owner() ) ) { $attempt?->deny(); return new QuoteAdmissionResult( 'denied', 'not_authorized' ); }
 		$session = null; $uncertain = false; $owns_unit = false; $commit_started = false; $descriptor = [ 'denied', 'storage_unavailable', null, false ];
 		try {

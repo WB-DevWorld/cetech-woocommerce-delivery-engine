@@ -26,10 +26,14 @@ final readonly class DeliveryQuoteSnapshotEnvelope implements \JsonSerializable 
 	public const PROMISE_PROFILE = [ 'code' => 'service_promise_v1', 'version' => 1 ];
 	public const PROMISE_OUTER_VERSION = '3';
 	public const PROMISE_DIGEST_DOMAIN = 'cetech-required-promise-snapshot-v1:';
+	public const FIXED_PROMOTION_FORMAT = 3;
+	public const FIXED_PROMOTION_PROFILE = [ 'code' => 'fixed_promotion_native_v1', 'version' => 1 ];
+	public const FIXED_PROMOTION_OUTER_VERSION = '4';
 	private function __construct( private string $json ) {}
 
 	public static function from_array( array $data ): self {
 		$data = QuoteJson::detach( $data, self::MAX_BYTES );
+		if ( self::FIXED_PROMOTION_FORMAT === ( $data['format'] ?? null ) ) { return new self( QuoteJson::encode( FixedPromotionSnapshotCodec::from_array( $data ), self::MAX_BYTES ) ); }
 		if ( self::PROMISE_FORMAT === ( $data['format'] ?? null ) ) { return self::from_promise_array( $data ); }
 		QuoteShape::fields( $data, [ 'format', 'quote_id', 'profile', 'issued_at', 'expires_at', 'accepted_at', 'body_digest', 'material_digest', 'placement_id', 'context_digest', 'money_receipt', 'provenance_receipt' ] );
 		if ( self::FORMAT !== $data['format'] || QuoteShape::object( $data['profile'] ) !== self::PROFILE ) { QuoteShape::invalid(); }
@@ -120,6 +124,7 @@ final readonly class DeliveryQuoteSnapshotEnvelope implements \JsonSerializable 
 
 	/** Pure packet construction from verified captured facts. This never writes or seals an order. */
 	public static function from_captured( QuoteHeader $header, QuoteContext $context, QuoteTerms $terms, QuoteTime $accepted_at, QuoteId $placement_id, string $context_digest ): self {
+		if ( self::FIXED_PROMOTION_PROFILE === [ 'code' => $header->profile(), 'version' => $header->profile_version() ] ) { return self::from_array( FixedPromotionSnapshotCodec::from_captured( $header, $context, $terms, $accepted_at, $placement_id, $context_digest ) ); }
 		$header->assert_body( $context, $terms );
 		$profile = [ 'code' => $header->profile(), 'version' => $header->profile_version() ]; $promise = self::PROMISE_PROFILE === $profile;
 		if ( 'checkout' !== $header->purpose() || ! $context->checkout_acceptable() || ! $terms->checkout_acceptable() || ( ! $promise && self::PROFILE !== $profile ) ) { QuoteShape::invalid(); }
@@ -146,6 +151,7 @@ final readonly class DeliveryQuoteSnapshotEnvelope implements \JsonSerializable 
 	public function to_private_json(): string { return $this->json; }
 	public function format(): int { return $this->private_facts()['format']; }
 	public function is_promise(): bool { return self::PROMISE_FORMAT === $this->format(); }
+	public function is_fixed_promotion(): bool { return self::FIXED_PROMOTION_FORMAT === $this->format(); }
 	public function promise_packet(): ?PromiseQuotePacket { return $this->is_promise() ? PromiseQuotePacket::from_array( $this->private_facts()['promise_packet'] ) : null; }
 	public function matches( self $other ): bool { return hash_equals( $this->json, $other->json ); }
 	public function jsonSerialize(): never { throw new \LogicException( 'A safe historical delivery quote projection is required.' ); }

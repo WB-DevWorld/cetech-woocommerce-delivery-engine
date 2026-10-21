@@ -51,6 +51,8 @@ final readonly class DeliveryQuote implements \JsonSerializable {
 
 	/** Exact server-resolved original envelope; no new token or expiry is accepted. */
 	public function accept( QuoteOwner $owner, QuoteReference $reference, QuoteContext $current_context, QuoteTime $at, int $opened_revision, string $body_digest, QuoteTime $original_expiry ): self {
+		// Reader-first format: historical proof does not establish current campaign authority.
+		if ( 3 === $this->original_header->format_version() ) { self::refuse(); }
 		$this->guard_original( $owner, $reference, $opened_revision, $body_digest, $original_expiry );
 		if ( ! hash_equals( $this->original_header->material_digest(), $current_context->digest() ) || ! $current_context->checkout_acceptable() ) { self::refuse(); }
 		if ( 'accepted' === $this->stored_state ) {
@@ -90,6 +92,7 @@ final readonly class DeliveryQuote implements \JsonSerializable {
 			|| $revision !== $this->original_header->revision() || ! hash_equals( $this->original_header->body_digest(), $body_digest ) || ! $this->original_header->expires_at()->equals( $expiry ) ) { self::refuse(); }
 	}
 	private function supported_terms(): bool {
+		if ( 3 === $this->original_header->format_version() ) { return false; }
 		if ( null === $this->original_terms ) { return false; }
 		if ( 2 === $this->original_header->format_version() && ( 'service_promise_v1' !== $this->original_header->profile() || null === $this->original_terms->promise_packet() ) ) { return false; }
 		foreach ( $this->original_terms->private_facts()['groups'] as $group ) {

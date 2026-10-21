@@ -58,6 +58,7 @@ final class OrderDeliverySnapshotReader {
 			return new OrderDeliveryLineReadResult( true, null, OrderDeliveryLineReadResult::ERROR_VERSION_MISMATCH, $stored, null, $quote );
 		}
 		if ( OrderDeliverySnapshot::VERSION_V3 === $format && ( '3' !== ( $decoded['snapshot_version'] ?? null ) || null === $quote?->envelope || ! $quote->envelope->is_promise() ) ) { return new OrderDeliveryLineReadResult( true, null, OrderDeliveryLineReadResult::ERROR_VERSION_MISMATCH, $stored, null, $quote ); }
+		if ( OrderDeliverySnapshot::VERSION_V4 === $format && ( '4' !== ( $decoded['snapshot_version'] ?? null ) || null === $quote?->envelope || ! $quote->envelope->is_fixed_promotion() ) ) { return new OrderDeliveryLineReadResult( true, null, OrderDeliveryLineReadResult::ERROR_VERSION_MISMATCH, $stored, null, $quote ); }
 		$extensions = $this->extension_parser->read( $decoded );
 		if ( ! $extensions->required_semantics_supported() ) {
 			return new OrderDeliveryLineReadResult( true, null, OrderDeliveryLineReadResult::ERROR_VERSION_MISMATCH, $stored, $extensions, $quote );
@@ -68,6 +69,11 @@ final class OrderDeliverySnapshotReader {
 				QuoteJson::decode( $raw );
 				if ( ( '3' !== $meta && 3 !== $meta ) || ! DeliveryQuoteSnapshotMarker::matches( $item, '2' ) || null === $quote?->envelope ) { throw new \InvalidArgumentException(); }
 				PromiseSnapshotCore::line( $decoded, $quote->envelope );
+			}
+			if ( OrderDeliverySnapshot::VERSION_V4 === $format ) {
+				QuoteJson::decode( $raw );
+				if ( ( '4' !== $meta && 4 !== $meta ) || ! DeliveryQuoteSnapshotMarker::matches( $item, '3' ) || null === $quote?->envelope ) { throw new \InvalidArgumentException(); }
+				FixedPromotionSnapshotCore::line( $decoded, $quote->envelope );
 			}
 			$context_version = $this->positive_int( $decoded['customer_context_version'] ?? null, true );
 			if ( null !== $context_version && CustomerCartContext::CONTRACT_VERSION !== $context_version ) {
@@ -137,6 +143,7 @@ final class OrderDeliverySnapshotReader {
 			return new OrderDeliveryPackageReadResult( true, null, OrderDeliveryPackageReadResult::ERROR_VERSION_MISMATCH, $stored, null, $quote );
 		}
 		if ( OrderDeliverySnapshot::VERSION_V3 === $format && ( '3' !== ( $decoded['snapshot_version'] ?? null ) || null === $quote?->envelope || ! $quote->envelope->is_promise() ) ) { return new OrderDeliveryPackageReadResult( true, null, OrderDeliveryPackageReadResult::ERROR_VERSION_MISMATCH, $stored, null, $quote ); }
+		if ( OrderDeliverySnapshot::VERSION_V4 === $format && ( '4' !== ( $decoded['snapshot_version'] ?? null ) || null === $quote?->envelope || ! $quote->envelope->is_fixed_promotion() ) ) { return new OrderDeliveryPackageReadResult( true, null, OrderDeliveryPackageReadResult::ERROR_VERSION_MISMATCH, $stored, null, $quote ); }
 		$extensions = $this->extension_parser->read( $decoded );
 		if ( ! $extensions->required_semantics_supported() ) {
 			return new OrderDeliveryPackageReadResult( true, null, OrderDeliveryPackageReadResult::ERROR_VERSION_MISMATCH, $stored, $extensions, $quote );
@@ -146,6 +153,11 @@ final class OrderDeliverySnapshotReader {
 				QuoteJson::decode( $raw );
 				if ( ( '3' !== $meta && 3 !== $meta ) || ! DeliveryQuoteSnapshotMarker::matches( $order, '2' ) || null === $quote?->envelope ) { throw new \InvalidArgumentException(); }
 				PromiseSnapshotCore::package( $decoded, $quote->envelope );
+			}
+			if ( OrderDeliverySnapshot::VERSION_V4 === $format ) {
+				QuoteJson::decode( $raw );
+				if ( ( '4' !== $meta && 4 !== $meta ) || ! DeliveryQuoteSnapshotMarker::matches( $order, '3' ) || null === $quote?->envelope ) { throw new \InvalidArgumentException(); }
+				FixedPromotionSnapshotCore::package( $decoded, $quote->envelope );
 			}
 			$snapshot = new OrderDeliveryPackageSnapshot(
 				$format,
@@ -219,7 +231,7 @@ final class OrderDeliverySnapshotReader {
 	}
 
 	private function supported_format( ?string $value ): bool {
-		return in_array( $value, [ OrderDeliverySnapshot::VERSION, OrderDeliverySnapshot::VERSION_V2, OrderDeliverySnapshot::VERSION_V3 ], true );
+		return in_array( $value, [ OrderDeliverySnapshot::VERSION, OrderDeliverySnapshot::VERSION_V2, OrderDeliverySnapshot::VERSION_V3, OrderDeliverySnapshot::VERSION_V4 ], true );
 	}
 
 	private function metadata_agrees( mixed $raw, ?string $stored, string $format ): bool {
