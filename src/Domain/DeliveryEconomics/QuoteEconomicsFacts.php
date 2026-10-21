@@ -60,6 +60,9 @@ final readonly class QuoteEconomicsFacts implements \JsonSerializable {
 		return new self( QuoteJson::encode( $data ), $data['terms_digest'] );
 	}
 
+	/** Strict historical hydration; captured terms are supplied, never fetched or repriced. */
+	public static function from_json( QuoteTerms $terms, string $json ): self { return self::from_array( $terms, QuoteJson::decode( $json ) ); }
+
 	public function matches_terms( QuoteTerms $terms ): bool { return hash_equals( $this->terms_digest, $terms->digest() ); }
 	public function terms_digest(): string { return $this->terms_digest; }
 	public function private_facts(): array { return QuoteJson::decode( $this->json ); }
