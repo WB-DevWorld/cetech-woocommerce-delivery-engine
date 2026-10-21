@@ -14,6 +14,15 @@ final class CetechPromiseStaffGuideHttpFixture {
     private static bool $observing = false;
 
     public static function register(): void {
+        // Even an inert query callback changes the native shopper source fence.
+        // Observe only this owned guide POST; all other requests keep its hooks untouched.
+        if (($_SERVER['REQUEST_METHOD'] ?? '') !== 'POST' || !is_admin() || ($_GET['page'] ?? null) !== 'cetech-de-promises'
+            || ($_POST['cetech_de_action'] ?? null) !== 'cetech_de_promise_guide') { return; }
+        $state = cetech_q05_state();
+        if (true !== ($state['p05_guide']['active'] ?? false) || true !== ($state['p05']['active'] ?? false)
+            || !is_int($state['p05']['admin']['id'] ?? null) || get_current_user_id() !== $state['p05']['admin']['id']
+            || ($state['site_id'] ?? null) !== get_current_blog_id()) { return; }
+        self::guard($state);
         add_filter('query', static function(string $sql): string {
             if (self::$observing || !str_contains($sql, 'cetech_de_staff_intent_') || !preg_match('/\A(?:INSERT|UPDATE|DELETE)\b/', $sql)) { return $sql; }
             self::$observing = true;
@@ -41,20 +50,44 @@ final class CetechPromiseStaffGuideHttpFixture {
     /** Parse only the three exact SQL shapes emitted by the private intent store. */
     public static function journal_sql(string $sql, string $table, string $name): array {
         if (!preg_match('/\A[A-Za-z0-9_]+\z/D', $table) || !preg_match('/\Acetech_de_staff_intent_[a-f0-9]{64}\z/D', $name) || strlen($sql) > 1048576) { throw new RuntimeException('Guide journal SQL bounds differ.'); }
-        $literal = "'((?:[^'\\\\]|\\\\.)*)'";
-        $prefix = preg_quote('`' . $table . '`', '~');
-        $values = [];
-        if (preg_match('~\AINSERT INTO ' . $prefix . ' \(option_name, option_value, autoload\) VALUES \(' . $literal . ', ' . $literal . ", 'off'\\)\\z~sD", $sql, $match)) {
-            if (self::sql_literal($match[1]) !== $name) { throw new RuntimeException('Guide journal option differs.'); }
-            $values[] = self::sql_literal($match[2]);
-        } elseif (preg_match('~\AUPDATE ' . $prefix . ' SET option_value = ' . $literal . ' WHERE option_name = ' . $literal . ' AND BINARY option_name = ' . $literal . ' AND BINARY option_value = ' . $literal . '\z~sD', $sql, $match)) {
-            if (self::sql_literal($match[2]) !== $name || self::sql_literal($match[3]) !== $name) { throw new RuntimeException('Guide journal option differs.'); }
-            $values = [self::sql_literal($match[1]), self::sql_literal($match[4])];
-        } elseif (preg_match('~\ADELETE FROM ' . $prefix . ' WHERE option_name = ' . $literal . ' AND BINARY option_name = ' . $literal . ' AND BINARY option_value = ' . $literal . '\z~sD', $sql, $match)) {
-            if (self::sql_literal($match[1]) !== $name || self::sql_literal($match[2]) !== $name) { throw new RuntimeException('Guide journal option differs.'); }
-            $values[] = self::sql_literal($match[3]);
+        $cursor = 0; $prefix = '`' . $table . '`'; $values = [];
+        if (str_starts_with($sql, 'INSERT INTO ')) {
+            self::sql_piece($sql, $cursor, 'INSERT INTO ' . $prefix . ' (option_name, option_value, autoload) VALUES (');
+            $observed = self::sql_value($sql, $cursor);
+            if ($observed !== $name) { throw new RuntimeException('Guide journal option differs.'); }
+            self::sql_piece($sql, $cursor, ', '); $values[] = self::sql_value($sql, $cursor);
+            self::sql_piece($sql, $cursor, ", 'off')");
+        } elseif (str_starts_with($sql, 'UPDATE ')) {
+            self::sql_piece($sql, $cursor, 'UPDATE ' . $prefix . ' SET option_value = '); $after = self::sql_value($sql, $cursor);
+            self::sql_piece($sql, $cursor, ' WHERE option_name = '); $first = self::sql_value($sql, $cursor);
+            self::sql_piece($sql, $cursor, ' AND BINARY option_name = '); $second = self::sql_value($sql, $cursor);
+            self::sql_piece($sql, $cursor, ' AND BINARY option_value = '); $before = self::sql_value($sql, $cursor);
+            if ($first !== $name || $second !== $name) { throw new RuntimeException('Guide journal option differs.'); }
+            $values = [$after, $before];
+        } elseif (str_starts_with($sql, 'DELETE FROM ')) {
+            self::sql_piece($sql, $cursor, 'DELETE FROM ' . $prefix . ' WHERE option_name = '); $first = self::sql_value($sql, $cursor);
+            self::sql_piece($sql, $cursor, ' AND BINARY option_name = '); $second = self::sql_value($sql, $cursor);
+            self::sql_piece($sql, $cursor, ' AND BINARY option_value = '); $values[] = self::sql_value($sql, $cursor);
+            if ($first !== $name || $second !== $name) { throw new RuntimeException('Guide journal option differs.'); }
         } else { throw new RuntimeException('Guide journal SQL shape differs.'); }
+        if ($cursor !== strlen($sql)) { throw new RuntimeException('Guide journal SQL shape differs.'); }
         return $values;
+    }
+
+    private static function sql_piece(string $sql, int &$cursor, string $piece): void {
+        if (substr($sql, $cursor, strlen($piece)) !== $piece) { throw new RuntimeException('Guide journal SQL shape differs.'); }
+        $cursor += strlen($piece);
+    }
+
+    /** Each byte is visited once; escaping never changes the fixed SQL template. */
+    private static function sql_value(string $sql, int &$cursor): string {
+        self::sql_piece($sql, $cursor, "'"); $start = $cursor; $length = strlen($sql);
+        while ($cursor < $length) {
+            if ($sql[$cursor] === "'") { $raw = substr($sql, $start, $cursor - $start); ++$cursor; return self::sql_literal($raw); }
+            if ($sql[$cursor] === '\\') { if ($cursor + 1 >= $length) { break; } $cursor += 2; }
+            else { ++$cursor; }
+        }
+        throw new RuntimeException('Guide journal SQL shape differs.');
     }
 
     public static function sql_literal(string $value): string {
@@ -225,6 +258,7 @@ final class CetechPromiseStaffGuideHttpFixture {
 
 if (defined('WP_CLI') && WP_CLI && isset($args) && count($args) === 3) {
     $guide_args = $args; unset($args); require_once __DIR__ . '/opening-http-promise-native-configuration-support.php'; $args = $guide_args; unset($guide_args);
+    require_once __DIR__ . '/opening-http-fixture-common.php';
     [$mode, $state_path, $output_path] = $args; $state = opening_http_read_state($state_path); CetechQuotePlacementHttpFixture::guard($state);
     if ($mode !== 'cleanupguide') { CetechPromiseStaffGuideHttpFixture::guard($state); }
     if ($mode === 'prepareguide') { $out = CetechPromiseStaffGuideHttpFixture::prepare($state); }

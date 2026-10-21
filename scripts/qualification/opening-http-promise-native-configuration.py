@@ -41,6 +41,53 @@ PRIOR = {
     "p05_cpt": ("opening-promise-native-configuration-cpt-results.json", None),
 }
 IDENTITY_KEYS = ("source_head", "candidate_head", "source_tree", "installed_php_sources_hash")
+FAILURE_PHASES = {'none', 'shopper_inspect_before_seed', 'shopper_seed_post', 'shopper_inspect_after_seed', 'classic_refresh_post', 'shopper_inspect_before_confirm', 'classic_confirm_post', 'classic_page_get'}
+FAILURE_CODES = {'unclassified', 'observer_http_status', 'observer_success_false', 'observer_source_identity_mismatch', 'stimulus_http_status', 'stimulus_success_false', 'json_decode_or_shape', 'refresh_http_status', 'refused_public_state', 'transport_or_unclassified'}
+FAILURE_CLASSES = {'RuntimeError', 'ValueError', 'TypeError', 'KeyError', 'TimeoutExpired', 'JSONDecodeError', 'OtherError'}
+PUBLIC_STATUSES = {'none', 'unknown', 'no_quote', 'review_required', 'confirmed', 'expired', 'changed', 'unconfirmed', 'unavailable'}
+
+
+def failure_error_valid(value):
+    if not isinstance(value, dict) or set(value) != {'class', 'phase', 'code', 'http_status', 'public_status'}: return False
+    if any(not isinstance(value[key], str) for key in ('class', 'phase', 'code', 'public_status')): return False
+    if value['class'] not in FAILURE_CLASSES or value['phase'] not in FAILURE_PHASES or value['code'] not in FAILURE_CODES or value['public_status'] not in PUBLIC_STATUSES: return False
+    if value['http_status'] is not None and (type(value['http_status']) is not int or not 100 <= value['http_status'] <= 599): return False
+    return value['code'] != 'unclassified' if value['phase'] != 'none' else value['code'] == 'unclassified' and value['http_status'] is None and value['public_status'] == 'none'
+
+
+class FailureDiagnostic:
+    """Failure-only scalars for one bounded interval; never retain response bodies."""
+    def __init__(self):
+        self.clear()
+
+    def clear(self):
+        self.phase = 'none'; self.code = 'unclassified'; self.http_status = None; self.public_status = 'none'
+
+    def begin(self, phase, public_status=None):
+        if not isinstance(phase, str) or phase not in FAILURE_PHASES or phase == 'none': raise ValueError('P05 diagnostic phase refused')
+        self.phase = phase; self.code = 'transport_or_unclassified'; self.http_status = None; self.public_status = 'none'
+        self.observe_public(public_status)
+
+    def mark(self, code):
+        if not isinstance(code, str) or code not in FAILURE_CODES or code == 'unclassified': raise ValueError('P05 diagnostic code refused')
+        if self.phase != 'none': self.code = code
+
+    def observe_http(self, status):
+        if self.phase != 'none': self.http_status = status if type(status) is int and 100 <= status <= 599 else None
+
+    def observe_public(self, status):
+        if self.phase != 'none': self.public_status = status if isinstance(status, str) and status in PUBLIC_STATUSES else 'none' if status is None else 'unknown'
+
+    def decode(self, response):
+        self.observe_http(response.status)
+        self.mark('json_decode_or_shape')
+        return json.loads(response.body)
+
+    def error(self, error):
+        name = type(error).__name__
+        result = {'class':name if name in FAILURE_CLASSES else 'OtherError', 'phase':self.phase, 'code':self.code, 'http_status':self.http_status, 'public_status':self.public_status}
+        if not failure_error_valid(result): raise RuntimeError('P05 diagnostic envelope refused')
+        return result
 
 
 def module(name, path):
@@ -296,6 +343,7 @@ def run(options, recorder):
         folder = Path(options.private) / name; folder.mkdir(mode=0o700)
         bridges[name] = common.FixtureBridge(options.php,options.wpcli,options.site,str(SOURCE/'admin-context.php'),str(SOURCE/script),Path(options.state),folder)
     failure = None
+    diagnostic = FailureDiagnostic()
     try:
         response = client.get('/?cetech_opening_http_probe=1', {'X-CETECH-Opening-Probe':state['probe_token']})
         observed = json.loads(response.body); runtime = observed.pop('runtime', None)
@@ -341,12 +389,25 @@ def run(options, recorder):
         recorder.check('HTTP-W2P05-REAL-PREVIEW-LABEL-NO-ADMISSION', preview.status == 200 and published_rows == after_preview and 'Hypothetical preview' in preview.body.decode(errors='replace'), {'actual_nonce_protected_preview_post':preview.status == 200,'hypothetical_label_visible':'Hypothetical preview' in preview.body.decode(errors='replace'),'explicit_no_checkout_acceptance':'Nothing was published or accepted for checkout' in preview.body.decode(errors='replace'),'physical_policy_calendar_unchanged':published_rows == after_preview})
         login(client,state['username'],state['password'],state['classic_page_url'])
         def inspect():
-            response = client.get('/?cetech_p05_fixture=inspect',headers); value=json.loads(response.body)
-            if response.status != 200 or value.get('success') is not True or any(value['data']['source_identity'][key] != state['identity'][key] for key in IDENTITY_KEYS): raise RuntimeError('P05 native shopper observer refused')
-            return value['data']
+            response = client.get('/?cetech_p05_fixture=inspect',headers); value=diagnostic.decode(response)
+            if response.status != 200: diagnostic.mark('observer_http_status')
+            elif value.get('success') is not True: diagnostic.mark('observer_success_false')
+            elif any(value['data']['source_identity'][key] != state['identity'][key] for key in IDENTITY_KEYS): diagnostic.mark('observer_source_identity_mismatch')
+            else: return value['data']
+            raise RuntimeError('P05 native shopper observer refused')
         def fixture(mode, promise=False):
-            before=inspect(); response=client.request('/?cetech_'+('p04' if promise else 'q06')+'_fixture='+mode, {'nonce':before['p04_fixture_nonce' if promise else 'nonce']},headers)
-            if response.status != 200 or json.loads(response.body).get('success') is not True: raise RuntimeError('P05 tracked shopper stimulus refused')
+            seeded_interval = mode == 'seed' and not promise and diagnostic.phase == 'shopper_inspect_before_seed'
+            before=inspect(); nonce=before['p04_fixture_nonce' if promise else 'nonce']
+            if seeded_interval: diagnostic.begin('shopper_seed_post')
+            response=client.request('/?cetech_'+('p04' if promise else 'q06')+'_fixture='+mode, {'nonce':nonce},headers)
+            diagnostic.observe_http(response.status)
+            if response.status != 200:
+                diagnostic.mark('stimulus_http_status')
+                raise RuntimeError('P05 tracked shopper stimulus refused')
+            if diagnostic.decode(response).get('success') is not True:
+                diagnostic.mark('stimulus_success_false')
+                raise RuntimeError('P05 tracked shopper stimulus refused')
+            if seeded_interval: diagnostic.begin('shopper_inspect_after_seed')
             return inspect()
         pdp = client.get(state['p05']['product_url']); pdp_text=pdp.body.decode(errors='replace')
         from html.parser import HTMLParser
@@ -360,10 +421,26 @@ def run(options, recorder):
                 if self.active:self.values.append(data)
         estimates=Estimate();estimates.feed(pdp_text);preliminary=any('Preliminary estimate' in text for text in estimates.values)
         recorder.check('HTTP-W2P05-REAL-PDP-PRELIMINARY-NO-ACCEPTED-PROMISE', pdp.status == 200 and preliminary, {'actual_published_product_page':pdp.status == 200,'preliminary_estimate_label':preliminary,'final_checkout_review_remains_required':any('checkout' in text for text in estimates.values),'no_original_accepted_marker':'data-cetech-de-original-promise="1"' not in pdp_text})
-        seeded=fixture('seed');response=client.request(state['classic_url'],{'_wpnonce':seeded['review_nonce'],'action':'refresh','generation':seeded['facts']['generation'],'review_token':str(uuid.uuid4())});facts=json.loads(response.body).get('data',{})
-        if response.status != 200 or facts.get('status') != 'review_required': raise RuntimeError('P05 actual Classic Refresh refused')
-        confirmed=client.request(state['classic_url'],{'_wpnonce':inspect()['review_nonce'],'action':'confirm','generation':facts['generation']});final=json.loads(confirmed.body).get('data',{});promise=final.get('quote',{}).get('promise');classic=client.get(state['classic_page_url']);classic_text=classic.body.decode(errors='replace')
+        diagnostic.begin('shopper_inspect_before_seed')
+        seeded=fixture('seed')
+        diagnostic.begin('classic_refresh_post')
+        response=client.request(state['classic_url'],{'_wpnonce':seeded['review_nonce'],'action':'refresh','generation':seeded['facts']['generation'],'review_token':str(uuid.uuid4())})
+        facts=diagnostic.decode(response).get('data',{})
+        diagnostic.observe_public(facts.get('status') if isinstance(facts,dict) else None)
+        if response.status != 200 or facts.get('status') != 'review_required':
+            diagnostic.mark('refresh_http_status' if response.status != 200 else 'refused_public_state')
+            raise RuntimeError('P05 actual Classic Refresh refused')
+        diagnostic.begin('shopper_inspect_before_confirm')
+        confirm_nonce=inspect()['review_nonce']
+        diagnostic.begin('classic_confirm_post')
+        confirmed=client.request(state['classic_url'],{'_wpnonce':confirm_nonce,'action':'confirm','generation':facts['generation']})
+        final=diagnostic.decode(confirmed).get('data',{});promise=final.get('quote',{}).get('promise')
+        diagnostic.begin('classic_page_get', final.get('status'))
+        classic=client.get(state['classic_page_url']);diagnostic.observe_http(classic.status);classic_text=classic.body.decode(errors='replace')
+        if confirmed.status != 200 or final.get('status') != 'confirmed':
+            diagnostic.begin('classic_confirm_post', final.get('status'));diagnostic.observe_http(confirmed.status);diagnostic.mark('refused_public_state')
         recorder.check('HTTP-W2P05-REAL-CLASSIC-FINAL-STRUCTURED-ORIGINAL-VIEW', confirmed.status == 200 and final.get('status') == 'confirmed' and safe_promise(promise), {'actual_separate_refresh_confirm_requests':response.status == 200 and confirmed.status == 200,'closed_safe_structured_original_promise':safe_promise(promise),'original_label_markup_visible':'data-cetech-de-original-promise="1"' in classic_text,'captured_customer_text_visible':all(group['customer_text'] in classic_text for group in promise.get('groups',[]))})
+        diagnostic.clear()
         store=client.get(state['store_cart_url'],{'Nonce':inspect()['store_nonce']});store_value=json.loads(store.body);store_facts=store_value.get('extensions',{}).get('cetech-delivery-quote-review',{});store_promise=store_facts.get('quote',{}).get('promise')
         recorder.check('HTTP-W2P05-REAL-STORE-API-SAME-ORIGINAL-PUBLIC-VIEW', store.status == 200 and safe_promise(store_promise) and store_promise == promise, {'actual_native_store_cart_request':store.status == 200,'closed_safe_structured_promise':safe_promise(store_promise),'same_accepted_quote_id':store_facts.get('quote',{}).get('quote_id') == final.get('quote',{}).get('quote_id'),'exact_original_view_and_text_parity':store_promise == promise})
         before_stale=inspect();fixture('normal_policy',True);stale=client.request(state['classic_url'],{'_wpnonce':inspect()['review_nonce'],'action':'confirm','generation':final['generation']});stale_value=json.loads(stale.body).get('data',{});after_stale=inspect()
@@ -402,7 +479,7 @@ def run(options, recorder):
         recorder.check('HTTP-W2P05-OUTSIDER-SHIPMENT-HISTORY-REFUSED', outsider_order_page.status in (200,403) and 'data-cetech-de-shipment-original="1"' not in outsider_order_page.body.decode(errors='replace') and after_outsider == after_change, {'actual_other_native_customer_get':any(cookie.name.startswith('wordpress_logged_in_') for cookie in denied.cookies),'no_original_or_current_private_history':'data-cetech-de-shipment-original="1"' not in outsider_order_page.body.decode(errors='replace') and 'data-cetech-de-shipment-current="1"' not in outsider_order_page.body.decode(errors='replace'),'unprivileged_native_staff_post_denied':outsider_admin.status in (302,303,403) and after_change['original_text'] not in outsider_admin.body.decode(errors='replace'),'stored_current_and_original_history_unchanged':after_outsider == after_change})
         run_guide(options, recorder.report, admin, state, bridges['guide'], fixture)
     except Exception as error:
-        failure=error;recorder.report['status']='FAIL';recorder.report['error']={'class':type(error).__name__ if type(error).__name__ in {'RuntimeError','ValueError','TypeError','KeyError','TimeoutExpired','JSONDecodeError'} else 'OtherError'};recorder.write()
+        failure=error;recorder.report['status']='FAIL';recorder.report['error']=diagnostic.error(error);recorder.write()
         guide = GuideRecorder(options.work); guide.report['status'] = 'FAIL'; guide.write()
     finally:
         try:
