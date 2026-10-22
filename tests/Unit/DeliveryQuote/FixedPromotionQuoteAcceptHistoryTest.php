@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Tests\Unit\DeliveryQuote;
 
 use CetechDeliveryEngine\Application\DeliveryPromotion\{FixedPromotionBudgetAccountStore, FixedPromotionEligibilityBudgetGuard};
-use CetechDeliveryEngine\Application\DeliveryQuote\{FixedPromotionQuoteAcceptCommand, FixedPromotionQuoteAcceptService, QuoteOperationProfile};
+use CetechDeliveryEngine\Application\DeliveryQuote\{FixedPromotionQuoteAcceptCommand, FixedPromotionQuoteAcceptService, QuoteOperationProfile, QuotePrivatePublication};
 use CetechDeliveryEngine\Application\Operation\OperationReadiness;
 use CetechDeliveryEngine\Core\Versioning\{MigrationStatus, SchemaVersion};
 use CetechDeliveryEngine\Domain\Contracts\RequestContext;
-use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteHeader, QuoteReference, QuoteStoredRow};
+use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteHeader, QuoteId, QuoteReference, QuoteStoredRow};
 use CetechDeliveryEngine\Domain\Operation\{OperationCommitResult, OperationCompletion, OperationConnectionFactory, OperationMaterialEvent, OperationSession};
 use CetechDeliveryEngine\Infrastructure\Persistence\{DeliveryQuoteSchema, EmergencyControlStore, OperationStoreSchema, RuleLifecycleSchema, WpdbOperationRecordRepository};
 use CetechDeliveryEngine\Tests\Support\DeliveryQuote\QuoteFixtures as Q;
@@ -22,6 +22,7 @@ require_once __DIR__ . '/FixedPromotionQuoteIssueHistoryTest.php';
 final class FixedPromotionQuoteAcceptHistoryTest extends TestCase {
 	private PromotionAcceptHistoryFactory $factory;
 	private FixedPromotionQuoteAcceptService $service;
+	private PromotionAcceptHistoryPublication $publication;
 	private bool $authorized = true;
 
 	protected function setUp(): void {
@@ -32,7 +33,8 @@ final class FixedPromotionQuoteAcceptHistoryTest extends TestCase {
 		$current = $this->createMock( OperationReadiness::class ); $current->expects( $this->never() )->method( 'assert_ready' );
 		$control = $this->createMock( EmergencyControlStore::class ); $control->expects( $this->never() )->method( 'assert_ready' ); $control->expects( $this->never() )->method( 'current' );
 		$ready = new class implements OperationReadiness { public function assert_ready( OperationSession $session ): void { if ( $session instanceof PromotionAcceptHistorySession ) { $session->hook( 'readiness' ); } } };
-		$this->service = new FixedPromotionQuoteAcceptService( $this->factory, $store, $eligibility, fn(): bool => $this->authorized, readiness: $ready, control: $control, current_readiness: $current );
+		$this->publication = new PromotionAcceptHistoryPublication();
+		$this->service = new FixedPromotionQuoteAcceptService( $this->factory, $store, $eligibility, fn(): bool => $this->authorized, readiness: $ready, control: $control, publication: $this->publication, current_readiness: $current );
 	}
 
 	public function test_exact_terminal_acceptance_replays_original_time_without_current_source_or_funding(): void {
@@ -42,6 +44,16 @@ final class FixedPromotionQuoteAcceptHistoryTest extends TestCase {
 		self::assertSame( $this->factory->quote->row(), $result->quote->row() ); self::assertSame( Q::time()->plus_seconds( 2 )->sql(), $result->quote->accepted_at()->sql() ); self::assertNull( $result->command->issue()->lease() );
 		self::assertSame( $before, [ $this->factory->quote->row(), $this->factory->records, $this->factory->events ] ); self::assertCount( 2, $this->factory->sessions );
 		foreach ( $this->factory->sessions as $session ) { self::assertTrue( $session->is_retired() ); self::assertFalse( $session->in_transaction() ); self::assertSame( 0, $session->writes ); self::assertSame( 0, $session->clock_reads ); }
+	}
+
+	public function test_failed_publication_preserves_acknowledged_acceptance_and_the_conservative_pending_outcome(): void {
+		$this->factory->records[2]['publication_state'] = 'pending';
+		$before = [ $this->factory->quote->row(), $this->factory->records, $this->factory->events ];
+		$result = $this->service->reconcile( $this->factory->command, RequestContext::create() );
+		self::assertSame( 'unconfirmed', $result->attempt->outcome->state ); self::assertTrue( $result->attempt->outcome->mutation_accepted ); self::assertTrue( $result->attempt->outcome->publication_pending ); self::assertSame( 'outcome_unknown', $result->attempt->outcome->error->code );
+		self::assertSame( 'accepted', $result->attempt->completion->state ); self::assertTrue( $result->attempt->replayed ); self::assertNotNull( $result->quote ); self::assertSame( 'accepted', $result->quote->state() ); self::assertSame( Q::time()->plus_seconds( 2 )->sql(), $result->quote->accepted_at()->sql() );
+		self::assertSame( $before, [ $this->factory->quote->row(), $this->factory->records, $this->factory->events ] ); self::assertSame( 'pending', $this->factory->records[2]['publication_state'] ); self::assertSame( 1, $this->publication->calls );
+		foreach ( $this->factory->sessions as $session ) { self::assertSame( 0, $session->writes ); self::assertSame( 0, $session->clock_reads ); }
 	}
 
 	public static function owner_losses(): array { return [ [ 'readiness', 'prefix' ], [ 'begin', 'site' ], [ 'validation', 'charset' ], [ 'receipt', 'prefix' ], [ 'quote', 'site' ], [ 'rollback', 'charset' ], [ 'retire', 'prefix' ] ]; }
@@ -89,6 +101,11 @@ final class FixedPromotionQuoteAcceptHistoryTest extends TestCase {
 		foreach ( $this->factory->sessions as $session ) { self::assertSame( 0, $session->writes ); }
 	}
 	private function assert_unknown( \CetechDeliveryEngine\Application\DeliveryQuote\FixedPromotionQuoteAcceptResult $result ): void { self::assertSame( 'unconfirmed', $result->attempt->outcome->state ); self::assertNull( $result->attempt->completion ); self::assertNull( $result->quote ); self::assertSame( 'outcome_unknown', $result->attempt->outcome->error->code ); }
+}
+
+final class PromotionAcceptHistoryPublication implements QuotePrivatePublication {
+	public int $calls = 0;
+	public function invalidate( int $site_id, string $owner_digest, QuoteId $quote_id ): bool { ++$this->calls; return false; }
 }
 
 /** Original issue comes from the retained immutable issued-history fixture, not a recovered live capability. */
