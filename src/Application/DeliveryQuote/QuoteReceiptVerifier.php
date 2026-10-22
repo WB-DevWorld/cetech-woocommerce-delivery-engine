@@ -76,20 +76,45 @@ final class QuoteReceiptVerifier {
 	/** Historical issued-only acknowledgement; it grants no current acceptance or budget authority. */
 	public function promotion_issue_verified( QuoteStoredRow $quote, array $records, FixedPromotionQuoteIssueCommand $expected ): bool {
 		try {
-			$header = $quote->header(); $context = $quote->context(); $terms = $quote->terms(); $record = $records['issue'] ?? null;
-			if ( 3 !== $header->format_version() || 'fixed_promotion_native_v1' !== $header->profile() || 1 !== $header->profile_version() || 'checkout' !== $header->purpose()
-				|| 'issued' !== $quote->state() || 1 !== $quote->revision() || null !== $quote->accepted_at() || null !== $quote->row()['transition_at'] || null === $context || null === $terms
-				|| 2 !== $expected->identity->operation_version || ! $expected->owner()->equals( $header->owner() ) || $header->to_private_json() !== $expected->header()->to_private_json()
-				|| $context->to_private_json() !== $expected->context()->to_private_json() || $terms->to_private_json() !== $expected->terms()->to_private_json() || ! $header->matches_reference( $expected->reference() )
-				|| ! $record instanceof OperationRecord || 2 !== $record->operation_version || ! $record->matches( $expected->identity, $expected->intent() ) || 'accepted' !== $record->state
-				|| ! $this->common( $record, $quote, $header->namespace_hashes()['issue'] ) || null === $record->event || null === $record->completed_at ) { return false; }
-			$r = $record->completion->result; $event = $record->event;
-			$facts = [ 'allocation_digest' => $expected->allocation_digest(), 'allocation_count' => count( $expected->allocation_set()->requests() ), 'hold_until' => $expected->hold_until()->epoch_microseconds() ];
-			foreach ( $facts as $field => $value ) { if ( ( $r[$field] ?? null ) !== $value || ( $event->target[$field] ?? null ) !== $value ) { return false; } }
-			$completed = \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime::from_epoch_microseconds( $r['completed_at'] );
-			return 1 === $r['quote_revision'] && 'issued' === $r['state'] && \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime::parse( $record->completed_at )->compare( $completed ) >= 0 && $header->valid_at( $completed ) && $completed->compare( $expected->hold_until() ) < 0
-				&& $event->operation === $expected->identity->operation && 2 === $event->operation_version && 'quote_issued' === $event->reason_code && 1 === $event->before_revision && 2 === $event->after_revision && [ 'quote', 'admission', 'promotion_budget' ] === $event->changed_fields;
+			return 'issued' === $quote->state() && 1 === $quote->revision() && null === $quote->accepted_at() && null === $quote->row()['transition_at']
+				&& $this->promotion_original_issue_verified( $quote, $records, $expected );
 		} catch ( \Throwable ) { return false; }
+	}
+	/** Original accepted history only; no current funding, control, or payment authority is inferred. */
+	public function promotion_acceptance_verified( QuoteStoredRow $quote, array $records, FixedPromotionQuoteAcceptCommand $expected ): bool {
+		try {
+			$accepted = $quote->accepted_at(); $record = $records['accept'] ?? null; $identity = $expected->identity;
+			if ( 'accepted' !== $quote->state() || 2 !== $quote->revision() || null === $accepted || $quote->row()['transition_at'] !== $accepted->sql()
+				|| 'delivery_quote.accept' !== $identity->operation || 1 !== $identity->operation_version
+				|| ! $this->promotion_original_issue_verified( $quote, $records, $expected->issue() )
+				|| ! $record instanceof OperationRecord || 'accepted' !== $record->state || ! $record->matches( $identity, $expected->intent() )
+				|| ! $this->common( $record, $quote, $quote->header()->namespace_hashes()['accept'] ) || null === $record->event || null === $record->completed_at
+				|| ( ( $records['invalidate'] ?? null ) instanceof OperationRecord && 'accepted' === $records['invalidate']->state ) ) { return false; }
+			$r = $record->completion->result; $event = $record->event; $issued = $records['issue']->completion->result;
+			if ( 2 !== $r['quote_revision'] || 'accepted' !== $r['state'] || $r['completed_at'] !== $accepted->epoch_microseconds()
+				|| \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime::parse( $record->completed_at )->compare( $accepted ) < 0
+				|| $issued['completed_at'] > $accepted->epoch_microseconds() || ! $quote->header()->valid_at( $accepted ) || $accepted->compare( $expected->hold_until() ) >= 0
+				|| ! $quote->context()?->checkout_acceptable() || ! $quote->terms()?->checkout_acceptable() || ! $quote->terms()->feasibility_at( $accepted ) ) { return false; }
+			foreach ( [ 'quote_id', 'body_digest', 'owner_digest', 'namespace_hash', 'quote_revision' ] as $field ) { if ( $r[$field] !== $event->target[$field] ) { return false; } }
+			return 'delivery_quote.accept' === $event->operation && 1 === $event->operation_version && 'quote_accepted' === $event->reason_code
+				&& 1 === $event->before_revision && 2 === $event->after_revision && [ 'quote' ] === $event->changed_fields && 0 === $event->target['binding_revision']
+				&& $event->actor['authority_hash'] === hash( 'sha256', 'delivery_quote_customer' ) && $event->actor['principal_hash'] === hash( 'sha256', $expected->owner()->digest() );
+		} catch ( \Throwable ) { return false; }
+	}
+	/** The exact immutable issue-v2 producer is shared by issued and accepted history, never by generic readers. */
+	private function promotion_original_issue_verified( QuoteStoredRow $quote, array $records, FixedPromotionQuoteIssueCommand $expected ): bool {
+		$header = $quote->header(); $context = $quote->context(); $terms = $quote->terms(); $record = $records['issue'] ?? null;
+		if ( 3 !== $header->format_version() || 'fixed_promotion_native_v1' !== $header->profile() || 1 !== $header->profile_version() || 'checkout' !== $header->purpose() || null === $context || null === $terms
+			|| 2 !== $expected->identity->operation_version || ! $expected->owner()->equals( $header->owner() ) || $header->to_private_json() !== $expected->header()->to_private_json()
+			|| $context->to_private_json() !== $expected->context()->to_private_json() || $terms->to_private_json() !== $expected->terms()->to_private_json() || ! $header->matches_reference( $expected->reference() )
+			|| ! $record instanceof OperationRecord || 2 !== $record->operation_version || ! $record->matches( $expected->identity, $expected->intent() ) || 'accepted' !== $record->state
+			|| ! $this->common( $record, $quote, $header->namespace_hashes()['issue'] ) || null === $record->event || null === $record->completed_at ) { return false; }
+		$r = $record->completion->result; $event = $record->event;
+		$facts = [ 'allocation_digest' => $expected->allocation_digest(), 'allocation_count' => count( $expected->allocation_set()->requests() ), 'hold_until' => $expected->hold_until()->epoch_microseconds() ];
+		foreach ( $facts as $field => $value ) { if ( ( $r[$field] ?? null ) !== $value || ( $event->target[$field] ?? null ) !== $value ) { return false; } }
+		$completed = \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime::from_epoch_microseconds( $r['completed_at'] );
+		return 1 === $r['quote_revision'] && 'issued' === $r['state'] && \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime::parse( $record->completed_at )->compare( $completed ) >= 0 && $header->valid_at( $completed ) && $completed->compare( $expected->hold_until() ) < 0
+			&& $event->operation === $expected->identity->operation && 2 === $event->operation_version && 'quote_issued' === $event->reason_code && 1 === $event->before_revision && 2 === $event->after_revision && [ 'quote', 'admission', 'promotion_budget' ] === $event->changed_fields;
 	}
 	/** Original final namespace is terminal no-effect; this never admits or replays payment. */
 	public function placement_rejected( QuoteStoredRow $quote, array $records, QuoteBinding $binding ): bool {

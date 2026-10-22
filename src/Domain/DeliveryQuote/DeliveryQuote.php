@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Domain\DeliveryQuote;
 
+use CetechDeliveryEngine\Domain\DeliveryCommercial\FixedPromotionQuoteCapture;
+
 /** Pure immutable lifecycle model. Acceptance does not reserve or place an order. */
 final readonly class DeliveryQuote implements \JsonSerializable {
 
@@ -61,6 +63,28 @@ final readonly class DeliveryQuote implements \JsonSerializable {
 			return $this;
 		}
 		if ( 'issued' !== $this->stored_state || ! $this->usable_at( $at ) ) { self::refuse(); }
+		return new self( $this->original_header, $this->original_context, $this->original_terms, 'accepted', 2, $at, $at );
+	}
+
+	/** Structural readiness only; a trusted adopter must separately prove current source and held funding. */
+	public function fixed_promotion_acceptable_at( QuoteTime $at ): bool {
+		$header = $this->original_header; $context = $this->original_context; $terms = $this->original_terms;
+		if ( 3 !== $header->format_version() || FixedPromotionQuoteCapture::PROFILE !== $header->profile() || FixedPromotionQuoteCapture::VERSION !== $header->profile_version() || 'checkout' !== $header->purpose()
+			|| ! in_array( $this->stored_state, [ 'issued', 'accepted' ], true ) || null === $context || null === $terms || 3 !== $context->format_version() || 3 !== $terms->format_version()
+			|| ! $header->valid_at( $at ) || ! $context->checkout_acceptable() || ! $terms->checkout_acceptable() || ! $terms->feasibility_at( $at )
+			|| ( null !== $this->transition_time && $at->compare( $this->transition_time ) < 0 ) ) { return false; }
+		try { $header->assert_body( $context, $terms ); return true; } catch ( \Throwable ) { return false; }
+	}
+
+	/** Pure fixed-promotion transition; this method grants no current funding, native checkout or payment authority. */
+	public function accept_fixed_promotion( QuoteOwner $owner, QuoteReference $reference, QuoteContext $current_context, QuoteTime $at, int $opened_revision, string $body_digest, QuoteTime $original_expiry ): self {
+		$this->guard_original( $owner, $reference, $opened_revision, $body_digest, $original_expiry );
+		if ( null === $this->original_context || $this->original_context->to_private_json() !== $current_context->to_private_json() ) { self::refuse(); }
+		if ( 'accepted' === $this->stored_state ) {
+			if ( null === $this->acceptance_time || ! $this->fixed_promotion_acceptable_at( $this->acceptance_time ) || $at->compare( $this->acceptance_time ) < 0 ) { self::refuse(); }
+			return $this;
+		}
+		if ( 'issued' !== $this->stored_state || ! $this->fixed_promotion_acceptable_at( $at ) ) { self::refuse(); }
 		return new self( $this->original_header, $this->original_context, $this->original_terms, 'accepted', 2, $at, $at );
 	}
 
