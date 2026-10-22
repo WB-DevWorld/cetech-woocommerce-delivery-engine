@@ -33,7 +33,12 @@ final readonly class QuoteStoredRow implements \JsonSerializable {
 			if ( 'issued' === $state && ( 1 !== $data['revision'] || null !== $accepted || null !== $transition ) ) { QuoteShape::invalid(); }
 			if ( 'accepted' === $state && ( 2 !== $data['revision'] || null === $accepted || null === $transition || ! $accepted->equals( $transition ) ) ) { QuoteShape::invalid(); }
 			if ( 'invalidated' === $state && ( null === $transition || $data['revision'] !== ( null === $accepted ? 2 : 3 ) ) ) { QuoteShape::invalid(); }
-			if ( null !== $accepted && ! DeliveryQuote::issue( $header, $context, $terms )->usable_at( $accepted ) ) { QuoteShape::invalid(); }
+			if ( null !== $accepted ) {
+				$model = DeliveryQuote::issue( $header, $context, $terms );
+				// Accepted format3 is structural history only. Later lifecycle states need their own adopter.
+				$valid = 3 === $header->format_version() ? 'accepted' === $state && $model->fixed_promotion_acceptable_at( $accepted ) : $model->usable_at( $accepted );
+				if ( ! $valid ) { QuoteShape::invalid(); }
+			}
 		}
 		return new self( $data, $header, $context, $terms );
 	}

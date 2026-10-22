@@ -123,11 +123,12 @@ final class FixedPromotionQuoteCoreTest extends TestCase {
 		$quote->accept( Fixture::owner(), $reference, $provider->context(), QuoteFixtures::time(), 1, $header->body_digest(), $header->expires_at() );
 	}
 
-	public function test_issued_storage_round_trip_is_additive_but_accepted_storage_is_refused(): void {
+	public function test_issued_and_accepted_storage_round_trip_without_enabling_generic_usability(): void {
 		$row = self::issued_row(); $stored = QuoteStoredRow::from_row( $row );
 		self::assertSame( $row, $stored->row() ); self::assertSame( 3, $stored->context()->format_version() ); self::assertSame( 3, $stored->terms()->format_version() );
 		$row['state'] = 'accepted'; $row['revision'] = 2; $row['accepted_at'] = QuoteFixtures::time()->plus_seconds( 1 )->sql(); $row['transition_at'] = $row['accepted_at'];
-		$this->expectException( \InvalidArgumentException::class ); QuoteStoredRow::from_row( $row );
+		$accepted = QuoteStoredRow::from_row( $row ); self::assertSame( $row, $accepted->row() ); self::assertSame( 'accepted', $accepted->state() );
+		self::assertFalse( DeliveryQuote::issue( $accepted->header(), $accepted->context(), $accepted->terms() )->usable_at( $accepted->accepted_at() ) );
 	}
 
 	public function test_capture_never_implicitly_exports_its_funding_body(): void {

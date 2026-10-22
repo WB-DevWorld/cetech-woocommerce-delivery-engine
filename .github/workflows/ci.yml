@@ -197,6 +197,8 @@ jobs:
             tests/Integration/DeliveryPromotion/PromotionBudgetAllocationRealDatabaseTest.php
           vendor/bin/phpunit -c phpunit.real-db.xml \
             tests/Integration/DeliveryPromotion/PromotionQuoteIssueRealDatabaseTest.php
+          vendor/bin/phpunit -c phpunit.real-db.xml \
+            tests/Integration/DeliveryPromotion/PromotionQuoteAcceptRealDatabaseTest.php
           vendor/bin/phpunit \
             -c phpunit.real-db.xml \
             --log-junit "${RUNNER_TEMP}/cetech-de-real-db.junit.xml"
@@ -240,6 +242,8 @@ jobs:
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionBudgetAllocationRealDatabaseTest' 10
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionQuoteIssueRealDatabaseTest' 12
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+            'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionQuoteAcceptRealDatabaseTest' 12
 
   php85-wordpress:
     name: PHP 8.5 WordPress/WooCommerce
