@@ -3,14 +3,19 @@
 declare(strict_types=1);
 namespace CetechDeliveryEngine\Application\Order;
 
+use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionFingerprint;
 use CetechDeliveryEngine\Application\DeliveryQuote\NativeCartQuotePreparation;
+use CetechDeliveryEngine\Application\DeliveryQuote\FixedPromotionQuoteBindResult;
+use CetechDeliveryEngine\Application\DeliveryQuote\FixedPromotionQuotePlacementEvidence;
+use CetechDeliveryEngine\Application\DeliveryQuote\QuoteSavedOrderAuthorization;
+use CetechDeliveryEngine\Integrations\DeliveryQuote\FixedPromotionNativeOrderEvidence;
 use CetechDeliveryEngine\Application\DeliveryQuote\QuoteCartDraft;
 use CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementEvidence;
 use CetechDeliveryEngine\Application\DeliveryQuote\QuoteNativeTaxSource;
 use CetechDeliveryEngine\Application\DeliveryQuote\QuoteNativeShippingTaxProjection;
 use CetechDeliveryEngine\Application\DeliveryQuote\QuoteSavedOrderNativeEvidence;
 use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
-use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
+use CetechDeliveryEngine\Domain\CustomerContext\{CustomerCartContext, DeliveryAddress};
 use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteBinding,QuoteId,QuoteJson,QuoteMoney,QuoteOwner,QuoteStoredRow};
 use CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory;
 
@@ -18,65 +23,77 @@ use CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory;
 final class QuoteNativeOrderStager {
 	private ?\Closure $loader;
 	public function __construct( private OperationConnectionFactory $factory, ?callable $fresh_loader = null ) { $this->loader = null === $fresh_loader ? null : \Closure::fromCallable( $fresh_loader ); }
-	public function mapping( \WC_Order $order, QuotePlacementEvidence $evidence ): array { return $this->map_context( $order, $evidence->quote_record() ); }
-	private function map_context( \WC_Order $order, QuoteStoredRow $quote ): array {
-		$context = $quote->context()?->private_facts(); $items = $order->get_items( 'line_item' );
-		if ( null === $context || count( $items ) > 200 || count( $items ) !== count( $context['lines'] ) || $order->get_id() < 1 ) { self::fail(); }
-		$mapped = []; $claimed = [];
-		foreach ( $context['lines'] as $line ) {
-			$pool = []; $keyed = [];
-			foreach ( $items as $item ) {
-				if ( ! $item instanceof \WC_Order_Item_Product || $item->get_id() < 1 || $item->get_order_id( 'edit' ) !== $order->get_id() ) { self::fail(); }
-				if ( isset( $claimed[$item->get_id()] ) ) { continue; }
-				$key = $item->get_meta( QuoteNativeOrderFacts::META_LINE_KEY, true );
-				if ( '' === $key ) { $key = $item->get_meta( OrderDeliverySnapshot::META_CART_ITEM_KEY, true ); }
-				if ( $item->get_product_id() === $line['product_id'] && ( $item->get_variation_id() ?: null ) === $line['variation_id'] && self::quantity( $item->get_quantity() ) === $line['quantity'] ) {
-					$pool[] = $item; if ( $key === $line['line_key'] ) { $keyed[] = $item; }
-				} elseif ( $key === $line['line_key'] ) { self::fail(); }
-			}
-			$pool = [] !== $keyed ? $keyed : $pool;
-			if ( 1 !== count( $pool ) ) { self::fail(); }
-			$item = $pool[0]; $claimed[$item->get_id()] = true;
-			$mapped[$line['component_key']][] = [ 'line_key' => $line['line_key'], 'product_id' => $line['product_id'], 'variation_id' => $line['variation_id'], 'parent_id' => $line['parent_id'], 'quantity' => $line['quantity'], 'item_id' => $item->get_id() ];
-		}
-		$groups = []; foreach ( $mapped as $component => $lines ) { $groups[] = [ 'component_key' => $component, 'lines' => $lines ]; }
-		return QuoteBinding::canonical_mapping( [ 'format_version' => 1, 'groups' => $groups ] );
+	public function mapping( \WC_Order $order, QuotePlacementEvidence $evidence ): array { if ( ! in_array( $evidence->header()->format_version(), [ 1, 2 ], true ) ) { self::fail(); } return $this->map_context( $order, $evidence->quote_record() ); }
+	private function map_context( \WC_Order $order, QuoteStoredRow $quote ): array { return QuoteNativeOrderFacts::mapping( $order, $quote ); }
+	/** Explicit promotion observations map a saved order only after exact native access is proved. */
+	public function promotion_mapping( \WC_Order $order, FixedPromotionQuotePlacementEvidence $evidence, callable $authorize_order ): array {
+		$authorization = QuoteSavedOrderAuthorization::capture( $order, $authorize_order );
+		$quote = $evidence->quote_record(); $hpos = self::hpos(); $this->assert_promotion_identity( $authorization, $quote, $hpos );
+		$mapping = $this->map_context( $order, $quote ); $this->assert_promotion_identity( $authorization, $quote, $hpos ); return $mapping;
+	}
+	/** Acknowledged prepared1 is the sole writer entry for the finite native promotion handoff. */
+	public function stage_promotion( \WC_Order $order, FixedPromotionQuoteBindResult $acknowledged, QuoteCartDraft $draft, QuoteNativeTaxSource $tax_source, string $route, callable $authorize_order ): QuoteNativeOrderStageResult {
+		$authorization = QuoteSavedOrderAuthorization::capture( $order, $authorize_order );
+		$quote = $acknowledged->quote; $binding = $acknowledged->binding; $command = $acknowledged->command;
+		if ( 'accepted' !== $acknowledged->attempt->outcome->state || true !== $acknowledged->attempt->outcome->mutation_accepted || null === $quote || null === $binding || null === $command || 'prepared' !== $binding->state() || 1 !== $binding->revision() || ! in_array( $route, [ 'classic', 'blocks', 'store_api', 'order_pay' ], true ) || 3 !== $quote->header()->format_version() || ! $draft->owner()->equals( $quote->header()->owner() ) ) { self::fail(); }
+		$hpos = self::hpos(); $actor = function() use ( $authorization, $quote ): void { if ( ! $authorization->unchanged() || ( $GLOBALS['blog_id'] ?? 1 ) !== $quote->site_id() ) { self::fail(); } };
+		$this->assert_promotion_identity( $authorization, $quote, $hpos ); $status = $this->unpaid_status( $order ); $this->assert_promotion_identity( $authorization, $quote, $hpos );
+		$check = function() use ( $authorization, $quote, $hpos, $order, $status ): void { $this->assert_promotion_identity( $authorization, $quote, $hpos ); if ( $this->unpaid_status( $order ) !== $status ) { self::fail(); } $this->assert_promotion_identity( $authorization, $quote, $hpos ); };
+		$check(); $mapping = $this->map_context( $order, $quote ); $check(); $this->assert_binding( $order, $quote, $binding, $mapping ); $check();
+		foreach ( $draft->private_facts()['lines'] as $line ) { if ( ! hash_equals( $line['selection_hash'], CartDeliverySelectionFingerprint::fromIntent( $line['selection'] ) ) ) { self::fail(); } $check(); }
+		$plan = $this->plan( $order, $quote, $binding, QuoteJson::encode( $draft->private_facts() ), QuoteJson::encode( $command->reference()->public_fields() ), $tax_source->to_private_json() ); $check();
+		$native = FixedPromotionNativeOrderEvidence::capture( $this->factory, $order, $quote, $mapping, $tax_source, $authorize_order ); $check();
+		if ( null === $native || ! hash_equals( $command->order_evidence_digest(), $native->evidence_digest() ) || $this->native_facts( $order ) !== $plan['native'] ) { self::fail(); } $check();
+		$write_guard = function() use ( $check, $order, $plan ): void { $check(); if ( $this->native_facts( $order ) !== $plan['native'] ) { self::fail(); } $check(); };
+		$this->write_plan( $order, $binding, $plan, $write_guard, true );
+		$result = $this->capture_saved( $order, $quote, $binding, $plan, $actor, $hpos, $tax_source->private_facts()['source']['selectors']['table_prefix'] ); $check(); return $result;
 	}
 	public function stage( \WC_Order $order, QuotePlacementEvidence $evidence, QuoteBinding $binding, string $route ): QuoteNativeOrderStageResult {
-		if ( ! in_array( $route, [ 'classic', 'blocks', 'store_api', 'order_pay' ], true ) || ! $evidence->authorize( $evidence->owner(), 'delivery_quote.bind' ) || null === $evidence->draft_facts() || null === $evidence->tax_source_json() ) { self::fail(); }
+		if ( ! in_array( $evidence->header()->format_version(), [ 1, 2 ], true ) || ! in_array( $route, [ 'classic', 'blocks', 'store_api', 'order_pay' ], true ) || ! $evidence->authorize( $evidence->owner(), 'delivery_quote.bind' ) || null === $evidence->draft_facts() || null === $evidence->tax_source_json() ) { self::fail(); }
 		$quote = $evidence->quote_record(); $mapping = $this->map_context( $order, $quote );
-		if ( $binding->row()['order_id'] !== $order->get_id() || $binding->mapping() !== $mapping || $binding->row()['quote_uuid'] !== $quote->header()->id()->value() || $binding->site_id() !== $quote->site_id() ) { self::fail(); }
+		$this->assert_binding( $order, $quote, $binding, $mapping );
 		$draft = QuoteJson::encode( $evidence->draft_facts() ); $reference = QuoteJson::encode( $evidence->reference()->public_fields() );
 		$plan = $this->plan( $order, $quote, $binding, $draft, $reference, $evidence->tax_source_json() );
-		if ( QuoteNativeOrderHistory::owned( $order ) ) {
-			if ( 'prepared' === $binding->state() && 1 === $binding->revision() ) { $this->complete_missing_packets( $order, $plan ); }
-			else { $this->assert_native_packets( $order, $plan ); }
-		} else {
-			if ( 'prepared' !== $binding->state() || 1 !== $binding->revision() ) { self::fail(); }
-			foreach ( $order->get_items( 'line_item' ) as $item ) {
-				foreach ( $plan['line_meta'][$item->get_id()] as $key => $value ) { $item->update_meta_data( $key, $value ); }
-				$item->save();
-			}
-			foreach ( $plan['order_meta'] as $key => $value ) { $order->update_meta_data( $key, $value ); }
-			$order->save();
-		}
+		$this->write_plan( $order, $binding, $plan );
 		return $this->capture_saved( $order, $quote, $binding, $plan );
 	}
+	private function assert_binding( \WC_Order $order, QuoteStoredRow $quote, QuoteBinding $binding, array $mapping ): void {
+		if ( $binding->row()['order_id'] !== $order->get_id() || $binding->mapping() !== $mapping || $binding->row()['quote_uuid'] !== $quote->header()->id()->value() || $binding->site_id() !== $quote->site_id() ) { self::fail(); }
+	}
+	/** One writer serves retained formats and the explicit promotion path. */
+	private function write_plan( \WC_Order $order, QuoteBinding $binding, array $plan, ?callable $guard = null, bool $missing_only = false ): void {
+		$guard?->__invoke(); $owned = QuoteNativeOrderHistory::owned( $order ); $guard?->__invoke();
+		if ( $missing_only || $owned ) {
+			if ( 'prepared' === $binding->state() && 1 === $binding->revision() ) { $this->complete_missing_packets( $order, $plan, $guard ); }
+			elseif ( ! $missing_only ) { $this->assert_native_packets( $order, $plan ); $guard?->__invoke(); }
+			else { self::fail(); }
+		} else {
+			if ( 'prepared' !== $binding->state() || 1 !== $binding->revision() ) { self::fail(); }
+			$items = $order->get_items( 'line_item' ); $guard?->__invoke();
+			foreach ( $items as $item ) {
+				foreach ( $plan['line_meta'][$item->get_id()] as $key => $value ) { $guard?->__invoke(); $item->update_meta_data( $key, $value ); $guard?->__invoke(); }
+				$guard?->__invoke(); $item->save(); $guard?->__invoke();
+			}
+			foreach ( $plan['order_meta'] as $key => $value ) { $guard?->__invoke(); $order->update_meta_data( $key, $value ); $guard?->__invoke(); }
+			$guard?->__invoke(); $order->save(); $guard?->__invoke();
+		}
+	}
 	/** Exact original prepared1 may finish absent writes, never replace any existing protected fact. */
-	private function complete_missing_packets( \WC_Order $order, array $plan ): void {
+	private function complete_missing_packets( \WC_Order $order, array $plan, ?callable $guard = null ): void {
 		$pending = []; $objects = [ [ $order, $plan['order_meta'] ] ];
-		foreach ( $order->get_items( 'line_item' ) as $item ) { $objects[] = [ $item, $plan['line_meta'][$item->get_id()] ]; }
+		$items = $order->get_items( 'line_item' ); $guard?->__invoke(); foreach ( $items as $item ) { $objects[] = [ $item, $plan['line_meta'][$item->get_id()] ]; }
 		foreach ( $objects as [ $object, $meta ] ) {
 			$missing = [];
 			foreach ( $meta as $key => $value ) {
-				$present = QuoteNativeOrderHistory::meta_present( $object, $key );
-				if ( null === $present || true === $present && $object->get_meta( $key, true ) !== $value ) { self::fail(); }
+				$present = QuoteNativeOrderHistory::meta_present( $object, $key ); $guard?->__invoke();
+				if ( null === $present ) { self::fail(); }
+				if ( true === $present ) { $actual = $object->get_meta( $key, true ); $guard?->__invoke(); if ( $actual !== $value ) { self::fail(); } }
 				if ( ! $present ) { $missing[$key] = $value; }
 			}
 			if ( [] !== $missing ) { $pending[] = [ $object, $missing ]; }
 		}
-		foreach ( $pending as [ $object, $meta ] ) { foreach ( $meta as $key => $value ) { $object->add_meta_data( $key, $value, true ); } $object->save(); }
-		$this->assert_native_packets( $order, $plan );
+		foreach ( $pending as [ $object, $meta ] ) { foreach ( $meta as $key => $value ) { $guard?->__invoke(); $object->add_meta_data( $key, $value, true ); $guard?->__invoke(); } $guard?->__invoke(); $object->save(); $guard?->__invoke(); }
+		$this->assert_native_packets( $order, $plan ); $guard?->__invoke();
 	}
 	public function load_draft( \WC_Order $order, QuoteOwner $owner ): QuoteCartDraft {
 		$raw = $order->get_meta( QuoteNativeOrderFacts::META_DRAFT, true ); if ( ! is_string( $raw ) ) { self::fail(); }
@@ -89,43 +106,80 @@ final class QuoteNativeOrderStager {
 	}
 	/** Saved retries and payment callbacks resolve captured history; this method never writes. */
 	public function saved_guard( \WC_Order $order, QuoteStoredRow $quote, QuoteBinding $binding ): QuoteNativeOrderStageResult {
-		if ( ! QuoteNativeOrderHistory::owned( $order ) ) { self::fail(); }
+		if ( ! in_array( $quote->header()->format_version(), [ 1, 2 ], true ) || ! QuoteNativeOrderHistory::owned( $order ) ) { self::fail(); }
 		$draft = $order->get_meta( QuoteNativeOrderFacts::META_DRAFT, true ); $reference = $order->get_meta( QuoteNativeOrderFacts::META_REFERENCE, true ); $tax_source = $this->load_tax_source( $order );
 		if ( ! is_string( $draft ) || ! is_string( $reference ) || $binding->mapping() !== $this->map_context( $order, $quote ) ) { self::fail(); }
 		$plan = $this->plan( $order, $quote, $binding, $draft, $reference, $tax_source->to_private_json() ); $this->assert_native_packets( $order, $plan );
 		return $this->capture_saved( $order, $quote, $binding, $plan );
 	}
-	private function capture_saved( \WC_Order $order, QuoteStoredRow $quote, QuoteBinding $binding, array $plan ): QuoteNativeOrderStageResult {
-		$fresh = null !== $this->loader ? ( $this->loader )( $order->get_id() ) : new \WC_Order( $order->get_id() );
-		if ( ! $fresh instanceof \WC_Order || $fresh === $order || $fresh->get_id() !== $order->get_id() ) { self::fail(); }
-		if ( method_exists( $fresh, 'read_meta_data' ) ) { $fresh->read_meta_data( true ); }
-		$this->assert_native_packets( $fresh, $plan );
+	/** Read-only original promotion history, including unchanged orders that were paid later. */
+	public function saved_promotion_guard( \WC_Order $order, QuoteStoredRow $quote, QuoteBinding $binding, callable $authorize_order ): QuoteNativeOrderStageResult {
+		$authorization = QuoteSavedOrderAuthorization::capture( $order, $authorize_order );
+		$hpos = self::hpos(); $check = function() use ( $authorization, $quote, $hpos ): void { $this->assert_promotion_identity( $authorization, $quote, $hpos ); };
+		$actor = function() use ( $authorization, $quote ): void { if ( ! $authorization->unchanged() || ( $GLOBALS['blog_id'] ?? 1 ) !== $quote->site_id() ) { self::fail(); } };
+		$check(); if ( 3 !== $quote->header()->format_version() || ! QuoteNativeOrderHistory::owned( $order ) ) { self::fail(); } $check();
+		$draft = $order->get_meta( QuoteNativeOrderFacts::META_DRAFT, true ); $check(); $reference = $order->get_meta( QuoteNativeOrderFacts::META_REFERENCE, true ); $check(); $tax_source = $this->load_tax_source( $order ); $check();
+		$mapping = $this->map_context( $order, $quote ); $check(); $this->assert_binding( $order, $quote, $binding, $mapping ); $check();
+		if ( ! is_string( $draft ) || ! is_string( $reference ) ) { self::fail(); }
+		$plan = $this->plan( $order, $quote, $binding, $draft, $reference, $tax_source->to_private_json() ); $check(); $this->assert_native_packets( $order, $plan ); $check();
+		$result = $this->capture_saved( $order, $quote, $binding, $plan, $actor, $hpos, $tax_source->private_facts()['source']['selectors']['table_prefix'] ); $check(); return $result;
+	}
+	private function assert_promotion_identity( QuoteSavedOrderAuthorization $authorization, QuoteStoredRow $quote, bool $hpos ): void {
+		if ( ! $authorization->unchanged() || ( $GLOBALS['blog_id'] ?? 1 ) !== $quote->site_id() || self::hpos() !== $hpos || ! $authorization->unchanged() ) { self::fail(); }
+	}
+	private function unpaid_status( \WC_Order $order ): string {
+		$status = $order->get_status(); if ( ! in_array( $status, [ 'pending', 'failed', 'checkout-draft' ], true ) || $order->is_paid() || null !== $order->get_date_paid( 'edit' ) ) { self::fail(); } return $status;
+	}
+	private static function hpos(): bool { return class_exists( '\Automattic\WooCommerce\Utilities\OrderUtil' ) && \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled(); }
+	private function capture_saved( \WC_Order $order, QuoteStoredRow $quote, QuoteBinding $binding, array $plan, ?callable $actor = null, ?bool $expected_hpos = null, ?string $expected_prefix = null ): QuoteNativeOrderStageResult {
+		$actor?->__invoke(); $order_id = $order->get_id(); $actor?->__invoke(); $fresh = null !== $this->loader ? ( $this->loader )( $order_id ) : new \WC_Order( $order_id ); $actor?->__invoke();
+		if ( ! $fresh instanceof \WC_Order || $fresh === $order || $fresh->get_id() !== $order_id ) { self::fail(); }
+		if ( method_exists( $fresh, 'read_meta_data' ) ) { $fresh->read_meta_data( true ); $actor?->__invoke(); }
+		$this->assert_native_packets( $fresh, $plan ); $actor?->__invoke();
 		if ( $this->map_context( $fresh, $quote ) !== $binding->mapping() || $this->native_facts( $fresh ) !== $plan['native'] || ! QuoteNativeOrderHistory::verify( $fresh ) ) { self::fail(); }
-		$hpos = class_exists( '\Automattic\WooCommerce\Utilities\OrderUtil' ) && \Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();
-		$session = $this->factory->open(); $begun = false; $retired = false;
+		$actor?->__invoke(); $hpos = self::hpos(); $actor?->__invoke(); if ( null !== $expected_hpos && $hpos !== $expected_hpos ) { self::fail(); }
+		$session = $this->factory->open(); $begun = false; $retired = false; $metadata = null; $completed = false;
 		try {
-			if ( ! $session->begin() ) { self::fail(); } $begun = true;
-			$probe = new QuoteNativeOrderStageResult( $quote->site_id(), $order->get_id(), $hpos, $binding->mapping(), $plan['snapshot_digest'], $plan['context_digest'], [], $fresh );
+			if ( null !== $expected_prefix ) { $metadata = self::session_metadata( $session ); if ( $metadata['site'] !== $quote->site_id() || $metadata['prefix'] !== $expected_prefix || $session->is_retired() || $session->in_transaction() ) { self::fail(); } }
+			$actor?->__invoke(); if ( ! $session->begin() ) { self::fail(); } $begun = true; $actor?->__invoke();
+			if ( null !== $expected_prefix && ( ! $session->in_transaction() || $session->is_retired() ) ) { self::fail(); }
+			$probe = new QuoteNativeOrderStageResult( $quote->site_id(), $order_id, $hpos, $binding->mapping(), $plan['snapshot_digest'], $plan['context_digest'], [], $fresh );
 			if ( $session->site_id() !== $quote->site_id() || ! $session->validate_tables( $probe->tables( $session ) ) ) { self::fail(); }
-			$physical = QuoteNativeOrderStageResult::read_physical( $session, $order->get_id(), $hpos );
+			if ( null !== $metadata && ( self::session_metadata( $session ) !== $metadata || ! $session->in_transaction() || $session->is_retired() ) ) { self::fail(); }
+			$actor?->__invoke(); $physical = QuoteNativeOrderStageResult::read_physical( $session, $order_id, $hpos ); $actor?->__invoke();
+			if ( null !== $metadata && ( self::session_metadata( $session ) !== $metadata || ! $session->in_transaction() || $session->is_retired() ) ) { self::fail(); }
 			QuoteNativeOrderStageResult::assert_snapshot_rows( $physical, $plan['order_meta'], $plan['line_meta'] );
 			$this->assert_physical_native( $physical, $plan['native'], $hpos );
-			$result = new QuoteNativeOrderStageResult( $quote->site_id(), $order->get_id(), $hpos, $binding->mapping(), $plan['snapshot_digest'], $plan['context_digest'], $physical, $fresh );
-			if ( ! $session->rollback() ) { self::fail(); } $begun = false;
-			if ( ! $session->retire() ) { self::fail(); } $retired = true;
-			return $result;
-		} finally { if ( $begun && ! $session->is_retired() ) { try { $session->rollback(); } catch ( \Throwable ) {} } if ( ! $retired && ! $session->is_retired() ) { try { $session->retire(); } catch ( \Throwable ) {} } }
+			$result = new QuoteNativeOrderStageResult( $quote->site_id(), $order_id, $hpos, $binding->mapping(), $plan['snapshot_digest'], $plan['context_digest'], $physical, $fresh );
+			if ( ! $session->rollback() || null !== $expected_prefix && $session->in_transaction() ) { self::fail(); } $begun = false;
+			if ( null !== $metadata && self::session_metadata( $session ) !== $metadata ) { self::fail(); }
+			if ( ! $session->retire() || null !== $expected_prefix && ( ! $session->is_retired() || $session->in_transaction() ) ) { self::fail(); } $retired = true; $actor?->__invoke();
+			if ( null !== $metadata && self::session_metadata( $session ) !== $metadata ) { self::fail(); }
+			$completed = true; return $result;
+		} finally {
+			if ( null !== $expected_prefix ) { if ( ! $completed ) { try { $session->rollback(); } catch ( \Throwable ) {} try { $session->retire(); } catch ( \Throwable ) {} } }
+			else { if ( $begun && ! $session->is_retired() ) { try { $session->rollback(); } catch ( \Throwable ) {} } if ( ! $retired && ! $session->is_retired() ) { try { $session->retire(); } catch ( \Throwable ) {} } }
+		}
+	}
+	private static function session_metadata( \CetechDeliveryEngine\Domain\Operation\OperationSession $session ): array {
+		$site = $session->site_id(); $prefix = $session->table_prefix(); $charset = $session->charset_collate();
+		if ( $site < 1 || 1 !== preg_match( '/\A[A-Za-z0-9_]{1,30}\z/D', $prefix ) || strlen( $charset ) > 256 || str_contains( $charset, "\0" ) ) { self::fail(); }
+		return [ 'site' => $site, 'prefix' => $prefix, 'charset' => $charset ];
 	}
 	private function plan( \WC_Order $order, QuoteStoredRow $quote, QuoteBinding $binding, string $draft_json, string $reference, string $tax_source_json ): array {
 		$context = $quote->context(); $terms = $quote->terms(); $accepted = $quote->accepted_at();
 		if ( null === $context || null === $terms || null === $accepted || 'accepted' !== $quote->state() ) { self::fail(); }
 		$tax_source = QuoteNativeTaxSource::from_private_json( $tax_source_json ); if ( ! $tax_source->matches_context( $context ) ) { self::fail(); }
+		$promotion = 3 === $quote->header()->format_version();
 		$captured_at = substr( $accepted->iso_utc(), 0, 19 ) . '+00:00';
 		$draft = QuoteJson::decode( $draft_json );
 		try {
 			\CetechDeliveryEngine\Domain\DeliveryQuote\QuoteShape::fields( $draft, [ 'format_version', 'owner_digest', 'currency', 'lines', 'customer_destination' ] );
 			if ( 1 !== $draft['format_version'] || QuoteJson::encode( $draft ) !== $draft_json || $draft['owner_digest'] !== $quote->header()->owner()->digest() || ! is_array( $draft['lines'] ) || ! array_is_list( $draft['lines'] ) || count( $draft['lines'] ) !== count( $context->private_facts()['lines'] ) ) { self::fail(); }
-			foreach ( $draft['lines'] as $line ) { \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteShape::fields( $line, [ 'line_key', 'product_id', 'variation_id', 'quantity', 'selection', 'selection_hash', 'customer_context' ] ); }
+			foreach ( $draft['lines'] as $line ) {
+				\CetechDeliveryEngine\Domain\DeliveryQuote\QuoteShape::fields( $line, [ 'line_key', 'product_id', 'variation_id', 'quantity', 'selection', 'selection_hash', 'customer_context' ] );
+			}
+			if ( $promotion && ! NativeCartQuotePreparation::draft_facts_match_original( $draft, $context->base_context() ) ) { self::fail(); }
 		} catch ( \Throwable ) { self::fail(); }
 		$refs = \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteReference::from_array( QuoteJson::decode( $reference ) );
 		if ( ! $refs->id()->equals( $quote->header()->id() ) || ! $quote->header()->matches_reference( $refs ) ) { self::fail(); }
@@ -162,7 +216,7 @@ final class QuoteNativeOrderStager {
 			foreach ( $term_facts as $term ) { $money = QuoteMoney::from_array( $term['final'] ); $promise_total = null === $promise_total ? $money : $promise_total->add( $money ); }
 			if ( null === $promise_total || ! self::money( $promise_total->amount(), $currency )->equals( $total ) ) { self::fail(); }
 		}
-		$outer_version = $promise ? '3' : '2'; $quote_format = $promise ? '2' : '1';
+		$outer_version = $promotion ? '4' : ( $promise ? '3' : '2' ); $quote_format = $promotion ? '3' : ( $promise ? '2' : '1' );
 		$core_lines = []; $line_keys = [];
 		foreach ( $binding->mapping()['groups'] as $group ) { foreach ( $group['lines'] as $member ) {
 			$line = $draft_lines[$member['line_key']] ?? null; $captured = $group_facts[$group['component_key']] ?? null; $term = $term_facts[$group['component_key']] ?? null;
@@ -170,6 +224,7 @@ final class QuoteNativeOrderStager {
 			$customer = CustomerCartContext::fromArray( $line['customer_context'] );
 			$historical = null === $customer ? null : DeliveryGroupIdentity::forHistorical( $line['selection'], $customer );
 			if ( null === $customer || ! $customer->hasCompleteDeliveryAddress() || $historical !== $shipping[$group['component_key']]['group_id'] ) { self::fail(); }
+			if ( $promotion && ( $customer->delivery_offer_id !== $captured['offer_id'] || $customer->delivery_address?->identity() !== DeliveryAddress::fromInput( $draft['customer_destination'] )->identity() ) ) { self::fail(); }
 			$snapshot = new OrderDeliveryLineSnapshot( '1', $outer_version, $member['product_id'], $member['variation_id'], $line['selection']['fulfilment_availability'], 'delivery', $captured['offer_id'], $term['customer_label'], null, $promise ? ( $estimates[$group['component_key']] ?? self::fail() ) : null, $line['selection']['rule_id'], $captured['destination_zone_id'], (int) $member['quantity'], $currency, $term['final']['amount'], 'quoted', null, null, $captured_at, $historical, null, null, null, $customer->contract_version, $customer->matching_location?->toArray(), $customer->delivery_address?->toArray(), $customer->matching_identity, $customer->delivery_location_identity, null );
 			$core_lines[$member['item_id']] = $snapshot->toArray(); $line_keys[$member['item_id']] = $member['line_key'];
 		} }
@@ -180,28 +235,14 @@ final class QuoteNativeOrderStager {
 		$line_meta = []; foreach ( $core_lines as $id => $line ) { $line[DeliveryQuoteSnapshotEnvelope::MEMBER] = $envelope; $line_meta[$id] = [ OrderDeliverySnapshot::META_LINE_SNAPSHOT => QuoteNativeOrderFacts::encode( $line ), OrderDeliverySnapshot::META_LINE_SNAPSHOT_VERSION => $outer_version, DeliveryQuoteSnapshotEnvelope::META_FORMAT => $quote_format, QuoteNativeOrderFacts::META_LINE_KEY => $line_keys[$id] ]; }
 		$core_package[DeliveryQuoteSnapshotEnvelope::MEMBER] = $envelope;
 		$order_meta = [ OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT => QuoteNativeOrderFacts::encode( $core_package ), OrderDeliverySnapshot::META_ORDER_SNAPSHOT_VERSION => $outer_version, DeliveryQuoteSnapshotEnvelope::META_FORMAT => $quote_format, QuoteNativeOrderFacts::META_DRAFT => $draft_json, QuoteNativeOrderFacts::META_REFERENCE => $reference, QuoteNativeOrderFacts::META_TAX_SOURCE => $tax_source_json ];
-		if ( $promise ) { QuoteJson::decode( $order_meta[OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT] ); foreach ( $line_meta as $meta ) { QuoteJson::decode( $meta[OrderDeliverySnapshot::META_LINE_SNAPSHOT] ); } }
+		if ( $promise || $promotion ) { QuoteJson::decode( $order_meta[OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT] ); foreach ( $line_meta as $meta ) { QuoteJson::decode( $meta[OrderDeliverySnapshot::META_LINE_SNAPSHOT] ); } }
 		return [ 'order_meta' => $order_meta, 'line_meta' => $line_meta, 'native' => $native, 'context_digest' => $context_digest, 'snapshot_digest' => QuoteNativeOrderFacts::digest( 'snapshot', [ 'order_meta' => $order_meta, 'line_meta' => $line_meta, 'native' => $native, 'mapping' => $binding->mapping() ] ) ];
 	}
 	private function assert_native_packets( \WC_Order $order, array $plan ): void {
 		foreach ( $plan['order_meta'] as $key => $value ) { if ( $order->get_meta( $key, true ) !== $value ) { self::fail(); } }
 		foreach ( $order->get_items( 'line_item' ) as $item ) { foreach ( $plan['line_meta'][$item->get_id()] as $key => $value ) { if ( $item->get_meta( $key, true ) !== $value ) { self::fail(); } } }
 	}
-	private function native_facts( \WC_Order $order ): array {
-		if ( [] !== $order->get_items( 'fee' ) || [] !== $order->get_items( 'coupon' ) ) { self::fail(); }
-		$key = $order->get_order_key( 'edit' ); if ( ! is_string( $key ) || '' === $key || strlen( $key ) > 128 ) { self::fail(); }
-		$facts = [ 'currency' => $order->get_currency( 'edit' ), 'customer_id' => $order->get_customer_id( 'edit' ), 'order_key' => $key, 'total' => self::decimal( $order->get_total( 'edit' ) ), 'total_tax' => self::decimal( $order->get_total_tax( 'edit' ) ), 'cart_tax' => self::decimal( $order->get_cart_tax( 'edit' ) ), 'shipping_total' => self::decimal( $order->get_shipping_total( 'edit' ) ), 'shipping_tax' => self::decimal( $order->get_shipping_tax( 'edit' ) ), 'address' => [], 'lines' => [], 'shipping' => [], 'tax' => [] ];
-		foreach ( [ 'country', 'state', 'city', 'postcode', 'address_1', 'address_2' ] as $field ) { $facts['address'][$field] = $order->{'get_shipping_' . $field}( 'edit' ); }
-		foreach ( $order->get_items( 'line_item' ) as $item ) { $facts['lines'][] = [ 'id' => $item->get_id(), 'product_id' => $item->get_product_id(), 'variation_id' => $item->get_variation_id(), 'quantity' => self::quantity( $item->get_quantity() ), 'total' => self::decimal( $item->get_total( 'edit' ) ), 'tax' => self::decimal( $item->get_total_tax( 'edit' ) ), 'subtotal' => self::decimal( $item->get_subtotal( 'edit' ) ), 'subtotal_tax' => self::decimal( $item->get_subtotal_tax( 'edit' ) ), 'taxes' => $item->get_taxes( 'edit' ) ]; }
-		foreach ( $order->get_items( 'shipping' ) as $item ) { $instance = $item->get_instance_id( 'edit' ); if ( is_string( $instance ) && ctype_digit( $instance ) ) { $instance = (int) $instance; } if ( ! is_int( $instance ) || $instance < 0 ) { self::fail(); } $facts['shipping'][] = [ 'id' => $item->get_id(), 'method_id' => $item->get_method_id( 'edit' ), 'instance_id' => $instance, 'group_id' => $item->get_meta( 'cetech_de_group_id', true ), 'label' => $item->get_name( 'edit' ), 'total' => self::decimal( $item->get_total( 'edit' ) ), 'tax' => self::decimal( $item->get_total_tax( 'edit' ) ), 'taxes' => $item->get_taxes( 'edit' ) ]; }
-		foreach ( $order->get_items( 'tax' ) as $item ) {
-			if ( ! $item instanceof \WC_Order_Item_Tax || $item->get_id() < 1 || $item->get_order_id( 'edit' ) !== $order->get_id() ) { self::fail(); }
-			$rate = $item->get_rate_id( 'edit' ); $label = $item->get_label( 'edit' ); $code = $item->get_name( 'edit' ); $compound = $item->get_compound( 'edit' ); $percent = $item->get_rate_percent( 'edit' );
-			if ( ! is_int( $rate ) || $rate < 1 || ! is_string( $label ) || strlen( $label ) > 512 || ! is_string( $code ) || strlen( $code ) > 512 || ! is_bool( $compound ) || null !== $percent && ! is_float( $percent ) && ! is_int( $percent ) && ! is_string( $percent ) ) { self::fail(); }
-			$facts['tax'][] = [ 'id' => $item->get_id(), 'rate_id' => $rate, 'label' => $label, 'code' => $code, 'compound' => $compound, 'rate_percent' => null === $percent ? null : self::decimal( (string) $percent ), 'tax' => self::decimal( (string) $item->get_tax_total( 'edit' ) ), 'shipping_tax' => self::decimal( (string) $item->get_shipping_tax_total( 'edit' ) ) ];
-		}
-		foreach ( [ 'lines', 'shipping', 'tax' ] as $type ) { usort( $facts[$type], static fn( array $a, array $b ): int => $a['id'] <=> $b['id'] ); } QuoteNativeOrderFacts::encode( $facts ); return $facts;
-	}
+	private function native_facts( \WC_Order $order ): array { return QuoteNativeOrderFacts::native( $order ); }
 	/** Native tax rows match accepted shipping rates and saved product tax maps; no tax engine is called. */
 	private function assert_tax_lines( array $native, array $terms, string $currency, array $native_zero_maps = [] ): void {
 		$shipping = []; $products = []; $rounding = null; $precision = null;
@@ -222,39 +263,8 @@ final class QuoteNativeOrderStager {
 		$factor = 10 ** ( 6 - $precision ); $units = (int) ( $whole . $fraction ); $rounded = intdiv( $units + intdiv( $factor, 2 ), $factor ); $digits = str_pad( (string) $rounded, $precision + 1, '0', STR_PAD_LEFT );
 		return 0 === $precision ? $digits : substr( $digits, 0, -$precision ) . '.' . substr( $digits, -$precision );
 	}
-	private function assert_physical_native( array $physical, array $native, bool $hpos ): void {
-		$meta = []; foreach ( $physical['order_meta'] as $row ) { $meta[$row['meta_key']][] = $row['meta_value']; }
-		if ( $hpos ) {
-			$row = $physical['order'][0]; $money = $physical['money'][0];
-			if ( $row['currency'] !== $native['currency'] || $money['order_key'] !== $native['order_key'] || (int) $row['customer_id'] !== $native['customer_id'] || self::decimal( $row['total_amount'] ) !== $native['total'] || self::decimal( $row['tax_amount'] ) !== $native['cart_tax'] || self::decimal( $money['shipping_total_amount'] ) !== $native['shipping_total'] || self::decimal( $money['shipping_tax_amount'] ) !== $native['shipping_tax'] ) { self::fail(); }
-			$address = array_values( array_filter( $physical['address'], static fn( array $row ): bool => 'shipping' === $row['address_type'] ) ); if ( 1 !== count( $address ) ) { self::fail(); }
-			foreach ( $native['address'] as $key => $value ) { if ( ( $address[0][$key] ?? '' ) !== $value ) { self::fail(); } }
-		} else {
-			if ( 'shop_order' !== $physical['order'][0]['post_type'] ) { self::fail(); }
-			foreach ( [ '_order_key' => $native['order_key'], '_order_currency' => $native['currency'], '_customer_user' => (string) $native['customer_id'] ] as $key => $value ) { if ( ( $meta[$key] ?? [] ) !== [ $value ] ) { self::fail(); } }
-			foreach ( [ '_order_total' => 'total', '_order_tax' => 'cart_tax', '_order_shipping' => 'shipping_total', '_order_shipping_tax' => 'shipping_tax' ] as $key => $field ) { if ( 1 !== count( $meta[$key] ?? [] ) || self::decimal( $meta[$key][0] ) !== $native[$field] ) { self::fail(); } }
-			foreach ( $native['address'] as $key => $value ) { $saved = $meta['_shipping_' . $key] ?? []; if ( $saved !== [ $value ] && ! ( '' === $value && [] === $saved ) ) { self::fail(); } }
-		}
-		$items = []; foreach ( $physical['item_meta'] as $row ) { $items[(int) $row['order_item_id']][$row['meta_key']][] = $row['meta_value']; }
-		$expected_items = []; foreach ( [ 'lines' => 'line_item', 'shipping' => 'shipping', 'tax' => 'tax' ] as $source => $type ) { foreach ( $native[$source] as $item ) { $expected_items[$item['id']] = $type; } } $actual_items = [];
-		foreach ( $physical['items'] as $row ) { $id = (int) $row['order_item_id']; if ( isset( $actual_items[$id] ) || (int) $row['order_id'] < 1 ) { self::fail(); } $actual_items[$id] = $row['order_item_type']; } ksort( $actual_items, SORT_NUMERIC ); ksort( $expected_items, SORT_NUMERIC ); if ( $actual_items !== $expected_items ) { self::fail(); }
-		foreach ( $native['lines'] as $line ) {
-			$raw = $items[$line['id']] ?? [];
-			foreach ( [ '_product_id' => (string) $line['product_id'], '_variation_id' => (string) $line['variation_id'], '_qty' => $line['quantity'] ] as $key => $value ) { if ( 1 !== count( $raw[$key] ?? [] ) || ( '_qty' === $key ? self::quantity( $raw[$key][0] ) : $raw[$key][0] ) !== $value ) { self::fail(); } }
-			foreach ( [ '_line_total' => 'total', '_line_tax' => 'tax', '_line_subtotal' => 'subtotal', '_line_subtotal_tax' => 'subtotal_tax' ] as $key => $field ) { if ( 1 !== count( $raw[$key] ?? [] ) || self::decimal( $raw[$key][0] ) !== $line[$field] ) { self::fail(); } }
-			if ( ( $raw['_line_tax_data'] ?? [] ) !== [ serialize( $line['taxes'] ) ] ) { self::fail(); }
-		}
-		foreach ( $native['shipping'] as $line ) { $raw = $items[$line['id']] ?? []; foreach ( [ 'method_id' => $line['method_id'], 'instance_id' => (string) $line['instance_id'], 'cost' => $line['total'], 'total_tax' => $line['tax'] ] as $key => $value ) { if ( 1 !== count( $raw[$key] ?? [] ) || ( in_array( $key, [ 'method_id', 'instance_id' ], true ) ? $raw[$key][0] : self::decimal( $raw[$key][0] ) ) !== $value ) { self::fail(); } } if ( ( $raw['taxes'] ?? [] ) !== [ serialize( $line['taxes'] ) ] ) { self::fail(); } }
-		foreach ( $native['tax'] as $line ) {
-			$raw = $items[$line['id']] ?? [];
-			foreach ( [ 'rate_id' => (string) $line['rate_id'], 'label' => $line['label'], 'compound' => $line['compound'] ? '1' : '' ] as $key => $value ) { if ( ( $raw[$key] ?? [] ) !== [ $value ] ) { self::fail(); } }
-			foreach ( [ 'tax_amount' => 'tax', 'shipping_tax_amount' => 'shipping_tax' ] as $key => $field ) { if ( 1 !== count( $raw[$key] ?? [] ) || self::decimal( $raw[$key][0] ) !== $line[$field] ) { self::fail(); } }
-			if ( null !== $line['rate_percent'] && ( 1 !== count( $raw['rate_percent'] ?? [] ) || self::decimal( $raw['rate_percent'][0] ) !== $line['rate_percent'] ) ) { self::fail(); }
-			$physical_item = array_values( array_filter( $physical['items'], static fn( array $row ): bool => (int) $row['order_item_id'] === $line['id'] ) ); if ( 1 !== count( $physical_item ) || $physical_item[0]['order_item_name'] !== $line['code'] ) { self::fail(); }
-		}
-	}
+	private function assert_physical_native( array $physical, array $native, bool $hpos ): void { QuoteNativeOrderFacts::assert_physical( $physical, $native, $hpos ); }
 	private static function decimal( mixed $value ): string { if ( ! is_string( $value ) || 1 !== preg_match( '/\A(0|[1-9][0-9]{0,15})(?:\.([0-9]{1,12}))?\z/D', $value, $m ) ) { self::fail(); } $fraction = rtrim( $m[2] ?? '', '0' ); return $m[1] . ( '' === $fraction ? '' : '.' . $fraction ); }
 	private static function money( string $amount, string $currency ): QuoteMoney { return QuoteMoney::from_array( [ 'amount' => self::decimal( $amount ), 'currency' => $currency, 'precision' => 6 ] ); }
-	private static function quantity( mixed $quantity ): string { if ( is_float( $quantity ) && is_finite( $quantity ) && floor( $quantity ) === $quantity ) { $quantity = (int) $quantity; } if ( is_int( $quantity ) ) { $quantity = (string) $quantity; } $value = self::decimal( $quantity ); if ( '0' === $value ) { self::fail(); } return $value; }
 	private static function fail(): never { throw new \UnexpectedValueException( 'Saved quote facts unavailable.' ); }
 }

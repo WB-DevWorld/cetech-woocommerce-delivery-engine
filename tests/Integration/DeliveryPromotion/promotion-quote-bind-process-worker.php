@@ -67,6 +67,16 @@ try {
 			$write_status( 'effect_released' );
 		};
 	}
+	if ( 'right' === $role ) {
+		$stack->observer->callback = static function( string $phase ) use ( $stack, $directory, $write_status ): void {
+			if ( 'reservation_committed' !== $phase ) { return; }
+			$transport = $stack->physical->transports[0]; $state = $transport->transaction_state(); $session = $stack->physical->sessions[0];
+			if ( $session->is_retired() || $session->in_transaction() || ! is_array( $state ) || false !== $state['in_transaction'] || true !== $state['autocommit'] ) { throw new RuntimeException( 'Owned bind committed reservation refused.' ); }
+			$write_status( 'reservation_held' );
+			if ( false === file_put_contents( $directory . '/right-reserved', json_encode( [ 'connection_id' => $transport->connection_id(), 'in_transaction' => $state['in_transaction'], 'autocommit' => $state['autocommit'] ], JSON_THROW_ON_ERROR ), LOCK_EX ) ) { throw new RuntimeException( 'Owned bind reservation signal failed.' ); }
+			OperationProofProcess::wait_for( $directory . '/right-start-effect', 30.0 ); $write_status( 'reservation_released' );
+		};
+	}
 	$stack->eligibility->poison = 'reconcile' === $mode; $stack->order->poison = 'reconcile' === $mode;
 	$write_status( 'running' );
 	$result = 'bind' === $mode ? $stack->service->bind( $command, $stack->inputs(), RequestContext::create() ) : $stack->service->reconcile( $command, RequestContext::create() );

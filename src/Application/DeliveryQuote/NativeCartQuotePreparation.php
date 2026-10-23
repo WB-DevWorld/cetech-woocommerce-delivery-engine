@@ -136,8 +136,10 @@ final class NativeCartQuotePreparation {
 	public static function component_key( string $group ): string { if ( '' === $group || strlen( $group ) > 191 ) { self::fail(); } return hash( 'sha256', 'cetech-cart-quote-component-v1:' . $group ); }
 	private static function legacy_groups( array $packages ): array { $out = []; foreach ( $packages as $package ) { $key = self::component_key( $package['legacy_group_id'] ); if ( isset( $out[$key] ) ) { self::fail(); } $out[$key] = $package['legacy_group_id']; } return $out; }
 	/** The current draft must name exactly the original selected members and endpoint. */
-	private static function draft_matches_original( QuoteCartDraft $draft, QuoteContext $context ): bool {
-		$facts = $context->private_facts(); $draft_facts = $draft->private_facts(); if ( $facts['currency']['charged'] !== $draft_facts['currency']['code'] || $facts['currency']['precision'] !== $draft_facts['currency']['precision'] || count( $facts['lines'] ) !== count( $draft_facts['lines'] ) ) { return false; }
+	private static function draft_matches_original( QuoteCartDraft $draft, QuoteContext $context ): bool { return self::draft_facts_match_original( $draft->private_facts(), $context ); }
+	/** Pure comparison of already-validated closed draft facts; no current key or source lookup. */
+	public static function draft_facts_match_original( array $draft_facts, QuoteContext $context ): bool {
+		$facts = $context->private_facts(); if ( $facts['currency']['charged'] !== $draft_facts['currency']['code'] || $facts['currency']['precision'] !== $draft_facts['currency']['precision'] || count( $facts['lines'] ) !== count( $draft_facts['lines'] ) ) { return false; }
 		$original = []; foreach ( $facts['lines'] as $line ) { $original[$line['line_key']] = $line; } $selection = [];
 		foreach ( $draft_facts['lines'] as $line ) { $old = $original[$line['line_key']] ?? null; if ( null === $old || $old['product_id'] !== $line['product_id'] || $old['variation_id'] !== $line['variation_id'] || $old['quantity'] !== $line['quantity'] || 'delivery' !== $line['selection']['fulfilment_choice'] ) { return false; } $selection[$line['line_key']] = $line['selection_hash']; }
 		ksort( $selection, SORT_STRING ); return hash_equals( $facts['selection_digest'], hash( 'sha256', QuoteJson::encode( $selection ) ) );
