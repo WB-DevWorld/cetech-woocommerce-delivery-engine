@@ -4,21 +4,24 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Tests\Support\DeliveryPromotion;
 
-use CetechDeliveryEngine\Application\DeliveryQuote\{FixedPromotionQuotePlacementEvidenceReader, FixedPromotionQuoteSealCommand, FixedPromotionQuoteSealedEvidence, FixedPromotionQuoteVerifyInputs};
+use CetechDeliveryEngine\Application\DeliveryQuote\{FixedPromotionQuoteAcceptInputs, FixedPromotionQuoteBindInputs, FixedPromotionQuotePlacementEvidenceReader, FixedPromotionQuoteSealCommand, FixedPromotionQuoteSealedEvidence, FixedPromotionQuoteVerifyInputs};
 use CetechDeliveryEngine\Application\Operation\OperationReadiness;
 use CetechDeliveryEngine\Domain\Contracts\RequestContext;
+use CetechDeliveryEngine\Domain\DeliveryPromotion\{FixedPromotionBudgetReservation, FixedPromotionBudgetState};
 use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteBinding, QuoteStoredRow};
 use CetechDeliveryEngine\Domain\EmergencyControl\EmergencyControlState;
 use CetechDeliveryEngine\Domain\Operation\{OperationCommitResult, OperationConnectionFactory, OperationSession};
-use CetechDeliveryEngine\Infrastructure\Persistence\{EmergencyControlStore, WpdbOperationRecordRepository};
+use CetechDeliveryEngine\Infrastructure\Persistence\{DeliveryQuoteSchema, EmergencyControlStore, WpdbOperationRecordRepository};
 use CetechDeliveryEngine\Tests\Support\DeliveryQuote\{QuoteDurableFixtureFactory, QuoteFixtures as Q};
 use CetechDeliveryEngine\Tests\Unit\DeliveryQuote\{PromotionAcceptMutationBudget, PromotionAcceptMutationEligibility, PromotionBindMutationOwner, PromotionBindOrderPort, PromotionMutationOwner, PromotionMutationTrace, PromotionSealProfileFixture, PromotionSealSavedPort};
 
 require_once dirname( __DIR__, 2 ) . '/Unit/DeliveryQuote/FixedPromotionQuoteSealProfileTest.php';
+require_once __DIR__ . '/PromotionQuoteAcceptSqlStack.php';
 
 /** Actual SQLite original-five history with explicitly synthetic current, order, saved and budget ports. */
 final class PromotionSealedReadFixture implements OperationConnectionFactory {
-	public PromotionSealProfileFixture $seed;
+	/** Scalar rows/facts and a captureless immutable command only; never cache a live fixture or port. */
+	private static array $seeds = [];
 	public QuoteDurableFixtureFactory $db;
 	public PromotionMutationTrace $trace;
 	public PromotionAcceptMutationBudget $budget;
@@ -37,14 +40,34 @@ final class PromotionSealedReadFixture implements OperationConnectionFactory {
 	public ?\Closure $on_authorize = null;
 	public ?\Closure $on_open = null;
 	public function __construct( bool $separate_accounts = false ) {
-		$this->seed = new PromotionSealProfileFixture( $separate_accounts ); $mutation = $this->seed->mutate( $this->seed->lock() ); $this->command = $this->seed->command; $at = Q::time()->plus_seconds( 5 ); $c = $this->command;
-		$this->db = $this->seed->base->base->db; $this->trace = $this->seed->trace(); $this->budget = $this->seed->base->base->budget; $this->eligibility = $this->seed->base->base->eligibility; $this->order = $this->seed->base->order; $this->saved = $this->seed->saved; $this->inputs = $this->seed->inputs;
-		$this->insert( 'operation_records', [ 'id' => 5, 'site_id' => 1, 'namespace_hash' => $c->identity->namespace_digest(), 'intent_hash' => $c->intent()->fingerprint(), 'namespace_format' => 1, 'intent_format' => 1, 'record_format' => 1, 'operation' => 'delivery_quote.seal', 'operation_version' => 2, 'target_hash' => WpdbOperationRecordRepository::target_hash( $c->identity ), 'state' => 'accepted', 'publication_state' => 'published', 'completion_json' => $mutation->completion->to_json(), 'audit_id' => 5, 'row_version' => 3, 'created_at' => $at->sql(), 'updated_at' => $at->sql(), 'completed_at' => $at->sql() ] );
-		$this->insert( 'operation_changes', [ 'id' => 5, 'site_id' => 1, 'operation_id' => 5, 'event_format' => 1, 'event_json' => $mutation->event->to_json(), 'created_at' => $at->sql() ] );
-		$this->db->pdo->commit(); $this->seed->owner->retire();
-		$this->budget->account_reads = []; $this->budget->claim_reads = []; $this->order->calls = 0; $this->order->owners = []; $this->saved->calls = 0; $this->saved->owners = []; $this->trace->events = []; $this->db->statements = [];
+		$mode = $separate_accounts ? 1 : 0; $seed = self::$seeds[$mode] ??= self::genuine_seed( $separate_accounts );
+		$this->db = new QuoteDurableFixtureFactory(); $this->trace = new PromotionMutationTrace(); $this->command = $seed['command'];
+		foreach ( $seed['tables'] as $table => $rows ) { $this->db->pdo->exec( 'DELETE FROM ' . $table ); foreach ( $rows as $row ) { self::insert_row( $this->db->pdo, $table, $row ); } }
+		$this->budget = new PromotionAcceptMutationBudget( $this->trace ); $this->eligibility = new PromotionAcceptMutationEligibility( $this->trace );
+		foreach ( $seed['accounts'] as $key => $facts ) { $this->budget->accounts[$key] = FixedPromotionBudgetState::from_array( $facts ); }
+		foreach ( $seed['claims'] as $key => $facts ) { $this->budget->claims[$key] = FixedPromotionBudgetReservation::from_array( $facts ); }
+		$this->order = new PromotionBindOrderPort( $this->command->verification()->binding_command(), $this->trace ); $this->saved = new PromotionSealSavedPort( $this->command->verified_binding(), $this->trace );
+		// Fresh current sources retain their original provenance, but never the cold seed's native source or owner.
+		$owner = new PromotionMutationOwner( new PromotionQuoteIssueMixedSession( $this->db->open() ), $this->trace );
+		try {
+			if ( ! $owner->begin() ) { throw new \RuntimeException( 'Owned source reconstruction did not begin.' ); }
+			$sources = PromotionQuoteAcceptSqlStack::sources_for( $owner, $this->command->verification()->binding_command()->acceptance() );
+			if ( ! $owner->rollback() ) { throw new \RuntimeException( 'Owned source reconstruction did not close.' ); }
+		} finally { $owner->retire(); }
+		$this->inputs = FixedPromotionQuoteVerifyInputs::from_sources( FixedPromotionQuoteBindInputs::from_sources( FixedPromotionQuoteAcceptInputs::from_sources( $sources['original'], $sources['fresh'] ), $this->order ), $this->saved );
+		$this->trace->events = []; $this->db->statements = [];
 	}
-	public function insert( string $suffix, array $row ): void { $columns = implode( ',', array_keys( $row ) ); $placeholders = implode( ',', array_fill( 0, count( $row ), '?' ) ); $this->db->pdo->prepare( "INSERT INTO durable_delivery_engine_{$suffix} ({$columns}) VALUES ({$placeholders})" )->execute( array_values( $row ) ); }
+	private static function genuine_seed( bool $separate_accounts ): array {
+		$seed = new PromotionSealProfileFixture( $separate_accounts ); $mutation = $seed->mutate( $seed->lock() ); $command = $seed->command->as_recovery(); $at = Q::time()->plus_seconds( 5 ); $db = $seed->base->base->db;
+		self::insert_row( $db->pdo, 'durable_delivery_engine_operation_records', [ 'id' => 5, 'site_id' => 1, 'namespace_hash' => $command->identity->namespace_digest(), 'intent_hash' => $command->intent()->fingerprint(), 'namespace_format' => 1, 'intent_format' => 1, 'record_format' => 1, 'operation' => 'delivery_quote.seal', 'operation_version' => 2, 'target_hash' => WpdbOperationRecordRepository::target_hash( $command->identity ), 'state' => 'accepted', 'publication_state' => 'published', 'completion_json' => $mutation->completion->to_json(), 'audit_id' => 5, 'row_version' => 3, 'created_at' => $at->sql(), 'updated_at' => $at->sql(), 'completed_at' => $at->sql() ] );
+		self::insert_row( $db->pdo, 'durable_delivery_engine_operation_changes', [ 'id' => 5, 'site_id' => 1, 'operation_id' => 5, 'event_format' => 1, 'event_json' => $mutation->event->to_json(), 'created_at' => $at->sql() ] );
+		$db->pdo->commit(); $seed->owner->retire();
+		$tables = []; foreach ( [ ...array_map( static fn( string $suffix ): string => 'durable_delivery_engine_' . $suffix, DeliveryQuoteSchema::SUFFIXES ), 'durable_delivery_engine_operation_records', 'durable_delivery_engine_operation_changes', 'durable_fence' ] as $table ) { $tables[$table] = $db->pdo->query( 'SELECT * FROM ' . $table . ' ORDER BY id' )->fetchAll( \PDO::FETCH_ASSOC ); }
+		return [ 'command' => $command, 'tables' => $tables, 'accounts' => array_map( static fn( $value ): array => $value->private_facts(), $seed->base->base->budget->accounts ), 'claims' => array_map( static fn( $value ): array => $value->private_facts(), $seed->base->base->budget->claims ) ];
+	}
+	private static function insert_row( \PDO $pdo, string $table, array $row ): void { $columns = implode( ',', array_keys( $row ) ); $placeholders = implode( ',', array_fill( 0, count( $row ), '?' ) ); $pdo->prepare( "INSERT INTO {$table} ({$columns}) VALUES ({$placeholders})" )->execute( array_values( $row ) ); }
+	public function insert( string $suffix, array $row ): void { self::insert_row( $this->db->pdo, 'durable_delivery_engine_' . $suffix, $row ); }
+
 	public function open(): OperationSession { $session = new PromotionSealedReadSession( new PromotionBindMutationOwner( new PromotionMutationOwner( new PromotionQuoteIssueMixedSession( $this->db->open() ), $this->trace ), $this->trace ), $this ); $this->sessions[] = $session; if ( null !== $this->on_open ) { ( $this->on_open )( $session ); } return $session; }
 	public function reader(): FixedPromotionQuotePlacementEvidenceReader {
 		$pre = new class implements OperationReadiness { public function assert_ready( OperationSession $s ): void { $s->hook( 'readiness' ); } };
