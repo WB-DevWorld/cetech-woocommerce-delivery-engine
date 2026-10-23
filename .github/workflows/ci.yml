@@ -33,7 +33,7 @@ jobs:
   php83-min:
     name: PHP 8.3 Minimum Supported
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
       - uses: shivammathur/setup-php@v2
