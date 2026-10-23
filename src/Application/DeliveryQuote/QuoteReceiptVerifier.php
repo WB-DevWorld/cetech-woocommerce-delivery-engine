@@ -63,6 +63,26 @@ final class QuoteReceiptVerifier {
 		}
 		return $out;
 	}
+	/** E15 acknowledgement locks all five exact producers and retains their existing SQL timestamps. */
+	public function lock_promotion_seal( OperationSession $session, FixedPromotionQuoteSealCommand $expected ): array {
+		return $this->promotion_seal_records( $session, $expected, [ 'issue', 'accept', 'bind', 'verify_binding', 'seal' ], true );
+	}
+	/** C03 owns seal; the four immutable prior producers must not reverse namespace locks. */
+	public function prerequisites_promotion_seal( OperationSession $session, FixedPromotionQuoteSealCommand $expected ): array {
+		return $this->promotion_seal_records( $session, $expected, [ 'issue', 'accept', 'bind', 'verify_binding' ], false );
+	}
+	private function promotion_seal_records( OperationSession $session, FixedPromotionQuoteSealCommand $expected, array $purposes, bool $lock ): array {
+		$binding = $expected->verified_binding()->row();
+		$names = $expected->header()->namespace_hashes() + [ 'bind' => $binding['bind_namespace_hash'], 'verify_binding' => QuoteDurableCommand::verification_namespace( $expected->owner(), $expected->header(), $binding['placement_uuid'] ), 'seal' => $binding['seal_namespace_hash'] ];
+		$names = array_intersect_key( $names, array_flip( $purposes ) );
+		if ( count( $purposes ) !== count( $names ) || count( $purposes ) !== count( array_unique( $names ) ) ) { throw new OperationStorageException(); }
+		asort( $names, SORT_STRING ); $out = [ 'event_persisted_at' => [] ];
+		foreach ( $names as $purpose => $namespace ) {
+			$metadata = []; $out[$purpose] = $this->read( $session, $namespace, 'delivery_quote.' . $purpose, $lock, $lock, $metadata );
+			if ( isset( $metadata['persisted_at'] ) ) { $out['event_persisted_at'][$purpose] = $metadata['persisted_at']; }
+		}
+		return $out;
+	}
 	/** One finite, globally ordered receipt set for the original no-effect attempt and explicit new review. */
 	public function lock_original_disposition( OperationSession $session, QuoteHeader $original, string $placement_id, QuoteHeader $replacement ): array {
 		$old = $original->namespace_hashes() + QuoteDurableCommand::binding_namespaces( $original->owner(), $original, $placement_id, true )
@@ -194,6 +214,34 @@ final class QuoteReceiptVerifier {
 			foreach ( [ 'quote_id', 'body_digest', 'owner_digest', 'namespace_hash', 'quote_revision' ] as $field ) { if ( $r[$field] !== $event->target[$field] ) { return false; } }
 			return 'delivery_quote.verify_binding' === $event->operation && 1 === $event->operation_version && 'quote_binding_verified' === $event->reason_code
 				&& 1 === $event->before_revision && 2 === $event->after_revision && [ 'binding' ] === $event->changed_fields && 2 === $event->target['binding_revision']
+				&& $event->actor['authority_hash'] === hash( 'sha256', $identity->authority ) && $event->actor['principal_hash'] === hash( 'sha256', $identity->principal );
+		} catch ( \Throwable ) { return false; }
+	}
+	/** Authenticate the exact original physical verified2 and four producers before any seal effect. */
+	public function promotion_seal_prerequisites_verified( QuoteStoredRow $quote, array $records, FixedPromotionQuoteSealCommand $expected ): bool {
+		return $this->promotion_verification_verified( $quote, $records, $expected->verified_binding(), $expected->verification() );
+	}
+	/** Exact immutable sealed history; this grants neither current funding nor payment authority. */
+	public function promotion_seal_verified( QuoteStoredRow $quote, array $records, QuoteBinding $binding, FixedPromotionQuoteSealCommand $expected ): bool {
+		try {
+			$original = $records; $times = $records['event_persisted_at'] ?? null;
+			if ( ! is_array( $times ) ) { return false; }
+			$original['event_persisted_at'] = array_intersect_key( $times, array_flip( [ 'issue', 'accept', 'bind', 'verify_binding' ] ) );
+			if ( ! $this->promotion_seal_prerequisites_verified( $quote, $original, $expected )
+				|| ! $this->promotion_binding_chronology( $records, $expected->verification()->binding_command(), [ 'issue', 'accept', 'bind', 'verify_binding', 'seal' ] ) ) { return false; }
+			$record = $records['seal'] ?? null; $identity = $expected->identity; $b = $binding->row(); $candidate = $expected->binding()->row(); $namespace = $expected->verified_binding()->row()['seal_namespace_hash'];
+			if ( 'sealed' !== $binding->state() || 3 !== $binding->revision() || 'delivery_quote.seal' !== $identity->operation || 2 !== $identity->operation_version
+				|| $identity->namespace_digest() !== $namespace || ! $record instanceof OperationRecord || 'accepted' !== $record->state || ! $record->matches( $identity, $expected->intent() )
+				|| ! $this->common( $record, $quote, $namespace ) || null === $record->event || null === $record->completed_at ) { return false; }
+			foreach ( array_diff( QuoteBinding::FIELDS, [ 'sealed_at' ] ) as $field ) { if ( $b[$field] !== $candidate[$field] ) { return false; } }
+			$r = $record->completion->result; $event = $record->event;
+			$effect = \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime::from_epoch_microseconds( $r['completed_at'] );
+			$verified = \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime::parse( $expected->verified_binding()->row()['verified_at'] );
+			if ( $b['sealed_at'] !== $effect->sql() || $effect->compare( $verified ) < 0 || ! $quote->header()->valid_at( $effect ) || $effect->compare( $expected->hold_until() ) >= 0
+				|| ! $this->binding_link( $record, $binding, 3, 'sealed' ) || 2 !== $r['quote_revision'] || $r['control_revision'] !== $expected->control_revision() ) { return false; }
+			foreach ( [ 'quote_id', 'body_digest', 'owner_digest', 'namespace_hash', 'quote_revision' ] as $field ) { if ( $r[$field] !== $event->target[$field] ) { return false; } }
+			return 'delivery_quote.seal' === $event->operation && 2 === $event->operation_version && 'quote_sealed' === $event->reason_code
+				&& 2 === $event->before_revision && 3 === $event->after_revision && [ 'binding' ] === $event->changed_fields && 3 === $event->target['binding_revision']
 				&& $event->actor['authority_hash'] === hash( 'sha256', $identity->authority ) && $event->actor['principal_hash'] === hash( 'sha256', $identity->principal );
 		} catch ( \Throwable ) { return false; }
 	}
