@@ -196,6 +196,19 @@ jobs:
             tests/Integration/DeliveryPromotion/PromotionQuoteBindRealDatabaseTest.php
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-bind-concurrency.junit.xml" 1 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionQuoteBindRealDatabaseTest' 1
+          # Verify and seal publication barriers are separate from initial namespace reservation.
+          vendor/bin/phpunit -c phpunit.real-db.xml \
+            --filter test_actual_processes_serialize_same_namespace_and_shared_publication_without_duplicate_cas \
+            --log-junit "${RUNNER_TEMP}/cetech-de-verify-concurrency.junit.xml" \
+            tests/Integration/DeliveryPromotion/PromotionQuoteVerifyRealDatabaseTest.php
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-verify-concurrency.junit.xml" 1 \
+            'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionQuoteVerifyRealDatabaseTest' 1
+          vendor/bin/phpunit -c phpunit.real-db.xml \
+            --filter test_actual_processes_serialize_same_namespace_and_shared_publication_without_duplicate_cas \
+            --log-junit "${RUNNER_TEMP}/cetech-de-seal-concurrency.junit.xml" \
+            tests/Integration/DeliveryPromotion/PromotionQuoteSealRealDatabaseTest.php
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-seal-concurrency.junit.xml" 1 \
+            'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionQuoteSealRealDatabaseTest' 1
           # Fail fast on N17; E16 and every retained proof remain in the full census below.
           vendor/bin/phpunit -c phpunit.real-db.xml \
             tests/Integration/DeliveryPromotion/PromotionNativeHandoffRealDatabaseTest.php
