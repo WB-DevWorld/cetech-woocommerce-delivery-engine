@@ -35,7 +35,8 @@ try {
 			$table = PromotionQuoteVerifySavedPort::table( $args['prefix'] ); $packet = PromotionQuoteVerifySavedPort::packet( $command->verified_binding() ); $packet['snapshot_digest'] = Q::digest( 'E16 separately committed saved change' );
 			$sql = "UPDATE `{$table}` SET packet_json='" . $writer->real_escape_string( QuoteJson::encode( $packet ) ) . "' WHERE site_id=1 AND order_id=" . $command->verified_binding()->row()['order_id'];
 		}
-		if ( false === file_put_contents( $directory . '/writer-dispatched', json_encode( [ 'connection_id' => $writer->thread_id, 'table' => $table ], JSON_THROW_ON_ERROR ), LOCK_EX ) ) { throw new RuntimeException( 'Owned competing writer signal failed.' ); }
+		$signal = json_encode( [ 'connection_id' => $writer->thread_id, 'table' => $table ], JSON_THROW_ON_ERROR ); $file = $directory . '/writer-dispatched';
+		if ( strlen( $signal ) !== file_put_contents( $file . '.tmp', $signal, LOCK_EX ) || ! chmod( $file . '.tmp', 0600 ) || ! rename( $file . '.tmp', $file ) ) { throw new RuntimeException( 'Owned competing writer signal failed.' ); }
 		DB::execute( $writer, $sql ); $affected = $writer->affected_rows;
 		if ( 1 !== $affected || ! $writer->commit() ) { throw new RuntimeException( 'Owned competing write was not acknowledged.' ); }
 		echo json_encode( [ 'process_id' => getmypid(), 'connection_id' => $writer->thread_id, 'changed' => $affected, 'table' => $table ], JSON_THROW_ON_ERROR ), PHP_EOL; $writer->close(); $writer = null;
@@ -53,7 +54,8 @@ try {
 		if ( 'reader-left' === $role ) {
 			$stack->saved->on_proof = static function( $session, int $proof ) use ( $stack, $directory ): void {
 				if ( 2 !== $proof ) { return; }
-				if ( false === file_put_contents( $directory . '/reader-held', json_encode( [ 'connection_id' => $stack->physical->transports[0]->connection_id() ], JSON_THROW_ON_ERROR ), LOCK_EX ) ) { throw new RuntimeException( 'Owned sealed observation lock signal failed.' ); }
+				$signal = json_encode( [ 'connection_id' => $stack->physical->transports[0]->connection_id() ], JSON_THROW_ON_ERROR ); $file = $directory . '/reader-held';
+				if ( strlen( $signal ) !== file_put_contents( $file . '.tmp', $signal, LOCK_EX ) || ! chmod( $file . '.tmp', 0600 ) || ! rename( $file . '.tmp', $file ) ) { throw new RuntimeException( 'Owned sealed observation lock signal failed.' ); }
 				OperationProofProcess::wait_for( $directory . '/release', 12.0 );
 			};
 		}
