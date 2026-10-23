@@ -36,7 +36,7 @@ final class FixedPromotionSealedReadNativeBoundaryTest extends TestCase {
 		$f = new PromotionSealedReadFixture(); $e = $this->ready( $f ); $before = $f->bytes(); $seen = new \SplObjectStorage();
 		$inspect = function( mixed $value ) use ( &$inspect, $seen ): void {
 			if ( is_array( $value ) ) { foreach ( $value as $child ) { $inspect( $child ); } return; }
-			if ( ! is_object( $value ) || $seen->contains( $value ) ) { return; } $seen->attach( $value );
+			if ( ! is_object( $value ) || $seen->offsetExists( $value ) ) { return; } $seen->offsetSet( $value );
 			foreach ( [ \Closure::class, \WC_Order::class, OperationSession::class, OperationConnectionFactory::class, FixedPromotionBudgetStore::class, FixedPromotionQuoteOrderEvidenceGuard::class, QuoteCurrentEvidenceGuard::class, QuotePlacementSavedEvidenceGuard::class ] as $port ) {
 				self::assertNotInstanceOf( $port, $value, 'A fresh observation retained a live participant.' );
 			}

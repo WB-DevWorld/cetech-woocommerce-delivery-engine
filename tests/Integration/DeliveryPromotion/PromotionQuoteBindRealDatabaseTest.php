@@ -76,6 +76,32 @@ final class PromotionQuoteBindRealDatabaseTest extends TestCase {
 		if ( null === $directory ) { $directory = OperationProofBarrier::directory(); $this->directories[] = $directory; } $file = $directory . '/' . $name; $bytes = json_encode( $command->to_recovery_array(), JSON_THROW_ON_ERROR ); self::assertSame( strlen( $bytes ), file_put_contents( $file, $bytes, LOCK_EX ) ); self::assertTrue( chmod( $file, 0600 ) ); return $file;
 	}
 	private function worker( string $file, string $mode = 'reconcile', string $role = 'history', int $clock = Factory::NOW + 2 ): OperationProofProcess { $p = new OperationProofProcess( [ __DIR__ . '/promotion-quote-bind-process-worker.php', json_encode( [ 'prefix' => $this->prefix, 'command_file' => $file, 'mode' => $mode, 'role' => $role, 'clock' => $clock ], JSON_THROW_ON_ERROR ) ] ); $this->processes[] = $p; return $p; }
+	/** This test-local diagnostic never copies worker stdout, stderr or private recovery facts. */
+	private function bind_worker_status( string $directory, string $role ): array {
+		$status = [ 'phase' => 'unknown', 'state' => 'unknown', 'exception_class' => 'none' ];
+		$file = $directory . '/bind-' . $role . '-status.json'; clearstatcache( true, $file );
+		$size = is_file( $file ) ? filesize( $file ) : false; if ( ! is_int( $size ) || $size < 1 || $size > 1024 ) { return $status; }
+		$bytes = file_get_contents( $file ); if ( ! is_string( $bytes ) || strlen( $bytes ) > 1024 ) { return $status; }
+		try { $row = json_decode( $bytes, true, 3, JSON_THROW_ON_ERROR ); } catch ( \Throwable ) { return $status; }
+		if ( ! is_array( $row ) || array_keys( $row ) !== [ 'phase', 'state', 'exception_class' ] ) { return $status; }
+		$phases = [ 'bootstrap', 'recovery', 'source_open', 'source_capture', 'source_cleanup', 'configured', 'running', 'namespace_reservation', 'namespace_lock', 'control_lock', 'publication_dispatched', 'account_lock', 'order_lock', 'quote_lock', 'binding_lock', 'effect_held', 'effect_released', 'cleanup' ];
+		$states = [ 'running', 'accepted', 'rejected', 'unconfirmed', 'not_applicable', 'failed' ];
+		$classes = [ 'none', 'RuntimeException', 'InvalidArgumentException', 'LogicException', 'TypeError', 'ErrorException', 'Error', 'Exception', 'Throwable' ];
+		if ( in_array( $row['phase'], $phases, true ) && in_array( $row['state'], $states, true ) && in_array( $row['exception_class'], $classes, true ) ) { return $row; } return $status;
+	}
+	private function wait_for_bind_marker( string $directory, string $marker, string $role, float $seconds ): void {
+		if ( ! in_array( [ $marker, $role ], [ [ 'left-held', 'left' ], [ 'right-dispatched', 'right' ] ], true ) || 20.0 !== $seconds ) { throw new \LogicException( 'Owned E13 barrier descriptor refused.' ); }
+		$end = microtime( true ) + $seconds;
+		do {
+			clearstatcache( true, $directory . '/' . $marker ); if ( is_file( $directory . '/' . $marker ) ) { return; }
+			$status = $this->bind_worker_status( $directory, $role );
+			if ( ! in_array( $status['state'], [ 'unknown', 'running' ], true ) ) { break; }
+			usleep( 10000 );
+		} while ( microtime( true ) < $end );
+		clearstatcache( true, $directory . '/' . $marker ); if ( is_file( $directory . '/' . $marker ) ) { return; }
+		$status = $this->bind_worker_status( $directory, $role );
+		throw new \RuntimeException( 'Owned E13 marker not reached: role=' . $role . ' phase=' . $status['phase'] . ' state=' . $status['state'] . ' exception_class=' . $status['exception_class'] . '.' );
+	}
 	private function wait_for_publication_wait( int $waiter, int $blocker ): void {
 		self::assertNotSame( $waiter, $blocker ); $table = $this->prefix . 'options'; $end = microtime( true ) + 3.0; $waiting = false;
 		$sql = "SELECT COUNT(*) FROM information_schema.INNODB_LOCK_WAITS w JOIN information_schema.INNODB_LOCKS l ON l.lock_id=w.requested_lock_id JOIN information_schema.INNODB_TRX r ON r.trx_id=w.requesting_trx_id JOIN information_schema.INNODB_TRX b ON b.trx_id=w.blocking_trx_id WHERE l.lock_table=CONCAT('`',DATABASE(),'`.`{$table}`') AND r.trx_mysql_thread_id={$waiter} AND b.trx_mysql_thread_id={$blocker} AND r.trx_state='LOCK WAIT'";
@@ -93,8 +119,8 @@ final class PromotionQuoteBindRealDatabaseTest extends TestCase {
 	public function test_two_actual_processes_competing_for_one_quote_make_only_one_binding(): void {
 		$accepted = $this->seed(); $left_command = $this->command( $accepted, 2001 ); $right_command = $this->command( $accepted, 2002 ); $protected = $this->protected_bytes();
 		$left_file = $this->command_file( $left_command, name: 'bind-left.json' ); $directory = dirname( $left_file ); $right_file = $this->command_file( $right_command, $directory, 'bind-right.json' );
-		$left = $this->worker( $left_file, 'bind', 'left' ); OperationProofProcess::wait_for( $directory . '/left-held' ); $held = json_decode( (string) file_get_contents( $directory . '/left-held' ), true, 4, JSON_THROW_ON_ERROR );
-		$right = $this->worker( $right_file, 'bind', 'right' ); OperationProofProcess::wait_for( $directory . '/right-dispatched' ); $waiter = json_decode( (string) file_get_contents( $directory . '/right-dispatched' ), true, 4, JSON_THROW_ON_ERROR ); $this->wait_for_publication_wait( $waiter['connection_id'], $held['connection_id'] ); OperationProofBarrier::signal( $directory . '/release' );
+		$left = $this->worker( $left_file, 'bind', 'left' ); $this->wait_for_bind_marker( $directory, 'left-held', 'left', 20.0 ); $held = json_decode( (string) file_get_contents( $directory . '/left-held' ), true, 4, JSON_THROW_ON_ERROR );
+		$right = $this->worker( $right_file, 'bind', 'right' ); $this->wait_for_bind_marker( $directory, 'right-dispatched', 'right', 20.0 ); $waiter = json_decode( (string) file_get_contents( $directory . '/right-dispatched' ), true, 4, JSON_THROW_ON_ERROR ); $this->wait_for_publication_wait( $waiter['connection_id'], $held['connection_id'] ); OperationProofBarrier::signal( $directory . '/release' );
 		$a = $left->finish(); $b = $right->finish(); self::assertNotSame( getmypid(), $a['process_id'] ); self::assertNotSame( $a['process_id'], $b['process_id'] ); self::assertSame( 'accepted', $a['state'] ); self::assertSame( 'rejected', $b['state'] ); self::assertSame( 1, $a['binding_inserts'] + $b['binding_inserts'] ); self::assertSame( 0, $a['protected_writes'] + $b['protected_writes'] ); self::assertSame( 1, $a['native_input_reads'] ); self::assertSame( 1, $b['native_input_reads'] ); self::assertCount( 1, $this->rows( 'delivery_quote_bindings' ) ); self::assertCount( 3, $this->rows( 'operation_changes' ) ); self::assertSame( $protected, $this->protected_bytes() );
 	}
 	public function test_distinct_quotes_cannot_duplicate_a_placement_or_order_manifest(): void {
