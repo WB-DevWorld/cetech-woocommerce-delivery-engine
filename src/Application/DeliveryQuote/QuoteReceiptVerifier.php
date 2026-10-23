@@ -24,6 +24,25 @@ final class QuoteReceiptVerifier {
 	public function prerequisites( OperationSession $session, QuoteHeader $header, ?QuoteBinding $binding, array $purposes ): array {
 		return $this->collect( $session, $header, $binding, $purposes, false );
 	}
+	/** E13 acknowledgement retains the exact already-fetched event persistence times. */
+	public function lock_promotion_binding( OperationSession $session, FixedPromotionQuoteBindCommand $expected ): array {
+		return $this->promotion_binding_records( $session, $expected, [ 'issue', 'accept', 'bind' ], true );
+	}
+	/** C03 owns bind already; immutable original prerequisites never reverse namespace locks. */
+	public function prerequisites_promotion_binding( OperationSession $session, FixedPromotionQuoteBindCommand $expected ): array {
+		return $this->promotion_binding_records( $session, $expected, [ 'issue', 'accept' ], false );
+	}
+	private function promotion_binding_records( OperationSession $session, FixedPromotionQuoteBindCommand $expected, array $purposes, bool $lock ): array {
+		$names = $expected->header()->namespace_hashes() + [ 'bind' => $expected->binding()->row()['bind_namespace_hash'] ];
+		$names = array_intersect_key( $names, array_flip( $purposes ) );
+		if ( count( $purposes ) !== count( $names ) || count( $purposes ) !== count( array_unique( $names ) ) ) { throw new OperationStorageException(); }
+		asort( $names, SORT_STRING ); $out = [ 'event_persisted_at' => [] ];
+		foreach ( $names as $purpose => $namespace ) {
+			$metadata = []; $out[$purpose] = $this->read( $session, $namespace, 'delivery_quote.' . $purpose, $lock, $lock, $metadata );
+			if ( isset( $metadata['persisted_at'] ) ) { $out['event_persisted_at'][$purpose] = $metadata['persisted_at']; }
+		}
+		return $out;
+	}
 	/** One finite, globally ordered receipt set for the original no-effect attempt and explicit new review. */
 	public function lock_original_disposition( OperationSession $session, QuoteHeader $original, string $placement_id, QuoteHeader $replacement ): array {
 		$old = $original->namespace_hashes() + QuoteDurableCommand::binding_namespaces( $original->owner(), $original, $placement_id, true )
@@ -101,6 +120,46 @@ final class QuoteReceiptVerifier {
 				&& $event->actor['authority_hash'] === hash( 'sha256', 'delivery_quote_customer' ) && $event->actor['principal_hash'] === hash( 'sha256', $expected->owner()->digest() );
 		} catch ( \Throwable ) { return false; }
 	}
+	/** Authenticate original producers, including SQL event chronology, before any new binding effect. */
+	public function promotion_binding_prerequisites_verified( QuoteStoredRow $quote, array $records, FixedPromotionQuoteBindCommand $expected ): bool {
+		try {
+			return $this->promotion_acceptance_verified( $quote, $records, $expected->acceptance() ) && $quote->row() === $expected->quote_record()->row()
+				&& $this->promotion_binding_chronology( $records, $expected, [ 'issue', 'accept' ] );
+		} catch ( \Throwable ) { return false; }
+	}
+	/** Immutable prepared binding only; present order, policy, source and funding are not consulted. */
+	public function promotion_binding_verified( QuoteStoredRow $quote, array $records, QuoteBinding $binding, FixedPromotionQuoteBindCommand $expected ): bool {
+		try {
+			$record = $records['bind'] ?? null; $identity = $expected->identity; $b = $binding->row(); $candidate = $expected->binding()->row();
+			if ( ! $this->promotion_acceptance_verified( $quote, $records, $expected->acceptance() ) || $quote->row() !== $expected->quote_record()->row()
+				|| 'prepared' !== $binding->state() || 1 !== $binding->revision() || 'delivery_quote.bind' !== $identity->operation || 1 !== $identity->operation_version
+				|| ! $record instanceof OperationRecord || 'accepted' !== $record->state || ! $record->matches( $identity, $expected->intent() )
+				|| ! $this->common( $record, $quote, $b['bind_namespace_hash'] ) || null === $record->event || null === $record->completed_at ) { return false; }
+			foreach ( array_diff( QuoteBinding::FIELDS, [ 'id', 'created_at' ] ) as $field ) { if ( $b[$field] !== $candidate[$field] ) { return false; } }
+			foreach ( [ 'snapshot_digest', 'context_digest', 'verified_at', 'sealed_at' ] as $field ) { if ( null !== $b[$field] ) { return false; } }
+			$r = $record->completion->result; $event = $record->event;
+			$effect = \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime::from_epoch_microseconds( $r['completed_at'] );
+			if ( $b['created_at'] !== $effect->sql() || $effect->compare( $quote->accepted_at() ) < 0 || ! $quote->header()->valid_at( $effect ) || $effect->compare( $expected->hold_until() ) >= 0 ) { return false; }
+			foreach ( [ 'binding_id' => $binding->id(), 'placement_id' => $b['placement_uuid'], 'order_id' => $b['order_id'], 'binding_revision' => 1, 'manifest_digest' => $b['managed_group_manifest_digest'], 'state' => 'prepared', 'quote_revision' => 2 ] as $field => $value ) { if ( ( $r[$field] ?? null ) !== $value ) { return false; } }
+			if ( ! $this->promotion_binding_chronology( $records, $expected, [ 'issue', 'accept', 'bind' ] ) ) { return false; }
+			foreach ( [ 'quote_id', 'body_digest', 'owner_digest', 'namespace_hash', 'quote_revision' ] as $field ) { if ( $r[$field] !== $event->target[$field] ) { return false; } }
+			return 'delivery_quote.bind' === $event->operation && 1 === $event->operation_version && 'quote_bound' === $event->reason_code
+				&& 1 === $event->before_revision && 2 === $event->after_revision && [ 'binding' ] === $event->changed_fields && 1 === $event->target['binding_revision']
+				&& $event->actor['authority_hash'] === hash( 'sha256', $identity->authority ) && $event->actor['principal_hash'] === hash( 'sha256', $identity->principal );
+		} catch ( \Throwable ) { return false; }
+	}
+	private function promotion_binding_chronology( array $records, FixedPromotionQuoteBindCommand $expected, array $purposes ): bool {
+		$times = $records['event_persisted_at'] ?? null;
+		if ( ! is_array( $times ) || count( $purposes ) !== count( $times ) || [] !== array_diff( $purposes, array_keys( $times ) ) ) { return false; }
+		$publication = [ 'site_id' => $expected->owner()->site_id(), 'owner_digest' => $expected->owner()->digest(), 'quote_id' => $expected->header()->id()->value(), 'purpose' => 'private_quote_invalidation' ];
+		foreach ( $purposes as $purpose ) {
+			$part = $records[$purpose] ?? null; $persisted = $times[$purpose] ?? null;
+			if ( ! $part instanceof OperationRecord || ! $persisted instanceof \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime || null === $part->completed_at || null === $part->completion?->result || $part->completion->publication !== $publication ) { return false; }
+			$at = \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime::from_epoch_microseconds( $part->completion->result['completed_at'] );
+			if ( $persisted->compare( $at ) < 0 || \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime::parse( $part->completed_at )->compare( $at ) < 0 || \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime::parse( $part->updated_at )->compare( $at ) < 0 ) { return false; }
+		}
+		return true;
+	}
 	/** The exact immutable issue-v2 producer is shared by issued and accepted history, never by generic readers. */
 	private function promotion_original_issue_verified( QuoteStoredRow $quote, array $records, FixedPromotionQuoteIssueCommand $expected ): bool {
 		$header = $quote->header(); $context = $quote->context(); $terms = $quote->terms(); $record = $records['issue'] ?? null;
@@ -150,7 +209,7 @@ final class QuoteReceiptVerifier {
 	private function common( OperationRecord $record, QuoteStoredRow $quote, string $namespace ): bool {
 		$r = $record->completion?->result; return null !== $r && $record->site_id === $quote->site_id() && $record->namespace_hash === $namespace && $r['namespace_hash'] === $namespace && $r['quote_id'] === $quote->header()->id()->value() && $r['body_digest'] === $quote->header()->body_digest() && $r['owner_digest'] === $quote->header()->owner()->digest() && $record->completion->publication['site_id'] === $quote->site_id();
 	}
-	private function read( OperationSession $s, string $namespace, string $operation, bool $lock, bool $lock_event = false ): ?OperationRecord {
+	private function read( OperationSession $s, string $namespace, string $operation, bool $lock, bool $lock_event = false, ?array &$event_metadata = null ): ?OperationRecord {
 		if ( ! $s->in_transaction() || $s->is_retired() ) { throw new OperationStorageException(); }
 		$table = WpdbOperationRecordRepository::table_name( $s, 'operation_records' ); $events = WpdbOperationRecordRepository::table_name( $s, 'operation_changes' );
 		$sql = "SELECT id,site_id,namespace_hash,intent_hash,namespace_format,intent_format,record_format,operation,operation_version,target_hash,state,publication_state,CASE WHEN OCTET_LENGTH(completion_json)<=16384 THEN completion_json ELSE NULL END AS completion_json,audit_id,row_version,created_at,updated_at,completed_at,CASE WHEN completion_json IS NOT NULL AND OCTET_LENGTH(completion_json)>16384 THEN 1 ELSE 0 END AS oversized FROM `{$table}` WHERE site_id=%d AND namespace_hash=%s LIMIT 2" . ( $lock ? ' FOR UPDATE' : '' );
@@ -159,6 +218,10 @@ final class QuoteReceiptVerifier {
 		$sql = "SELECT id,site_id,operation_id,event_format,CASE WHEN OCTET_LENGTH(event_json)<=16384 THEN event_json ELSE NULL END AS event_json,created_at,CASE WHEN OCTET_LENGTH(event_json)>16384 THEN 1 ELSE 0 END AS oversized FROM `{$events}` WHERE site_id=%d AND operation_id=%d LIMIT 2" . ( $lock_event ? ' FOR UPDATE' : '' );
 		$rows = $s->get_results( $s->prepare( $sql, $s->site_id(), WpdbOperationRecordRepository::positive_integer( $row['id'] ) ) ); if ( ! is_array( $rows ) || count( $rows ) > 1 ) { throw new OperationStorageException(); } $event = $rows[0] ?? null;
 		if ( null !== $event ) { if ( ! is_array( $event ) || ! array_key_exists( 'oversized', $event ) || '0' !== (string) $event['oversized'] ) { throw new OperationStorageException(); } unset( $event['oversized'] ); }
-		try { return OperationRecord::from_row( $row, QuoteOperationProfile::registry()->get( $operation, WpdbOperationRecordRepository::positive_integer( $row['operation_version'] ) ), $event ); } catch ( \Throwable ) { throw new OperationStorageException(); }
+		try {
+			$record = OperationRecord::from_row( $row, QuoteOperationProfile::registry()->get( $operation, WpdbOperationRecordRepository::positive_integer( $row['operation_version'] ) ), $event );
+			if ( null !== $event_metadata && null !== $event ) { $event_metadata['persisted_at'] = \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime::parse( $event['created_at'] ); }
+			return $record;
+		} catch ( \Throwable ) { throw new OperationStorageException(); }
 	}
 }
