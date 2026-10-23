@@ -63,6 +63,7 @@ finish_n18_http() {
     trap - EXIT
     set +e
     local task_stopped=1 task_mu_removed=1 task_private_removed=1 task_cleanup=1 task_wait=0
+    local task_promotion_cleanup_exit=0 task_cart_cleanup_exit=0
     if [[ -n "$TASK_SERVER_PID" ]]; then
         if kill -0 "$TASK_SERVER_PID" 2>/dev/null; then
             kill "$TASK_SERVER_PID" 2>/dev/null || task_stopped=0
@@ -79,18 +80,10 @@ finish_n18_http() {
     fi
     # Exact tracked fixture IDs provide cleanup authority; appeared-row diffs do not.
     if [[ -f "$TASK_STATE" && ! -L "$TASK_STATE" ]]; then
-        "$TASK_PHP" "$TASK_WORK/wp-cli.phar" --allow-root --path="$TASK_SITE" --require="$TASK_ROOT/scripts/qualification/admin-context.php" eval-file "$TASK_SUPPORT" --use-include cleanuppromotioncart "$TASK_STATE" "$TASK_PRIVATE/promotion-cleanup.json" >"$TASK_PRIVATE/promotion-cleanup.log" 2>&1 || task_cleanup=0
-        "${TASK_WP[@]}" eval-file "$TASK_ROOT/scripts/qualification/opening-http-quote-cart-fixture.php" --use-include cleanupquotecart "$TASK_STATE" "$TASK_PRIVATE/cart-cleanup.json" >"$TASK_PRIVATE/cart-cleanup.log" 2>&1 || task_cleanup=0
-        python3 - "$TASK_PRIVATE" <<'PY'
-import json,sys
-from pathlib import Path
-root=Path(sys.argv[1])
-for name in ('promotion-cleanup.json','cart-cleanup.json'):
-    path=root/name
-    if not path.is_file() or path.is_symlink(): raise SystemExit(1)
-    value=json.loads(path.read_text())
-    if not isinstance(value,dict) or not value or any(item is not True for item in value.values()): raise SystemExit(1)
-PY
+        "$TASK_PHP" "$TASK_WORK/wp-cli.phar" --allow-root --path="$TASK_SITE" --require="$TASK_ROOT/scripts/qualification/admin-context.php" eval-file "$TASK_SUPPORT" --use-include cleanuppromotioncart "$TASK_STATE" "$TASK_PRIVATE/promotion-cleanup.json" >"$TASK_PRIVATE/promotion-cleanup.log" 2>&1 || { task_promotion_cleanup_exit=$?; task_cleanup=0; }
+        "${TASK_WP[@]}" eval-file "$TASK_ROOT/scripts/qualification/opening-http-quote-cart-fixture.php" --use-include cleanupquotecart "$TASK_STATE" "$TASK_PRIVATE/cart-cleanup.json" >"$TASK_PRIVATE/cart-cleanup.log" 2>&1 || { task_cart_cleanup_exit=$?; task_cleanup=0; }
+        python3 "$TASK_ROOT/scripts/qualification/promotion-cart-cleanup-diagnostic.py" \
+            "$TASK_PRIVATE" "$TASK_STATE" "$task_promotion_cleanup_exit" "$task_cart_cleanup_exit"
         if [[ "$?" != 0 ]]; then task_cleanup=0; fi
         python3 "$TASK_ROOT/scripts/qualification/verify-opening-promotion-cart.py" \
             "$TASK_RECEIPT" "$TASK_BROWSER_RECEIPT" "$TASK_PLACEMENT_RECEIPT" "$TASK_STATE" \
@@ -167,7 +160,11 @@ PY
 TASK_STAGE=direct
 python3 "$TASK_ROOT/scripts/qualification/opening-http-promotion-cart-driver.py" --state "$TASK_STATE.browser.json" --base-url http://127.0.0.1:8085 --receipt "$TASK_RECEIPT"
 TASK_STAGE=browser
+# The review assets use Woo's actual checkout-page context; visiting a second
+# Blocks page alone does not make it the configured native checkout page.
+"${TASK_WP[@]}" eval-file "$TASK_ROOT/scripts/qualification/opening-http-quote-cart-fixture.php" --use-include blockspagequotecart "$TASK_STATE" "$TASK_PRIVATE/blocks-page.json" >"$TASK_PRIVATE/blocks-page.log" 2>&1
 node "$TASK_ROOT/scripts/qualification/promotion-cart-browser.cjs" --state "$TASK_STATE.browser.json" --base-url http://127.0.0.1:8085 --receipt "$TASK_BROWSER_RECEIPT"
 TASK_STAGE=placement
+"${TASK_WP[@]}" eval-file "$TASK_ROOT/scripts/qualification/opening-http-quote-cart-fixture.php" --use-include classicpagequotecart "$TASK_STATE" "$TASK_PRIVATE/classic-page.json" >"$TASK_PRIVATE/classic-page.log" 2>&1
 python3 "$TASK_ROOT/scripts/qualification/opening-http-promotion-placement-driver.py" --state "$TASK_STATE.browser.json" --base-url http://127.0.0.1:8085 --receipt "$TASK_PLACEMENT_RECEIPT"
 TASK_STAGE=complete

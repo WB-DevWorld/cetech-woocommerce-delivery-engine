@@ -198,7 +198,14 @@ final class CetechPromotionCartHttpFixture {
             $ids=$db->get_col($db->prepare('SELECT id FROM `'.TableNames::for('operation_records').'` WHERE site_id=%d AND namespace_hash=%s AND operation IN (%s,%s,%s)',$state['site_id'],$namespace,'delivery_quote.bind','delivery_quote.verify_binding','delivery_quote.seal'));
             foreach ($ids as $id) { $ok=false!==$db->delete(TableNames::for('operation_changes'),['site_id'=>$state['site_id'],'operation_id'=>(int)$id])&&$ok; $ok=false!==$db->delete(TableNames::for('operation_records'),['site_id'=>$state['site_id'],'id'=>(int)$id])&&$ok; }
         }
-        foreach ($p['before'] as $suffix=>$rows) { $ok=$rows===CetechNativeQuoteProviderFixture::rows(TableNames::for($suffix))&&$ok; }
+        $steps_acknowledged=$ok; $tables_restored=[];
+        foreach ($p['before'] as $suffix=>$rows) { $tables_restored[$suffix]=$rows===CetechNativeQuoteProviderFixture::rows(TableNames::for($suffix)); $ok=$tables_restored[$suffix]&&$ok; }
+        // Private, boolean-only diagnostics do not replace the original cleanup receipt.
+        opening_http_write_json($state['state_path'].'.promotion-cleanup-observation.json',[
+            'format'=>'cetech-n18-promotion-cleanup-observation-v1',
+            'owners_retired'=>true===($p['all_owners_retired']??false),
+            'steps_acknowledged'=>$steps_acknowledged,'tables_restored'=>$tables_restored,
+        ],true);
         return ['tracked_promotion_cleanup_restored'=>$ok];
     }
 }
