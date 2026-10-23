@@ -195,7 +195,9 @@ final class PromotionNativeHandoffRealDatabaseTest extends TestCase {
 		$deadline = microtime( true ) + 1.5;
 		do {
 			$count = (int) DB::scalar( $this->database, "SELECT COUNT(*) FROM information_schema.INNODB_LOCK_WAITS w JOIN information_schema.INNODB_LOCKS l ON l.lock_id=w.requested_lock_id JOIN information_schema.INNODB_TRX r ON r.trx_id=w.requesting_trx_id JOIN information_schema.INNODB_TRX b ON b.trx_id=w.blocking_trx_id WHERE l.lock_table=CONCAT('`',DATABASE(),'`.`{$table}`') AND r.trx_mysql_thread_id={$waiter} AND b.trx_mysql_thread_id={$blocker} AND r.trx_state='LOCK WAIT'" );
-			if ( $count > 0 ) { self::assertGreaterThan( 0, $count ); return; } usleep( 10000 );
+			if ( $count > 0 ) { self::assertGreaterThan( 0, $count ); return; }
+			// MariaDB11.4 refreshes this observation cache only after >100ms idle; 10ms reads can retain an empty snapshot.
+			$remaining = $deadline - microtime( true ); if ( $remaining <= 0 ) { break; } usleep( (int) min( 120000, ceil( $remaining * 1000000 ) ) );
 		} while ( microtime( true ) < $deadline );
 		$status = [ 'phase' => 'unknown', 'state' => 'unknown', 'errno' => -1 ]; $file = $directory . '/writer-status.json'; clearstatcache( true, $file ); $size = is_file( $file ) ? filesize( $file ) : false;
 		if ( is_int( $size ) && $size > 0 && $size <= 512 ) { try { $row = json_decode( (string) file_get_contents( $file ), true, 3, JSON_THROW_ON_ERROR ); if ( is_array( $row ) && array_keys( $row ) === [ 'phase', 'state', 'errno' ] && in_array( $row['phase'], [ 'connected', 'query_dispatched', 'query_reaped', 'committed' ], true ) && in_array( $row['state'], [ 'running', 'failed', 'committed' ], true ) && in_array( $row['errno'], [ -1, 0, 1205, 1213, 2006, 2013 ], true ) ) { $status = $row; } } catch ( \Throwable ) {} }

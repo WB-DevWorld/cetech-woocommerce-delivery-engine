@@ -85,7 +85,8 @@ final class PromotionQuoteAcceptRealDatabaseTest extends TestCase {
 	private function wait_for_wait( int $waiter, int $blocker ): void {
 		self::assertNotSame( $waiter, $blocker ); $table = $this->prefix . 'delivery_engine_operation_records'; $end = microtime( true ) + 3.0; $waiting = false;
 		$sql = "SELECT COUNT(*) FROM information_schema.INNODB_LOCK_WAITS w JOIN information_schema.INNODB_LOCKS l ON l.lock_id=w.requested_lock_id JOIN information_schema.INNODB_TRX r ON r.trx_id=w.requesting_trx_id JOIN information_schema.INNODB_TRX b ON b.trx_id=w.blocking_trx_id WHERE l.lock_table=CONCAT('`',DATABASE(),'`.`{$table}`') AND r.trx_mysql_thread_id={$waiter} AND b.trx_mysql_thread_id={$blocker} AND r.trx_state='LOCK WAIT'";
-		do { $waiting = (int) DB::scalar( $this->database, $sql ) > 0; if ( $waiting ) { break; } usleep( 10000 ); } while ( microtime( true ) < $end ); self::assertTrue( $waiting, 'The second actual accepting process must wait on the first operation owner.' );
+		// Allow the MariaDB observation cache to refresh without extending the existing deadline.
+		do { $waiting = (int) DB::scalar( $this->database, $sql ) > 0; if ( $waiting ) { break; } $remaining = $end - microtime( true ); if ( $remaining <= 0 ) { break; } usleep( (int) min( 120000, ceil( $remaining * 1000000 ) ) ); } while ( microtime( true ) < $end ); self::assertTrue( $waiting, 'The second actual accepting process must wait on the first operation owner.' );
 	}
 	private function fail_after_quote( string $kind ): void {
 		$command = FixedPromotionQuoteAcceptCommand::from_issue( $this->seed()->command ); $before = $this->effects(); $stack = $this->stack( configure: static function( Transport $transport ) use ( $kind ): void { $transport->{'reject_' . $kind} = true; } );
