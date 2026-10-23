@@ -9,7 +9,7 @@ import unittest
 
 HERE = Path(__file__).resolve().parent
 SECRET = 'PRIVATE_message_nonce_SQL_order_912345_source_path'
-KEYS = {'format', 'phase', 'kind', 'error_class', 'checkout_exception_observed', 'tracked_native_order', 'checkout_endpoint_verified'}
+KEYS = {'format', 'phase', 'kind', 'error_class', 'checkout_exception_observed', 'tracked_native_order', 'checkout_endpoint_verified', 'callback_status', 'callback_observation'}
 PHP_PROBE = r'''
 class WC_Order {
     public function __construct(private int $id, private int $customer) {}
@@ -18,6 +18,7 @@ class WC_Order {
 }
 class PrivateDiagnosticError extends Exception {}
 function get_current_user_id(): int { return $GLOBALS['probe_current_user']; }
+require dirname($argv[1]).'/opening-http-promotion-placement-observer.php';
 require $argv[1];
 $input=json_decode(stream_get_contents(STDIN),true,32,JSON_THROW_ON_ERROR);
 $GLOBALS['probe_current_user']=$input['current_user']??0;
@@ -25,6 +26,8 @@ $GLOBALS['cetech_n18_placement_phase']=$input['phase']??'entry';
 $GLOBALS['cetech_n18_placement_wp_error_returned']=$input['wp_error']??false;
 $GLOBALS['cetech_n18_checkout_endpoint_verified']=$input['endpoint']??null;
 $GLOBALS['cetech_n18_checkout_exception_observed']=$input['exception_observed']??false;
+$GLOBALS['cetech_n18_callback_observation']=$input['callback_observation']??null;
+$GLOBALS['cetech_n18_callback_status']=$input['callback_status']??'not_installed';
 $GLOBALS['cetech_n18_owned_orders']=$input['owned']??[];
 $GLOBALS['cetech_n18_creating_order']=$input['creating']??false;
 $order=isset($input['order'])?new WC_Order($input['order'][0],$input['order'][1]):null;
@@ -82,7 +85,7 @@ class PlacementDiagnosticTests(unittest.TestCase):
         return self.execute([sys.executable, '-c', PYTHON_PROBE, str(HERE / 'opening-http-promotion-placement-driver.py')], {'status': status, 'body': body})
 
     def valid(self):
-        return {'format': 'cetech-n18-placement-failure-v1', 'phase': 'explicit_stage', 'kind': 'throwable', 'error_class': 'UnexpectedValueException', 'checkout_exception_observed': False, 'tracked_native_order': True, 'checkout_endpoint_verified': True}
+        return {'format': 'cetech-n18-placement-failure-v1', 'phase': 'explicit_stage', 'kind': 'throwable', 'error_class': 'UnexpectedValueException', 'checkout_exception_observed': False, 'tracked_native_order': True, 'checkout_endpoint_verified': True, 'callback_status': 'not_installed', 'callback_observation': None}
 
     def rejected(self, **arguments):
         value = self.consume(**arguments)
@@ -104,6 +107,24 @@ class PlacementDiagnosticTests(unittest.TestCase):
         self.assertTrue(self.consume(value)['packet_valid'])
         for overrides in ({'phase': 'create_order'}, {'error_class': 'RuntimeException'}):
             self.rejected(value={**value, **overrides})
+
+    def test_callback_observation_is_separate_closed_original_exception_evidence(self):
+        observation = {'format': 'cetech-n18-stage-classic-failure-v1', 'error_class': 'RuntimeException', 'cause_class': 'UnexpectedValueException', 'guard_site': 'plan_destination'}
+        value = self.producer(phase='create_order_wp_error', wp_error=True, callback_status='threw', callback_observation=observation)
+        self.assertIsNone(value['error_class']); self.assertEqual(observation, value['callback_observation'])
+        self.assertTrue(self.consume(value)['packet_valid'])
+        for invalid in ({**observation, 'message': SECRET}, {**observation, 'guard_site': SECRET}, {**observation, 'cause_class': SECRET}, [], SECRET, True):
+            with self.subTest(invalid=type(invalid).__name__):
+                self.assertIsNone(self.producer(callback_observation=invalid)['callback_observation'])
+                self.rejected(value={**self.valid(), 'callback_observation': invalid})
+
+    def test_callback_progress_is_closed_and_does_not_claim_restoration_as_completion(self):
+        for status in ('not_installed', 'installed', 'entered', 'completed', 'threw'):
+            value = self.producer(callback_status=status)
+            self.assertEqual(status, value['callback_status']); self.assertTrue(self.consume(value)['packet_valid'])
+        for status in (SECRET, 1, True, [], {}):
+            self.assertEqual('not_installed', self.producer(callback_status=status)['callback_status'])
+            self.rejected(value={**self.valid(), 'callback_status': status})
 
     def test_exception_hook_observes_only_creating_tracked_current_principal_order(self):
         base = dict(phase='create_order_wp_error', wp_error=True, order=[17, 0], owned=[17], creating=True, observe=True)
