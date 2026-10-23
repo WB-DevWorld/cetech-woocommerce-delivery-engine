@@ -155,7 +155,7 @@ final class PromotionNativeHandoffRealDatabaseTest extends TestCase {
 			$process = new OperationProofProcess( [ __DIR__ . '/promotion-native-handoff-process-worker.php', json_encode( [ 'mode' => 'writer', 'prefix' => $this->prefix, 'directory' => $directory, 'hpos' => $hpos, 'kind' => $kind ], JSON_THROW_ON_ERROR ) ] ); $this->processes[] = $process;
 			OperationProofProcess::wait_for( $directory . '/dispatched', 20.0 ); $packet = json_decode( (string) file_get_contents( $directory . '/dispatched' ), true, 4, JSON_THROW_ON_ERROR ); self::assertNotSame( getmypid(), $packet['process_id'] );
 			$table = $this->prefix . match ( $kind ) { 'candidate_order' => $hpos ? 'wc_orders' : 'posts', 'candidate_item' => 'woocommerce_order_itemmeta', default => $hpos ? 'wc_orders_meta' : 'postmeta' };
-			$this->wait_for_lock( $packet['connection_id'], $factory->transports[0]->connection_id(), $table ); self::assertFileDoesNotExist( $directory . '/finished' ); self::assertTrue( $session->rollback() ); self::assertTrue( $session->retire() ); $result = $process->finish( 10.0 ); $this->processes = array_values( array_filter( $this->processes, static fn( $active ): bool => $active !== $process ) ); self::assertSame( 1, $result['affected'] ); self::assertSame( 'committed', $result['state'] );
+			$this->wait_for_lock( $packet['connection_id'], $factory->transports[0]->connection_id(), $table, $directory, $hpos, $kind ); self::assertFileDoesNotExist( $directory . '/finished' ); self::assertTrue( $session->rollback() ); self::assertTrue( $session->retire() ); $result = $process->finish( 10.0 ); $this->processes = array_values( array_filter( $this->processes, static fn( $active ): bool => $active !== $process ) ); self::assertSame( 1, $result['affected'] ); self::assertSame( 'committed', $result['state'] );
 		} }
 	}
 	public function test_genuine_issue_accept_bind_verify_seal_records_keep_held_budget_and_native_rows_exact(): void {
@@ -191,11 +191,14 @@ final class PromotionNativeHandoffRealDatabaseTest extends TestCase {
 
 	private function held_bytes(): array { $all = Rows::census( $this->database, $this->prefix ); return array_intersect_key( $all, array_flip( [ 'delivery_engine_promotion_budget_accounts', 'delivery_engine_promotion_budget_reservations', 'delivery_engine_delivery_quotes' ] ) ); }
 	private function native_bytes(): array { return array_slice( Rows::census( $this->database, $this->prefix ), 0, 8, true ); }
-	private function wait_for_lock( int $waiter, int $blocker, string $table ): void {
+	private function wait_for_lock( int $waiter, int $blocker, string $table, string $directory, bool $hpos, string $kind ): void {
 		$deadline = microtime( true ) + 1.5;
 		do {
-			$row = DB::row( $this->database, "SELECT r.trx_mysql_thread_id AS waiter,b.trx_mysql_thread_id AS blocker,l.lock_table AS locked_table FROM information_schema.INNODB_LOCK_WAITS w INNER JOIN information_schema.INNODB_TRX r ON r.trx_id=w.requesting_trx_id INNER JOIN information_schema.INNODB_TRX b ON b.trx_id=w.blocking_trx_id INNER JOIN information_schema.INNODB_LOCKS l ON l.lock_id=w.requested_lock_id WHERE r.trx_mysql_thread_id={$waiter} AND b.trx_mysql_thread_id={$blocker} LIMIT 1" );
-			if ( null !== $row ) { self::assertStringContainsString( $table, $row['locked_table'] ); return; } usleep( 10000 );
-		} while ( microtime( true ) < $deadline ); self::fail( 'The independent writer did not wait on the exact native owner/table.' );
+			$count = (int) DB::scalar( $this->database, "SELECT COUNT(*) FROM information_schema.INNODB_LOCK_WAITS w JOIN information_schema.INNODB_LOCKS l ON l.lock_id=w.requested_lock_id JOIN information_schema.INNODB_TRX r ON r.trx_id=w.requesting_trx_id JOIN information_schema.INNODB_TRX b ON b.trx_id=w.blocking_trx_id WHERE l.lock_table=CONCAT('`',DATABASE(),'`.`{$table}`') AND r.trx_mysql_thread_id={$waiter} AND b.trx_mysql_thread_id={$blocker} AND r.trx_state='LOCK WAIT'" );
+			if ( $count > 0 ) { self::assertGreaterThan( 0, $count ); return; } usleep( 10000 );
+		} while ( microtime( true ) < $deadline );
+		$status = [ 'phase' => 'unknown', 'state' => 'unknown', 'errno' => -1 ]; $file = $directory . '/writer-status.json'; clearstatcache( true, $file ); $size = is_file( $file ) ? filesize( $file ) : false;
+		if ( is_int( $size ) && $size > 0 && $size <= 512 ) { try { $row = json_decode( (string) file_get_contents( $file ), true, 3, JSON_THROW_ON_ERROR ); if ( is_array( $row ) && array_keys( $row ) === [ 'phase', 'state', 'errno' ] && in_array( $row['phase'], [ 'connected', 'query_dispatched', 'query_reaped', 'committed' ], true ) && in_array( $row['state'], [ 'running', 'failed', 'committed' ], true ) && in_array( $row['errno'], [ -1, 0, 1205, 1213, 2006, 2013 ], true ) ) { $status = $row; } } catch ( \Throwable ) {} }
+		self::fail( 'The independent writer did not wait on the exact native owner/table: store=' . ( $hpos ? 'hpos' : 'cpt' ) . ' kind=' . $kind . ' phase=' . $status['phase'] . ' state=' . $status['state'] . ' errno=' . $status['errno'] . '.' );
 	}
 }
