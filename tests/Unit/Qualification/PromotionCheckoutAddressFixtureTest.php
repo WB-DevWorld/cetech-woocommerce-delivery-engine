@@ -84,4 +84,16 @@ final class PromotionCheckoutAddressFixtureTest extends TestCase {
         $f=F::create(); $this->expectException(\RuntimeException::class);
         \CetechPromotionCartHttpFixture::checkout_address($f['draft'],$f['evidence']);
     }
+    public static function original_destination_fields(): array { return array_map(static fn(string $field): array=>[$field],['country','state','city','postcode','address','address_2']); }
+    #[DataProvider('original_destination_fields')]
+    public function test_complete_line_endpoint_cannot_replace_a_different_original_native_customer_field(string $field): void {
+        $f=$this->fixture(); $draft=$f['draft']->private_facts(); $draft['customer_destination'][$field]='different original native field';
+        $f['draft']=QuoteCartDraft::from_private_facts($f['owner'],$draft); $before=$f['draft']->private_facts();
+        try { $this->project($f); self::fail('The original native checkout destination must agree before any order effect.'); }
+        catch (\RuntimeException $error) { self::assertSame('N18 original draft checkout destination differs.',$error->getMessage()); self::assertSame($before,$f['draft']->private_facts()); }
+    }
+    public function test_blank_original_customer_address_refuses_despite_complete_accepted_line_endpoint(): void {
+        $f=$this->fixture(); $draft=$f['draft']->private_facts(); $draft['customer_destination']=array_fill_keys(array_keys($draft['customer_destination']),'');
+        $f['draft']=QuoteCartDraft::from_private_facts($f['owner'],$draft); $this->expectException(\RuntimeException::class); $this->expectExceptionMessage('N18 original draft checkout destination differs.'); $this->project($f);
+    }
 }

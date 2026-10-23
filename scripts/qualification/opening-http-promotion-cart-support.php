@@ -109,6 +109,9 @@ final class CetechPromotionCartHttpFixture {
             $address=$candidate;
         }
         if (null===$address) { throw new RuntimeException('N18 explicit checkout address unavailable.'); }
+        foreach (['country','state','city','postcode','address','address_2'] as $field) {
+            if (($loaded['customer_destination'][$field]??null)!==$address[$field]) { throw new RuntimeException('N18 original draft checkout destination differs.'); }
+        }
         return $address;
     }
     /** Native create_order CRUD and production C07, deliberately ending before any gateway. */

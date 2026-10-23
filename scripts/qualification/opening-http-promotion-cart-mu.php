@@ -23,12 +23,16 @@ function cetech_n18_placement_failure(Throwable $error): array {
     $class=get_class($error);
     $classes=['Exception','RuntimeException','LogicException','InvalidArgumentException','UnexpectedValueException','Error','TypeError','ParseError','OtherError'];
     $endpoint=$GLOBALS['cetech_n18_checkout_endpoint_verified']??null;
+    $callback_status=$GLOBALS['cetech_n18_callback_status']??'not_installed';
+    $callback_status=in_array($callback_status,['not_installed','installed','entered','completed','threw'],true)?$callback_status:'not_installed';
     return ['format'=>'cetech-n18-placement-failure-v1','phase'=>$phase,'kind'=>$wp_error?'wp_error':'throwable',
         // Woo returns only WP_Error and discards the original caught exception.
         'error_class'=>$wp_error?null:(in_array($class,$classes,true)?$class:'OtherError'),
         'checkout_exception_observed'=>true===($GLOBALS['cetech_n18_checkout_exception_observed']??false),
         'tracked_native_order'=>cetech_n18_placement_tracked_order($GLOBALS['cetech_n18_created_order']??null),
-        'checkout_endpoint_verified'=>is_bool($endpoint)?$endpoint:null];
+        'checkout_endpoint_verified'=>is_bool($endpoint)?$endpoint:null,
+        'callback_status'=>$callback_status,
+        'callback_observation'=>function_exists('cetech_n18_closed_callback_observation')?cetech_n18_closed_callback_observation($GLOBALS['cetech_n18_callback_observation']??null):null];
 }
 
 if ( '1' !== getenv( 'CETECH_DE_HTTP_OPENING_QUALIFICATION' ) || '1' !== getenv( 'CETECH_DE_NATIVE_OPENING_QUALIFICATION' ) ) { return; }
@@ -74,14 +78,21 @@ add_action( 'template_redirect', static function (): void {
 		if ('POST'!==($_SERVER['REQUEST_METHOD']??'')||!is_string($_POST['nonce']??null)||!wp_verify_nonce($_POST['nonce'],'cetech_q05_fixture')) { wp_send_json_error(['code'=>'fixture_nonce'],403); }
 		$GLOBALS['cetech_n18_placement_phase']='entry'; $GLOBALS['cetech_n18_placement_wp_error_returned']=false;
 		$GLOBALS['cetech_n18_checkout_endpoint_verified']=null; $GLOBALS['cetech_n18_checkout_exception_observed']=false;
+		$GLOBALS['cetech_n18_callback_observation']=null;
+		$GLOBALS['cetech_n18_callback_status']='not_installed';
 		add_action('woocommerce_checkout_order_exception','cetech_n18_observe_checkout_exception',PHP_INT_MAX,1);
-		$failure=null;
+		$failure=null; $restore_callback=null;
 		try {
 			WC()->cart->get_cart(); get_option('woocommerce_currency'); get_option('woocommerce_price_num_decimals'); wp_salt('auth');
+			$observer=dirname((string)getenv('CETECH_DE_HTTP_N18_SUPPORT')).'/opening-http-promotion-placement-observer.php';
+			if (!is_file($observer)||is_link($observer)) { throw new RuntimeException('N18 native callback observation unavailable.'); }
+			require_once $observer;
+			$restore_callback=cetech_n18_install_stage_callback_observer();
 			$result=CetechPromotionCartHttpFixture::place($wpdb,$state);
 		} catch (Throwable $error) {
 			$failure=cetech_n18_placement_failure($error);
 		} finally {
+			if ($restore_callback instanceof Closure) { $restore_callback(); }
 			remove_action('woocommerce_checkout_order_exception','cetech_n18_observe_checkout_exception',PHP_INT_MAX);
 		}
 		if (null!==$failure) { wp_send_json_error(['cetech_n18_placement_failure'=>$failure],503); return; }

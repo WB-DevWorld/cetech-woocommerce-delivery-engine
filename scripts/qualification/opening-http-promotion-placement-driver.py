@@ -46,6 +46,41 @@ PLACEMENT_ERROR_CLASSES = frozenset((
     "Exception", "RuntimeException", "LogicException", "InvalidArgumentException", "UnexpectedValueException",
     "Error", "TypeError", "ParseError", "OtherError",
 ))
+CALLBACK_STATUSES = frozenset(("not_installed", "installed", "entered", "completed", "threw"))
+CALLBACK_GUARD_SITES = frozenset((
+    "unknown", "stage_authorization", "existing_stage", "saved_history", "saved_resume", "saved_inputs", "saved_bind",
+    "current_bundle", "original_bind", "fresh_bundle", "native_capture", "bind_identity", "bind_ack", "verify_capture",
+    "verify_ack", "local_binding", "bundle_shape", "native_coordinate", "native_pointer", "native_session",
+    "stage_input", "stage_actor", "stage_status", "stage_selection", "stage_native", "stage_write_guard",
+    "plan_accepted", "plan_tax_source", "plan_draft", "plan_reference", "plan_currency", "plan_destination",
+    "plan_shipping_method", "plan_shipping_terms", "plan_shipping_tax_map", "plan_shipping_tax",
+    "plan_shipping_totals", "plan_line_mapping", "plan_line_context", "plan_line_destination",
+))
+# Declared synthetic setup only, pinned by its pure test to the actual per-line
+# CetechNativeQuoteProviderFixture::cart declaration. Never merchant defaults.
+FIXTURE_CHECKOUT_ADDRESS = {
+    "country": "GH", "state": "AA", "city": "Accra", "postcode": "00001",
+    "address_1": "PRIVATE-Q04-NATIVE-FIXTURE-ADDRESS", "address_2": "",
+}
+
+
+def setup_native_customer(client, state, nonce):
+    response = client.json_post(state["store_customer_url"], {
+        "billing_address": dict(FIXTURE_CHECKOUT_ADDRESS),
+        "shipping_address": dict(FIXTURE_CHECKOUT_ADDRESS),
+    }, {"Nonce": nonce})
+    try:
+        payload = json.loads(response.body)
+        valid = response.status == 200 and isinstance(payload, dict)
+        for kind in ("billing_address", "shipping_address"):
+            address = payload.get(kind) if isinstance(payload, dict) else None
+            valid = valid and isinstance(address, dict) and all(type(address.get(field)) is str and address[field] == expected for field, expected in FIXTURE_CHECKOUT_ADDRESS.items())
+        facts = payload.get("extensions", {}).get("cetech-delivery-quote-review") if isinstance(payload, dict) and isinstance(payload.get("extensions"), dict) else None
+        valid = valid and public.safe_facts(facts) and facts["status"] == "no_quote" and facts["quote"] is None
+    except (ValueError, TypeError, UnicodeError, RecursionError):
+        valid = False
+    if not valid:
+        raise RuntimeError("N18 native customer setup did not echo the declared fixture address")
 
 
 def placement_failure_observation(response):
@@ -73,7 +108,7 @@ def placement_failure_observation(response):
         if not public.exact(packet, ("success", "data")) or packet["success"] is not False or not public.exact(packet["data"], ("cetech_n18_placement_failure",)):
             return result
         value = packet["data"]["cetech_n18_placement_failure"]
-        keys = ("format", "phase", "kind", "error_class", "checkout_exception_observed", "tracked_native_order", "checkout_endpoint_verified")
+        keys = ("format", "phase", "kind", "error_class", "checkout_exception_observed", "tracked_native_order", "checkout_endpoint_verified", "callback_status", "callback_observation")
         if not public.exact(value, keys) or value["format"] != "cetech-n18-placement-failure-v1" or value["phase"] not in PLACEMENT_PHASES or value["kind"] not in ("wp_error", "throwable"):
             return result
         if any(type(value[key]) is not bool for key in ("checkout_exception_observed", "tracked_native_order")) or (value["checkout_endpoint_verified"] is not None and type(value["checkout_endpoint_verified"]) is not bool):
@@ -82,6 +117,13 @@ def placement_failure_observation(response):
             if value["error_class"] is not None or value["phase"] != "create_order_wp_error":
                 return result
         elif value["error_class"] not in PLACEMENT_ERROR_CLASSES:
+            return result
+        if value["callback_status"] not in CALLBACK_STATUSES:
+            return result
+        callback = value["callback_observation"]
+        if callback is not None and (not public.exact(callback, ("format", "error_class", "cause_class", "guard_site"))
+                or callback["format"] != "cetech-n18-stage-classic-failure-v1" or callback["error_class"] not in PLACEMENT_ERROR_CLASSES
+                or callback["cause_class"] not in PLACEMENT_ERROR_CLASSES or callback["guard_site"] not in CALLBACK_GUARD_SITES):
             return result
         result.update(packet_valid=True, observation={key: value[key] for key in keys})
     except (ValueError, TypeError, KeyError, UnicodeError, RecursionError):
@@ -159,6 +201,12 @@ def run(client, state, recorder):
     before = inspection()
     if before["facts"]["status"] != "no_quote":
         raise RuntimeError("N18 placement requires its own fresh native session")
+    stage("native_customer_setup")
+    setup_native_customer(client, state, before["store_nonce"])
+    configured = inspection()
+    if not same_history(before, configured) or configured["facts"]["status"] != "no_quote" or configured["owner_digest"] != before["owner_digest"] or configured["native_session_key_digest"] != before["native_session_key_digest"]:
+        raise RuntimeError("N18 native customer setup changed quote history or session ownership")
+    before = configured
     stage("native_refresh")
     refresh = client.post(state["classic_url"], {"_wpnonce": before["review_nonce"], "action": "refresh", "generation": "0", "review_token": str(uuid.uuid4())})
     packet = decoded(refresh)

@@ -32,6 +32,7 @@ PRODUCERS = (
     "scripts/qualification/promotion-cart-browser.cjs",
     "scripts/qualification/promotion-cart-cleanup-diagnostic.py",
     "scripts/qualification/opening-http-promotion-placement-driver.py",
+    "scripts/qualification/opening-http-promotion-placement-observer.php",
     "scripts/qualification/verify-opening-promotion-cart.py",
     "scripts/qualification/verify-quote-placement-receipts.py",
     "scripts/qualification/opening-http-driver.py",
