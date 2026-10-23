@@ -130,6 +130,7 @@ jobs:
           python3 scripts/qualification/test-opening-promise-native-configuration-browser.py
           python3 scripts/qualification/test-verify-opening-promise-native-configuration.py
           python3 scripts/qualification/test-native-payment-transport-diagnostic.py
+          python3 scripts/qualification/test-promotion-cart-cleanup-diagnostic.py
           python3 scripts/qualification/test-promise-qualification-package.py
           python3 scripts/qualification/test-verify-promise-operational-lifecycle-receipts.py
           python3 scripts/qualification/test-verify-promise-qualification-bounds.py
