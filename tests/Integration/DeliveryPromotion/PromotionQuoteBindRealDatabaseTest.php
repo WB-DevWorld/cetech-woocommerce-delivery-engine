@@ -84,13 +84,13 @@ final class PromotionQuoteBindRealDatabaseTest extends TestCase {
 		$bytes = file_get_contents( $file ); if ( ! is_string( $bytes ) || strlen( $bytes ) > 1024 ) { return $status; }
 		try { $row = json_decode( $bytes, true, 3, JSON_THROW_ON_ERROR ); } catch ( \Throwable ) { return $status; }
 		if ( ! is_array( $row ) || array_keys( $row ) !== [ 'phase', 'state', 'exception_class' ] ) { return $status; }
-		$phases = [ 'bootstrap', 'recovery', 'source_open', 'source_capture', 'source_cleanup', 'configured', 'running', 'namespace_reservation', 'namespace_lock', 'control_lock', 'publication_dispatched', 'account_lock', 'order_lock', 'quote_lock', 'binding_lock', 'effect_held', 'effect_released', 'cleanup' ];
+		$phases = [ 'bootstrap', 'recovery', 'source_open', 'source_capture', 'source_cleanup', 'configured', 'running', 'namespace_reservation', 'reservation_held', 'reservation_released', 'namespace_lock', 'control_lock', 'publication_dispatched', 'account_lock', 'order_lock', 'quote_lock', 'binding_lock', 'effect_held', 'effect_released', 'cleanup' ];
 		$states = [ 'running', 'accepted', 'rejected', 'unconfirmed', 'not_applicable', 'failed' ];
 		$classes = [ 'none', 'RuntimeException', 'InvalidArgumentException', 'LogicException', 'TypeError', 'ErrorException', 'Error', 'Exception', 'Throwable' ];
 		if ( in_array( $row['phase'], $phases, true ) && in_array( $row['state'], $states, true ) && in_array( $row['exception_class'], $classes, true ) ) { return $row; } return $status;
 	}
 	private function wait_for_bind_marker( string $directory, string $marker, string $role, float $seconds ): void {
-		if ( ! in_array( [ $marker, $role ], [ [ 'left-held', 'left' ], [ 'right-dispatched', 'right' ] ], true ) || 20.0 !== $seconds ) { throw new \LogicException( 'Owned E13 barrier descriptor refused.' ); }
+		if ( ! in_array( [ $marker, $role ], [ [ 'left-held', 'left' ], [ 'right-reserved', 'right' ], [ 'right-dispatched', 'right' ] ], true ) || 20.0 !== $seconds ) { throw new \LogicException( 'Owned E13 barrier descriptor refused.' ); }
 		$end = microtime( true ) + $seconds;
 		do {
 			clearstatcache( true, $directory . '/' . $marker ); if ( is_file( $directory . '/' . $marker ) ) { return; }
@@ -119,8 +119,11 @@ final class PromotionQuoteBindRealDatabaseTest extends TestCase {
 	public function test_two_actual_processes_competing_for_one_quote_make_only_one_binding(): void {
 		$accepted = $this->seed(); $left_command = $this->command( $accepted, 2001 ); $right_command = $this->command( $accepted, 2002 ); $protected = $this->protected_bytes();
 		$left_file = $this->command_file( $left_command, name: 'bind-left.json' ); $directory = dirname( $left_file ); $right_file = $this->command_file( $right_command, $directory, 'bind-right.json' );
+		// Commit the genuine right namespace before holding the left effect. This test targets
+		// current-publication serialization, so unrelated initial INSERT contention is outside its barrier.
+		$right = $this->worker( $right_file, 'bind', 'right' ); $this->wait_for_bind_marker( $directory, 'right-reserved', 'right', 20.0 ); $reserved = json_decode( (string) file_get_contents( $directory . '/right-reserved' ), true, 4, JSON_THROW_ON_ERROR ); self::assertFalse( $reserved['in_transaction'] ); self::assertTrue( $reserved['autocommit'] );
 		$left = $this->worker( $left_file, 'bind', 'left' ); $this->wait_for_bind_marker( $directory, 'left-held', 'left', 20.0 ); $held = json_decode( (string) file_get_contents( $directory . '/left-held' ), true, 4, JSON_THROW_ON_ERROR );
-		$right = $this->worker( $right_file, 'bind', 'right' ); $this->wait_for_bind_marker( $directory, 'right-dispatched', 'right', 20.0 ); $waiter = json_decode( (string) file_get_contents( $directory . '/right-dispatched' ), true, 4, JSON_THROW_ON_ERROR ); $this->wait_for_publication_wait( $waiter['connection_id'], $held['connection_id'] ); OperationProofBarrier::signal( $directory . '/release' );
+		OperationProofBarrier::signal( $directory . '/right-start-effect' ); $this->wait_for_bind_marker( $directory, 'right-dispatched', 'right', 20.0 ); $waiter = json_decode( (string) file_get_contents( $directory . '/right-dispatched' ), true, 4, JSON_THROW_ON_ERROR ); self::assertSame( $reserved['connection_id'], $waiter['connection_id'] ); $this->wait_for_publication_wait( $waiter['connection_id'], $held['connection_id'] ); OperationProofBarrier::signal( $directory . '/release' );
 		$a = $left->finish(); $b = $right->finish(); self::assertNotSame( getmypid(), $a['process_id'] ); self::assertNotSame( $a['process_id'], $b['process_id'] ); self::assertSame( 'accepted', $a['state'] ); self::assertSame( 'rejected', $b['state'] ); self::assertSame( 1, $a['binding_inserts'] + $b['binding_inserts'] ); self::assertSame( 0, $a['protected_writes'] + $b['protected_writes'] ); self::assertSame( 1, $a['native_input_reads'] ); self::assertSame( 1, $b['native_input_reads'] ); self::assertCount( 1, $this->rows( 'delivery_quote_bindings' ) ); self::assertCount( 3, $this->rows( 'operation_changes' ) ); self::assertSame( $protected, $this->protected_bytes() );
 	}
 	public function test_distinct_quotes_cannot_duplicate_a_placement_or_order_manifest(): void {
