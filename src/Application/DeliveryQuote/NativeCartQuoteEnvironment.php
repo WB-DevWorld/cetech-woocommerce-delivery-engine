@@ -8,19 +8,21 @@ use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteOwner;
 use CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory;
 
 /** Native loaded draft first; all source/product/tax work belongs to the admitted preparation. */
-final class NativeCartQuoteEnvironment implements CartQuoteProfileEnvironment {
+final class NativeCartQuoteEnvironment implements FixedPromotionCartQuoteEnvironment {
 	private NativeCartQuotePreparation $preparation;
 	private QuotePreparationAccess $current_access;
 	private ?CartQuoteRateProjection $rate_projection = null;
 	private bool $preparation_configured;
 	private bool $preparation_started = false;
 	private ?\Closure $profile_selector;
-	public function __construct( OperationConnectionFactory $factory, ?QuotePreparationAccess $current_access = null, ?NativeCartQuotePreparation $preparation = null, ?callable $profile_selector = null ) { $this->preparation = $preparation ?? new NativeCartQuotePreparation( $factory ); $this->preparation_configured = null !== $preparation; $this->current_access = $current_access ?? new NativeQuotePreparationAccess( $factory ); $this->profile_selector = null === $profile_selector ? null : \Closure::fromCallable( $profile_selector ); }
+	private ?\Closure $promotion_abort = null;
+	private ?QuoteOwner $promotion_abort_owner = null;
+	public function __construct( private OperationConnectionFactory $factory, ?QuotePreparationAccess $current_access = null, ?NativeCartQuotePreparation $preparation = null, ?callable $profile_selector = null ) { $this->preparation = $preparation ?? new NativeCartQuotePreparation( $factory ); $this->preparation_configured = null !== $preparation; $this->current_access = $current_access ?? new NativeQuotePreparationAccess( $factory ); $this->profile_selector = null === $profile_selector ? null : \Closure::fromCallable( $profile_selector ); }
 	/** One bootstrap handoff breaks native authorization construction cycles before any capture starts. */
 	public function set_preparation( NativeCartQuotePreparation $preparation ): void { if ( $this->preparation_started || $this->preparation_configured ) { throw new \LogicException( 'Native promise preparation is already configured.' ); } $this->preparation = $preparation; $this->preparation_configured = true; }
 	public function profile(): string {
 		$profile = null === $this->profile_selector ? LegacyFixedBaseQuoteProvider::CODE : ( $this->profile_selector )();
-		if ( ! is_string( $profile ) || ! in_array( $profile, [ LegacyFixedBaseQuoteProvider::CODE, ServicePromiseQuoteProvider::PROFILE ], true ) ) { self::fail(); }
+		if ( ! is_string( $profile ) || ! in_array( $profile, [ LegacyFixedBaseQuoteProvider::CODE, ServicePromiseQuoteProvider::PROFILE, FixedPromotionQuoteProvider::CODE ], true ) ) { self::fail(); }
 		return $profile;
 	}
 	/** Trusted composition only; replacement cannot change a captured native lifecycle. */
@@ -50,6 +52,7 @@ final class NativeCartQuoteEnvironment implements CartQuoteProfileEnvironment {
 	}
 	public function prepare_at( QuoteCartDraft $draft, \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime $original_issued_at ): LegacyQuotePreparedCapture {
 		$profile = $this->profile();
+		if ( FixedPromotionQuoteProvider::CODE === $profile ) { self::fail(); }
 		$this->preparation_started = true;
 		if ( ! $this->same_draft( $draft ) || ! $this->authorize( $draft->owner(), 'delivery_quote.issue' ) ) { self::fail(); }
 		// The caller already owns the early preparation lease. Native totals are never
@@ -58,6 +61,38 @@ final class NativeCartQuoteEnvironment implements CartQuoteProfileEnvironment {
 		if ( ! $this->same_draft( $draft ) ) { self::fail(); }
 		$prepared = $this->preparation->prepare( $draft, $profile, $original_issued_at );
 		if ( ! $this->same_draft( $draft ) || ! $this->authorize( $draft->owner(), 'delivery_quote.issue' ) ) { self::fail(); } return $prepared;
+	}
+	public function prepare_promotion_at( QuoteCartDraft $draft, \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteTime $original_issued_at ): FixedPromotionNativeCartPreparedCapture {
+		$this->preparation_started = true;
+		$unchanged = fn(): bool => FixedPromotionQuoteProvider::CODE === $this->profile() && $this->same_draft( $draft ) && $this->authorize( $draft->owner(), 'delivery_quote.issue' );
+		if ( ! $unchanged() ) { self::fail(); }
+		$this->promotion_abort = NativeCartQuoteShipping::promotion_failure_cleanup();
+		$this->promotion_abort_owner = $draft->owner();
+		// Both base and promoted calculations must visit the actual native method;
+		// an earlier quoted packet must not be mistaken for a fresh base amount.
+		try {
+			NativeCartQuoteShipping::prepare_promotion_after_admission();
+			if ( ! $unchanged() ) { self::fail(); }
+			$prepared = $this->preparation->prepare_promotion( $draft, $original_issued_at, $unchanged );
+			if ( ! $unchanged() || ! $prepared->owner()->equals( $draft->owner() ) ) { self::fail(); } return $prepared;
+		} catch ( \Throwable $error ) { $this->abort_promotion(); throw $error; }
+	}
+	public function abort_promotion(): void {
+		if ( null === $this->promotion_abort ) {
+			$draft = $this->draft(); if ( null === $draft || ! $this->authorize( $draft->owner(), 'delivery_quote.session' ) ) { self::fail(); }
+			$this->promotion_abort = NativeCartQuoteShipping::promotion_failure_cleanup(); $this->promotion_abort_owner = $draft->owner();
+		}
+		$expected = ( $this->promotion_abort )(); NativeCartQuoteShipping::acknowledge_promotion_cleanup( $this->factory, $this->promotion_abort_owner, $expected );
+	}
+	public function promotion_inputs( QuoteIssueCommand $original, QuoteCartDraft $draft ): ?FixedPromotionQuoteAcceptInputs {
+		try {
+			if ( FixedPromotionQuoteProvider::CODE !== $this->profile() || ! $this->same_draft( $draft ) || ! $this->preparation->matches_promotion_original( $original, $draft ) || ! $this->authorize( $draft->owner(), 'delivery_quote.read' ) ) { return null; }
+			$revision = $this->current_access->observe( $draft->owner() ); if ( null === $revision ) { return null; }
+			NativeCartQuoteShipping::restore_cached_calculation();
+			$this->rate_projection?->project_loaded_rates();
+			$inputs = $this->preparation->promotion_inputs( $original, $draft );
+			return null !== $inputs && $this->same_draft( $draft ) && FixedPromotionQuoteProvider::CODE === $this->profile() && $this->authorize( $draft->owner(), 'delivery_quote.read' ) && $this->current_access->confirm( $draft->owner(), $revision ) ? $inputs : null;
+		} catch ( \Throwable ) { return null; }
 	}
 	public function evidence( QuoteIssueCommand $original, QuoteHeader $header, QuoteCartDraft $draft ): ?QuoteCartCurrentEvidence {
 		try {

@@ -15,7 +15,9 @@ use CetechDeliveryEngine\Infrastructure\Persistence\EmergencyControlStore;
 
 /** Explicit mounted cart review. No passive issuance, acceptance, snapshot writer or placement. */
 final class CartQuoteService implements CartQuoteReviewService {
-	public function __construct( private CartQuoteEnvironment $environment, private QuotePreparationGate $gate, private CartQuoteSessionStore $sessions, private OperationConnectionFactory $factory, private ?OperationReadiness $readiness = null, private ?OperationPhaseObserver $observer = null, private ?EmergencyControlStore $control = null, private ?QuotePrivatePublication $publication = null ) {}
+	private ?\Closure $promotion_issuer;
+	/** Promotion services are explicit capabilities; their absence leaves the reader-first lane closed. */
+	public function __construct( private CartQuoteEnvironment $environment, private QuotePreparationGate $gate, private CartQuoteSessionStore $sessions, private OperationConnectionFactory $factory, private ?OperationReadiness $readiness = null, private ?OperationPhaseObserver $observer = null, private ?EmergencyControlStore $control = null, private ?QuotePrivatePublication $publication = null, ?callable $promotion_issuer = null, private ?FixedPromotionQuoteAcceptService $promotion_accept = null, private ?FixedPromotionQuotePlacementEvidenceReader $promotion_reader = null ) { $this->promotion_issuer = null === $promotion_issuer ? null : \Closure::fromCallable( $promotion_issuer ); }
 	public function current( RequestContext $request ): CartQuoteResult {
 		try {
 			$draft = $this->draft(); if ( null === $draft ) { return $this->result( 'no_quote', 0, $request ); }
@@ -24,7 +26,7 @@ final class CartQuoteService implements CartQuoteReviewService {
 		} catch ( \Throwable ) { return $this->result( 'unavailable', 0, $request ); }
 	}
 	public function refresh( string $original_token, int $expected_generation, RequestContext $request ): CartQuoteResult {
-		$envelope = null; $lease = null; $handoff = false; $preparation = null;
+		$envelope = null; $lease = null; $handoff = false; $preparation = null; $prepared = null;
 		try {
 			QuoteId::from_string( $original_token ); $this->generation( $expected_generation );
 			$draft = $this->draft(); if ( null === $draft || ! $this->environment->authorize( $draft->owner(), 'delivery_quote.issue' ) ) { return $this->result( 'unavailable', 0, $request ); }
@@ -36,8 +38,8 @@ final class CartQuoteService implements CartQuoteReviewService {
 			if ( ( $old?->generation() ?? 0 ) !== $expected_generation ) { return $this->result( 'changed', $old?->generation() ?? 0, $request, refresh: ! ( $old?->pending() ?? false ) ); }
 			if ( null !== $old && $old->pending() ) { return $this->result( 'unconfirmed', $old->generation(), $request, retry: true ); }
 			$profile = $this->environment instanceof CartQuoteProfileEnvironment ? $this->environment->profile() : LegacyFixedBaseQuoteProvider::CODE;
-			if ( ! in_array( $profile, [ LegacyFixedBaseQuoteProvider::CODE, ServicePromiseQuoteProvider::PROFILE ], true ) ) { throw new \RuntimeException( 'Unsupported quote preparation profile.' ); }
-			$preparation = QuotePreparationCommand::create( $draft->owner(), $draft->draft_digest(), $original_token, LegacyFixedBaseQuoteProvider::CODE, 1, $profile, 1 );
+			if ( ! in_array( $profile, [ LegacyFixedBaseQuoteProvider::CODE, ServicePromiseQuoteProvider::PROFILE, FixedPromotionQuoteProvider::CODE ], true ) || ( FixedPromotionQuoteProvider::CODE === $profile && ! $this->promotion_ready() ) ) { throw new \RuntimeException( 'Unsupported quote preparation profile.' ); }
+			$preparation = FixedPromotionQuoteProvider::CODE === $profile ? QuotePreparationCommand::fixed_promotion( $draft->owner(), $draft->draft_digest(), $original_token ) : QuotePreparationCommand::create( $draft->owner(), $draft->draft_digest(), $original_token, LegacyFixedBaseQuoteProvider::CODE, 1, $profile, 1 );
 			$envelope = CartQuoteSessionEnvelope::begin( $preparation, $expected_generation + 1, $this->sessions->expires_at( $draft->owner() ) );
 			if ( ! $this->sessions->compare_and_swap( $draft->owner(), $old, $envelope ) ) { return $this->result( 'unconfirmed', $envelope->generation(), $request, retry: true ); }
 			$attempt = QuotePreparationAttempt::generate(); $gate = $this->gate->admit( $preparation, $attempt );
@@ -47,13 +49,20 @@ final class CartQuoteService implements CartQuoteReviewService {
 				return $this->result( 'unconfirmed', $envelope->generation(), $request, retry: true );
 			}
 			$lease = $gate->lease; if ( ! $lease->claim_preparation() ) { return $this->result( 'unconfirmed', $envelope->generation(), $request, retry: true ); }
-			$prepared = $this->environment instanceof CartQuoteProfileEnvironment ? $this->environment->prepare_at( $draft, $lease->created_at() ) : $this->environment->prepare( $draft );
+			$prepared = FixedPromotionQuoteProvider::CODE === $profile ? $this->environment->prepare_promotion_at( $draft, $lease->created_at() ) : ( $this->environment instanceof CartQuoteProfileEnvironment ? $this->environment->prepare_at( $draft, $lease->created_at() ) : $this->environment->prepare( $draft ) );
 			$fresh = $this->draft(); if ( null === $fresh || ! $draft->owner()->equals( $fresh->owner() ) || ! hash_equals( $draft->draft_digest(), $fresh->draft_digest() ) || ! $prepared->owner()->equals( $draft->owner() ) || ! $this->environment->authorize( $draft->owner(), 'delivery_quote.issue' ) ) { throw new \RuntimeException( 'Cart quote preparation unavailable.' ); }
-			$command = $prepared->command( $original_token ); $admission = $lease->bind_issue( $command ); $handoff = true;
+			$command = $prepared->command( $original_token );
+			$promotion_issuer = $prepared instanceof FixedPromotionNativeCartPreparedCapture ? $this->promotion_issue_service( $prepared->registry() ) : null;
+			$admission = $lease->bind_issue( $command ); $handoff = true;
+			if ( $prepared instanceof FixedPromotionNativeCartPreparedCapture ) {
+				$result = $promotion_issuer->issue_admitted( $command, $admission, $prepared->issue_inputs(), $request, function ( FixedPromotionQuoteIssueCommand $captured ) use ( &$envelope ): bool { $staged = $envelope->stage_promotion( $captured ); if ( ! $this->sessions->compare_and_swap( $envelope->owner(), $envelope, $staged ) ) { return false; } $envelope = $staged; return true; } );
+				return $this->finish( $result, $envelope, $fresh, $request, false );
+			}
 			$durable = $this->durable( $prepared->registry(), $prepared->guard() );
 			$result = $durable->issue_admitted( $command, $admission, $request, function ( QuoteDurableCommand $captured ) use ( &$envelope ): bool { $staged = $envelope->stage( $captured ); if ( ! $this->sessions->compare_and_swap( $envelope->owner(), $envelope, $staged ) ) { return false; } $envelope = $staged; return true; } );
 			return $this->finish( $result, $envelope, $fresh, $request, false );
 		} catch ( \Throwable ) {
+			if ( ! $handoff && $prepared instanceof FixedPromotionNativeCartPreparedCapture ) { try { $this->environment->abort_promotion(); } catch ( \Throwable ) { return $this->result( 'unconfirmed', $envelope?->generation() ?? 0, $request, retry: true ); } }
 			if ( null !== $envelope && ! $handoff && null !== $lease && null !== $preparation ) { try { $terminated = $this->gate->terminate( $preparation, $lease ); if ( 'denied' === $terminated->status && $this->fail( $envelope ) ) { return $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ); } } catch ( \Throwable ) {} }
 			return $this->result( null === $envelope ? 'unavailable' : 'unconfirmed', $envelope?->generation() ?? 0, $request, retry: null !== $envelope );
 		}
@@ -67,6 +76,7 @@ final class CartQuoteService implements CartQuoteReviewService {
 			if ( 'issued' !== $envelope->phase() || $envelope->preparation()->draft_digest() !== $draft->draft_digest() || ! $this->environment->authorize( $draft->owner(), 'delivery_quote.accept' ) ) { return $this->result( 'changed', $envelope->generation(), $request, refresh: true ); }
 			$original = $envelope->original_issue(); $header = $envelope->header(); $reference = $envelope->reference();
 			if ( null === $original || null === $header || null === $reference ) { return $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ); }
+			if ( null !== $envelope->promotion_issue() ) { return $this->confirm_promotion( $draft, $envelope, $request ); }
 			$evidence = $this->environment->evidence( $original, $header, $draft ); if ( null === $evidence ) { return $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ); }
 			$durable = $this->durable( new QuoteProviderRegistry(), $evidence->guard );
 			$read = $durable->current( $draft->owner(), $reference, $evidence->current_context, $request );
@@ -80,13 +90,30 @@ final class CartQuoteService implements CartQuoteReviewService {
 			$this->generation( $expected_generation ); $draft = $this->draft(); if ( null === $draft ) { return $this->result( 'unavailable', 0, $request ); } $envelope = $this->sessions->load( $draft->owner() );
 			if ( null === $envelope || $envelope->generation() !== $expected_generation ) { return $this->result( 'changed', $envelope?->generation() ?? 0, $request, refresh: ! ( $envelope?->pending() ?? false ) ); }
 			if ( ! $envelope->pending() ) { return $this->read( $draft, $envelope, $request ); }
-			if ( 'preparing' === $envelope->phase() ) { $gate = $this->gate->reconcile( $envelope->preparation() ); if ( 'denied' === $gate->status && $this->fail( $envelope ) ) { return $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ); } return $this->result( 'unconfirmed', $envelope->generation(), $request, retry: true ); }
+			if ( 'preparing' === $envelope->phase() ) {
+				$gate = $this->gate->reconcile( $envelope->preparation() );
+				if ( 'denied' === $gate->status ) {
+					if ( FixedPromotionQuoteProvider::CODE === $envelope->preparation()->profile() && $this->environment instanceof FixedPromotionCartQuoteEnvironment ) { $this->environment->abort_promotion(); }
+					if ( $this->fail( $envelope ) ) { return $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ); }
+				}
+				return $this->result( 'unconfirmed', $envelope->generation(), $request, retry: true );
+			}
 			$original = $envelope->original_issue(); $header = $envelope->header(); $reference = $envelope->reference(); if ( null === $original || null === $header || null === $reference ) { return $this->result( 'unconfirmed', $envelope->generation(), $request, retry: true ); }
 			if ( 'staged' === $envelope->phase() ) {
 				$admission = $this->gate->reconcile( $envelope->preparation() );
 				// A lost staging acknowledgement sent no C03 effect. Expired current grant closure
 				// also fences every possible late effect; a consumed grant is reconciled below.
-				if ( 'denied' === $admission->status && 'lease_terminated' === $admission->reason && $this->fail( $envelope ) ) { return $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ); }
+				if ( 'denied' === $admission->status && 'lease_terminated' === $admission->reason ) {
+					if ( null !== $envelope->promotion_issue() && $this->environment instanceof FixedPromotionCartQuoteEnvironment ) { $this->environment->abort_promotion(); }
+					if ( $this->fail( $envelope ) ) { return $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ); }
+				}
+			}
+			if ( null !== $envelope->promotion_issue() ) {
+				if ( ! $this->promotion_ready() ) { return $this->result( 'unconfirmed', $envelope->generation(), $request, retry: true ); }
+				$accept = 'accepting' === $envelope->phase(); $issue = $envelope->promotion_issue();
+				// Recovery observes the original C03 history only; it never creates a new hold or acceptance.
+				$result = $accept ? $this->promotion_accept->reconcile( FixedPromotionQuoteAcceptCommand::from_issue( $issue ), $request ) : $this->promotion_issue_service( new QuoteProviderRegistry() )->reconcile( $issue, $request );
+				return $this->finish( $result, $envelope, $draft, $request, $accept );
 			}
 			$evidence = $this->environment->evidence( $original, $header, $draft ); $durable = $this->durable( new QuoteProviderRegistry(), $evidence?->guard );
 			$accept = 'accepting' === $envelope->phase();
@@ -97,25 +124,63 @@ final class CartQuoteService implements CartQuoteReviewService {
 			return $this->finish( $result, $envelope, $draft, $request, $accept );
 		} catch ( \Throwable ) { return $this->result( 'unconfirmed', $this->safe_generation( $expected_generation ), $request, retry: true ); }
 	}
+	/** Private same-request accepted observations; no session or browser command export. */
+	public function promotion_placement( RequestContext $request ): ?array {
+		try {
+			if ( ! $this->promotion_ready() ) { return null; }
+			$draft = $this->draft(); if ( null === $draft || ! $this->environment->authorize( $draft->owner(), 'delivery_quote.bind' ) ) { return null; }
+			$envelope = $this->sessions->load( $draft->owner() );
+			if ( null === $envelope || 'confirmed' !== $envelope->phase() || ! $envelope->owner()->equals( $draft->owner() ) || ! hash_equals( $envelope->preparation()->draft_digest(), $draft->draft_digest() ) ) { return null; }
+			$issue = $envelope->promotion_issue(); if ( null === $issue ) { return null; }
+			$inputs = $this->environment->promotion_inputs( $issue->original_issue(), $draft ); if ( null === $inputs ) { return null; }
+			$read = $this->promotion_reader->current( FixedPromotionQuoteAcceptCommand::from_issue( $issue ), $inputs, $request );
+			if ( 'ready' !== $read->status || null === $read->evidence || ! $this->environment->authorize( $draft->owner(), 'delivery_quote.bind' ) ) { return null; }
+			return [ 'evidence' => $read->evidence, 'inputs' => $inputs, 'draft' => $draft, 'tax_source' => $inputs->fresh_native()->native_receipt()->tax_source() ];
+		} catch ( \Throwable ) { return null; }
+	}
 	private function read( QuoteCartDraft $draft, CartQuoteSessionEnvelope $envelope, RequestContext $request ): CartQuoteResult {
 		if ( $envelope->pending() ) { return $this->result( 'unconfirmed', $envelope->generation(), $request, retry: true ); }
 		if ( 'failed' === $envelope->phase() ) { return $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ); }
 		if ( ! $envelope->owner()->equals( $draft->owner() ) || ! $this->environment->authorize( $draft->owner(), 'delivery_quote.read' ) ) { return $this->result( 'unavailable', $envelope->generation(), $request ); }
 		if ( $envelope->preparation()->draft_digest() !== $draft->draft_digest() ) { return $this->result( 'changed', $envelope->generation(), $request, refresh: true ); }
 		$original = $envelope->original_issue(); $header = $envelope->header(); $reference = $envelope->reference(); if ( null === $original || null === $header || null === $reference ) { return $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ); }
+		if ( null !== $envelope->promotion_issue() ) { return $this->read_promotion( $draft, $envelope, $request ); }
 		$evidence = $this->environment->evidence( $original, $header, $draft ); if ( null === $evidence ) { return $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ); }
 		$read = $this->durable( new QuoteProviderRegistry(), $evidence->guard )->current( $draft->owner(), $reference, $evidence->current_context, $request );
 		if ( 'ready' !== $read->status || null === $read->quote || ! $this->environment->authorize( $draft->owner(), 'delivery_quote.read' ) ) { return $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ); }
 		return $this->project( $read->quote, $read->reason, $envelope, $request, $read->evaluated_at );
 	}
-	private function finish( QuoteDurableResult $result, CartQuoteSessionEnvelope $envelope, QuoteCartDraft $draft, RequestContext $request, bool $accept ): CartQuoteResult {
+	private function finish( QuoteDurableResult|FixedPromotionQuoteIssueResult|FixedPromotionQuoteAcceptResult $result, CartQuoteSessionEnvelope $envelope, QuoteCartDraft $draft, RequestContext $request, bool $accept ): CartQuoteResult {
 		if ( ! $this->environment->authorize( $draft->owner(), $accept ? 'delivery_quote.accept' : 'delivery_quote.issue' ) ) { return $this->result( 'unavailable', $envelope->generation(), $request ); }
-		if ( 'rejected' === $result->attempt->outcome->state ) { return $this->fail( $envelope ) ? $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ) : $this->result( 'unconfirmed', $envelope->generation(), $request, retry: true ); }
+		if ( 'rejected' === $result->attempt->outcome->state ) {
+			// A known failed issue has no funded quote. Remove its native discounted packet,
+			// while retaining the original staged recovery for historical reconciliation.
+			if ( ! $accept && null !== $envelope->promotion_issue() && $this->environment instanceof FixedPromotionCartQuoteEnvironment ) { $this->environment->abort_promotion(); }
+			return $this->fail( $envelope ) ? $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ) : $this->result( 'unconfirmed', $envelope->generation(), $request, retry: true ); }
 		if ( 'accepted' !== $result->attempt->outcome->state || null === $result->quote ) { return $this->result( 'unconfirmed', $envelope->generation(), $request, retry: true ); }
 		$next = $envelope->with_phase( $accept ? 'confirmed' : 'issued' );
 		if ( ! $this->sessions->compare_and_swap( $draft->owner(), $envelope, $next ) ) { return $this->result( 'unconfirmed', $envelope->generation(), $request, retry: true ); }
 		return $this->read( $draft, $next, $request );
 	}
+	private function confirm_promotion( QuoteCartDraft $draft, CartQuoteSessionEnvelope $envelope, RequestContext $request ): CartQuoteResult {
+		if ( ! $this->promotion_ready() ) { return $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ); }
+		$issue = $envelope->promotion_issue(); $inputs = $this->environment->promotion_inputs( $issue->original_issue(), $draft );
+		if ( null === $inputs || null === $this->promotion_reader->current_issued( $issue, $inputs, $request ) || ! $this->environment->authorize( $draft->owner(), 'delivery_quote.accept' ) ) { return $this->read( $draft, $envelope, $request ); }
+		$accepting = $envelope->with_phase( 'accepting' ); if ( ! $this->sessions->compare_and_swap( $draft->owner(), $envelope, $accepting ) ) { return $this->result( 'unconfirmed', $envelope->generation(), $request, retry: true ); }
+		return $this->finish( $this->promotion_accept->accept( FixedPromotionQuoteAcceptCommand::from_issue( $issue ), $inputs, $request ), $accepting, $draft, $request, true );
+	}
+	private function read_promotion( QuoteCartDraft $draft, CartQuoteSessionEnvelope $envelope, RequestContext $request ): CartQuoteResult {
+		if ( ! $this->promotion_ready() ) { return $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ); }
+		$issue = $envelope->promotion_issue(); $inputs = $this->environment->promotion_inputs( $issue->original_issue(), $draft );
+		if ( null === $inputs ) { return $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ); }
+		if ( 'confirmed' === $envelope->phase() ) { $read = $this->promotion_reader->current( FixedPromotionQuoteAcceptCommand::from_issue( $issue ), $inputs, $request ); $evidence = 'ready' === $read->status ? $read->evidence : null; }
+		else { $evidence = $this->promotion_reader->current_issued( $issue, $inputs, $request ); }
+		if ( null === $evidence || ! $this->environment->authorize( $draft->owner(), 'delivery_quote.read' ) ) { return $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ); }
+		$projection = QuoteProjection::for_fixed_promotion_current( $evidence, $request );
+		return $this->result( 'confirmed' === $envelope->phase() ? 'confirmed' : 'review_required', $envelope->generation(), $request, $projection, true, 'issued' === $envelope->phase() );
+	}
+	private function promotion_ready(): bool { return $this->environment instanceof FixedPromotionCartQuoteEnvironment && null !== $this->promotion_issuer && null !== $this->promotion_accept && null !== $this->promotion_reader; }
+	private function promotion_issue_service( QuoteProviderRegistry $providers ): FixedPromotionQuoteIssueService { $service = null === $this->promotion_issuer ? null : ( $this->promotion_issuer )( $providers ); if ( ! $service instanceof FixedPromotionQuoteIssueService ) { throw new \RuntimeException( 'Promotion quote service unavailable.' ); } return $service; }
 	private function project( QuoteStoredRow $row, ?string $reason, CartQuoteSessionEnvelope $envelope, RequestContext $request, ?QuoteTime $evaluated_at ): CartQuoteResult {
 		if ( in_array( $reason, [ 'quote_unavailable', 'checkout_suspended' ], true ) || null === $row->context() || null === $row->terms() ) { return $this->result( 'unavailable', $envelope->generation(), $request, refresh: true ); }
 		if ( 'quote_invalidated' === $reason || 'invalidated' === $row->state() ) { return $this->result( 'changed', $envelope->generation(), $request, refresh: true ); }

@@ -26,6 +26,7 @@ final readonly class FixedPromotionQuotePlacementEvidence implements \JsonSerial
 	}
 
 	public function owner(): QuoteOwner { return $this->command->owner(); }
+	public function acceptance(): FixedPromotionQuoteAcceptCommand { return $this->command; }
 	public function reference(): QuoteReference { return $this->command->reference(); }
 	public function header(): QuoteHeader { return $this->row->header(); }
 	public function context(): QuoteContext { return $this->row->context(); }

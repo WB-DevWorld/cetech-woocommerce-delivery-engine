@@ -393,6 +393,7 @@ if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
 	bash "$ROOT/scripts/ci-promotion-native-hpos-off.sh" "$NATIVE" "$WORK/wp-cli.phar" "$WORK/opening-promotion-native-cpt-results.json"
 	python3 "$ROOT/scripts/qualification/verify-opening-promotion-native.py" \
 		"$WORK/opening-promotion-native-results.json" "$WORK/opening-promotion-native-cpt-results.json"
+	bash "$ROOT/scripts/ci-promotion-cart-http-qualification.sh" "$WORK" "$NATIVE"
 else
 	echo "opening_http_qualification=NOT_REQUESTED"
 fi

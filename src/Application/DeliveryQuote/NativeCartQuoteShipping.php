@@ -12,6 +12,71 @@ final class NativeCartQuoteShipping {
 		// Woo cart session before capture so a fresh request sees the same packet.
 		$session->save_data();
 	}
+	/** Explicit promotion preparation must re-enter native rates even when the package hash is unchanged. */
+	public static function prepare_promotion_after_admission(): void {
+		[ $cart, $session ] = self::native_objects();
+		$packages = $cart->get_shipping_packages();
+		if ( ! is_array( $packages ) || [] === $packages || count( $packages ) > 200 ) { self::fail(); }
+		// Validate the whole bounded layout before mutating any native session entry.
+		foreach ( $packages as $index => $package ) {
+			if ( ! is_int( $index ) || $index < 0 || $index > 199 || ! is_array( $package ) ) { self::fail(); }
+		}
+		foreach ( array_keys( $packages ) as $index ) { $session->__unset( 'shipping_for_package_' . $index ); }
+		$cart->calculate_totals();
+		$session->save_data();
+	}
+	/** Retain the original native session before callbacks; cleanup never calculates or calls layout filters. */
+	public static function promotion_failure_cleanup(): \Closure {
+		[ $cart, $session ] = self::native_objects();
+		$db = $GLOBALS['wpdb'] ?? null; if ( ! is_object( $db ) || 'wpdb' !== get_class( $db ) ) { self::fail(); }
+		$prefix = self::raw( $db, 'prefix' ); if ( ! is_string( $prefix ) || strlen( $prefix ) > 30 || 1 !== preg_match( '/\A[a-zA-Z0-9_]+\z/D', $prefix ) ) { self::fail(); }
+		$identity = [ self::raw( $session, '_customer_id' ), self::raw( $session, '_cookie' ), self::raw( $session, '_has_cookie' ) ];
+		$property = new \ReflectionProperty( '\WC_Shipping', '_instance' ); $shipping = $property->getValue();
+		if ( ( null !== $shipping && ( ! $shipping instanceof \WC_Shipping || 'WC_Shipping' !== get_class( $shipping ) ) ) || ! is_string( $identity[0] ) || '' === $identity[0] || ! is_string( $identity[1] ) || ! is_bool( $identity[2] ) ) { self::fail(); }
+		$wc = $GLOBALS['woocommerce'];
+		return static function () use ( $cart, $session, $shipping, $identity, $prefix, $property, $wc ): array {
+			// A replaced global cart/session does not authorize touching its new owner.
+			// The captured original remains the cleanup target while its physical key is exact.
+			if ( $identity !== [ self::raw( $session, '_customer_id' ), self::raw( $session, '_cookie' ), self::raw( $session, '_has_cookie' ) ] ) { self::fail(); }
+			$data = self::raw( $session, '_data' ); if ( ! is_array( $data ) || count( $data ) > 1024 ) { self::fail(); } $keys = []; $nodes = 0; self::cleanup_value( $data, 0, $nodes );
+			foreach ( array_keys( $data ) as $key ) {
+				if ( ! is_string( $key ) || ! str_starts_with( $key, 'shipping_for_package_' ) ) { continue; }
+				if ( 1 !== preg_match( '/\Ashipping_for_package_(0|[1-9][0-9]{0,2})\z/D', $key, $match ) || (int) $match[1] > 199 ) { self::fail(); }
+				$keys[] = $key;
+			}
+			if ( count( $keys ) > 200 ) { self::fail(); }
+			foreach ( [ ...$keys, 'cart_totals', 'chosen_shipping_methods' ] as $key ) { $session->__unset( $key ); }
+			$target = $shipping;
+			if ( null === $target && ( $GLOBALS['woocommerce'] ?? null ) === $wc && self::raw( $wc, 'cart' ) === $cart && self::raw( $wc, 'session' ) === $session ) { $target = $property->getValue(); }
+			if ( null !== $target ) { if ( ! $target instanceof \WC_Shipping || 'WC_Shipping' !== get_class( $target ) ) { self::fail(); } self::write_raw( $target, 'packages', [] ); }
+			self::write_raw( $cart, 'shipping_methods', [] ); self::write_raw( $cart, 'has_calculated_shipping', false ); self::write_raw( $cart, 'totals', [] );
+			$session->save_data();
+			$value = serialize( self::raw( $session, '_data' ) ); if ( strlen( $value ) > 1048576 ) { self::fail(); }
+			return [ 'table_prefix' => $prefix, 'session_key' => $identity[0], 'session_value' => $value ];
+		};
+	}
+	private static function cleanup_value( mixed $value, int $depth, int &$nodes ): void {
+		if ( $depth > 12 || ++$nodes > 16384 ) { self::fail(); }
+		if ( is_array( $value ) ) { foreach ( $value as $key => $part ) { if ( ! is_int( $key ) && ( ! is_string( $key ) || strlen( $key ) > 255 ) ) { self::fail(); } self::cleanup_value( $part, $depth + 1, $nodes ); } return; }
+		if ( is_string( $value ) && strlen( $value ) <= 1048576 || null === $value || is_int( $value ) || is_bool( $value ) || is_float( $value ) && is_finite( $value ) ) { return; } self::fail();
+	}
+	/** Exact fresh SQL readback; native save_data() has no reliable write acknowledgement. */
+	public static function acknowledge_promotion_cleanup( \CetechDeliveryEngine\Domain\Operation\OperationConnectionFactory $factory, \CetechDeliveryEngine\Domain\DeliveryQuote\QuoteOwner $owner, array $expected ): void {
+		$session = null; $begun = false;
+		try {
+			if ( array_keys( $expected ) !== [ 'table_prefix', 'session_key', 'session_value' ] || ! is_string( $expected['table_prefix'] ) || strlen( $expected['table_prefix'] ) > 30 || 1 !== preg_match( '/\A[a-zA-Z0-9_]+\z/D', $expected['table_prefix'] ) || ! is_string( $expected['session_key'] ) || '' === $expected['session_key'] || strlen( $expected['session_key'] ) > 128 || ! is_string( $expected['session_value'] ) || strlen( $expected['session_value'] ) > 1048576 ) { self::fail(); }
+			$session = $factory->open(); $binding = [ $session->site_id(), $session->table_prefix(), $session->charset_collate() ];
+			$pin = static function ( bool $active ) use ( $session, $binding, $owner, $expected ): void { if ( $session->is_retired() || $session->in_transaction() !== $active || [ $session->site_id(), $session->table_prefix(), $session->charset_collate() ] !== $binding || $binding[0] !== $owner->site_id() || $binding[1] !== $expected['table_prefix'] ) { self::fail(); } };
+			$pin( false ); if ( ! $session->begin() ) { self::fail(); } $begun = true; $pin( true );
+			$table = $binding[1] . 'woocommerce_sessions'; if ( ! $session->validate_tables( [ $table ] ) ) { self::fail(); } $pin( true );
+			$sql = $session->prepare( "SELECT session_key,CASE WHEN OCTET_LENGTH(session_value)<=1048576 THEN session_value ELSE NULL END AS session_value FROM `{$table}` WHERE session_key=%s LIMIT 2 FOR UPDATE", $expected['session_key'] ); $pin( true );
+			$rows = $session->get_results( $sql ); $pin( true );
+			if ( ! is_array( $rows ) || 1 !== count( $rows ) || array_keys( $rows[0] ) !== [ 'session_key', 'session_value' ] || $rows[0]['session_key'] !== $expected['session_key'] || ! is_string( $rows[0]['session_value'] ) || ! hash_equals( $expected['session_value'], $rows[0]['session_value'] ) ) { self::fail(); }
+			if ( ! $session->rollback() ) { self::fail(); } $begun = false; $pin( false );
+			if ( ! $session->retire() || ! $session->is_retired() || $session->in_transaction() ) { self::fail(); }
+		} catch ( \Throwable $error ) { throw new \RuntimeException( 'Native promotion cache cleanup unconfirmed.', 0, $error ); }
+		finally { if ( null !== $session && ! $session->is_retired() ) { if ( $begun ) { try { $session->rollback(); } catch ( \Throwable ) {} } try { $session->retire(); } catch ( \Throwable ) {} } }
+	}
 	/** No rate calculation, cart total calculation, native session setter or persistence. */
 	public static function restore_cached_calculation(): void {
 		[ $cart, $session ] = self::native_objects();

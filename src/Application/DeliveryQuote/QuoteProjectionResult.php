@@ -32,6 +32,24 @@ final class QuoteProjectionResult implements JsonSerializable {
 		] );
 	}
 
+	/**
+	 * A generic format-3 model remains historical. Only the completed current
+	 * read's typed observations can make this detached shopper DTO applicable.
+	 * The DTO is never a placement, budget commit or payment capability.
+	 */
+	public static function fixed_promotion_current( FixedPromotionQuoteIssuedEvidence|FixedPromotionQuotePlacementEvidence $evidence, RequestContext $request ): self {
+		$row = $evidence->quote_record(); $at = $evidence->evaluated_at();
+		if ( ! $evidence->validity()->valid_at( $at ) || ! in_array( $row->state(), [ 'issued', 'accepted' ], true ) || null === $row->context() || null === $row->terms() ) { self::invalid(); }
+		$quote = DeliveryQuote::issue( $row->header(), $row->context(), $row->terms() );
+		if ( $evidence instanceof FixedPromotionQuotePlacementEvidence ) {
+			$quote = $quote->accept_fixed_promotion( $evidence->owner(), $evidence->reference(), $row->context(), $evidence->accepted_at(), $row->header()->revision(), $row->header()->body_digest(), $row->header()->expires_at() );
+		}
+		if ( ! $quote->fixed_promotion_acceptable_at( $at ) ) { self::invalid(); }
+		$fields = self::shopper( $quote, $at, $request )->fields();
+		$fields['currently_applicable'] = true; $fields['reason_code'] = null; $fields['recovery_action'] = null;
+		return new self( 'shopper', $fields );
+	}
+
 	/** No quote ID, owner, material fingerprint, private provenance or money. */
 	public static function diagnostic( DeliveryQuote $quote, QuoteTime $at, RequestContext $request ): self {
 		$reason = self::reason( $quote->reason_at( $at ) );

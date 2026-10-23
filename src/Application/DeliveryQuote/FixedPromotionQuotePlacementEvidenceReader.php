@@ -24,6 +24,72 @@ final readonly class FixedPromotionQuotePlacementEvidenceReader implements \Json
 		$this->control = $control ?? new EmergencyControlStore(); $this->current_readiness = $current_readiness ?? new FixedPromotionBudgetOperationReadiness();
 	}
 
+	/** Current review of the exact original issued1 producer, without accepting or reserving again. */
+	public function current_issued( FixedPromotionQuoteIssueCommand $command, FixedPromotionQuoteAcceptInputs $inputs, RequestContext $request ): ?FixedPromotionQuoteIssuedEvidence {
+		$session = null; $closed = false;
+		try {
+			$command = $command->as_recovery();
+			if ( ! $this->authorized( $command->owner() ) ) { return null; }
+			$guard = FixedPromotionQuoteCurrentEvidenceGuard::from_captured( $command->header(), $command->context(), $command->terms(), $inputs->original(), $inputs->fresh_native(), FixedPromotionBudgetCurrentAuthority::from_captured( $command->header(), $command->context(), $command->terms(), $command->account_slots(), $this->store, $this->eligibility ) );
+			$session = $this->factory->open(); $pin = [ $session->site_id(), $session->table_prefix(), $session->charset_collate() ];
+			DeliveryQuoteSchema::tables( $pin[1] ); DeliveryQuoteSchema::charset_details( $pin[2] );
+			$this->assert_owned( $session, $command->owner(), $pin, false );
+			$this->readiness->assert_ready( $session ); $this->assert_owned( $session, $command->owner(), $pin, false );
+			if ( ! $session->begin() ) { return null; } $this->assert_owned( $session, $command->owner(), $pin, true );
+			$history = [ ...DeliveryQuoteSchema::tables( $pin[1] ), ...array_map( static fn( string $suffix ): string => $pin[1] . TableNames::PREFIX . $suffix, OperationStoreSchema::SUFFIXES ) ];
+			$this->sealed_tables( $session, [ $history ], $pin[1] ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			// Authenticate provenance without a quote lock: acceptance locks current dependencies first.
+			$verifier = new QuoteReceiptVerifier(); $records = $verifier->lock( $session, $command->header(), null, [ 'issue' ] ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			$repository = new DeliveryQuoteRepository( $session ); $quote = $repository->find_quote( $command->header()->id(), false ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			if ( null === $quote || ! $verifier->promotion_issue_verified( $quote, $records, $command ) ) { return null; }
+			$issued_at = QuoteTime::parse( $records['issue']->completed_at );
+			$this->control->assert_ready( $session, $command->owner()->site_id() ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			$guard_tables = $guard->tables( $session ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			$options = $this->control->options_table( $session ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			$this->sealed_tables( $session, [ $history, [ $options ], $guard_tables ], $pin[1] ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			$control = $this->control->current( $session ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			if ( ! $control->enabled() || $control->site_id !== $command->owner()->site_id() ) { return null; }
+			$this->current_readiness->assert_ready( $session ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			$at = QuoteOperationProfile::time( $session ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			if ( ! $this->issued_deadlines( $command, $at, $issued_at, $control->changed_at_epoch ) ) { return null; }
+			$source = $guard->source_validity_at( $session, $command->owner(), $command->context(), $at ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			if ( null === $source ) { return null; }
+			$eligible = $this->eligibility->validity_for_requests_at( $session, $command->owner(), $command->header(), $command->context(), $command->terms(), $command->allocation_set()->requests(), $at ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			if ( null === $eligible ) { return null; }
+			$initial = QuoteCurrentEvidenceValidity::intersection( $at, $source, $eligible, QuoteCurrentEvidenceValidity::capture( $at, $command->header()->expires_at() ), QuoteCurrentEvidenceValidity::capture( $at, $command->hold_until() ) );
+			if ( null === $initial || ! $this->issued_claims( $session, $command, $pin, $at ) ) { return null; }
+			$proof_at = QuoteOperationProfile::time( $session ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			if ( $proof_at->compare( $at ) < 0 || ! $initial->valid_at( $proof_at ) || ! $this->issued_deadlines( $command, $proof_at, $issued_at, $control->changed_at_epoch ) ) { return null; }
+			$proof = $guard->validity_at( $session, $command->owner(), $command->context(), $proof_at ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			if ( null === $proof || ! $this->issued_claims( $session, $command, $pin, $proof_at ) ) { return null; }
+			$actual = $repository->find_quote( $command->header()->id(), true ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			if ( null === $actual || $actual->row() !== $quote->row() || ! $verifier->promotion_issue_verified( $actual, $records, $command ) ) { return null; }
+			$final_at = QuoteOperationProfile::time( $session ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			if ( $final_at->compare( $proof_at ) < 0 || ! $this->issued_deadlines( $command, $final_at, $issued_at, $control->changed_at_epoch ) ) { return null; }
+			$validity = QuoteCurrentEvidenceValidity::intersection( $final_at, $initial, $proof ); if ( null === $validity ) { return null; }
+			if ( ! $session->rollback() ) { return null; } $this->assert_owned( $session, $command->owner(), $pin, false );
+			if ( ! $session->retire() ) { return null; } $this->assert_owned( $session, $command->owner(), $pin, false, true );
+			if ( ! $this->authorized( $command->owner() ) ) { return null; } $this->assert_owned( $session, $command->owner(), $pin, false, true );
+			$evidence = new FixedPromotionQuoteIssuedEvidence( $command, $actual, $final_at, $validity );
+			$closed = true; return $evidence;
+		} catch ( \Throwable ) { return null; }
+		finally {
+			if ( null !== $session && ! $closed ) { try { $session->rollback(); } catch ( \Throwable ) {} try { $session->retire(); } catch ( \Throwable ) {} }
+		}
+	}
+	private function issued_deadlines( FixedPromotionQuoteIssueCommand $command, QuoteTime $at, QuoteTime $issued_at, ?int $control_epoch ): bool { return $at->compare( $issued_at ) >= 0 && $command->header()->valid_at( $at ) && $at->compare( $command->hold_until() ) < 0 && $at->epoch_microseconds() >= ( $control_epoch ?? 0 ) * 1000000; }
+	private function issued_claims( OperationSession $session, FixedPromotionQuoteIssueCommand $command, array $pin, QuoteTime $at ): bool {
+		foreach ( $command->allocation_set()->account_keys() as $key ) {
+			$account = $this->store->lock_account( $session, $key ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			if ( null === $account || $account->site_id() !== $command->owner()->site_id() || $account->account_key() !== $key ) { return false; }
+		}
+		foreach ( $command->allocation_set()->requests() as $request ) {
+			$claim = $this->store->lock_reservation_for_account( $session, $request->claim_key(), $request->account_key() ); $this->assert_owned( $session, $command->owner(), $pin, true );
+			if ( null === $claim || ! $claim->matches( $request ) || 'held' !== $claim->state() || ! $claim->expires_at()->equals( $command->hold_until() ) || ! $claim->is_held_at( $at ) ) { return false; }
+		}
+		return true;
+	}
+
 	/** A new owner performs each read; no transaction, lock or authority escapes its cleanup. */
 	public function current( FixedPromotionQuoteAcceptCommand $command, FixedPromotionQuoteAcceptInputs $inputs, RequestContext $request ): FixedPromotionQuotePlacementReadResult {
 		$session = null; $begun = false; $closed = false;

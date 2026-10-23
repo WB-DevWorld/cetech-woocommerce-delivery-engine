@@ -125,6 +125,7 @@ jobs:
           python3 scripts/qualification/test-verify-promise-calculation-receipts.py
           python3 scripts/qualification/test-verify-promise-handoff-receipts.py
           python3 scripts/qualification/test-verify-opening-promotion-native.py
+          python3 scripts/qualification/test-verify-opening-promotion-cart.py
           python3 scripts/qualification/test-opening-http-promise-handoff.py
           python3 scripts/qualification/test-opening-promise-native-configuration-browser.py
           python3 scripts/qualification/test-verify-opening-promise-native-configuration.py
@@ -487,6 +488,34 @@ jobs:
           path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promotion-native-cpt-results.json
           if-no-files-found: warn
 
+      - name: Retain N18 native promotion cart HTTP receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-http-promotion-cart
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-promotion-cart-results.json
+          if-no-files-found: error
+      - name: Retain N18 native promotion cart browser receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-http-promotion-cart-browser
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-promotion-cart-browser-results.json
+          if-no-files-found: error
+      - name: Retain N18 native promotion order handoff HTTP receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-http-promotion-placement
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-promotion-placement-results.json
+          if-no-files-found: error
+      - name: Retain N18 native promotion cart closeout
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-http-promotion-cart-closeout
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-promotion-cart-closeout.json
+          if-no-files-found: error
       - name: Retain original P06 current, predecessor and reader packages
         if: always()
         uses: actions/upload-artifact@v4
