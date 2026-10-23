@@ -321,6 +321,8 @@ bash "$ROOT/scripts/ci-quote-placement-hpos-off.sh" "$NATIVE" "$WORK/wp-cli.phar
 if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
 	bash "$ROOT/scripts/ci-opening-http-qualification.sh" "$WORK" "$NATIVE"
 	python3 "$ROOT/scripts/qualification/verify-quote-placement-receipts.py" "$WORK/opening-qualification-results.json" "$WORK/opening-quote-placement-cpt-results.json" "$WORK/opening-http-qualification-results.json"
+	# Fail fast on N18 after its native/CPT/HTTP prerequisites; retain every later gate.
+	bash "$ROOT/scripts/ci-promotion-cart-http-qualification.sh" "$WORK" "$NATIVE"
 	# P02 is a separate receipt; all retained primary predicates must pass first.
 	"${WP[@]}" --require="$ROOT/scripts/qualification/admin-context.php" \
 		eval-file "$ROOT/scripts/qualification/opening-promise-storage-runner.php" --use-include \
@@ -393,7 +395,6 @@ if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
 	bash "$ROOT/scripts/ci-promotion-native-hpos-off.sh" "$NATIVE" "$WORK/wp-cli.phar" "$WORK/opening-promotion-native-cpt-results.json"
 	python3 "$ROOT/scripts/qualification/verify-opening-promotion-native.py" \
 		"$WORK/opening-promotion-native-results.json" "$WORK/opening-promotion-native-cpt-results.json"
-	bash "$ROOT/scripts/ci-promotion-cart-http-qualification.sh" "$WORK" "$NATIVE"
 else
 	echo "opening_http_qualification=NOT_REQUESTED"
 fi
