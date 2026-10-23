@@ -387,6 +387,12 @@ if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
 	python3 "$ROOT/scripts/qualification/verify-promise-operational-lifecycle-receipts.py" \
 		"$WORK/opening-promise-operational-lifecycle-results.json" "$WORK/opening-promise-operational-lifecycle-cpt-results.json" \
 		"${P06_PRIORS[@]}" "$CETECH_DE_P06_CURRENT_PACKAGE" "$CETECH_DE_P06_PREDECESSOR_PACKAGE" "$CETECH_DE_P06_READER_PACKAGE"
+	# N17 actual native promotion adapters/staging have separate finite receipts.
+	"${WP[@]}" --require="$ROOT/scripts/qualification/admin-context.php" eval-file "$ROOT/scripts/qualification/opening-promotion-native-runner.php" --use-include \
+		"$WORK/opening-promotion-native-results.json" hpos_on --path="$NATIVE"
+	bash "$ROOT/scripts/ci-promotion-native-hpos-off.sh" "$NATIVE" "$WORK/wp-cli.phar" "$WORK/opening-promotion-native-cpt-results.json"
+	python3 "$ROOT/scripts/qualification/verify-opening-promotion-native.py" \
+		"$WORK/opening-promotion-native-results.json" "$WORK/opening-promotion-native-cpt-results.json"
 else
 	echo "opening_http_qualification=NOT_REQUESTED"
 fi
