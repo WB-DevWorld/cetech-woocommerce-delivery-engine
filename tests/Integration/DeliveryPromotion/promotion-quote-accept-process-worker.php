@@ -35,13 +35,15 @@ try {
 		$transport->before = static function( string $sql, Transport $owner ) use ( $command, $directory, &$dispatched ): void {
 			if ( $dispatched || ! str_starts_with( $sql, 'INSERT INTO ' ) || ! str_contains( $sql, 'delivery_engine_operation_records' ) || ! str_contains( $sql, $command->identity->namespace_digest() ) ) { return; }
 			$dispatched = true;
-			if ( false === file_put_contents( $directory . '/right-dispatched', json_encode( [ 'connection_id' => $owner->connection_id() ], JSON_THROW_ON_ERROR ), LOCK_EX ) ) { throw new RuntimeException( 'Owned acceptance dispatch signal failed.' ); }
+			$signal = json_encode( [ 'connection_id' => $owner->connection_id() ], JSON_THROW_ON_ERROR ); $file = $directory . '/right-dispatched';
+			if ( strlen( $signal ) !== file_put_contents( $file . '.tmp', $signal, LOCK_EX ) || ! chmod( $file . '.tmp', 0600 ) || ! rename( $file . '.tmp', $file ) ) { throw new RuntimeException( 'Owned acceptance dispatch signal failed.' ); }
 		};
 	} );
 	if ( 'left' === $role ) {
 		$stack->observer->callback = static function( string $phase ) use ( $stack, $directory ): void {
 			if ( 'before_effect_commit' !== $phase ) { return; }
-			if ( false === file_put_contents( $directory . '/left-held', json_encode( [ 'connection_id' => $stack->physical->transports[0]->connection_id() ], JSON_THROW_ON_ERROR ), LOCK_EX ) ) { throw new RuntimeException( 'Owned acceptance lock signal failed.' ); }
+			$signal = json_encode( [ 'connection_id' => $stack->physical->transports[0]->connection_id() ], JSON_THROW_ON_ERROR ); $file = $directory . '/left-held';
+			if ( strlen( $signal ) !== file_put_contents( $file . '.tmp', $signal, LOCK_EX ) || ! chmod( $file . '.tmp', 0600 ) || ! rename( $file . '.tmp', $file ) ) { throw new RuntimeException( 'Owned acceptance lock signal failed.' ); }
 			OperationProofProcess::wait_for( $directory . '/release', 12.0 );
 		};
 	}

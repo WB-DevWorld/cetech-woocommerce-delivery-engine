@@ -11,6 +11,10 @@ use CetechDeliveryEngine\Application\RateQuote\RateQuoteEngine;
 use CetechDeliveryEngine\Application\RateQuote\RateQuoteRequest;
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryConfigurationSourceInterface;
 use CetechDeliveryEngine\Application\Runtime\RuntimeConfigurationSource;
+use CetechDeliveryEngine\Application\Cart\{CartDeliverySelectionCapture, CartDeliverySelectionFingerprint};
+use CetechDeliveryEngine\Application\DeliveryPromotion\FixedPromotionNativeRequests;
+use CetechDeliveryEngine\Application\DeliveryQuote\{NativeCartQuotePreparation, QuoteNativeContextIdentity};
+use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteJson, QuoteMoney};
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Domain\ProductRule\ProductDeliveryRuleRepositoryInterface;
 use CetechDeliveryEngine\Support\Logger;
@@ -39,6 +43,14 @@ final class SelectedOfferShippingRateCalculator {
 
 	public const BLOCK_RUNTIME_INACTIVE = 'runtime_inactive';
 
+	public const BLOCK_PROMOTION_UNAVAILABLE = 'promotion_unavailable';
+
+	private ?FixedPromotionNativeRequests $promotion_requests = null;
+	private ?\Closure $promotion_unchanged = null;
+	private array $promotion_observed = [];
+	private array $promotion_selections = [];
+	private bool $promotion_failed = false;
+
 	public function __construct(
 		private ShippingRateCalculationGate $gate,
 		private PackageDestinationZoneResolverInterface $destination_resolver,
@@ -56,9 +68,45 @@ final class SelectedOfferShippingRateCalculator {
 	}
 
 	/**
+	 * An explicit admitted calculation only. The caller owns native cache reset and
+	 * session publication; this scope neither selects policy nor reserves funding.
+	 * Every expected package must actually pass the retained list calculation.
+	 */
+	public function with_promotion( FixedPromotionNativeRequests $requests, callable $unchanged, callable $work ): mixed {
+		if ( null !== $this->promotion_requests ) { $this->promotion_failed = true; self::promotion_fail(); }
+		$current = \Closure::fromCallable( $unchanged );
+		$this->promotion_requests = $requests; $this->promotion_unchanged = $current;
+		$this->promotion_observed = []; $this->promotion_selections = []; $this->promotion_failed = false;
+		try {
+			if ( ! $this->promotion_current() ) { self::promotion_fail(); }
+			$result = $work();
+			if ( $this->promotion_failed || ! $this->promotion_current() || count( $this->promotion_observed ) !== count( $requests->native_requests() ) ) { self::promotion_fail(); }
+			ksort( $this->promotion_selections, SORT_STRING );
+			if ( ! hash_equals( $requests->original_context()->private_facts()['selection_digest'], hash( 'sha256', QuoteJson::encode( $this->promotion_selections ) ) ) ) { self::promotion_fail(); }
+			return $result;
+		} finally {
+			$this->promotion_requests = null; $this->promotion_unchanged = null; $this->promotion_observed = []; $this->promotion_selections = []; $this->promotion_failed = false;
+		}
+	}
+
+	/**
 	 * @param array<string, mixed> $package WooCommerce shipping package.
 	 */
 	public function calculate_for_package( array $package ): SelectedOfferShippingRateResult {
+		if ( null === $this->promotion_requests ) { return $this->calculate_list_for_package( $package ); }
+		try {
+			if ( $this->promotion_failed || ! $this->promotion_current() ) { self::promotion_fail(); }
+			$base = $this->calculate_list_for_package( $package );
+			if ( ! $this->promotion_current() ) { self::promotion_fail(); }
+			return $this->promotion_rate( $package, $base );
+		} catch ( \Throwable ) {
+			$this->promotion_failed = true;
+			return SelectedOfferShippingRateResult::blocked( self::BLOCK_PROMOTION_UNAVAILABLE );
+		}
+	}
+
+	/** Retained default calculation, before any explicitly scoped final amount. */
+	private function calculate_list_for_package( array $package ): SelectedOfferShippingRateResult {
 		$decision = $this->emergency_control?->package_decision( $package );
 		if ( null !== $decision && ! $decision->allowed ) { return SelectedOfferShippingRateResult::blocked( $decision->code ); }
 		if ( ! $this->is_runtime_active() ) {
@@ -121,6 +169,52 @@ final class SelectedOfferShippingRateCalculator {
 
 		return $this->calculate_legacy_sum( $contents, $zone_ids, $currency_code );
 	}
+
+	private function promotion_rate( array $package, SelectedOfferShippingRateResult $base ): SelectedOfferShippingRateResult {
+		$requests = $this->promotion_requests; $meta = DeliveryGroupIdentity::package_meta( $package );
+		if ( null === $requests || ! $base->success || null === $base->total_amount || null === $base->currency || true !== ( $meta['managed'] ?? null ) || ! empty( $meta['is_pickup'] ) || ! is_string( $meta['group_id'] ?? null ) ) { self::promotion_fail(); }
+		$group_id = $meta['group_id']; $component = NativeCartQuotePreparation::component_key( $group_id ); $request = null;
+		foreach ( $requests->native_requests() as $candidate ) { if ( $candidate->component_key === $component && $candidate->legacy_group_id === $group_id ) { $request = $candidate; break; } }
+		if ( null === $request ) { self::promotion_fail(); }
+		$context = $requests->original_context()->private_facts(); $group = null; $term = null;
+		foreach ( $context['groups'] as $candidate ) { if ( $candidate['component_key'] === $component ) { $group = $candidate; break; } }
+		foreach ( $requests->original_terms()->private_facts()['groups'] as $candidate ) { if ( $candidate['component_key'] === $component ) { $term = $candidate; break; } }
+		if ( null === $group || null === $term || 'delivery' !== $group['choice'] || $base->currency !== $context['currency']['charged'] ) { self::promotion_fail(); }
+		$identity = QuoteNativeContextIdentity::from_server(); $destination = $package['destination'] ?? null;
+		if ( ! is_array( $destination ) ) { self::promotion_fail(); }
+		$digest = $identity->destination_digest( $requests->header()->owner()->site_id(), $destination );
+		if ( ! hash_equals( $context['destination']['digest'], $digest ) || ! hash_equals( $group['endpoint_digest'], $digest ) ) { self::promotion_fail(); }
+		$contents = $package['contents'] ?? null;
+		if ( ! is_array( $contents ) || [] === $contents || count( $contents ) > 200 ) { self::promotion_fail(); }
+		$keys = array_keys( $contents ); sort( $keys, SORT_STRING ); $expected = $group['line_keys']; sort( $expected, SORT_STRING );
+		if ( $keys !== $expected ) { self::promotion_fail(); }
+		$lines = []; foreach ( $context['lines'] as $line ) { if ( $line['component_key'] === $component ) { $lines[$line['line_key']] = $line; } }
+		foreach ( $contents as $key => $item ) {
+			$line = $lines[$key] ?? null;
+			if ( ! is_array( $item ) || null === $line || ! is_int( $item['product_id'] ?? null ) || $item['product_id'] !== $line['product_id'] || ! is_int( $item['variation_id'] ?? null ) || ( $item['variation_id'] ?: null ) !== $line['variation_id'] || ! is_int( $item['quantity'] ?? null ) || (string) $item['quantity'] !== $line['quantity'] ) { self::promotion_fail(); }
+			$selection = $item[CartDeliverySelectionCapture::CART_SELECTION_KEY] ?? null; $hash = $item[CartDeliverySelectionCapture::CART_HASH_KEY] ?? null;
+			if ( ! is_array( $selection ) || ! is_string( $hash ) || ! hash_equals( CartDeliverySelectionFingerprint::fromIntent( $selection ), $hash ) || ( $selection['delivery_offer_id'] ?? null ) !== $group['offer_id'] || 'delivery' !== ( $selection['fulfilment_choice'] ?? null ) || DeliveryGroupIdentity::fromCartItem( $item ) !== $group_id || ( isset( $this->promotion_selections[$key] ) && $this->promotion_selections[$key] !== $hash ) ) { self::promotion_fail(); }
+			$this->promotion_selections[$key] = $hash;
+		}
+		$list = QuoteMoney::from_array( $term['list'] );
+		// Only discard zero padding. Never round a changed list into the captured one.
+		$amount = str_contains( $base->total_amount, '.' ) ? rtrim( rtrim( $base->total_amount, '0' ), '.' ) : $base->total_amount;
+		$observed = QuoteMoney::from_array( [ 'amount' => $amount, 'currency' => $base->currency, 'precision' => $list->precision() ] );
+		if ( ! $list->equals( $observed ) || $request->expected_ex_tax->currency() !== $base->currency ) { self::promotion_fail(); }
+		$this->promotion_observed[$component] = true;
+		// Requests contain the absolute final, including explicit unchanged null slots.
+		// Woo receives this pre-tax cost and performs its ordinary native tax/rounding.
+		return SelectedOfferShippingRateResult::quoted( $request->expected_ex_tax->amount(), $base->currency, $base->charge_type );
+	}
+
+	private function promotion_current(): bool {
+		try {
+			return null !== $this->promotion_requests && null !== $this->promotion_unchanged && true === ( $this->promotion_unchanged )()
+				&& QuoteNativeContextIdentity::from_server()->key_epoch() === $this->promotion_requests->header()->owner()->key_epoch();
+		} catch ( \Throwable ) { return false; }
+	}
+
+	private static function promotion_fail(): never { throw new \RuntimeException( 'Native promotion shipping unavailable.' ); }
 
 	/**
 	 * @param array<string, mixed> $contents

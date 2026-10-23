@@ -25,7 +25,7 @@ final readonly class FixedPromotionEligibilityFamily implements RuleFamilyProfil
 	public function version(): int { return self::VERSION; }
 	public function policy_hash(): string { return self::definition_hash(); }
 	public static function definition_hash(): string {
-		return hash( 'sha256', 'cetech-fixed-promotion-eligibility-v1:exact-scalars:all-captured-product-ids:ascending-unique-nonempty:strict-fixed-rule:explicit-account:priority-desc:specificity-zero:equal-refuse:' . self::predicate_schema()->fingerprint() . ':' . self::rule_payload_schema()->fingerprint() );
+		return hash( 'sha256', 'cetech-fixed-promotion-eligibility-v1:exact-scalars:coherent-native-money-unit:scale-at-least-captured-display-up-to-six:all-captured-product-ids:ascending-unique-nonempty:strict-fixed-rule:explicit-account:priority-desc:specificity-zero:equal-refuse:' . self::predicate_schema()->fingerprint() . ':' . self::rule_payload_schema()->fingerprint() );
 	}
 	public function scope_schema(): RuleSchema { return self::predicate_schema(); }
 	public function subject_schema(): RuleSchema { return self::predicate_schema(); }
@@ -83,8 +83,11 @@ final readonly class FixedPromotionEligibilityFamily implements RuleFamilyProfil
 		if ( null === $component ) { QuoteShape::invalid(); }
 		foreach ( $terms['groups'] as $group ) {
 			if ( $group['component_key'] !== $component_key ) { continue; }
+			// Context precision is native display precision. Retained money may carry
+			// a finer native calculation unit; preserve it without rounding or padding.
+			$precision = QuoteShape::integer( $group['list']['precision'], $context['currency']['precision'], 6 );
 			foreach ( [ 'list', 'final', 'tax', 'total' ] as $field ) {
-				if ( $group[$field]['currency'] !== $currency || $group[$field]['precision'] !== $context['currency']['precision'] ) { QuoteShape::invalid(); }
+				if ( $group[$field]['currency'] !== $currency || $group[$field]['precision'] !== $precision ) { QuoteShape::invalid(); }
 			}
 		}
 		$products = [];

@@ -38,7 +38,7 @@ final class QuoteNativeOrderHistory {
 		} catch ( \Throwable ) { return null; }
 	}
 	public static function owned( \WC_Order $order ): bool {
-		foreach ( [ QuoteNativeOrderFacts::META_DRAFT, QuoteNativeOrderFacts::META_REFERENCE, QuoteNativeOrderFacts::META_TAX_SOURCE ] as $key ) { if ( false !== self::meta_present( $order, $key ) ) { return true; } }
+		foreach ( [ QuoteNativeOrderFacts::META_DRAFT, QuoteNativeOrderFacts::META_REFERENCE, QuoteNativeOrderFacts::META_TAX_SOURCE, \CetechDeliveryEngine\Application\DeliveryQuote\FixedPromotionSavedOrderPlacementEvidenceReader::META_ORIGINAL_BIND ] as $key ) { if ( false !== self::meta_present( $order, $key ) ) { return true; } }
 		if ( self::object_owned( $order, OrderDeliverySnapshot::META_ORDER_QUOTE_SNAPSHOT ) ) { return true; }
 		foreach ( $order->get_items( 'line_item' ) as $item ) {
 			if ( $item instanceof \WC_Order_Item_Product && self::object_owned( $item, OrderDeliverySnapshot::META_LINE_SNAPSHOT ) ) { return true; }

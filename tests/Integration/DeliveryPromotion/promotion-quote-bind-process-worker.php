@@ -55,14 +55,16 @@ try {
 			}
 			if ( 'right' !== $role || $dispatched || ! str_starts_with( $sql, 'SELECT option_name, CASE WHEN' ) || ! str_contains( $sql, 'FOR UPDATE' ) ) { return; }
 			$dispatched = true; $write_status( 'publication_dispatched' );
-			if ( false === file_put_contents( $directory . '/right-dispatched', json_encode( [ 'connection_id' => $owner->connection_id() ], JSON_THROW_ON_ERROR ), LOCK_EX ) ) { throw new RuntimeException( 'Owned bind dispatch signal failed.' ); }
+			$signal = json_encode( [ 'connection_id' => $owner->connection_id() ], JSON_THROW_ON_ERROR ); $file = $directory . '/right-dispatched';
+			if ( strlen( $signal ) !== file_put_contents( $file . '.tmp', $signal, LOCK_EX ) || ! chmod( $file . '.tmp', 0600 ) || ! rename( $file . '.tmp', $file ) ) { throw new RuntimeException( 'Owned bind dispatch signal failed.' ); }
 		};
 	} );
 	if ( 'left' === $role ) {
 		$stack->observer->callback = static function( string $phase ) use ( $stack, $directory, $write_status ): void {
 			if ( 'before_effect_commit' !== $phase ) { return; }
 			$write_status( 'effect_held' );
-			if ( false === file_put_contents( $directory . '/left-held', json_encode( [ 'connection_id' => $stack->physical->transports[0]->connection_id() ], JSON_THROW_ON_ERROR ), LOCK_EX ) ) { throw new RuntimeException( 'Owned bind lock signal failed.' ); }
+			$signal = json_encode( [ 'connection_id' => $stack->physical->transports[0]->connection_id() ], JSON_THROW_ON_ERROR ); $file = $directory . '/left-held';
+			if ( strlen( $signal ) !== file_put_contents( $file . '.tmp', $signal, LOCK_EX ) || ! chmod( $file . '.tmp', 0600 ) || ! rename( $file . '.tmp', $file ) ) { throw new RuntimeException( 'Owned bind lock signal failed.' ); }
 			OperationProofProcess::wait_for( $directory . '/release', 30.0 );
 			$write_status( 'effect_released' );
 		};
@@ -73,7 +75,8 @@ try {
 			$transport = $stack->physical->transports[0]; $state = $transport->transaction_state(); $session = $stack->physical->sessions[0];
 			if ( $session->is_retired() || $session->in_transaction() || ! is_array( $state ) || false !== $state['in_transaction'] || true !== $state['autocommit'] ) { throw new RuntimeException( 'Owned bind committed reservation refused.' ); }
 			$write_status( 'reservation_held' );
-			if ( false === file_put_contents( $directory . '/right-reserved', json_encode( [ 'connection_id' => $transport->connection_id(), 'in_transaction' => $state['in_transaction'], 'autocommit' => $state['autocommit'] ], JSON_THROW_ON_ERROR ), LOCK_EX ) ) { throw new RuntimeException( 'Owned bind reservation signal failed.' ); }
+			$signal = json_encode( [ 'connection_id' => $transport->connection_id(), 'in_transaction' => $state['in_transaction'], 'autocommit' => $state['autocommit'] ], JSON_THROW_ON_ERROR ); $file = $directory . '/right-reserved';
+			if ( strlen( $signal ) !== file_put_contents( $file . '.tmp', $signal, LOCK_EX ) || ! chmod( $file . '.tmp', 0600 ) || ! rename( $file . '.tmp', $file ) ) { throw new RuntimeException( 'Owned bind reservation signal failed.' ); }
 			OperationProofProcess::wait_for( $directory . '/right-start-effect', 30.0 ); $write_status( 'reservation_released' );
 		};
 	}

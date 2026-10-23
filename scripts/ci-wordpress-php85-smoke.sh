@@ -319,6 +319,8 @@ export CETECH_DE_QUALIFICATION_TREE="$(git -C "$ROOT" rev-parse HEAD^{tree})"
 bash "$ROOT/scripts/ci-quote-placement-hpos-off.sh" "$NATIVE" "$WORK/wp-cli.phar" "$WORK/opening-quote-placement-cpt-results.json"
 
 if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
+	# N18 consumes the native identity receipt; retain every HTTP and later gate.
+	bash "$ROOT/scripts/ci-promotion-cart-http-qualification.sh" "$WORK" "$NATIVE"
 	bash "$ROOT/scripts/ci-opening-http-qualification.sh" "$WORK" "$NATIVE"
 	python3 "$ROOT/scripts/qualification/verify-quote-placement-receipts.py" "$WORK/opening-qualification-results.json" "$WORK/opening-quote-placement-cpt-results.json" "$WORK/opening-http-qualification-results.json"
 	# P02 is a separate receipt; all retained primary predicates must pass first.

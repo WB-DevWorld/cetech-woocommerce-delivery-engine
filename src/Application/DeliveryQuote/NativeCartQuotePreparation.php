@@ -25,11 +25,77 @@ use CetechDeliveryEngine\Infrastructure\WooCommerce\Destination\WooCommerceState
 use CetechDeliveryEngine\Application\ServicePromise\Handoff\{PromiseNativeCaptureService,PromiseQuoteCurrentEvidenceGuard};
 use CetechDeliveryEngine\Domain\RuleLifecycle\RuleTime;
 use CetechDeliveryEngine\Integrations\ServicePromise\PromiseNativeServiceRegistry;
+use CetechDeliveryEngine\Application\DeliveryPromotion\{FixedPromotionCartPlanning, FixedPromotionNativeCapture, FixedPromotionNativeRequests};
+use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingRateCalculator;
+use CetechDeliveryEngine\Domain\DeliveryPromotion\{DeliveryPromotionPlan, FixedDeliveryPromotion};
+use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteId;
 
 /** Called after the early preparation lease. Current reads never invoke the pricing engine. */
 final class NativeCartQuotePreparation {
 	private LegacyQuoteNativeSourcePreparer $sources;
-	public function __construct( private OperationConnectionFactory $factory, private ?QuoteNativeCaptureSource $native_source = null, private ?PromiseNativeCaptureService $promise_capture = null, private ?PromiseNativeServiceRegistry $promise_services = null ) { $this->sources = new LegacyQuoteNativeSourcePreparer( $factory ); }
+	private ?\Closure $promotion_rules;
+	/** Promotion inputs are trusted composition, never browser rule, account, or deadline choices. */
+	public function __construct( private OperationConnectionFactory $factory, private ?QuoteNativeCaptureSource $native_source = null, private ?PromiseNativeCaptureService $promise_capture = null, private ?PromiseNativeServiceRegistry $promise_services = null, private ?FixedPromotionCartPlanning $promotion_planning = null, private ?SelectedOfferShippingRateCalculator $promotion_rates = null, ?callable $promotion_rules = null, private ?int $promotion_hold_seconds = null ) { $this->sources = new LegacyQuoteNativeSourcePreparer( $factory ); $this->promotion_rules = null === $promotion_rules ? null : \Closure::fromCallable( $promotion_rules ); }
+	/** Actual admitted native base calculation precedes this explicit promotion lane. */
+	public function prepare_promotion( QuoteCartDraft $draft, QuoteTime $original_issued_at, callable $unchanged ): FixedPromotionNativeCartPreparedCapture {
+		$cleanup = null;
+		try {
+			if ( null === $this->promotion_planning || null === $this->promotion_rates || null === $this->promotion_rules || null === $this->promotion_hold_seconds || $this->promotion_hold_seconds < 1 || $this->promotion_hold_seconds > QuoteHeader::TTL_SECONDS || true !== $unchanged() ) { self::fail(); }
+			$until = $original_issued_at->plus_seconds( $this->promotion_hold_seconds );
+			if ( QuoteTime::now()->compare( $original_issued_at ) < 0 || QuoteTime::now()->compare( $until ) >= 0 ) { self::fail(); }
+			$base = $this->prepare( $draft ); $owner = $draft->owner(); $context = $base->context(); $terms = $base->terms();
+			$source = $this->sources->prepare( $owner, $context )->bind_context( $context );
+			if ( true !== $unchanged() || ! $source->applicable_at( QuoteTime::now() ) || ! $source->local_state_unchanged() ) { self::fail(); }
+			$rules = ( $this->promotion_rules )( $owner, $context, $terms );
+			if ( ! is_array( $rules ) || true !== $unchanged() ) { self::fail(); }
+			$selected = $this->promotion_planning->capture( $owner, $context, $terms, $rules, QuoteTime::now() );
+			if ( null === $selected || true !== $unchanged() ) { self::fail(); }
+			// This private base header binds planning provenance; no quote row or grant is issued.
+			$id = QuoteId::generate(); $base_command = $base->command( QuoteId::generate()->value() );
+			$header = QuoteHeader::issue( $id, $owner, $context, $terms, $original_issued_at, $base_command->namespace_hashes( $id ), LegacyFixedBaseQuoteProvider::CODE );
+			$packages = self::package_facts( WC()->shipping()->get_packages(), $draft );
+			$requests = FixedPromotionNativeRequests::from_captured( $header, $context, $terms, $selected['plans'], self::promotion_mapping( $packages ) );
+			$current = static fn(): bool => true === $unchanged() && $source->local_state_unchanged() && $source->applicable_at( QuoteTime::now() ) && QuoteTime::now()->compare( $until ) < 0;
+			$cleanup = NativeCartQuoteShipping::promotion_failure_cleanup();
+			$this->promotion_rates->with_promotion( $requests, $current, static function (): void { NativeCartQuoteShipping::prepare_promotion_after_admission(); } );
+			if ( ! $current() ) { self::fail(); }
+			// Resolver cache refresh happens before the final native raw-state fence.
+			$fresh_source = $this->sources->prepare( $owner, $context )->bind_context( $context );
+			if ( ! $source->matches( $fresh_source ) || ! $current() || ! $fresh_source->applicable_at( QuoteTime::now() ) ) { self::fail(); }
+			$native = ( new FixedPromotionNativeCapture( $this->native_source ?? new QuoteNativeWooSource() ) )->capture( $owner, $requests );
+			if ( true !== $unchanged() || ! $native->unchanged() || ! $fresh_source->local_state_unchanged() || QuoteTime::now()->compare( $until ) >= 0 ) { self::fail(); }
+			return new FixedPromotionNativeCartPreparedCapture( $fresh_source, $native, $selected['rules'], $selected['account_slots'], $until );
+		} catch ( \Throwable $error ) { if ( null !== $cleanup ) { try { NativeCartQuoteShipping::acknowledge_promotion_cleanup( $this->factory, $draft->owner(), $cleanup() ); } catch ( \Throwable $cleanup_error ) { throw new \RuntimeException( 'Cart quote preparation unavailable.', 0, $cleanup_error ); } } throw new \RuntimeException( 'Cart quote preparation unavailable.', 0, $error ); }
+	}
+	/** Current reads reuse the original plan and cached native calculation, without repricing. */
+	public function promotion_inputs( QuoteIssueCommand $original, QuoteCartDraft $draft ): ?FixedPromotionQuoteAcceptInputs {
+		try {
+			if ( ! $this->matches_promotion_original( $original, $draft ) ) { return null; }
+			$capture = $original->context()->fixed_promotion_capture(); $context = $capture->original_context(); $terms = $capture->original_terms();
+			$source = $this->sources->prepare( $draft->owner(), $context )->bind_context( $context );
+			$plans = []; $rules = [];
+			foreach ( $capture->private_facts()['groups'] as $slot ) {
+				$rule = null === $slot['rule'] ? null : FixedDeliveryPromotion::from_array( $slot['rule'] );
+				$plans[] = [ 'component_key' => $slot['component_key'], 'plan' => null === $rule ? null : DeliveryPromotionPlan::from_array( $terms, $rule, $slot['plan'] ) ];
+				$rules[] = [ 'component_key' => $slot['component_key'], 'rule' => $rule ];
+			}
+			$packages = self::package_facts( WC()->shipping()->get_packages(), $draft );
+			$requests = FixedPromotionNativeRequests::from_captured( $capture->original_header(), $context, $terms, $plans, self::promotion_mapping( $packages ) );
+			$native = ( new FixedPromotionNativeCapture( $this->native_source ?? new QuoteNativeWooSource() ) )->capture( $draft->owner(), $requests );
+			$current = FixedPromotionQuoteProvider::from_native_result( $native, $rules );
+			if ( ! hash_equals( $original->context()->digest(), $current->context()->digest() ) || ! $source->applicable_at( QuoteTime::now() ) || ! $source->local_state_unchanged() || ! $native->unchanged() ) { return null; }
+			return FixedPromotionQuoteAcceptInputs::from_sources( $source, $native );
+		} catch ( \Throwable ) { return null; }
+	}
+	public function matches_promotion_original( QuoteIssueCommand $original, QuoteCartDraft $draft ): bool {
+		try {
+			$context = $original->context(); $capture = $context->fixed_promotion_capture();
+			if ( 2 !== $original->identity()->operation_version || FixedPromotionQuoteProvider::CODE !== $original->provider_code() || FixedPromotionQuoteProvider::CODE !== $original->profile() || 1 !== $original->provider_version() || 1 !== $original->profile_version() || null === $capture || ! $original->owner()->equals( $draft->owner() ) || ! $draft->owner()->equals( $capture->original_header()->owner() ) || null === $original->promotion_account_slots() || null === $original->promotion_hold_until() || ! self::draft_matches_original( $draft, $context->base_context() ) ) { return false; }
+			foreach ( $draft->private_facts()['lines'] as $line ) { if ( ! hash_equals( $line['selection_hash'], CartDeliverySelectionFingerprint::fromIntent( $line['selection'] ) ) ) { return false; } }
+			return true;
+		} catch ( \Throwable ) { return false; }
+	}
+	private static function promotion_mapping( array $packages ): array { $mapping = []; foreach ( self::legacy_groups( $packages ) as $component => $group ) { $mapping[] = [ 'component_key' => $component, 'legacy_group_id' => $group ]; } return $mapping; }
 	public function prepare( QuoteCartDraft $draft, string $profile = LegacyFixedBaseQuoteProvider::CODE, ?QuoteTime $original_issued_at = null ): LegacyQuotePreparedCapture {
 		try {
 			$facts = $draft->private_facts(); $offers = [];

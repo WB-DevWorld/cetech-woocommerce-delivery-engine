@@ -125,10 +125,15 @@ jobs:
           python3 scripts/qualification/test-verify-promise-calculation-receipts.py
           python3 scripts/qualification/test-verify-promise-handoff-receipts.py
           python3 scripts/qualification/test-verify-opening-promotion-native.py
+          python3 scripts/qualification/test-verify-opening-promotion-cart.py
           python3 scripts/qualification/test-opening-http-promise-handoff.py
           python3 scripts/qualification/test-opening-promise-native-configuration-browser.py
           python3 scripts/qualification/test-verify-opening-promise-native-configuration.py
           python3 scripts/qualification/test-native-payment-transport-diagnostic.py
+          python3 scripts/qualification/test-promotion-cart-cleanup-diagnostic.py
+          python3 scripts/qualification/test-promotion-placement-customer-setup.py
+          python3 scripts/qualification/test-promotion-placement-diagnostic.py
+          python3 scripts/qualification/test-promotion-stage-callback-observer.py
           python3 scripts/qualification/test-promise-qualification-package.py
           python3 scripts/qualification/test-verify-promise-operational-lifecycle-receipts.py
           python3 scripts/qualification/test-verify-promise-qualification-bounds.py
@@ -195,6 +200,19 @@ jobs:
             tests/Integration/DeliveryPromotion/PromotionQuoteBindRealDatabaseTest.php
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-bind-concurrency.junit.xml" 1 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionQuoteBindRealDatabaseTest' 1
+          # Verify and seal publication barriers are separate from initial namespace reservation.
+          vendor/bin/phpunit -c phpunit.real-db.xml \
+            --filter test_actual_processes_serialize_same_namespace_and_shared_publication_without_duplicate_cas \
+            --log-junit "${RUNNER_TEMP}/cetech-de-verify-concurrency.junit.xml" \
+            tests/Integration/DeliveryPromotion/PromotionQuoteVerifyRealDatabaseTest.php
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-verify-concurrency.junit.xml" 1 \
+            'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionQuoteVerifyRealDatabaseTest' 1
+          vendor/bin/phpunit -c phpunit.real-db.xml \
+            --filter test_actual_processes_serialize_same_namespace_and_shared_publication_without_duplicate_cas \
+            --log-junit "${RUNNER_TEMP}/cetech-de-seal-concurrency.junit.xml" \
+            tests/Integration/DeliveryPromotion/PromotionQuoteSealRealDatabaseTest.php
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-seal-concurrency.junit.xml" 1 \
+            'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionQuoteSealRealDatabaseTest' 1
           # Fail fast on N17; E16 and every retained proof remain in the full census below.
           vendor/bin/phpunit -c phpunit.real-db.xml \
             tests/Integration/DeliveryPromotion/PromotionNativeHandoffRealDatabaseTest.php
@@ -487,6 +505,34 @@ jobs:
           path: ${{ runner.temp }}/cetech-de-php85-wp/opening-promotion-native-cpt-results.json
           if-no-files-found: warn
 
+      - name: Retain N18 native promotion cart HTTP receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-http-promotion-cart
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-promotion-cart-results.json
+          if-no-files-found: error
+      - name: Retain N18 native promotion cart browser receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-http-promotion-cart-browser
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-promotion-cart-browser-results.json
+          if-no-files-found: error
+      - name: Retain N18 native promotion order handoff HTTP receipt
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-http-promotion-placement
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-promotion-placement-results.json
+          if-no-files-found: error
+      - name: Retain N18 native promotion cart closeout
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: opening-http-promotion-cart-closeout
+          path: ${{ runner.temp }}/cetech-de-php85-wp/opening-http-promotion-cart-closeout.json
+          if-no-files-found: error
       - name: Retain original P06 current, predecessor and reader packages
         if: always()
         uses: actions/upload-artifact@v4

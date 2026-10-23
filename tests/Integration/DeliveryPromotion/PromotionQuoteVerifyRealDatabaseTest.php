@@ -87,10 +87,37 @@ final class PromotionQuoteVerifyRealDatabaseTest extends TestCase {
 	}
 	private function worker( string $file, string $mode = 'reconcile', string $role = 'history', int $clock = Factory::NOW + 3, string $barrier = 'publication' ): OperationProofProcess { $p = new OperationProofProcess( [ __DIR__ . '/promotion-quote-verify-process-worker.php', json_encode( [ 'prefix' => $this->prefix, 'command_file' => $file, 'mode' => $mode, 'role' => $role, 'clock' => $clock, 'barrier' => $barrier ], JSON_THROW_ON_ERROR ) ] ); $this->processes[] = $p; return $p; }
 	private function finish_worker( OperationProofProcess $process ): array { $result = $process->finish(); $this->processes = array_values( array_filter( $this->processes, static fn( OperationProofProcess $active ): bool => $active !== $process ) ); return $result; }
+	/** Closed diagnostics never copy worker output, private recovery facts or exception messages. */
+	private function verify_worker_status( string $directory, string $role ): array {
+		$status = [ 'phase' => 'unknown', 'state' => 'unknown', 'exception_class' => 'none' ];
+		$file = $directory . '/verify-' . $role . '-status.json'; clearstatcache( true, $file );
+		$size = is_file( $file ) && ! is_link( $file ) ? filesize( $file ) : false; if ( ! is_int( $size ) || $size < 1 || $size > 1024 ) { return $status; }
+		$bytes = file_get_contents( $file ); if ( ! is_string( $bytes ) || strlen( $bytes ) > 1024 ) { return $status; }
+		try { $row = json_decode( $bytes, true, 3, JSON_THROW_ON_ERROR ); } catch ( \Throwable ) { return $status; }
+		if ( ! is_array( $row ) || array_keys( $row ) !== [ 'phase', 'state', 'exception_class' ] ) { return $status; }
+		$phases = [ 'bootstrap', 'recovery', 'source_open', 'source_capture', 'source_cleanup', 'configured', 'running', 'namespace_reservation', 'namespace_dispatched', 'reservation_held', 'reservation_released', 'namespace_lock', 'control_lock', 'publication_dispatched', 'account_lock', 'order_lock', 'saved_lock', 'quote_lock', 'binding_lock', 'effect_held', 'effect_released', 'cleanup' ];
+		$states = [ 'running', 'accepted', 'rejected', 'unconfirmed', 'not_applicable', 'failed' ];
+		$classes = [ 'none', 'RuntimeException', 'InvalidArgumentException', 'LogicException', 'TypeError', 'ErrorException', 'Error', 'Exception', 'Throwable' ];
+		if ( in_array( $row['phase'], $phases, true ) && in_array( $row['state'], $states, true ) && in_array( $row['exception_class'], $classes, true ) ) { return $row; } return $status;
+	}
+	private function wait_for_verify_marker( string $directory, string $marker, string $role ): void {
+		if ( ! in_array( [ $marker, $role ], [ [ 'left-held', 'left' ], [ 'right-reserved', 'right' ], [ 'right-dispatched', 'right' ] ], true ) ) { throw new \LogicException( 'Owned E14 barrier descriptor refused.' ); }
+		// Preserve OperationProofProcess::wait_for's original eight-second marker bound.
+		$end = microtime( true ) + 8.0;
+		do {
+			clearstatcache( true, $directory . '/' . $marker ); if ( is_file( $directory . '/' . $marker ) ) { return; }
+			$status = $this->verify_worker_status( $directory, $role ); if ( ! in_array( $status['state'], [ 'unknown', 'running' ], true ) ) { break; }
+			usleep( 10000 );
+		} while ( microtime( true ) < $end );
+		clearstatcache( true, $directory . '/' . $marker ); if ( is_file( $directory . '/' . $marker ) ) { return; }
+		$status = $this->verify_worker_status( $directory, $role );
+		throw new \RuntimeException( 'Owned E14 marker not reached: role=' . $role . ' phase=' . $status['phase'] . ' state=' . $status['state'] . ' exception_class=' . $status['exception_class'] . '.' );
+	}
 	private function wait_for_lock( int $waiter, int $blocker, string $kind ): void {
 		self::assertNotSame( $waiter, $blocker ); $table = $this->prefix . ( 'namespace' === $kind ? 'delivery_engine_operation_records' : 'options' ); $end = microtime( true ) + 3.0; $waiting = false;
 		$sql = "SELECT COUNT(*) FROM information_schema.INNODB_LOCK_WAITS w JOIN information_schema.INNODB_LOCKS l ON l.lock_id=w.requested_lock_id JOIN information_schema.INNODB_TRX r ON r.trx_id=w.requesting_trx_id JOIN information_schema.INNODB_TRX b ON b.trx_id=w.blocking_trx_id WHERE l.lock_table=CONCAT('`',DATABASE(),'`.`{$table}`') AND r.trx_mysql_thread_id={$waiter} AND b.trx_mysql_thread_id={$blocker} AND r.trx_state='LOCK WAIT'";
-		do { $waiting = (int) DB::scalar( $this->database, $sql ) > 0; if ( $waiting ) { break; } usleep( 10000 ); } while ( microtime( true ) < $end ); self::assertTrue( $waiting, 'The competing verification process must wait on the exact declared owner and table.' );
+		// Allow the MariaDB observation cache to refresh without extending the existing deadline.
+		do { $waiting = (int) DB::scalar( $this->database, $sql ) > 0; if ( $waiting ) { break; } $remaining = $end - microtime( true ); if ( $remaining <= 0 ) { break; } usleep( (int) min( 120000, ceil( $remaining * 1000000 ) ) ); } while ( microtime( true ) < $end ); self::assertTrue( $waiting, 'The competing verification process must wait on the exact declared owner and table.' );
 	}
 
 	public function test_atomic_verified_binding_exact_history_and_changed_digest_intent(): void {
@@ -108,14 +135,17 @@ final class PromotionQuoteVerifyRealDatabaseTest extends TestCase {
 		// The same-placement retry first waits on C03's unique operation namespace.
 		$same = $this->command( $this->seed( 2001 ) ); $protected = $this->protected_bytes();
 		$left_file = $this->command_file( $same, name: 'verify-left.json' ); $directory = dirname( $left_file ); $right_file = $this->command_file( $same, $directory, 'verify-right.json' );
-		$left = $this->worker( $left_file, 'verify', 'left', barrier: 'namespace' ); OperationProofProcess::wait_for( $directory . '/left-held' ); $held = json_decode( (string) file_get_contents( $directory . '/left-held' ), true, 4, JSON_THROW_ON_ERROR );
-		$right = $this->worker( $right_file, 'verify', 'right', barrier: 'namespace' ); OperationProofProcess::wait_for( $directory . '/right-dispatched' ); $waiter = json_decode( (string) file_get_contents( $directory . '/right-dispatched' ), true, 4, JSON_THROW_ON_ERROR ); $this->wait_for_lock( $waiter['connection_id'], $held['connection_id'], 'namespace' ); OperationProofBarrier::signal( $directory . '/release' );
+		$left = $this->worker( $left_file, 'verify', 'left', barrier: 'namespace' ); $this->wait_for_verify_marker( $directory, 'left-held', 'left' ); $held = json_decode( (string) file_get_contents( $directory . '/left-held' ), true, 4, JSON_THROW_ON_ERROR );
+		$right = $this->worker( $right_file, 'verify', 'right', barrier: 'namespace' ); $this->wait_for_verify_marker( $directory, 'right-dispatched', 'right' ); $waiter = json_decode( (string) file_get_contents( $directory . '/right-dispatched' ), true, 4, JSON_THROW_ON_ERROR ); $this->wait_for_lock( $waiter['connection_id'], $held['connection_id'], 'namespace' ); OperationProofBarrier::signal( $directory . '/release' );
 		$a = $this->finish_worker( $left ); $b = $this->finish_worker( $right ); self::assertNotSame( getmypid(), $a['process_id'] ); self::assertNotSame( $a['process_id'], $b['process_id'] ); self::assertSame( 'accepted', $a['state'] ); self::assertSame( 'accepted', $b['state'] ); self::assertTrue( $b['replayed'] ); self::assertSame( 1, $a['binding_updates'] + $b['binding_updates'] ); self::assertSame( $a['binding_verified_at'], $b['binding_verified_at'] ); self::assertSame( 0, $a['protected_writes'] + $b['protected_writes'] ); self::assertCount( 4, $this->rows( 'operation_changes' ) ); self::assertSame( $protected, $this->protected_bytes() );
 		// Distinct placement namespaces instead contend on the current publication.
 		$first = $this->command( $this->seed( 2002 ) ); $second = $this->command( $this->seed( 2003 ) ); $protected = $this->protected_bytes(); self::assertSame( [ 'held', 'held', 'held', 'held', 'held', 'held' ], array_column( $this->rows( 'promotion_budget_reservations' ), 'state' ) );
 		$left_file = $this->command_file( $first, name: 'verify-left.json' ); $directory = dirname( $left_file ); $right_file = $this->command_file( $second, $directory, 'verify-right.json' );
-		$left = $this->worker( $left_file, 'verify', 'left' ); OperationProofProcess::wait_for( $directory . '/left-held' ); $held = json_decode( (string) file_get_contents( $directory . '/left-held' ), true, 4, JSON_THROW_ON_ERROR );
-		$right = $this->worker( $right_file, 'verify', 'right' ); OperationProofProcess::wait_for( $directory . '/right-dispatched' ); $waiter = json_decode( (string) file_get_contents( $directory . '/right-dispatched' ), true, 4, JSON_THROW_ON_ERROR ); $this->wait_for_lock( $waiter['connection_id'], $held['connection_id'], 'publication' ); OperationProofBarrier::signal( $directory . '/release' );
+		// This branch targets current-publication serialization. Commit the genuine right
+		// namespace before holding the left effect, so initial INSERT contention cannot mask it.
+		$right = $this->worker( $right_file, 'verify', 'right' ); $this->wait_for_verify_marker( $directory, 'right-reserved', 'right' ); $reserved = json_decode( (string) file_get_contents( $directory . '/right-reserved' ), true, 4, JSON_THROW_ON_ERROR ); self::assertFalse( $reserved['in_transaction'] ); self::assertTrue( $reserved['autocommit'] );
+		$left = $this->worker( $left_file, 'verify', 'left' ); $this->wait_for_verify_marker( $directory, 'left-held', 'left' ); $held = json_decode( (string) file_get_contents( $directory . '/left-held' ), true, 4, JSON_THROW_ON_ERROR );
+		OperationProofBarrier::signal( $directory . '/right-start-effect' ); $this->wait_for_verify_marker( $directory, 'right-dispatched', 'right' ); $waiter = json_decode( (string) file_get_contents( $directory . '/right-dispatched' ), true, 4, JSON_THROW_ON_ERROR ); self::assertSame( $reserved['connection_id'], $waiter['connection_id'] ); $this->wait_for_lock( $waiter['connection_id'], $held['connection_id'], 'publication' ); OperationProofBarrier::signal( $directory . '/release' );
 		$a = $this->finish_worker( $left ); $b = $this->finish_worker( $right ); self::assertNotSame( $a['process_id'], $b['process_id'] ); self::assertSame( 'accepted', $a['state'] ); self::assertSame( 'accepted', $b['state'] ); self::assertFalse( $a['replayed'] ); self::assertFalse( $b['replayed'] ); self::assertSame( 2, $a['binding_updates'] + $b['binding_updates'] ); self::assertSame( 0, $a['protected_writes'] + $b['protected_writes'] ); self::assertCount( 3, $this->rows( 'delivery_quote_bindings' ) ); self::assertSame( [ 2, 2, 2 ], array_map( 'intval', array_column( $this->rows( 'delivery_quote_bindings' ), 'revision' ) ) ); self::assertCount( 12, $this->rows( 'operation_changes' ) ); self::assertSame( $protected, $this->protected_bytes() );
 	}
 

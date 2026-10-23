@@ -27,6 +27,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 	private \WeakMap $continuations;
 	private array $stages = [];
 	private ?QuoteNativeOrderPayContinuation $pay_continuation = null;
+	private ?FixedPromotionNativePlacementRuntime $promotion = null;
 	private bool $registered = false;
 
 	/** Policy/ownership closures are invoked only outside owned database locks. */
@@ -41,7 +42,8 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 		?callable $guard_decorator = null,
 		?callable $redirect = null,
 		?callable $terminate = null,
-		?callable $final_admission = null
+		?callable $final_admission = null,
+		?FixedPromotionNativePlacementRuntime $promotion = null
 	) {
 		$this->active = \Closure::fromCallable( $active ); $this->managed_cart = \Closure::fromCallable( $managed_cart );
 		$this->saved_reader = null === $saved_reader ? null : \Closure::fromCallable( $saved_reader );
@@ -49,6 +51,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 		$this->redirect = null === $redirect ? null : \Closure::fromCallable( $redirect );
 		$this->terminate = null === $terminate ? null : \Closure::fromCallable( $terminate );
 		$this->final_admission = null === $final_admission ? null : \Closure::fromCallable( $final_admission );
+		$this->promotion = $promotion;
 		$this->store_posts = new \WeakMap(); $this->saved = new \WeakMap(); $this->continuations = new \WeakMap();
 	}
 
@@ -67,11 +70,12 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 		add_filter( 'rest_dispatch_request', [ $this, 'recover_store_post' ], -100, 4 );
 		add_action( 'woocommerce_pre_payment_complete', [ $this, 'guard_free_payment_continuation' ], PHP_INT_MAX, 1 );
 		add_action( 'woocommerce_rest_checkout_process_payment_with_context', [ $this, 'guard_store_payment_context' ], -PHP_INT_MAX, 2 );
+		if ( null !== $this->promotion ) { add_filter( 'woocommerce_available_payment_gateways', [ $this, 'guard_payment_gateways' ], PHP_INT_MAX, 1 ); }
 	}
 
 	/** Persister guard: a quote-owned group never falls back to the legacy writer. */
 	public function owns_order( \WC_Order $order ): bool {
-		try { return QuoteNativeOrderHistory::attempted( $order ) || $this->new_cart_owned(); }
+		try { return ( null !== $this->promotion && $this->promotion->owns( $order ) ) || QuoteNativeOrderHistory::attempted( $order ) || $this->new_cart_owned(); }
 		catch ( \Throwable ) { return true; }
 	}
 	public function fingerprint( \WC_Order $order ): ?string { return EmergencyCheckoutFacts::order_fingerprint( $order ); }
@@ -91,6 +95,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 	/** Read the completed pinned native logger save outside all owned SQL. */
 	public function observe_native_logging_save( mixed $order, mixed $store = null ): void {
 		if ( ! $order instanceof \WC_Order ) { return; }
+		$this->promotion?->observe_native_logging_save( $order );
 		try {
 			$coordinate = $this->coordinate( $order ); $entry = $this->stages[$coordinate] ?? null;
 			if ( null === $entry || 'classic' !== $entry['route'] || ! ( $entry['logging'] ?? null ) instanceof QuoteNativeCheckoutLoggingEvidence ) { return; }
@@ -137,6 +142,13 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 			if ( ! is_string( $nonce ) || strlen( $nonce ) > 128 || ! function_exists( 'wp_verify_nonce' ) || ! wp_verify_nonce( $nonce, 'wc_store_api' ) || '' !== (string) $request->get_header( 'Cart-Token' ) || ! $native->has_session() ) { return $this->store_recovery_error(); }
 			$order = function_exists( 'wc_get_order' ) ? wc_get_order( $original['order_id'] ) : null;
 			if ( ! $order instanceof \WC_Order || ! $this->authorize_checkout_pointer( $order, $native ) ) { return $this->store_recovery_error(); }
+			if ( null !== $this->promotion && $this->promotion->owns( $order ) ) {
+				// Original promotion recovery ends at a pending sealed observation. Woo
+				// must not synchronize the order or receive a successful payment response.
+				$this->promotion->stage( $order, $original['route'] );
+				if ( null !== $this->final_admission ) { ( $this->final_admission )( $order, $original['route'] ); }
+				return $this->store_recovery_error();
+			}
 			// This dispatch seam precedes Woo's handler. Load the same native session
 			// cart once, after authorization and before capturing any quote evidence.
 			if ( ! class_exists( '\Automattic\WooCommerce\StoreApi\Utilities\CartController' ) ) { return $this->store_recovery_error(); }
@@ -160,6 +172,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 	public function validate_order( \WC_Order $order, string $route ): bool {
 		try {
 			if ( ! in_array( $route, [ 'classic', 'blocks', 'store_api', 'order_pay' ], true ) ) { return false; }
+			if ( null !== $this->promotion && ( $this->promotion->owns( $order ) || $this->promotion->selected() ) ) { return $this->promotion->validate_order( $order, $route ); }
 			$entry = $this->stages[$this->coordinate( $order )] ?? null;
 			if ( null !== $entry ) { return $this->stage_matches( $order, $entry ) && ( $entry['route'] === $route || 'order_pay' === $route && 'sealed' === $entry['binding']->state() && $this->authorize_saved_order( $order ) ) && QuoteNativeOrderHistory::verify( $order ); }
 			if ( ! QuoteNativeOrderHistory::owned( $order ) ) {
@@ -177,6 +190,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 
 	/** Invoked by C07 only after its tentative current control confirmation releases. */
 	public function complete( \WC_Order $order, string $route, int $control_revision, EmergencyCheckoutLocalBinding $local ): bool {
+		if ( null !== $this->promotion && $this->promotion->owns( $order ) ) { return $this->promotion->complete( $order, $route, $control_revision, $local ); }
 		try {
 			if ( ! $local->unchanged() || $control_revision < 1 ) { return false; }
 			if ( 'store_api' === $route && ! $this->store_payment_hook_supported() ) { return false; }
@@ -247,6 +261,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 		} catch ( \Throwable ) { return false; }
 	}
 	public function admitted( \WC_Order $order, string $route, int $control_revision, EmergencyCheckoutLocalBinding $binding ): bool {
+		if ( null !== $this->promotion && $this->promotion->owns( $order ) ) { return false; }
 		try {
 			$entry = $this->continuations[$order] ?? null;
 			if ( null !== $entry ) { return $entry['route'] === $route && $entry['revision'] === $control_revision && $entry['local'] === $binding && $binding->unchanged(); }
@@ -256,6 +271,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 
 	/** Native pay_action saves the selected method and validates fields after C07. */
 	public function guard_payment_gateways( mixed $gateways ): mixed {
+		if ( null !== $this->promotion && $this->promotion->selected() ) { return []; }
 		if ( null === $this->pay_continuation ) { return $gateways; }
 		if ( ! is_array( $gateways ) || ! $this->terminal_gateway_filter() ) { throw new \RuntimeException( EmergencyControlResponse::message() ); }
 		$id = $this->pay_continuation->method(); $gateway = $gateways[$id] ?? null;
@@ -273,6 +289,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 	}
 	/** Before native free completion, retain only the already acknowledged facts. */
 	public function guard_free_payment_continuation( mixed $order_id ): void {
+		if ( null !== $this->promotion && is_int( $order_id ) && function_exists( 'wc_get_order' ) ) { $order = wc_get_order( $order_id ); if ( $order instanceof \WC_Order && $this->promotion->owns( $order ) ) { throw new \RuntimeException( EmergencyControlResponse::message() ); } }
 		if ( null === $this->pay_continuation || $this->pay_continuation->delegated() || $order_id !== $this->pay_continuation->order_id() ) { return; }
 		$hook = $GLOBALS['wp_filter']['woocommerce_pre_payment_complete'] ?? null;
 		$callbacks = $hook instanceof \WP_Hook ? $hook->callbacks : []; ksort( $callbacks, SORT_NUMERIC ); $last = end( $callbacks ); $callback = is_array( $last ) && [] !== $last ? end( $last ) : null;
@@ -282,6 +299,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 	}
 	/** Before native Store API callbacks, retain the same acknowledged order. */
 	public function guard_store_payment_context( mixed $context, mixed $result ): void {
+		if ( null !== $this->promotion && is_object( $context ) && isset( $context->order ) && $context->order instanceof \WC_Order && $this->promotion->owns( $context->order ) ) { throw new \RuntimeException( EmergencyControlResponse::message() ); }
 		if ( null === $this->pay_continuation ) { return; }
 		if ( ! $this->store_payment_hook_supported() || ! is_object( $context ) || 'Automattic\\WooCommerce\\StoreApi\\Payments\\PaymentContext' !== get_class( $context ) || ! $context->order instanceof \WC_Order || $context->order->get_id() !== $this->pay_continuation->order_id() || $context->payment_method !== $this->pay_continuation->method() || ! $this->pay_continuation->verify() ) { throw new \RuntimeException( EmergencyControlResponse::message() ); }
 	}
@@ -329,6 +347,10 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 		if ( ! $order instanceof \WC_Order ) { return; }
 		if ( ! self::valid_continuation( $original ) || $original['order_id'] !== $id ) { if ( QuoteNativeOrderHistory::owned( $order ) ) { self::refuse( 'classic' ); } return; }
 		if ( ! $this->authorize_checkout_pointer( $order, $native ) ) { self::refuse( 'classic' ); }
+		if ( null !== $this->promotion && $this->promotion->owns( $order ) ) {
+			try { $this->promotion->stage( $order, $original['route'] ); if ( null !== $this->final_admission ) { ( $this->final_admission )( $order, $original['route'] ); } } catch ( \Throwable ) {}
+			self::refuse( 'classic' );
+		}
 		// The pointer belongs to this native authorized checkout session. Do not
 		// expose a saved order or reuse it through a browser-supplied order ID.
 		$evidence = $this->cart->current( RequestContext::create() );
@@ -351,12 +373,17 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 		$original = $native->get( self::SESSION_CONTINUATION );
 		if ( ! self::valid_continuation( $original ) || $original['order_id'] !== $order_id ) { if ( QuoteNativeOrderHistory::owned( $order ) ) { self::refuse( 'classic' ); } return; }
 		if ( ! $this->authorize_checkout_pointer( $order, $native ) || ! method_exists( $order, 'get_checkout_payment_url' ) ) { self::refuse( 'classic' ); }
+		if ( null !== $this->promotion && $this->promotion->owns( $order ) ) {
+			try { $this->promotion->stage( $order, $original['route'] ); if ( null !== $this->final_admission ) { ( $this->final_admission )( $order, $original['route'] ); } } catch ( \Throwable ) {}
+			self::refuse( 'classic' );
+		}
 		try { $this->stage( $order, $original['route'] ); } catch ( \Throwable ) { self::refuse( 'classic' ); }
 		if ( ! $this->finish_recovery( $order, $original['route'] ) ) { self::refuse( 'classic' ); }
 		$url = $order->get_checkout_payment_url(); $this->redirect_payment( $url );
 	}
 
 	private function stage( \WC_Order $order, string $route ): void {
+		if ( null !== $this->promotion && ( $this->promotion->owns( $order ) || $this->promotion->selected() ) ) { $this->promotion->stage( $order, $route ); return; }
 		$coordinate = $this->coordinate( $order );
 		if ( isset( $this->stages[$coordinate] ) ) { if ( $this->stages[$coordinate]['route'] !== $route || ! QuoteNativeOrderHistory::verify( $order ) ) { self::refuse( $route ); } return; }
 		$logging = 'classic' === $route ? QuoteNativeCheckoutLoggingEvidence::begin_classic() : null;
@@ -414,7 +441,7 @@ final class QuotePlacementRuntime implements EmergencyFinalPlacementGuard, Emerg
 		return $fresh;
 	}
 	private function coordinate( \WC_Order $order ): string { $site = get_current_blog_id(); $id = $order->get_id(); if ( ! is_int( $site ) || $site < 1 || ! is_int( $id ) || $id < 1 ) { throw new \RuntimeException( 'Quote placement unavailable.' ); } return $site . ':' . $id; }
-	private function new_cart_owned(): bool { try { return true === ( $this->active )() && true === ( $this->managed_cart )(); } catch ( \Throwable ) { return true; } }
+	private function new_cart_owned(): bool { try { return ( null !== $this->promotion && $this->promotion->selected() ) || true === ( $this->active )() && true === ( $this->managed_cart )(); } catch ( \Throwable ) { return true; } }
 	private function preserve_original_pointer( \WC_Order $order, QuotePlacementEvidence $evidence, string $placement, string $route ): void {
 		$native = function_exists( 'WC' ) ? ( WC()->session ?? null ) : null;
 		if ( ! $native instanceof \WC_Session_Handler || \WC_Session_Handler::class !== get_class( $native ) || ! $evidence->authorize( $evidence->owner(), 'delivery_quote.session' ) ) { self::refuse( $route ); }

@@ -19,6 +19,11 @@ final class QuoteProjection {
 		return QuoteProjectionResult::shopper( $quote, $at, $request );
 	}
 
+	/** Current promotion reads supply their own typed source and held-funding observations. */
+	public static function for_fixed_promotion_current( FixedPromotionQuoteIssuedEvidence|FixedPromotionQuotePlacementEvidence $evidence, RequestContext $request ): QuoteProjectionResult {
+		return QuoteProjectionResult::fixed_promotion_current( $evidence, $request );
+	}
+
 	/** A diagnostic is neither quote acceptance nor a material mutation/audit. */
 	public static function for_diagnostic_log( DeliveryQuote $quote, QuoteTime $at, RequestContext $request ): QuoteProjectionResult {
 		return QuoteProjectionResult::diagnostic( $quote, $at, $request );

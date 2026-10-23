@@ -81,7 +81,7 @@ final class NativeCartQuoteSessionStore implements CartQuoteSessionStore {
 		if ( ! $unique || ! $primary ) { self::unavailable(); }
 	}
 	private function row( OperationSession $session, string $key, bool $lock ): ?array {
-		$table = $session->table_prefix() . 'woocommerce_sessions'; $max = CartQuoteSessionEnvelope::MAX_BYTES;
+		$table = $session->table_prefix() . 'woocommerce_sessions'; $max = max( CartQuoteSessionEnvelope::MAX_BYTES, CartQuoteSessionEnvelope::MAX_PROMOTION_BYTES );
 		$sql = $session->prepare( "SELECT session_id,session_key,CASE WHEN OCTET_LENGTH(session_value)<={$max} THEN session_value ELSE NULL END AS session_value,session_expiry,CASE WHEN OCTET_LENGTH(session_value)>{$max} THEN 1 ELSE 0 END AS payload_oversized FROM `{$table}` WHERE session_key=%s LIMIT 2" . ( $lock ? ' FOR UPDATE' : '' ), $key ); $rows = $session->get_results( $sql );
 		if ( ! is_array( $rows ) || count( $rows ) > 1 ) { self::unavailable(); } return $rows[0] ?? null;
 	}
