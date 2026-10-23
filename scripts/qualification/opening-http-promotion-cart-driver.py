@@ -105,6 +105,12 @@ def run(client, state, recorder):
         response = shopper.json_post(state["store_extensions_url"], {"namespace": "cetech-delivery-quote-review", "data": fields}, {"Nonce": nonce if nonce is not None else inspect(shopper)["store_nonce"]})
         return response, decoded(response).get("extensions", {}).get("cetech-delivery-quote-review")
 
+    # Fixture seeding refreshes Woo's site-wide shipping cache version. Prepare
+    # both owners before issuing the primary quote so the isolation setup cannot
+    # invalidate the native calculation whose current authority we later prove.
+    other = common.HttpClient(client.base_url)
+    seed(other)
+
     # Read-only rendering and repeated real Store GETs must not issue a quote.
     before = seed(client)
     page = client.get(state["classic_page_url"])
@@ -131,12 +137,11 @@ def run(client, state, recorder):
     after = inspect(client)
     check(3, extra.status == 400 and stale.status == 200 and public.safe_facts(stale_facts) and stale_facts["status"] != "confirmed" and same(before, after), before, after, extra_authority_refused=True, stale_generation_refused=True)
 
-    other = common.HttpClient(client.base_url)
-    other_before = seed(other)
+    other_before = inspect(other)
     foreign, foreign_facts = store(other, {"action": "confirm", "generation": generation})
     other_after = inspect(other)
     after = inspect(client)
-    check(4, before["owner_digest"] != other_after["owner_digest"] and other_before["facts"]["status"] == "no_quote" and foreign.status == 200 and public.safe_facts(foreign_facts) and foreign_facts["status"] != "confirmed" and same(before, after) and same(other_before, other_after), before, after, distinct_native_owner=True, foreign_session_has_no_quote=True)
+    check(4, before["owner_digest"] != other_after["owner_digest"] and other_before["facts"]["status"] == "no_quote" and foreign.status == 200 and public.safe_facts(foreign_facts) and foreign_facts["status"] != "confirmed" and same(before, after) and same(other_before, other_after) and promotion(after["facts"]) and after["facts"]["status"] == "review_required" and after["facts"]["can_confirm"] and after["facts"]["generation"] == generation, before, after, distinct_native_owner=True, foreign_session_has_no_quote=True)
 
     before = after
     response, facts = store(client, {"action": "confirm", "generation": generation})
