@@ -37,10 +37,74 @@ PLACED_KEYS = (
 HISTORY_KEYS = (
     "fresh_native_order", "original_five_authenticated", "pending_unpaid", "gateway_zero", "fresh_current_sealed",
 )
+PLACEMENT_PHASES = frozenset((
+    "entry", "current_bundle", "checkout_address", "namespace_tracking", "budget_before",
+    "create_order", "create_order_wp_error", "created_order_identity", "explicit_stage",
+    "final_admission", "sealed_read", "saved_history", "package_read", "persist_placed_order", "complete",
+))
+PLACEMENT_ERROR_CLASSES = frozenset((
+    "Exception", "RuntimeException", "LogicException", "InvalidArgumentException", "UnexpectedValueException",
+    "Error", "TypeError", "ParseError", "OtherError",
+))
+
+
+def placement_failure_observation(response):
+    """A failed-only, closed projection; never copy a body or an exception message."""
+    status = response.status if type(response.status) is int and 100 <= response.status <= 599 else None
+    result = {"http_status": status, "packet_valid": False, "observation": None}
+    if status != 503 or not isinstance(response.body, (str, bytes)):
+        return result
+    try:
+        if len(response.body.encode("utf-8") if isinstance(response.body, str) else response.body) > 4096:
+            return result
+
+        def unique(pairs):
+            value = {}
+            for key, item in pairs:
+                if key in value:
+                    raise ValueError("Duplicate diagnostic field")
+                value[key] = item
+            return value
+
+        def no_constant(_):
+            raise ValueError("Non-JSON diagnostic constant")
+
+        packet = json.loads(response.body, object_pairs_hook=unique, parse_constant=no_constant)
+        if not public.exact(packet, ("success", "data")) or packet["success"] is not False or not public.exact(packet["data"], ("cetech_n18_placement_failure",)):
+            return result
+        value = packet["data"]["cetech_n18_placement_failure"]
+        keys = ("format", "phase", "kind", "error_class", "checkout_exception_observed", "tracked_native_order", "checkout_endpoint_verified")
+        if not public.exact(value, keys) or value["format"] != "cetech-n18-placement-failure-v1" or value["phase"] not in PLACEMENT_PHASES or value["kind"] not in ("wp_error", "throwable"):
+            return result
+        if any(type(value[key]) is not bool for key in ("checkout_exception_observed", "tracked_native_order")) or (value["checkout_endpoint_verified"] is not None and type(value["checkout_endpoint_verified"]) is not bool):
+            return result
+        if value["kind"] == "wp_error":
+            if value["error_class"] is not None or value["phase"] != "create_order_wp_error":
+                return result
+        elif value["error_class"] not in PLACEMENT_ERROR_CLASSES:
+            return result
+        result.update(packet_valid=True, observation={key: value[key] for key in keys})
+    except (ValueError, TypeError, KeyError, UnicodeError, RecursionError):
+        pass
+    return result
 
 
 def booleans(value, keys):
     return public.exact(value, keys) and all(type(value[key]) is bool for key in keys)
+
+
+def closed_observation(response, keys, recorder):
+    try:
+        payload = json.loads(response.body)
+        approved = response.status == 200 and public.exact(payload, ("success", "data")) and payload["success"] is True and booleans(payload["data"], keys)
+    except (ValueError, TypeError, UnicodeError, RecursionError):
+        approved = False
+    if not approved:
+        if keys == PLACED_KEYS:
+            recorder.report["failure_observation"] = placement_failure_observation(response)
+            recorder.write()
+        raise RuntimeError("N18 native placement returned an unapproved observation shape")
+    return payload["data"]
 
 
 def fixture_mode(url, mode):
@@ -87,12 +151,6 @@ def run(client, state, recorder):
                 and (part["display_total"] or part["total"])["amount"] == expected["display_total"]
                 and all(part[key]["currency"] == expected["currency"] for key in ("list_price", "final_price", "tax", "total")))
 
-    def closed_observation(response, keys):
-        payload = decoded(response)
-        if response.status != 200 or not public.exact(payload, ("success", "data")) or payload["success"] is not True or not booleans(payload["data"], keys):
-            raise RuntimeError("N18 native placement returned an unapproved observation shape")
-        return payload["data"]
-
     stage("native_seed")
     initial = inspection()
     seeded = client.request(state["seed_url"], {"nonce": initial["fixture_nonce"]}, headers)
@@ -123,7 +181,7 @@ def run(client, state, recorder):
     before = after
     stage("native_place")
     place = client.request(fixture_mode(state["fixture_url"], "place"), {"nonce": before["fixture_nonce"]}, headers)
-    observed = closed_observation(place, PLACED_KEYS)
+    observed = closed_observation(place, PLACED_KEYS, recorder)
     after = inspection()
     recorder.check(IDS[1], bool(all(observed.values()) and after["orders_count"] > before["orders_count"] and after["history_counts"]["bindings"] == before["history_counts"]["bindings"] + 1 and after["history_counts"]["accepted"] == before["history_counts"]["accepted"] and after["history_counts"]["quotes"] == before["history_counts"]["quotes"] and after["gateway_count"] == before["gateway_count"] == 0), {
         **observed, "actual_native_http": True, "fixture_post_once": True,
@@ -136,7 +194,7 @@ def run(client, state, recorder):
     reads = []
     for _ in range(2):
         response = client.get(fixture_mode(state["fixture_url"], "placed"), headers)
-        reads.append(closed_observation(response, HISTORY_KEYS))
+        reads.append(closed_observation(response, HISTORY_KEYS, recorder))
     after = inspection()
     recorder.check(IDS[2], bool(all(all(value.values()) for value in reads) and same_history(before, after)), {
         **{key: all(value[key] for value in reads) for key in HISTORY_KEYS},
