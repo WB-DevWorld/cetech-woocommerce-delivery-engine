@@ -5,13 +5,14 @@ declare(strict_types=1);
 require_once __DIR__ . '/opening-quote-cart-support.php';
 
 use CetechDeliveryEngine\Application\DeliveryPromotion\FixedPromotionCartPlanning;
-use CetechDeliveryEngine\Application\DeliveryQuote\{CartQuoteService, FixedPromotionQuoteAcceptService, FixedPromotionQuoteIssueService, FixedPromotionQuotePlacementEvidenceReader, FixedPromotionQuoteProvider, NativeCartQuoteEnvironment, NativeCartQuotePreparation, NativeCartQuoteSessionStore, QuotePreparationGate};
+use CetechDeliveryEngine\Application\DeliveryQuote\{CartQuoteService, FixedPromotionQuoteAcceptService, FixedPromotionQuoteIssueService, FixedPromotionQuotePlacementEvidence, FixedPromotionQuotePlacementEvidenceReader, FixedPromotionQuoteProvider, NativeCartQuoteEnvironment, NativeCartQuotePreparation, NativeCartQuoteSessionStore, QuoteCartDraft, QuoteNativeContextIdentity, QuotePreparationGate};
 use CetechDeliveryEngine\Application\RuleLifecycle\RuleLifecycleService;
 use CetechDeliveryEngine\Application\Shipping\SelectedOfferShippingRateCalculator;
 use CetechDeliveryEngine\Bootstrap\Plugin;
 use CetechDeliveryEngine\Domain\Contracts\{OperationIdentity, RequestContext};
+use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
 use CetechDeliveryEngine\Domain\DeliveryPromotion\{FixedDeliveryPromotion, FixedPromotionBudgetRequest, FixedPromotionBudgetState, FixedPromotionEligibilityFamily};
-use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteId, QuoteMoney, QuoteOwner};
+use CetechDeliveryEngine\Domain\DeliveryQuote\{QuoteContext, QuoteId, QuoteMoney, QuoteOwner};
 use CetechDeliveryEngine\Domain\Operation\{OperationCommitResult, OperationSession};
 use CetechDeliveryEngine\Domain\RuleLifecycle\{RuleContent, RuleFamilyRegistry, RuleLifecycleCommand};
 use CetechDeliveryEngine\Infrastructure\Persistence\{SqlFixedPromotionBudgetStore, SqlFixedPromotionRuleEligibilityGuard, TableNames};
@@ -58,7 +59,7 @@ final class CetechPromotionCartHttpFixture {
             $state=null; $tracked=false;
             try {
                 $state=cetech_q05_state();
-                if (WC()->session instanceof WC_Session_Handler&&WC()->cart instanceof WC_Cart&&WC()->customer instanceof WC_Customer) { CetechQuoteCartHttpFixture::track_owner($state,$sessions); }
+                if (WC()->session instanceof WC_Session_Handler&&WC()->cart instanceof WC_Cart&&WC()->customer instanceof WC_Customer&&WC()->session->has_session()) { CetechQuoteCartHttpFixture::track_owner($state,$sessions); }
                 $tracked=true;
             } finally {
                 $retired=$factory->close_all();
@@ -73,10 +74,50 @@ final class CetechPromotionCartHttpFixture {
             static fn(int $candidate_site, int $candidate_author): bool => $candidate_site === $site && $candidate_author === $author
         );
     }
+    /** Project one explicit accepted destination; never read or mutate the global Woo customer. */
+    public static function checkout_address(QuoteCartDraft $draft, FixedPromotionQuotePlacementEvidence $evidence): array {
+        return self::project_checkout_address($draft,$evidence->context()->base_context(),$evidence->owner());
+    }
+    /** Pure fixture projection; its caller must supply the original authenticated placement evidence. */
+    private static function project_checkout_address(QuoteCartDraft $draft, QuoteContext $context, QuoteOwner $owner): array {
+        $facts=$context->private_facts(); $loaded=$draft->private_facts();
+        $identity=QuoteNativeContextIdentity::from_server(); $destination=$facts['destination'];
+        if (!$draft->owner()->equals($owner)||!NativeCartQuotePreparation::draft_facts_match_original($loaded,$context)
+            ||'full'!==$destination['kind']||$identity->key_epoch()!==$destination['key_epoch']||$identity->key_epoch()!==$owner->key_epoch()) {
+            throw new RuntimeException('N18 accepted checkout destination unavailable.');
+        }
+        $components=[]; foreach ($facts['lines'] as $line) { $components[$line['line_key']]=$line['component_key']; }
+        $groups=[]; foreach ($facts['groups'] as $group) {
+            if ('delivery'!==$group['choice']||!hash_equals($destination['digest'],$group['endpoint_digest'])) { throw new RuntimeException('N18 accepted checkout endpoints differ.'); }
+            $groups[$group['component_key']]=$group;
+        }
+        $address=null;
+        foreach ($loaded['lines'] as $line) {
+            $group=$groups[$components[$line['line_key']]??'']??null; $customer=CustomerCartContext::fromArray($line['customer_context']);
+            if (null===$group||!$customer instanceof CustomerCartContext||!$customer->isDelivery()||!$customer->hasCompleteDeliveryAddress()
+                ||$customer->delivery_offer_id!==$group['offer_id']||$line['selection']['delivery_offer_id']!==$group['offer_id']) {
+                throw new RuntimeException('N18 explicit checkout address unavailable.');
+            }
+            $raw=$customer->delivery_address->toWcPackageDestination(); $candidate=[];
+            foreach (['country','state','city','postcode','address','address_2'] as $field) {
+                if (!isset($raw[$field])||!is_string($raw[$field])) { throw new RuntimeException('N18 explicit checkout address unavailable.'); }
+                $candidate[$field]=$raw[$field];
+            }
+            if (!hash_equals($destination['digest'],$identity->destination_digest($owner->site_id(),$candidate))||null!==$address&&$address!==$candidate) {
+                throw new RuntimeException('N18 accepted checkout addresses differ.');
+            }
+            $address=$candidate;
+        }
+        if (null===$address) { throw new RuntimeException('N18 explicit checkout address unavailable.'); }
+        return $address;
+    }
     /** Native create_order CRUD and production C07, deliberately ending before any gateway. */
     public static function place(wpdb $db, array &$state): array {
+        $GLOBALS['cetech_n18_placement_phase']='current_bundle'; $GLOBALS['cetech_n18_placement_wp_error_returned']=false; $GLOBALS['cetech_n18_checkout_endpoint_verified']=null;
         $request=RequestContext::create(); $service=$GLOBALS['cetech_n18_cart_service'];
         $bundle=$service->promotion_placement($request); if (null===$bundle) { throw new RuntimeException('N18 current accepted cart proof unavailable.'); }
+        $GLOBALS['cetech_n18_placement_phase']='checkout_address'; $address=self::checkout_address($bundle['draft'],$bundle['evidence']); $GLOBALS['cetech_n18_checkout_endpoint_verified']=true;
+        $GLOBALS['cetech_n18_placement_phase']='namespace_tracking';
         $evidence=$bundle['evidence']; $placement=\CetechDeliveryEngine\Application\DeliveryQuote\QuotePlacementService::placement_id_for($evidence->owner(),$evidence->header());
         $state['promotion']['stage_namespaces']=$state['promotion']['stage_namespaces']??[];
         foreach (['delivery_quote.bind'=>1,'delivery_quote.verify_binding'=>1,'delivery_quote.seal'=>2] as $operation=>$version) {
@@ -86,19 +127,28 @@ final class CetechPromotionCartHttpFixture {
         $state['promotion']['stage_namespaces']=array_values(array_unique($state['promotion']['stage_namespaces']));
         if (count($state['promotion']['stage_namespaces'])>12) { throw new RuntimeException('N18 owned namespace cap exceeded.'); }
         cetech_q05_write($state); // Exact deterministic namespaces are cleanup authority before effects.
-        $before=self::budget_rows($db,$state); $GLOBALS['cetech_n18_creating_order']=true; unset($GLOBALS['cetech_n18_created_order']);
+        $GLOBALS['cetech_n18_placement_phase']='budget_before'; $before=self::budget_rows($db,$state); $GLOBALS['cetech_n18_creating_order']=true; unset($GLOBALS['cetech_n18_created_order']);
         try {
-            $customer=WC()->customer; $data=['billing_first_name'=>'Owned','billing_last_name'=>'Fixture','billing_email'=>'n18@example.invalid','billing_country'=>'GH','billing_state'=>'AA','billing_city'=>'Accra','billing_postcode'=>'00001','billing_address_1'=>$customer->get_shipping_address_1(),'shipping_first_name'=>'Owned','shipping_last_name'=>'Fixture','shipping_country'=>$customer->get_shipping_country(),'shipping_state'=>$customer->get_shipping_state(),'shipping_city'=>$customer->get_shipping_city(),'shipping_postcode'=>$customer->get_shipping_postcode(),'shipping_address_1'=>$customer->get_shipping_address_1(),'shipping_address_2'=>$customer->get_shipping_address_2(),'ship_to_different_address'=>1,'payment_method'=>''];
+            $data=['billing_first_name'=>'Owned','billing_last_name'=>'Fixture','billing_email'=>'n18@example.invalid','shipping_first_name'=>'Owned','shipping_last_name'=>'Fixture','ship_to_different_address'=>1,'payment_method'=>''];
+            foreach ($address as $field=>$value) { $field='address'===$field?'address_1':$field; $data['billing_'.$field]=$value; $data['shipping_'.$field]=$value; }
+            $GLOBALS['cetech_n18_placement_phase']='create_order';
             $id=WC()->checkout()->create_order($data);
-            if (is_wp_error($id)||!is_int($id)||$id<1) { throw new RuntimeException('N18 actual native order creation failed.'); }
+            if (is_wp_error($id)) { $GLOBALS['cetech_n18_placement_wp_error_returned']=true; $GLOBALS['cetech_n18_placement_phase']='create_order_wp_error'; throw new RuntimeException('N18 actual native order creation failed.'); }
+            if (!is_int($id)||$id<1) { throw new RuntimeException('N18 actual native order creation failed.'); }
+            $GLOBALS['cetech_n18_placement_phase']='created_order_identity';
             $order=$GLOBALS['cetech_n18_created_order']??null;
             if (!$order instanceof WC_Order||$order->get_id()!==$id) { throw new RuntimeException('N18 native creation identity unavailable.'); }
         } finally { $GLOBALS['cetech_n18_creating_order']=false; }
-        $runtime=$GLOBALS['cetech_n18_promotion_runtime']; $runtime->stage($order,'classic',$request);
+        $GLOBALS['cetech_n18_placement_phase']='explicit_stage'; $runtime=$GLOBALS['cetech_n18_promotion_runtime']; $runtime->stage($order,'classic',$request);
+        $GLOBALS['cetech_n18_placement_phase']='final_admission';
         $decision=Plugin::instance()->container()->get(\CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutAdmissionService::class)->final_order($order,'classic');
-        $sealed=$runtime->sealed($order); $history=$GLOBALS['cetech_n18_saved_reader']->read($order,RequestContext::create());
+        $GLOBALS['cetech_n18_placement_phase']='sealed_read'; $sealed=$runtime->sealed($order);
+        $GLOBALS['cetech_n18_placement_phase']='saved_history'; $history=$GLOBALS['cetech_n18_saved_reader']->read($order,RequestContext::create());
+        $GLOBALS['cetech_n18_placement_phase']='package_read';
         $package=(new \CetechDeliveryEngine\Application\Order\OrderDeliverySnapshotReader())->read_package($order);
+        $GLOBALS['cetech_n18_placement_phase']='persist_placed_order';
         $state=cetech_q05_state(); $state['promotion']['placed_order']=$id; cetech_q05_write($state);
+        $GLOBALS['cetech_n18_placement_phase']='complete';
         return ['native_order_created'=>true,'pending_unpaid'=>$order->has_status('pending')&&!$order->is_paid()&&null===$order->get_date_paid(),'sealed3_current'=>$sealed instanceof \CetechDeliveryEngine\Application\DeliveryQuote\FixedPromotionQuoteSealedEvidence,'history_all_five'=>is_array($history)&&null!==$history['seal']&&3===$history['binding']->revision(),'saved_format3'=>3===$package->delivery_quote?->envelope?->format(),'gateway_refused'=>false===$decision->allowed&&0===(int)get_option('cetech_opening_c07_gateway_count',0),'held_budget_unchanged'=>$before===self::budget_rows($db,$state)];
     }
     public static function placed_history(array $state): array {
