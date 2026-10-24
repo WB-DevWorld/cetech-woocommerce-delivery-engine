@@ -105,7 +105,7 @@ def prior(work):
     for key, variable in (("source_head", "CETECH_DE_QUALIFICATION_HEAD"), ("candidate_head", "CETECH_DE_QUALIFICATION_CANDIDATE_HEAD"), ("source_tree", "CETECH_DE_QUALIFICATION_TREE")):
         require(re.fullmatch(r"[0-9a-f]{40}", str(document.get(key, ""))) and (not os.environ.get(variable) or document[key] == os.environ[variable]), "R22 immutable native authority differs")
     sources = document.get("installed_php_sources")
-    require(isinstance(sources, dict) and len(sources) == 955 and all(path in sources for path in REFUND_SOURCES) and list(sources) == sorted(sources) and all(isinstance(path, str) and re.fullmatch(r"[0-9a-f]{64}", str(digest)) for path, digest in sources.items()) and document["installed_php_sources_hash"] == hashlib.sha256(canonical(sources)).hexdigest(), "R22 production map is not canonical")
+    require(isinstance(sources, dict) and len(sources) == 968 and all(path in sources for path in REFUND_SOURCES) and list(sources) == sorted(sources) and all(isinstance(path, str) and re.fullmatch(r"[0-9a-f]{64}", str(digest)) for path, digest in sources.items()) and document["installed_php_sources_hash"] == hashlib.sha256(canonical(sources)).hexdigest(), "R22 production map is not canonical")
     return document, hashlib.sha256(path.read_bytes()).hexdigest()
 
 

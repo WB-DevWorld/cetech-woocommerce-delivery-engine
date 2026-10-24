@@ -222,7 +222,7 @@ final class DataLifecycleRegistryTest extends TestCase {
 		$list = $standard->classes();
 		array_pop( $list );
 		self::assertSame( $standard->policy_digest(), DataLifecycleRegistry::standard()->policy_digest() );
-		self::assertCount( 146, $standard->classes() );
+		self::assertCount( 148, $standard->classes() );
 	}
 
 	public function test_diagnostics_do_not_emit_selectors_paths_storage_names_or_caller_content(): void {
@@ -262,6 +262,10 @@ final class DataLifecycleRegistryTest extends TestCase {
 					self::assertSame( 'R21-ORIGINAL-RECOVERY', $case );
 				} elseif ( 'refund_policy.admin_original_intent' === $class->class_id ) {
 					self::assertSame( 'R22-ORIGINAL-RECOVERY', $case );
+				} elseif ( 'policy_assignment.admin_original_intent' === $class->class_id ) {
+					self::assertSame( 'R23-ORIGINAL-RECOVERY', $case );
+				} elseif ( 'policy_assignment.configuration' === $class->class_id ) {
+					self::assertSame( 'R23-ASSIGNMENT-PRESERVATION', $case );
 				} else {
 					self::assertMatchesRegularExpression( '/^C06-(?:0[1-9]|[12][0-9]|30)$/D', $case );
 				}
@@ -283,7 +287,7 @@ final class DataLifecycleRegistryTest extends TestCase {
 		$error = stream_get_contents( $pipes[2] );
 		fclose( $pipes[1] ); fclose( $pipes[2] );
 		self::assertSame( 0, proc_close( $process ), $error );
-		self::assertSame( [ 41, 45, 18, 146, false, false, false, true, true, false, 39, 2, false ], json_decode( $output, true, 16, JSON_THROW_ON_ERROR ) );
+		self::assertSame( [ 41, 45, 18, 148, false, false, false, true, true, false, 39, 2, false ], json_decode( $output, true, 16, JSON_THROW_ON_ERROR ) );
 	}
 
 	/** R21-ORIGINAL-RECOVERY: unresolved original requests have no cleanup or TTL grant. */
@@ -306,6 +310,19 @@ final class DataLifecycleRegistryTest extends TestCase {
 		self::assertNull( $definition['expires_after_seconds'] );
 		self::assertFalse( $class->cleanup_eligible() );
 		self::assertContains( 'unresolved_original_never_expires_or_evicts', $definition['protections'] );
+	}
+
+	/** R23 durable assignment maps and uncertain originals grant no automatic removal. */
+	public function test_policy_assignment_maps_and_originals_are_preservation_only(): void {
+		foreach ( [ 'policy_assignment.configuration' => 'cetech_de_policy_assignment_v1_', 'policy_assignment.admin_original_intent' => 'cetech_de_policy_assignment_intent_v1_' ] as $id => $prefix ) {
+			$class = DataLifecycleRegistry::standard()->get( $id );
+			self::assertSame( $prefix, $class->storage_key );
+			$definition = $class->definition();
+			foreach ( [ 'normal_policy', 'default_uninstall_policy', 'explicit_uninstall_policy' ] as $key ) { self::assertSame( 'preserve', $definition[$key] ); }
+			self::assertNull( $definition['expires_after_seconds'] );
+			self::assertFalse( $class->cleanup_eligible() );
+			self::assertContains( 'no_maintenance_or_uninstall_deletion', $definition['protections'] );
+		}
 	}
 
 	private function sorted( array $values ): array {

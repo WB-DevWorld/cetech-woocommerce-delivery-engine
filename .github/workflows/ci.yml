@@ -127,6 +127,7 @@ jobs:
           python3 scripts/qualification/test-verify-opening-promotion-native.py
           python3 scripts/qualification/test-verify-return-policy-admin-native.py
           python3 scripts/qualification/test-verify-refund-policy-admin-native.py
+          python3 scripts/qualification/test-verify-policy-assignment-admin-native.py
           python3 scripts/qualification/test-verify-opening-promotion-cart.py
           python3 scripts/qualification/test-opening-http-promise-handoff.py
           python3 scripts/qualification/test-opening-promise-native-configuration-browser.py
@@ -230,6 +231,12 @@ jobs:
             tests/Integration/RefundPolicy/RefundPolicyCatalogRealDatabaseTest.php
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-refund-policy.junit.xml" 11 \
             'CetechDeliveryEngine\Tests\Integration\RefundPolicy\RefundPolicyCatalogRealDatabaseTest' 11
+          # R23 exact policy-assignment ownership before the retained full census.
+          vendor/bin/phpunit -c phpunit.real-db.xml \
+            --log-junit "${RUNNER_TEMP}/cetech-de-policy-assignment.junit.xml" \
+            tests/Integration/PolicyAssignment/PolicyAssignmentRealDatabaseTest.php
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-policy-assignment.junit.xml" 13 \
+            'CetechDeliveryEngine\Tests\Integration\PolicyAssignment\PolicyAssignmentRealDatabaseTest' 13
           vendor/bin/phpunit \
             -c phpunit.real-db.xml --stop-on-error --stop-on-failure \
             --log-junit "${RUNNER_TEMP}/cetech-de-real-db.junit.xml"
@@ -291,6 +298,8 @@ jobs:
             'CetechDeliveryEngine\Tests\Integration\ReturnPolicy\ReturnPolicyCatalogRealDatabaseTest' 10
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
             'CetechDeliveryEngine\Tests\Integration\RefundPolicy\RefundPolicyCatalogRealDatabaseTest' 11
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+            'CetechDeliveryEngine\Tests\Integration\PolicyAssignment\PolicyAssignmentRealDatabaseTest' 13
 
   php85-wordpress:
     name: PHP 8.5 WordPress/WooCommerce
@@ -386,6 +395,14 @@ jobs:
         with:
           name: refund-policy-admin-native
           path: ${{ runner.temp }}/cetech-de-php85-wp/refund-policy-admin-native-results.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain separate Policy assignment native admin proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: policy-assignment-admin-native
+          path: ${{ runner.temp }}/cetech-de-php85-wp/policy-assignment-admin-native-results.json
           if-no-files-found: error
           retention-days: 14
       - name: Retain separate Store API smoke diagnostic receipt

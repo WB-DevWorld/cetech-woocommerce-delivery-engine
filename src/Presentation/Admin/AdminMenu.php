@@ -49,7 +49,8 @@ final class AdminMenu {
 		private ?LocationPacksPage $location_packs_page = null,
 		private ?PromiseConfigurationPage $promise_configuration_page = null,
 		private ?ReturnPolicyPage $return_policy_page = null,
-		private ?RefundPolicyPage $refund_policy_page = null
+		private ?RefundPolicyPage $refund_policy_page = null,
+		private ?PolicyAssignmentPage $policy_assignment_page = null
 	) {
 	}
 
@@ -83,6 +84,9 @@ final class AdminMenu {
 		}
 		if ( $this->refund_policy_page instanceof RefundPolicyPage ) {
 			add_action( 'admin_init', [ $this->refund_policy_page, 'handle_actions' ] );
+		}
+		if ( $this->policy_assignment_page instanceof PolicyAssignmentPage ) {
+			add_action( 'admin_init', [ $this->policy_assignment_page, 'handle_actions' ] );
 		}
 		add_action( 'admin_init', [ $this->overview_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->setup_wizard_page, 'handle_actions' ] );
@@ -147,6 +151,9 @@ final class AdminMenu {
 		}
 		if ( $this->refund_policy_page instanceof RefundPolicyPage && current_user_can( 'manage_delivery_settings' ) && current_user_can( Capabilities::SITE_WIDE ) ) {
 			add_submenu_page( $parent_slug, __( 'Refund policies', 'cetech-woocommerce-delivery-engine' ), __( 'Refund policies', 'cetech-woocommerce-delivery-engine' ), 'manage_delivery_settings', RefundPolicyPage::SLUG, [ $this->refund_policy_page, 'render' ] );
+		}
+		if ( $this->policy_assignment_page instanceof PolicyAssignmentPage && current_user_can( 'manage_delivery_settings' ) && current_user_can( Capabilities::SITE_WIDE ) ) {
+			add_submenu_page( $parent_slug, __( 'Policy assignments', 'cetech-woocommerce-delivery-engine' ), __( 'Policy assignments', 'cetech-woocommerce-delivery-engine' ), 'manage_delivery_settings', PolicyAssignmentPage::SLUG, [ $this->policy_assignment_page, 'render' ] );
 		}
 
 		if ( $setup_open ) {

@@ -211,6 +211,14 @@ final class DataLifecycleManifest {
 			'observe_private_original_intent_v1', 'bounded_owner_site_original_operation',
 			protections: [ 'preserve_original_value_and_autoload', 'current_site_and_actor_only', 'unresolved_original_never_expires_or_evicts', 'no_maintenance_or_uninstall_deletion', 'only_authenticated_owner_resolution_may_remove' ],
 			sources: [ 'src/Infrastructure/Persistence/WpdbRefundPolicyAdminIntent.php' ], proofs: [ 'R22-ORIGINAL-RECOVERY' ] );
+		$entries[] = self::entry( 'policy_assignment.admin_original_intent', 'policy_assignment_admin', 'wp_option', 'cetech_de_policy_assignment_intent_v1_',
+			'observe_private_original_intent_v1', 'bounded_owner_site_original_operation',
+			protections: [ 'preserve_original_value_and_autoload', 'current_site_and_actor_only', 'unresolved_original_never_expires_or_evicts', 'no_maintenance_or_uninstall_deletion', 'only_authenticated_owner_resolution_may_remove' ],
+			sources: [ 'src/Infrastructure/Persistence/WpdbPolicyAssignmentAdminIntent.php' ], proofs: [ 'R23-ORIGINAL-RECOVERY' ] );
+		$entries[] = self::entry( 'policy_assignment.configuration', 'policy_assignment', 'wp_option', 'cetech_de_policy_assignment_v1_',
+			'observe_private_policy_assignments_v1', 'bounded_current_site_scope_assignment_maps',
+			protections: [ 'preserve_original_value_and_autoload', 'current_site_and_actor_only', 'no_maintenance_or_uninstall_deletion', 'no_retention_or_cleanup_authority' ],
+			sources: [ 'src/Infrastructure/Persistence/PolicyAssignmentStore.php' ], proofs: [ 'R23-ASSIGNMENT-PRESERVATION' ] );
 		foreach ( [
 			'geography_generation_source' => 'country_token_checksum_txt',
 			'geography_incoming' => 'country_token_incoming_txt',
