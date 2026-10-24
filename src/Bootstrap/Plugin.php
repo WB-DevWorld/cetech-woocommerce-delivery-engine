@@ -8,6 +8,10 @@ use CetechDeliveryEngine\Integrations\ReturnPolicy\NativeReturnPolicyAuthority;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbReturnPolicyAdminIntent;
 use CetechDeliveryEngine\Application\ReturnPolicy\ReturnPolicyAdminWorkflow;
 use CetechDeliveryEngine\Presentation\Admin\ReturnPolicyPage;
+use CetechDeliveryEngine\Integrations\RefundPolicy\NativeRefundPolicyAuthority;
+use CetechDeliveryEngine\Infrastructure\Persistence\WpdbRefundPolicyAdminIntent;
+use CetechDeliveryEngine\Application\RefundPolicy\RefundPolicyAdminWorkflow;
+use CetechDeliveryEngine\Presentation\Admin\RefundPolicyPage;
 
 use CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutAdmissionService;
 use CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutQuoteValidator;
@@ -605,6 +609,18 @@ final class Plugin {
 		$this->container->singleton( ReturnPolicyPage::class,
 			static fn( ServiceContainer $c ) => new ReturnPolicyPage(
 				$c->get( ReturnPolicyAdminWorkflow::class ), $c->get( AdminActionHandler::class ) ) );
+		$this->container->singleton( NativeRefundPolicyAuthority::class,
+			static fn() => new NativeRefundPolicyAuthority() );
+		$this->container->singleton( WpdbRefundPolicyAdminIntent::class,
+			static fn() => new WpdbRefundPolicyAdminIntent() );
+		$this->container->singleton( RefundPolicyAdminWorkflow::class,
+			static fn( ServiceContainer $c ) => new RefundPolicyAdminWorkflow(
+				$c->get( NativeRefundPolicyAuthority::class ),
+				$c->get( WpdbRefundPolicyAdminIntent::class ),
+				$c->get( OperationConnectionFactory::class ) ) );
+		$this->container->singleton( RefundPolicyPage::class,
+			static fn( ServiceContainer $c ) => new RefundPolicyPage(
+				$c->get( RefundPolicyAdminWorkflow::class ), $c->get( AdminActionHandler::class ) ) );
 		$this->container->singleton( NativeShipmentPromiseRuntime::class,
 			static fn( ServiceContainer $c ) => new NativeShipmentPromiseRuntime( $c->get( OperationConnectionFactory::class ), $c->get( ShipmentRepositoryInterface::class ), static fn(): bool => $c->get( FeatureFlags::class )->is_enabled( 'enable_shipment_records' ) ) );
 		$this->container->singleton( PromiseShipmentSummaryRenderer::class,
@@ -2066,7 +2082,8 @@ final class Plugin {
 				$container->get( ShipmentActivityCursor::class ),
 				$container->get( LocationPacksPage::class ),
 				$container->get( PromiseConfigurationPage::class ),
-				$container->get( ReturnPolicyPage::class )
+				$container->get( ReturnPolicyPage::class ),
+				$container->get( RefundPolicyPage::class )
 			)
 		);
 	}

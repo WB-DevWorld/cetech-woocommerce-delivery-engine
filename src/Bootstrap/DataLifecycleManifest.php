@@ -207,6 +207,10 @@ final class DataLifecycleManifest {
 			'observe_private_original_intent_v1', 'bounded_owner_site_original_operation',
 			protections: [ 'preserve_original_value_and_autoload', 'current_site_and_actor_only', 'unresolved_original_never_expires_or_evicts', 'no_maintenance_or_uninstall_deletion', 'only_authenticated_owner_resolution_may_remove' ],
 			sources: [ 'src/Infrastructure/Persistence/WpdbReturnPolicyAdminIntent.php' ], proofs: [ 'R21-ORIGINAL-RECOVERY' ] );
+		$entries[] = self::entry( 'refund_policy.admin_original_intent', 'refund_policy_admin', 'wp_option', 'cetech_de_refund_intent_v1_',
+			'observe_private_original_intent_v1', 'bounded_owner_site_original_operation',
+			protections: [ 'preserve_original_value_and_autoload', 'current_site_and_actor_only', 'unresolved_original_never_expires_or_evicts', 'no_maintenance_or_uninstall_deletion', 'only_authenticated_owner_resolution_may_remove' ],
+			sources: [ 'src/Infrastructure/Persistence/WpdbRefundPolicyAdminIntent.php' ], proofs: [ 'R22-ORIGINAL-RECOVERY' ] );
 		foreach ( [
 			'geography_generation_source' => 'country_token_checksum_txt',
 			'geography_incoming' => 'country_token_incoming_txt',

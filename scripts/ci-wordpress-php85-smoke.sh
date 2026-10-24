@@ -397,6 +397,8 @@ if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
 		"$WORK/opening-promotion-native-results.json" "$WORK/opening-promotion-native-cpt-results.json"
 	# R21 is a separate native admin journey; all retained receipts remain required.
 	bash "$ROOT/scripts/ci-return-policy-admin-native.sh" "$WORK" "$NATIVE"
+	# R22 remains a distinct Refund-only native admin receipt.
+	bash "$ROOT/scripts/ci-refund-policy-admin-native.sh" "$WORK" "$NATIVE"
 else
 	echo "opening_http_qualification=NOT_REQUESTED"
 fi
