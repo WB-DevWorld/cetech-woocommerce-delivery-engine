@@ -123,7 +123,7 @@ return static function ( callable $check, string $mode = 'hpos_on', int $install
 	$fixture = new CetechPromotionNativeFixture( $wpdb, $mode ); $failure = null;
 	$refuses = static function ( callable $work ): bool { try { $work(); return false; } catch ( Throwable ) { return true; } };
 	try {
-		$check( 'NATIVE-N17-INSTALLED-DEFAULT-OFF', true, [ 'actual_wordpress_and_woo' => defined( 'ABSPATH' ) && class_exists( WC_Order::class ), 'installed943_production_php' => 943 === $installed_count, 'installed_schema12' => '12' === (string) get_option( 'cetech_de_db_version' ), 'adoption_off_unchanged' => $fixture->adoption_off_unchanged() ] );
+		$check( 'NATIVE-N17-INSTALLED-DEFAULT-OFF', true, [ 'actual_wordpress_and_woo' => defined( 'ABSPATH' ) && class_exists( WC_Order::class ), 'installed947_production_php' => 947 === $installed_count, 'installed_schema12' => '12' === (string) get_option( 'cetech_de_db_version' ), 'adoption_off_unchanged' => $fixture->adoption_off_unchanged() ] );
 		$fixture->prepare(); $seed = $fixture->seed; $auth = [ $fixture, 'authorize' ]; $order = $fixture->order;
 		$mapping = $fixture->stager->promotion_mapping( $order, $seed['evidence'], $auth ); $guard = $fixture->capture();
 		$check( 'NATIVE-N17-ACTUAL-NATIVE-ORDER-CAPTURE', null !== $guard, [ 'actual_saved_order_and_product' => $order->get_id() > 0 && $fixture->product->get_id() > 0, 'complete_actual_item_mapping' => $mapping === $seed['mapping'], 'format3_accepted_quote' => 3 === $seed['quote']->header()->format_version() && 'accepted' === $seed['quote']->state(), 'physical_guard_captured' => null !== $guard ] );

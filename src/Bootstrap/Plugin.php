@@ -588,6 +588,18 @@ final class Plugin {
 
 	/** Protected P05 admin adapters reuse immutable lifecycle and current C07 truth. */
 	private function register_promise_configuration_services(): void {
+		$this->container->singleton( \CetechDeliveryEngine\Integrations\ReturnPolicy\NativeReturnPolicyAuthority::class,
+			static fn() => new \CetechDeliveryEngine\Integrations\ReturnPolicy\NativeReturnPolicyAuthority() );
+		$this->container->singleton( \CetechDeliveryEngine\Infrastructure\Persistence\WpdbReturnPolicyAdminIntent::class,
+			static fn() => new \CetechDeliveryEngine\Infrastructure\Persistence\WpdbReturnPolicyAdminIntent() );
+		$this->container->singleton( \CetechDeliveryEngine\Application\ReturnPolicy\ReturnPolicyAdminWorkflow::class,
+			static fn( ServiceContainer $c ) => new \CetechDeliveryEngine\Application\ReturnPolicy\ReturnPolicyAdminWorkflow(
+				$c->get( \CetechDeliveryEngine\Integrations\ReturnPolicy\NativeReturnPolicyAuthority::class ),
+				$c->get( \CetechDeliveryEngine\Infrastructure\Persistence\WpdbReturnPolicyAdminIntent::class ),
+				$c->get( OperationConnectionFactory::class ) ) );
+		$this->container->singleton( \CetechDeliveryEngine\Presentation\Admin\ReturnPolicyPage::class,
+			static fn( ServiceContainer $c ) => new \CetechDeliveryEngine\Presentation\Admin\ReturnPolicyPage(
+				$c->get( \CetechDeliveryEngine\Application\ReturnPolicy\ReturnPolicyAdminWorkflow::class ), $c->get( AdminActionHandler::class ) ) );
 		$this->container->singleton( NativeShipmentPromiseRuntime::class,
 			static fn( ServiceContainer $c ) => new NativeShipmentPromiseRuntime( $c->get( OperationConnectionFactory::class ), $c->get( ShipmentRepositoryInterface::class ), static fn(): bool => $c->get( FeatureFlags::class )->is_enabled( 'enable_shipment_records' ) ) );
 		$this->container->singleton( PromiseShipmentSummaryRenderer::class,
@@ -2048,7 +2060,8 @@ final class Plugin {
 				$container->get( NeedsAttentionCountQuery::class ),
 				$container->get( ShipmentActivityCursor::class ),
 				$container->get( LocationPacksPage::class ),
-				$container->get( PromiseConfigurationPage::class )
+				$container->get( PromiseConfigurationPage::class ),
+				$container->get( \CetechDeliveryEngine\Presentation\Admin\ReturnPolicyPage::class )
 			)
 		);
 	}

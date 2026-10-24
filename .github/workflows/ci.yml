@@ -125,6 +125,7 @@ jobs:
           python3 scripts/qualification/test-verify-promise-calculation-receipts.py
           python3 scripts/qualification/test-verify-promise-handoff-receipts.py
           python3 scripts/qualification/test-verify-opening-promotion-native.py
+          python3 scripts/qualification/test-verify-return-policy-admin-native.py
           python3 scripts/qualification/test-verify-opening-promotion-cart.py
           python3 scripts/qualification/test-opening-http-promise-handoff.py
           python3 scripts/qualification/test-opening-promise-native-configuration-browser.py
@@ -362,6 +363,14 @@ jobs:
           CETECH_DE_WP_DB_PASSWORD: wordpress
         shell: bash
         run: bash scripts/ci-wordpress-php85-smoke.sh
+      - name: Retain separate Return Policy native admin proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: return-policy-admin-native
+          path: ${{ runner.temp }}/cetech-de-php85-wp/return-policy-admin-native-results.json
+          if-no-files-found: error
+          retention-days: 14
       - name: Retain separate Store API smoke diagnostic receipt
         if: always()
         uses: actions/upload-artifact@v4

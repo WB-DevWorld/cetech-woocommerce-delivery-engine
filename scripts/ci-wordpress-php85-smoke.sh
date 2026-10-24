@@ -395,6 +395,8 @@ if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
 	bash "$ROOT/scripts/ci-promotion-native-hpos-off.sh" "$NATIVE" "$WORK/wp-cli.phar" "$WORK/opening-promotion-native-cpt-results.json"
 	python3 "$ROOT/scripts/qualification/verify-opening-promotion-native.py" \
 		"$WORK/opening-promotion-native-results.json" "$WORK/opening-promotion-native-cpt-results.json"
+	# R21 is a separate native admin journey; all retained receipts remain required.
+	bash "$ROOT/scripts/ci-return-policy-admin-native.sh" "$WORK" "$NATIVE"
 else
 	echo "opening_http_qualification=NOT_REQUESTED"
 fi

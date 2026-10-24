@@ -47,7 +47,8 @@ final class AdminMenu {
 		private ?NeedsAttentionCountQuery $needs_attention_count = null,
 		private ?ShipmentActivityCursor $shipment_activity = null,
 		private ?LocationPacksPage $location_packs_page = null,
-		private ?PromiseConfigurationPage $promise_configuration_page = null
+		private ?PromiseConfigurationPage $promise_configuration_page = null,
+		private ?ReturnPolicyPage $return_policy_page = null
 	) {
 	}
 
@@ -75,6 +76,9 @@ final class AdminMenu {
 		}
 		if ( $this->promise_configuration_page instanceof PromiseConfigurationPage ) {
 			add_action( 'admin_init', [ $this->promise_configuration_page, 'handle_actions' ] );
+		}
+		if ( $this->return_policy_page instanceof ReturnPolicyPage ) {
+			add_action( 'admin_init', [ $this->return_policy_page, 'handle_actions' ] );
 		}
 		add_action( 'admin_init', [ $this->overview_page, 'handle_actions' ] );
 		add_action( 'admin_init', [ $this->setup_wizard_page, 'handle_actions' ] );
@@ -133,6 +137,9 @@ final class AdminMenu {
 		if ( $this->promise_configuration_page instanceof PromiseConfigurationPage && ( current_user_can( 'manage_delivery_settings' ) || current_user_can( 'manage_product_delivery_rules' ) || current_user_can( 'manage_shipments' ) ) ) {
 			$capability = current_user_can( 'manage_delivery_settings' ) ? 'manage_delivery_settings' : ( current_user_can( 'manage_product_delivery_rules' ) ? 'manage_product_delivery_rules' : 'manage_shipments' );
 			add_submenu_page( $parent_slug, __( 'Delivery promises', 'cetech-woocommerce-delivery-engine' ), __( 'Delivery promises', 'cetech-woocommerce-delivery-engine' ), $capability, PromiseConfigurationPage::SLUG, [ $this->promise_configuration_page, 'render' ] );
+		}
+		if ( $this->return_policy_page instanceof ReturnPolicyPage && current_user_can( 'manage_delivery_settings' ) && current_user_can( Capabilities::SITE_WIDE ) ) {
+			add_submenu_page( $parent_slug, __( 'Return policies', 'cetech-woocommerce-delivery-engine' ), __( 'Return policies', 'cetech-woocommerce-delivery-engine' ), 'manage_delivery_settings', ReturnPolicyPage::SLUG, [ $this->return_policy_page, 'render' ] );
 		}
 
 		if ( $setup_open ) {
