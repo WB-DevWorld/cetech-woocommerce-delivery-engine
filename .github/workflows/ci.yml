@@ -126,6 +126,7 @@ jobs:
           python3 scripts/qualification/test-verify-promise-handoff-receipts.py
           python3 scripts/qualification/test-verify-opening-promotion-native.py
           python3 scripts/qualification/test-verify-return-policy-admin-native.py
+          python3 scripts/qualification/test-verify-refund-policy-admin-native.py
           python3 scripts/qualification/test-verify-opening-promotion-cart.py
           python3 scripts/qualification/test-opening-http-promise-handoff.py
           python3 scripts/qualification/test-opening-promise-native-configuration-browser.py
@@ -223,6 +224,12 @@ jobs:
             tests/Integration/ReturnPolicy/ReturnPolicyCatalogRealDatabaseTest.php
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-return-policy.junit.xml" 10 \
             'CetechDeliveryEngine\Tests\Integration\ReturnPolicy\ReturnPolicyCatalogRealDatabaseTest' 10
+          # R22 must execute its new Refund-only authoring proofs before the retained census.
+          vendor/bin/phpunit -c phpunit.real-db.xml \
+            --log-junit "${RUNNER_TEMP}/cetech-de-refund-policy.junit.xml" \
+            tests/Integration/RefundPolicy/RefundPolicyCatalogRealDatabaseTest.php
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-refund-policy.junit.xml" 11 \
+            'CetechDeliveryEngine\Tests\Integration\RefundPolicy\RefundPolicyCatalogRealDatabaseTest' 11
           vendor/bin/phpunit \
             -c phpunit.real-db.xml --stop-on-error --stop-on-failure \
             --log-junit "${RUNNER_TEMP}/cetech-de-real-db.junit.xml"
@@ -282,6 +289,8 @@ jobs:
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionNativeHandoffRealDatabaseTest' 12
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
             'CetechDeliveryEngine\Tests\Integration\ReturnPolicy\ReturnPolicyCatalogRealDatabaseTest' 10
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+            'CetechDeliveryEngine\Tests\Integration\RefundPolicy\RefundPolicyCatalogRealDatabaseTest' 11
 
   php85-wordpress:
     name: PHP 8.5 WordPress/WooCommerce
@@ -369,6 +378,14 @@ jobs:
         with:
           name: return-policy-admin-native
           path: ${{ runner.temp }}/cetech-de-php85-wp/return-policy-admin-native-results.json
+          if-no-files-found: error
+          retention-days: 14
+      - name: Retain separate Refund Policy native admin proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: refund-policy-admin-native
+          path: ${{ runner.temp }}/cetech-de-php85-wp/refund-policy-admin-native-results.json
           if-no-files-found: error
           retention-days: 14
       - name: Retain separate Store API smoke diagnostic receipt
