@@ -216,6 +216,12 @@ jobs:
           # Fail fast on N17; E16 and every retained proof remain in the full census below.
           vendor/bin/phpunit -c phpunit.real-db.xml \
             tests/Integration/DeliveryPromotion/PromotionNativeHandoffRealDatabaseTest.php
+          # R20 must execute its new Return-only authoring proofs before the retained census.
+          vendor/bin/phpunit -c phpunit.real-db.xml \
+            --log-junit "${RUNNER_TEMP}/cetech-de-return-policy.junit.xml" \
+            tests/Integration/ReturnPolicy/ReturnPolicyCatalogRealDatabaseTest.php
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-return-policy.junit.xml" 10 \
+            'CetechDeliveryEngine\Tests\Integration\ReturnPolicy\ReturnPolicyCatalogRealDatabaseTest' 10
           vendor/bin/phpunit \
             -c phpunit.real-db.xml --stop-on-error --stop-on-failure \
             --log-junit "${RUNNER_TEMP}/cetech-de-real-db.junit.xml"
@@ -273,6 +279,8 @@ jobs:
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionQuoteSealedReadRealDatabaseTest' 10
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionNativeHandoffRealDatabaseTest' 12
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+            'CetechDeliveryEngine\Tests\Integration\ReturnPolicy\ReturnPolicyCatalogRealDatabaseTest' 10
 
   php85-wordpress:
     name: PHP 8.5 WordPress/WooCommerce
