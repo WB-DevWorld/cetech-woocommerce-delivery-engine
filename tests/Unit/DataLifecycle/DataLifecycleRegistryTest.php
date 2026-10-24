@@ -222,7 +222,7 @@ final class DataLifecycleRegistryTest extends TestCase {
 		$list = $standard->classes();
 		array_pop( $list );
 		self::assertSame( $standard->policy_digest(), DataLifecycleRegistry::standard()->policy_digest() );
-		self::assertCount( 144, $standard->classes() );
+		self::assertCount( 145, $standard->classes() );
 	}
 
 	public function test_diagnostics_do_not_emit_selectors_paths_storage_names_or_caller_content(): void {
@@ -258,6 +258,8 @@ final class DataLifecycleRegistryTest extends TestCase {
 					self::assertContains( $case, [ 'W2P-28', 'W2P-32' ] );
 				} elseif ( in_array( $class->storage_key, DataLifecycleManifest::PROMOTION_BUDGET_TABLE_SUFFIXES, true ) && 'plugin_table' === $class->storage_adapter ) {
 					self::assertContains( $case, [ 'E08-01', 'E08-02', 'E08-03' ] );
+				} elseif ( 'return_policy.admin_original_intent' === $class->class_id ) {
+					self::assertSame( 'R21-ORIGINAL-RECOVERY', $case );
 				} else {
 					self::assertMatchesRegularExpression( '/^C06-(?:0[1-9]|[12][0-9]|30)$/D', $case );
 				}
@@ -279,7 +281,18 @@ final class DataLifecycleRegistryTest extends TestCase {
 		$error = stream_get_contents( $pipes[2] );
 		fclose( $pipes[1] ); fclose( $pipes[2] );
 		self::assertSame( 0, proc_close( $process ), $error );
-		self::assertSame( [ 41, 45, 18, 144, false, false, false, true, true, false, 39, 2, false ], json_decode( $output, true, 16, JSON_THROW_ON_ERROR ) );
+		self::assertSame( [ 41, 45, 18, 145, false, false, false, true, true, false, 39, 2, false ], json_decode( $output, true, 16, JSON_THROW_ON_ERROR ) );
+	}
+
+	/** R21-ORIGINAL-RECOVERY: unresolved original requests have no cleanup or TTL grant. */
+	public function test_return_policy_original_journal_is_preserved_by_all_maintenance_paths(): void {
+		$class = DataLifecycleRegistry::standard()->get( 'return_policy.admin_original_intent' );
+		self::assertSame( 'cetech_de_return_intent_v1_', $class->storage_key );
+		$definition = $class->definition();
+		foreach ( [ 'normal_policy', 'default_uninstall_policy', 'explicit_uninstall_policy' ] as $key ) { self::assertSame( 'preserve', $definition[$key] ); }
+		self::assertNull( $definition['expires_after_seconds'] );
+		self::assertFalse( $class->cleanup_eligible() );
+		self::assertContains( 'unresolved_original_never_expires_or_evicts', $definition['protections'] );
 	}
 
 	private function sorted( array $values ): array {

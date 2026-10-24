@@ -74,12 +74,12 @@ def main(paths):
     for path in PRODUCERS:
         require((SOURCE.parent.parent / path).read_bytes() == placement.git("show", head + ":" + path), "Uncommitted N17 producer authority")
     sources = placement.immutable_sources(head)
-    require(len(sources) == 943 and "src/Integrations/DeliveryQuote/FixedPromotionNativeOrderEvidence.php" in sources, "N17 production inventory differs")
+    require(len(sources) == 947 and "src/Integrations/DeliveryQuote/FixedPromotionNativeOrderEvidence.php" in sources, "N17 production inventory differs")
     identity = {"source_head": head, "candidate_head": candidate, "source_tree": placement.git("rev-parse", "HEAD^{tree}").decode().strip()}
     cases = protocol()
     for path, mode in zip(paths, ("yes", "no")):
         verify(load(path), mode, identity, sources, cases)
-    print("opening_promotion_native_receipts=PASS modes=2 cases_per_mode=12 production_php=943")
+    print("opening_promotion_native_receipts=PASS modes=2 cases_per_mode=12 production_php=947")
 
 
 if __name__ == "__main__":

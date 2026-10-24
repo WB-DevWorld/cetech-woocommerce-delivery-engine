@@ -203,6 +203,10 @@ final class DataLifecycleManifest {
 			'managed_geo_current_site_options_v1', 'managed_geo_envelope_v1', normal: 'managed_cache_expiry', explicit: 'managed_cache_removal', ttl: self::CACHE_TTL_SECONDS,
 			protections: [ 'current_owned_site_table_and_full_lower_hex_key', 'exact_physical_id_and_current_generation', 'valid_inline_expiry_strictly_before_cutoff', 'non_authoritative_response_only' ],
 			sources: [ 'src/Application/Geography/StorefrontGeographyEndpoint.php' ], proofs: [ 'C06-01', 'C06-06', 'C06-07', 'C06-13', 'C06-14', 'C06-29' ] );
+		$entries[] = self::entry( 'return_policy.admin_original_intent', 'return_policy_admin', 'wp_option', 'cetech_de_return_intent_v1_',
+			'observe_private_original_intent_v1', 'bounded_owner_site_original_operation',
+			protections: [ 'preserve_original_value_and_autoload', 'current_site_and_actor_only', 'unresolved_original_never_expires_or_evicts', 'no_maintenance_or_uninstall_deletion', 'only_authenticated_owner_resolution_may_remove' ],
+			sources: [ 'src/Infrastructure/Persistence/WpdbReturnPolicyAdminIntent.php' ], proofs: [ 'R21-ORIGINAL-RECOVERY' ] );
 		foreach ( [
 			'geography_generation_source' => 'country_token_checksum_txt',
 			'geography_incoming' => 'country_token_incoming_txt',
