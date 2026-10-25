@@ -319,6 +319,9 @@ export CETECH_DE_QUALIFICATION_TREE="$(git -C "$ROOT" rev-parse HEAD^{tree})"
 bash "$ROOT/scripts/ci-quote-placement-hpos-off.sh" "$NATIVE" "$WORK/wp-cli.phar" "$WORK/opening-quote-placement-cpt-results.json"
 
 if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
+	# R23 depends only on the original native receipt and restored CPT state.
+	# Run the new finite journey first; every retained gate below stays required.
+	bash "$ROOT/scripts/ci-policy-assignment-admin-native.sh" "$WORK" "$NATIVE"
 	# N18 consumes the native identity receipt; retain every HTTP and later gate.
 	bash "$ROOT/scripts/ci-promotion-cart-http-qualification.sh" "$WORK" "$NATIVE"
 	bash "$ROOT/scripts/ci-opening-http-qualification.sh" "$WORK" "$NATIVE"
@@ -399,8 +402,6 @@ if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
 	bash "$ROOT/scripts/ci-return-policy-admin-native.sh" "$WORK" "$NATIVE"
 	# R22 remains a distinct Refund-only native admin receipt.
 	bash "$ROOT/scripts/ci-refund-policy-admin-native.sh" "$WORK" "$NATIVE"
-	# R23 is a distinct saved-assignment/effective-preview native journey.
-	bash "$ROOT/scripts/ci-policy-assignment-admin-native.sh" "$WORK" "$NATIVE"
 else
 	echo "opening_http_qualification=NOT_REQUESTED"
 fi

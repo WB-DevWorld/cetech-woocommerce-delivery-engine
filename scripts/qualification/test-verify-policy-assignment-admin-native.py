@@ -238,6 +238,71 @@ class PolicyAssignmentNativeProtocolTest(unittest.TestCase):
                     verifier.setup_diagnostic(path)
                 self.assertEqual("policy_assignment_admin_last_entered_fixture_step=unavailable\n", output.getvalue())
 
+    def test_actual_php_inspect_bridge_preserves_empty_and_populated_scope_maps(self):
+        # Execute the original helper's inspect branch and guarded JSON writer.
+        # Only native functions/physical reads are owned in-memory stubs; the
+        # actual assignment Map/State codecs preserve nested offers objects.
+        code = r'''
+spl_autoload_register(static function(string $class):void {
+    $prefix='CetechDeliveryEngine\\';
+    if(str_starts_with($class,$prefix))require $GLOBALS['source_root'].'/src/'.str_replace('\\','/',substr($class,strlen($prefix))).'.php';
+});
+$GLOBALS['source_root']=$argv[2];$work=$argv[3];$populated='1'===$argv[4];
+define('WP_CLI',true);define('WP_ADMIN',true);define('DISABLE_WP_CRON',true);define('ARRAY_A','ARRAY_A');
+define('ABSPATH',$work.'/site/');define('DB_HOST','127.0.0.1');define('DB_NAME','cetech_wp_opening_qualification_r23shape');
+class WC_Product {}
+function add_filter(...$arguments):void {}
+function get_option(string $key):mixed { return match($key){'cetech_opening_qualification_disposable'=>'1','home','siteurl'=>'http://127.0.0.1:8085','cetech_de_db_version'=>'12',default=>null}; }
+$store=new CetechDeliveryEngine\Infrastructure\Persistence\PolicyAssignmentStore(1,'wp_');
+$coordinate=CetechDeliveryEngine\Domain\PolicyAssignment\PolicyAssignmentState::make_coordinate(1,'global',0);
+$name=$store->name($coordinate);$rows=[];
+if($populated){
+    $return=CetechDeliveryEngine\Domain\PolicyAssignment\PolicyAssignmentMap::empty(1,'return_policy_v1')->with_instruction(0,['mode'=>'assigned','policy_uuid'=>'00000000-0000-4000-8000-000000000001']);
+    $refund=CetechDeliveryEngine\Domain\PolicyAssignment\PolicyAssignmentMap::empty(1,'refund_policy_v1')->with_instruction(7,['mode'=>'assigned','policy_uuid'=>'00000000-0000-4000-8000-000000000002']);
+    $bytes=CetechDeliveryEngine\Domain\PolicyAssignment\PolicyAssignmentState::record_json($coordinate,'00000000-0000-4000-8000-000000000003',3,$return,$refund,5,'Owned shape regression','2026-10-25 00:00:00.000000');
+    $rows=[['option_id'=>'11','option_name'=>$name,'option_value'=>$bytes,'autoload'=>'off']];
+}
+$wpdb=new class($rows) {
+    public string $prefix='wp_';public string $options='wp_options';public string $last_error='';
+    public function __construct(private array $rows){}
+    public function prepare(string $sql,mixed ...$values):string{return $sql.' -- '.json_encode($values,JSON_THROW_ON_ERROR);}
+    public function esc_like(string $value):string{return $value;}
+    public function get_var(string $sql):mixed{return null;}
+    public function get_results(string $sql,mixed $format):array{return str_contains($sql,'WHERE option_name LIKE')&&str_contains($sql,CetechDeliveryEngine\Infrastructure\Persistence\PolicyAssignmentStore::PREFIX)?$this->rows:[];}
+};
+foreach(['CETECH_DE_NATIVE_OPENING_QUALIFICATION'=>'1','CETECH_DE_HTTP_OPENING_QUALIFICATION'=>'1','CETECH_DE_WP_DB_HOST'=>'127.0.0.1','CETECH_DE_HTTP_FIXTURE_SITE'=>ABSPATH,'CETECH_DE_HTTP_WORK_PATH'=>$work,'CETECH_DE_HTTP_PRIVATE_DIR'=>$work.'/private']as$key=>$value)putenv($key.'='.$value);
+$state_path=$work.'/private/state.json';$output_path=$work.'/private/inspect.json';
+$state=['site_path'=>realpath(ABSPATH),'database_name'=>DB_NAME,'site_id'=>1,'prefix'=>'wp_','products'=>[],'offers'=>[],'actors'=>[],'option_names'=>['global'=>$name],'journal_names'=>[],'targets'=>[],'protected'=>['adoption'=>[]],'configuration'=>[]];
+file_put_contents($state_path,json_encode($state,JSON_THROW_ON_ERROR));chmod($state_path,0600);
+$args=['inspect',$state_path,$output_path];require $argv[1];
+$internal=cetech_r23_inspect($state);
+echo json_encode(['inspection'=>json_decode(file_get_contents($output_path),false,512,JSON_THROW_ON_ERROR),'internal_scope_states_are_array'=>is_array($internal['states']),'internal_empty_options_are_array'=>$populated||[]===cetech_r23_options($state)],JSON_THROW_ON_ERROR);
+'''
+        for populated in (False, True):
+            with self.subTest(populated=populated):
+                work = self.root / ("populated" if populated else "empty")
+                (work / "site").mkdir(parents=True)
+                (work / "private").mkdir()
+                result = subprocess.run(["php", "-r", code, str(SOURCE / "policy-assignment-admin-native.php"), str(verifier.ROOT), str(work), "1" if populated else "0"], capture_output=True, text=True, check=False, timeout=10)
+                self.assertEqual(0, result.returncode, result.stderr)
+                observed = json.loads(result.stdout)
+                self.assertTrue(observed["internal_scope_states_are_array"])
+                self.assertTrue(observed["internal_empty_options_are_array"])
+                inspection = observed["inspection"]
+                self.assertIsInstance(inspection["states"], dict)
+                self.assertEqual(0, inspection["operation_count"])
+                self.assertEqual("12", inspection["schema"])
+                self.assertIs(inspection["adoption_off"], True)
+                if not populated:
+                    self.assertEqual({}, inspection["states"])
+                else:
+                    self.assertEqual({"global"}, set(inspection["states"]))
+                    actual = inspection["states"]["global"]
+                    self.assertEqual((11, 3), (actual["row_id"], actual["revision"]))
+                    self.assertEqual({"mode": "assigned", "policy_uuid": "00000000-0000-4000-8000-000000000001"}, actual["maps"]["return_policy_v1"]["default"])
+                    self.assertEqual({}, actual["maps"]["return_policy_v1"]["offers"])
+                    self.assertEqual({"7": {"mode": "assigned", "policy_uuid": "00000000-0000-4000-8000-000000000002"}}, actual["maps"]["refund_policy_v1"]["offers"])
+
     def test_actual_copied_mu_is_inert_during_cli_bridges(self):
         copied = self.root / "cetech-policy-assignment-admin-fixture.php"
         copied.write_bytes((SOURCE / "policy-assignment-admin-native.php").read_bytes())

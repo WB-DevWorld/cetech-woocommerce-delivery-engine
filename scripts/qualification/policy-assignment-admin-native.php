@@ -179,4 +179,7 @@ if(true===($state['cleanup_done']??false))throw new RuntimeException('R23 fixtur
 if('replace'===$mode){wp_set_current_user($state['actors']['a']['id']);cetech_r23_seed_policy($state,'return_a',true);opening_http_write_json($output_path,['replaced'=>true,'policy_uuid'=>$state['catalogs']['return_a']['policy_uuid'],'version_uuid'=>$state['catalogs']['return_a']['replacement_uuid']]);return;}
 if('revoke'===$mode){$u=get_userdata($state['actors']['a']['id']);if(!$u||$u->user_login!==$state['actors']['a']['login'])throw new RuntimeException('R23 revoke owner differs.');$u->add_cap('manage_site_wide_defaults',false);clean_user_cache($u->ID);opening_http_write_json($output_path,['revoked'=>!user_can($u,'manage_site_wide_defaults')]);return;}
 if(str_starts_with($mode,'capture-')){[, $kind,$offer]=explode('-',$mode);opening_http_write_json($output_path,cetech_r23_capture($state,$kind,$offer));return;}
-opening_http_write_json($output_path,cetech_r23_inspect($state));
+$inspection=cetech_r23_inspect($state);
+// Scope names form a JSON map even before the first assignment; PHP APIs stay arrays.
+$inspection['states']=(object)$inspection['states'];
+opening_http_write_json($output_path,$inspection);
