@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Configuration;
 
+use CetechDeliveryEngine\Domain\PolicyAssignment\PolicyAssignmentMap;
+use CetechDeliveryEngine\Domain\PolicyAssignment\PolicyAssignmentState;
+use CetechDeliveryEngine\Domain\Operation\OperationJson;
 use CetechDeliveryEngine\Domain\Configuration\CollectionMutationStep;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldRegistry;
@@ -156,6 +159,74 @@ final class EffectiveConfigurationResolver {
 		$this->loaded_contexts      = [];
 		$this->memoized             = [];
 		$this->profile_global_cache = [];
+	}
+
+
+	/**
+	 * Pure policy layering over a coherently captured managed-option chain.
+	 * The caller supplies an authorized actual offer and proves current publications separately.
+	 * Ordinary delivery resolution and its memo remain independent of this private proposal.
+	 *
+	 * @param list<PolicyAssignmentState> $states Exact global/product/variation order for the target.
+	 * @return array{instructions:array,provenance:array,fingerprint:string}
+	 */
+	public function resolve_policy_instructions( array $coordinate, int $real_offer, array $states ): array {
+		OperationJson::exact_fields( (object) $coordinate, [ 'site_id', 'scope_type', 'scope_id', 'parent_id' ] );
+		$coordinate = PolicyAssignmentState::make_coordinate(
+			$coordinate['site_id'], $coordinate['scope_type'], $coordinate['scope_id'], $coordinate['parent_id']
+		);
+		if ( $real_offer < 1 || ! array_is_list( $states ) ) {
+			throw new \InvalidArgumentException( 'Invalid policy resolution context.' );
+		}
+		$site = $coordinate['site_id'];
+		$expected = [ PolicyAssignmentState::make_coordinate( $site, 'global', 0 ) ];
+		if ( 'product' === $coordinate['scope_type'] ) {
+			$expected[] = $coordinate;
+		} elseif ( 'variation' === $coordinate['scope_type'] ) {
+			$expected[] = PolicyAssignmentState::make_coordinate( $site, 'product', $coordinate['parent_id'] );
+			$expected[] = $coordinate;
+		}
+		if ( count( $states ) !== count( $expected ) ) {
+			throw new \InvalidArgumentException( 'Policy resolution requires its exact captured chain.' );
+		}
+		$instructions = $provenance = [];
+		foreach ( PolicyAssignmentMap::FAMILIES as $family ) {
+			$instructions[ $family ] = [ 'mode' => 'inherit' ];
+			$provenance[ $family ] = [];
+		}
+		$witnesses = [];
+		foreach ( $states as $index => $state ) {
+			if ( ! $state instanceof PolicyAssignmentState || $state->coordinate() !== $expected[ $index ] ) {
+				throw new \InvalidArgumentException( 'Policy resolution chain does not match its target.' );
+			}
+			$map_digests = [];
+			foreach ( PolicyAssignmentMap::FAMILIES as $family ) {
+				$map = $state->map( $family );
+				$map_digests[ $family ] = $map->digest();
+				$selected = $map->instruction( $real_offer );
+				if ( 'inherit' === $selected['instruction']['mode'] ) { continue; }
+				$instructions[ $family ] = $selected['instruction'];
+				$provenance[ $family ] = [
+					'scope_type' => $expected[ $index ]['scope_type'], 'scope_id' => $expected[ $index ]['scope_id'],
+					'parent_id' => $expected[ $index ]['parent_id'], 'slot' => 0 === $selected['slot'] ? 'default' : 'offer',
+					'offer_id' => $selected['slot'],
+					'row_id' => $state->row_id(), 'revision' => $state->revision(),
+					'generation' => $state->generation(), 'assignment_digest' => $state->digest(),
+				];
+			}
+			$witnesses[] = (object) [
+				'coordinate' => (object) $expected[ $index ], 'row_id' => $state->row_id(),
+				'revision' => $state->revision(), 'generation' => $state->generation(),
+				'digest' => $state->digest(), 'maps' => (object) $map_digests,
+			];
+		}
+		$material = OperationJson::encode( (object) [
+			'coordinate' => (object) $coordinate, 'offer_id' => $real_offer, 'states' => $witnesses,
+		] );
+		return [
+			'instructions' => $instructions, 'provenance' => $provenance,
+			'fingerprint' => hash( 'sha256', 'cetech-policy-assignment-chain-v1:' . $material ),
+		];
 	}
 
 	/**

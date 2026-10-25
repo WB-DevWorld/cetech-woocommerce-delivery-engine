@@ -319,6 +319,9 @@ export CETECH_DE_QUALIFICATION_TREE="$(git -C "$ROOT" rev-parse HEAD^{tree})"
 bash "$ROOT/scripts/ci-quote-placement-hpos-off.sh" "$NATIVE" "$WORK/wp-cli.phar" "$WORK/opening-quote-placement-cpt-results.json"
 
 if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
+	# R23 depends only on the original native receipt and restored CPT state.
+	# Run the new finite journey first; every retained gate below stays required.
+	bash "$ROOT/scripts/ci-policy-assignment-admin-native.sh" "$WORK" "$NATIVE"
 	# N18 consumes the native identity receipt; retain every HTTP and later gate.
 	bash "$ROOT/scripts/ci-promotion-cart-http-qualification.sh" "$WORK" "$NATIVE"
 	bash "$ROOT/scripts/ci-opening-http-qualification.sh" "$WORK" "$NATIVE"

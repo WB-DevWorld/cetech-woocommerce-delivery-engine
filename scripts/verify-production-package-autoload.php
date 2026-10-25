@@ -72,6 +72,19 @@ $required_classes = [
 	'CetechDeliveryEngine\\Infrastructure\\Persistence\\WpdbRefundPolicyAdminIntent',
 	'CetechDeliveryEngine\\Application\\RefundPolicy\\RefundPolicyAdminWorkflow',
 	'CetechDeliveryEngine\\Presentation\\Admin\\RefundPolicyPage',
+	'CetechDeliveryEngine\\Domain\\PolicyAssignment\\PolicyAssignmentMap',
+	'CetechDeliveryEngine\\Domain\\PolicyAssignment\\PolicyAssignmentState',
+	'CetechDeliveryEngine\\Domain\\PolicyAssignment\\PolicyAssignmentCommand',
+	'CetechDeliveryEngine\\Domain\\PolicyAssignment\\PolicyEffectiveSelection',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\PolicyAssignmentStore',
+	'CetechDeliveryEngine\\Application\\PolicyAssignment\\PolicyAssignmentOperationProfile',
+	'CetechDeliveryEngine\\Application\\PolicyAssignment\\PolicyAssignmentService',
+	'CetechDeliveryEngine\\Application\\PolicyAssignment\\PolicyCurrentCatalog',
+	'CetechDeliveryEngine\\Application\\PolicyAssignment\\PolicyAssignmentCurrentService',
+	'CetechDeliveryEngine\\Integrations\\PolicyAssignment\\NativePolicyAssignmentAuthority',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\WpdbPolicyAssignmentAdminIntent',
+	'CetechDeliveryEngine\\Application\\PolicyAssignment\\PolicyAssignmentAdminWorkflow',
+	'CetechDeliveryEngine\\Presentation\\Admin\\PolicyAssignmentPage',
 	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionCartPlanning',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\FixedPromotionNativeCartPreparedCapture',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\FixedPromotionQuoteIssuedEvidence',
@@ -591,7 +604,7 @@ $is_schema9_release = str_contains( $header_source, '1.0.0-dev.wave2-quote-stora
 	|| 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-contract\.1\'\s*\);\s*$/m', $header_source );
 $is_schema10_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-(?:storage|calculation|handoff)\.1\'\s*\);\s*$/m', $header_source );
 $is_schema11_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.(?:wave2-promise-(?:native|qualification)\.1|economics-facts\.1|delivery-promotion-fixed\.1|currency-convert-once\.1|commercial-handoff\.1|fixed-promotion-format\.1|promotion-authority\.1|promotion-sql\.1)\'\s*\);\s*$/m', $header_source );
-$is_schema12_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.(?:promotion-(?:install|preparation|issue|accept|placement|bind|verify|seal|sealed-read|native-handoff|native-cart)|return-policy-(?:contract|authoring|editor)|refund-policy-editor)\.1\'\s*\);\s*$/m', $header_source );
+$is_schema12_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.(?:promotion-(?:install|preparation|issue|accept|placement|bind|verify|seal|sealed-read|native-handoff|native-cart)|return-policy-(?:contract|authoring|editor)|refund-policy-editor|policy-assignments)\.1\'\s*\);\s*$/m', $header_source );
 $is_schema8_release = str_contains( $header_source, '1.0.0-dev.wave1-rule-lifecycle' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-snapshot-readers' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-data-lifecycle' )
