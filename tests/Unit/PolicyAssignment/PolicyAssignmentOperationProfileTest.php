@@ -3,15 +3,21 @@
 declare(strict_types=1);
 namespace CetechDeliveryEngine\Tests\Unit\PolicyAssignment;
 
-use CetechDeliveryEngine\Application\PolicyAssignment\PolicyAssignmentOperationProfile;
+use CetechDeliveryEngine\Application\PolicyAssignment\{PolicyAssignmentOperationProfile,PolicyAssignmentService,PolicyCurrentCatalog};
+use CetechDeliveryEngine\Integrations\PolicyAssignment\NativePolicyAssignmentAuthority;
+use CetechDeliveryEngine\Presentation\Admin\AdminPageAccess;
+use CetechDeliveryEngine\Tests\Support\RestoresWordPressFixtureGlobals;
+use CetechDeliveryEngine\Tests\Support\PolicyAssignment\{PolicyAssignmentUnitFactory,PolicyAssignmentUnitReadiness};
 use CetechDeliveryEngine\Domain\Contracts\RequestContext;
 use CetechDeliveryEngine\Domain\Operation\{OperationCompletion,OperationMaterialEvent};
 use CetechDeliveryEngine\Tests\Support\PolicyAssignment\PolicyAssignmentFixture;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 require_once dirname(__DIR__,2).'/Support/PolicyAssignment/PolicyAssignmentFixture.php';
+require_once dirname(__DIR__,2).'/Support/PolicyAssignment/PolicyAssignmentAdminNativeFixtures.php';
 
 final class PolicyAssignmentOperationProfileTest extends TestCase {
+ use RestoresWordPressFixtureGlobals;
  private PolicyAssignmentFixture $f;
  protected function setUp():void{$this->f=new PolicyAssignmentFixture();}
  protected function tearDown():void{$this->f->close();}
@@ -39,6 +45,18 @@ final class PolicyAssignmentOperationProfileTest extends TestCase {
  }
  public function test_no_change_receipt_is_checked_against_original_physical_frame_not_latest_rows():void{
   $f=$this->f;$p=$f->payload();$identity=$f->identity($p);$r=$f->attempt($p);self::assertSame('not_applicable',$r->outcome->state);$profile=new PolicyAssignmentOperationProfile([$f,'authorize'],$f->store,$f->catalog($identity));$profile->validate_command($identity,$p);self::assertTrue($profile->validate_no_change_facts($r->completion));$bad=$r->completion->result;$bad['revision']=1;self::assertFalse($profile->validate_no_change_facts(OperationCompletion::not_applicable($profile,$bad)));
+ }
+
+ public function test_genuine_native_variation_grant_rejects_forged_parent_before_opening_sql():void{
+  $this->remember_fixture_globals();$old_blog=$GLOBALS['blog_id']??null;$f=$this->f;
+  try{
+   $GLOBALS['blog_id']=1;$GLOBALS['cetech_de_test_is_admin']=true;$GLOBALS['cetech_de_test_user_id']=9;$GLOBALS['cetech_de_test_caps']=['manage_delivery_settings'=>true,'manage_site_wide_defaults'=>true];$GLOBALS['cetech_de_test_edit_posts']=[33=>true,44=>true,55=>true];AdminPageAccess::bind(null);
+   $authority=new NativePolicyAssignmentAuthority(null,static fn(int $id):array=>['parent_id'=>44===$id?33:0,'is_variation'=>44===$id,'label'=>'Owned target'],static fn():array=>['site_id'=>1,'prefix'=>PolicyAssignmentUnitFactory::PREFIX]);
+   $coordinate=$authority->target('variation',44);self::assertSame(33,$coordinate['parent_id']);$identity=$authority->identity($authority->identity_data('policy.assignment.set',$coordinate,0,'parent-fence'));$grant=$authority->capture($identity,$coordinate,0);
+   $wrong=$coordinate;$wrong['parent_id']=55;$payload=$f->payload($wrong,instructions:['return_policy_v1'=>['mode'=>'disabled'],'refund_policy_v1'=>['mode'=>'disabled']]);
+   $service=new PolicyAssignmentService($f->factory,$f->store,new PolicyCurrentCatalog($grant['return_family'],$grant['refund_family'],$identity),$grant['authorize'],new PolicyAssignmentUnitReadiness());$opens=$f->factory->opens;
+   $result=$service->attempt($identity,$payload,RequestContext::create());self::assertSame('rejected',$result->outcome->state);self::assertSame('not_authorized',$result->outcome->error?->code);self::assertSame($opens,$f->factory->opens);self::assertSame(0,$f->count('options'));self::assertSame(0,$f->count('operation_records'));self::assertSame(0,$f->count('operation_changes'));
+  }finally{AdminPageAccess::bind(null);$this->restore_fixture_globals();if(null===$old_blog){unset($GLOBALS['blog_id']);}else{$GLOBALS['blog_id']=$old_blog;}}
  }
  private function accepted():array{
   $f=$this->f;$p=$f->payload(instructions:['return_policy_v1'=>['mode'=>'disabled'],'refund_policy_v1'=>['mode'=>'disabled']]);$identity=$f->identity($p);$r=$f->attempt($p);self::assertSame('accepted',$r->outcome->state);$profile=new PolicyAssignmentOperationProfile([$f,'authorize'],$f->store,$f->catalog($identity));$profile->validate_command($identity,$p);$event=OperationMaterialEvent::from_json($f->rows('operation_changes')[0]['event_json'],$profile);return [$profile,$r->completion,$event,$p];

@@ -128,6 +128,18 @@ final class PolicyAssignmentCurrentServiceTest extends TestCase {
 		self::assertSame( 0, $this->service( $id )->read( $id, $coordinate )->revision() );
 	}
 
+	public function test_read_grant_cannot_be_rebound_to_a_different_variation_parent(): void {
+		$f = $this->fixture; $coordinate = PolicyAssignmentState::make_coordinate( 1, 'variation', 44, 33 ); $forged = PolicyAssignmentState::make_coordinate( 1, 'variation', 44, 55 ); $id = $this->identity( $coordinate, 7 );
+		// Initial C03 authorization may precede command parsing. Once the target is
+		// known, the same retained grant must bind its full native parent context.
+		$grant = static fn( OperationIdentity $candidate, ?int $actor = null, ?array $target = null, ?int $offer = null ): bool => $candidate === $id && ( null === $actor || 9 === $actor ) && ( null === $target || $coordinate === $target ) && ( null === $offer || 7 === $offer );
+		$service = new PolicyAssignmentCurrentService( $f->factory, $f->store, $f->catalog( $id ), new EffectiveConfigurationResolver( new InMemoryScopedConfigurationRepository(), new EffectiveConfigurationValidator() ), $grant, new PolicyAssignmentUnitReadiness() );
+		$opens = $f->factory->opens; $this->unavailable( fn() => $service->read( $id, $forged, 7 ) ); self::assertSame( $opens, $f->factory->opens );
+		$this->unavailable( fn() => $service->capture( $id, $forged, 7 ) ); self::assertSame( $opens, $f->factory->opens );
+		self::assertSame( $coordinate, $service->read( $id, $coordinate, 7 )->coordinate() );
+		self::assertSame( 'not_assigned', $service->capture( $id, $coordinate, 7 )['selections']['return_policy_v1']->disposition() );
+	}
+
 	public function test_revoked_or_nonstrict_grant_never_opens_or_discloses(): void {
 		$f = $this->fixture; $coordinate = PolicyAssignmentState::make_coordinate( 1, 'global', 0 ); $id = $this->identity( $coordinate, 7 );
 		foreach ( [ false, 1, '1', null ] as $value ) { $f->allowed = $value; $opens = $f->factory->opens; $this->unavailable( fn() => $this->service( $id )->capture( $id, $coordinate, 7 ) ); self::assertSame( $opens, $f->factory->opens ); }

@@ -137,8 +137,10 @@ final class NativePolicyAssignmentAuthority {
 	public function capture( OperationIdentity $identity, array $coordinate, int $offer ): array {
 		if ( ! $this->authorize( $identity, $coordinate, $offer ) ) { self::deny(); }
 		$binding = $this->binding(); $actor = $this->actor();
-		$authorize = static fn ( OperationIdentity $candidate, ?int $candidate_actor = null ): bool => $candidate === $identity
-			&& ( null === $candidate_actor || $candidate_actor === $actor['user_id'] );
+		$authorize = static fn ( OperationIdentity $candidate, ?int $candidate_actor = null, ?array $candidate_coordinate = null, ?int $candidate_offer = null ): bool => $candidate === $identity
+			&& ( null === $candidate_actor || $candidate_actor === $actor['user_id'] )
+			&& ( null === $candidate_coordinate || $candidate_coordinate === $coordinate )
+			&& ( null === $candidate_offer || $candidate_offer === $offer );
 		$scope = static function ( OperationIdentity $candidate, array $value ) use ( $identity ): bool {
 			ReturnPolicyFamily::checked_scope( $value ); return $candidate === $identity;
 		};

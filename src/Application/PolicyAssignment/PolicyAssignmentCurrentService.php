@@ -47,14 +47,14 @@ final class PolicyAssignmentCurrentService {
 		try {
 			OperationJson::exact_fields( (object) $coordinate, [ 'site_id', 'scope_type', 'scope_id', 'parent_id' ] );
 			$coordinate = PolicyAssignmentState::make_coordinate( $coordinate['site_id'], $coordinate['scope_type'], $coordinate['scope_id'], $coordinate['parent_id'] );
-			if ( $offer < 0 || $identity->site_id !== $coordinate['site_id'] || PolicyAssignmentCommand::AUTHORITY !== $identity->authority || 'policy.assignment.read' !== $identity->operation || 1 !== $identity->operation_version || PolicyAssignmentCommand::make_target( $coordinate['scope_type'], $coordinate['scope_id'], $offer ) !== $identity->target_key || ! $this->allowed( $identity ) ) { self::refuse(); }
+			if ( $offer < 0 || $identity->site_id !== $coordinate['site_id'] || PolicyAssignmentCommand::AUTHORITY !== $identity->authority || 'policy.assignment.read' !== $identity->operation || 1 !== $identity->operation_version || PolicyAssignmentCommand::make_target( $coordinate['scope_type'], $coordinate['scope_id'], $offer ) !== $identity->target_key || ! $this->allowed( $identity, $coordinate, $offer ) ) { self::refuse(); }
 			$session = $this->factory->open();
 			$binding = [ $session->site_id(), $session->table_prefix() ];
 			if ( $binding[0] !== $identity->site_id || $session->is_retired() || $session->in_transaction() ) { self::refuse(); }
 			if ( null !== $this->readiness ) { $this->readiness->assert_ready( $session ); }
 			else { ( new RuleLifecycleReadiness( $session ) )->assert_ready(); }
 			$this->assert_binding( $session, $binding, false );
-			if ( ! $this->allowed( $identity ) ) { self::refuse(); }
+			if ( ! $this->allowed( $identity, $coordinate, $offer ) ) { self::refuse(); }
 			$owned = true; // Beginning was attempted only after the no-foreign-unit fence.
 			if ( ! $session->begin() ) { self::refuse(); }
 			$this->assert_binding( $session, $binding, true );
@@ -72,11 +72,11 @@ final class PolicyAssignmentCurrentService {
 				if ( null !== $result->changed_at() && $result->changed_at()->compare( $at ) > 0 ) { self::refuse(); }
 			}
 			$this->assert_binding( $session, $binding, true );
-			if ( ! $this->allowed( $identity ) || ! $session->rollback() ) { self::refuse(); }
+			if ( ! $this->allowed( $identity, $coordinate, $offer ) || ! $session->rollback() ) { self::refuse(); }
 			$owned = false;
 			if ( ! $session->retire() ) { self::refuse(); }
 			$this->assert_retired( $session, $binding );
-			if ( ! $this->allowed( $identity ) ) { self::refuse(); }
+			if ( ! $this->allowed( $identity, $coordinate, $offer ) ) { self::refuse(); }
 			$this->assert_retired( $session, $binding );
 			$closed = true;
 			return $result;
@@ -139,7 +139,7 @@ final class PolicyAssignmentCurrentService {
 		return $out;
 	}
 
-	private function allowed( OperationIdentity $identity ): bool { try { return true === ( $this->authorize )( $identity ); } catch ( \Throwable ) { return false; } }
+	private function allowed( OperationIdentity $identity, array $coordinate, int $offer ): bool { try { return true === ( $this->authorize )( $identity, null, $coordinate, $offer ); } catch ( \Throwable ) { return false; } }
 	private function assert_binding( OperationSession $session, array $binding, bool $transaction ): void {
 		if ( $session->is_retired() || $session->in_transaction() !== $transaction || [ $session->site_id(), $session->table_prefix() ] !== $binding ) { self::refuse(); }
 	}

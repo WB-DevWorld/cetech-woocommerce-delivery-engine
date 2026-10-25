@@ -6,18 +6,34 @@ namespace CetechDeliveryEngine\Tests\Unit\PolicyAssignment;
 
 use CetechDeliveryEngine\Application\Configuration\{EffectiveConfigurationResolver, EffectiveConfigurationValidator};
 use CetechDeliveryEngine\Application\PolicyAssignment\{PolicyAssignmentCurrentService, PolicyAssignmentService};
+use CetechDeliveryEngine\Application\PolicyAssignment\PolicyCurrentCatalog;
 use CetechDeliveryEngine\Domain\Contracts\{OperationIdentity, RequestContext};
 use CetechDeliveryEngine\Domain\PolicyAssignment\{PolicyAssignmentCommand, PolicyAssignmentState};
 use CetechDeliveryEngine\Infrastructure\Persistence\{InMemoryScopedConfigurationRepository, PolicyAssignmentStore};
+use CetechDeliveryEngine\Presentation\Admin\AdminPageAccess;
+use CetechDeliveryEngine\Tests\Support\RestoresWordPressFixtureGlobals;
+use CetechDeliveryEngine\Tests\Support\PolicyAssignment\PolicyAssignmentAdminFixture;
 use CetechDeliveryEngine\Tests\Support\PolicyAssignment\{PolicyAssignmentFixture as Fixture, PolicyAssignmentReadFenceFactory, PolicyAssignmentUnitFactory, PolicyAssignmentUnitReadiness};
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 
+require_once dirname( __DIR__, 2 ) . '/Support/PolicyAssignment/PolicyAssignmentAdminFixture.php';
+
 /** Cross-boundary original/CAS/owner proofs; the shared SQLite model is not native SQL acceptance. */
 final class PolicyAssignmentSecurityTest extends TestCase {
+	use RestoresWordPressFixtureGlobals;
 	private Fixture $f;
-	protected function setUp(): void { $this->f = new Fixture(); $this->f->publish( 'return_policy_v1', 101, 1 ); $this->f->publish( 'refund_policy_v1', 102, 2 ); }
-	protected function tearDown(): void { $this->f->close(); }
+	private mixed $old_blog;
+	private mixed $old_vendor;
+	protected function setUp(): void {
+		$this->remember_fixture_globals(); $this->old_blog = $GLOBALS['blog_id'] ?? null;
+		$this->old_vendor = ( new \ReflectionProperty( AdminPageAccess::class, 'vendor_isolation' ) )->getValue();
+		$this->f = new Fixture(); $this->f->publish( 'return_policy_v1', 101, 1 ); $this->f->publish( 'refund_policy_v1', 102, 2 );
+	}
+	protected function tearDown(): void {
+		$this->f->close(); AdminPageAccess::bind( $this->old_vendor ); $this->restore_fixture_globals();
+		if ( null === $this->old_blog ) { unset( $GLOBALS['blog_id'] ); } else { $GLOBALS['blog_id'] = $this->old_blog; }
+	}
 	private function payload(): array { return $this->f->payload( instructions: [ 'return_policy_v1' => [ 'mode' => 'assigned', 'policy_uuid' => Fixture::uuid( 101 ) ], 'refund_policy_v1' => [ 'mode' => 'assigned', 'policy_uuid' => Fixture::uuid( 102 ) ] ] ); }
 	private function read_identity( ?array $coordinate = null, int $offer = 0 ): OperationIdentity {
 		$c = $coordinate ?? PolicyAssignmentState::make_coordinate( 1, 'global', 0 );
@@ -153,4 +169,56 @@ final class PolicyAssignmentSecurityTest extends TestCase {
 		self::assertSame( $rows, $this->assignment_rows() ); foreach ( $this->f->factory->sessions as $session ) { self::assertTrue( $session->is_retired() ); }
 	}
 	public static function read_paths(): array { return [ 'read' => [ 'read' ], 'capture' => [ 'capture' ] ]; }
+
+	/** Capture the actual native adapter, rather than the deliberately broad unit host grant. */
+	private function native_variation_context( string $operation ): array {
+		$GLOBALS['blog_id'] = 1; $GLOBALS['cetech_de_test_is_admin'] = true; $GLOBALS['cetech_de_test_user_id'] = 9;
+		$GLOBALS['cetech_de_test_caps'] = [ 'manage_delivery_settings' => true, 'manage_site_wide_defaults' => true ];
+		$GLOBALS['cetech_de_test_edit_posts'] = [ 100 => true, 101 => true, 200 => true ]; AdminPageAccess::bind( null );
+		$native = new PolicyAssignmentAdminFixture();
+		$native->products = [ 100 => [ 'parent_id' => 0, 'is_variation' => false, 'label' => 'Original parent' ],
+			101 => [ 'parent_id' => 100, 'is_variation' => true, 'label' => 'Actual owned variation' ],
+			200 => [ 'parent_id' => 0, 'is_variation' => false, 'label' => 'Other parent' ] ];
+		$coordinate = $native->authority->target( 'variation', 101 );
+		$identity = $native->authority->identity( $native->authority->identity_data( $operation, $coordinate, 7, 'native-context-original' ) );
+		$grant = $native->authority->capture( $identity, $coordinate, 7 );
+		return [ $native, $coordinate, $identity, $grant ];
+	}
+
+	public function test_actual_native_write_grant_cannot_be_reused_with_a_forged_variation_parent(): void {
+		[ $native, $coordinate, $identity, $grant ] = $this->native_variation_context( PolicyAssignmentCommand::OPERATION );
+		try {
+			self::assertSame( 100, $coordinate['parent_id'] );
+			$payload = $native->core->payload( $coordinate, 7, [ 'return_policy_v1' => [ 'mode' => 'disabled' ], 'refund_policy_v1' => [ 'mode' => 'disabled' ] ] );
+			$forged = $payload; $forged['coordinate']['parent_id'] = 200;
+			self::assertSame( $identity->target_key, PolicyAssignmentCommand::make_target( 'variation', 101, 7 ) );
+			$service = new PolicyAssignmentService( $native->core->factory, $native->core->store,
+				new PolicyCurrentCatalog( $grant['return_family'], $grant['refund_family'], $identity ), $grant['authorize'], new PolicyAssignmentUnitReadiness() );
+			$opens = $native->core->factory->opens; $records = $native->core->rows( 'operation_records' ); $options = $native->core->rows( 'options' );
+			$result = $service->attempt( $identity, $forged, RequestContext::create() );
+			self::assertSame( 'rejected', $result->outcome->state ); self::assertSame( 'not_authorized', $result->outcome->error?->code );
+			self::assertSame( $opens, $native->core->factory->opens ); self::assertSame( $records, $native->core->rows( 'operation_records' ) ); self::assertSame( $options, $native->core->rows( 'options' ) );
+			self::assertSame( [], $native->core->rows( 'operation_changes' ) );
+			self::assertSame( 'accepted', $service->attempt( $identity, $payload, RequestContext::create() )->outcome->state );
+			self::assertSame( $coordinate, $native->core->state( $coordinate )->coordinate() ); self::assertSame( 1, $native->core->state( $coordinate )->revision() );
+		} finally { $native->close(); }
+	}
+
+	#[DataProvider( 'read_paths' )]
+	public function test_actual_native_read_grant_cannot_be_reused_for_another_variation_parent( string $path ): void {
+		[ $native, $coordinate, $identity, $grant ] = $this->native_variation_context( 'policy.assignment.read' );
+		try {
+			$forged = $coordinate; $forged['parent_id'] = 200;
+			$reader = new PolicyAssignmentCurrentService( $native->core->factory, $native->core->store,
+				new PolicyCurrentCatalog( $grant['return_family'], $grant['refund_family'], $identity ),
+				new EffectiveConfigurationResolver( $native->configuration, new EffectiveConfigurationValidator() ), $grant['authorize'], new PolicyAssignmentUnitReadiness() );
+			$opens = $native->core->factory->opens; $records = $native->core->rows( 'operation_records' ); $options = $native->core->rows( 'options' );
+			$this->refused_read( fn() => 'capture' === $path ? $reader->capture( $identity, $forged, 7 ) : $reader->read( $identity, $forged, 7 ) );
+			self::assertSame( $opens, $native->core->factory->opens ); self::assertSame( $records, $native->core->rows( 'operation_records' ) ); self::assertSame( $options, $native->core->rows( 'options' ) );
+			if ( 'capture' === $path ) {
+				$valid = $reader->capture( $identity, $coordinate, 7 ); self::assertCount( 3, $valid['states'] );
+				self::assertSame( 'not_assigned', $valid['selections']['return_policy_v1']->disposition() ); self::assertSame( 'not_assigned', $valid['selections']['refund_policy_v1']->disposition() );
+			} else { self::assertSame( $coordinate, $reader->read( $identity, $coordinate, 7 )->coordinate() ); }
+		} finally { $native->close(); }
+	}
 }

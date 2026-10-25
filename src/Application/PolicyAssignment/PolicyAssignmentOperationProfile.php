@@ -23,7 +23,7 @@ final class PolicyAssignmentOperationProfile implements OperationProfile {
 	public function __construct( callable $pure_authorize, private readonly PolicyAssignmentStore $store, private readonly PolicyCurrentCatalog $catalog ) { $this->grant = \Closure::fromCallable( $pure_authorize ); }
 	public function operation(): string { return PolicyAssignmentCommand::OPERATION; }
 	public function version(): int { return PolicyAssignmentCommand::VERSION; }
-	public function authorize( OperationIdentity $identity ): bool { try { return true === ( $this->grant )( $identity, $this->command?->actor_user_id() ); } catch ( \Throwable ) { return false; } }
+	public function authorize( OperationIdentity $identity ): bool { try { return true === ( $this->grant )( $identity, $this->command?->actor_user_id(), $this->command?->coordinate(), $this->command?->offer_id() ); } catch ( \Throwable ) { return false; } }
 
 	public function validate_command( OperationIdentity $identity, mixed $command ): OperationCommand {
 		$parsed = $command instanceof PolicyAssignmentCommand ? $command : PolicyAssignmentCommand::from_array( $identity, $command );

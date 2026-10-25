@@ -68,6 +68,15 @@ final class NativePolicyAssignmentAuthorityTest extends TestCase {
 		self::assertTrue($g['return_family']->authorize($id,$scope));self::assertTrue($g['refund_family']->authorize($id,$scope));self::assertFalse($g['return_family']->authorize_author(1,9,$scope));
 		self::assertSame($before,$this->native_reads);self::assertFalse($this->authority->authorize($id,$c,7));
 	}
+	#[DataProvider('captured_frames')]
+	public function test_captured_pure_grant_binds_the_complete_coordinate_and_offer(array $changes,int $offer,bool $allowed):void {
+		$c=$this->authority->target('variation',11);$id=$this->identity('variation',11);$g=$this->authority->capture($id,$c,7);$before=$this->native_reads;
+		$GLOBALS['cetech_de_test_caps']=[];$candidate=array_replace($c,$changes);
+		self::assertSame($allowed,($g['authorize'])($id,null,$candidate,$offer));
+		self::assertSame($allowed,($g['authorize'])($id,9,$candidate,$offer));
+		self::assertSame($before,$this->native_reads);
+	}
+	public static function captured_frames():array{return [[[],7,true],[['parent_id'=>20],7,false],[[],8,false],[['scope_type'=>'product'],7,false]];}
 	#[DataProvider('foreign_identity')]
 	public function test_foreign_actor_authority_operation_or_site_never_gets_native_identity(string $key,mixed $value):void {
 		$c=$this->authority->target('global',0);$tuple=$this->authority->identity_data('policy.assignment.read',$c,7,'original');$tuple[$key]=$value;$this->refusal(fn()=>$this->authority->identity($tuple));
