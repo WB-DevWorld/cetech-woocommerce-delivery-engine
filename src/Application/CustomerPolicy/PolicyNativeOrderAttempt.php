@@ -37,11 +37,19 @@ final class PolicyNativeOrderAttempt implements \JsonSerializable {
   $expected=array_values($expected);$state=$this->alignment_state();$order->read_meta_data(true);
   if(!PolicyNativeOrderFacts::hpos()||!$this->issued_for($order,$p))self::fail();
   // No callbacks follow this last fence: even an authority getter may be filtered.
-  if(self::raw($order,'data_store',['WC_Data'])!==$store||self::raw($store,'instance',['WC_Data_Store'])!==$instance||self::raw($store,'current_class_name',['WC_Data_Store'])!==$store_name||self::acknowledged_rows($order)!==$expected||$this->alignment_state()!==$state)self::fail();$this->aligned=true;
+  if(self::raw($order,'data_store',['WC_Data'])!==$store||self::raw($store,'instance',['WC_Data_Store'])!==$instance||self::raw($store,'current_class_name',['WC_Data_Store'])!==$store_name||!self::initial_metadata_matches($expected,self::acknowledged_rows($order))||$this->alignment_state()!==$state)self::fail();$this->aligned=true;
+ }
+ /** Before the first capture only, native SQL may interleave distinct keys differently. */
+ private static function initial_metadata_matches(array$before,array$after):bool{
+  $count=count($before);if($count<2||$count!==count($after)||$count>PolicyNativeOrderFacts::MAX_META_ROWS||array_keys($after)!==range(0,$count-1))return false;
+  $prefix=[$after[0]['key']??null,$after[1]['key']??null];if($prefix!==['_billing_address_index','_shipping_address_index']&&$prefix!==['_shipping_address_index','_billing_address_index'])return false;
+  $rows=[];$groups=[];foreach($before as$row){if(!is_array($row)||array_keys($row)!==['id','key','value']||!is_int($row['id'])||$row['id']<1||!is_string($row['key'])||isset($rows['id:'.$row['id']]))return false;$rows['id:'.$row['id']]=$row;$groups['key:'.$row['key']][]=$row['id'];}
+  $seen=[];$actual_groups=[];foreach($after as$row){if(!is_array($row)||array_keys($row)!==['id','key','value']||!is_int($row['id'])||$row['id']<1||!is_string($row['key']))return false;$id='id:'.$row['id'];if(isset($seen[$id])||!isset($rows[$id])||$rows[$id]!==$row)return false;$seen[$id]=true;$actual_groups['key:'.$row['key']][]=$row['id'];}
+  if(count($groups)!==count($actual_groups))return false;foreach($groups as$key=>$ids)if(!isset($actual_groups[$key])||$actual_groups[$key]!==$ids)return false;return true;
  }
  private static function acknowledged_rows(object$o):array{
   $members=self::raw($o,'meta_data',['WC_Data']);if(!is_array($members)||count($members)>PolicyNativeOrderFacts::MAX_META_ROWS)self::fail();$out=[];$ids=[];$bytes=0;$nodes=0;
-  foreach($members as$index=>$member){if(!is_int($index)||$index<0||!is_object($member)||get_class($member)!=='WC_Meta_Data')self::fail();$data=self::raw($member,'data',['WC_Meta_Data']);$current=self::raw($member,'current_data',['WC_Meta_Data']);if(!is_array($data)||$data!==$current||count($data)!==3||array_diff(['id','key','value'],array_keys($data))||!is_int($data['id'])||$data['id']<1||isset($ids[$data['id']])||!is_string($data['key'])||strlen($data['key'])>255||$data['value']===null)self::fail();$ids[$data['id']]=true;self::bounded_value($data,0,$nodes,$bytes);$out[$index]=['id'=>$data['id'],'key'=>$data['key'],'value'=>$data['value']];}return$out;
+  foreach($members as$index=>$member){if(!is_int($index)||$index<0||!is_object($member)||get_class($member)!=='WC_Meta_Data')self::fail();$data=self::raw($member,'data',['WC_Meta_Data']);$current=self::raw($member,'current_data',['WC_Meta_Data']);if(!is_array($data)||$data!==$current||count($data)!==3||array_diff(['id','key','value'],array_keys($data))||!is_int($data['id'])||$data['id']<1||isset($ids[$data['id']])||!is_string($data['key'])||strlen($data['key'])>255||$data['value']===null)self::fail();$ids[$data['id']]=true;$data=self::bounded_value($data,0,$nodes,$bytes);$out[$index]=['id'=>$data['id'],'key'=>$data['key'],'value'=>$data['value']];}return$out;
  }
  /** Root metadata alone may reload; every other native raw business coordinate stays exact. */
  private function alignment_state():string{

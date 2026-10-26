@@ -332,12 +332,12 @@ $observerAfter=r24_alignment_probe_after($observerBefore);
 $revoked=$observerBefore!==null&&alignment_raw($observerBefore['attempt'],'active')===false;
 echo "\n".json_encode(['alignment'=>$observerAfter,'retained_revoked'=>$revoked,'reads'=>$reader->reads,'sql'=>$GLOBALS['alignment_sql'],'saves'=>$GLOBALS['alignment_saves']],JSON_THROW_ON_ERROR)."\n";
 '''
-        cases = [("same", "", True, True, "equal"), ("id", "", True, True, "membership"), ("type", "", True, True, "type"), ("value", "", True, True, "value"), ("other_order", "", True, True, "order"), ("gap", "", True, True, "order"), ("root_money", "", True, False, "equal"), ("wrong_site", "", True, False, "equal"), ("same", "store", False, True, "equal")]
+        cases = [("same", "", True, True, "equal", True), ("id", "", True, True, "membership", False), ("type", "", True, True, "type", False), ("value", "", True, True, "value", False), ("inter_key_order", "", True, True, "order", True), ("same_key_order", "", True, True, "order", False), ("gap", "", True, True, "order", False), ("root_money", "", True, False, "equal", True), ("wrong_site", "", True, False, "equal", True), ("same", "store", False, True, "equal", True)]
         with tempfile.TemporaryDirectory(prefix="r24-observer-alignment-") as directory:
             file = Path(directory) / "native-probe.php"
             file.write_text(prefix + native_source + suffix)
             file.chmod(0o600)
-            for mode, mutation, store_same, business_same, delta in cases:
+            for mode, mutation, store_same, business_same, delta, projection_matches in cases:
                 with self.subTest(mode=mode, mutation=mutation):
                     result = subprocess.run([PHP, str(file), mode, mutation], text=True, capture_output=True, timeout=30, check=False)
                     self.assertEqual(result.returncode, 0, result.stderr)
@@ -345,7 +345,7 @@ echo "\n".json_encode(['alignment'=>$observerAfter,'retained_revoked'=>$revoked,
                     self.assertEqual(len(lines), 2)
                     self.assertFalse(json.loads(lines[0])["physical_qualification"])
                     observed = json.loads(lines[1])
-                    self.assertEqual(observed, {"alignment":{"observed":True,"store_unchanged":store_same,"metadata_projection_matches":delta == "equal","business_unchanged":business_same,"metadata_delta":delta},"retained_revoked":True,"reads":1,"sql":0,"saves":0})
+                    self.assertEqual(observed, {"alignment":{"observed":True,"store_unchanged":store_same,"metadata_projection_matches":projection_matches,"business_unchanged":business_same,"metadata_delta":delta},"retained_revoked":True,"reads":1,"sql":0,"saves":0})
 
     def test_real_production_reflection_pin_needs_exact_root_and_file_bytes(self):
         cli = self.php(r'''

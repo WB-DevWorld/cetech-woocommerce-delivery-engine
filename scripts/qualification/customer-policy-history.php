@@ -64,11 +64,22 @@ function r24_hist_meta(int$id):array {
 function r24_hist_target(array$meta,string$kind):array {
     $class=CetechDeliveryEngine\Application\CustomerPolicy\PolicyNativeOrderFacts::class;$keys=['packet'=>$class::META_PACKET,'format'=>$class::META_FORMAT,'line_key'=>$class::META_LINE_KEY,'manifest'=>$class::META_MANIFEST,'manifest_format'=>$class::META_MANIFEST_FORMAT];r24_require(isset($keys[$kind]));$group=in_array($kind,['manifest','manifest_format'],true)?'root':'items';$d=$meta[$group];$rows=array_values(array_filter($d['rows'],static fn(array$row):bool=>$row['meta_key']===$keys[$kind]));r24_require(count($rows)>0);$d['row']=$rows[0];return$d;
 }
+/** Raw fixture DML bypasses Woo's per-object metadata cache; evict that exact owner only. */
+function r24_hist_invalidate_meta_cache(array$target):void {
+    global$wpdb;$coordinates=[
+        $wpdb->prefix.'woocommerce_order_itemmeta'=>['meta_id','order_item_id','order-items'],
+        $wpdb->postmeta=>['meta_id','post_id','orders'],
+        $wpdb->prefix.'wc_orders_meta'=>['id','order_id','orders'],
+    ];
+    $coordinate=$coordinates[$target['table']??'']??null;$owner=$target['row']['owner_id']??null;
+    r24_require(is_array($coordinate)&&($target['pk']??null)===$coordinate[0]&&($target['fk']??null)===$coordinate[1]&&(is_int($owner)||is_string($owner))&&preg_match('/\A[1-9][0-9]*\z/D',(string)$owner)===1&&(string)(int)$owner===(string)$owner);
+    wp_cache_delete(WC_Data::generate_meta_cache_key((int)$owner,$coordinate[2]),$coordinate[2]);
+}
 function r24_hist_mutate(array$target,string$kind):?int {
     global$wpdb;$row=$target['row'];$table=$target['table'];$pk=$target['pk'];$fk=$target['fk'];foreach([$table,$pk,$fk]as$name)r24_require(1===preg_match('/\A[A-Za-z0-9_]{1,64}\z/D',$name));
-    if('missing'===$kind){r24_require(1===$wpdb->query($wpdb->prepare("DELETE FROM `{$table}` WHERE `{$pk}`=%d AND `{$fk}`=%d AND meta_key=%s",$row['row_id'],$row['owner_id'],$row['meta_key'])));return null;}
-    if('null'===$kind){r24_require(1===$wpdb->query($wpdb->prepare("UPDATE `{$table}` SET meta_value=NULL WHERE `{$pk}`=%d AND `{$fk}`=%d AND meta_key=%s",$row['row_id'],$row['owner_id'],$row['meta_key'])));return null;}
-    r24_require('duplicate'===$kind&&is_string($row['meta_value']));r24_require(1===$wpdb->query($wpdb->prepare("INSERT INTO `{$table}` (`{$fk}`,meta_key,meta_value) VALUES (%d,%s,%s)",$row['owner_id'],$row['meta_key'],$row['meta_value'])));$id=(int)$wpdb->insert_id;r24_require($id>0&&$id!==(int)$row['row_id']);return$id;
+    if('missing'===$kind){r24_require(1===$wpdb->query($wpdb->prepare("DELETE FROM `{$table}` WHERE `{$pk}`=%d AND `{$fk}`=%d AND meta_key=%s",$row['row_id'],$row['owner_id'],$row['meta_key'])));r24_hist_invalidate_meta_cache($target);return null;}
+    if('null'===$kind){r24_require(1===$wpdb->query($wpdb->prepare("UPDATE `{$table}` SET meta_value=NULL WHERE `{$pk}`=%d AND `{$fk}`=%d AND meta_key=%s",$row['row_id'],$row['owner_id'],$row['meta_key'])));r24_hist_invalidate_meta_cache($target);return null;}
+    r24_require('duplicate'===$kind&&is_string($row['meta_value']));r24_require(1===$wpdb->query($wpdb->prepare("INSERT INTO `{$table}` (`{$fk}`,meta_key,meta_value) VALUES (%d,%s,%s)",$row['owner_id'],$row['meta_key'],$row['meta_value'])));$id=(int)$wpdb->insert_id;r24_require($id>0&&$id!==(int)$row['row_id']);r24_hist_invalidate_meta_cache($target);return$id;
 }
 function r24_hist_restore_meta(array$target,?int$duplicate):void {
     global$wpdb;$row=$target['row'];$table=$target['table'];$pk=$target['pk'];$fk=$target['fk'];
@@ -76,7 +87,7 @@ function r24_hist_restore_meta(array$target,?int$duplicate):void {
     $found=r24_rows($wpdb->prepare("SELECT `{$pk}` AS row_id,`{$fk}` AS owner_id,meta_key,meta_value FROM `{$table}` WHERE `{$pk}`=%d",$row['row_id']));
     if([]===$found){r24_require(1===$wpdb->query($wpdb->prepare("INSERT INTO `{$table}` (`{$pk}`,`{$fk}`,meta_key,meta_value) VALUES (%d,%d,%s,%s)",$row['row_id'],$row['owner_id'],$row['meta_key'],$row['meta_value'])));}
     elseif($found!==[$row]){r24_require(count($found)===1&&$found[0]['owner_id']===$row['owner_id']&&$found[0]['meta_key']===$row['meta_key']);r24_require(1===$wpdb->query($wpdb->prepare("UPDATE `{$table}` SET meta_value=%s WHERE `{$pk}`=%d AND `{$fk}`=%d AND meta_key=%s",$row['meta_value'],$row['row_id'],$row['owner_id'],$row['meta_key'])));}
-    r24_require(r24_rows($wpdb->prepare("SELECT `{$pk}` AS row_id,`{$fk}` AS owner_id,meta_key,meta_value FROM `{$table}` WHERE `{$pk}`=%d",$row['row_id']))===[$row]);
+    r24_require(r24_rows($wpdb->prepare("SELECT `{$pk}` AS row_id,`{$fk}` AS owner_id,meta_key,meta_value FROM `{$table}` WHERE `{$pk}`=%d",$row['row_id']))===[$row]);r24_hist_invalidate_meta_cache($target);
 }
 function r24_hist_refused(array$state,int$id):bool {
     $container=CetechDeliveryEngine\Bootstrap\Plugin::instance()->container();$reader=$container->get(CetechDeliveryEngine\Application\CustomerPolicy\PolicySavedOrderReader::class);$facade=$container->get(CetechDeliveryEngine\Application\CustomerPolicy\CustomerPolicyFacade::class);$presenter=$container->get(CetechDeliveryEngine\Presentation\Frontend\CustomerPolicySavedPresenter::class);$audience=$container->get(CetechDeliveryEngine\Integrations\CustomerPolicy\PolicySavedAudience::class);$order=r24_hist_order($id);
@@ -113,7 +124,7 @@ function r24_hist_variants(array$state,int$id):array {
 
 function r24_hist_future(array$state,int$id,bool$check):array {
     global$wpdb;$path=r24_hist_private('history-future');
-    if(!$check){r24_require(!file_exists($path));$target=r24_hist_target(r24_hist_meta($id),'packet');$value=CetechDeliveryEngine\Domain\CustomerPolicy\PolicyJson::decode($target['row']['meta_value'],CetechDeliveryEngine\Domain\CustomerPolicy\PolicyLinePacket::MAX_BYTES);$value->format=999;$future=CetechDeliveryEngine\Domain\CustomerPolicy\PolicyJson::encode($value,CetechDeliveryEngine\Domain\CustomerPolicy\PolicyLinePacket::MAX_BYTES);$table=$target['table'];$pk=$target['pk'];r24_json($path,['order_id'=>$id,'target'=>$target,'future'=>$future,'baseline'=>r24_history($id)]);r24_require(1===$wpdb->query($wpdb->prepare("UPDATE `{$table}` SET meta_value=%s WHERE `{$pk}`=%d",$future,$target['row']['row_id'])));r24_require(r24_hist_refused($state,$id));return['unknown_not_absence'=>true,'unsupported_customer_projection_closed'=>true,'raw_bytes_preserved'=>r24_hist_target(r24_hist_meta($id),'packet')['row']['meta_value']===$future];}
+    if(!$check){r24_require(!file_exists($path));$target=r24_hist_target(r24_hist_meta($id),'packet');$value=CetechDeliveryEngine\Domain\CustomerPolicy\PolicyJson::decode($target['row']['meta_value'],CetechDeliveryEngine\Domain\CustomerPolicy\PolicyLinePacket::MAX_BYTES);$value->format=999;$future=CetechDeliveryEngine\Domain\CustomerPolicy\PolicyJson::encode($value,CetechDeliveryEngine\Domain\CustomerPolicy\PolicyLinePacket::MAX_BYTES);$table=$target['table'];$pk=$target['pk'];r24_json($path,['order_id'=>$id,'target'=>$target,'future'=>$future,'baseline'=>r24_history($id)]);r24_require(1===$wpdb->query($wpdb->prepare("UPDATE `{$table}` SET meta_value=%s WHERE `{$pk}`=%d",$future,$target['row']['row_id'])));r24_hist_invalidate_meta_cache($target);r24_require(r24_hist_refused($state,$id));return['unknown_not_absence'=>true,'unsupported_customer_projection_closed'=>true,'raw_bytes_preserved'=>r24_hist_target(r24_hist_meta($id),'packet')['row']['meta_value']===$future];}
     $saved=r24_load($path,4194304);r24_require($saved['order_id']===$id);$actual=r24_hist_target(r24_hist_meta($id),'packet');$preserved=$actual['row']['meta_value']===$saved['future'];$refused=r24_hist_refused($state,$id);r24_require($preserved&&$refused);r24_hist_restore_meta($saved['target'],null);r24_require(r24_history($id)===$saved['baseline']);r24_require(unlink($path));return['unknown_not_absence'=>$refused,'unsupported_customer_projection_closed'=>$refused,'raw_bytes_preserved'=>$preserved,'no_live_fallback_or_reinstall_rewrite'=>$preserved&&$refused];
 }
 
