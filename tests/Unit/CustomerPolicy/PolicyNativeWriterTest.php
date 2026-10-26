@@ -46,5 +46,11 @@ final class PolicyNativeWriterTest extends TestCase {
   $r=$this->probe('customer-policy-c07-probe.php',$mode);self::assertTrue($r['allowed']);self::assertTrue($r['admitted']);self::assertSame($allowed,$r['last']);foreach(['new_called','prepared_called','catalog_calls','legacy_calls','getters_in_sql','writes']as$key)self::assertSame(0,$r[$key],$key);self::assertGreaterThanOrEqual(1,$r['control_confirmations']);
  }
  public static function payment_cases():array{return[['hpos',true],['cpt',true],['hpos-mutation',false],['cpt-mutation',false],['hpos-pause',false],['cpt-pause',false],['hpos-method-save',true],['cpt-method-save',true],['hpos-untraced-method-save',false],['cpt-untraced-method-save',false]];}
+ /** The fixture is the unmodified pinned Woo 11.1.2 PaymentContext source. */
+ #[DataProvider('native_context_cases')]
+ public function test_native_payment_context_preserves_the_actual_class_object_and_method_boundary(string$mode,bool$expected):void{
+  $r=$this->probe('customer-policy-c07-probe.php',$mode);self::assertTrue($r['allowed']);self::assertTrue($r['admitted']);self::assertSame($expected,$r['context_passed']);foreach(['new_called','prepared_called','catalog_calls','legacy_calls','getters_in_sql','writes']as$key)self::assertSame(0,$r[$key],$key);
+ }
+ public static function native_context_cases():array{return[['hpos-native-context',true],['cpt-native-context',true],['hpos-native-context-other-object',false],['hpos-native-context-public-double',false],['hpos-native-context-wrong-method',false],['hpos-native-context-pause',false]];}
  private function probe(string$filename,string$mode):array{$cmd=escapeshellarg(PHP_BINARY).' '.escapeshellarg(dirname(__DIR__,2).'/Support/CustomerPolicy/'.$filename).' '.escapeshellarg($mode);$lines=[];$exit=0;exec($cmd.' 2>&1',$lines,$exit);self::assertSame(0,$exit,implode("\n",$lines));return json_decode(implode("\n",$lines),true,16,JSON_THROW_ON_ERROR);}
 }

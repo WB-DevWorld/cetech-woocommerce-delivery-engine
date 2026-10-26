@@ -34,7 +34,7 @@ final class FixedPromotionBudgetPersistenceContractsTest extends TestCase {
 		self::assertSame( [ 'site_id', 'account_key', 'id' ], Schema::indexes( Schema::RESERVATIONS_SUFFIX )['account_claims']['columns'] );
 	}
 	public function test_budget_installation_is_registered_only_in_its_coordinated_migration_and_manifest(): void {
-		self::assertSame( '12', SchemaVersion::TARGET ); self::assertCount( 41, DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES ); self::assertCount( 39, DataLifecycleManifest::RETAINED_SHIPMENT_PROMISE_DOMAIN_TABLE_SUFFIXES ); self::assertCount( 23, DataLifecycleManifest::FEATURE_FLAG_OPTIONS );
+		self::assertSame( '12', SchemaVersion::TARGET ); self::assertCount( 41, DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES ); self::assertCount( 39, DataLifecycleManifest::RETAINED_SHIPMENT_PROMISE_DOMAIN_TABLE_SUFFIXES ); self::assertCount( 24, DataLifecycleManifest::FEATURE_FLAG_OPTIONS );
 		$root = dirname( __DIR__, 3 ); $activation = (string) file_get_contents( $root . '/src/Bootstrap/Activator.php' );
 		foreach ( Schema::SUFFIXES as $suffix ) { self::assertContains( $suffix, DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES ); self::assertNotContains( $suffix, DataLifecycleManifest::RETAINED_SHIPMENT_PROMISE_DOMAIN_TABLE_SUFFIXES ); self::assertStringNotContainsString( $suffix, $activation ); }
 		self::assertStringNotContainsString( 'FixedPromotionBudgetSchema', $activation );

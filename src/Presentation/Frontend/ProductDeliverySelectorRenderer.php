@@ -555,8 +555,7 @@ final class ProductDeliverySelectorRenderer {
 		echo '</span>';
 		echo '</label>';
 		echo '</p>';
-		echo CustomerPolicyRenderer::html( $this->policy_views[ $option->display_key ] ?? null );
-		echo CustomerPolicyRenderer::ticket_input( $this->policy_views[ $option->display_key ] ?? null, $option->display_key );
+		echo CustomerPolicyRenderer::option_html( $this->policy_views[ $option->display_key ] ?? null, $option->display_key );
 	}
 
 	private function render_pickup_card_meta( ProductDeliveryOption $option ): void {

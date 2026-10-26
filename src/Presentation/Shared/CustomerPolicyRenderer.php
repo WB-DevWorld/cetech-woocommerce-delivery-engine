@@ -33,8 +33,8 @@ final class CustomerPolicyRenderer {
 		$v=self::normalize($value);if(null===$v){return '';}
 		if(in_array($v['status'],['unavailable','unsupported'],true)){return '<div class="cetech-de-customer-policies" data-cetech-de-policy-view="1" style="overflow-wrap:anywhere"><p role="status">'.esc_html(self::unavailable_message()).'</p></div>';}
 		$html='review_required'===$v['status']?'<p role="status" data-cetech-de-policy-review-notice="1">'.esc_html(self::review_message()).'</p>':'';
-		foreach(self::FAMILIES as$code){$f=$v['families'][$code];if('assigned'!==$f['disposition']){continue;}$html.='<section class="cetech-de-policy-family" data-cetech-de-policy-family="'.esc_attr($code).'"><h4>'.esc_html($f['customer_title']).'</h4><p style="white-space:pre-wrap">'.esc_html($f['summary']).'</p><details><summary>'.esc_html__('Read full policy','cetech-woocommerce-delivery-engine').'</summary><div style="white-space:pre-wrap">'.esc_html($f['full_text']).'</div>';
-			if(''!==$f['exceptions']){$html.='<h5>'.esc_html__('Exceptions','cetech-woocommerce-delivery-engine').'</h5><div style="white-space:pre-wrap">'.esc_html($f['exceptions']).'</div>';}$html.='</details></section>';
+		foreach(self::FAMILIES as$code){$f=$v['families'][$code];if('assigned'!==$f['disposition']){continue;}$html.='<section class="cetech-de-policy-family" data-cetech-de-policy-family="'.esc_attr($code).'"><h4 data-cetech-de-policy-field="customer_title">'.esc_html($f['customer_title']).'</h4><p data-cetech-de-policy-field="summary" style="white-space:pre-wrap">'.esc_html($f['summary']).'</p><details><summary>'.esc_html__('Read full policy','cetech-woocommerce-delivery-engine').'</summary><div data-cetech-de-policy-field="full_text" style="white-space:pre-wrap">'.esc_html($f['full_text']).'</div>';
+			if(''!==$f['exceptions']){$html.='<h5>'.esc_html__('Exceptions','cetech-woocommerce-delivery-engine').'</h5><div data-cetech-de-policy-field="exceptions" style="white-space:pre-wrap">'.esc_html($f['exceptions']).'</div>';}$html.='</details></section>';
 		}
 		return ''===$html?'':'<div class="cetech-de-customer-policies" data-cetech-de-policy-view="1" style="overflow-wrap:anywhere">'.$html.'</div>';
 	}
@@ -47,6 +47,9 @@ final class CustomerPolicyRenderer {
 	}
 	public static function ticket_input(mixed$value,string$key): string {
 		$v=self::normalize($value);if(null===$v||null===$v['ticket']||''===$key||strlen($key)>512||1!==preg_match('//u',$key)){return'';}return '<input type="hidden" data-cetech-de-policy-ticket="1" name="'.esc_attr(self::TICKET_FIELD.'['.$key.']').'" value="'.esc_attr($v['ticket']).'" />';
+	}
+	public static function option_html(mixed$value,string$key): string {
+		if(strlen($key)>512||!self::text($key,false)){return'';}$body=self::html($value).self::ticket_input($value,$key);return ''===$body?'':'<div data-cetech-de-policy-option="'.esc_attr($key).'">'.$body.'</div>';
 	}
 	public static function saved_html(array$items): string {return self::saved($items,false);}
 	public static function saved_plain(array$items): string {return self::saved($items,true);}

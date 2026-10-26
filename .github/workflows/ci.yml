@@ -251,65 +251,65 @@ jobs:
           vendor/bin/phpunit \
             -c phpunit.real-db.xml --stop-on-error --stop-on-failure \
             --log-junit "${RUNNER_TEMP}/cetech-de-real-db.junit.xml"
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\Operation\OperationStoreRealDatabaseTest' 43
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\Operation\OperationStoreRealDatabaseTest' 56
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\RuleLifecycle\RuleLifecycleRealDatabaseTest' 44
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DataLifecycle\DataLifecycleRealDatabaseTest' 30
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\EmergencyControl\EmergencyControlRealDatabaseTest' 30
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryQuote\DeliveryQuoteStorageRealDatabaseTest' 30
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryQuote\DeliveryQuoteLifecycleRealDatabaseTest' 46
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryQuote\LegacyPriceProviderRealDatabaseTest' 41
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryQuote\DeliveryQuoteCartReferenceRealDatabaseTest' 32
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryQuote\DeliveryQuotePlacementCoreRealDatabaseTest' 10
 
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\ServicePromise\ServicePromisePersistenceRealDatabaseTest' 15
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\ServicePromise\PromiseHandoffSourcesRealDatabaseTest' 16
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\ServicePromise\PromisePrimedSourceLifetimeRealDatabaseTest' 4
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\ServicePromise\PromiseQualificationBoundsRealDatabaseTest' 3
 
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionBudgetRealDatabaseTest' 9
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionRuleEligibilityRealDatabaseTest' 6
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionBudgetInstallationRealDatabaseTest' 12
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionBudgetAllocationRealDatabaseTest' 10
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionQuoteIssueRealDatabaseTest' 12
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionQuoteAcceptRealDatabaseTest' 12
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionQuotePlacementReadRealDatabaseTest' 12
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionQuoteBindRealDatabaseTest' 12
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionQuoteVerifyRealDatabaseTest' 12
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionQuoteSealRealDatabaseTest' 12
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionQuoteSealedReadRealDatabaseTest' 10
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\DeliveryPromotion\PromotionNativeHandoffRealDatabaseTest' 12
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\ReturnPolicy\ReturnPolicyCatalogRealDatabaseTest' 10
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\RefundPolicy\RefundPolicyCatalogRealDatabaseTest' 11
-          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 5 \
+          php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\PolicyAssignment\PolicyAssignmentRealDatabaseTest' 13
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\CustomerPolicy\CustomerPolicyReceiptRealDatabaseTest' 15

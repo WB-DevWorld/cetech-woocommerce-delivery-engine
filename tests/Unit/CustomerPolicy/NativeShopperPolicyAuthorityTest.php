@@ -8,7 +8,15 @@ use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 final class NativeShopperPolicyAuthorityTest extends TestCase{
  private array$owner,$products,$lines;private bool$available=true;
- protected function setUp():void{$this->owner=['site_id'=>1,'actor_id'=>0,'session_id'=>'guest-native-A','cookie'=>false,'wc'=>new \stdClass(),'session'=>new \stdClass(),'cart'=>new \stdClass(),'database'=>new \stdClass(),'auth_session'=>''];$this->products=[33=>['id'=>33,'parent_id'=>0,'is_variation'=>false,'is_variable'=>true,'visible'=>true,'viewable'=>true],44=>['id'=>44,'parent_id'=>33,'is_variation'=>true,'is_variable'=>false,'visible'=>true,'viewable'=>true]];$this->lines=['actual-key'=>$this->line()];}
+ private bool$had_wc;private mixed$previous_wc;
+ protected function setUp():void{
+  // These trusted-port fixtures own their geography environment too: the
+  // production MatchingLocation codec consults WC()->countries while reparsing.
+  // An unrelated suite's native Woo stub must not supply that hidden input.
+  $this->had_wc=array_key_exists('cetech_de_test_wc',$GLOBALS);$this->previous_wc=$GLOBALS['cetech_de_test_wc']??null;$GLOBALS['cetech_de_test_wc']=null;
+  $this->owner=['site_id'=>1,'actor_id'=>0,'session_id'=>'guest-native-A','cookie'=>false,'wc'=>new \stdClass(),'session'=>new \stdClass(),'cart'=>new \stdClass(),'database'=>new \stdClass(),'auth_session'=>''];$this->products=[33=>['id'=>33,'parent_id'=>0,'is_variation'=>false,'is_variable'=>true,'visible'=>true,'viewable'=>true],44=>['id'=>44,'parent_id'=>33,'is_variation'=>true,'is_variable'=>false,'visible'=>true,'viewable'=>true]];$this->lines=['actual-key'=>$this->line()];
+ }
+ protected function tearDown():void{if($this->had_wc){$GLOBALS['cetech_de_test_wc']=$this->previous_wc;}else{unset($GLOBALS['cetech_de_test_wc']);}}
  private function line():array{return['product_id'=>33,'variation_id'=>0,'quantity'=>2,CustomerCartContext::CART_KEY=>$this->context()->toArray(),CartDeliverySelectionCapture::CART_SELECTION_KEY=>['contract_version'=>'1','product_id'=>33,'variation_id'=>null,'target_type'=>'product','target_id'=>33,'display_key'=>'in_warehouse:delivery:7','fulfilment_availability'=>'in_warehouse','fulfilment_choice'=>'delivery','delivery_offer_id'=>7,'rule_id'=>1,'issued_at'=>'2026-10-26T00:00:00Z']];}
  private function context():CustomerCartContext{return CustomerCartContext::delivery(7,MatchingLocation::fromInput(['country'=>'GH','state'=>'AA','city'=>'Accra','postcode'=>'00001']));}
  private function authority(?callable$available=null):NativeShopperPolicyAuthority{return new NativeShopperPolicyAuthority($available??fn():bool=>$this->available,fn(int$id)=>$this->products[$id]??null,fn():array=>$this->owner,fn(string$key)=>$this->lines[$key]??null,static fn():array=>['site_id'=>1,'prefix'=>'wp_']);}
@@ -26,6 +34,12 @@ final class NativeShopperPolicyAuthorityTest extends TestCase{
  public function test_positive_actor_without_auth_token_or_matching_woo_id_is_refused():void{$this->owner['actor_id']=9;$this->owner['session_id']='9';$this->refuse(fn()=>$this->authority()->session_owner());$this->owner['auth_session']='token';$this->owner['session_id']='10';$this->refuse(fn()=>$this->authority()->session_owner());}
  public function test_option_callback_cannot_revoke_native_owner_and_still_publish():void{$a=$this->authority(function():bool{$this->owner['session_id']='foreign';return true;});$this->refuse(fn()=>$a->product(33,0,'2',7,$this->context(),'in_warehouse:delivery:7'));}
  public function test_changed_actual_quantity_or_removed_raw_key_revokes_grant():void{$a=$this->authority();$g=$a->cart('actual-key');$this->lines['actual-key']['quantity']=3;self::assertFalse($g->refresh());$g=$a->cart('actual-key');unset($this->lines['actual-key']);self::assertFalse($g->refresh());$this->refuse(fn()=>$a->cart('posted-product-33'));}
+ public function test_changed_native_geography_normalization_refuses_the_original_raw_cart_context():void{
+  $a=$this->authority();$g=$a->cart('actual-key');
+  $GLOBALS['cetech_de_test_wc']=(object)['countries'=>new class{public function get_states(string$country):array{return'GH'===$country?['Z9'=>'AA']:[];}}];
+  self::assertFalse($g->refresh());$this->refuse(fn()=>$a->cart('actual-key'));
+  $GLOBALS['cetech_de_test_wc']=null;self::assertFalse($g->refresh());
+ }
  #[DataProvider('bad_quantities')]
  public function test_fractional_noncanonical_and_nonpositive_cart_quantity_refuse(mixed$q):void{$this->lines['actual-key']['quantity']=$q;$this->refuse(fn()=>$this->authority()->cart('actual-key'));}
  public static function bad_quantities():array{return[[0],[-1],[1.5],['01'],['1.5'],['1e1'],[true],[null],['9223372036854775808']];}

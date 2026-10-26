@@ -27,5 +27,6 @@ final readonly class CustomerPolicyPreparedCheckout implements \JsonSerializable
 	public function issued_record(CartPolicyReceiptService$service):array{if($service!==$this->service){throw new \LogicException('Foreign original owner.');}return$this->opened['record'];}
 	public function jsonSerialize():never{throw new \LogicException('Customer policy originals require an explicit projection.');}
 	public function __serialize():never{throw new \LogicException('Customer policy originals are request-local.');}
+	public function __unserialize(array$data):never{throw new \LogicException('Customer policy originals are request-local.');}
 	public function __debugInfo():array{return['customer_policy_original'=>'redacted'];}
 }
