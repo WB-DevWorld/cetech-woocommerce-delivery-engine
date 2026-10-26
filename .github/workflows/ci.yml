@@ -130,6 +130,7 @@ jobs:
           python3 scripts/qualification/test-verify-policy-assignment-admin-native.py
           python3 scripts/qualification/test-verify-customer-policy-native.py
           python3 scripts/qualification/test-customer-policy-observer.py
+          python3 scripts/qualification/test-customer-policy-private-prerequisite.py
           python3 scripts/qualification/test-verify-opening-promotion-cart.py
           python3 scripts/qualification/test-opening-http-promise-handoff.py
           python3 scripts/qualification/test-opening-promise-native-configuration-browser.py

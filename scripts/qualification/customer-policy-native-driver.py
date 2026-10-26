@@ -15,6 +15,7 @@ from pathlib import Path
 import re
 import secrets
 import shutil
+import stat
 import subprocess
 import sys
 import time
@@ -22,6 +23,35 @@ import urllib.request
 sys.dont_write_bytecode=True
 HERE=Path(__file__).resolve().parent
 SPEC=importlib.util.spec_from_file_location('r24_verifier',HERE/'verify-customer-policy-native.py');V=importlib.util.module_from_spec(SPEC);SPEC.loader.exec_module(V)
+def copy_private_prerequisite(source,private,expected_sha,maximum=4194304):
+ source=Path(source);private=Path(private);destination=private/'opening-qualification-results.json'
+ V.require(type(maximum)is int and 0<maximum<=4194304 and type(expected_sha)is str and re.fullmatch('[a-f0-9]{64}',expected_sha),'Prerequisite copy authority refused')
+ V.require(private.is_dir()and not private.is_symlink()and stat.S_IMODE(private.stat().st_mode)==0o700,'Private prerequisite directory refused')
+ def read_exact(path):
+  V.require(not path.is_symlink(),'Prerequisite symlink refused')
+  descriptor=os.open(path,os.O_RDONLY|os.O_NOFOLLOW|os.O_NONBLOCK)
+  try:
+   before=os.fstat(descriptor);V.require(stat.S_ISREG(before.st_mode)and 0<before.st_size<=maximum,'Bounded regular prerequisite required')
+   with os.fdopen(descriptor,'rb',closefd=False)as stream:raw=stream.read(maximum+1);after=os.fstat(descriptor)
+  finally:os.close(descriptor)
+  identity=lambda value:(value.st_dev,value.st_ino,value.st_size,value.st_mtime_ns,value.st_ctime_ns)
+  V.require(identity(before)==identity(after)==identity(path.stat(follow_symlinks=False))and len(raw)==before.st_size and hashlib.sha256(raw).hexdigest()==expected_sha,'Prerequisite bytes or identity changed')
+  return raw,identity(after)
+ raw,original_identity=read_exact(source);created=None
+ try:
+  descriptor=os.open(destination,os.O_WRONLY|os.O_CREAT|os.O_EXCL|os.O_NOFOLLOW,0o600)
+  with os.fdopen(descriptor,'wb')as stream:
+   os.fchmod(stream.fileno(),0o600);created=os.fstat(stream.fileno());V.require(stream.write(raw)==len(raw),'Private prerequisite copy incomplete');stream.flush();os.fsync(stream.fileno())
+  copied,_=read_exact(destination);again,identity=read_exact(source)
+  V.require(copied==raw==again and identity==original_identity and stat.S_IMODE(destination.stat().st_mode)==0o600,'Private prerequisite copy differs')
+  return destination
+ except BaseException:
+  if created is not None:
+   try:
+    current=destination.stat(follow_symlinks=False)
+    if(current.st_dev,current.st_ino)==(created.st_dev,created.st_ino):destination.unlink()
+   except FileNotFoundError:pass
+  raise
 def write_json(path,value):
  path=Path(path);V.require(not path.is_symlink()and(not path.exists()or path.is_file()),'Unsafe output path')
  temporary=path.with_name('.r24-'+secrets.token_hex(8))
@@ -58,7 +88,8 @@ class Harness:
   self.args=args;self.work=args.work.resolve();self.site=args.site.resolve();self.repo=args.repo.resolve();self.php=args.php.resolve();self.wpcli=self.work/'wp-cli.phar'
   V.require(os.environ.get('GITHUB_ACTIONS')=='true'and os.environ.get('CETECH_DE_NATIVE_OPENING_QUALIFICATION')=='1'and os.environ.get('CETECH_DE_HTTP_OPENING_QUALIFICATION')=='1'and os.environ.get('CETECH_DE_WP_DB_HOST')=='127.0.0.1'and self.site==self.work/'opening-qualification','Owned CI environment required')
   self.auth=V.authority(self.repo,self.work,args.package.resolve());self.token=secrets.token_hex(12);self.private=self.work/('customer-policy-private-'+self.token);self.private.mkdir(mode=0o700);self.fixture=HERE/'customer-policy-native.php';self.plan_path=self.private/'plan.json';self.initialized=False;atexit.register(self.cleanup_initial_failure)
-  self.env=dict(os.environ,CETECH_R24_PRIVATE=str(self.private),CETECH_R24_PLAN=str(self.plan_path),CETECH_R24_REPO=str(self.repo),CETECH_R24_NATIVE=str(self.work/'opening-qualification-results.json'),CETECH_R24_PACKAGE=str(args.package.resolve()),CETECH_R24_PACKAGE_REPORT=str(args.package.resolve().with_suffix('.json')))
+  self.native_prerequisite=copy_private_prerequisite(self.work/'opening-qualification-results.json',self.private,self.auth['prerequisite_receipts']['opening-qualification-results.json'])
+  self.env=dict(os.environ,CETECH_R24_PRIVATE=str(self.private),CETECH_R24_PLAN=str(self.plan_path),CETECH_R24_REPO=str(self.repo),CETECH_R24_NATIVE=str(self.native_prerequisite),CETECH_R24_PACKAGE=str(args.package.resolve()),CETECH_R24_PACKAGE_REPORT=str(args.package.resolve().with_suffix('.json')))
   source_database=config_value(self.php,self.wpcli,self.site,'DB_NAME','constant',self.env);prefix=config_value(self.php,self.wpcli,self.site,'table_prefix','variable',self.env)
   V.require(re.fullmatch(r'cetech_wp_opening_qualification_[a-z0-9]+',source_database)and re.fullmatch(r'[A-Za-z0-9_]{1,30}',prefix),'Owned source database differs')
   self.plan={'format':'cetech-r24-owned-plan-v1','token':self.token,'probe':secrets.token_hex(24),'private':str(self.private),'work':str(self.work),'source_site':str(self.site),'source_database':source_database,'prefix':prefix,'installed_php_sources':self.auth['installed_php_sources'],'backends':{}}
