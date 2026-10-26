@@ -373,6 +373,8 @@ jobs:
             "${RUNNER_TEMP}/cetech-de-c07-browser/node_modules/.bin/playwright" install --with-deps chromium
           echo "CETECH_DE_EMERGENCY_PLAYWRIGHT_MODULE=${RUNNER_TEMP}/cetech-de-c07-browser/node_modules/playwright" >> "$GITHUB_ENV"
           echo "PLAYWRIGHT_BROWSERS_PATH=${RUNNER_TEMP}/cetech-de-c07-browsers" >> "$GITHUB_ENV"
+      - name: Verify customer policy response observation in the pinned browser
+        run: node --test scripts/qualification/test-customer-policy-browser-response.cjs
       - name: Build and replay exact P06 installable and historical reader packages
         shell: bash
         run: |

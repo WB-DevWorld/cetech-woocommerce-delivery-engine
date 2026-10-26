@@ -17,9 +17,9 @@ function emitCheckoutDiagnostic(before,after,route){
  const stage=key=>{const s=d[key]||{},status=['entered','returned','threw'].includes(s.status)?s.status:'unobserved';return{status,error_class:status==='threw'?(classes.includes(s.error_class)&&s.error_class!=='none'?s.error_class:'OtherThrowable'):'none',cause_class:status==='threw'?(classes.includes(s.cause_class)&&s.cause_class!=='none'?s.cause_class:'OtherThrowable'):'none'};};
  const created=key=>{const a=before.native_physical_census?.[key],b=after.native_physical_census?.[key];if(!Array.isArray(a)||!Array.isArray(b)||a.some(x=>!Number.isInteger(x)||x<1)||b.some(x=>!Number.isInteger(x)||x<1))return'unknown';const old=new Set(a);return b.some(x=>!old.has(x))?'positive':'zero';};
  const delta=key=>{const a=before[key],b=after[key];if(!Array.isArray(a)||!Array.isArray(b)||b.length<a.length||JSON.stringify(b.slice(0,a.length))!==JSON.stringify(a))return'unknown';const count=b.length-a.length;return count===0?'zero':count===1?'one':'multiple';};
- const snapshot=lastCheckout||{},operation=['click','final_response','final_body','classification','inspect_after','native_cart','headers'].includes(snapshot.operation)?snapshot.operation:'unobserved',response_seen=snapshot.response_seen===true,http_class=response_seen&&['2xx','3xx','4xx','5xx','other'].includes(snapshot.http_class)?snapshot.http_class:'unobserved',native_result=response_seen&&['success','failure','other'].includes(snapshot.native_result)?snapshot.native_result:'unobserved';
+ const snapshot=lastCheckout||{},operation=['click','final_response','final_body','classification','inspect_after','native_cart','headers'].includes(snapshot.operation)?snapshot.operation:'unobserved',response_seen=snapshot.response_seen===true,http_class=response_seen&&['2xx','3xx','4xx','5xx','other'].includes(snapshot.http_class)?snapshot.http_class:'unobserved',native_result=response_seen&&['success','failure','other'].includes(snapshot.native_result)?snapshot.native_result:'unobserved',body_access=['pending','ready','captured','enable_failed','request_invalid','request_ambiguous','response_mismatch','request_failed','body_unavailable','body_overflow','body_invalid','body_timeout'].includes(snapshot.body_access)?snapshot.body_access:'unobserved';
  let originals=after.originals.filter(row=>!before.originals.some(prior=>prior.attempt_id===row.attempt_id));if(originals.length===0)originals=after.originals.filter(row=>row.state!=='complete');const original_state=originals.length===0?'absent':originals.length>1?'multiple':['frozen','bound','complete'].includes(originals[0].state)?originals[0].state:'unknown';
- process.stdout.write('customer_policy_native_checkout_diagnostic='+JSON.stringify({backend:input.backend,route,operation,response_seen,http_class,native_result,gateway_entries:delta('gateway_entry_calls'),gateway_delegations:delta('gateway_calls'),payment_completions:delta('completion_calls'),unsaved_preflight:after.unsaved_ownership_preflight===true?'pass':'unobserved',validation,checkpoints,stage_classic:stage('stage_classic'),stage_store_post:stage('stage_store_post'),new_native_orders:created('orders'),new_native_lines:created('lines'),original_state})+'\n');
+ process.stdout.write('customer_policy_native_checkout_diagnostic='+JSON.stringify({backend:input.backend,route,operation,response_seen,http_class,native_result,body_access,gateway_entries:delta('gateway_entry_calls'),gateway_delegations:delta('gateway_calls'),payment_completions:delta('completion_calls'),unsaved_preflight:after.unsaved_ownership_preflight===true?'pass':'unobserved',validation,checkpoints,stage_classic:stage('stage_classic'),stage_store_post:stage('stage_store_post'),new_native_orders:created('orders'),new_native_lines:created('lines'),original_state})+'\n');
 }
 
 function loadPrivate(file){const s=fs.lstatSync(file);need(s.isFile()&&!s.isSymbolicLink()&&(s.mode&0o077)===0&&s.size<=4194304);return JSON.parse(fs.readFileSync(file,'utf8'));}
@@ -131,17 +131,93 @@ async function reviewCart(shopper,options={}) {
 async function setQuantity(shopper,quantity){setPhase('cart_quantity');need(Number.isInteger(quantity)&&quantity>0);await shopper.page.goto(local(prepared.cart_url));const state=await native(shopper,'cart');need(state.cart_keys.length===1,'One actual native cart line required for quantity review');const key=state.cart_keys[0],form=shopper.page.locator('.woocommerce-cart-form'),oldForm=await form.elementHandle();need(oldForm!==null);const qty=form.locator('input.qty').first();await qty.fill(String(quantity));await qty.dispatchEvent('change');const observed=shopper.page.waitForResponse(response=>{const request=response.request();if(request.method()!=='POST'||new URL(request.url()).origin!==input.url||new URL(request.url()).pathname!==new URL(prepared.cart_url).pathname)return false;const body=new URLSearchParams(request.postData()||'');return body.has('update_cart')&&body.get('cart['+key+'][qty]')===String(quantity);});await form.locator('button[name="update_cart"]').click();const response=await observed;need(response.status()>=200&&response.status()<400,'Actual native quantity update was not acknowledged');if(response.status()>=300){const target=await response.headerValue('location');need(typeof target==='string'&&new URL(target,input.url).origin===input.url,'Native quantity redirect left the owned listener');}await shopper.page.waitForFunction(node=>!node.isConnected,oldForm);need(await shopper.page.locator('.woocommerce-cart-form input.qty').first().inputValue()===String(quantity),'Actual updated cart DOM quantity differs');const actual=await native(shopper,'cart');need(actual.cart_keys.length===1&&actual.cart_keys[0]===key&&actual.cart_count===quantity);return actual;}
 function finalSelection(request,route){if(request.method()!=='POST')return null;const url=new URL(request.url());if(url.origin!==input.url)return null;if(route==='classic')return url.searchParams.get('wc-ajax')==='checkout'?{transport:'direct',index:0,count:1}:null;const native=leaf=>{const expected=new URL(prepared.store_checkout_url);if(expected.origin!==input.url)return false;if(expected.searchParams.has('rest_route'))return url.pathname===expected.pathname&&url.searchParams.get('rest_route')===leaf;const suffix='/wc/store/v1/checkout';return expected.pathname.endsWith(suffix)&&!url.searchParams.has('rest_route')&&url.pathname===expected.pathname.slice(0,-suffix.length)+leaf;};if(native('/wc/store/v1/checkout'))return{transport:'direct',index:0,count:1};if(!native('/wc/store/v1/batch'))return null;let parsed;try{parsed=JSON.parse(request.postData()||'');}catch{return null;}if(!parsed||Object.keys(parsed).join(',')!=='requests'||!Array.isArray(parsed.requests)||parsed.requests.length<1||parsed.requests.length>25)return null;const matches=[];for(let index=0;index<parsed.requests.length;index++){const row=parsed.requests[index];if(!row||typeof row.path!=='string'||typeof row.method!=='string')return null;const target=new URL(row.path,input.url);if(target.origin!==input.url)return null;if(target.pathname==='/wc/store/v1/checkout'&&row.method==='POST')matches.push(index);}return matches.length===1?{transport:'batch',index:matches[0],count:parsed.requests.length}:null;}
 function isFinal(request,route){return finalSelection(request,route)!==null;}
+/** Passive, bounded same-session CDP body retention; never replays or intercepts HTTP. */
+async function createDurableFinalBody(page,matchesRequest,observation) {
+ const MAX_BODY=1048576,MAX_POST=262144;
+ const record=value=>{try{observation.body_access=value;}catch{}};
+ let session,mainFrameId,selected=null,terminal=null,disposed=false,settled=false,timer;
+ let resolveBody;const body=new Promise(resolve=>{resolveBody=resolve;});
+ const settle=value=>{if(!settled){settled=true;resolveBody(value);}};
+ const fail=(category,error=new Error('R24 passive response observation refused'))=>{if(!terminal){terminal=error;record(category);}settle({ok:false,error:terminal});};
+ const request=event=>{
+  if(disposed)return;
+  try{
+   if(selected&&event.requestId===selected.id){fail('request_ambiguous');return;}
+   const raw=event.request,view={url:()=>raw?.url,method:()=>raw?.method,postData:()=>raw?.postData};
+   if(!matchesRequest(view))return;
+   if(selected){fail('request_ambiguous');return;}
+   if(typeof event.requestId!=='string'||event.requestId.length<1||event.requestId.length>256||event.redirectResponse||event.frameId!==mainFrameId||typeof raw?.url!=='string'||raw.url.length>8192||raw.method!=='POST'||typeof raw.postData!=='string'||raw.postData.length<1||Buffer.byteLength(raw.postData,'utf8')>MAX_POST){fail('request_invalid');return;}
+   selected={id:event.requestId,url:raw.url,method:raw.method,postData:raw.postData,response:null,finished:false};
+  }catch(error){fail('request_invalid',error);}
+ };
+ const response=event=>{
+  if(disposed||!selected||event.requestId!==selected.id)return;
+  const raw=event.response;
+  if(selected.response!==null||event.frameId!==mainFrameId||!raw||raw.url!==selected.url||!Number.isInteger(raw.status)){fail('response_mismatch');return;}
+  selected.response={url:raw.url,status:raw.status};
+ };
+ const finished=event=>{
+  if(disposed||!selected||event.requestId!==selected.id)return;
+  if(selected.finished||selected.response===null){fail('response_mismatch');return;}
+  selected.finished=true;
+  Promise.resolve().then(()=>session.send('Network.getResponseBody',{requestId:selected.id})).then(result=>{
+   if(disposed||terminal)return;
+   try{
+    if(!result||typeof result.body!=='string'||typeof result.base64Encoded!=='boolean'){fail('body_invalid');return;}
+    let bytes;
+    if(result.base64Encoded){
+     if(result.body.length>4*Math.ceil(MAX_BODY/3)){fail('body_overflow');return;}
+     if(result.body.length%4!==0||!/^[A-Za-z0-9+/]*={0,2}$/.test(result.body)){fail('body_invalid');return;}
+     bytes=Buffer.from(result.body,'base64');if(bytes.toString('base64')!==result.body){fail('body_invalid');return;}
+    }else{
+     if(Buffer.byteLength(result.body,'utf8')>MAX_BODY){fail('body_overflow');return;}
+     for(let i=0;i<result.body.length;i++){const c=result.body.charCodeAt(i);if(c>=0xd800&&c<=0xdbff){const next=result.body.charCodeAt(++i);if(!(next>=0xdc00&&next<=0xdfff)){fail('body_invalid');return;}}else if(c>=0xdc00&&c<=0xdfff){fail('body_invalid');return;}}
+     bytes=Buffer.from(result.body,'utf8');
+    }
+    if(bytes.length>MAX_BODY){fail('body_overflow');return;}
+    const text=new TextDecoder('utf-8',{fatal:true}).decode(bytes),value=JSON.parse(text);
+    record('captured');settle({ok:true,value});
+   }catch(error){fail('body_invalid',error);}
+  },error=>fail('body_unavailable',error));
+ };
+ const failed=event=>{if(!disposed&&selected&&event.requestId===selected.id)fail('request_failed');};
+ const closed=()=>{if(!disposed)fail('body_unavailable');};
+ const listeners=[['Network.requestWillBeSent',request],['Network.responseReceived',response],['Network.loadingFinished',finished],['Network.loadingFailed',failed],['Inspector.detached',closed]];
+ const dispose=async()=>{
+  if(disposed)return;disposed=true;clearTimeout(timer);
+  page.removeListener('close',closed);
+  if(session){for(const [name,listener]of listeners)session.removeListener(name,listener);try{await session.detach();}catch{}}
+  settle({ok:false,error:terminal||new Error('R24 passive response observer closed')});
+ };
+ record('pending');
+ try{
+  session=await page.context().newCDPSession(page);
+  const tree=await session.send('Page.getFrameTree');mainFrameId=tree?.frameTree?.frame?.id;
+  if(typeof mainFrameId!=='string'||mainFrameId.length<1||mainFrameId.length>256)throw new Error('R24 passive page identity unavailable');
+  for(const [name,listener]of listeners)session.on(name,listener);page.on('close',closed);
+  await session.send('Network.enable',{maxTotalBufferSize:4194304,maxResourceBufferSize:MAX_BODY,maxPostDataSize:MAX_POST,enableDurableMessages:true});
+  timer=setTimeout(()=>fail('body_timeout'),30000);record('ready');
+ }catch(error){record('enable_failed');await dispose();throw error;}
+ return{read:async nativeResponse=>{
+  const observed=await body;if(!observed.ok)throw observed.error;if(terminal)throw terminal;
+  try{const nativeRequest=nativeResponse.request();
+   if(!selected||nativeRequest.frame()!==page.mainFrame()||nativeRequest.url()!==selected.url||nativeRequest.method()!==selected.method||nativeRequest.postData()!==selected.postData||nativeResponse.url()!==selected.response.url||nativeResponse.status()!==selected.response.status)fail('response_mismatch');
+  }catch(error){fail('response_mismatch',error);}
+  if(terminal)throw terminal;
+  return observed.value;
+ },dispose};
+}
 async function checkout(shopper,route='classic',options={}){setPhase(route==='classic'?'checkout_classic':'checkout_blocks');need(['classic','blocks'].includes(route));bridge('checkout-'+route);await shopper.page.goto(local(prepared[route+'_url']));const page=shopper.page;const values={billing_first_name:'Synthetic',billing_last_name:'Shopper',billing_address_1:'PRIVATE-R24-TEST-ADDRESS',billing_city:'Accra',billing_postcode:'00001',billing_phone:'0200000000',billing_email:'r24-shopper@example.invalid',email:'r24-shopper@example.invalid','billing-first_name':'Synthetic','billing-last_name':'Shopper','billing-address_1':'PRIVATE-R24-TEST-ADDRESS','billing-city':'Accra','billing-postcode':'00001','billing-phone':'0200000000'};for(const [id,value]of Object.entries(values)){const field=page.locator('[id="'+id+'"]');if(await field.count()&&await field.isVisible())await field.fill(value);}for(const id of ['billing_country','billing-country']){const field=page.locator('[id="'+id+'"]');if(await field.count()&&await field.isVisible())await field.selectOption('GH');}for(const id of ['billing_state','billing-state']){const field=page.locator('[id="'+id+'"]');if(await field.count()&&await field.isVisible())await field.selectOption('AA');}const gateway=page.locator('input[value="cetech_r24_local"]');if(await gateway.count()&&await gateway.isVisible())await gateway.check();const terms=page.locator('#terms');if(await terms.count()&&await terms.isVisible())await terms.check();const button=page.locator(route==='classic'?'#place_order':'.wc-block-components-checkout-place-order-button').first();await button.waitFor();await page.waitForFunction(selector=>{const b=document.querySelector(selector);return b&&!b.disabled&&b.getAttribute('aria-disabled')!=='true';},route==='classic'?'#place_order':'.wc-block-components-checkout-place-order-button');const before=inspect();
- lastCheckout={before,after:null,route,operation:'click',response_seen:false,http_class:'unobserved',native_result:'unobserved'};
+ lastCheckout={before,after:null,route,operation:'click',response_seen:false,http_class:'unobserved',native_result:'unobserved',body_access:'unobserved'};
  // Read the matched response while the original native click/navigation is still pending.
  // Detached outcomes are always consumed; only the awaited native boundary can throw them.
- async function observeFinalResponse(button,pendingResponse,observation) {
+ async function observeFinalResponse(button,pendingResponse,observation,readBody=null) {
   const record=(key,value)=>{try{observation[key]=value;}catch{}};
   const received=Promise.resolve(pendingResponse).then(response=>{
    record('response_seen',true);
    const status=response.status();
    record('http_class',status>=200&&status<300?'2xx':status>=300&&status<400?'3xx':status>=400&&status<500?'4xx':status>=500&&status<600?'5xx':'other');
-   const body=Promise.resolve().then(()=>response.json()).then(value=>({ok:true,value}),error=>({ok:false,error}));
+   const body=Promise.resolve().then(()=>readBody===null?response.json():readBody(response)).then(value=>({ok:true,value}),error=>({ok:false,error}));
    return{ok:true,response,body};
   }).catch(error=>({ok:false,error}));
   record('operation','click');
@@ -152,10 +228,16 @@ async function checkout(shopper,route='classic',options={}){setPhase(route==='cl
   record('operation','final_body');
   const body=await response.body;
   if(!body.ok)throw body.error;
+  // Revalidate the same cached bytes through the complete native click boundary.
+  // A late duplicate, failure or timeout must not leave an earlier body authoritative.
+  if(readBody!==null&&await readBody(response.response)!==body.value)throw new Error('R24 passive response identity changed');
   return{response:response.response,body:body.value};
  }
- const pending=page.waitForResponse(r=>isFinal(r.request(),route),{timeout:30000});
- const observed=await observeFinalResponse(button,pending,lastCheckout),response=observed.response;
+ const durable=await createDurableFinalBody(page,r=>isFinal(r,route),lastCheckout);
+ let observed;
+ try{const pending=page.waitForResponse(r=>isFinal(r.request(),route),{timeout:30000});observed=await observeFinalResponse(button,pending,lastCheckout,response=>durable.read(response));}
+ finally{await durable.dispose();}
+ const response=observed.response;
  let body=observed.body;
  lastCheckout.operation='classification';
  const request=response.request(),selection=finalSelection(request,route);need(selection!==null);

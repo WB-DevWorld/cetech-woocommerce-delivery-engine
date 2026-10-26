@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const {test} = require('node:test');
+const {EventEmitter} = require('node:events');
 
 const source = fs.readFileSync(path.join(__dirname, 'customer-policy-browser.cjs'), 'utf8');
 function extractFunction(name) {
@@ -104,4 +105,142 @@ test('diagnostic setter failures cannot replace actual click or body outcomes', 
  const f = fixture({json:Promise.resolve(packet),observation}); f.pending.resolve(f.response); await flush(); f.click.resolve(); const result = await f.result;
  assert.equal(result.ok, true); assert.equal(result.value.response, f.response); assert.equal(result.value.body, packet);
  const clickError = new Error('declared click error'), g = fixture({observation}); g.click.reject(clickError); const failed = await g.result; assert.equal(failed.ok, false); assert.equal(failed.error, clickError); g.pending.resolve(g.response); await flush();
+});
+
+const durableSource=extractFunction('createDurableFinalBody');
+async function durableFixture(options={}) {
+ const events=new EventEmitter(),commands=[],timers=[],frame={},observation={};let detached=0;
+ const payload=deferred();
+ const session=Object.assign(events,{send:async(name,args)=>{
+  commands.push({name,args});
+  if(name==='Page.getFrameTree')return{frameTree:{frame:{id:'main-frame'}}};
+  if(name==='Network.enable'){if(options.enableError)throw options.enableError;return{};}
+  if(name==='Network.getResponseBody')return payload.promise;
+  throw new Error('Unexpected active CDP command');
+ },detach:async()=>{++detached;if(options.detachError)throw options.detachError;}});
+ const page=Object.assign(new EventEmitter(),{context:()=>({newCDPSession:async target=>{assert.equal(target,page);return session;}}),mainFrame:()=>frame});
+ const sandbox={Buffer,TextDecoder,setTimeout:(fn,ms)=>{const timer={fn,ms,cleared:false};timers.push(timer);return timer;},clearTimeout:timer=>{if(timer)timer.cleared=true;}};
+ const create=vm.runInNewContext(durableSource+'; createDurableFinalBody',sandbox);
+ const match=request=>request.method()==='POST'&&request.url()==='http://127.0.0.1:8999/?wc-ajax=checkout';
+ const observer=await create(page,match,observation);
+ const raw={requestId:'123.1',frameId:'main-frame',request:{url:'http://127.0.0.1:8999/?wc-ajax=checkout',method:'POST',postData:'native=one'}};
+ const nativeRequest={url:()=>raw.request.url,method:()=>raw.request.method,postData:()=>raw.request.postData,frame:()=>frame};
+ const nativeResponse={request:()=>nativeRequest,url:()=>raw.request.url,status:()=>200};
+ const emitRequest=value=>events.emit('Network.requestWillBeSent',value||raw);
+ const emitResponse=value=>events.emit('Network.responseReceived',value||{requestId:raw.requestId,frameId:'main-frame',response:{url:raw.request.url,status:200}});
+ const finish=()=>events.emit('Network.loadingFinished',{requestId:raw.requestId});
+ const complete=(body='{"result":"success"}',base64Encoded=false)=>{emitRequest();emitResponse();finish();payload.resolve({body,base64Encoded});};
+ return{events,page,commands,timers,observation,payload,session,observer,raw,nativeRequest,nativeResponse,emitRequest,emitResponse,finish,complete,detached:()=>detached};
+}
+async function refused(f,category,expectedName) {
+ const result=await outcome(f.observer.read(f.nativeResponse));
+ assert.equal(result.ok,false);if(expectedName)assert.equal(result.error.name,expectedName);
+ assert.equal(f.observation.body_access,category);await f.observer.dispose();
+ assert.equal(f.detached(),1);assert.ok(f.timers.every(x=>x.cleared));assert.equal(f.events.eventNames().length,0);assert.equal(f.page.eventNames().length,0);
+}
+
+test('served producer installs the passive observer before the unchanged one-click helper',()=>{
+ assert.equal((source.match(/await\s+createDurableFinalBody\(/g)||[]).length,1);
+ assert.ok(source.includes('response=>durable.read(response)'));
+ assert.ok(source.includes('finally{await durable.dispose();}'));
+ assert.ok(!/Fetch\.|route\(|replayXHR|Runtime\.evaluate/.test(durableSource));
+});
+
+test('durable observer pins the main page and enables bounded passive retention before any request',async()=>{
+ const f=await durableFixture();assert.equal(f.observation.body_access,'ready');
+ assert.deepEqual(f.commands.map(x=>x.name),['Page.getFrameTree','Network.enable']);
+ assert.deepEqual(JSON.parse(JSON.stringify(f.commands[1].args)),{maxTotalBufferSize:4194304,maxResourceBufferSize:1048576,maxPostDataSize:262144,enableDurableMessages:true});
+ assert.equal(f.timers.length,1);assert.equal(f.timers[0].ms,30000);await f.observer.dispose();
+ assert.equal(f.detached(),1);assert.equal(f.events.eventNames().length,0);assert.equal(f.timers[0].cleared,true);
+});
+
+test('durable body read retains the exact matched response while native click remains pending',async()=>{
+ const f=await durableFixture(),click=deferred(),pending=deferred();let clicks=0;
+ const result=outcome(observe({click:()=>{++clicks;return click.promise;}},pending.promise,f.observation,response=>f.observer.read(response)));
+ f.complete();pending.resolve(f.nativeResponse);await flush();assert.equal(clicks,1);assert.equal(f.observation.body_access,'captured');
+ assert.equal(f.commands.filter(x=>x.name==='Network.getResponseBody').length,1);
+ click.resolve();const observed=await result;assert.equal(observed.ok,true);assert.equal(observed.value.response,f.nativeResponse);assert.equal(JSON.stringify(observed.value.body),'{"result":"success"}');
+ await f.observer.dispose();assert.equal(f.detached(),1);
+});
+
+test('foreign origin, GET, and update traffic cannot substitute for the native final POST',async()=>{
+ const f=await durableFixture();
+ for(const request of [{url:'https://foreign.invalid/?wc-ajax=checkout',method:'POST',postData:'native=one'},{url:f.raw.request.url,method:'GET'},{url:'http://127.0.0.1:8999/?wc-ajax=update_order_review',method:'POST',postData:'native=one'}])f.emitRequest({...f.raw,requestId:'foreign',request});
+ f.complete();const observed=await f.observer.read(f.nativeResponse);assert.equal(observed.result,'success');await f.observer.dispose();
+});
+
+test('loadingFinished is required before reading the one exact CDP request body',async()=>{
+ const f=await durableFixture();f.emitRequest();f.emitResponse();await flush();assert.equal(f.commands.filter(x=>x.name==='Network.getResponseBody').length,0);
+ f.finish();f.payload.resolve({body:'{"result":"failure"}',base64Encoded:false});assert.equal((await f.observer.read(f.nativeResponse)).result,'failure');
+ const command=f.commands.find(x=>x.name==='Network.getResponseBody');assert.deepEqual(JSON.parse(JSON.stringify(command.args)),{requestId:'123.1'});await f.observer.dispose();
+});
+
+for(const [label,mutate]of [
+ ['second final POST',f=>f.emitRequest({...f.raw,requestId:'second'})],
+ ['redirect reuse',f=>f.emitRequest({...f.raw,redirectResponse:{status:302},request:{url:'http://127.0.0.1:8999/destination',method:'GET'}})],
+ ['same request event twice',f=>f.emitRequest()]
+])test('durable observer refuses ambiguous '+label,async()=>{const f=await durableFixture();f.emitRequest();mutate(f);await refused(f,'request_ambiguous');});
+
+for(const [label,change]of [
+ ['iframe',{frameId:'foreign-frame'}],['missing postData',{request:{url:'http://127.0.0.1:8999/?wc-ajax=checkout',method:'POST'}}],
+ ['oversized postData',{request:{url:'http://127.0.0.1:8999/?wc-ajax=checkout',method:'POST',postData:'x'.repeat(262145)}}],
+ ['already redirected',{redirectResponse:{status:302}}]
+])test('durable observer refuses '+label,async()=>{const f=await durableFixture();f.emitRequest({...f.raw,...change});await refused(f,'request_invalid');});
+
+for(const [label,change]of [
+ ['URL',f=>{f.nativeRequest.url=()=>f.raw.request.url+'&foreign=1';}],
+ ['method',f=>{f.nativeRequest.method=()=>'GET';}],
+ ['literal POST bytes',f=>{f.nativeRequest.postData=()=>'native=two';}],
+ ['response URL',f=>{f.nativeResponse.url=()=>'http://127.0.0.1:8999/other';}],
+ ['status',f=>{f.nativeResponse.status=()=>503;}],
+ ['frame object',f=>{f.nativeRequest.frame=()=>({});}]
+])test('durable body cannot stand in for another Playwright '+label,async()=>{const f=await durableFixture();f.complete();change(f);await refused(f,'response_mismatch');});
+
+test('durable observer preserves native failure JSON and non-success HTTP status',async()=>{
+ const f=await durableFixture();f.emitRequest();f.emitResponse({requestId:f.raw.requestId,frameId:'main-frame',response:{url:f.raw.request.url,status:503}});f.nativeResponse.status=()=>503;
+ f.finish();f.payload.resolve({body:'{"result":"failure","declared":true}',base64Encoded:false});const value=await f.observer.read(f.nativeResponse);
+ assert.equal(value.result,'failure');assert.equal(value.declared,true);assert.equal(f.nativeResponse.status(),503);await f.observer.dispose();
+});
+
+for(const [label,payload]of [
+ ['invalid JSON',{body:'not-json',base64Encoded:false}],['empty body',{body:'',base64Encoded:false}],
+ ['lone surrogate',{body:'"\ud800"',base64Encoded:false}],['invalid base64',{body:'@@==',base64Encoded:true}],
+ ['noncanonical base64',{body:'Zh==',base64Encoded:true}],['invalid UTF8',{body:Buffer.from([0xff]).toString('base64'),base64Encoded:true}],
+ ['wrong protocol shape',{body:'{}',base64Encoded:1}]
+])test('durable observer refuses '+label,async()=>{const f=await durableFixture();f.emitRequest();f.emitResponse();f.finish();f.payload.resolve(payload);await refused(f,'body_invalid');});
+
+test('canonical base64 body decodes UTF8 without changing the native JSON',async()=>{
+ const f=await durableFixture();f.complete(Buffer.from('{"result":"success","declared":"é😀"}').toString('base64'),true);
+ const value=await f.observer.read(f.nativeResponse);assert.equal(value.declared,'é😀');await f.observer.dispose();
+});
+
+for(const [label,body,base64Encoded]of [['plain','x'.repeat(1048577),false],['encoded',Buffer.alloc(1048577,120).toString('base64'),true]])test('durable observer refuses '+label+' body overflow',async()=>{
+ const f=await durableFixture();f.complete(body,base64Encoded);await refused(f,'body_overflow');
+});
+
+test('loading failure, detached session, missing body, and timeout remain closed finite outcomes',async()=>{
+ let f=await durableFixture();f.emitRequest();f.events.emit('Network.loadingFailed',{requestId:f.raw.requestId});await refused(f,'request_failed');
+ f=await durableFixture();f.events.emit('Inspector.detached');await refused(f,'body_unavailable');
+ f=await durableFixture();f.page.emit('close');await refused(f,'body_unavailable');
+ f=await durableFixture();const original=new Error('declared private protocol failure');f.emitRequest();f.emitResponse();f.finish();f.payload.reject(original);const result=await outcome(f.observer.read(f.nativeResponse));assert.equal(result.error,original);assert.equal(f.observation.body_access,'body_unavailable');await f.observer.dispose();
+ f=await durableFixture();f.timers[0].fn();await refused(f,'body_timeout');
+});
+
+test('durable callback and detach failures cannot replace the original click error',async()=>{
+ const f=await durableFixture({detachError:new Error('declared detach failure')}),pending=deferred(),clickError=new Error('declared click failure');
+ const result=await outcome(observe({click:async()=>{throw clickError;}},pending.promise,f.observation,response=>f.observer.read(response)));
+ assert.equal(result.error,clickError);await f.observer.dispose();pending.reject(new Error('declared late response failure'));await flush();assert.equal(f.detached(),1);assert.equal(f.events.eventNames().length,0);
+});
+
+for(const [label,late,category]of [
+ ['duplicate POST',f=>f.emitRequest({...f.raw,requestId:'late-second'}),'request_ambiguous'],
+ ['native loading failure',f=>f.events.emit('Network.loadingFailed',{requestId:f.raw.requestId}),'request_failed'],
+ ['observer timeout',f=>f.timers[0].fn(),'body_timeout'],
+ ['target detach',f=>f.events.emit('Inspector.detached'),'body_unavailable']
+])test('a body captured before the native click finishes cannot survive a late '+label,async()=>{
+ const f=await durableFixture(),click=deferred(),pending=deferred();let reads=0;
+ const result=outcome(observe({click:()=>click.promise},pending.promise,f.observation,response=>{++reads;return f.observer.read(response);}));
+ f.complete();pending.resolve(f.nativeResponse);await flush();assert.equal(reads,1);assert.equal(f.observation.body_access,'captured');
+ late(f);click.resolve();const observed=await result;
+ assert.equal(observed.ok,false);assert.equal(f.observation.body_access,category);assert.equal(reads,2);assert.equal(f.commands.filter(x=>x.name==='Network.getResponseBody').length,1);await f.observer.dispose();
 });
