@@ -12,16 +12,19 @@ final class PolicyNativeOrderAttempt implements \JsonSerializable {
  public static function begin(PolicyNativeOrderStager$issuer,\WC_Order$order,CustomerPolicyPreparedCheckout$p,array$latch):self{
   if($p->state()!=='frozen'||$p->binding()!==null||($GLOBALS['blog_id']??null)!==$p->site_id()||!in_array($p->route(),['classic','store_api'],true))self::fail();
   if($p->route()==='classic'?$order->get_id()!==0:$order->get_status('edit')!=='checkout-draft')self::fail();
-  $claim=new self($issuer,$order,$p,$latch);$claim->native();if(self::policy_rows($order)!==[])self::fail();foreach($latch as$item)if(self::policy_rows($item)!==[])self::fail();
-  $order->add_meta_data(PolicyNativeOrderFacts::META_ATTEMPT,$p->attempt_id(),false);if(!$claim->allows($issuer,$order,$p))self::fail();return$claim;
+  $claim=new self($issuer,$order,$p,$latch);$claim->native(true);if(self::policy_rows($order)!==[])self::fail();foreach($latch as$item)if(self::policy_rows($item)!==[])self::fail();
+  // Native Classic orders begin with an empty edit status. Initialize only this
+  // verified new object; native stores otherwise default the SQL row alone.
+  if($order->get_status('edit')===''){if($order->get_status('view')!=='pending'||$p->route()!=='classic'||$order->get_id()!==0||$order->get_status('edit')!=='')self::fail();$claim->native(true);if(self::policy_rows($order)!==[])self::fail();foreach($latch as$item)if(self::policy_rows($item)!==[])self::fail();$transition=$order->set_status('pending');if($transition!==['from'=>'pending','to'=>'pending']||$p->route()!=='classic'||$order->get_id()!==0)self::fail();$claim->native();if(self::policy_rows($order)!==[])self::fail();foreach($latch as$item)if(self::policy_rows($item)!==[])self::fail();}$claim->native();if($p->route()==='classic'&&$order->get_id()!==0)self::fail();
+  $order->add_meta_data(PolicyNativeOrderFacts::META_ATTEMPT,$p->attempt_id(),false);if(!$claim->allows($issuer,$order,$p)||$p->route()==='classic'&&$order->get_id()!==0)self::fail();return$claim;
  }
  public function allows(PolicyNativeOrderStager$issuer,\WC_Order$order,CustomerPolicyPreparedCheckout$p):bool{
   try{if(!$this->active||$this->issuer!==$issuer||$this->order!==$order||$this->prepared!==$p)return false;$this->native();if(self::policy_rows($order)!==[[PolicyNativeOrderFacts::META_ATTEMPT,$p->attempt_id()]])return false;foreach($this->latch as$item)if(self::policy_rows($item)!==[])return false;return true;}catch(\Throwable){return false;}
  }
  public function revoke():void{$this->active=false;}
  public function issued_for(\WC_Order$order,CustomerPolicyPreparedCheckout$p):bool{return$this->issuer->owns_attempt($this,$order,$p)&&$this->allows($this->issuer,$order,$p);}
- private function native():void{
-  $o=$this->order;$p=$this->prepared;if(!in_array(get_class($o),['WC_Order','Automattic\\WooCommerce\\Admin\\Overrides\\Order'],true)||($GLOBALS['blog_id']??null)!==$p->site_id()||$o->is_paid()||$o->get_date_paid('edit')!==null||$o->get_transaction_id('edit')!==''||!in_array($o->get_status('edit'),['pending','failed','checkout-draft'],true))self::fail();
+ private function native(bool$before_initialization=false):void{
+  $o=$this->order;$p=$this->prepared;$status=$o->get_status('edit');$new_classic=$before_initialization&&$p->route()==='classic'&&$o->get_id()===0&&$status==='';if(!in_array(get_class($o),['WC_Order','Automattic\\WooCommerce\\Admin\\Overrides\\Order'],true)||($GLOBALS['blog_id']??null)!==$p->site_id()||$o->is_paid()||$o->get_date_paid('edit')!==null||$o->get_transaction_id('edit')!==''||(!$new_classic&&!in_array($status,['pending','failed','checkout-draft'],true)))self::fail();
   $items=$o->get_items('line_item');$lines=$p->lines();if(!is_array($items)||count($items)!==count($lines)||count($this->latch)!==count($lines)||$lines===[])self::fail();$used=[];
   foreach($lines as$key=>$line){$item=$this->latch[$key]??null;$f=$line['frame'];if(!$item instanceof \WC_Order_Item_Product||get_class($item)!=='WC_Order_Item_Product'||!in_array($item,$items,true)||isset($used[spl_object_id($item)])||$item->get_order_id('edit')!==$o->get_id()||$o->get_customer_id('edit')!==$f['actor_id']||$item->get_product_id()!==$f['product_id']||$item->get_variation_id()!==$f['variation_id']||PolicyNativeOrderFacts::quantity($item->get_quantity('edit'))!==$f['quantity'])self::fail();$used[spl_object_id($item)]=true;}
  }
