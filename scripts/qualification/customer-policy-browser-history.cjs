@@ -50,6 +50,19 @@ async function review(api,shopper,view,{ticket=view.ticket,key=view.key,nonce=vi
   return responseValue(response);
 }
 const refusedReview = value => value.status >= 400 && value.body?.success !== true;
+function nativeRefundUrl(api,orderId) {
+  const url=new URL(api.input.prepared.store_checkout_url);
+  const checkout='/wc/store/v1/checkout',refund='/wc/v3/orders/'+orderId+'/refunds';
+  api.require(Number.isInteger(orderId)&&orderId>0&&url.origin===new URL(api.input.url).origin,'Owned native REST refund route required.');
+  if(url.searchParams.has('rest_route')){
+    api.require(url.searchParams.get('rest_route')===checkout,'Actual native Store checkout route required.');
+    url.searchParams.set('rest_route',refund);
+  }else{
+    api.require(url.pathname.endsWith(checkout),'Actual native REST pathname prefix required.');
+    url.pathname=url.pathname.slice(0,-checkout.length)+refund;
+  }
+  return url.href;
+}
 async function cart(api,shopper) {
   const url = api.input.prepared.store_cart_url;
   api.require(typeof url==='string'&&new URL(url).origin===new URL(api.input.url).origin,'Owned native cart route required.');
@@ -110,6 +123,7 @@ async function replayActual(api,shopper,request) {
   return responseValue(response);
 }
 async function nativePayAttempt(api,shopper,order) {
+  api.phase('order_pay');
   api.require(typeof order.order_pay_url==='string'&&new URL(order.order_pay_url).origin===new URL(api.input.url).origin,'Actual native order-pay URL required.');
   const pageResponse=await shopper.page.goto(order.order_pay_url,{waitUntil:'domcontentloaded'});
   const form=shopper.page.locator('form#order_review');
@@ -229,10 +243,20 @@ async function runHistoryProbes(api) {
     const parentView=await api.productView(shoppers[0],{kind:'parent',quantity:1,offer:'a'});
     const form=parentView.form;
     api.require(form&&await form.locator('input[name="variation_id"]').count()===1,'Actual native variation form required.');
-    await form.locator('input[name="product_id"]').evaluate((el,value)=>{el.value=String(value);},api.input.prepared.products.simple);
+    const nativeVariation=await form.locator('input[name="variation_id"]').inputValue();
+    api.require(Number(nativeVariation)===api.input.prepared.products.variation,'Actual served variation identity required.');
+    // Woo's native handler selects the parent from add-to-cart. Mutating only
+    // product_id would leave a valid native parent/variation request unchanged.
+    for(const name of ['add-to-cart','product_id']){
+      const field=form.locator('input[name="'+name+'"]');
+      api.require(await field.count()===1,'Actual native parent form field required.');
+      await field.evaluate((el,value)=>{el.value=String(value);},api.input.prepared.products.simple);
+    }
     const beforeParent=await cart(api,shoppers[0]);
     const parentResponse=shoppers[0].page.waitForResponse(r=>r.request().method()==='POST'&&r.request().isNavigationRequest()&&new URL(r.url()).origin===new URL(api.input.url).origin,{timeout:15000});
-    await Promise.all([shoppers[0].page.waitForNavigation({waitUntil:'domcontentloaded'}),parentResponse,form.locator('button.single_add_to_cart_button').click()]);
+    const [,actualParentPost]=await Promise.all([shoppers[0].page.waitForNavigation({waitUntil:'domcontentloaded'}),parentResponse,form.locator('button.single_add_to_cart_button').click()]);
+    const postedParent=new URLSearchParams(actualParentPost.request().postData()||'');
+    api.require(postedParent.get('add-to-cart')===String(api.input.prepared.products.simple)&&postedParent.get('product_id')===String(api.input.prepared.products.simple)&&postedParent.get('variation_id')===nativeVariation&&postedParent.get('cetech_de_policy_tickets['+parentView.displayKey+']')===parentView.ticket,'Actual native submitted parent mismatch and original served ticket required.');
     const afterParent=await cart(api,shoppers[0]);
     results.tamper_variants.variation_parent=equal(beforeParent.items,afterParent.items)||afterParent.items.every(item=>policy(item)?.status==='review_required');
 
@@ -258,6 +282,7 @@ async function runHistoryProbes(api) {
     });
 
     const publicShopper=shoppers[3];const publicView=await forceCandidate(api,publicShopper);
+    api.phase('public_read');
     const publicBefore=api.inspect();
     await cart(api,publicShopper);
     const get=await review(api,publicShopper,publicView,{method:'GET'});
@@ -266,16 +291,21 @@ async function runHistoryProbes(api) {
     const extra=await review(api,publicShopper,publicView,{extra:{manage_policy:'1'}});
     const catalog=await publicShopper.context.request.get(new URL('/wp-admin/admin.php?page=cetech-de-return-policies',api.input.url).href,{maxRedirects:0});
     const firstId=api.historyIds[0];api.require(Number.isInteger(firstId)&&firstId>0,'Actual original saved order required.');
-    const refund=await publicShopper.context.request.post(new URL('/wp-json/wc/v3/orders/'+firstId+'/refunds',api.input.url).href,{data:{amount:'1.00',reason:'Owned R24 denied customer refund'}});
+    const customerNonce=await api.native(publicShopper,'cart');
+    api.require(publicShopper.principal==='customer'&&typeof customerNonce.rest_nonce==='string'&&customerNonce.rest_nonce.length>0,'Actual authenticated customer REST nonce required.');
+    const refund=await publicShopper.context.request.post(nativeRefundUrl(api,firstId),{headers:{'X-WP-Nonce':customerNonce.rest_nonce},data:{amount:'1.00',reason:'Owned R24 denied customer refund'}});
+    const refundBody=await refund.json();
+    const refundDenied=refund.status()===403&&refundBody?.code==='woocommerce_rest_cannot_create'&&refundBody?.data?.status===403;
     const publicAfter=api.inspect();
     api.check('R24-PUBLIC-READ-HAS-NO-WRITER-AUTHORITY',{
       get_patch_and_totals_no_history_write:refusedReview(get)&&refusedReview(patch)&&stable(publicBefore,publicAfter),
       no_catalog_listing_or_manager_grant:catalog.status()>=300&&refusedReview(extra),
-      no_payment_or_refund_money_authority:refund.status()>=400&&stable(publicBefore,publicAfter),
+      no_payment_or_refund_money_authority:refundDenied&&stable(publicBefore,publicAfter),
       csrf_scope_refusals_zero_effect:refusedReview(csrf)&&refusedReview(extra)&&stable(publicBefore,publicAfter)
     });
 
     const lateObservations=[];
+    api.phase('source_race');
     for(const mode of ['late-assignment','late-publication','late-native','late-policy','late-pause']){
       const s=await create();await api.addProduct(s,{kind:'simple',quantity:1,offer:'a'});await api.reviewCart(s,{completeAddress:true,accept:true});
       const before=api.inspect();api.bridge(mode);

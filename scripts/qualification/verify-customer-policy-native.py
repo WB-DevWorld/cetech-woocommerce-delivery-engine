@@ -18,6 +18,17 @@ BACKEND_FORMAT='cetech-r24-customer-policy-backend-v1'
 CLOSEOUT_FORMAT='cetech-r24-customer-policy-closeout-v1'
 BACKENDS=('hpos','cpt')
 MAX_RECEIPT_BYTES=2097152
+DIAGNOSTIC_PHASES=('initialize','shopper_guest','shopper_customer','pdp_simple','pdp_variation','native_add','cart_editor','cart_review','cart_quantity','checkout_classic','checkout_blocks','history','order_pay','public_read','source_race','complete')
+DIAGNOSTIC_CLASSES=('ObservationError','TimeoutError','TypeError','SyntaxError','Error','UnknownError')
+DIAGNOSTIC_CODES=('observation_required','case_refused','native_bridge_failed','browser_timeout','harness_type','invalid_json','private_file_missing','browser_error','unknown_error')
+def browser_diagnostic(line,backend):
+ prefix='customer_policy_native_browser_diagnostic='
+ if not isinstance(line,str)or len(line)>512 or not line.startswith(prefix):return None
+ try:
+  value=json.loads(line[len(prefix):],object_pairs_hook=pairs)
+  if type(value)is not dict or set(value)!=set(('backend','phase','error_class','code'))or value['backend']!=backend or value['phase']not in DIAGNOSTIC_PHASES or value['error_class']not in DIAGNOSTIC_CLASSES or value['code']not in DIAGNOSTIC_CODES:return None
+  return prefix+json.dumps(value,sort_keys=True,separators=(',',':'))
+ except(ValueError,TypeError):return None
 PRODUCERS=('scripts/ci-customer-policy-native.sh','scripts/qualification/customer-policy-native.php','scripts/qualification/customer-policy-history.php','scripts/qualification/customer-policy-native-driver.py','scripts/qualification/customer-policy-browser.cjs','scripts/qualification/customer-policy-browser-history.cjs','scripts/qualification/verify-customer-policy-native.py')
 REQUIRED_SOURCES=('src/Domain/CustomerPolicy/PolicyJson.php','src/Domain/CustomerPolicy/PolicyFamilyRecord.php','src/Domain/CustomerPolicy/PolicyLineage.php','src/Domain/CustomerPolicy/PolicyLinePacket.php','src/Domain/CustomerPolicy/PolicyOrderManifest.php','src/Application/CustomerPolicy/CustomerPolicyReadGrant.php','src/Application/CustomerPolicy/CustomerPolicyCurrentObservation.php','src/Application/CustomerPolicy/CustomerPolicyCurrentProvider.php','src/Application/CustomerPolicy/CartPolicyReceiptService.php','src/Application/CustomerPolicy/CustomerPolicyPreparedCheckout.php','src/Application/CustomerPolicy/PolicyNativeOrderFacts.php','src/Application/CustomerPolicy/PolicyNativeOrderStage.php','src/Application/CustomerPolicy/PolicyNativeOrderStager.php','src/Application/CustomerPolicy/PolicySavedOrderReader.php','src/Application/CustomerPolicy/CustomerPolicyFacade.php','src/Integrations/CustomerPolicy/PolicyCheckoutRuntime.php','src/Integrations/CustomerPolicy/PolicyNativeLocalBinding.php','src/Integrations/CustomerPolicy/CustomerPolicyRuntimeGate.php')
 LIMITS=[

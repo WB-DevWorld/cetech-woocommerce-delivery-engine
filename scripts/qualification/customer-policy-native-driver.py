@@ -77,13 +77,13 @@ class Harness:
   directory=self.private/backend;target=self.plan['backends'][backend]['restore'if restore else'primary'];env=dict(self.env,CETECH_R24_BACKEND=backend,CETECH_R24_STATE=str(directory/'state.json'))
   run([self.php,self.wpcli,'--allow-root','--path='+target['site'],'--require='+str(HERE/'admin-context.php'),'eval-file',self.fixture,'--use-include',mode,directory/'state.json',output],env,directory/'bridge.log',300);return V.regular_private(output,V.MAX_RECEIPT_BYTES)
  def backend(self,backend):
-  directory=self.private/backend;directory.mkdir(mode=0o700);target=self.plan['backends'][backend]['primary'];site=Path(target['site']);report=V.skeleton(self.auth,backend);server=None;stopped=False;mu_removed=False;sites_removed=False;database_removed=False;failed=None
+  directory=self.private/backend;directory.mkdir(mode=0o700);target=self.plan['backends'][backend]['primary'];site=Path(target['site']);report=V.skeleton(self.auth,backend);server=None;stopped=False;mu_removed=False;sites_removed=False;database_removed=False;failed=None;phase='clone'
   try:
    self.infrastructure('clone',backend,directory/'clone.json');shutil.copytree(self.site,site,symlinks=False);config_derivative(site,target)
    mu=site/'wp-content/mu-plugins/cetech-r24-fixture.php';V.require(not mu.exists()and not mu.is_symlink(),'Owned MU already exists');mu.parent.mkdir(parents=True,exist_ok=True);mu.write_bytes(self.fixture.read_bytes());os.chmod(mu,0o600)
    env=dict(self.env,CETECH_R24_BACKEND=backend,CETECH_R24_STATE=str(directory/'state.json'))
-   prepared=self.bridge(backend,'prepare',directory/'prepare.json');V.require(prepared.get('ready')is True,'Native preparation incomplete');report['environment']=prepared['environment']
-   args=[self.php];jit=env.get('CETECH_DE_HTTP_LISTENER_JIT','');V.require(jit in('','disable'),'Unexpected listener policy')
+   phase='prepare';prepared=self.bridge(backend,'prepare',directory/'prepare.json');V.require(prepared.get('ready')is True,'Native preparation incomplete');report['environment']=prepared['environment']
+   phase='listener';args=[self.php];jit=env.get('CETECH_DE_HTTP_LISTENER_JIT','');V.require(jit in('','disable'),'Unexpected listener policy')
    if jit:args+=['-d','opcache.jit=disable']
    args+=['-S','127.0.0.1:'+str(target['port']),'-t',site]
    stream=(directory/'listener.log').open('ab');os.chmod(directory/'listener.log',0o600);server=subprocess.Popen([str(x)for x in args],env=env,stdin=subprocess.DEVNULL,stdout=stream,stderr=subprocess.STDOUT);stream.close()
@@ -95,8 +95,14 @@ class Harness:
     except(OSError,ValueError):time.sleep(.15)
    V.require(observed==expected,'Listener identity refused before credentials');V.check_case(report,'R24-OWNED-SOURCE-LISTENER',dict.fromkeys(V.CASE_FIELDS['R24-OWNED-SOURCE-LISTENER'],True))
    browser_input={'format':'cetech-r24-browser-input-v1','backend':backend,'url':target['url'],'private':str(directory),'probe':self.plan['probe'],'prepared':prepared,'php':str(self.php),'wpcli':str(self.wpcli),'site':str(site),'fixture':str(self.fixture),'repo':str(self.repo),'state':str(directory/'state.json')};write_json(directory/'browser-input.json',browser_input)
+   phase='browser'
    try:run(['node',HERE/'customer-policy-browser.cjs',directory/'browser-input.json',directory/'browser-results.json'],env,directory/'browser.log',1200)
    finally:
+    browser_log=directory/'browser.log'
+    if browser_log.is_file()and not browser_log.is_symlink():
+     for line in browser_log.read_bytes()[-65536:].decode('utf-8',errors='replace').splitlines():
+      diagnostic=V.browser_diagnostic(line,backend)
+      if diagnostic is not None:print(diagnostic,flush=True)
     if(directory/'browser-results.json').is_file():
      actual=V.regular_private(directory/'browser-results.json',V.MAX_RECEIPT_BYTES);V.require(set(actual)=={'format','cases','tamper_variants','history_variants'}and actual['format']=='cetech-r24-browser-observations-v1','Browser observations refused')
      for name,evidence in actual['cases'].items():V.check_case(report,name,evidence)
@@ -126,7 +132,7 @@ class Harness:
    cleanup={'all_declared_owned_fixtures_removed':database_removed and sites_removed,'all_protected_native_c01_config_and_options_restored':database_removed,'no_untracked_row_or_prefix_deletion':database_removed,'restore_derivative_removed':database_removed and sites_removed};V.check_case(report,'R24-TRACKED-PHYSICAL-CLEANUP',cleanup)
    V.check_case(report,'R24-OWNED-LISTENER-AND-PRIVATE-CLOSEOUT',{'listeners_stopped_and_waited':stopped,'exact_owned_mu_removed':mu_removed,'private_material_removed':False,'cleanup_acknowledged':database_removed and sites_removed})
    self.reports[backend]=report
-  if failed:print('customer_policy_native_backend='+backend+' result=FAIL phase='+failed,flush=True)
+  if failed:print('customer_policy_native_backend='+backend+' result=FAIL phase='+phase+' error='+(failed if failed in('ValueError','TimeoutExpired','OSError','KeyError','TypeError')else'UnknownError'),flush=True)
  def execute(self):
   self.reports={};self.backend_cleanup={}
   try:

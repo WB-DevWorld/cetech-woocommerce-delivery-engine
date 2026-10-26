@@ -76,4 +76,13 @@ class ReceiptProtocol(unittest.TestCase):
   report=V.skeleton(self.auth,'hpos')
   with self.assertRaises(ValueError):V.check_case(report,'fabricated',{})
   with self.assertRaises(ValueError):V.check_case(report,V.CASES[0][0],dict.fromkeys(V.CASES[0][1],1))
+  prefix='customer_policy_native_browser_diagnostic='
+  value={'backend':'hpos','phase':'pdp_simple','error_class':'TimeoutError','code':'browser_timeout'}
+  self.assertIsNotNone(V.browser_diagnostic(prefix+json.dumps(value),'hpos'))
+  self.assertIsNone(V.browser_diagnostic(prefix+json.dumps(value),'cpt'))
+  for key,untrusted in (('phase','private customer URL?nonce=secret'),('error_class','SecretClass'),('code','raw private message')):
+   invalid=dict(value);invalid[key]=untrusted;self.assertIsNone(V.browser_diagnostic(prefix+json.dumps(invalid),'hpos'))
+  self.assertIsNone(V.browser_diagnostic(prefix+json.dumps({**value,'html':'private'}),'hpos'))
+  self.assertIsNone(V.browser_diagnostic(prefix+'{"backend":"hpos","backend":"hpos","phase":"pdp_simple","error_class":"TimeoutError","code":"browser_timeout"}','hpos'))
+  self.assertIsNone(V.browser_diagnostic(prefix+'x'*513,'hpos'))
 if __name__=='__main__':unittest.main()

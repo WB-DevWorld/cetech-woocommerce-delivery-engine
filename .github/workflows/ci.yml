@@ -249,7 +249,7 @@ jobs:
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-customer-policy.junit.xml" 36 \
             'CetechDeliveryEngine\Tests\Integration\CustomerPolicy\CustomerPolicyNativeReadRealDatabaseTest' 7
           vendor/bin/phpunit \
-            -c phpunit.real-db.xml --stop-on-error --stop-on-failure \
+            -c phpunit.real-db.xml --stop-on-error --stop-on-failure --display-deprecations --display-phpunit-deprecations \
             --log-junit "${RUNNER_TEMP}/cetech-de-real-db.junit.xml"
           php scripts/ci-assert-junit-counts.php "${RUNNER_TEMP}/cetech-de-real-db.junit.xml" 585 \
             'CetechDeliveryEngine\Tests\Integration\Operation\OperationStoreRealDatabaseTest' 43
