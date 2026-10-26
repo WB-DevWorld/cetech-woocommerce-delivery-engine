@@ -61,7 +61,7 @@ class Harness:
   self.env=dict(os.environ,CETECH_R24_PRIVATE=str(self.private),CETECH_R24_PLAN=str(self.plan_path),CETECH_R24_REPO=str(self.repo),CETECH_R24_NATIVE=str(self.work/'opening-qualification-results.json'),CETECH_R24_PACKAGE=str(args.package.resolve()),CETECH_R24_PACKAGE_REPORT=str(args.package.resolve().with_suffix('.json')))
   source_database=config_value(self.php,self.wpcli,self.site,'DB_NAME','constant',self.env);prefix=config_value(self.php,self.wpcli,self.site,'table_prefix','variable',self.env)
   V.require(re.fullmatch(r'cetech_wp_opening_qualification_[a-z0-9]+',source_database)and re.fullmatch(r'[A-Za-z0-9_]{1,30}',prefix),'Owned source database differs')
-  self.plan={'format':'cetech-r24-owned-plan-v1','token':self.token,'probe':secrets.token_hex(24),'private':str(self.private),'work':str(self.work),'source_site':str(self.site),'source_database':source_database,'prefix':prefix,'backends':{}}
+  self.plan={'format':'cetech-r24-owned-plan-v1','token':self.token,'probe':secrets.token_hex(24),'private':str(self.private),'work':str(self.work),'source_site':str(self.site),'source_database':source_database,'prefix':prefix,'installed_php_sources':self.auth['installed_php_sources'],'backends':{}}
   for index,backend in enumerate(V.BACKENDS):
    self.plan['backends'][backend]={}
    for kind,tag in [('primary','main'),('restore','restore')]:self.plan['backends'][backend][kind]={'database':f'cetech_r24_{self.token}_{backend}_{tag}','user':f'r24_{self.token[:16]}_{backend}_{tag}','password':secrets.token_hex(32),'site':str(self.work/f'customer-policy-{self.token}-{backend}-{tag}'),'url':f'http://127.0.0.1:{8086+index}','port':8086+index}
@@ -101,7 +101,7 @@ class Harness:
     browser_log=directory/'browser.log'
     if browser_log.is_file()and not browser_log.is_symlink():
      for line in browser_log.read_bytes()[-65536:].decode('utf-8',errors='replace').splitlines():
-      diagnostic=V.browser_diagnostic(line,backend)
+      diagnostic=V.browser_diagnostic(line,backend) or V.checkout_diagnostic(line,backend)
       if diagnostic is not None:print(diagnostic,flush=True)
     if(directory/'browser-results.json').is_file():
      actual=V.regular_private(directory/'browser-results.json',V.MAX_RECEIPT_BYTES);V.require(set(actual)=={'format','cases','tamper_variants','history_variants'}and actual['format']=='cetech-r24-browser-observations-v1','Browser observations refused')

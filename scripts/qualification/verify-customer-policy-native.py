@@ -29,8 +29,32 @@ def browser_diagnostic(line,backend):
   if type(value)is not dict or set(value)!=set(('backend','phase','error_class','code'))or value['backend']!=backend or value['phase']not in DIAGNOSTIC_PHASES or value['error_class']not in DIAGNOSTIC_CLASSES or value['code']not in DIAGNOSTIC_CODES:return None
   return prefix+json.dumps(value,sort_keys=True,separators=(',',':'))
  except(ValueError,TypeError):return None
+CHECKOUT_ERROR_CLASSES=('none','Exception','RuntimeException','LogicException','InvalidArgumentException','UnexpectedValueException','Error','TypeError','ParseError','ValueError','JsonException','mysqli_sql_exception','OtherThrowable')
+CHECKOUT_VALIDATION_CATEGORIES=('delivery','policy','control','shipping','payment','terms','field_required','field_invalid','other')
+CHECKOUT_CHECKPOINTS=('before_v2_line','after_v2_line','before_policy_line','after_policy_line')
+def checkout_diagnostic(line,backend):
+ """Closed console-only observation, independent of all four receipt schemas."""
+ prefix='customer_policy_native_checkout_diagnostic='
+ if not isinstance(line,str)or len(line)>2048 or not line.startswith(prefix):return None
+ try:
+  value=json.loads(line[len(prefix):],object_pairs_hook=pairs)
+  if type(value)is not dict or set(value)!=set(('backend','route','unsaved_preflight','validation','checkpoints','stage_classic','stage_store_post','new_native_orders','new_native_lines','original_state'))or value['backend']!=backend or value['route']not in('classic','blocks')or value['unsaved_preflight']not in('pass','unobserved'):return None
+  validation=value['validation']
+  if type(validation)is not dict or set(validation)!=set(('observed','has_errors','categories','notice_errors'))or any(type(validation[k])is not bool for k in('observed','has_errors','notice_errors')):return None
+  categories=validation['categories']
+  if type(categories)is not list or len(categories)>len(CHECKOUT_VALIDATION_CATEGORIES)or any(type(x)is not str or x not in CHECKOUT_VALIDATION_CATEGORIES for x in categories)or categories!=[x for x in CHECKOUT_VALIDATION_CATEGORIES if x in categories]:return None
+  if not validation['observed']and(validation['has_errors']or categories or validation['notice_errors']):return None
+  checkpoints=value['checkpoints']
+  if type(checkpoints)is not dict or set(checkpoints)!=set(CHECKOUT_CHECKPOINTS)or any(type(x)is not bool for x in checkpoints.values()):return None
+  for key in('stage_classic','stage_store_post'):
+   stage=value[key]
+   if type(stage)is not dict or set(stage)!=set(('status','error_class','cause_class'))or stage['status']not in('unobserved','entered','returned','threw')or stage['error_class']not in CHECKOUT_ERROR_CLASSES or stage['cause_class']not in CHECKOUT_ERROR_CLASSES:return None
+   if(stage['status']=='threw')!=(stage['error_class']!='none')or(stage['status']=='threw')!=(stage['cause_class']!='none'):return None
+  if any(value[k]not in('zero','positive','unknown')for k in('new_native_orders','new_native_lines'))or value['original_state']not in('absent','frozen','bound','complete','multiple','unknown'):return None
+  return prefix+json.dumps(value,sort_keys=True,separators=(',',':'))
+ except(ValueError,TypeError):return None
 PRODUCERS=('scripts/ci-customer-policy-native.sh','scripts/qualification/customer-policy-native.php','scripts/qualification/customer-policy-history.php','scripts/qualification/customer-policy-native-driver.py','scripts/qualification/customer-policy-browser.cjs','scripts/qualification/customer-policy-browser-history.cjs','scripts/qualification/verify-customer-policy-native.py')
-REQUIRED_SOURCES=('src/Domain/CustomerPolicy/PolicyJson.php','src/Domain/CustomerPolicy/PolicyFamilyRecord.php','src/Domain/CustomerPolicy/PolicyLineage.php','src/Domain/CustomerPolicy/PolicyLinePacket.php','src/Domain/CustomerPolicy/PolicyOrderManifest.php','src/Application/CustomerPolicy/CustomerPolicyReadGrant.php','src/Application/CustomerPolicy/CustomerPolicyCurrentObservation.php','src/Application/CustomerPolicy/CustomerPolicyCurrentProvider.php','src/Application/CustomerPolicy/CartPolicyReceiptService.php','src/Application/CustomerPolicy/CustomerPolicyPreparedCheckout.php','src/Application/CustomerPolicy/PolicyNativeOrderFacts.php','src/Application/CustomerPolicy/PolicyNativeOrderStage.php','src/Application/CustomerPolicy/PolicyNativeOrderStager.php','src/Application/CustomerPolicy/PolicySavedOrderReader.php','src/Application/CustomerPolicy/CustomerPolicyFacade.php','src/Integrations/CustomerPolicy/PolicyCheckoutRuntime.php','src/Integrations/CustomerPolicy/PolicyNativeLocalBinding.php','src/Integrations/CustomerPolicy/CustomerPolicyRuntimeGate.php')
+REQUIRED_SOURCES=('src/Domain/CustomerPolicy/PolicyJson.php','src/Domain/CustomerPolicy/PolicyFamilyRecord.php','src/Domain/CustomerPolicy/PolicyLineage.php','src/Domain/CustomerPolicy/PolicyLinePacket.php','src/Domain/CustomerPolicy/PolicyOrderManifest.php','src/Application/CustomerPolicy/CustomerPolicyReadGrant.php','src/Application/CustomerPolicy/CustomerPolicyCurrentObservation.php','src/Application/CustomerPolicy/CustomerPolicyCurrentProvider.php','src/Application/CustomerPolicy/CartPolicyReceiptService.php','src/Application/CustomerPolicy/CustomerPolicyPreparedCheckout.php','src/Application/CustomerPolicy/PolicyNativeOrderFacts.php','src/Application/CustomerPolicy/PolicyNativeOrderAttempt.php','src/Application/CustomerPolicy/PolicyNativeOrderStage.php','src/Application/CustomerPolicy/PolicyNativeOrderStager.php','src/Application/CustomerPolicy/PolicySavedOrderReader.php','src/Application/CustomerPolicy/CustomerPolicyFacade.php','src/Integrations/CustomerPolicy/PolicyCheckoutRuntime.php','src/Integrations/CustomerPolicy/PolicyNativeLocalBinding.php','src/Integrations/CustomerPolicy/CustomerPolicyRuntimeGate.php')
 LIMITS=[
  'Owned disposable Basic positive-real-offer policy runtime only; no merchant terms, rollout, live site, SSH or protected checkpoint acceptance.',
  'Actual Classic and Blocks browser submissions are separate for HPOS/CPT and guest/customer principals; local non-settling gateway only.',

@@ -11,7 +11,7 @@ final class PolicyNativePaymentBindingTest extends TestCase {
 	public static function native_method_steps(): array { return [ [ 'method' ], [ 'native_save' ] ]; }
 	#[DataProvider( 'unsaved_mutations' )]
 	public function test_unsaved_price_address_tax_map_metadata_and_unsupported_fee_mutations_refuse( string $mode ): void { $out = $this->probe( $mode ); self::assertFalse( $out['unchanged'], $mode ); self::assertSame( 2, $out['private_encodings_refused'] ); }
-	public static function unsaved_mutations(): array { return array_map( static fn( string $mode ): array => [ $mode ], [ 'line_money', 'billing', 'protected_meta', 'fee', 'site', 'policy_byte', 'policy_row', 'hostile', 'status' ] ); }
+	public static function unsaved_mutations(): array { return array_map( static fn( string $mode ): array => [ $mode ], [ 'line_money', 'billing', 'protected_meta', 'fee', 'site', 'policy_byte', 'policy_row', 'hostile', 'status', 'attempt_byte', 'attempt_overflow' ] ); }
 	public function test_native_classic_reload_matches_exact_native_fields_without_transferring_object_identity(): void { $out = $this->probe( 'same' ); self::assertTrue( $out['unchanged'] ); self::assertTrue( $out['same_native'] ); self::assertFalse( $out['selected_method'] ); }
 	#[DataProvider( 'changed_reload' )]
 	public function test_changed_native_reload_or_foreign_subclass_cannot_inherit_stage_authority( string $mode ): void { self::assertFalse( $this->probe( $mode )['same_native'] ); }

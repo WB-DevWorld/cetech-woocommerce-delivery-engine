@@ -32,10 +32,11 @@ class WC_Order extends WC_Data {
 		// Opaque large strings exercise raw-byte guards, not valid policy packet authority.
 		for($i=0;$i<8;++$i){$item=new WC_Order_Item_Product(10+$i,['total'=>'10.00','taxes'=>[]]);$item->meta(new WC_Meta_Data('_cetech_de_policy_packet',str_repeat('x',250000)));$this->items['line_items'][10+$i]=$item;}
 		$this->meta(new WC_Meta_Data('_cetech_de_policy_manifest',str_repeat('m',32000)));
+		$this->meta(new WC_Meta_Data('_cetech_de_policy_attempt','550e8400-e29b-41d4-a716-446655440000'));
 	}
 	public function line(): WC_Order_Item_Product { return $this->items['line_items'][10]; }
 	public function protected_meta(): WC_Meta_Data { return $this->meta_data[0]; }
-	public function policy_mutate(string $mode):void { if('policy_byte'===$mode){$this->items['line_items'][10]->raw_policy()->change(str_repeat('y',250000));}elseif('hostile'===$mode){$this->items['line_items'][10]->raw_policy()->hostile();}elseif('policy_row'===$mode){$this->items['line_items'][10]->meta(new WC_Meta_Data('_cetech_de_policy_format','1'));}elseif('status'===$mode){$this->change('status','processing');} }
+	public function policy_mutate(string $mode):void { if('policy_byte'===$mode){$this->items['line_items'][10]->raw_policy()->change(str_repeat('y',250000));}elseif('hostile'===$mode){$this->items['line_items'][10]->raw_policy()->hostile();}elseif('policy_row'===$mode){$this->items['line_items'][10]->meta(new WC_Meta_Data('_cetech_de_policy_format','1'));}elseif('attempt_byte'===$mode){$this->meta_data[2]->change('550e8400-e29b-41d4-a716-446655440001');}elseif('attempt_overflow'===$mode){$this->meta_data[2]->change(str_repeat('a',37));}elseif('status'===$mode){$this->change('status','processing');} }
 	public function add_fee(): void { $this->items['fee_lines'][] = new WC_Order_Item_Fee( 12, [ 'total' => '0.00' ] ); }
 }
 class ForeignOrder extends WC_Order {}
@@ -43,7 +44,7 @@ class PolicyPoison implements JsonSerializable { public static int $calls=0; pub
 $GLOBALS['blog_id'] = 1;
 $order = new WC_Order(); $old_refused=false;try{QuoteOrderPayLocalBinding::capture($order);}catch(Throwable){$old_refused=true;} $binding = PolicyNativePaymentLocalBinding::capture( $order ); $mode = $argv[1] ?? 'same'; $fresh = new WC_Order();
 switch ( $mode ) {
-	case 'policy_byte':case 'policy_row':case 'hostile':case 'status': $order->policy_mutate($mode);break;
+	case 'policy_byte':case 'policy_row':case 'hostile':case 'status':case 'attempt_byte':case 'attempt_overflow': $order->policy_mutate($mode);break;
 	case 'method': $order->change( 'payment_method', 'new_gateway' ); $order->change( 'payment_method_title', 'New title' ); break;
 	case 'native_save': $order->change( 'payment_method', 'new_gateway' ); $order->change( 'payment_method_title', 'New title' ); $order->change( 'date_modified', new WC_DateTime( '2026-10-08 00:00:01', new DateTimeZone( 'UTC' ) ) ); $order->apply_changes(); break;
 	case 'line_money': $order->line()->change( 'total', '999.00' ); break;

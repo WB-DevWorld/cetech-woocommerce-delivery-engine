@@ -222,7 +222,7 @@ final class DataLifecycleRegistryTest extends TestCase {
 		$list = $standard->classes();
 		array_pop( $list );
 		self::assertSame( $standard->policy_digest(), DataLifecycleRegistry::standard()->policy_digest() );
-		self::assertCount( 156, $standard->classes() );
+		self::assertCount( 157, $standard->classes() );
 	}
 
 	public function test_diagnostics_do_not_emit_selectors_paths_storage_names_or_caller_content(): void {
@@ -289,7 +289,7 @@ final class DataLifecycleRegistryTest extends TestCase {
 		$error = stream_get_contents( $pipes[2] );
 		fclose( $pipes[1] ); fclose( $pipes[2] );
 		self::assertSame( 0, proc_close( $process ), $error );
-		self::assertSame( [ 41, 46, 18, 156, false, false, false, true, true, false, 39, 2, false ], json_decode( $output, true, 16, JSON_THROW_ON_ERROR ) );
+		self::assertSame( [ 41, 46, 18, 157, false, false, false, true, true, false, 39, 2, false ], json_decode( $output, true, 16, JSON_THROW_ON_ERROR ) );
 	}
 
 	/** R21-ORIGINAL-RECOVERY: unresolved original requests have no cleanup or TTL grant. */
@@ -312,6 +312,17 @@ final class DataLifecycleRegistryTest extends TestCase {
 		self::assertNull( $definition['expires_after_seconds'] );
 		self::assertFalse( $class->cleanup_eligible() );
 		self::assertContains( 'unresolved_original_never_expires_or_evicts', $definition['protections'] );
+	}
+
+	/** R24 incomplete native orders retain their refusal-only ownership marker. */
+	public function test_incomplete_customer_policy_order_attempt_remains_owned_through_maintenance(): void {
+		$class = DataLifecycleRegistry::standard()->get( 'woo_meta._cetech_de_policy_attempt' );
+		self::assertSame( '_cetech_de_policy_attempt', $class->storage_key );
+		foreach ( [ 'normal_policy', 'default_uninstall_policy', 'explicit_uninstall_policy' ] as $key ) {
+			self::assertSame( 'preserve', $class->definition()[$key] );
+		}
+		self::assertNull( $class->definition()['expires_after_seconds'] );
+		self::assertFalse( $class->cleanup_eligible() );
 	}
 
 	/** R23 durable assignment maps and uncertain originals grant no automatic removal. */

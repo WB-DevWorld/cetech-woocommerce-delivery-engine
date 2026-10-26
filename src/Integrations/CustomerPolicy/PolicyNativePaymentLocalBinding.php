@@ -72,6 +72,7 @@ final readonly class PolicyNativePaymentLocalBinding implements \JsonSerializabl
 			'_cetech_de_policy_packet' => 327680,
 			'_cetech_de_policy_manifest' => 65536,
 			'_cetech_de_policy_line_key' => 256,
+			'_cetech_de_policy_attempt' => 36,
 			'_cetech_de_policy_format', '_cetech_de_policy_manifest_format' => 32,
 			default => throw new \RuntimeException( 'Unknown native policy metadata.' ),
 		};

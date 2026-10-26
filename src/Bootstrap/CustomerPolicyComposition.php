@@ -61,6 +61,8 @@ final class CustomerPolicyComposition {
 	public static function mount(ServiceContainer $c):void {
 		$c->get(NativePolicyCartRuntime::class)->register();$c->get(PolicyCheckoutRuntime::class)->register();$c->get(CustomerPolicyCartPresenter::class)->register();$c->get(CustomerPolicySavedPresenter::class)->register();
 		$c->get(OrderDeliverySnapshotPersister::class)->set_policy_preservation_guard(static function(\WC_Order $order)use($c):bool {
+			// Only the issuer-held capability may finish this exact new order's initial V2 write.
+			if($c->get(PolicyCheckoutRuntime::class)->allows_initial_legacy_write($order)){return false;}
 			$reader=$c->get(PolicySavedOrderReader::class);if(!$reader->attempted($order)){return false;}
 			// An internal preservation probe projects nothing to any audience.
 			if([]===$reader->read($order,static fn():bool=>true)){self::refuse();}return true;

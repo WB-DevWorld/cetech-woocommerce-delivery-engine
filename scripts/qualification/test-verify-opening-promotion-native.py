@@ -34,7 +34,7 @@ class NativeReceiptRefusals(unittest.TestCase):
         self.check(copy.deepcopy(self.report))
 
     def test_counterfeit_observation_and_incomplete_inventory_refused(self):
-        for change in ("false", "integer", "extra", "missing", "duplicate", "reordered"):
+        for change in ("false", "integer", "extra", "missing", "duplicate", "reordered", "old_inventory_key"):
             with self.subTest(change=change):
                 report = copy.deepcopy(self.report)
                 observations = report["cases"][0]["evidence"]
@@ -44,6 +44,7 @@ class NativeReceiptRefusals(unittest.TestCase):
                 elif change == "extra": observations["invented"] = True
                 elif change == "missing": del observations[first]
                 elif change == "duplicate": report["cases"][-1] = report["cases"][0]
+                elif change == "old_inventory_key": observations["installed1003_production_php"] = observations.pop("installed1004_production_php")
                 else: report["cases"].reverse()
                 with self.assertRaises((AssertionError, ValueError, RuntimeError)):
                     self.check(report)

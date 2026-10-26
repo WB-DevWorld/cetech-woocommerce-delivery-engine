@@ -98,7 +98,7 @@ final class DataLifecycleManifest {
 	/** Names describe owned metadata only; Woo/user storage tables remain shared. */
 	public const WOO_META_KEYS = [
 		'_cetech_de_policy_line_key', '_cetech_de_policy_packet', '_cetech_de_policy_format',
-		'_cetech_de_policy_manifest', '_cetech_de_policy_manifest_format',
+		'_cetech_de_policy_manifest', '_cetech_de_policy_manifest_format', '_cetech_de_policy_attempt',
 		'_cetech_de_delivery_quote_format', '_cetech_de_quote_native_draft', '_cetech_de_quote_reference', '_cetech_de_quote_line_key',
 		'_cetech_de_quote_native_tax_source',
 		'_cetech_de_quote_id', '_cetech_de_quote_component_handle', '_cetech_de_quote_generation',

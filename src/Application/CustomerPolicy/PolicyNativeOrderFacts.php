@@ -14,10 +14,11 @@ final class PolicyNativeOrderFacts {
  public const META_FORMAT='_cetech_de_policy_format';
  public const META_MANIFEST='_cetech_de_policy_manifest';
  public const META_MANIFEST_FORMAT='_cetech_de_policy_manifest_format';
+ public const META_ATTEMPT='_cetech_de_policy_attempt';
  public const FORMAT='1'; public const MAX_LINES=200; public const MAX_META_ROWS=12000; public const MAX_PHYSICAL_BYTES=4194304;
- public const OWN_KEYS=[self::META_LINE_KEY,self::META_PACKET,self::META_FORMAT,self::META_MANIFEST,self::META_MANIFEST_FORMAT];
+ public const OWN_KEYS=[self::META_LINE_KEY,self::META_PACKET,self::META_FORMAT,self::META_MANIFEST,self::META_MANIFEST_FORMAT,self::META_ATTEMPT];
  public const ITEM_KEYS=[self::META_LINE_KEY,self::META_PACKET,self::META_FORMAT];
- public const ORDER_KEYS=[self::META_MANIFEST,self::META_MANIFEST_FORMAT];
+ public const ORDER_KEYS=[self::META_MANIFEST,self::META_MANIFEST_FORMAT,self::META_ATTEMPT];
  public static function own_key(string$key):bool{return 0===strncasecmp($key,'_cetech_de_policy_',18);}
  public static function metadata(object$object):array{
   if(!class_exists('WC_Data',false)||!$object instanceof \WC_Data||!method_exists($object,'get_meta_data'))self::fail();
@@ -76,7 +77,7 @@ final class PolicyNativeOrderFacts {
  public static function read_physical(OperationSession$s,int$id,bool$hpos):array{
   if($id<1||!$s->in_transaction()||$s->is_retired())self::fail();$p=$s->table_prefix();if(1!==preg_match('/\A[A-Za-z0-9_]{1,30}\z/D',$p))self::fail();
   $root=$hpos?"`{$p}wc_orders_meta` WHERE order_id=%d":"`{$p}postmeta` WHERE post_id=%d";
-  $bad="LEFT(meta_key,18)='_cetech_de_policy_' AND (meta_value IS NULL OR OCTET_LENGTH(meta_value)>CASE meta_key WHEN '_cetech_de_policy_line_key' THEN 256 WHEN '_cetech_de_policy_format' THEN 32 WHEN '_cetech_de_policy_manifest_format' THEN 32 WHEN '_cetech_de_policy_manifest' THEN 65536 ELSE 327680 END)";
+  $bad="LEFT(meta_key,18)='_cetech_de_policy_' AND (meta_value IS NULL OR OCTET_LENGTH(meta_value)>CASE meta_key WHEN '_cetech_de_policy_attempt' THEN 36 WHEN '_cetech_de_policy_line_key' THEN 256 WHEN '_cetech_de_policy_format' THEN 32 WHEN '_cetech_de_policy_manifest_format' THEN 32 WHEN '_cetech_de_policy_manifest' THEN 65536 ELSE 327680 END)";
   $item_bad=str_replace(['meta_key','meta_value'],['m.meta_key','m.meta_value'],$bad);
   $counts=$s->get_results($s->prepare("SELECT 1 AS policy_budget_format,(SELECT COUNT(*) FROM {$root}) AS root_rows,(SELECT COALESCE(SUM(COALESCE(OCTET_LENGTH(meta_key),256)+COALESCE(OCTET_LENGTH(meta_value),4194305)),0) FROM {$root}) AS root_bytes,(SELECT COUNT(*) FROM `{$p}woocommerce_order_itemmeta` m INNER JOIN `{$p}woocommerce_order_items` i ON i.order_item_id=m.order_item_id WHERE i.order_id=%d) AS item_rows,(SELECT COALESCE(SUM(COALESCE(OCTET_LENGTH(m.meta_key),256)+COALESCE(OCTET_LENGTH(m.meta_value),4194305)),0) FROM `{$p}woocommerce_order_itemmeta` m INNER JOIN `{$p}woocommerce_order_items` i ON i.order_item_id=m.order_item_id WHERE i.order_id=%d) AS item_bytes,(SELECT COUNT(*) FROM {$root} AND ({$bad})) AS root_policy_bad,(SELECT COUNT(*) FROM `{$p}woocommerce_order_itemmeta` m INNER JOIN `{$p}woocommerce_order_items` i ON i.order_item_id=m.order_item_id WHERE i.order_id=%d AND ({$item_bad})) AS item_policy_bad",$id,$id,$id,$id,$id,$id));
   if(!is_array($counts)||count($counts)!==1)self::fail();$size=$counts[0];if(!in_array($size['policy_budget_format']??null,[1,'1'],true))self::fail();foreach(['root_rows','root_bytes','item_rows','item_bytes','root_policy_bad','item_policy_bad']as$k)if(!isset($size[$k])||!is_numeric($size[$k])||$size[$k]<0)self::fail();if((int)$size['root_policy_bad']!==0||(int)$size['item_policy_bad']!==0||$size['root_rows']>self::MAX_META_ROWS||$size['item_rows']>self::MAX_META_ROWS||$size['root_bytes']+$size['item_bytes']>self::MAX_PHYSICAL_BYTES)self::fail();

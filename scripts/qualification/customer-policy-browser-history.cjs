@@ -407,4 +407,4 @@ async function runHistoryProbes(api) {
     for(const shopper of owned)await shopper.context.close();
   }
 }
-module.exports={runHistoryProbes};
+module.exports={runHistoryProbes,nativePayAttempt};

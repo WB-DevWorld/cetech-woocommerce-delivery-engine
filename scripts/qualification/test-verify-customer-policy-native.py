@@ -85,4 +85,19 @@ class ReceiptProtocol(unittest.TestCase):
   self.assertIsNone(V.browser_diagnostic(prefix+json.dumps({**value,'html':'private'}),'hpos'))
   self.assertIsNone(V.browser_diagnostic(prefix+'{"backend":"hpos","backend":"hpos","phase":"pdp_simple","error_class":"TimeoutError","code":"browser_timeout"}','hpos'))
   self.assertIsNone(V.browser_diagnostic(prefix+'x'*513,'hpos'))
+  prefix='customer_policy_native_checkout_diagnostic='
+  value={'backend':'hpos','route':'classic','unsaved_preflight':'pass','validation':{'observed':True,'has_errors':True,'categories':['delivery'],'notice_errors':False},'checkpoints':dict.fromkeys(V.CHECKOUT_CHECKPOINTS,False),'stage_classic':{'status':'unobserved','error_class':'none','cause_class':'none'},'stage_store_post':{'status':'unobserved','error_class':'none','cause_class':'none'},'new_native_orders':'zero','new_native_lines':'zero','original_state':'frozen'}
+  self.assertIsNotNone(V.checkout_diagnostic(prefix+json.dumps(value),'hpos'))
+  self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps(value),'cpt'))
+  thrown=deepcopy(value);thrown['stage_classic']={'status':'threw','error_class':'RuntimeException','cause_class':'TypeError'};self.assertIsNotNone(V.checkout_diagnostic(prefix+json.dumps(thrown),'hpos'))
+  for key,untrusted in (('route','private?nonce=value'),('unsaved_preflight','invented'),('new_native_orders',2),('original_state','private order')):
+   invalid=deepcopy(value);invalid[key]=untrusted;self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps(invalid),'hpos'))
+  for member,field,untrusted in (('validation','categories',['private error code']),('validation','has_errors',1),('checkpoints','before_v2_line','secret'),('stage_classic','status','private method'),('stage_classic','error_class','SecretThrowable'),('stage_classic','cause_class','SecretPreviousThrowable')):
+   invalid=deepcopy(value);invalid[member][field]=untrusted;self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps(invalid),'hpos'))
+  invalid=deepcopy(value);invalid['validation']['categories']=['delivery','delivery'];self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps(invalid),'hpos'))
+  invalid=deepcopy(value);invalid['validation']['observed']=False;self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps(invalid),'hpos'))
+  invalid=deepcopy(value);invalid['stage_classic']={'status':'threw','error_class':'none','cause_class':'none'};self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps(invalid),'hpos'))
+  self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps({**value,'body':'private'}),'hpos'))
+  self.assertIsNone(V.checkout_diagnostic(prefix+'{"backend":"hpos","backend":"hpos"}','hpos'))
+  self.assertIsNone(V.checkout_diagnostic(prefix+'x'*2049,'hpos'))
 if __name__=='__main__':unittest.main()

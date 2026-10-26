@@ -66,6 +66,7 @@ $required_classes = [
 	'CetechDeliveryEngine\\Application\\CustomerPolicy\\CustomerPolicyReadGrant',
 	'CetechDeliveryEngine\\Application\\CustomerPolicy\\CustomerPolicySessionOwner',
 	'CetechDeliveryEngine\\Application\\CustomerPolicy\\PolicyNativeOrderFacts',
+	'CetechDeliveryEngine\\Application\\CustomerPolicy\\PolicyNativeOrderAttempt',
 	'CetechDeliveryEngine\\Application\\CustomerPolicy\\PolicyNativeOrderStage',
 	'CetechDeliveryEngine\\Application\\CustomerPolicy\\PolicyNativeOrderStager',
 	'CetechDeliveryEngine\\Application\\CustomerPolicy\\PolicySavedOrderReader',

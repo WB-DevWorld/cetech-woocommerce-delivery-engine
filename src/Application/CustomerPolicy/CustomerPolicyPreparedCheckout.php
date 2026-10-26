@@ -23,6 +23,8 @@ final readonly class CustomerPolicyPreparedCheckout implements \JsonSerializable
 	public function reconcile_original():self{return$this->service->reconcile_prepared($this);}
 	public function original_witness():array{return$this->service->witness_for($this);}
 	public function verify_original(OperationSession$session):bool{return$this->service->verify_prepared($this,$session);}
+	/** Read-only participant for a typed native retry proof; never an order grant. */
+	public function verify_unbound_original(OperationSession$session,int$order_id):bool{return$this->service->verify_unbound_prepared($this,$session,$order_id);}
 	/** Issuer-identity checks prevent any rehydrated object from becoming a live original. */
 	public function issued_record(CartPolicyReceiptService$service):array{if($service!==$this->service){throw new \LogicException('Foreign original owner.');}return$this->opened['record'];}
 	public function jsonSerialize():never{throw new \LogicException('Customer policy originals require an explicit projection.');}
