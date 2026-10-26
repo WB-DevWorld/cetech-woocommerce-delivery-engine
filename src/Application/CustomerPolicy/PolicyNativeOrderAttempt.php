@@ -31,7 +31,10 @@ final class PolicyNativeOrderAttempt implements \JsonSerializable {
   if(!is_object($store)||get_class($store)!=='WC_Data_Store'||ltrim($store->get_current_class_name(),'\\')!==$class)self::fail();$store_name=self::raw($store,'current_class_name',['WC_Data_Store']);$instance=self::raw($store,'instance',['WC_Data_Store']);if(!is_string($store_name)||ltrim($store_name,'\\')!==$class||!is_object($instance)||get_class($instance)!==$class)self::fail();foreach(['read_meta','filter_raw_meta_data']as$method){$m=new \ReflectionMethod($instance,$method);if($m->getDeclaringClass()->getName()!==$class||!$m->isPublic()||$m->isStatic())self::fail();}
   $before=self::acknowledged_rows($order);$expected=[];$indices=[];$seen=0;
   foreach($before as$index=>$row){if(in_array($row['key'],['_billing_address_index','_shipping_address_index'],true)){if(isset($indices[$row['key']])||!is_string($row['value']))self::fail();$indices[$row['key']]=$row;++$seen;continue;}$position=$index+2-$seen;if(!is_int($position)||$position<2||isset($expected[$position]))self::fail();$expected[$position]=$row;}
-  if(count($indices)!==2||array_keys($indices)!==['_billing_address_index','_shipping_address_index'])self::fail();$expected=[0=>$indices['_billing_address_index'],1=>$indices['_shipping_address_index']]+$expected;$state=$this->alignment_state();$order->read_meta_data(true);
+  if(count($indices)!==2||array_keys($indices)!==['_billing_address_index','_shipping_address_index'])self::fail();$expected=[0=>$indices['_billing_address_index'],1=>$indices['_shipping_address_index']]+$expected;
+  // Woo's acknowledged native deletes can leave sparse PHP keys; its read builds
+  // a dense list. Project only this initial producer before any sealed capture.
+  $expected=array_values($expected);$state=$this->alignment_state();$order->read_meta_data(true);
   if(!PolicyNativeOrderFacts::hpos()||!$this->issued_for($order,$p))self::fail();
   // No callbacks follow this last fence: even an authority getter may be filtered.
   if(self::raw($order,'data_store',['WC_Data'])!==$store||self::raw($store,'instance',['WC_Data_Store'])!==$instance||self::raw($store,'current_class_name',['WC_Data_Store'])!==$store_name||self::acknowledged_rows($order)!==$expected||$this->alignment_state()!==$state)self::fail();$this->aligned=true;

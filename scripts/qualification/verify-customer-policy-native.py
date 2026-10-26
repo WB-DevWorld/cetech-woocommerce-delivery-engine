@@ -34,16 +34,19 @@ CHECKOUT_VALIDATION_CATEGORIES=('delivery','policy','control','shipping','paymen
 CHECKOUT_CHECKPOINTS=('before_v2_line','after_v2_line','before_policy_line','after_policy_line')
 CHECKOUT_OPERATIONS=('unobserved','click','final_response','final_body','classification','inspect_after','native_cart','headers')
 CHECKOUT_BODY_ACCESS=('unobserved','pending','ready','captured','enable_failed','request_invalid','request_ambiguous','response_mismatch','request_failed','body_unavailable','body_overflow','body_invalid','body_timeout')
+CHECKOUT_BODY_KINDS=('unobserved','rest_error','payment_result','other_object','non_object')
+CHECKOUT_NATIVE_ERRORS=('unobserved','checkout_control','policy_review','quote_placement','unknown_server','payment_processing','gateway_payment','invalid_payment_result','gateway_disabled','missing_order','invalid_param','nonce','total_mismatch','other')
 def checkout_diagnostic(line,backend):
  """Closed console-only observation, independent of all four receipt schemas."""
  prefix='customer_policy_native_checkout_diagnostic='
  if not isinstance(line,str)or len(line)>2048 or not line.startswith(prefix):return None
  try:
   value=json.loads(line[len(prefix):],object_pairs_hook=pairs)
-  if type(value)is not dict or set(value)!=set(('backend','route','operation','response_seen','http_class','native_result','body_access','gateway_entries','gateway_delegations','payment_completions','unsaved_preflight','validation','checkpoints','stage_classic','stage_store_post','new_native_orders','new_native_lines','original_state'))or value['backend']!=backend or value['route']not in('classic','blocks')or value['unsaved_preflight']not in('pass','unobserved'):return None
+  if type(value)is not dict or set(value)!=set(('backend','route','operation','response_seen','http_class','native_result','body_access','body_kind','native_error','gateway_entries','gateway_delegations','payment_completions','unsaved_preflight','validation','checkpoints','stage_classic','stage_store_post','new_native_orders','new_native_lines','original_state'))or value['backend']!=backend or value['route']not in('classic','blocks')or value['unsaved_preflight']not in('pass','unobserved'):return None
   if value['body_access']not in CHECKOUT_BODY_ACCESS:return None
+  if value['body_kind']not in CHECKOUT_BODY_KINDS or value['native_error']not in CHECKOUT_NATIVE_ERRORS or(value['body_kind']=='rest_error')!=(value['native_error']!='unobserved'):return None
   if value['operation']not in CHECKOUT_OPERATIONS or type(value['response_seen'])is not bool or value['http_class']not in('unobserved','2xx','3xx','4xx','5xx','other')or value['native_result']not in('unobserved','success','failure','other'):return None
-  if not value['response_seen']and(value['http_class']!='unobserved'or value['native_result']!='unobserved'):return None
+  if not value['response_seen']and(value['http_class']!='unobserved'or value['native_result']!='unobserved'or value['body_kind']!='unobserved'or value['native_error']!='unobserved'):return None
   if any(value[k]not in('zero','one','multiple','unknown')for k in('gateway_entries','gateway_delegations','payment_completions')):return None
   validation=value['validation']
   if type(validation)is not dict or set(validation)!=set(('observed','has_errors','categories','notice_errors'))or any(type(validation[k])is not bool for k in('observed','has_errors','notice_errors')):return None

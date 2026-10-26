@@ -9,7 +9,7 @@ const {EventEmitter} = require('node:events');
 
 const source = fs.readFileSync(path.join(__dirname, 'customer-policy-browser.cjs'), 'utf8');
 function extractFunction(name) {
- const marker = 'async function ' + name + '(';
+ const marker = (source.includes('async function ' + name + '(') ? 'async ' : '') + 'function ' + name + '(';
  const start = source.indexOf(marker);
  assert.ok(start >= 0, 'Actual named producer helper is absent');
  assert.equal(source.indexOf(marker, start + marker.length), -1, 'Ambiguous producer helper');
@@ -243,4 +243,26 @@ for(const [label,late,category]of [
  f.complete();pending.resolve(f.nativeResponse);await flush();assert.equal(reads,1);assert.equal(f.observation.body_access,'captured');
  late(f);click.resolve();const observed=await result;
  assert.equal(observed.ok,false);assert.equal(f.observation.body_access,category);assert.equal(reads,2);assert.equal(f.commands.filter(x=>x.name==='Network.getResponseBody').length,1);await f.observer.dispose();
+});
+
+const classifyBody=vm.runInNewContext(extractFunction('classifyCheckoutBody')+'; classifyCheckoutBody',Object.create(null));
+test('native response diagnostics expose only two fixed labels from exact source-known error codes',()=>{
+ const known=[['cetech_de_checkout_control','checkout_control'],['cetech_de_customer_policy_review','policy_review'],['cetech_de_quote_placement_unavailable','quote_placement'],['woocommerce_rest_unknown_server_error','unknown_server'],['woocommerce_rest_checkout_process_payment_error','payment_processing'],['woocommerce_rest_payment_error','gateway_payment'],['woocommerce_rest_checkout_invalid_payment_result','invalid_payment_result'],['woocommerce_rest_checkout_payment_method_disabled','gateway_disabled'],['woocommerce_rest_checkout_missing_order','missing_order'],['rest_invalid_param','invalid_param'],['woocommerce_rest_missing_nonce','nonce'],['woocommerce_rest_invalid_nonce','nonce'],['woocommerce_rest_checkout_total_mismatch','total_mismatch']];
+ for(const [code,category]of known){
+  const input={code,message:'PRIVATE message nonce=secret',data:{order_id:123,private:'raw'}};
+  const actual=classifyBody(input);assert.equal(JSON.stringify(actual),JSON.stringify({body_kind:'rest_error',native_error:category}));
+  assert.deepEqual(Object.keys(actual).sort(),['body_kind','native_error']);assert.ok(!JSON.stringify(actual).includes('PRIVATE'));assert.equal(input.code,code);
+ }
+});
+test('unknown, inherited, malformed and non-object native bodies cannot leak an error code or imply native payment',()=>{
+ for(const code of ['PRIVATE nonce=secret','__proto__','constructor','woocommerce_rest_checkout_process_payment_error_suffix','WOOCOMMERCE_REST_UNKNOWN_SERVER_ERROR','x'.repeat(8192)])assert.equal(JSON.stringify(classifyBody({code,message:'PRIVATE'})),JSON.stringify({body_kind:'rest_error',native_error:'other'}));
+ for(const value of [null,undefined,'PRIVATE',42,[]])assert.equal(JSON.stringify(classifyBody(value)),JSON.stringify({body_kind:'non_object',native_error:'unobserved'}));
+ for(const value of [{},{code:123},{payment_result:null},{payment_result:[]},Object.create({code:'cetech_de_checkout_control'})])assert.equal(JSON.stringify(classifyBody(value)),JSON.stringify({body_kind:'other_object',native_error:'unobserved'}));
+ assert.equal(JSON.stringify(classifyBody({payment_result:{payment_status:'success',private:'PRIVATE'}})),JSON.stringify({body_kind:'payment_result',native_error:'unobserved'}));
+});
+test('selected Blocks body is classified before the unchanged native HTTP refusal',()=>{
+ const classify=source.indexOf("if(route==='blocks')Object.assign(lastCheckout,classifyCheckoutBody(body));");
+ assert.ok(classify>source.indexOf("if(selection.transport==='batch')"));
+ assert.ok(classify<source.indexOf("requireCode(status>=200&&status<300,'checkout_http_refused')"));
+ assert.equal((source.match(/Object\.assign\(lastCheckout,classifyCheckoutBody\(body\)\)/g)||[]).length,1);
 });
