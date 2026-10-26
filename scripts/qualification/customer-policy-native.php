@@ -28,12 +28,50 @@ function r24_hash(array$value):string{return hash('sha256',json_encode($value,JS
 function r24_state():array{return r24_load((string)getenv('CETECH_R24_STATE'),4194304);}
 function r24_save(array$state):void{r24_json((string)getenv('CETECH_R24_STATE'),$state);}
 /** Closed request observations only; no checkout authority or native mutation. */
-function r24_diagnostic_default():array{return['validation'=>['observed'=>false,'has_errors'=>false,'categories'=>[],'notice_errors'=>false],'checkpoints'=>['before_v2_line'=>false,'after_v2_line'=>false,'before_policy_line'=>false,'after_policy_line'=>false],'stage_classic'=>['status'=>'unobserved','error_class'=>'none','cause_class'=>'none'],'stage_store_post'=>['status'=>'unobserved','error_class'=>'none','cause_class'=>'none']];}
+function r24_diagnostic_default():array{return['validation'=>['observed'=>false,'has_errors'=>false,'categories'=>[],'notice_errors'=>false],'checkpoints'=>['before_v2_line'=>false,'after_v2_line'=>false,'before_policy_line'=>false,'after_policy_line'=>false],'stage_classic'=>['status'=>'unobserved','error_class'=>'none','cause_class'=>'none','cause_point'=>'none'],'stage_store_post'=>['status'=>'unobserved','error_class'=>'none','cause_class'=>'none','cause_point'=>'none']];}
 function r24_diagnostic_class(Throwable$error):string{$class=get_class($error);return in_array($class,['Exception','RuntimeException','LogicException','InvalidArgumentException','UnexpectedValueException','Error','TypeError','ParseError','ValueError','JsonException','mysqli_sql_exception'],true)?$class:'OtherThrowable';}
 function r24_diagnostic_cause_class(Throwable$error):string{$seen=[];for($depth=0;$depth<8;++$depth){$id=spl_object_id($error);if(isset($seen[$id]))return'OtherThrowable';$seen[$id]=true;$previous=$error->getPrevious();if(null===$previous)return r24_diagnostic_class($error);$error=$previous;}return'OtherThrowable';}
-function r24_diagnostic_record(string$slot,string$status,string$class='none',string$cause='none'):void{try{if(!r24_authorized())return;$state=r24_state();$d=$state['checkout_diagnostic']??r24_diagnostic_default();if(in_array($slot,['stage_classic','stage_store_post'],true)&&in_array($status,['entered','returned','threw'],true))$d[$slot]=['status'=>$status,'error_class'=>$class,'cause_class'=>$cause];elseif(array_key_exists($slot,$d['checkpoints']))$d['checkpoints'][$slot]=true;else return;$state['checkout_diagnostic']=$d;r24_save($state);}catch(Throwable){/* Observation cannot change a native callback outcome. */}}
+/** Inspect an executed call-site only against the exact installed initial-producer source pin. */
+function r24_diagnostic_initial_point(array$frame):?string{
+ try{
+  $class='CetechDeliveryEngine\\Application\\CustomerPolicy\\PolicyNativeOrderAttempt';$relative='src/Application/CustomerPolicy/PolicyNativeOrderAttempt.php';
+  if(($frame['class']??null)!==$class||($frame['function']??null)!=='fail'||!class_exists($class,false)||!defined('CETECH_DE_PATH')||!function_exists('r24_plan'))return null;
+  $root=realpath(CETECH_DE_PATH);$path=false===$root?false:realpath($root.'/'.$relative);$method=new ReflectionMethod($class,'align_initial_metadata');$file=$method->getFileName();$line=$frame['line']??null;
+  if($path===false||!is_string($file)||realpath($file)!==$path||is_link($file)||!is_string($frame['file']??null)||realpath($frame['file'])!==$path||!is_int($line)||$line<$method->getStartLine()||$line>$method->getEndLine())return null;
+  $size=@filesize($path);$pin=r24_plan()['installed_php_sources'][$relative]??null;if(!is_int($size)||$size<1||$size>65536||!is_string($pin)||preg_match('/\A[a-f0-9]{64}\z/D',$pin)!==1||!hash_equals($pin,(string)@hash_file('sha256',$path)))return null;
+  $lines=@file($path,FILE_IGNORE_NEW_LINES);if(!is_array($lines)||!isset($lines[$line-1])||strlen($lines[$line-1])>8192)return null;
+  $signatures=[
+   '947bafd8f65aa451ea4f9eff4e67ae1bc24938627fe5c34a20e24bec23b39872'=>'initial_authority',
+   '9923b9c5e3eb158aca55b4ef9c23c639027a928ba677441c96a383319c01ebf9'=>'initial_reader',
+   '49587df374a38069eeb82c793e2846d8a716346fddc54882bf057036960d6b81'=>'initial_store',
+   '0c64b1be00fbbb1ec336b33508bf139d197207b0f11d00957c2d3e2752be95fb'=>'initial_row_projection',
+   '40f73c3bed5ae70ec67005640cc28e492b656ebb945a95377f7214f097780a87'=>'initial_index_pair',
+   '9d841380a49a3d5d4f5fd0675fae11c405ef36fc9e9eb764c05f3d12bed1f436'=>'initial_post_read_authority',
+   'be16876dace24a017b57faf10397cc36a813b50482e3aad447c2b441a06741fc'=>'initial_final_fence',
+  ];
+  return$signatures[hash('sha256',trim($lines[$line-1]))]??null;
+ }catch(Throwable){return null;}
+}
+/** Match static methods and pinned call-sites; trace arguments are never inspected or emitted. */
+function r24_diagnostic_cause_point(Throwable$error):string{
+ $application='CetechDeliveryEngine\\Application\\CustomerPolicy\\';$integration='CetechDeliveryEngine\\Integrations\\CustomerPolicy\\';
+ $methods=[
+  'PolicyNativeOrderAttempt'=>['begin'=>'attempt_authority','allows'=>'attempt_authority','issued_for'=>'attempt_authority','native'=>'attempt_authority','align_initial_metadata'=>'initial_alignment','acknowledged_rows'=>'metadata_acknowledgement','alignment_state'=>'initial_business_fence','bounded_value'=>'initial_business_fence','raw'=>'initial_business_fence'],
+  'PolicyNativeOrderFacts'=>['native'=>'native_facts','metadata'=>'native_facts','quantity'=>'native_facts','foreign'=>'native_facts','legacy'=>'legacy_read','read_physical'=>'physical_native','assert_physical'=>'physical_native','assert_rows'=>'physical_plan'],
+  'PolicyNativeOrderStager'=>['binding'=>'native_binding','stage'=>'native_stage','missing'=>'missing_write'],
+  'PolicyNativeOrderStage'=>['capture'=>'stage_capture','assert_binding'=>'stage_binding','assert_object_rows'=>'object_plan','acknowledged'=>'stage_acknowledgement','assert_legacy_physical'=>'physical_legacy','assert_physical_plan'=>'physical_plan','derive_plan'=>'stage_plan','packet_plan'=>'stage_plan'],
+  'CustomerPolicyPreparedCheckout'=>['bind_native'=>'original_bind','reconcile_original'=>'original_bind','verify_unbound_original'=>'original_bind'],
+ ];
+ $map=[];foreach($methods as$class=>$entries)foreach($entries as$method=>$point)$map[$application.$class.'::'.$method]=$point;
+ foreach(['capture','capture_logging','same_native_facts','unchanged','logging_unchanged']as$method)$map[$integration.'PolicyNativePaymentLocalBinding::'.$method]='native_local_binding';
+ foreach(['stage','stage_classic','stage_store_post']as$method)$map[$integration.'PolicyCheckoutRuntime::'.$method]='runtime_stage';
+ $chain=[];$seen=[];for($depth=0;$depth<8;++$depth){$id=spl_object_id($error);if(isset($seen[$id]))return'bounded';$seen[$id]=true;$chain[]=$error;$previous=$error->getPrevious();if($previous===null)break;$error=$previous;if($depth===7)return'bounded';}
+ $remaining=32;foreach(array_reverse($chain)as$cause){$trace=$cause->getTrace();$count=count($trace);$limit=min($count,$remaining);for($index=0;$index<$limit;++$index){$frame=$trace[$index];if(!is_array($frame))continue;$class=$frame['class']??null;$method=$frame['function']??null;if(!is_string($class)||strlen($class)>192||!is_string($method)||strlen($method)>128)continue;$point=r24_diagnostic_initial_point($frame)??($map[$class.'::'.$method]??null);if($point!==null)return$point;}$remaining-=$limit;if($count>$limit)return'bounded';}
+ return'other';
+}
+function r24_diagnostic_record(string$slot,string$status,string$class='none',string$cause='none',string$point='none'):void{try{if(!r24_authorized())return;$state=r24_state();$d=$state['checkout_diagnostic']??r24_diagnostic_default();if(in_array($slot,['stage_classic','stage_store_post'],true)&&in_array($status,['entered','returned','threw'],true))$d[$slot]=['status'=>$status,'error_class'=>$class,'cause_class'=>$cause,'cause_point'=>$point];elseif(array_key_exists($slot,$d['checkpoints']))$d['checkpoints'][$slot]=true;else return;$state['checkout_diagnostic']=$d;r24_save($state);}catch(Throwable){/* Observation cannot change a native callback outcome. */}}
 /** A recorder failure cannot replace the original return value or Throwable. */
-function r24_stage_callback_wrapper(callable$original,callable$record,string$slot):Closure{return static function(mixed...$arguments)use($original,$record,$slot):mixed{try{$record($slot,'entered','none','none');}catch(Throwable){}try{$result=$original(...$arguments);}catch(Throwable$error){try{$record($slot,'threw',r24_diagnostic_class($error),r24_diagnostic_cause_class($error));}catch(Throwable){}throw$error;}try{$record($slot,'returned','none','none');}catch(Throwable){}return$result;};}
+function r24_stage_callback_wrapper(callable$original,callable$record,string$slot):Closure{return static function(mixed...$arguments)use($original,$record,$slot):mixed{try{$record($slot,'entered','none','none','none');}catch(Throwable){}try{$result=$original(...$arguments);}catch(Throwable$error){try{$record($slot,'threw',r24_diagnostic_class($error),r24_diagnostic_cause_class($error),r24_diagnostic_cause_point($error));}catch(Throwable){}throw$error;}try{$record($slot,'returned','none','none','none');}catch(Throwable){}return$result;};}
 /** Replace only the exact native callback slot, retaining sibling order and arity. */
 function r24_install_stage_observer(object$runtime,string$hook_name,string$method,callable$record):Closure{
  $class='CetechDeliveryEngine\\Integrations\\CustomerPolicy\\PolicyCheckoutRuntime';$expected=['woocommerce_checkout_order_created'=>'stage_classic','woocommerce_store_api_checkout_order_processed'=>'stage_store_post'];$hook=$GLOBALS['wp_filter'][$hook_name]??null;$priority=PHP_INT_MAX-2;

@@ -79,6 +79,8 @@ class ReceiptProtocol(unittest.TestCase):
   prefix='customer_policy_native_browser_diagnostic='
   value={'backend':'hpos','phase':'pdp_simple','error_class':'TimeoutError','code':'browser_timeout'}
   self.assertIsNotNone(V.browser_diagnostic(prefix+json.dumps(value),'hpos'))
+  for code in ('parent_form_invalid','parent_variation_mismatch','parent_field_invalid','parent_submission_mismatch'):
+   parent={**value,'phase':'pdp_variation','error_class':'ObservationError','code':code};self.assertIsNotNone(V.browser_diagnostic(prefix+json.dumps(parent),'hpos'))
   self.assertIsNone(V.browser_diagnostic(prefix+json.dumps(value),'cpt'))
   for key,untrusted in (('phase','private customer URL?nonce=secret'),('error_class','SecretClass'),('code','raw private message')):
    invalid=dict(value);invalid[key]=untrusted;self.assertIsNone(V.browser_diagnostic(prefix+json.dumps(invalid),'hpos'))
@@ -86,16 +88,19 @@ class ReceiptProtocol(unittest.TestCase):
   self.assertIsNone(V.browser_diagnostic(prefix+'{"backend":"hpos","backend":"hpos","phase":"pdp_simple","error_class":"TimeoutError","code":"browser_timeout"}','hpos'))
   self.assertIsNone(V.browser_diagnostic(prefix+'x'*513,'hpos'))
   prefix='customer_policy_native_checkout_diagnostic='
-  value={'backend':'hpos','route':'classic','operation':'final_body','response_seen':True,'http_class':'2xx','native_result':'unobserved','body_access':'body_unavailable','body_kind':'unobserved','native_error':'unobserved','gateway_entries':'one','gateway_delegations':'zero','payment_completions':'zero','unsaved_preflight':'pass','validation':{'observed':True,'has_errors':True,'categories':['delivery'],'notice_errors':False},'checkpoints':dict.fromkeys(V.CHECKOUT_CHECKPOINTS,False),'stage_classic':{'status':'unobserved','error_class':'none','cause_class':'none'},'stage_store_post':{'status':'unobserved','error_class':'none','cause_class':'none'},'new_native_orders':'zero','new_native_lines':'zero','original_state':'frozen'}
+  value={'backend':'hpos','route':'classic','operation':'final_body','response_seen':True,'http_class':'2xx','native_result':'unobserved','body_access':'body_unavailable','body_kind':'unobserved','native_error':'unobserved','gateway_entries':'one','gateway_delegations':'zero','payment_completions':'zero','unsaved_preflight':'pass','validation':{'observed':True,'has_errors':True,'categories':['delivery'],'notice_errors':False},'checkpoints':dict.fromkeys(V.CHECKOUT_CHECKPOINTS,False),'stage_classic':{'status':'unobserved','error_class':'none','cause_class':'none','cause_point':'none'},'stage_store_post':{'status':'unobserved','error_class':'none','cause_class':'none','cause_point':'none'},'new_native_orders':'zero','new_native_lines':'zero','original_state':'frozen'}
   self.assertIsNotNone(V.checkout_diagnostic(prefix+json.dumps(value),'hpos'))
   self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps(value),'cpt'))
   unseen=deepcopy(value);unseen['response_seen']=False;self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps(unseen),'hpos'));unseen['http_class']='unobserved';self.assertIsNotNone(V.checkout_diagnostic(prefix+json.dumps(unseen),'hpos'))
-  thrown=deepcopy(value);thrown['stage_classic']={'status':'threw','error_class':'RuntimeException','cause_class':'TypeError'};self.assertIsNotNone(V.checkout_diagnostic(prefix+json.dumps(thrown),'hpos'))
+  thrown=deepcopy(value);thrown['stage_classic']={'status':'threw','error_class':'RuntimeException','cause_class':'TypeError','cause_point':'other'};self.assertIsNotNone(V.checkout_diagnostic(prefix+json.dumps(thrown),'hpos'))
+  for point in V.CHECKOUT_CAUSE_POINTS[1:]:
+   thrown['stage_classic']['cause_point']=point;self.assertIsNotNone(V.checkout_diagnostic(prefix+json.dumps(thrown),'hpos'))
+  thrown['stage_classic']['cause_point']='none';self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps(thrown),'hpos'))
   for key,untrusted in (('route','private?nonce=value'),('operation','private_nonce=value'),('response_seen',1),('http_class',200),('native_result','private body'),('body_access','private CDP error message'),('body_kind','private data'),('native_error','cetech_private_secret_code'),('gateway_entries',1),('gateway_delegations','private order'),('payment_completions',[]),('unsaved_preflight','invented'),('new_native_orders',2),('original_state','private order')):
    invalid=deepcopy(value);invalid[key]=untrusted;self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps(invalid),'hpos'))
   rest=deepcopy(value);rest.update(route='blocks',body_access='captured',body_kind='rest_error',native_error='payment_processing',http_class='4xx',native_result='failure');self.assertIsNotNone(V.checkout_diagnostic(prefix+json.dumps(rest),'hpos'))
   rest['native_error']='unobserved';self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps(rest),'hpos'));rest['body_kind']='payment_result';rest['native_error']='payment_processing';self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps(rest),'hpos'))
-  for member,field,untrusted in (('validation','categories',['private error code']),('validation','has_errors',1),('checkpoints','before_v2_line','secret'),('stage_classic','status','private method'),('stage_classic','error_class','SecretThrowable'),('stage_classic','cause_class','SecretPreviousThrowable')):
+  for member,field,untrusted in (('validation','categories',['private error code']),('validation','has_errors',1),('checkpoints','before_v2_line','secret'),('stage_classic','status','private method'),('stage_classic','error_class','SecretThrowable'),('stage_classic','cause_class','SecretPreviousThrowable'),('stage_classic','cause_point','/private/source/path:123 nonce=secret')):
    invalid=deepcopy(value);invalid[member][field]=untrusted;self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps(invalid),'hpos'))
   invalid=deepcopy(value);invalid['validation']['categories']=['delivery','delivery'];self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps(invalid),'hpos'))
   invalid=deepcopy(value);invalid['validation']['observed']=False;self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps(invalid),'hpos'))

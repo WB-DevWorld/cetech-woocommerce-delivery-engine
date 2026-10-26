@@ -641,7 +641,7 @@ jobs:
       - name: Vitest
         run: npm run test:js
       - name: Verify customer policy checkout observation
-        run: node --test scripts/qualification/test-customer-policy-checkout-observation.cjs
+        run: node --test scripts/qualification/test-customer-policy-checkout-observation.cjs scripts/qualification/test-customer-policy-parent-submission.cjs
 
   control-plane:
     name: Control Plane

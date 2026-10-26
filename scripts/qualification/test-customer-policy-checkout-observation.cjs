@@ -266,3 +266,32 @@ test('selected Blocks body is classified before the unchanged native HTTP refusa
  assert.ok(classify<source.indexOf("requireCode(status>=200&&status<300,'checkout_http_refused')"));
  assert.equal((source.match(/Object\.assign\(lastCheckout,classifyCheckoutBody\(body\)\)/g)||[]).length,1);
 });
+
+const checkoutDiagnosticSource=extractFunction('emitCheckoutDiagnostic');
+function stageDiagnostic(stage){
+ const lines=[],before={native_physical_census:{orders:[],lines:[]},originals:[],gateway_entry_calls:[],gateway_calls:[],completion_calls:[]};
+ const after={...before,checkout_diagnostic:{stage_store_post:stage}};
+ const emit=vm.runInNewContext(checkoutDiagnosticSource+'; emitCheckoutDiagnostic',{input:{backend:'hpos'},lastCheckout:{operation:'classification',response_seen:true,http_class:'5xx',native_result:'failure',body_access:'captured',body_kind:'rest_error',native_error:'unknown_server'},process:{stdout:{write:value=>lines.push(value)}}});
+ emit(before,after,'blocks');assert.equal(lines.length,1);
+ return JSON.parse(lines[0].slice('customer_policy_native_checkout_diagnostic='.length));
+}
+test('registered native stage causes forward only fixed point labels without source or exception details',()=>{
+ const points=['other','bounded','attempt_authority','initial_alignment','initial_authority','initial_reader','initial_store','initial_row_projection','initial_index_pair','initial_post_read_authority','initial_final_fence','metadata_acknowledgement','initial_business_fence','native_facts','legacy_read','native_binding','stage_capture','stage_binding','object_plan','physical_native','physical_legacy','physical_plan','stage_acknowledgement','stage_plan','original_bind','missing_write','native_local_binding','native_stage','runtime_stage'];
+ for(const point of points){const observed=stageDiagnostic({status:'threw',error_class:'RuntimeException',cause_class:'RuntimeException',cause_point:point,file:'/PRIVATE/path.php',line:123,message:'PRIVATE nonce=secret',order_id:246});assert.equal(observed.stage_store_post.cause_point,point);assert.deepEqual(Object.keys(observed.stage_store_post).sort(),['cause_class','cause_point','error_class','status']);assert.ok(!JSON.stringify(observed).includes('PRIVATE'));assert.ok(!JSON.stringify(observed).includes('246'));}
+ for(const point of ['/PRIVATE/path.php:123 nonce=secret','unknown point','none',123,null,{},[]])assert.equal(stageDiagnostic({status:'threw',error_class:'RuntimeException',cause_class:'RuntimeException',cause_point:point}).stage_store_post.cause_point,'other');
+});
+test('a nonthrowing stage never forwards a stray cause point or exception class',()=>{
+ for(const status of ['unobserved','entered','returned','PRIVATE']){const observed=stageDiagnostic({status,error_class:'RuntimeException',cause_class:'RuntimeException',cause_point:'original_bind'}).stage_store_post;assert.equal(observed.cause_point,'none');assert.equal(observed.error_class,'none');assert.equal(observed.cause_class,'none');assert.equal(observed.status,status==='PRIVATE'?'unobserved':status);}
+});
+
+test('browser diagnostics allow the four exact native-parent labels and suppress arbitrary raw codes',()=>{
+ const diagnosticSource=extractFunction('emitDiagnostic');
+ for(const raw of ['parent_form_invalid','parent_variation_mismatch','parent_field_invalid','parent_submission_mismatch','PRIVATE nonce=secret /path:123',123,{},null]){
+  const lines=[],emit=vm.runInNewContext(diagnosticSource+'; emitDiagnostic',{input:{backend:'cpt'},phase:'pdp_variation',lastCheckout:null,process:{stdout:{write:line=>lines.push(line)}}});
+  emit({name:'ObservationError',code:raw,message:'PRIVATE native body'});assert.equal(lines.length,1);
+  const value=JSON.parse(lines[0].slice('customer_policy_native_browser_diagnostic='.length));
+  assert.equal(value.code,typeof raw==='string'&&raw.startsWith('parent_')?raw:'observation_required');
+  assert.deepEqual(Object.keys(value).sort(),['backend','code','error_class','phase']);assert.ok(!lines[0].includes('PRIVATE'));
+ }
+ assert.ok(source.includes('require:need,requireCode,unchanged'));
+});

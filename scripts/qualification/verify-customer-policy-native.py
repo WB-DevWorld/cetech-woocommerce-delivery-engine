@@ -20,7 +20,7 @@ BACKENDS=('hpos','cpt')
 MAX_RECEIPT_BYTES=2097152
 DIAGNOSTIC_PHASES=('initialize','shopper_guest','shopper_customer','pdp_simple','pdp_variation','native_add','cart_editor','cart_review','cart_quantity','checkout_classic','checkout_blocks','history','order_pay','public_read','source_race','complete')
 DIAGNOSTIC_CLASSES=('ObservationError','TimeoutError','TypeError','SyntaxError','Error','UnknownError')
-DIAGNOSTIC_CODES=('observation_required','case_refused','native_bridge_failed','browser_timeout','harness_type','invalid_json','private_file_missing','browser_error','unknown_error','checkout_http_refused','checkout_native_refused_no_original','checkout_native_refused_frozen','checkout_native_refused_bound','checkout_native_refused_complete','checkout_native_refused_unknown','checkout_result_unrecognized','checkout_gateway_missing','checkout_gateway_count','checkout_completion_count','checkout_cart_read_failed','checkout_cart_not_empty')
+DIAGNOSTIC_CODES=('observation_required','case_refused','native_bridge_failed','browser_timeout','harness_type','invalid_json','private_file_missing','browser_error','unknown_error','checkout_http_refused','checkout_native_refused_no_original','checkout_native_refused_frozen','checkout_native_refused_bound','checkout_native_refused_complete','checkout_native_refused_unknown','checkout_result_unrecognized','checkout_gateway_missing','checkout_gateway_count','checkout_completion_count','checkout_cart_read_failed','checkout_cart_not_empty','parent_form_invalid','parent_variation_mismatch','parent_field_invalid','parent_submission_mismatch')
 def browser_diagnostic(line,backend):
  prefix='customer_policy_native_browser_diagnostic='
  if not isinstance(line,str)or len(line)>512 or not line.startswith(prefix):return None
@@ -36,6 +36,7 @@ CHECKOUT_OPERATIONS=('unobserved','click','final_response','final_body','classif
 CHECKOUT_BODY_ACCESS=('unobserved','pending','ready','captured','enable_failed','request_invalid','request_ambiguous','response_mismatch','request_failed','body_unavailable','body_overflow','body_invalid','body_timeout')
 CHECKOUT_BODY_KINDS=('unobserved','rest_error','payment_result','other_object','non_object')
 CHECKOUT_NATIVE_ERRORS=('unobserved','checkout_control','policy_review','quote_placement','unknown_server','payment_processing','gateway_payment','invalid_payment_result','gateway_disabled','missing_order','invalid_param','nonce','total_mismatch','other')
+CHECKOUT_CAUSE_POINTS=('none','other','bounded','attempt_authority','initial_alignment','initial_authority','initial_reader','initial_store','initial_row_projection','initial_index_pair','initial_post_read_authority','initial_final_fence','metadata_acknowledgement','initial_business_fence','native_facts','legacy_read','native_binding','stage_capture','stage_binding','object_plan','physical_native','physical_legacy','physical_plan','stage_acknowledgement','stage_plan','original_bind','missing_write','native_local_binding','native_stage','runtime_stage')
 def checkout_diagnostic(line,backend):
  """Closed console-only observation, independent of all four receipt schemas."""
  prefix='customer_policy_native_checkout_diagnostic='
@@ -57,8 +58,8 @@ def checkout_diagnostic(line,backend):
   if type(checkpoints)is not dict or set(checkpoints)!=set(CHECKOUT_CHECKPOINTS)or any(type(x)is not bool for x in checkpoints.values()):return None
   for key in('stage_classic','stage_store_post'):
    stage=value[key]
-   if type(stage)is not dict or set(stage)!=set(('status','error_class','cause_class'))or stage['status']not in('unobserved','entered','returned','threw')or stage['error_class']not in CHECKOUT_ERROR_CLASSES or stage['cause_class']not in CHECKOUT_ERROR_CLASSES:return None
-   if(stage['status']=='threw')!=(stage['error_class']!='none')or(stage['status']=='threw')!=(stage['cause_class']!='none'):return None
+   if type(stage)is not dict or set(stage)!=set(('status','error_class','cause_class','cause_point'))or stage['status']not in('unobserved','entered','returned','threw')or stage['error_class']not in CHECKOUT_ERROR_CLASSES or stage['cause_class']not in CHECKOUT_ERROR_CLASSES or stage['cause_point']not in CHECKOUT_CAUSE_POINTS:return None
+   if(stage['status']=='threw')!=(stage['error_class']!='none')or(stage['status']=='threw')!=(stage['cause_class']!='none')or(stage['status']=='threw')!=(stage['cause_point']!='none'):return None
   if any(value[k]not in('zero','positive','unknown')for k in('new_native_orders','new_native_lines'))or value['original_state']not in('absent','frozen','bound','complete','multiple','unknown'):return None
   return prefix+json.dumps(value,sort_keys=True,separators=(',',':'))
  except(ValueError,TypeError):return None

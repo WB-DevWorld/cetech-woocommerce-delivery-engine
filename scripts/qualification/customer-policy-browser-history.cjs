@@ -50,6 +50,28 @@ async function review(api,shopper,view,{ticket=view.ticket,key=view.key,nonce=vi
   return responseValue(response);
 }
 const refusedReview = value => value.status >= 400 && value.body?.success !== true;
+/** Observe the actual native form bytes; never replay or reconstruct a submission. */
+async function nativeParentSubmission(request,expected) {
+  try {
+    const keys=Object.keys(expected),native=['add-to-cart','product_id','variation_id'];
+    if(keys.length!==4||!native.every(key=>Object.hasOwn(expected,key))||!keys.every(key=>typeof expected[key]==='string'&&expected[key].length>0&&expected[key].length<=512))return false;
+    const ticket=keys.find(key=>!native.includes(key));
+    if(!ticket||!/^cetech_de_policy_tickets\[[^\[\]\r\n]{1,256}\]$/.test(ticket)||request.method()!=='POST'||request.isNavigationRequest()!==true)return false;
+    const headers=request.headers(),type=headers&&headers['content-type'],bytes=request.postDataBuffer();
+    if(typeof type!=='string'||type.length>1024||/[\r\n]/.test(type)||!Buffer.isBuffer(bytes)||bytes.length===0||bytes.length>262144)return false;
+    const multipart=/^multipart\/form-data[ \t]*;[ \t]*boundary=(?:"([A-Za-z0-9'()+_,./:=?-]{1,70})"|([A-Za-z0-9'()+_,./:=?-]{1,70}))[ \t]*$/i.exec(type);
+    if(!multipart&&!/^application\/x-www-form-urlencoded(?:[ \t]*;[ \t]*charset=utf-8)?[ \t]*$/i.test(type))return false;
+    if(multipart){
+      const boundary=multipart[1]||multipart[2],first=Buffer.from('--'+boundary+'\r\n'),last=Buffer.from('\r\n--'+boundary+'--');
+      const end=bytes.length>=2&&bytes.subarray(-2).equals(Buffer.from('\r\n'))?bytes.subarray(0,-2):bytes;
+      if(!bytes.subarray(0,first.length).equals(first)||!end.subarray(-last.length).equals(last))return false;
+    }
+    const fields=await new Response(bytes,{headers:{'content-type':type}}).formData();
+    let count=0;
+    for(const [key,value]of fields){if(++count>256||typeof key!=='string'||key.length>512||typeof value!=='string'||Buffer.byteLength(value,'utf8')>65536)return false;}
+    return keys.every(key=>{const values=fields.getAll(key);return values.length===1&&typeof values[0]==='string'&&values[0]===expected[key];});
+  }catch{return false;}
+}
 function nativeRefundUrl(api,orderId) {
   const url=new URL(api.input.prepared.store_checkout_url);
   const checkout='/wc/store/v1/checkout',refund='/wc/v3/orders/'+orderId+'/refunds';
@@ -242,21 +264,20 @@ async function runHistoryProbes(api) {
     await clearCart(api,shoppers[0]);
     const parentView=await api.productView(shoppers[0],{kind:'parent',quantity:1,offer:'a'});
     const form=parentView.form;
-    api.require(form&&await form.locator('input[name="variation_id"]').count()===1,'Actual native variation form required.');
+    api.requireCode(form&&await form.locator('input[name="variation_id"]').count()===1,'parent_form_invalid');
     const nativeVariation=await form.locator('input[name="variation_id"]').inputValue();
-    api.require(Number(nativeVariation)===api.input.prepared.products.variation,'Actual served variation identity required.');
+    api.requireCode(Number(nativeVariation)===api.input.prepared.products.variation,'parent_variation_mismatch');
     // Woo's native handler selects the parent from add-to-cart. Mutating only
     // product_id would leave a valid native parent/variation request unchanged.
     for(const name of ['add-to-cart','product_id']){
       const field=form.locator('input[name="'+name+'"]');
-      api.require(await field.count()===1,'Actual native parent form field required.');
+      api.requireCode(await field.count()===1,'parent_field_invalid');
       await field.evaluate((el,value)=>{el.value=String(value);},api.input.prepared.products.simple);
     }
     const beforeParent=await cart(api,shoppers[0]);
     const parentResponse=shoppers[0].page.waitForResponse(r=>r.request().method()==='POST'&&r.request().isNavigationRequest()&&new URL(r.url()).origin===new URL(api.input.url).origin,{timeout:15000});
     const [,actualParentPost]=await Promise.all([shoppers[0].page.waitForNavigation({waitUntil:'domcontentloaded'}),parentResponse,form.locator('button.single_add_to_cart_button').click()]);
-    const postedParent=new URLSearchParams(actualParentPost.request().postData()||'');
-    api.require(postedParent.get('add-to-cart')===String(api.input.prepared.products.simple)&&postedParent.get('product_id')===String(api.input.prepared.products.simple)&&postedParent.get('variation_id')===nativeVariation&&postedParent.get('cetech_de_policy_tickets['+parentView.displayKey+']')===parentView.ticket,'Actual native submitted parent mismatch and original served ticket required.');
+    api.requireCode(await nativeParentSubmission(actualParentPost.request(),{'add-to-cart':String(api.input.prepared.products.simple),product_id:String(api.input.prepared.products.simple),variation_id:nativeVariation,['cetech_de_policy_tickets['+parentView.displayKey+']']:parentView.ticket}),'parent_submission_mismatch');
     const afterParent=await cart(api,shoppers[0]);
     results.tamper_variants.variation_parent=equal(beforeParent.items,afterParent.items)||afterParent.items.every(item=>policy(item)?.status==='review_required');
 
@@ -407,4 +428,4 @@ async function runHistoryProbes(api) {
     for(const shopper of owned)await shopper.context.close();
   }
 }
-module.exports={runHistoryProbes,nativePayAttempt};
+module.exports={runHistoryProbes,nativePayAttempt,nativeParentSubmission};

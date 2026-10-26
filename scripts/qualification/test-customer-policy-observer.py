@@ -11,6 +11,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import tempfile
 import unittest
 
 
@@ -21,7 +22,7 @@ PRODUCER = ROOT / "scripts/qualification/customer-policy-native.php"
 EXTRACT = r'''
 $source=file_get_contents($argv[1]);
 $needed=['r24_stage_callback_wrapper','r24_install_stage_observer',
- 'r24_stage_source_exact','r24_diagnostic_class','r24_diagnostic_cause_class','r24_validation_categories',
+ 'r24_stage_source_exact','r24_diagnostic_class','r24_diagnostic_cause_class','r24_diagnostic_cause_point','r24_diagnostic_initial_point','r24_validation_categories',
  'r24_mount_http','r24_install_request_stage_observer'];
 $tokens=token_get_all($source);$found=[];
 for($i=0;$i<count($tokens);++$i){
@@ -114,7 +115,7 @@ class ProducerObserverTest(unittest.TestCase):
  echo json_encode([count($calls),$calls[0][0],$calls[0][1]===$input,$calls[0][2],$actual===$result,$records],JSON_THROW_ON_ERROR);
 ''')
         self.assertEqual(actual, [1, 2, True, 17, True,
-            [["stage_classic", "entered", "none", "none"], ["stage_classic", "returned", "none", "none"]]])
+            [["stage_classic", "entered", "none", "none", "none"], ["stage_classic", "returned", "none", "none", "none"]]])
 
     def test_original_throwable_identity_and_closed_class_survive_recorder_failure(self):
         actual = self.php(r'''
@@ -128,8 +129,8 @@ class ProducerObserverTest(unittest.TestCase):
  }echo json_encode($out,JSON_THROW_ON_ERROR);
 ''')
         self.assertEqual(actual, [
-            [1, True, [["stage_store_post", "entered", "none", "none"], ["stage_store_post", "threw", "LogicException", "LogicException"]]],
-            [1, True, [["stage_store_post", "entered", "none", "none"], ["stage_store_post", "threw", "OtherThrowable", "OtherThrowable"]]],
+            [1, True, [["stage_store_post", "entered", "none", "none", "none"], ["stage_store_post", "threw", "LogicException", "LogicException", "other"]]],
+            [1, True, [["stage_store_post", "entered", "none", "none", "none"], ["stage_store_post", "threw", "OtherThrowable", "OtherThrowable", "other"]]],
         ])
 
     def test_recorder_failure_never_changes_successful_original_result(self):
@@ -145,7 +146,7 @@ class ProducerObserverTest(unittest.TestCase):
     def test_exact_slot_retains_siblings_key_priority_arity_and_restores_once(self):
         actual = self.php(r'''
  [$runtime,$hook,$events]=fixture();$before=$hook->callbacks;$records=[];
- $record=static function($slot,$status,$class,$cause)use(&$records,$events){$records[]=[$slot,$status,$class,$cause];$events->append($status);};
+ $record=static function($slot,$status,$class,$cause,$point)use(&$records,$events){$records[]=[$slot,$status,$class,$cause,$point];$events->append($status);};
  $restore=r24_install_stage_observer($runtime,'woocommerce_checkout_order_created','stage_classic',$record);
  $order=new stdClass();dispatch_fixture($hook,[$order,'EXTRA']);
  $slot=$hook->callbacks[PHP_INT_MAX-2]['actual-slot'];
@@ -155,7 +156,7 @@ class ProducerObserverTest(unittest.TestCase):
  echo json_encode([$stable_keys,$siblings,$slot['accepted_args'],$slot['fixture_tag'],count($runtime->calls),$runtime->calls[0][0],$runtime->calls[0][1]===$order,$restored,$hook->callbacks===$before,$records,$events->getArrayCopy()],JSON_THROW_ON_ERROR);
 ''', hook_fixture=True)
         self.assertEqual(actual, [True, True, 1, "retained", 1, 1, True, True, True,
-            [["stage_classic", "entered", "none", "none"], ["stage_classic", "returned", "none", "none"]],
+            [["stage_classic", "entered", "none", "none", "none"], ["stage_classic", "returned", "none", "none", "none"]],
             ["earlier", "before", "entered", "stage_classic", "returned", "after"]])
 
     def test_restore_never_overwrites_a_later_entry_or_different_hook_slot(self):
@@ -201,7 +202,7 @@ class ProducerObserverTest(unittest.TestCase):
  $restore();echo json_encode([$same,count($runtime->calls),$hook->callbacks===$before,$records],JSON_THROW_ON_ERROR);
 ''', hook_fixture=True)
         self.assertEqual(actual, [True, 1, True,
-            [["stage_store_post", "entered", "none", "none"], ["stage_store_post", "threw", "UnexpectedValueException", "UnexpectedValueException"]]])
+            [["stage_store_post", "entered", "none", "none", "none"], ["stage_store_post", "threw", "UnexpectedValueException", "UnexpectedValueException", "other"]]])
 
     def test_previous_cause_is_closed_bounded_and_does_not_replace_outer_throwable(self):
         actual = self.php(r'''
@@ -217,7 +218,7 @@ class ProducerObserverTest(unittest.TestCase):
  echo json_encode([r24_diagnostic_cause_class($eight),r24_diagnostic_cause_class($nine),r24_diagnostic_cause_class($unknown),r24_diagnostic_cause_class($cycle),$same,$records],JSON_THROW_ON_ERROR);
 ''')
         self.assertEqual(actual, ["ValueError", "OtherThrowable", "OtherThrowable", "OtherThrowable", True,
-            [["stage_classic", "entered", "none", "none"], ["stage_classic", "threw", "RuntimeException", "ValueError"]]])
+            [["stage_classic", "entered", "none", "none", "none"], ["stage_classic", "threw", "RuntimeException", "ValueError", "other"]]])
 
     def test_validation_categories_are_closed_and_contain_no_private_unknown_code(self):
         actual = self.php(r'''
@@ -225,6 +226,75 @@ class ProducerObserverTest(unittest.TestCase):
  echo json_encode([r24_validation_categories($codes),r24_validation_categories(array_fill(0,257,'terms')),r24_validation_categories([])],JSON_THROW_ON_ERROR);
 ''')
         self.assertEqual(actual, [["delivery", "policy", "control", "shipping", "payment", "terms", "field_required", "field_invalid", "other"], ["other"], []])
+
+    def test_deepest_known_fence_preserves_throwable_and_never_evaluates_private_arguments(self):
+        actual = self.php(r'''
+ $private=new class{public int$reads=0;public function __debugInfo():array{++$this->reads;throw new Error('PRIVATE');}public function __serialize():array{++$this->reads;throw new Error('PRIVATE');}};
+ eval('namespace CetechDeliveryEngine\\Application\\CustomerPolicy; class PolicyNativeOrderAttempt {public static function acknowledged_rows(mixed$private):never{throw new \\RuntimeException("PRIVATE");}}');
+ eval('namespace CetechDeliveryEngine\\Integrations\\CustomerPolicy; class PolicyCheckoutRuntime {public static function stage(\\Throwable$previous):never{throw new \\RuntimeException("PRIVATE",0,$previous);}}');
+ try{CetechDeliveryEngine\Application\CustomerPolicy\PolicyNativeOrderAttempt::acknowledged_rows($private);}catch(Throwable$leaf){}
+ try{CetechDeliveryEngine\Integrations\CustomerPolicy\PolicyCheckoutRuntime::stage($leaf);}catch(Throwable$outer){}
+ $records=[];$wrapped=r24_stage_callback_wrapper(static function()use($outer){throw$outer;},static function(...$args)use(&$records){$records[]=$args;},'stage_store_post');
+ try{$wrapped();$same=false;}catch(Throwable$caught){$same=$caught===$outer;}
+ echo json_encode([r24_diagnostic_cause_point($outer),$same,$private->reads,$records],JSON_THROW_ON_ERROR);
+''')
+        self.assertEqual(actual, ["metadata_acknowledgement", True, 0,
+            [["stage_store_post", "entered", "none", "none", "none"],
+             ["stage_store_post", "threw", "RuntimeException", "RuntimeException", "metadata_acknowledgement"]]])
+
+    def test_cause_point_enforces_eight_causes_and_thirty_two_total_frames(self):
+        actual = self.php(r'''
+ $unknown=['class'=>'PRIVATE\\PolicyNativeOrderAttempt','function'=>'align_initial_metadata','args'=>[new stdClass()],'file'=>'PRIVATE','line'=>999];
+ $known=['class'=>'CetechDeliveryEngine\\Application\\CustomerPolicy\\PolicyNativeOrderAttempt','function'=>'align_initial_metadata','args'=>[new stdClass()],'file'=>'PRIVATE','line'=>999];
+ $trace=new ReflectionProperty(Exception::class,'trace');
+ $make=static function(array$frames)use($trace):Throwable{$e=new RuntimeException('PRIVATE');$trace->setValue($e,$frames);return$e;};
+ $at32=$make([...array_fill(0,31,$unknown),$known]);$at33=$make([...array_fill(0,32,$unknown),$known]);
+ $leaf=$make([$known]);$eight=$leaf;for($i=0;$i<7;++$i)$eight=new RuntimeException('PRIVATE',0,$eight);$nine=new RuntimeException('PRIVATE',0,$eight);
+ $cycle=new RuntimeException('PRIVATE');(new ReflectionProperty(Exception::class,'previous'))->setValue($cycle,$cycle);
+ $outer=new RuntimeException('PRIVATE',0,$make(array_fill(0,32,$unknown)));$trace->setValue($outer,[$known]);
+ echo json_encode([r24_diagnostic_cause_point($at32),r24_diagnostic_cause_point($at33),r24_diagnostic_cause_point($eight),r24_diagnostic_cause_point($nine),r24_diagnostic_cause_point($cycle),r24_diagnostic_cause_point($outer),r24_diagnostic_cause_point($make([$unknown]))],JSON_THROW_ON_ERROR);
+''')
+        self.assertEqual(actual, ["initial_alignment", "bounded", "initial_alignment", "bounded", "bounded", "bounded", "other"])
+
+    def test_initial_subfences_require_real_installed_source_pin_and_exact_executed_line(self):
+        actual = self.php(r'''
+ define('CETECH_DE_PATH',$observer_root);
+ $class='CetechDeliveryEngine\\Application\\CustomerPolicy\\PolicyNativeOrderAttempt';class_exists($class);
+ $relative='src/Application/CustomerPolicy/PolicyNativeOrderAttempt.php';$file=$observer_root.'/'.$relative;
+ $GLOBALS['observer_test_plan']['installed_php_sources'][$relative]=hash_file('sha256',$file);
+ $needles=['initial_authority'=>"if(!\$this->issued_for(\$order,\$p)",'initial_reader'=>"\$read=new \\ReflectionMethod",'initial_store'=>"if(!is_object(\$store)",'initial_row_projection'=>"foreach(\$before as\$index=>\$row)",'initial_index_pair'=>"if(count(\$indices)!==2",'initial_post_read_authority'=>"if(!PolicyNativeOrderFacts::hpos()",'initial_final_fence'=>"if(self::raw(\$order,'data_store'"];
+ $lines=file($file,FILE_IGNORE_NEW_LINES);$out=[];$frame=null;
+ foreach($needles as$point=>$needle){$matches=[];foreach($lines as$index=>$line)if(str_starts_with(trim($line),$needle))$matches[]=$index+1;if(count($matches)!==1)throw new RuntimeException('Pinned subfence ambiguous.');$frame=['class'=>$class,'function'=>'fail','file'=>$file,'line'=>$matches[0],'args'=>['PRIVATE']];$out[$point]=r24_diagnostic_initial_point($frame);}
+ $mutations=[];foreach([['line'=>1],['line'=>'40'],['file'=>__FILE__],['function'=>'PRIVATE'],['class'=>'PRIVATE']]as$changes)$mutations[]=r24_diagnostic_initial_point(array_replace($frame,$changes));
+ $GLOBALS['observer_test_plan']['installed_php_sources'][$relative]=str_repeat('0',64);$mutations[]=r24_diagnostic_initial_point($frame);
+ echo json_encode([$out,$mutations],JSON_THROW_ON_ERROR);
+''', production_reflection=True)
+        labels = ["initial_authority", "initial_reader", "initial_store", "initial_row_projection", "initial_index_pair", "initial_post_read_authority", "initial_final_fence"]
+        self.assertEqual(actual, [dict(zip(labels, labels)), [None] * 6])
+
+    def test_genuine_native_probe_exceptions_reach_the_exact_pinned_initial_subfence(self):
+        probe = ROOT / "tests/Support/CustomerPolicy/policy-pinned-native-alignment-probe.php"
+        prepend = "<?php\ndeclare(strict_types=1);\n" + EXTRACT.replace("$argv[1]", json.dumps(str(PRODUCER)))
+        prepend += "\ndefine('CETECH_DE_PATH'," + json.dumps(str(ROOT)) + ");\n"
+        prepend += r'''
+function r24_plan():array{$relative='src/Application/CustomerPolicy/PolicyNativeOrderAttempt.php';return['installed_php_sources'=>[$relative=>hash_file('sha256',CETECH_DE_PATH.'/'.$relative)]];}
+register_shutdown_function(static function():void{$error=$GLOBALS['e']??null;echo "\n".json_encode(['observed_cause_point'=>$error instanceof Throwable?r24_diagnostic_cause_point($error):'none'],JSON_THROW_ON_ERROR)."\n";});
+'''
+        modes = {"revoked":"initial_authority", "wrong_store":"initial_store", "missing_index":"initial_index_pair", "pending_root":"metadata_acknowledgement", "root_money":"initial_final_fence"}
+        with tempfile.TemporaryDirectory(prefix="r24-observer-cause-") as directory:
+            file = Path(directory) / "prepend.php"
+            file.write_text(prepend)
+            file.chmod(0o600)
+            for mode, expected in modes.items():
+                with self.subTest(mode=mode):
+                    result = subprocess.run([PHP, "-d", "auto_prepend_file=" + str(file), str(probe), mode], text=True, capture_output=True, timeout=30, check=False)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    lines = result.stdout.splitlines()
+                    self.assertEqual(len(lines), 2)
+                    native = json.loads(lines[0])
+                    self.assertFalse(native["accepted"])
+                    self.assertFalse(native["physical_qualification"])
+                    self.assertEqual(json.loads(lines[1]), {"observed_cause_point": expected})
 
     def test_real_production_reflection_pin_needs_exact_root_and_file_bytes(self):
         cli = self.php(r'''
