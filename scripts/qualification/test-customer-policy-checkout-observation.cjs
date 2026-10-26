@@ -277,7 +277,7 @@ function stageDiagnostic(stage){
 }
 test('registered native stage causes forward only fixed point labels without source or exception details',()=>{
  const points=['other','bounded','attempt_authority','initial_alignment','initial_authority','initial_reader','initial_store','initial_row_projection','initial_index_pair','initial_post_read_authority','initial_final_fence','metadata_acknowledgement','initial_business_fence','native_facts','legacy_read','native_binding','stage_capture','stage_binding','object_plan','physical_native','physical_legacy','physical_plan','stage_acknowledgement','stage_plan','original_bind','missing_write','native_local_binding','native_stage','runtime_stage'];
- for(const point of points){const observed=stageDiagnostic({status:'threw',error_class:'RuntimeException',cause_class:'RuntimeException',cause_point:point,file:'/PRIVATE/path.php',line:123,message:'PRIVATE nonce=secret',order_id:246});assert.equal(observed.stage_store_post.cause_point,point);assert.deepEqual(Object.keys(observed.stage_store_post).sort(),['cause_class','cause_point','error_class','status']);assert.ok(!JSON.stringify(observed).includes('PRIVATE'));assert.ok(!JSON.stringify(observed).includes('246'));}
+ for(const point of points){const observed=stageDiagnostic({status:'threw',error_class:'RuntimeException',cause_class:'RuntimeException',cause_point:point,file:'/PRIVATE/path.php',line:123,message:'PRIVATE nonce=secret',order_id:246});assert.equal(observed.stage_store_post.cause_point,point);assert.deepEqual(Object.keys(observed.stage_store_post).sort(),['alignment','cause_class','cause_point','error_class','status']);assert.ok(!JSON.stringify(observed).includes('PRIVATE'));assert.ok(!JSON.stringify(observed).includes('246'));}
  for(const point of ['/PRIVATE/path.php:123 nonce=secret','unknown point','none',123,null,{},[]])assert.equal(stageDiagnostic({status:'threw',error_class:'RuntimeException',cause_class:'RuntimeException',cause_point:point}).stage_store_post.cause_point,'other');
 });
 test('a nonthrowing stage never forwards a stray cause point or exception class',()=>{
@@ -294,4 +294,19 @@ test('browser diagnostics allow the four exact native-parent labels and suppress
   assert.deepEqual(Object.keys(value).sort(),['backend','code','error_class','phase']);assert.ok(!lines[0].includes('PRIVATE'));
  }
  assert.ok(source.includes('require:need,requireCode,unchanged'));
+});
+
+test('passive alignment observations forward only the closed booleans and metadata category on a thrown stage',()=>{
+ for(const delta of ['equal','shape','membership','type','value','order','mixed']){
+  const alignment={observed:true,store_unchanged:true,metadata_projection_matches:false,business_unchanged:true,metadata_delta:delta};
+  const observed=stageDiagnostic({status:'threw',error_class:'RuntimeException',cause_class:'RuntimeException',cause_point:'initial_final_fence',alignment}).stage_store_post;
+  assert.deepEqual(observed.alignment,alignment);assert.deepEqual(Object.keys(observed.alignment).sort(),['business_unchanged','metadata_delta','metadata_projection_matches','observed','store_unchanged']);
+ }
+});
+test('unknown, malformed or nonthrowing alignment observations become the unobserved default without private data',()=>{
+ const empty={observed:false,store_unchanged:false,metadata_projection_matches:false,business_unchanged:false,metadata_delta:'unobserved'};
+ const good={observed:true,store_unchanged:true,metadata_projection_matches:true,business_unchanged:true,metadata_delta:'equal'};
+ const invalid=[null,[],{},'PRIVATE',1,{...good,observed:1},{...good,store_unchanged:'PRIVATE'},{...good,metadata_projection_matches:null},{...good,business_unchanged:[]},{...good,metadata_delta:'PRIVATE /path.php:123'},{...good,observed:false},{...good,metadata_delta:'unobserved'},{...good,private:'PRIVATE native facts'}];
+ for(const alignment of invalid){const output=stageDiagnostic({status:'threw',error_class:'RuntimeException',cause_class:'RuntimeException',cause_point:'initial_final_fence',alignment});assert.deepEqual(output.stage_store_post.alignment,empty);assert.ok(!JSON.stringify(output).includes('PRIVATE'));}
+ for(const status of ['unobserved','entered','returned'])assert.deepEqual(stageDiagnostic({status,alignment:good}).stage_store_post.alignment,empty);
 });

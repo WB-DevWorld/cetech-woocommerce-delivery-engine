@@ -18,12 +18,13 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 PHP = os.environ.get("CETECH_R24_TEST_PHP") or shutil.which("php")
 PRODUCER = ROOT / "scripts/qualification/customer-policy-native.php"
+ALIGNMENT_DEFAULT = {"observed": False, "store_unchanged": False, "metadata_projection_matches": False, "business_unchanged": False, "metadata_delta": "unobserved"}
 
 EXTRACT = r'''
 $source=file_get_contents($argv[1]);
 $needed=['r24_stage_callback_wrapper','r24_install_stage_observer',
  'r24_stage_source_exact','r24_diagnostic_class','r24_diagnostic_cause_class','r24_diagnostic_cause_point','r24_diagnostic_initial_point','r24_validation_categories',
- 'r24_mount_http','r24_install_request_stage_observer'];
+ 'r24_mount_http','r24_install_request_stage_observer','r24_alignment_default','r24_alignment_raw','r24_alignment_source_exact','r24_alignment_probe_begin','r24_alignment_metadata_delta','r24_alignment_probe_after'];
 $tokens=token_get_all($source);$found=[];
 for($i=0;$i<count($tokens);++$i){
  if(!is_array($tokens[$i])||$tokens[$i][0]!==T_FUNCTION)continue;
@@ -115,7 +116,7 @@ class ProducerObserverTest(unittest.TestCase):
  echo json_encode([count($calls),$calls[0][0],$calls[0][1]===$input,$calls[0][2],$actual===$result,$records],JSON_THROW_ON_ERROR);
 ''')
         self.assertEqual(actual, [1, 2, True, 17, True,
-            [["stage_classic", "entered", "none", "none", "none"], ["stage_classic", "returned", "none", "none", "none"]]])
+            [["stage_classic", "entered", "none", "none", "none", ALIGNMENT_DEFAULT], ["stage_classic", "returned", "none", "none", "none", ALIGNMENT_DEFAULT]]])
 
     def test_original_throwable_identity_and_closed_class_survive_recorder_failure(self):
         actual = self.php(r'''
@@ -129,8 +130,8 @@ class ProducerObserverTest(unittest.TestCase):
  }echo json_encode($out,JSON_THROW_ON_ERROR);
 ''')
         self.assertEqual(actual, [
-            [1, True, [["stage_store_post", "entered", "none", "none", "none"], ["stage_store_post", "threw", "LogicException", "LogicException", "other"]]],
-            [1, True, [["stage_store_post", "entered", "none", "none", "none"], ["stage_store_post", "threw", "OtherThrowable", "OtherThrowable", "other"]]],
+            [1, True, [["stage_store_post", "entered", "none", "none", "none", ALIGNMENT_DEFAULT], ["stage_store_post", "threw", "LogicException", "LogicException", "other", ALIGNMENT_DEFAULT]]],
+            [1, True, [["stage_store_post", "entered", "none", "none", "none", ALIGNMENT_DEFAULT], ["stage_store_post", "threw", "OtherThrowable", "OtherThrowable", "other", ALIGNMENT_DEFAULT]]],
         ])
 
     def test_recorder_failure_never_changes_successful_original_result(self):
@@ -146,7 +147,7 @@ class ProducerObserverTest(unittest.TestCase):
     def test_exact_slot_retains_siblings_key_priority_arity_and_restores_once(self):
         actual = self.php(r'''
  [$runtime,$hook,$events]=fixture();$before=$hook->callbacks;$records=[];
- $record=static function($slot,$status,$class,$cause,$point)use(&$records,$events){$records[]=[$slot,$status,$class,$cause,$point];$events->append($status);};
+ $record=static function($slot,$status,$class,$cause,$point,$alignment)use(&$records,$events){$records[]=[$slot,$status,$class,$cause,$point,$alignment];$events->append($status);};
  $restore=r24_install_stage_observer($runtime,'woocommerce_checkout_order_created','stage_classic',$record);
  $order=new stdClass();dispatch_fixture($hook,[$order,'EXTRA']);
  $slot=$hook->callbacks[PHP_INT_MAX-2]['actual-slot'];
@@ -156,7 +157,7 @@ class ProducerObserverTest(unittest.TestCase):
  echo json_encode([$stable_keys,$siblings,$slot['accepted_args'],$slot['fixture_tag'],count($runtime->calls),$runtime->calls[0][0],$runtime->calls[0][1]===$order,$restored,$hook->callbacks===$before,$records,$events->getArrayCopy()],JSON_THROW_ON_ERROR);
 ''', hook_fixture=True)
         self.assertEqual(actual, [True, True, 1, "retained", 1, 1, True, True, True,
-            [["stage_classic", "entered", "none", "none", "none"], ["stage_classic", "returned", "none", "none", "none"]],
+            [["stage_classic", "entered", "none", "none", "none", ALIGNMENT_DEFAULT], ["stage_classic", "returned", "none", "none", "none", ALIGNMENT_DEFAULT]],
             ["earlier", "before", "entered", "stage_classic", "returned", "after"]])
 
     def test_restore_never_overwrites_a_later_entry_or_different_hook_slot(self):
@@ -202,7 +203,7 @@ class ProducerObserverTest(unittest.TestCase):
  $restore();echo json_encode([$same,count($runtime->calls),$hook->callbacks===$before,$records],JSON_THROW_ON_ERROR);
 ''', hook_fixture=True)
         self.assertEqual(actual, [True, 1, True,
-            [["stage_store_post", "entered", "none", "none", "none"], ["stage_store_post", "threw", "UnexpectedValueException", "UnexpectedValueException", "other"]]])
+            [["stage_store_post", "entered", "none", "none", "none", ALIGNMENT_DEFAULT], ["stage_store_post", "threw", "UnexpectedValueException", "UnexpectedValueException", "other", ALIGNMENT_DEFAULT]]])
 
     def test_previous_cause_is_closed_bounded_and_does_not_replace_outer_throwable(self):
         actual = self.php(r'''
@@ -218,7 +219,7 @@ class ProducerObserverTest(unittest.TestCase):
  echo json_encode([r24_diagnostic_cause_class($eight),r24_diagnostic_cause_class($nine),r24_diagnostic_cause_class($unknown),r24_diagnostic_cause_class($cycle),$same,$records],JSON_THROW_ON_ERROR);
 ''')
         self.assertEqual(actual, ["ValueError", "OtherThrowable", "OtherThrowable", "OtherThrowable", True,
-            [["stage_classic", "entered", "none", "none", "none"], ["stage_classic", "threw", "RuntimeException", "ValueError", "other"]]])
+            [["stage_classic", "entered", "none", "none", "none", ALIGNMENT_DEFAULT], ["stage_classic", "threw", "RuntimeException", "ValueError", "other", ALIGNMENT_DEFAULT]]])
 
     def test_validation_categories_are_closed_and_contain_no_private_unknown_code(self):
         actual = self.php(r'''
@@ -239,8 +240,8 @@ class ProducerObserverTest(unittest.TestCase):
  echo json_encode([r24_diagnostic_cause_point($outer),$same,$private->reads,$records],JSON_THROW_ON_ERROR);
 ''')
         self.assertEqual(actual, ["metadata_acknowledgement", True, 0,
-            [["stage_store_post", "entered", "none", "none", "none"],
-             ["stage_store_post", "threw", "RuntimeException", "RuntimeException", "metadata_acknowledgement"]]])
+            [["stage_store_post", "entered", "none", "none", "none", ALIGNMENT_DEFAULT],
+             ["stage_store_post", "threw", "RuntimeException", "RuntimeException", "metadata_acknowledgement", ALIGNMENT_DEFAULT]]])
 
     def test_cause_point_enforces_eight_causes_and_thirty_two_total_frames(self):
         actual = self.php(r'''
@@ -295,6 +296,56 @@ register_shutdown_function(static function():void{$error=$GLOBALS['e']??null;ech
                     self.assertFalse(native["accepted"])
                     self.assertFalse(native["physical_qualification"])
                     self.assertEqual(json.loads(lines[1]), {"observed_cause_point": expected})
+
+    def test_metadata_delta_is_closed_and_distinguishes_membership_type_value_and_order(self):
+        actual = self.php(r'''
+ $rows=[['id'=>1,'key'=>'ordinary-a','value'=>'one'],['id'=>2,'key'=>'ordinary-b','value'=>'two']];$out=[];
+ $out[]=r24_alignment_metadata_delta($rows,$rows);
+ foreach(['shape','membership','type','value','order','mixed','gap']as$mode){$changed=$rows;switch($mode){case'shape':unset($changed[0]['id']);break;case'membership':$changed[0]['id']=3;break;case'type':$changed[0]['value']=1;break;case'value':$changed[0]['value']='changed';break;case'order':$changed=array_reverse($changed);break;case'mixed':$changed[0]['value']=1;$changed=array_reverse($changed);break;case'gap':$changed=[1=>$changed[0],2=>$changed[1]];break;}$out[]=r24_alignment_metadata_delta($rows,$changed);}
+ echo json_encode($out,JSON_THROW_ON_ERROR);
+''')
+        self.assertEqual(actual, ["equal", "shape", "membership", "type", "value", "order", "mixed", "order"])
+
+    def test_passive_alignment_probe_retains_revoked_exact_attempt_across_genuine_native_read(self):
+        probe = ROOT / "tests/Support/CustomerPolicy/policy-pinned-native-alignment-probe.php"
+        native_source = probe.read_text().removeprefix("<?php\ndeclare(strict_types=1);")
+        native_source = native_source.replace("__DIR__", json.dumps(str(probe.parent)))
+        marker = "$accepted=false;$error=null;try{"
+        self.assertEqual(native_source.count(marker), 1)
+        capture = r'''
+$observerClass='CetechDeliveryEngine\\Integrations\\CustomerPolicy\\PolicyCheckoutRuntime';
+$observerRuntime=(new ReflectionClass($observerClass))->newInstanceWithoutConstructor();
+(new ReflectionProperty($observerClass,'stager'))->setValue($observerRuntime,$stager);
+(new ReflectionProperty($observerClass,'prepared'))->setValue($observerRuntime,$p);
+$observerBefore=r24_alignment_probe_begin([$observerRuntime,'stage_classic'],[$order]);
+'''
+        native_source = native_source.replace(marker, capture + marker)
+        prefix = "<?php\ndeclare(strict_types=1);\n" + EXTRACT.replace("$argv[1]", json.dumps(str(PRODUCER)))
+        prefix += "\ndefine('CETECH_DE_PATH'," + json.dumps(str(ROOT)) + ");\n"
+        prefix += r'''
+function r24_plan():array{$files=['src/Integrations/CustomerPolicy/PolicyCheckoutRuntime.php','src/Application/CustomerPolicy/PolicyNativeOrderStager.php','src/Application/CustomerPolicy/PolicyNativeOrderAttempt.php','src/Application/CustomerPolicy/CustomerPolicyPreparedCheckout.php'];$pins=[];foreach($files as$file)$pins[$file]=hash_file('sha256',CETECH_DE_PATH.'/'.$file);return['installed_php_sources'=>$pins];}
+'''
+        suffix = r'''
+$stager->finish_attempt($order);
+if(($argv[2]??'')==='store')alignment_raw($order,'data_store',new stdClass(),true);
+$observerAfter=r24_alignment_probe_after($observerBefore);
+$revoked=$observerBefore!==null&&alignment_raw($observerBefore['attempt'],'active')===false;
+echo "\n".json_encode(['alignment'=>$observerAfter,'retained_revoked'=>$revoked,'reads'=>$reader->reads,'sql'=>$GLOBALS['alignment_sql'],'saves'=>$GLOBALS['alignment_saves']],JSON_THROW_ON_ERROR)."\n";
+'''
+        cases = [("same", "", True, True, "equal"), ("id", "", True, True, "membership"), ("type", "", True, True, "type"), ("value", "", True, True, "value"), ("other_order", "", True, True, "order"), ("gap", "", True, True, "order"), ("root_money", "", True, False, "equal"), ("wrong_site", "", True, False, "equal"), ("same", "store", False, True, "equal")]
+        with tempfile.TemporaryDirectory(prefix="r24-observer-alignment-") as directory:
+            file = Path(directory) / "native-probe.php"
+            file.write_text(prefix + native_source + suffix)
+            file.chmod(0o600)
+            for mode, mutation, store_same, business_same, delta in cases:
+                with self.subTest(mode=mode, mutation=mutation):
+                    result = subprocess.run([PHP, str(file), mode, mutation], text=True, capture_output=True, timeout=30, check=False)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    lines = result.stdout.splitlines()
+                    self.assertEqual(len(lines), 2)
+                    self.assertFalse(json.loads(lines[0])["physical_qualification"])
+                    observed = json.loads(lines[1])
+                    self.assertEqual(observed, {"alignment":{"observed":True,"store_unchanged":store_same,"metadata_projection_matches":delta == "equal","business_unchanged":business_same,"metadata_delta":delta},"retained_revoked":True,"reads":1,"sql":0,"saves":0})
 
     def test_real_production_reflection_pin_needs_exact_root_and_file_bytes(self):
         cli = self.php(r'''

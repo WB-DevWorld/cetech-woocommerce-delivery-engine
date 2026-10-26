@@ -37,6 +37,8 @@ CHECKOUT_BODY_ACCESS=('unobserved','pending','ready','captured','enable_failed',
 CHECKOUT_BODY_KINDS=('unobserved','rest_error','payment_result','other_object','non_object')
 CHECKOUT_NATIVE_ERRORS=('unobserved','checkout_control','policy_review','quote_placement','unknown_server','payment_processing','gateway_payment','invalid_payment_result','gateway_disabled','missing_order','invalid_param','nonce','total_mismatch','other')
 CHECKOUT_CAUSE_POINTS=('none','other','bounded','attempt_authority','initial_alignment','initial_authority','initial_reader','initial_store','initial_row_projection','initial_index_pair','initial_post_read_authority','initial_final_fence','metadata_acknowledgement','initial_business_fence','native_facts','legacy_read','native_binding','stage_capture','stage_binding','object_plan','physical_native','physical_legacy','physical_plan','stage_acknowledgement','stage_plan','original_bind','missing_write','native_local_binding','native_stage','runtime_stage')
+CHECKOUT_ALIGNMENT_FLAGS=('observed','store_unchanged','metadata_projection_matches','business_unchanged')
+CHECKOUT_ALIGNMENT_DELTAS=('unobserved','equal','shape','membership','type','value','order','mixed')
 def checkout_diagnostic(line,backend):
  """Closed console-only observation, independent of all four receipt schemas."""
  prefix='customer_policy_native_checkout_diagnostic='
@@ -58,8 +60,12 @@ def checkout_diagnostic(line,backend):
   if type(checkpoints)is not dict or set(checkpoints)!=set(CHECKOUT_CHECKPOINTS)or any(type(x)is not bool for x in checkpoints.values()):return None
   for key in('stage_classic','stage_store_post'):
    stage=value[key]
-   if type(stage)is not dict or set(stage)!=set(('status','error_class','cause_class','cause_point'))or stage['status']not in('unobserved','entered','returned','threw')or stage['error_class']not in CHECKOUT_ERROR_CLASSES or stage['cause_class']not in CHECKOUT_ERROR_CLASSES or stage['cause_point']not in CHECKOUT_CAUSE_POINTS:return None
+   if type(stage)is not dict or set(stage)!=set(('status','error_class','cause_class','cause_point','alignment'))or stage['status']not in('unobserved','entered','returned','threw')or stage['error_class']not in CHECKOUT_ERROR_CLASSES or stage['cause_class']not in CHECKOUT_ERROR_CLASSES or stage['cause_point']not in CHECKOUT_CAUSE_POINTS:return None
    if(stage['status']=='threw')!=(stage['error_class']!='none')or(stage['status']=='threw')!=(stage['cause_class']!='none')or(stage['status']=='threw')!=(stage['cause_point']!='none'):return None
+   alignment=stage['alignment']
+   if type(alignment)is not dict or set(alignment)!=set((*CHECKOUT_ALIGNMENT_FLAGS,'metadata_delta'))or any(type(alignment[k])is not bool for k in CHECKOUT_ALIGNMENT_FLAGS)or alignment['metadata_delta']not in CHECKOUT_ALIGNMENT_DELTAS:return None
+   if not alignment['observed']and(any(alignment[k]for k in CHECKOUT_ALIGNMENT_FLAGS[1:])or alignment['metadata_delta']!='unobserved'):return None
+   if alignment['observed']and(stage['status']!='threw'or alignment['metadata_delta']=='unobserved'):return None
   if any(value[k]not in('zero','positive','unknown')for k in('new_native_orders','new_native_lines'))or value['original_state']not in('absent','frozen','bound','complete','multiple','unknown'):return None
   return prefix+json.dumps(value,sort_keys=True,separators=(',',':'))
  except(ValueError,TypeError):return None

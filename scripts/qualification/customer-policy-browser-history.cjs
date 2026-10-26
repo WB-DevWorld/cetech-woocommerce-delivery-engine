@@ -295,6 +295,7 @@ async function runHistoryProbes(api) {
     const roundtripAfter=await api.reviewCart(shoppers[2],{completeAddress:true,accept:false});
     results.tamper_variants.replayed_round_trip=refusedReview(await review(api,shoppers[2],roundtripAfter,{ticket:roundtripBefore.ticket}));
     const afterTamper=api.inspect();
+    api.report.tamper_variants={...results.tamper_variants};
     api.check('R24-TAMPERED-AND-FOREIGN-CANDIDATE',{
       every_closed_tamper_variant_refused:Object.values(results.tamper_variants).every(value=>value===true),
       two_guests_and_two_customers_isolated:cross.length===4&&cross.every(Boolean),
