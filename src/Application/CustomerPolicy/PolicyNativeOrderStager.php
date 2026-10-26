@@ -18,7 +18,7 @@ final class PolicyNativeOrderStager {
  /** @return array{stage:PolicyNativeOrderStage,prepared:CustomerPolicyPreparedCheckout} */
  public function stage(\WC_Order$order,CustomerPolicyPreparedCheckout$prepared,callable$authorize):array{
   try{
-  if(true!==$authorize())PolicyNativeOrderFacts::fail();$native=PolicyNativeOrderFacts::native($order,true);$legacy=PolicyNativeOrderFacts::legacy($order);$binding=$prepared->binding();
+  if(true!==$authorize())PolicyNativeOrderFacts::fail();$binding=$prepared->binding();if($binding===null){$attempt=$this->attempts[$order]??null;if(!$attempt instanceof PolicyNativeOrderAttempt)PolicyNativeOrderFacts::fail();$attempt->align_initial_metadata($order,$prepared);}$native=PolicyNativeOrderFacts::native($order,true);$legacy=PolicyNativeOrderFacts::legacy($order);
   if(null===$binding){$binding=$this->binding($order,$prepared,$native,$legacy);}
   $before=PolicyNativeOrderStage::capture($this->factory,$order,$prepared,$binding,'before_write',$authorize,$this->attempts[$order]??null);
   try{$prepared=$prepared->bind_native($before);}finally{$this->finish_attempt($order);}$plan=PolicyNativeOrderStage::derive_plan($prepared,$binding);
