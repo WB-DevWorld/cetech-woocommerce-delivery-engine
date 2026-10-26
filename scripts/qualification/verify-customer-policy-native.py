@@ -20,13 +20,23 @@ BACKENDS=('hpos','cpt')
 MAX_RECEIPT_BYTES=2097152
 DIAGNOSTIC_PHASES=('initialize','shopper_guest','shopper_customer','pdp_simple','pdp_variation','native_add','cart_editor','cart_review','cart_quantity','checkout_classic','checkout_blocks','history','order_pay','public_read','source_race','complete')
 DIAGNOSTIC_CLASSES=('ObservationError','TimeoutError','TypeError','SyntaxError','Error','UnknownError')
-DIAGNOSTIC_CODES=('observation_required','case_refused','native_bridge_failed','browser_timeout','harness_type','invalid_json','private_file_missing','browser_error','unknown_error','checkout_http_refused','checkout_native_refused_no_original','checkout_native_refused_frozen','checkout_native_refused_bound','checkout_native_refused_complete','checkout_native_refused_unknown','checkout_result_unrecognized','checkout_gateway_missing','checkout_gateway_count','checkout_completion_count','checkout_cart_read_failed','checkout_cart_not_empty','parent_form_invalid','parent_variation_mismatch','parent_field_invalid','parent_submission_mismatch')
+DIAGNOSTIC_CODES=('observation_required','case_refused','native_bridge_failed','history_lifecycle_failed','history_no_current_failed','browser_timeout','harness_type','invalid_json','private_file_missing','browser_error','unknown_error','checkout_http_refused','checkout_native_refused_no_original','checkout_native_refused_frozen','checkout_native_refused_bound','checkout_native_refused_complete','checkout_native_refused_unknown','checkout_result_unrecognized','checkout_gateway_missing','checkout_gateway_count','checkout_completion_count','checkout_cart_read_failed','checkout_cart_not_empty','parent_form_invalid','parent_variation_mismatch','parent_field_invalid','parent_submission_mismatch')
 def browser_diagnostic(line,backend):
  prefix='customer_policy_native_browser_diagnostic='
  if not isinstance(line,str)or len(line)>512 or not line.startswith(prefix):return None
  try:
   value=json.loads(line[len(prefix):],object_pairs_hook=pairs)
   if type(value)is not dict or set(value)!=set(('backend','phase','error_class','code'))or value['backend']!=backend or value['phase']not in DIAGNOSTIC_PHASES or value['error_class']not in DIAGNOSTIC_CLASSES or value['code']not in DIAGNOSTIC_CODES:return None
+  return prefix+json.dumps(value,sort_keys=True,separators=(',',':'))
+ except(ValueError,TypeError):return None
+HISTORY_BRIDGE_STEPS=('unobserved','entry','baseline','shipment_create','shipment_cards','shipment_render','shipment_preservation','replacement','retire_return','retire_refund','retire_rows','retire_attempt','retire_preservation','delete_products','disable_runtime','fresh_saved','saved_preservation','absent_history','absent_remove','absent_probe','absent_restore','source_plan','source_baseline','source_rename','source_probe','source_preservation','source_restore','output')
+HISTORY_BRIDGE_CLASSES=('invalid_argument','runtime','type_error','error','exception','other')
+def history_bridge_diagnostic(line,backend):
+ prefix='customer_policy_history_bridge_diagnostic='
+ if not isinstance(line,str)or len(line)>512 or not line.startswith(prefix):return None
+ try:
+  value=json.loads(line[len(prefix):],object_pairs_hook=pairs)
+  if type(value)is not dict or set(value)!=set(('backend','mode','step','error_class'))or value['backend']!=backend or value['mode']not in('lifecycle','no_current')or value['step']not in HISTORY_BRIDGE_STEPS or value['error_class']not in HISTORY_BRIDGE_CLASSES:return None
   return prefix+json.dumps(value,sort_keys=True,separators=(',',':'))
  except(ValueError,TypeError):return None
 CHECKOUT_ERROR_CLASSES=('none','Exception','RuntimeException','LogicException','InvalidArgumentException','UnexpectedValueException','Error','TypeError','ParseError','ValueError','JsonException','mysqli_sql_exception','OtherThrowable')
@@ -39,13 +49,16 @@ CHECKOUT_NATIVE_ERRORS=('unobserved','checkout_control','policy_review','quote_p
 CHECKOUT_CAUSE_POINTS=('none','other','bounded','attempt_authority','initial_alignment','initial_authority','initial_reader','initial_store','initial_row_projection','initial_index_pair','initial_post_read_authority','initial_final_fence','metadata_acknowledgement','initial_business_fence','native_facts','legacy_read','native_binding','stage_capture','stage_binding','object_plan','physical_native','physical_legacy','physical_plan','stage_acknowledgement','stage_plan','original_bind','missing_write','native_local_binding','native_stage','runtime_stage')
 CHECKOUT_ALIGNMENT_FLAGS=('observed','store_unchanged','metadata_projection_matches','business_unchanged')
 CHECKOUT_ALIGNMENT_DELTAS=('unobserved','equal','shape','membership','type','value','order','mixed')
+CHECKOUT_LOGGER_FLAGS=('observed','original_unchanged','receipt_current','matches_saved','strict_native_match','cross_read_match')
 def checkout_diagnostic(line,backend):
  """Closed console-only observation, independent of all four receipt schemas."""
  prefix='customer_policy_native_checkout_diagnostic='
  if not isinstance(line,str)or len(line)>2048 or not line.startswith(prefix):return None
  try:
   value=json.loads(line[len(prefix):],object_pairs_hook=pairs)
-  if type(value)is not dict or set(value)!=set(('backend','route','operation','response_seen','http_class','native_result','body_access','body_kind','native_error','gateway_entries','gateway_delegations','payment_completions','unsaved_preflight','validation','checkpoints','stage_classic','stage_store_post','new_native_orders','new_native_lines','original_state'))or value['backend']!=backend or value['route']not in('classic','blocks')or value['unsaved_preflight']not in('pass','unobserved'):return None
+  if type(value)is not dict or set(value)!=set(('backend','route','operation','response_seen','http_class','native_result','body_access','body_kind','native_error','gateway_entries','gateway_delegations','payment_completions','unsaved_preflight','validation','checkpoints','logger','stage_classic','stage_store_post','new_native_orders','new_native_lines','original_state'))or value['backend']!=backend or value['route']not in('classic','blocks')or value['unsaved_preflight']not in('pass','unobserved'):return None
+  logger=value['logger']
+  if type(logger)is not dict or set(logger)!=set(CHECKOUT_LOGGER_FLAGS)or any(type(logger[k])is not bool for k in CHECKOUT_LOGGER_FLAGS)or(not logger['observed']and any(logger[k]for k in CHECKOUT_LOGGER_FLAGS[1:])):return None
   if value['body_access']not in CHECKOUT_BODY_ACCESS:return None
   if value['body_kind']not in CHECKOUT_BODY_KINDS or value['native_error']not in CHECKOUT_NATIVE_ERRORS or(value['body_kind']=='rest_error')!=(value['native_error']!='unobserved'):return None
   if value['operation']not in CHECKOUT_OPERATIONS or type(value['response_seen'])is not bool or value['http_class']not in('unobserved','2xx','3xx','4xx','5xx','other')or value['native_result']not in('unobserved','success','failure','other'):return None

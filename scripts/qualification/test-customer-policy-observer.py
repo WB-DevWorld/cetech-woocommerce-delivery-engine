@@ -24,7 +24,7 @@ EXTRACT = r'''
 $source=file_get_contents($argv[1]);
 $needed=['r24_stage_callback_wrapper','r24_install_stage_observer',
  'r24_stage_source_exact','r24_diagnostic_class','r24_diagnostic_cause_class','r24_diagnostic_cause_point','r24_diagnostic_initial_point','r24_validation_categories',
- 'r24_mount_http','r24_install_request_stage_observer','r24_alignment_default','r24_alignment_raw','r24_alignment_source_exact','r24_alignment_probe_begin','r24_alignment_metadata_delta','r24_alignment_probe_after'];
+ 'r24_mount_http','r24_install_request_stage_observer','r24_alignment_default','r24_alignment_raw','r24_alignment_source_exact','r24_alignment_probe_begin','r24_alignment_metadata_delta','r24_alignment_probe_after','r24_logger_guard_default','r24_logger_guard_observation','r24_install_logger_guard_observer'];
 $tokens=token_get_all($source);$found=[];
 for($i=0;$i<count($tokens);++$i){
  if(!is_array($tokens[$i])||$tokens[$i][0]!==T_FUNCTION)continue;
@@ -88,6 +88,15 @@ $GLOBALS['observer_test_plan']=['installed_php_sources'=>[
 
 
 class ProducerObserverTest(unittest.TestCase):
+    def test_logger_observation_does_not_touch_unknown_or_callback_bearing_objects(self):
+        actual = self.php(r'''
+ class PrivateCallbackObject {public static int $calls=0;public function __get($key){++self::$calls;throw new Error('PRIVATE');}}
+ $value=new PrivateCallbackObject();$out=[];foreach([[null,null,null],[$value,$value,$value],[new stdClass(),new stdClass(),new stdClass()]]as$args)$out[]=r24_logger_guard_observation(...$args);
+ echo json_encode([$out,PrivateCallbackObject::$calls],JSON_THROW_ON_ERROR);
+''')
+        expected = dict.fromkeys(['observed','original_unchanged','receipt_current','matches_saved','strict_native_match','cross_read_match'], False)
+        self.assertEqual(actual, [[expected, expected, expected], 0])
+
     @classmethod
     def setUpClass(cls):
         if not PHP:

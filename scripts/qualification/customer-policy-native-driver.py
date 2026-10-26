@@ -101,7 +101,7 @@ class Harness:
     browser_log=directory/'browser.log'
     if browser_log.is_file()and not browser_log.is_symlink():
      for line in browser_log.read_bytes()[-65536:].decode('utf-8',errors='replace').splitlines():
-      diagnostic=V.browser_diagnostic(line,backend) or V.checkout_diagnostic(line,backend)
+      diagnostic=V.browser_diagnostic(line,backend) or V.checkout_diagnostic(line,backend) or V.history_bridge_diagnostic(line,backend)
       if diagnostic is not None:print(diagnostic,flush=True)
     if(directory/'browser-results.json').is_file():
      actual=V.regular_private(directory/'browser-results.json',V.MAX_RECEIPT_BYTES);V.require(set(actual)=={'format','cases','tamper_variants','history_variants'}and actual['format']=='cetech-r24-browser-observations-v1','Browser observations refused')

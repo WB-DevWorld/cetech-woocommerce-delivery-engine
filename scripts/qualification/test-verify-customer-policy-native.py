@@ -79,7 +79,7 @@ class ReceiptProtocol(unittest.TestCase):
   prefix='customer_policy_native_browser_diagnostic='
   value={'backend':'hpos','phase':'pdp_simple','error_class':'TimeoutError','code':'browser_timeout'}
   self.assertIsNotNone(V.browser_diagnostic(prefix+json.dumps(value),'hpos'))
-  for code in ('parent_form_invalid','parent_variation_mismatch','parent_field_invalid','parent_submission_mismatch'):
+  for code in ('parent_form_invalid','parent_variation_mismatch','parent_field_invalid','parent_submission_mismatch','history_lifecycle_failed','history_no_current_failed'):
    parent={**value,'phase':'pdp_variation','error_class':'ObservationError','code':code};self.assertIsNotNone(V.browser_diagnostic(prefix+json.dumps(parent),'hpos'))
   self.assertIsNone(V.browser_diagnostic(prefix+json.dumps(value),'cpt'))
   for key,untrusted in (('phase','private customer URL?nonce=secret'),('error_class','SecretClass'),('code','raw private message')):
@@ -89,7 +89,7 @@ class ReceiptProtocol(unittest.TestCase):
   self.assertIsNone(V.browser_diagnostic(prefix+'x'*513,'hpos'))
   prefix='customer_policy_native_checkout_diagnostic='
   alignment_default={**dict.fromkeys(V.CHECKOUT_ALIGNMENT_FLAGS,False),'metadata_delta':'unobserved'}
-  value={'backend':'hpos','route':'classic','operation':'final_body','response_seen':True,'http_class':'2xx','native_result':'unobserved','body_access':'body_unavailable','body_kind':'unobserved','native_error':'unobserved','gateway_entries':'one','gateway_delegations':'zero','payment_completions':'zero','unsaved_preflight':'pass','validation':{'observed':True,'has_errors':True,'categories':['delivery'],'notice_errors':False},'checkpoints':dict.fromkeys(V.CHECKOUT_CHECKPOINTS,False),'stage_classic':{'status':'unobserved','error_class':'none','cause_class':'none','cause_point':'none','alignment':deepcopy(alignment_default)},'stage_store_post':{'status':'unobserved','error_class':'none','cause_class':'none','cause_point':'none','alignment':deepcopy(alignment_default)},'new_native_orders':'zero','new_native_lines':'zero','original_state':'frozen'}
+  value={'backend':'hpos','route':'classic','operation':'final_body','response_seen':True,'http_class':'2xx','native_result':'unobserved','body_access':'body_unavailable','body_kind':'unobserved','native_error':'unobserved','gateway_entries':'one','gateway_delegations':'zero','payment_completions':'zero','unsaved_preflight':'pass','validation':{'observed':True,'has_errors':True,'categories':['delivery'],'notice_errors':False},'checkpoints':dict.fromkeys(V.CHECKOUT_CHECKPOINTS,False),'logger':dict.fromkeys(V.CHECKOUT_LOGGER_FLAGS,False),'stage_classic':{'status':'unobserved','error_class':'none','cause_class':'none','cause_point':'none','alignment':deepcopy(alignment_default)},'stage_store_post':{'status':'unobserved','error_class':'none','cause_class':'none','cause_point':'none','alignment':deepcopy(alignment_default)},'new_native_orders':'zero','new_native_lines':'zero','original_state':'frozen'}
   self.assertIsNotNone(V.checkout_diagnostic(prefix+json.dumps(value),'hpos'))
   self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps(value),'cpt'))
   unseen=deepcopy(value);unseen['response_seen']=False;self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps(unseen),'hpos'));unseen['http_class']='unobserved';self.assertIsNotNone(V.checkout_diagnostic(prefix+json.dumps(unseen),'hpos'))
@@ -117,4 +117,14 @@ class ReceiptProtocol(unittest.TestCase):
   self.assertIsNone(V.checkout_diagnostic(prefix+json.dumps({**value,'body':'private'}),'hpos'))
   self.assertIsNone(V.checkout_diagnostic(prefix+'{"backend":"hpos","backend":"hpos"}','hpos'))
   self.assertIsNone(V.checkout_diagnostic(prefix+'x'*2049,'hpos'))
+ def test_closed_history_bridge_diagnostic(self):
+  prefix='customer_policy_history_bridge_diagnostic='
+  value={'backend':'cpt','mode':'lifecycle','step':'baseline','error_class':'runtime'}
+  for step in V.HISTORY_BRIDGE_STEPS:
+   for kind in V.HISTORY_BRIDGE_CLASSES:self.assertIsNotNone(V.history_bridge_diagnostic(prefix+json.dumps({**value,'step':step,'error_class':kind}),'cpt'))
+  self.assertIsNone(V.history_bridge_diagnostic(prefix+json.dumps(value),'hpos'))
+  for key,bad in [('mode','PRIVATE'),('step','/PRIVATE/path:123'),('error_class','PrivateClass'),('backend','PRIVATE')]:self.assertIsNone(V.history_bridge_diagnostic(prefix+json.dumps({**value,key:bad}),'cpt'))
+  self.assertIsNone(V.history_bridge_diagnostic(prefix+json.dumps({**value,'message':'PRIVATE'}),'cpt'))
+  self.assertIsNone(V.history_bridge_diagnostic(prefix+'{"backend":"cpt","backend":"cpt"}','cpt'))
+  self.assertIsNone(V.history_bridge_diagnostic(prefix+'x'*513,'cpt'))
 if __name__=='__main__':unittest.main()

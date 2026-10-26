@@ -8,19 +8,24 @@ use CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutFacts;
 /** Original acknowledged object, allowing only Woo's native payment-method save. */
 final readonly class PolicyNativePaymentLocalBinding implements \JsonSerializable {
 	private const OWNERS = [ 'WC_Data', 'WC_Abstract_Order', 'WC_Order', 'WC_Order_Item', 'WC_Order_Item_Product', 'WC_Order_Item_Shipping', 'WC_Order_Item_Tax', 'WC_Meta_Data' ];
-	private function __construct( private \WC_Order $order, private string $digest, private string $native_digest, private mixed $site, private ?string $logging_digest = null ) {}
-	public static function capture( \WC_Order $order ): self { return new self( $order, self::digest( $order ), self::digest( $order, true ), $GLOBALS['blog_id'] ?? null ); }
+	private function __construct( private \WC_Order $order, private string $digest, private string $native_digest, private mixed $site, private ?string $logging_digest = null, private ?string $first_read_digest = null ) {}
+	public static function capture( \WC_Order $order ): self { return new self( $order, self::digest( $order ), self::digest( $order, true ), $GLOBALS['blog_id'] ?? null, null, self::first_read_digest( $order ) ); }
 	/** Only the typed, observed native logger row may differ in this Classic attempt. */
 	public static function capture_logging( \WC_Order $order, PolicyNativeCheckoutLoggingEvidence $logging ): self { return new self( $order, self::digest( $order ), self::digest( $order, true ), $GLOBALS['blog_id'] ?? null, self::digest( $order, false, $logging ) ); }
 	public function logging_unchanged( PolicyNativeCheckoutLoggingEvidence $logging ): bool { try { return null !== $this->logging_digest && ( $GLOBALS['blog_id'] ?? null ) === $this->site && hash_equals( $this->logging_digest, self::digest( $this->order, false, $logging ) ); } catch ( \Throwable ) { return false; } }
 	public function unchanged(): bool { try { return ( $GLOBALS['blog_id'] ?? null ) === $this->site && hash_equals( $this->digest, self::digest( $this->order ) ); } catch ( \Throwable ) { return false; } }
 	/** Classic reloads the same native coordinates; no object identity is transferred. */
 	public function same_native_facts( \WC_Order $order, ?PolicyNativeCheckoutLoggingEvidence $logging = null ): bool { try { return ( $GLOBALS['blog_id'] ?? null ) === $this->site && hash_equals( $this->native_digest, self::digest( $order, true, $logging ) ); } catch ( \Throwable ) { return false; } }
+	/** First distinct Classic reload only; each root key retains its exact acknowledged row sequence. */
+	public function same_first_native_read_facts( \WC_Order $order, PolicyNativeCheckoutLoggingEvidence $logging ): bool {
+		try { if ( $order === $this->order || null === $this->first_read_digest || 4 !== $logging->phase() || ! $this->unchanged() ) { return false; } $same = hash_equals( $this->first_read_digest, self::digest( $order, true, $logging, true ) ); return $same && $this->unchanged(); } catch ( \Throwable ) { return false; }
+	}
 	public function payment_matches( string $id, string $title ): bool {
 		try { $data = self::effective( $this->order ); return ( $data['payment_method'] ?? null ) === $id && ( $data['payment_method_title'] ?? null ) === $title; } catch ( \Throwable ) { return false; }
 	}
-	private static function digest( \WC_Order $order, bool $native = false, ?PolicyNativeCheckoutLoggingEvidence $logging = null ): string { $nodes = 0; $seen = []; $index = null === $logging ? null : $logging->admitted_index( $order ); $facts = self::value( $order, 0, $nodes, $seen, $order, $native, $index ); $hash = EmergencyCheckoutFacts::bounded_hash( $facts ); if ( null === $hash ) { throw new \RuntimeException( 'Native payment continuation unavailable.' ); } return $hash; }
-	private static function value( mixed $value, int $depth, int &$nodes, array &$seen, \WC_Order $root, bool $native, ?int $logging_index = null ): mixed {
+	private static function first_read_digest( \WC_Order $order ): ?string { try { return self::digest( $order, true, null, true ); } catch ( \Throwable ) { return null; } }
+	private static function digest( \WC_Order $order, bool $native = false, ?PolicyNativeCheckoutLoggingEvidence $logging = null, bool $first_read = false ): string { $nodes = 0; $seen = []; $index = null === $logging ? null : $logging->admitted_index( $order ); $facts = self::value( $order, 0, $nodes, $seen, $order, $native, $index, $first_read ); $hash = EmergencyCheckoutFacts::bounded_hash( $facts ); if ( null === $hash ) { throw new \RuntimeException( 'Native payment continuation unavailable.' ); } return $hash; }
+	private static function value( mixed $value, int $depth, int &$nodes, array &$seen, \WC_Order $root, bool $native, ?int $logging_index = null, bool $first_read = false ): mixed {
 		if ( ++$nodes > 262144 || $depth > 24 || is_resource( $value ) ) { throw new \RuntimeException( 'Native payment continuation unavailable.' ); }
 		if ( is_array( $value ) ) { $out = []; foreach ( $value as $key => $child ) { $out[$key] = self::value( $child, $depth + 1, $nodes, $seen, $root, $native, $logging_index ); } return $out; }
 		if ( ! is_object( $value ) ) { return $value; }
@@ -42,8 +47,9 @@ final readonly class PolicyNativePaymentLocalBinding implements \JsonSerializabl
 		$meta = self::property( $value, 'meta_data', false );
 		if ( null !== $meta ) {
 			if ( ! is_array( $meta ) ) { throw new \RuntimeException( 'Native payment metadata unavailable.' ); }
-			$out['meta'] = [];
-			foreach ( $meta as $index => $member ) { if ( $value === $root && null !== $logging_index && $index === $logging_index ) { continue; } if ( ! $member instanceof \WC_Meta_Data || 'WC_Meta_Data' !== get_class( $member ) ) { throw new \RuntimeException( 'Native payment metadata unavailable.' ); } $current = self::property( $member, 'current_data' ); $data = self::property( $member, 'data' ); if ( ! is_array( $current ) || ! is_array( $data ) ) { throw new \RuntimeException( 'Native payment metadata maps unavailable.' ); } if ( $native ) { $current = self::native_meta( $current ); $data = self::native_meta( $data ); } $out['meta'][$index] = [ 'class' => get_class( $member ), 'data' => self::value( self::policy_meta( $current ), $depth + 1, $nodes, $seen, $root, $native ), 'original' => self::value( self::policy_meta( $data ), $depth + 1, $nodes, $seen, $root, $native ) ]; if ( ! $native ) { $out['meta'][$index]['object'] = spl_object_id( $member ); } }
+			$out['meta'] = []; $root_ids = []; $root_groups = [];
+			foreach ( $meta as $index => $member ) { if ( $value === $root && null !== $logging_index && $index === $logging_index ) { continue; } if ( ! $member instanceof \WC_Meta_Data || 'WC_Meta_Data' !== get_class( $member ) ) { throw new \RuntimeException( 'Native payment metadata unavailable.' ); } $current = self::property( $member, 'current_data' ); $data = self::property( $member, 'data' ); if ( ! is_array( $current ) || ! is_array( $data ) ) { throw new \RuntimeException( 'Native payment metadata maps unavailable.' ); } if ( $native ) { $current = self::native_meta( $current ); $data = self::native_meta( $data ); } if ( $first_read && $value === $root ) { if ( $current !== $data || ! is_int( $current['id'] ) || $current['id'] < 1 || isset( $root_ids['id:' . $current['id']] ) || ! is_string( $current['key'] ) || strlen( $current['key'] ) > 255 ) { throw new \RuntimeException( 'Native root read metadata unavailable.' ); } $root_ids['id:' . $current['id']] = true; } $out['meta'][$index] = [ 'class' => get_class( $member ), 'data' => self::value( self::policy_meta( $current ), $depth + 1, $nodes, $seen, $root, $native ), 'original' => self::value( self::policy_meta( $data ), $depth + 1, $nodes, $seen, $root, $native ) ]; if ( ! $native ) { $out['meta'][$index]['object'] = spl_object_id( $member ); } if ( $first_read && $value === $root ) { $root_groups['key:' . $current['key']][] = $out['meta'][$index]; } }
+			if ( $first_read && $value === $root ) { ksort( $root_groups, SORT_STRING ); $out['meta'] = $root_groups; }
 		}
 		$items = self::property( $value, 'items', false );
 		if ( null !== $items ) {

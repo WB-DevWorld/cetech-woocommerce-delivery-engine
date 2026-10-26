@@ -268,9 +268,9 @@ test('selected Blocks body is classified before the unchanged native HTTP refusa
 });
 
 const checkoutDiagnosticSource=extractFunction('emitCheckoutDiagnostic');
-function stageDiagnostic(stage){
+function stageDiagnostic(stage,logger){
  const lines=[],before={native_physical_census:{orders:[],lines:[]},originals:[],gateway_entry_calls:[],gateway_calls:[],completion_calls:[]};
- const after={...before,checkout_diagnostic:{stage_store_post:stage}};
+ const after={...before,checkout_diagnostic:{stage_store_post:stage,logger}};
  const emit=vm.runInNewContext(checkoutDiagnosticSource+'; emitCheckoutDiagnostic',{input:{backend:'hpos'},lastCheckout:{operation:'classification',response_seen:true,http_class:'5xx',native_result:'failure',body_access:'captured',body_kind:'rest_error',native_error:'unknown_server'},process:{stdout:{write:value=>lines.push(value)}}});
  emit(before,after,'blocks');assert.equal(lines.length,1);
  return JSON.parse(lines[0].slice('customer_policy_native_checkout_diagnostic='.length));
@@ -284,16 +284,24 @@ test('a nonthrowing stage never forwards a stray cause point or exception class'
  for(const status of ['unobserved','entered','returned','PRIVATE']){const observed=stageDiagnostic({status,error_class:'RuntimeException',cause_class:'RuntimeException',cause_point:'original_bind'}).stage_store_post;assert.equal(observed.cause_point,'none');assert.equal(observed.error_class,'none');assert.equal(observed.cause_class,'none');assert.equal(observed.status,status==='PRIVATE'?'unobserved':status);}
 });
 
-test('browser diagnostics allow the four exact native-parent labels and suppress arbitrary raw codes',()=>{
+test('browser diagnostics allow exact native-parent and history bridge labels and suppress arbitrary raw codes',()=>{
  const diagnosticSource=extractFunction('emitDiagnostic');
- for(const raw of ['parent_form_invalid','parent_variation_mismatch','parent_field_invalid','parent_submission_mismatch','PRIVATE nonce=secret /path:123',123,{},null]){
+ const known=['parent_form_invalid','parent_variation_mismatch','parent_field_invalid','parent_submission_mismatch','history_lifecycle_failed','history_no_current_failed'];
+ for(const raw of [...known,'PRIVATE nonce=secret /path:123',123,{},null]){
   const lines=[],emit=vm.runInNewContext(diagnosticSource+'; emitDiagnostic',{input:{backend:'cpt'},phase:'pdp_variation',lastCheckout:null,process:{stdout:{write:line=>lines.push(line)}}});
   emit({name:'ObservationError',code:raw,message:'PRIVATE native body'});assert.equal(lines.length,1);
   const value=JSON.parse(lines[0].slice('customer_policy_native_browser_diagnostic='.length));
-  assert.equal(value.code,typeof raw==='string'&&raw.startsWith('parent_')?raw:'observation_required');
+  assert.equal(value.code,known.includes(raw)?raw:'observation_required');
   assert.deepEqual(Object.keys(value).sort(),['backend','code','error_class','phase']);assert.ok(!lines[0].includes('PRIVATE'));
  }
  assert.ok(source.includes('require:need,requireCode,unchanged'));
+});
+
+test('only the two declared history modes select a specific bridge failure code',()=>{
+ const classify=vm.runInNewContext(extractFunction('bridgeFailureCode')+'; bridgeFailureCode',Object.create(null));
+ assert.equal(classify('history-lifecycle'),'history_lifecycle_failed');assert.equal(classify('history-no-current'),'history_no_current_failed');
+ for(const value of ['history-future-check','history-restore','inspect','history-lifecycle-PRIVATE','PRIVATE nonce=secret /path.php',null,123,{},[]])assert.equal(classify(value),'native_bridge_failed');
+ assert.equal((source.match(/requireCode\(result\.status===0,bridgeFailureCode\(mode\)\)/g)||[]).length,1);
 });
 
 test('passive alignment observations forward only the closed booleans and metadata category on a thrown stage',()=>{
@@ -309,4 +317,20 @@ test('unknown, malformed or nonthrowing alignment observations become the unobse
  const invalid=[null,[],{},'PRIVATE',1,{...good,observed:1},{...good,store_unchanged:'PRIVATE'},{...good,metadata_projection_matches:null},{...good,business_unchanged:[]},{...good,metadata_delta:'PRIVATE /path.php:123'},{...good,observed:false},{...good,metadata_delta:'unobserved'},{...good,private:'PRIVATE native facts'}];
  for(const alignment of invalid){const output=stageDiagnostic({status:'threw',error_class:'RuntimeException',cause_class:'RuntimeException',cause_point:'initial_final_fence',alignment});assert.deepEqual(output.stage_store_post.alignment,empty);assert.ok(!JSON.stringify(output).includes('PRIVATE'));}
  for(const status of ['unobserved','entered','returned'])assert.deepEqual(stageDiagnostic({status,alignment:good}).stage_store_post.alignment,empty);
+});
+
+test('private history failures forward only the matching closed mode, step and class',()=>{
+ const classify=vm.runInNewContext(extractFunction('historyBridgeFailureDiagnostic')+'; historyBridgeFailureDiagnostic',Object.create(null));
+ const packet={r24_history_failure:{mode:'lifecycle',step:'shipment_render',class:'runtime'}};
+ assert.equal(JSON.stringify(classify('history-lifecycle',packet,'cpt')),JSON.stringify({backend:'cpt',mode:'lifecycle',step:'shipment_render',error_class:'runtime'}));
+ assert.equal(classify('history-no-current',packet,'cpt'),null);
+ for(const value of [null,[],{}, {...packet,private:'PRIVATE'},{r24_history_failure:{...packet.r24_history_failure,message:'PRIVATE'}},{r24_history_failure:{...packet.r24_history_failure,step:'PRIVATE /path:123'}},{r24_history_failure:{...packet.r24_history_failure,class:'PrivateClass'}}])assert.equal(classify('history-lifecycle',value,'cpt'),null);
+ assert.equal(classify('inspect',packet,'cpt'),null);assert.equal(classify('history-lifecycle',packet,'PRIVATE'),null);
+ assert.ok(source.includes("if(result.status!==0){try{const diagnostic=historyBridgeFailureDiagnostic"));
+});
+test('logger diagnostics emit only six coherent booleans and suppress malformed private data',()=>{
+ const keys=['observed','original_unchanged','receipt_current','matches_saved','strict_native_match','cross_read_match'],empty=Object.fromEntries(keys.map(key=>[key,false]));
+ const good={...empty,observed:true,original_unchanged:true,receipt_current:true,matches_saved:true,cross_read_match:true};
+ assert.deepEqual(stageDiagnostic({},good).logger,good);
+ for(const value of [null,[],{},'PRIVATE',{...good,private:'PRIVATE'},{...good,observed:1},{...good,strict_native_match:'PRIVATE'},{...good,observed:false}]){const observed=stageDiagnostic({},value);assert.deepEqual(observed.logger,empty);assert.ok(!JSON.stringify(observed).includes('PRIVATE'));}
 });
