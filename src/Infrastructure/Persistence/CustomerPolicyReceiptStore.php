@@ -16,12 +16,23 @@ final class CustomerPolicyReceiptStore {
 	public const ORDER_INDEX_MAX_BYTES = 2048;
 	private readonly ?\Closure $factory;
 	private bool $busy = false;
-	public function __construct( private readonly int $site, private readonly string $prefix, ?callable $transport_factory = null ) {
-		if ( $site < 1 || 1 !== preg_match( '/\A[A-Za-z0-9_]{1,57}\z/D', $prefix ) ) { self::fail( 'unavailable' ); }
+	private int $site;
+	private string $prefix;
+	private bool $deferred_native = false;
+	private ?array $pinned_native_route = null;
+	public function __construct( ?int $site = null, ?string $prefix = null, ?callable $transport_factory = null ) {
+		if ( null === $site && null === $prefix && null === $transport_factory ) {
+			// Unsupported hosts can still boot with this new feature OFF. The zero
+			// fields are never exposed or used as a fabricated native routing.
+			$this->site = 0; $this->prefix = ''; $this->deferred_native = true; $this->factory = null; return;
+		}
+		if ( null === $site || null === $prefix || $site < 1 || 1 !== preg_match( '/\A[A-Za-z0-9_]{1,57}\z/D', $prefix ) ) { self::fail( 'unavailable' ); }
+		$this->site = $site; $this->prefix = $prefix;
 		$this->factory = null === $transport_factory ? null : \Closure::fromCallable( $transport_factory );
 	}
+	public static function from_wordpress(): self { return new self(); }
 	public static function from_server_configuration( int $site, string $prefix, array $configuration ): self { return new self( $site, $prefix, static fn(): OperationConnectionTransport => self::connect( $configuration ) ); }
-	public function binding(): array { return [ 'site_id' => $this->site, 'prefix' => $this->prefix ]; }
+	public function binding(): array { $this->bind_native_if_needed(); return [ 'site_id' => $this->site, 'prefix' => $this->prefix ]; }
 	public static function cart_name( int $site, string $subject ): string { self::subject( $subject ); if ( $site < 1 ) { self::fail(); } return self::CART_PREFIX . hash( 'sha256', 'cetech-customer-policy-cart-v1:' . $site . ':' . $subject ); }
 	public static function original_name( int $site, string $attempt ): string { PolicyJson::uuid( $attempt ); if ( $site < 1 ) { self::fail(); } return self::ORIGINAL_PREFIX . hash( 'sha256', 'cetech-customer-policy-original-v1:' . $site . ':' . $attempt ); }
 	public static function order_index_name( int $site, int $order ): string { if ( $site < 1 || $order < 1 ) { self::fail(); } return self::ORIGINAL_PREFIX . $site . '_order_' . $order; }
@@ -32,7 +43,7 @@ final class CustomerPolicyReceiptStore {
 	}
 	/** Unknown COMMIT is never rolled back or blindly replayed. No result escapes before retirement. */
 	public function transaction( string $subject, callable $work ): mixed {
-		self::subject( $subject ); if ( $this->busy ) { self::fail( 'unavailable' ); } $this->busy = true;
+		self::subject( $subject ); $this->bind_native_if_needed(); if ( $this->busy ) { self::fail( 'unavailable' ); } $this->busy = true;
 		$transport=null; $session=null; $active=false; $locked=false; $committed=false; $uncertain=false; $route=null; $connection=0; $database=''; $packet=0; $lock=''; $unit=null;
 		try {
 			if ( null === $this->factory ) { $route=$this->native_route(); $transport=self::connect( $route['configuration'] ); } else { $transport=( $this->factory )(); }
@@ -85,6 +96,19 @@ final class CustomerPolicyReceiptStore {
 	}
 	private function assert_owned(OperationConnectionTransport$t,int$id,string$db,int$packet,string$lock,bool$active):void{$this->state($t,$id,$active);if($this->probe($t,$id)!==['database'=>$db,'max_packet'=>$packet]){self::fail();}$r=$this->execute($t,$id,"SELECT IS_USED_LOCK('".$t->escape($lock)."') AS lock_owner")->rows;if(1!==count($r)||(string)$id!==(string)($r[0]['lock_owner']??'')){self::fail();}}
 	private function release(OperationConnectionTransport$t,int$id,string$lock):void{$r=$this->execute($t,$id,"SELECT RELEASE_LOCK('".$t->escape($lock)."') AS released")->rows;if(1!==count($r)||'1'!==(string)($r[0]['released']??'')){self::fail();}}
+	private function bind_native_if_needed(): void {
+		if ( ! $this->deferred_native ) { return; }
+		if ( null !== $this->pinned_native_route ) {
+			if ( $this->native_route() !== $this->pinned_native_route ) { self::fail( 'unavailable' ); }
+			return;
+		}
+		$db = $GLOBALS['wpdb'] ?? null;
+		$site = function_exists( 'get_current_blog_id' ) ? get_current_blog_id() : null;
+		if ( ! is_int( $site ) || $site < 1 || ! is_object( $db ) || \wpdb::class !== get_class( $db ) || ! is_string( $db->prefix ?? null ) || 1 !== preg_match( '/\A[A-Za-z0-9_]{1,57}\z/D', $db->prefix ) || ( $db->options ?? null ) !== $db->prefix . 'options' ) { self::fail( 'unavailable' ); }
+		$this->site = $site; $this->prefix = $db->prefix;
+		try { $this->pinned_native_route = $this->native_route(); }
+		catch ( \Throwable ) { $this->site = 0; $this->prefix = ''; self::fail( 'unavailable' ); }
+	}
 	private function native_route():array{
 		global$wpdb;if(!is_object($wpdb)||\wpdb::class!==get_class($wpdb)||(defined('WP_CONTENT_DIR')&&is_file(WP_CONTENT_DIR.'/db.php'))||!defined('DB_HOST')||!defined('DB_USER')||!defined('DB_PASSWORD')||!defined('DB_NAME')||!method_exists($wpdb,'parse_db_host')||($wpdb->prefix??null)!==$this->prefix||($wpdb->options??null)!==$this->prefix.'options'||!function_exists('get_current_blog_id')||get_current_blog_id()!==$this->site){self::fail('unavailable');}
 		$host=$wpdb->parse_db_host(DB_HOST);if(!is_array($host)||count($host)<3){self::fail('unavailable');}return['wpdb'=>$wpdb,'site'=>$this->site,'prefix'=>$this->prefix,'configuration'=>['host'=>$host[0],'port'=>$host[1]?:3306,'socket'=>$host[2],'user'=>DB_USER,'password'=>DB_PASSWORD,'database'=>DB_NAME,'charset'=>$wpdb->charset?:'utf8mb4','flags'=>defined('MYSQL_CLIENT_FLAGS')?MYSQL_CLIENT_FLAGS:0]];

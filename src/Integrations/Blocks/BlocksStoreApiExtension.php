@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Integrations\Blocks;
 
+use CetechDeliveryEngine\Application\CustomerPolicy\CustomerPolicyFacade;
+use CetechDeliveryEngine\Presentation\Shared\CustomerPolicyRenderer;
+
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
 use CetechDeliveryEngine\Application\Checkout\CheckoutAddressPolicy;
@@ -27,7 +30,8 @@ final class BlocksStoreApiExtension {
 		private CartDeliverySelectionCapture $cart_capture,
 		private CartDeliverySelectionRevalidator $cart_revalidator,
 		private ShippingRateCalculationGate $shipping_gate,
-		private ?CheckoutAddressPolicy $address_policy = null
+		private ?CheckoutAddressPolicy $address_policy = null,
+		private ?CustomerPolicyFacade $policy_facade = null
 	) {
 	}
 
@@ -61,11 +65,14 @@ final class BlocksStoreApiExtension {
 	public function cart_item_data( array $cart_item = [] ): array {
 		$key = is_string( $cart_item['key'] ?? null ) ? (string) $cart_item['key'] : '';
 
+		$policy = null;
+		if ( ( isset( $this->policy_facade ) && $this->policy_facade->enabled() ) && '' !== $key ) { try { $policy = $this->policy_facade->for_cart_line( $key, $cart_item ); } catch ( \Throwable ) {} }
 		return BlocksPublicPayload::cart_item(
 			$cart_item,
 			$this->cart_capture,
 			$this->cart_revalidator,
-			$key
+			$key,
+			$policy
 		);
 	}
 
@@ -73,7 +80,7 @@ final class BlocksStoreApiExtension {
 	 * @return array<string, mixed>
 	 */
 	public function cart_item_schema(): array {
-		return [
+		$schema = [
 			'fulfilment_choice'       => [ 'description' => 'Public fulfilment choice.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
 			'fulfilment_availability' => [ 'description' => 'Public fulfilment availability.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
 			'delivery_option_label'   => [ 'description' => 'Public Delivery Option label.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
@@ -108,6 +115,8 @@ final class BlocksStoreApiExtension {
 			'has_matching_location' => [ 'description' => 'Whether a matching destination is already selected.', 'type' => 'boolean', 'readonly' => true ],
 			'destination_summary'   => [ 'description' => 'Compact destination summary for the cart editor.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
 		];
+		if ( ( isset( $this->policy_facade ) && $this->policy_facade->enabled() ) ) { $schema['customer_policy'] = CustomerPolicyRenderer::public_schema(); }
+		return $schema;
 	}
 
 	/**

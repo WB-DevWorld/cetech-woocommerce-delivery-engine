@@ -163,7 +163,7 @@
 			this.showLoading();
 
 			var cacheKey = productId + ':' + variationId + ':' + location.country + ':' + location.state + ':' + location.city + ':' + location.postcode + ':' + (location.location_key || '') + ':' + quantity;
-			if (this.cache[cacheKey]) {
+			if (!config.policyEnabled && this.cache[cacheKey]) {
 				if (token === this.requestToken && variationId === this.currentVariationId) {
 					this.renderResponse(this.cache[cacheKey], variationId);
 				}
@@ -201,7 +201,7 @@
 					}
 
 					var payload = self.normalizePayload(response);
-					if (payload && payload.status === 'ok') {
+					if (!config.policyEnabled && payload && payload.status === 'ok') {
 						self.cache[cacheKey] = payload;
 					}
 					self.renderResponse(payload, variationId);
@@ -467,6 +467,16 @@
 			label.appendChild(input);
 			label.appendChild(body);
 			p.appendChild(label);
+			if (window.CetechDeCustomerPolicy) {
+				var policyHtml = window.CetechDeCustomerPolicy.optionHtml(option.customer_policy, displayKey);
+				if (policyHtml) {
+					var policies = document.createElement('div');
+					var optionWrap = document.createElement('div');
+					policies.innerHTML = policyHtml; optionWrap.appendChild(p);
+					while (policies.firstChild) { optionWrap.appendChild(policies.firstChild); }
+					return optionWrap;
+				}
+			}
 			return p;
 		},
 
@@ -541,6 +551,7 @@
 		},
 
 		showLoading: function () {
+			if (config.policyEnabled && window.CetechDeCustomerPolicy) { window.CetechDeCustomerPolicy.clear(this.root); }
 			this.setStatus((config.i18n && config.i18n.loading) || '', 'loading');
 			if (this.optionsEl) {
 				this.optionsEl.innerHTML = '';

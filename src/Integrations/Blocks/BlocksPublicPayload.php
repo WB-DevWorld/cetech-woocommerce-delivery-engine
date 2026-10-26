@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Integrations\Blocks;
 
+use CetechDeliveryEngine\Presentation\Shared\CustomerPolicyRenderer;
+
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidationResult;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
@@ -51,7 +53,8 @@ final class BlocksPublicPayload {
 		array $cart_item,
 		?CartDeliverySelectionCapture $capture = null,
 		?CartDeliverySelectionRevalidator $revalidator = null,
-		string $cart_item_key = ''
+		string $cart_item_key = '',
+		mixed $policy_view = null
 	): array {
 		$intent  = CartDeliverySelectionSessionData::normalizeIntent(
 			$cart_item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] ?? null
@@ -196,6 +199,8 @@ final class BlocksPublicPayload {
 		$payload['has_matching_location'] = $context instanceof CustomerCartContext && $context->hasMatchingLocation();
 		$payload['destination_summary']   = self::destination_summary( $context instanceof CustomerCartContext ? $context->matching_location : null );
 
+		$policy = CustomerPolicyRenderer::normalize( $policy_view );
+		if ( null !== $policy ) { $payload['customer_policy'] = $policy; }
 		return self::strip_forbidden( $payload );
 	}
 

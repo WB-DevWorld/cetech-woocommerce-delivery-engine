@@ -71,6 +71,7 @@ final class DataLifecycleManifest {
 		'cetech_de_enable_checkout_delivery_selection_validation', 'cetech_de_enable_woocommerce_shipping_rate_calculation',
 		'cetech_de_enable_order_delivery_snapshot_persistence', 'cetech_de_enable_customer_order_delivery_summary',
 		'cetech_de_enable_customer_email_delivery_summary', 'cetech_de_enable_shipment_records',
+		'cetech_de_enable_customer_policy_runtime',
 		'cetech_de_enable_customer_timeline', 'cetech_de_enable_tracking_links', 'cetech_de_enable_wpml_adapter',
 		'cetech_de_enable_wcml_adapter', 'cetech_de_enable_woodmart_adapter', 'cetech_de_enable_wcfm_adapter',
 		'cetech_de_enable_vitepos_adapter', 'cetech_de_enable_bulk_import', 'cetech_de_enable_classic_checkout_adapter',
@@ -96,6 +97,8 @@ final class DataLifecycleManifest {
 
 	/** Names describe owned metadata only; Woo/user storage tables remain shared. */
 	public const WOO_META_KEYS = [
+		'_cetech_de_policy_line_key', '_cetech_de_policy_packet', '_cetech_de_policy_format',
+		'_cetech_de_policy_manifest', '_cetech_de_policy_manifest_format',
 		'_cetech_de_delivery_quote_format', '_cetech_de_quote_native_draft', '_cetech_de_quote_reference', '_cetech_de_quote_line_key',
 		'_cetech_de_quote_native_tax_source',
 		'_cetech_de_quote_id', '_cetech_de_quote_component_handle', '_cetech_de_quote_generation',
@@ -219,6 +222,12 @@ final class DataLifecycleManifest {
 			'observe_private_policy_assignments_v1', 'bounded_current_site_scope_assignment_maps',
 			protections: [ 'preserve_original_value_and_autoload', 'current_site_and_actor_only', 'no_maintenance_or_uninstall_deletion', 'no_retention_or_cleanup_authority' ],
 			sources: [ 'src/Infrastructure/Persistence/PolicyAssignmentStore.php' ], proofs: [ 'R23-ASSIGNMENT-PRESERVATION' ] );
+		foreach ( [ 'cart_receipt' => 'cetech_de_customer_policy_cart_v1_', 'original_capture' => 'cetech_de_customer_policy_original_v1_' ] as $id => $prefix ) {
+			$entries[] = self::entry( 'customer_policy.' . $id, 'customer_policy', 'wp_option', $prefix,
+				'observe_private_customer_policy_original_v1', 'bounded_native_session_original_policy_capture',
+				protections: [ 'preserve_original_value_and_autoload', 'no_maintenance_or_uninstall_deletion', 'frozen_or_uncertain_original_never_expires_or_evicts', 'only_exact_owned_original_resolution' ],
+				sources: [ 'src/Infrastructure/Persistence/CustomerPolicyReceiptStore.php' ], proofs: [ 'R24-ORIGINAL-PRESERVATION' ] );
+		}
 		foreach ( [
 			'geography_generation_source' => 'country_token_checksum_txt',
 			'geography_incoming' => 'country_token_incoming_txt',
@@ -332,6 +341,7 @@ final class DataLifecycleManifest {
 	}
 
 	private static function meta_source( string $name ): string {
+		if ( str_starts_with( $name, '_cetech_de_policy_' ) ) { return 'src/Application/CustomerPolicy/PolicyNativeOrderFacts.php'; }
 		if ( '_cetech_de_cod_awaiting_shipment' === $name ) { return 'src/Application/Shipment/CodAwaitingShipmentStore.php'; }
 		if ( str_contains( $name, 'shipment_creation' ) ) { return 'src/Application/Shipment/ShipmentCreationFailureStore.php'; }
 		if ( 'cetech_de_group_id' === $name ) { return 'src/Presentation/Admin/OrderShippingItemPresentationGuard.php'; }

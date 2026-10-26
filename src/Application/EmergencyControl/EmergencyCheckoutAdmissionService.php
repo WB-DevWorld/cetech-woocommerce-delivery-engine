@@ -8,15 +8,18 @@ namespace CetechDeliveryEngine\Application\EmergencyControl;
 final class EmergencyCheckoutAdmissionService {
 	/** @var \WeakMap<\WC_Order,array{route:string,fingerprint:string,revision:int,site:int,binding:EmergencyCheckoutLocalBinding}> */
 	private \WeakMap $stamps;
+	private readonly ?\Closure $additional_owned;
 
 	public function __construct(
 		private readonly EmergencyAdmissionControlInterface $control,
 		private readonly EmergencyOwnershipClassifier $classifier,
 		private readonly EmergencyOrderQuoteValidatorInterface $quote_validator,
 		private readonly EmergencyOwnershipLatch $latch,
-		private readonly ?EmergencyFinalPlacementGuard $placement = null
+		private readonly ?EmergencyFinalPlacementGuard $placement = null,
+		?callable $additional_owned = null
 	) {
 		$this->stamps = new \WeakMap();
+		$this->additional_owned = null === $additional_owned ? null : \Closure::fromCallable( $additional_owned );
 	}
 
 	public function early_product( int $product_id, ?int $variation_id = null ): EmergencyAdmissionResult {
@@ -52,7 +55,10 @@ final class EmergencyCheckoutAdmissionService {
 			if ( isset( $this->stamps[ $order ] ) && $this->stamps[ $order ]['route'] === $route ) {
 				return new EmergencyAdmissionResult( false, 'checkout_revalidation_required', EmergencyOwnership::Managed );
 			}
-			$ownership = $this->classifier->order( $order );
+			$additional = null === $this->additional_owned ? false : ( $this->additional_owned )( $order );
+			if ( ! is_bool( $additional ) ) { throw new \RuntimeException( 'Order ownership unavailable.' ); }
+			// Captured policy history does not reload current products or rule sources.
+			$ownership = $additional ? EmergencyOwnership::Managed : $this->classifier->order( $order );
 			// Even a malformed mandatory quote marker is ownership evidence after rollback.
 			if ( \CetechDeliveryEngine\Application\Order\QuoteNativeOrderHistory::attempted( $order ) ) { $ownership = EmergencyOwnership::Managed; }
 			// Paying an existing order uses that order's facts, independently of the live cart draft.

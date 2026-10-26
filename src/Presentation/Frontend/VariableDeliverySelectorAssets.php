@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Frontend;
 
+use CetechDeliveryEngine\Application\CustomerPolicy\CustomerPolicyFacade;
+use CetechDeliveryEngine\Presentation\Shared\CustomerPolicyRenderer;
+
 use CetechDeliveryEngine\Application\Runtime\ProductDeliveryRuntimeConfigurationRouter;
 use CetechDeliveryEngine\Application\Selector\VariationDeliveryOptionsEndpoint;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
@@ -22,7 +25,8 @@ final class VariableDeliverySelectorAssets {
 
 	public function __construct(
 		private FeatureFlags $feature_flags,
-		private Requirements $requirements
+		private Requirements $requirements,
+		private ?CustomerPolicyFacade $policy_facade = null
 	) {
 	}
 
@@ -38,6 +42,7 @@ final class VariableDeliverySelectorAssets {
 		$version = defined( 'CETECH_DE_VERSION' ) ? CETECH_DE_VERSION : '1.0.0-rc.1';
 		$base    = defined( 'CETECH_DE_URL' ) ? CETECH_DE_URL : '';
 
+		if ( $this->policy_facade?->enabled() ) { CustomerPolicyRenderer::register_assets(); }
 		// Shared compact option hierarchy for simple + variable product pages.
 		wp_enqueue_style(
 			ProductDeliverySelectorRenderer::STYLE_HANDLE,
@@ -49,7 +54,7 @@ final class VariableDeliverySelectorAssets {
 		wp_enqueue_script(
 			ProductDeliverySelectorRenderer::SCRIPT_HANDLE,
 			$base . 'assets/frontend/product-delivery-selector.js',
-			[],
+			$this->policy_facade?->enabled() ? [ CustomerPolicyRenderer::SCRIPT_HANDLE ] : [],
 			$version,
 			true
 		);
@@ -80,6 +85,7 @@ final class VariableDeliverySelectorAssets {
 				'action'    => VariationDeliveryOptionsEndpoint::ACTION,
 				'nonce'     => wp_create_nonce( VariationDeliveryOptionsEndpoint::ACTION ),
 				'productId' => $product_id,
+				'policyEnabled' => $this->policy_facade?->enabled() ?? false,
 				'i18n'      => [
 					'selectOptions'     => __( 'Select your product options to see delivery choices.', 'cetech-woocommerce-delivery-engine' ),
 					'loading'           => __( 'Loading delivery choices…', 'cetech-woocommerce-delivery-engine' ),

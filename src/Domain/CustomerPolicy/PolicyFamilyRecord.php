@@ -25,7 +25,7 @@ final readonly class PolicyFamilyRecord implements \JsonSerializable {
         if(!in_array($disposition,['assigned','disabled','not_assigned'],true)||self::mode($instruction)!==$disposition||PolicyJson::encode((object)$selection->provenance())!==PolicyJson::encode((object)$provenance)){self::fail();}
         $content=$reference=$guard=$logical=$version=$candidate_digest=null;
         if($assigned){
-            if(null===$snapshot||!$snapshot->complete||null===$snapshot->guard||$snapshot->guard->site_id!==$coordinate['site_id']){self::fail();}
+            if(null===$snapshot||!$snapshot->complete||!$snapshot->history_complete||null===$snapshot->guard||$snapshot->guard->site_id!==$coordinate['site_id']){self::fail();}
             $expected=PolicyEffectiveSelection::assigned($family,$snapshot,$instruction['policy_uuid'],$at,$provenance,$fingerprint);
             if($expected->fingerprint()!==$selection->fingerprint()||null===$selection->version()||$expected->version()?->reference()->facts()!==$selection->version()->reference()->facts()){self::fail();}
             $selected=$expected->version();$reference=$selected->reference()->facts();$content=$selected->content()->facts();

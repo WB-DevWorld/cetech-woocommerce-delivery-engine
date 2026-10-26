@@ -563,6 +563,7 @@
 		if (!host) {
 			return;
 		}
+		if (window.CetechDeCustomerPolicy) { window.CetechDeCustomerPolicy.renderBlocks(cart, host); }
 		var i18n = (window.cetechDeBlocks && window.cetechDeBlocks.i18n) || {};
 		var extensions = getExtensions(cart);
 		var items = editableItems(cart);

@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Selector;
 
+use CetechDeliveryEngine\Application\CustomerPolicy\CustomerPolicyFacade;
+use CetechDeliveryEngine\Presentation\Shared\CustomerPolicyRenderer;
+
 use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
 use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlResponse;
 
@@ -38,7 +41,8 @@ final class VariationDeliveryOptionsEndpoint {
 		private VariationRelationshipInspectorInterface $variation_inspector,
 		private ?LocationAwareDeliveryOptions $location_options = null,
 		private ?ShopperDeliveryLocationPrecision $precision = null,
-		private ?EmergencyControlRuntime $emergency_control = null
+		private ?EmergencyControlRuntime $emergency_control = null,
+		private ?CustomerPolicyFacade $policy_facade = null
 	) {
 	}
 
@@ -230,8 +234,11 @@ final class VariationDeliveryOptionsEndpoint {
 
 		$public_options = [];
 
+		$policy_views = $this->policy_facade?->for_options( $product_id, $variation_id, $quantity, $options, $location ) ?? [];
 		foreach ( $options as $option ) {
-			$public_options[] = $this->public_option_array( $option );
+			$row = $this->public_option_array( $option );
+			if ( isset( $policy_views[ $option->display_key ] ) ) { $row['customer_policy'] = $policy_views[ $option->display_key ]; }
+			$public_options[] = $row;
 		}
 
 		$available = array_filter(
