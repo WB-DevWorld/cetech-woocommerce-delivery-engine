@@ -33,7 +33,20 @@ final class PolicyNativeOrderFacts {
  public static function one(array$rows,string$key):mixed{$v=self::values($rows,$key);if(count($v)!==1)self::fail();return$v[0];}
  public static function attempted(\WC_Order$order):bool{
   if(!class_exists('WC_Data',false)||!$order instanceof \WC_Data){try{foreach(self::OWN_KEYS as$key)if(method_exists($order,'meta_exists')&&$order->meta_exists($key))return true;}catch(\Throwable){}return false;}
-  try{foreach([$order,...array_values($order->get_items('line_item'))]as$object)foreach(self::metadata($object)as$row)if(self::own_key($row['key']))return true;return false;}catch(\Throwable){return true;}
+  try{
+   $items=$order->get_items('line_item');if(!is_array($items)||count($items)>=self::MAX_META_ROWS)self::fail();$remaining=self::MAX_META_ROWS;
+   $members_property=new \ReflectionProperty(\WC_Data::class,'meta_data');$maps=[new \ReflectionProperty(\WC_Meta_Data::class,'data'),new \ReflectionProperty(\WC_Meta_Data::class,'current_data')];
+   foreach([$order,...array_values($items)]as$object){
+    if(!$object instanceof \WC_Data||!method_exists($object,'get_meta_data'))self::fail();$object->get_meta_data();$members=method_exists($members_property,'getRawValue')?$members_property->getRawValue($object):$members_property->getValue($object);
+    if(!is_array($members)||count($members)>$remaining)self::fail();$remaining-=count($members);
+    foreach($members as$member){
+     if(!is_object($member)||get_class($member)!=='WC_Meta_Data')self::fail();
+     // Native new-order rows have key/value before save appends their id.
+     // Ownership depends on either raw key, never saved-row shape or payload.
+     foreach($maps as$property){$row=method_exists($property,'getRawValue')?$property->getRawValue($member):$property->getValue($member);if(!is_array($row)||!array_key_exists('key',$row)||!is_string($row['key'])||strlen($row['key'])>255)self::fail();if(self::own_key($row['key']))return true;}
+    }
+   }return false;
+  }catch(\Throwable){return true;}
  }
  public static function hpos():bool{return class_exists('Automattic\\WooCommerce\\Utilities\\OrderUtil')&&\Automattic\WooCommerce\Utilities\OrderUtil::custom_orders_table_usage_is_enabled();}
  public static function quantity(mixed$value):string{if(is_float($value)&&is_finite($value)&&floor($value)===$value&&$value<=2147483647)$value=(int)$value;if(is_int($value))$value=(string)$value;if(!is_string($value)||1!==preg_match('/\A[1-9][0-9]{0,9}\z/D',$value)||strlen($value)>10||(strlen($value)===10&&strcmp($value,'2147483647')>0))self::fail();return$value;}
