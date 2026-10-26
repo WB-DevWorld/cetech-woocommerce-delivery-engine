@@ -8,7 +8,7 @@ use CetechDeliveryEngine\Infrastructure\Persistence\{CustomerPolicyReceiptStore,
 /** Complete saved history has no current product/source/session/original-journal dependency. */
 final readonly class PolicySavedOrderReader {
  public function __construct(private OperationConnectionFactory$factory){}
- public function read(\WC_Order$order,callable$authorize):array{if(true!==$authorize())PolicyNativeOrderFacts::fail();if(!$this->attempted($order))return[];return$this->proof($order,$authorize)->packets();}
+ public function read(\WC_Order$order,callable$authorize):array{if(true!==$authorize())PolicyNativeOrderFacts::fail();if(!$this->attempted($order))return[];return PolicyNativeOrderStage::read_saved_history($this->factory,$order,$authorize);}
  public function proof(\WC_Order$order,callable$authorize):PolicyNativeOrderStage{return PolicyNativeOrderStage::capture_saved($this->factory,$order,$authorize);}
  /** Index-only, null, duplicate, future or filtered-away markers claim ownership. */
  public function attempted(\WC_Order$order):bool{
