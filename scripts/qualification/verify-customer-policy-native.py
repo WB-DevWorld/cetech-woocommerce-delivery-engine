@@ -20,7 +20,7 @@ BACKENDS=('hpos','cpt')
 MAX_RECEIPT_BYTES=2097152
 DIAGNOSTIC_PHASES=('initialize','shopper_guest','shopper_customer','pdp_simple','pdp_variation','native_add','cart_editor','cart_review','cart_quantity','checkout_classic','checkout_blocks','history','order_pay','public_read','source_race','complete')
 DIAGNOSTIC_CLASSES=('ObservationError','TimeoutError','TypeError','SyntaxError','Error','UnknownError')
-DIAGNOSTIC_CODES=('observation_required','case_refused','native_bridge_failed','browser_timeout','harness_type','invalid_json','private_file_missing','browser_error','unknown_error')
+DIAGNOSTIC_CODES=('observation_required','case_refused','native_bridge_failed','browser_timeout','harness_type','invalid_json','private_file_missing','browser_error','unknown_error','checkout_http_refused','checkout_native_refused_no_original','checkout_native_refused_frozen','checkout_native_refused_bound','checkout_native_refused_complete','checkout_native_refused_unknown','checkout_result_unrecognized','checkout_gateway_missing','checkout_gateway_count','checkout_completion_count','checkout_cart_read_failed','checkout_cart_not_empty')
 def browser_diagnostic(line,backend):
  prefix='customer_policy_native_browser_diagnostic='
  if not isinstance(line,str)or len(line)>512 or not line.startswith(prefix):return None

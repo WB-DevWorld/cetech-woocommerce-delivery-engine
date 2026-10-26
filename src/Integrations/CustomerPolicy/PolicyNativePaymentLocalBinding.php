@@ -43,7 +43,7 @@ final readonly class PolicyNativePaymentLocalBinding implements \JsonSerializabl
 		if ( null !== $meta ) {
 			if ( ! is_array( $meta ) ) { throw new \RuntimeException( 'Native payment metadata unavailable.' ); }
 			$out['meta'] = [];
-			foreach ( $meta as $index => $member ) { if ( $value === $root && null !== $logging_index && $index === $logging_index ) { continue; } if ( ! $member instanceof \WC_Meta_Data || 'WC_Meta_Data' !== get_class( $member ) ) { throw new \RuntimeException( 'Native payment metadata unavailable.' ); } $current = self::property( $member, 'current_data' ); $data = self::property( $member, 'data' ); if ( ! is_array( $current ) || ! is_array( $data ) ) { throw new \RuntimeException( 'Native payment metadata maps unavailable.' ); } $out['meta'][$index] = [ 'class' => get_class( $member ), 'data' => self::value( self::policy_meta( $current ), $depth + 1, $nodes, $seen, $root, $native ), 'original' => self::value( self::policy_meta( $data ), $depth + 1, $nodes, $seen, $root, $native ) ]; if ( ! $native ) { $out['meta'][$index]['object'] = spl_object_id( $member ); } }
+			foreach ( $meta as $index => $member ) { if ( $value === $root && null !== $logging_index && $index === $logging_index ) { continue; } if ( ! $member instanceof \WC_Meta_Data || 'WC_Meta_Data' !== get_class( $member ) ) { throw new \RuntimeException( 'Native payment metadata unavailable.' ); } $current = self::property( $member, 'current_data' ); $data = self::property( $member, 'data' ); if ( ! is_array( $current ) || ! is_array( $data ) ) { throw new \RuntimeException( 'Native payment metadata maps unavailable.' ); } if ( $native ) { $current = self::native_meta( $current ); $data = self::native_meta( $data ); } $out['meta'][$index] = [ 'class' => get_class( $member ), 'data' => self::value( self::policy_meta( $current ), $depth + 1, $nodes, $seen, $root, $native ), 'original' => self::value( self::policy_meta( $data ), $depth + 1, $nodes, $seen, $root, $native ) ]; if ( ! $native ) { $out['meta'][$index]['object'] = spl_object_id( $member ); } }
 		}
 		$items = self::property( $value, 'items', false );
 		if ( null !== $items ) {
@@ -58,6 +58,11 @@ final readonly class PolicyNativePaymentLocalBinding implements \JsonSerializabl
 			$out['items'] = self::value( $items, $depth + 1, $nodes, $seen, $root, $native );
 		}
 		return $out;
+	}
+	/** Native add/save appends id; native reload reads id first. No row coordinate is normalized. */
+	private static function native_meta( array $row ): array {
+		if ( count( $row ) !== 3 || array_diff( [ 'id', 'key', 'value' ], array_keys( $row ) ) ) { throw new \RuntimeException( 'Native payment metadata maps unavailable.' ); }
+		return [ 'id' => $row['id'], 'key' => $row['key'], 'value' => $row['value'] ];
 	}
 	/** Only owned bounded policy bodies are compacted; every metadata coordinate remains exact. */
 	private static function policy_meta( array $row ): array {

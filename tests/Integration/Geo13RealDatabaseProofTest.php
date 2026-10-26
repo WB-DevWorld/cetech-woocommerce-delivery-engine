@@ -283,7 +283,6 @@ final class Geo13RealDatabaseProofTest extends TestCase {
 	 */
 	private function invoke( object $object, string $method, array $args = [] ): mixed {
 		$ref = new \ReflectionMethod( $object, $method );
-		$ref->setAccessible( true );
 
 		return $ref->invokeArgs( $object, $args );
 	}
