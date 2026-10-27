@@ -92,6 +92,36 @@ jobs:
           PY
           test -z "$(git -C candidate status --porcelain)"
           test -z "$(git -C tooling status --porcelain)"
+      - name: Verify Root MCP metadata and original SQL transport roundtrip
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ROOT_RUN_SHA: 'd015113e475831557e50a3acd06380969dc88d30373d1db3a7fffc0d27567811'
+          ROOT_JOBS_SHA: '31903cee962bccf9fbaad40d0b3fb9c3bd20e70e41ed8551b3a56d88ea60614b'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import hashlib, importlib.util, os, sys
+          from pathlib import Path
+          source = Path('tooling/scripts/qualification/r24-originals-remote-bootstrap.py').resolve()
+          spec = importlib.util.spec_from_file_location('r24_transport_preflight', source)
+          module = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = module
+          spec.loader.exec_module(module)
+          token = os.environ.pop('GITHUB_TOKEN')
+          base = 'https://api.github.com/repos/WB-DevWorld/cetech-woocommerce-delivery-engine'
+          run = module.get_json(base + '/actions/runs/40419092642', token)
+          jobs = module.get_json(base + '/actions/runs/40419092642/jobs?per_page=100&page=1', token)
+          assert run['head_sha'] == '67c3ecc44cee0f5aa53a0090e49575ada46f7539' and run['conclusion'] == 'failure'
+          assert jobs['total_count'] == 8
+          assert module.digest(module.canonical(run)) == os.environ['ROOT_RUN_SHA'], 'Root MCP run bytes differ'
+          assert module.digest(module.canonical(jobs)) == os.environ['ROOT_JOBS_SHA'], 'Root MCP jobs bytes differ'
+          folder = Path(os.environ['RUNNER_TEMP']) / 'r24-transport-preflight-67'
+          folder.mkdir(mode=0o700)
+          module.download_exact(base + '/actions/jobs/121908700741/logs', token, folder / 'sql-original.log', 75379,
+              '6bf96da91715cafb59db543608b62f9b49c90232055b0d4eb89f06900156b76d', module.MAX_SQL_LOG)
+          print('root_mcp_rest_transport=PASS run=40419092642 parent_conclusion=failure sql_bytes=75379; candidate_qualification=false')
+          PY
       - name: Preserve bounded failed-candidate diagnostic
         if: always()
         uses: actions/upload-artifact@v4
