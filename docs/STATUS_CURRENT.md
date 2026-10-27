@@ -1,4 +1,16 @@
-# Current implementation — E09 atomic promotion quote preparation — 2026-10-21
+# Current status — E01–E09 integrated on the reconciliation branch — 2026-10-27
+
+The current repository record is `docs/REPOSITORY-RECONCILIATION-2026-10-27.md`.
+
+Implemented and qualified on functional parent `8063211df8e6b79c0dfb8e1d02eb65e85d977d66` / tree `228c346d45b64e697145ff0ebf7fb110eb3166e2`: private economics facts, fixed promotion planning, convert-once currency receipts, budget SQL, schema 12 installation, and caller-owned preparation. Push CI `39687973318` passed all eight jobs. This is not a release, not an installation, and not an activation. Tagged release authority remains `v1.0.0-rc.12` at `78594ad8962868683726373f58f4a8b1b48e4d0e`, schema 6.
+
+The P06 master `bcfebf7f22da7ea6272fddc096c2b22b67257b87` is the parent baseline. Its push CI `38026222648` succeeded. Older sentences that leave P06 unintegrated or leave run `38022281912` running are historical; that run succeeded.
+
+Schema target on this source is 12. The two promotion-budget tables are additive and preserved. Feature-flag defaults and `Plugin.php` registration are unchanged from the P06 master. Format 3 is refused unless the fixed-promotion identity matches. Customer promotion, return and refund behaviour in PRs 124–138 is not merged. Staff workflow PR 114 is not merged.
+
+## Historical implementation — E09 atomic promotion quote preparation — 2026-10-21
+
+The following E09 status is the source-freeze record. Fresh push CI on `8063211` later passed. Do not read its “CI pending” or “do not merge” sentences as the status after 27 October 2026.
 
 The owner requests continued implementation in parallel on ws3/promotion-preparation-e09, based on E08 0dab8962ca99c320ff7eea26efb45c3be85591a8. Development identity is 1.0.0-dev.promotion-preparation.1. This bounded source task connects a complete compiled quote to explicit budget allocations on one caller-owned transaction. No native runtime is mounted. Schema12/current41/retained39,144 lifecycle declarations,23 feature flags and372 classifications stay unchanged.
 

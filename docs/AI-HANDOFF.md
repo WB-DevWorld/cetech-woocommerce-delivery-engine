@@ -1,4 +1,18 @@
-# Current continuation — corrected P05 integrated; refreshed P06 qualification — 2026-10-10
+# Current handoff — start here — 2026-10-27
+
+Another agent can continue from this file and `docs/REPOSITORY-RECONCILIATION-2026-10-27.md` without the reconciliation chat.
+
+1. Confirm `origin` is `https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine` and the integration branch is `master`.
+2. Read the reconciliation document for the exact commit, the open pulls, the preserved branches and the next task.
+3. The functional source integrated here is parent `8063211df8e6b79c0dfb8e1d02eb65e85d977d66`, tree `228c346d45b64e697145ff0ebf7fb110eb3166e2`, push CI `39687973318`.
+4. Do not deploy, retag, boot a protected site, or merge PRs 114, 49 or 124–138 under this handoff.
+5. Next task: clear GitGuardian incidents `38833021` and `38911283`–`38911285` as synthetic test literals, without printing the values or rewriting commits `64c02510` and `a8993c74`. Only then consider E10.
+
+Canonical local checkout identity is recorded only in that clone’s `.git/cetech-local-checkout.txt`. Commands and pins are in the reconciliation document. Credentials stay outside Git.
+
+## Historical continuation — corrected P05 integrated; refreshed P06 qualification — 2026-10-10
+
+The section below was written before P06’s master merge. P06 is merged as `bcfebf7f22da7ea6272fddc096c2b22b67257b87`; push run `38026222648` succeeded. Run `38022281912` also succeeded and is not still executing. Keep the paragraph as history.
 
 The owner instructed **Approve W2-P05 for integration and implement W2-P06** and explicitly authorized publication: **“i approve.. i authorize you”**. Qualified P05 correction [PR112](https://github.com/WB-DevWorld/cetech-woocommerce-delivery-engine/pull/112) is normally integrated as actual master `543275af6844d649268f9ac02db518420dac9fe6`, unchanged tree `19c237227d9f3fd9d8d16b4c7d136fad23f83b07`, ordered parents `[8a7a7815b249c7bc117a64ffcc36db1dd8f73ee0,e4340bfbeb75e8e96444ee240fff873748c36449]`. Both exact correction candidate runs38019278584/38019308681 passed all eight jobs, all879 observations and13 original archives, with separate root and independent source/package/runtime/cleanup audits. The separate actual-master run38022281912 is executing and remains a distinct required gate.
 

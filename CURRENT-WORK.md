@@ -1,4 +1,18 @@
-# Current task — E09 atomic promotion quote preparation — 2026-10-21
+# Current continuation — repository reconciliation — 2026-10-27
+
+Read `docs/REPOSITORY-RECONCILIATION-2026-10-27.md` first. It is the versioned record of the repository, checkout, open work and the next task.
+
+The operator authorized this repository reconciliation. Protected `master` before the documentation commit was P06 merge `bcfebf7f22da7ea6272fddc096c2b22b67257b87`, tree `25e6d63fa9bd5ed29b6d34634f8ebab8e1eba501`. Push run `38026222648` on that commit succeeded. Statements below that say P06 is not integrated, or that run `38022281912` is still executing, are historical. Run `38022281912` succeeded on the P05 correction merge `543275af6844d649268f9ac02db518420dac9fe6`.
+
+This branch integrates E01–E09 by ancestry. The functional parent is `8063211df8e6b79c0dfb8e1d02eb65e85d977d66`, tree `228c346d45b64e697145ff0ebf7fb110eb3166e2`. Push run `39687973318` passed all eight required jobs and GitGuardian on that exact commit. Development identity `1.0.0-dev.promotion-preparation.1`. Schema target 12 is additive and seeds nothing. `FeatureFlags.php` and `Plugin.php` are unchanged from the P06 master, so this checkpoint does not mount a new storefront path. Do not deploy it and do not boot a protected site with it.
+
+Not in this integration: draft PR 114 at `d2f22ae58ac407bc2f3930ff7c33788c5e5d6730`; draft PRs 124–138, blocked by Triggered GitGuardian incidents `38833021` and `38911283`–`38911285` on synthetic test literals; PR 49, behind master with unresolved tester-doc findings. Open issues that remain are #113, #54 and #50. Issue #47 is closed.
+
+The next task is the GitGuardian disposition for E10 (`64c02510f8092811da2e91476e14cf0768fdb19c`) and N18 (`a8993c7439e7516c1a3f7c56ce8c9faec71847f0`). Do not print the flagged values, do not rewrite those commits, and do not merge PRs 124–138 while the incidents stay Triggered.
+
+## Historical task — E09 atomic promotion quote preparation — 2026-10-21
+
+The E09 section below is the checkpoint record. Its statement that fresh CI was still pending is superseded for `8063211` by run `39687973318`. Its statement that merge was not authorized is superseded by the 27 October 2026 reconciliation instruction.
 
 Source freeze: all four lanes are complete and independently reviewed without a remaining source blocker. Root combined focused regression passes714 tests/2,490 assertions with one existing skip; all19 changed PHP files lint, both control planes and whitespace pass. The result includes44 new allocation cases,31 preparation cases and72 source/readiness cases within that combined execution; those owner runs are not added again. Ten mandatory new physical cases enumerate and their pure multi-component/prefix/canonical fixture probes pass, but no physical E09 PASS is claimed before CI. Exact committed package and fresh CI remain separate gates. All default admission/model/order/payment tripwires and preserved manifest/schema/classification files are byte-unchanged.
 
