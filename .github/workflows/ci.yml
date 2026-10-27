@@ -17,7 +17,6 @@ on:
       - master
       - 'ws1/**'
       - 'ws2/**'
-      - 'ws3/**'
       - 'fix/**'
       - 'feat/**'
       - 'batch/**'

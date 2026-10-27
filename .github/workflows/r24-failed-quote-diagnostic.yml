@@ -1,0 +1,79 @@
+name: R24 Failed Quote Receipt Diagnosis
+
+on:
+  push:
+    branches:
+      - 'ws3/r24-quote-receipt-diag-67c3ecc'
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: r24-quote-receipt-diag-67c3ecc
+  cancel-in-progress: true
+
+jobs:
+  failed-receipt-diagnosis:
+    name: Diagnose original failed quote receipts
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONDONTWRITEBYTECODE: '1'
+      TASK_DIAG_DIR: ${{ runner.temp }}/r24-quote-diag-40419092642
+    steps:
+      - name: Checkout owned diagnostic tooling
+        uses: actions/checkout@v4
+        with:
+          path: tooling
+          persist-credentials: false
+      - name: Checkout exact failed candidate
+        uses: actions/checkout@v4
+        with:
+          ref: 67c3ecc44cee0f5aa53a0090e49575ada46f7539
+          path: candidate
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Verify immutable diagnostic source
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import ast, hashlib
+          from pathlib import Path
+          expected = {
+              'tooling/scripts/qualification/r24-originals-remote-bootstrap.py': 'd1fbdf4e4613bddb583285ac75288094d2638f48dfdd33b9550a330d6bf847af',
+              'tooling/scripts/qualification/r24-failed-quote-diagnostic.py': 'ddc8caddf82a6679e80582abc5371f00af719fc2f9a196c740cbebe79d1de7e3',
+          }
+          for name, sha in expected.items():
+              raw = Path(name).read_bytes()
+              assert hashlib.sha256(raw).hexdigest() == sha, name
+              ast.parse(raw, filename=name)
+          print('diagnostic_tooling_integrity=PASS')
+          PY
+      - name: Reproduce unchanged validator on authenticated original three archives
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tooling/scripts/qualification/r24-failed-quote-diagnostic.py \
+            --bootstrap "$GITHUB_WORKSPACE/tooling/scripts/qualification/r24-originals-remote-bootstrap.py" \
+            --source "$GITHUB_WORKSPACE/candidate" \
+            --directory "$TASK_DIAG_DIR"
+          test -z "$(git -C candidate status --porcelain)"
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          raw = (Path(os.environ['TASK_DIAG_DIR']) / 'r24-quote-failure-diagnostic.json').read_bytes()
+          print('R24_QUOTE_DIAGNOSTIC_SHA256=' + hashlib.sha256(raw).hexdigest())
+          print('R24_QUOTE_DIAGNOSTIC=' + json.dumps(json.loads(raw), sort_keys=True, separators=(',', ':')))
+          PY
+      - name: Preserve bounded failed-candidate diagnostic
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: r24-quote-failed-originals-40419092642
+          path: ${{ runner.temp }}/r24-quote-diag-40419092642/r24-quote-failure-diagnostic.json
+          if-no-files-found: error
+          retention-days: 30
