@@ -41,7 +41,7 @@ final class LegacyQuoteSourceSnapshotReader {
 			return new LegacyQuoteSourceSeedRows( $rows, QuoteTime::parse( $at['utc'] ) );
 		} catch ( \Throwable ) { self::fail(); }
 	}
-	public function capture( OperationSession $session, QuoteOwner $owner, QuoteContext $context, LegacyQuoteSourcePlan $plan ): LegacyQuoteSourceSnapshot {
+	public function capture( OperationSession $session, QuoteOwner $owner, QuoteContext $context, LegacyQuoteSourcePlan $plan, ?QuoteTime $captured_at = null ): LegacyQuoteSourceSnapshot {
 		try {
 			if ( $session->is_retired() || ! $session->in_transaction() || $session->site_id() !== $owner->site_id() || ! $owner->equals( $plan->owner() ) || ! $plan->matches_context( $context ) || ! $session->validate_tables( $plan->tables( $session ) ) ) { self::fail(); }
 			$selectors = []; foreach ( $plan->fences() as $fence ) { $selectors[LegacyQuoteSourcePlan::table( $session, $fence['source'] )] = $fence; }
@@ -64,8 +64,9 @@ final class LegacyQuoteSourceSnapshotReader {
 				if ( 'scopes' === $source && $opened_scopes !== $values ) { self::fail(); }
 				foreach ( $values as $row ) { $this->budget( $row, $count, $bytes ); } $rows[$source] = $values;
 			}
-			$this->relationships( $context, $rows, $plan ); $at = $session->get_row( 'SELECT UTC_TIMESTAMP(6) AS utc' ); if ( ! is_array( $at ) || array_keys( $at ) !== [ 'utc' ] || ! is_string( $at['utc'] ) ) { self::fail(); }
-			return LegacyQuoteSourceSnapshot::captured( $plan, $context, $rows, $cards, QuoteTime::parse( $at['utc'] ) );
+			$this->relationships( $context, $rows, $plan );
+			if ( null === $captured_at ) { $at = $session->get_row( 'SELECT UTC_TIMESTAMP(6) AS utc' ); if ( ! is_array( $at ) || array_keys( $at ) !== [ 'utc' ] || ! is_string( $at['utc'] ) ) { self::fail(); } $captured_at = QuoteTime::parse( $at['utc'] ); }
+			return LegacyQuoteSourceSnapshot::captured( $plan, $context, $rows, $cards, $captured_at );
 		} catch ( \Throwable ) { self::fail(); }
 	}
 	private function columns( OperationSession $session, string $table, string $source ): array {

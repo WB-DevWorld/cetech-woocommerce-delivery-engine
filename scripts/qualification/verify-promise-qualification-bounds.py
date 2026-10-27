@@ -105,7 +105,7 @@ def verify(reports, priors, hashes, expected):
             require(env["php"] == "8.5.11" and env["context"] == PURE_CONTEXT and isinstance(env["timezone_data_version"], str) and re.fullmatch(r"[A-Za-z0-9._+-]{1,128}", env["timezone_data_version"]), "P06 pinned pure runtime differs")
         else:
             closed(env, {"php", "wordpress", "woocommerce", "database_version", "hpos", "schema_before", "context", "background_requests"}, "Unknown P06 native environment")
-            for key, value in {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "hpos": "yes" if index == 1 else "no", "schema_before": "11", "context": NATIVE_CONTEXT, "background_requests": BACKGROUND}.items(): require(env[key] == value, "P06 pinned native runtime or mode differs")
+            for key, value in {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "hpos": "yes" if index == 1 else "no", "schema_before": "12", "context": NATIVE_CONTEXT, "background_requests": BACKGROUND}.items(): require(env[key] == value, "P06 pinned native runtime or mode differs")
             require(isinstance(env["database_version"], str) and re.fullmatch(r"11\.4\.13-MariaDB(?:-[A-Za-z0-9_.]+)*", env["database_version"]), "P06 pinned database differs")
         closed(report["preceding_receipts"], hashes, "Unknown P06 preceding receipt linkage")
         for kind, prior in zip(("p05_hpos", "p05_cpt", "p05_http"), priors):

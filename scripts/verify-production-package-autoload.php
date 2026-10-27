@@ -56,6 +56,44 @@ if ( ! str_contains( $health_source, 'namespace CetechDeliveryEngine\\Applicatio
 require_once $autoload;
 
 $required_classes = [
+	'CetechDeliveryEngine\\Domain\\DeliveryPromotion\\FixedPromotionBudgetAllocationSet',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionBudgetAllocationService',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionBudgetWriteTrackingStore',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionQuotePreparationService',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionQuotePreparation',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\FixedPromotionBudgetOperationReadiness',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\FixedPromotionBudgetInstallationReadiness',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\FixedPromotionBudgetSchema',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\FixedPromotionBudgetReadiness',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\FixedPromotionBudgetRecordCodec',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\SqlFixedPromotionBudgetStore',
+	'CetechDeliveryEngine\\Domain\\DeliveryPromotion\\FixedPromotionEligibilityFamily',
+	'CetechDeliveryEngine\\Domain\\DeliveryPromotion\\FixedPromotionEligibilityReference',
+	'CetechDeliveryEngine\\Infrastructure\\Persistence\\SqlFixedPromotionRuleEligibilityGuard',
+	'CetechDeliveryEngine\\Domain\\DeliveryPromotion\\FixedPromotionBudgetRequest',
+	'CetechDeliveryEngine\\Domain\\DeliveryPromotion\\FixedPromotionBudgetState',
+	'CetechDeliveryEngine\\Domain\\DeliveryPromotion\\FixedPromotionBudgetReservation',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionBudgetService',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\FixedPromotionQuoteCurrentEvidenceGuard',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\FixedPromotionSourceValidity',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionBudgetCurrentAuthority',
+	'CetechDeliveryEngine\\Domain\\DeliveryCommercial\\FixedPromotionQuoteCapture',
+	'CetechDeliveryEngine\\Application\\DeliveryQuote\\FixedPromotionQuoteProvider',
+	'CetechDeliveryEngine\\Application\\Order\\FixedPromotionSnapshotCodec',
+	'CetechDeliveryEngine\\Application\\Order\\FixedPromotionSnapshotCore',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionNativeRequests',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionNativeCapture',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionNativeResult',
+	'CetechDeliveryEngine\\Domain\\DeliveryCommercial\\QuoteCommercialEvidencePacket',
+	'CetechDeliveryEngine\\Domain\\DeliveryCommercial\\QuoteCommercialEvidenceReadResult',
+	'CetechDeliveryEngine\\Domain\\DeliveryCurrency\\CurrencyConversionReceipt',
+	'CetechDeliveryEngine\\Application\\DeliveryCurrency\\ConvertOnceCurrencyService',
+	'CetechDeliveryEngine\\Domain\\DeliveryPromotion\\FixedDeliveryPromotion',
+	'CetechDeliveryEngine\\Domain\\DeliveryPromotion\\DeliveryPromotionPlan',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedDeliveryPromotionCalculator',
+	'CetechDeliveryEngine\\Domain\\DeliveryEconomics\\EconomicAmountFact',
+	'CetechDeliveryEngine\\Domain\\DeliveryEconomics\\QuoteEconomicsFacts',
+	'CetechDeliveryEngine\\Application\\DeliveryEconomics\\QuoteEconomicsCapture',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\PromiseQuotePaymentBoundary',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\PromiseQuotePlacementActivation',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\PromiseQuotePlacementPolicyFence',
@@ -334,6 +372,13 @@ $required_classes = [
 ];
 
 $required_interfaces = [
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionBudgetAccountStore',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionEligibilityBudgetGuard',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionBudgetStore',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionCurrentAuthority',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\FixedPromotionEligibilityGuard',
+	'CetechDeliveryEngine\\Application\\DeliveryCurrency\\CurrencyConversionProvider',
+	'CetechDeliveryEngine\\Application\\DeliveryPromotion\\DeliveryPromotionEvidenceProvider',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\CartQuoteProfileEnvironment',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteNativeTaxEvidenceGuard',
 	'CetechDeliveryEngine\\Application\\DeliveryQuote\\QuoteTimedCurrentEvidenceGuard',
@@ -493,7 +538,8 @@ $is_schema9_release = str_contains( $header_source, '1.0.0-dev.wave2-quote-stora
 	|| str_contains( $header_source, '1.0.0-dev.wave2-quote-placement' )
 	|| 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-contract\.1\'\s*\);\s*$/m', $header_source );
 $is_schema10_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-(?:storage|calculation|handoff)\.1\'\s*\);\s*$/m', $header_source );
-$is_schema11_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-(?:native|qualification)\.1\'\s*\);\s*$/m', $header_source );
+$is_schema11_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.(?:wave2-promise-(?:native|qualification)\.1|economics-facts\.1|delivery-promotion-fixed\.1|currency-convert-once\.1|commercial-handoff\.1|fixed-promotion-format\.1|promotion-authority\.1|promotion-sql\.1)\'\s*\);\s*$/m', $header_source );
+$is_schema12_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.promotion-(?:install|preparation)\.1\'\s*\);\s*$/m', $header_source );
 $is_schema8_release = str_contains( $header_source, '1.0.0-dev.wave1-rule-lifecycle' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-snapshot-readers' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-data-lifecycle' )
@@ -511,11 +557,11 @@ $is_schema6_release = str_contains( $header_source, '1.0.0-dev.geo' )
 $target = 'unknown';
 if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 	$target = ( new ReflectionClass( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) )->getConstant( 'TARGET' );
-	if ( $is_schema8_release || $is_schema9_release || $is_schema10_release || $is_schema11_release ) {
-		if ( ( $is_schema11_release ? '11' : ( $is_schema10_release ? '10' : ( $is_schema9_release ? '9' : '8' ) ) ) !== $target ) {
-			$failures[] = 'SchemaVersion::TARGET does not match this schema-8/9/10/11 package.';
+	if ( $is_schema8_release || $is_schema9_release || $is_schema10_release || $is_schema11_release || $is_schema12_release ) {
+		if ( ( $is_schema12_release ? '12' : ( $is_schema11_release ? '11' : ( $is_schema10_release ? '10' : ( $is_schema9_release ? '9' : '8' ) ) ) ) !== $target ) {
+			$failures[] = 'SchemaVersion::TARGET does not match this schema-8/9/10/11/12 package.';
 		}
-		if ( $is_schema9_release || $is_schema10_release || $is_schema11_release ) {
+		if ( $is_schema9_release || $is_schema10_release || $is_schema11_release || $is_schema12_release ) {
 			foreach ( \CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteSchema::SUFFIXES as $suffix ) {
 				if ( ! str_contains( implode( "\n", \CetechDeliveryEngine\Infrastructure\Persistence\DeliveryQuoteSchema::create_table_statements( 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' ) ), $suffix ) ) {
 					$failures[] = 'Missing schema-9 quote table definition.';
@@ -525,17 +571,27 @@ if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 				$failures[] = 'Missing schema-9 rate candidate range index.';
 			}
 		}
-		if ( $is_schema10_release || $is_schema11_release ) {
+		if ( $is_schema10_release || $is_schema11_release || $is_schema12_release ) {
 			foreach ( \CetechDeliveryEngine\Infrastructure\Persistence\PromiseStorageSchema::SUFFIXES as $suffix ) {
 				if ( ! str_contains( implode( "\n", \CetechDeliveryEngine\Infrastructure\Persistence\PromiseStorageSchema::create_table_statements( 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' ) ), $suffix ) ) {
 					$failures[] = 'Missing schema-10 promise storage table definition.';
 				}
 			}
 		}
-		if ( $is_schema11_release ) {
-			if ( 39 !== count( \CetechDeliveryEngine\Bootstrap\DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES ) || 38 !== count( \CetechDeliveryEngine\Bootstrap\DataLifecycleManifest::RETAINED_PROMISE_DOMAIN_TABLE_SUFFIXES ) || [ 'shipment_promises' ] !== \CetechDeliveryEngine\Infrastructure\Persistence\ShipmentPromiseSchema::SUFFIXES || ! str_contains( implode( "\n", \CetechDeliveryEngine\Infrastructure\Persistence\ShipmentPromiseSchema::create_table_statements( 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' ) ), 'shipment_promises' ) ) {
+		if ( $is_schema11_release || $is_schema12_release ) {
+			if ( ( $is_schema12_release ? 41 : 39 ) !== count( \CetechDeliveryEngine\Bootstrap\DataLifecycleManifest::DOMAIN_TABLE_SUFFIXES ) || 38 !== count( \CetechDeliveryEngine\Bootstrap\DataLifecycleManifest::RETAINED_PROMISE_DOMAIN_TABLE_SUFFIXES ) || [ 'shipment_promises' ] !== \CetechDeliveryEngine\Infrastructure\Persistence\ShipmentPromiseSchema::SUFFIXES || ! str_contains( implode( "\n", \CetechDeliveryEngine\Infrastructure\Persistence\ShipmentPromiseSchema::create_table_statements( 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' ) ), 'shipment_promises' ) ) {
 				$failures[] = 'Schema-11 shipment promise storage or retained store partition differs.';
 			}
+		}
+		if ( $is_schema12_release ) {
+			$manifest = \CetechDeliveryEngine\Bootstrap\DataLifecycleManifest::class;
+			$budget = \CetechDeliveryEngine\Infrastructure\Persistence\FixedPromotionBudgetSchema::class;
+			if ( 39 !== count( $manifest::RETAINED_SHIPMENT_PROMISE_DOMAIN_TABLE_SUFFIXES ) || $budget::SUFFIXES !== $manifest::PROMOTION_BUDGET_TABLE_SUFFIXES || $manifest::DOMAIN_TABLE_SUFFIXES !== [ ...$manifest::RETAINED_SHIPMENT_PROMISE_DOMAIN_TABLE_SUFFIXES, ...$budget::SUFFIXES ] || 41 !== count( array_unique( $manifest::DOMAIN_TABLE_SUFFIXES ) ) ) { $failures[] = 'Schema-12 budget or retained history partition differs.'; }
+			$ddl = $budget::create_table_statements( 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci', 'wp_delivery_engine_' );
+			foreach ( $budget::SUFFIXES as $suffix ) { if ( ! isset( $ddl[$suffix] ) || ! str_contains( $ddl[$suffix], 'CREATE TABLE wp_delivery_engine_' . $suffix ) || ! str_contains( $ddl[$suffix], 'ENGINE=InnoDB' ) ) { $failures[] = 'Missing schema-12 budget definition.'; } }
+			$migration_file = $package_root . '/database/migrations/20261021213000_create_promotion_budget_tables.php';
+			$migration = is_readable( $migration_file ) ? require $migration_file : null;
+			if ( ! $migration instanceof \CetechDeliveryEngine\Core\Versioning\VerifiableMigrationInterface || '12' !== $migration->get_version() || \CetechDeliveryEngine\Infrastructure\Persistence\FixedPromotionBudgetInstallationReadiness::MIGRATION_ID !== $migration->get_id() ) { $failures[] = 'Schema-12 verified migration is absent or inconsistent.'; }
 		}
 		foreach ( [ 'rule_family_guards', 'logical_rules', 'rule_versions' ] as $suffix ) {
 			if ( ! str_contains( implode( "\n", \CetechDeliveryEngine\Infrastructure\Persistence\RuleLifecycleSchema::create_table_statements( 'DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci' ) ), $suffix ) ) {
@@ -570,9 +626,9 @@ if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {
 }
 
 $bulk_js = $package_root . '/assets/admin/bulk-tools.js';
-if ( ( $is_schema5_release || $is_schema6_release || $is_schema7_release || $is_schema8_release || $is_schema9_release || $is_schema10_release || $is_schema11_release ) && ! is_readable( $bulk_js ) ) {
+if ( ( $is_schema5_release || $is_schema6_release || $is_schema7_release || $is_schema8_release || $is_schema9_release || $is_schema10_release || $is_schema11_release || $is_schema12_release ) && ! is_readable( $bulk_js ) ) {
 	$failures[] = 'Missing assets/admin/bulk-tools.js';
-} elseif ( is_readable( $bulk_js ) && ( $is_schema5_release || $is_schema6_release || $is_schema7_release || $is_schema8_release || $is_schema9_release || $is_schema10_release || $is_schema11_release ) ) {
+} elseif ( is_readable( $bulk_js ) && ( $is_schema5_release || $is_schema6_release || $is_schema7_release || $is_schema8_release || $is_schema9_release || $is_schema10_release || $is_schema11_release || $is_schema12_release ) ) {
 	$bulk_js_source = (string) file_get_contents( $bulk_js );
 	if ( ! str_contains( $bulk_js_source, "body.set('advance', '1')" ) ) {
 		$failures[] = 'bulk-tools.js missing bounded AJAX continue (advance=1).';

@@ -35,6 +35,12 @@ final class QuoteProviderRegistry {
 		$entry = $this->entry( $code, $version, $profile, $profile_version );
 		$terms = QuoteTerms::from_json( $entry['provider']->capture( $context )->to_private_json() );
 		if ( ServicePromiseQuoteProvider::PROFILE === $profile && ( LegacyFixedBaseQuoteProvider::CODE !== $code || 1 !== $version || 1 !== $profile_version || 2 !== $context->format_version() || 2 !== $terms->format_version() ) ) { QuoteShape::invalid(); }
+		// Forward fixed-promotion capture is a distinct format, never a legacy/v2 alias.
+		if ( FixedPromotionQuoteProvider::CODE === $profile || FixedPromotionQuoteProvider::CODE === $code || 3 === $context->format_version() || 3 === $terms->format_version() ) {
+			if ( FixedPromotionQuoteProvider::CODE !== $profile || FixedPromotionQuoteProvider::CODE !== $code || 1 !== $version || 1 !== $profile_version || 3 !== $context->format_version() || 3 !== $terms->format_version()
+				|| null === $context->fixed_promotion_capture() || ! hash_equals( $context->fixed_promotion_capture()->digest(), $terms->private_facts()['promotion_capture_digest'] ?? '' ) ) { QuoteShape::invalid(); }
+			$context->fixed_promotion_capture()->assert_terms( $terms->base_terms() );
+		}
 		$captured = $context->private_facts(); $groups = []; foreach ( $captured['groups'] as $group ) { $groups[$group['component_key']] = $group; }
 		$facts = $terms->private_facts(); if ( count( $facts['groups'] ) !== count( $groups ) ) { QuoteShape::invalid(); }
 		foreach ( $facts['groups'] as $term ) {

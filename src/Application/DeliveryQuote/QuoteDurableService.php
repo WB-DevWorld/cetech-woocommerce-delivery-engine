@@ -38,6 +38,7 @@ final class QuoteDurableService {
 		$this->gate = $gate ?? new QuoteAdmissionGate( $factory, $authorize, null, $this->control );
 	}
 	public function issue( QuoteIssueCommand $command, QuoteAdmissionAttempt $attempt, RequestContext $request ): QuoteDurableResult {
+		if ( self::reader_only( null, $command->context(), $command ) ) { return $this->reject( $request, 'temporarily_unavailable' ); }
 		if ( ! $this->authorized( $command->owner(), 'delivery_quote.issue' ) ) { return $this->reject( $request, 'not_authorized' ); }
 		if ( 'checkout' !== $command->context()->private_facts()['kind'] || ! $command->context()->material_evidence_available() ) { return $this->reject( $request, 'invalid_input' ); }
 		if ( null === $this->evidence ) { return $this->reject( $request, 'temporarily_unavailable' ); }
@@ -58,6 +59,7 @@ final class QuoteDurableService {
 	}
 	/** One charged preparation handoff. Its original recovery envelope is acknowledged before C03. */
 	public function issue_admitted( QuoteIssueCommand $command, QuoteAdmissionLease $lease, RequestContext $request, callable $stage ): QuoteDurableResult {
+		if ( self::reader_only( null, $command->context(), $command ) ) { return $this->reject( $request, 'temporarily_unavailable' ); }
 		if ( ! $this->authorized( $command->owner(), 'delivery_quote.issue' ) ) { return $this->reject( $request, 'not_authorized' ); }
 		if ( 'checkout' !== $command->context()->private_facts()['kind'] || ! $command->context()->material_evidence_available() || null === $this->evidence || ! $lease->matches( $command ) ) { return $this->reject( $request, 'temporarily_unavailable' ); }
 		$original = QuoteDurableCommand::issue_probe( $command );
@@ -78,21 +80,25 @@ final class QuoteDurableService {
 	public function bind( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, QuoteBinding $binding, RequestContext $request, ?QuoteContext $current = null ): QuoteDurableResult { return $this->transition( 'bind', $owner, $reference, $opened, $current, $request, $binding ); }
 	public function seal( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, QuoteBinding $binding, RequestContext $request, ?QuoteContext $current = null ): QuoteDurableResult { return $this->transition( 'seal', $owner, $reference, $opened, $current, $request, $binding ); }
 	public function verify_binding( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, QuoteBinding $binding, RequestContext $request, ?QuoteContext $current, QuotePlacementSavedEvidenceGuard $saved ): QuoteDurableResult {
+		if ( self::reader_only( $opened, $current ) ) { return $this->reject( $request, 'temporarily_unavailable' ); }
 		if ( ! $this->authorized( $owner, 'delivery_quote.verify_binding' ) ) { return $this->reject( $request, 'not_authorized' ); }
 		try { $command = QuoteDurableCommand::verify_binding( $owner, $reference, $opened, $binding, $saved, $current ); } catch ( \Throwable ) { return $this->reject( $request, 'not_authorized' ); }
 		return $this->execute( $command, $request );
 	}
 	public function seal_placement( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, QuoteBinding $binding, RequestContext $request, ?QuoteContext $current, QuotePlacementProof $proof ): QuoteDurableResult {
+		if ( self::reader_only( $opened, $current ) ) { return $this->reject( $request, 'temporarily_unavailable' ); }
 		if ( ! $this->authorized( $owner, 'delivery_quote.seal' ) || ! $proof->unchanged() ) { return $this->reject( $request, 'not_authorized' ); }
 		try { $command = QuoteDurableCommand::seal_placement( $owner, $reference, $opened, $binding, $proof, $current ); } catch ( \Throwable ) { return $this->reject( $request, 'not_authorized' ); }
 		return $this->execute( $command, $request );
 	}
 	/** A terminal no-effect placement may release its native pointer for explicit new review. */
 	public function known_rejected_original_placement( QuotePlacementEvidence $replacement, QuoteStoredRow $original, int $order_id, string $placement_id, ?QuoteBinding $expected, QuotePlacementNoEffectEvidenceGuard $native ): bool {
+		if ( self::reader_only( $original->header(), null ) ) { return false; }
 		return ( new QuotePlacementNoEffectDisposition( $this->factory, $this->readiness, $this->authorizer ) )->known( $replacement, $original, $order_id, $placement_id, $expected, $native );
 	}
 	/** A terminal final no-effect placement retains the original prepared-two contract. */
 	public function known_rejected_placement( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, QuoteBinding $expected, QuotePlacementSavedEvidenceGuard $saved ): bool {
+		if ( self::reader_only( $opened, null ) ) { return false; }
 		if ( ! $this->authorized( $owner, 'delivery_quote.read' ) || ! $opened->owner()->equals( $owner ) || ! $opened->matches_reference( $reference ) || 'prepared' !== $expected->state() || 2 !== $expected->revision() || $expected->site_id() !== $owner->site_id() || $expected->row()['quote_uuid'] !== $opened->id()->value() ) { return false; }
 		$session = null; $begun = false;
 		try {
@@ -116,11 +122,13 @@ final class QuoteDurableService {
 	}
 	/** Fresh order-pay admission; historical seal replay alone never admits a payment. */
 	public function admit_sealed_placement( QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, QuoteBinding $binding, RequestContext $request, ?QuoteContext $current, int $control_revision, \CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutLocalBinding $local, QuotePlacementSavedEvidenceGuard $saved ): bool {
+		if ( self::reader_only( $opened, $current ) ) { return false; }
 		if ( ! $this->authorized( $owner, 'delivery_quote.seal' ) || 'sealed' !== $binding->state() || 3 !== $binding->revision() || $control_revision < 1 || ! $local->unchanged() || ! $opened->owner()->equals( $owner ) || ! $opened->matches_reference( $reference ) ) { return false; }
 		$loaded = $this->load( $owner, $opened->id(), $current, $reference, 'delivery_quote.seal', true, saved: $saved, admission_revision: $control_revision, expected_binding: $binding, local: $local );
 		return null !== $loaded && null === $loaded[2] && null !== $loaded[1] && $loaded[1]->row() === $binding->row() && $loaded[0]->header()->to_private_json() === $opened->to_private_json() && $this->authorized( $owner, 'delivery_quote.seal' ) && $local->unchanged();
 	}
 	public function reconcile( QuoteDurableCommand $command, RequestContext $request ): QuoteDurableResult {
+		if ( self::reader_only( $command->header(), $command->current_context(), $command->original_issue() ) ) { return $this->reject( $request, 'temporarily_unavailable' ); }
 		if ( ! $this->authorized( $command->owner(), $command->identity->operation ) ) { return $this->reject( $request, 'not_authorized' ); }
 		$attempt = $this->coordinator( $command )->reconcile( $command->identity, $command, $request ); return $this->finish( $attempt, $command, $request );
 	}
@@ -132,11 +140,13 @@ final class QuoteDurableService {
 		return ( new QuoteReceiptVerifier() )->promise_seal( $loaded[0], $loaded[4], $loaded[1] );
 	}
 	public function current( QuoteOwner $owner, QuoteReference $reference, ?QuoteContext $current, RequestContext $request ): QuoteCurrentReadResult {
+		if ( self::reader_only( null, $current ) ) { return QuoteCurrentReadResult::unavailable(); }
 		if ( ! $this->authorized( $owner, 'delivery_quote.read' ) ) { return QuoteCurrentReadResult::unavailable(); }
 		$loaded = $this->load( $owner, $reference->id(), $current, $reference, 'delivery_quote.read', true );
 		return null === $loaded ? QuoteCurrentReadResult::unavailable() : QuoteCurrentReadResult::ready( $loaded[0], $loaded[2], $loaded[3] );
 	}
 	private function transition( string $action, QuoteOwner $owner, QuoteReference $reference, QuoteHeader $opened, ?QuoteContext $current, RequestContext $request, ?QuoteBinding $binding = null ): QuoteDurableResult {
+		if ( self::reader_only( $opened, $current ) ) { return $this->reject( $request, 'temporarily_unavailable' ); }
 		if ( ! $this->authorized( $owner, 'delivery_quote.' . $action ) ) { return $this->reject( $request, 'not_authorized' ); }
 		// Unknown evidence is no invalidation command and cannot occupy its one-shot intent.
 		if ( 'invalidate' === $action && ( null === $current || ! $current->material_evidence_available() ) ) { return $this->reject( $request, 'temporarily_unavailable' ); }
@@ -146,6 +156,7 @@ final class QuoteDurableService {
 		return $this->execute( $command, $request );
 	}
 	private function execute( QuoteDurableCommand $command, RequestContext $request ): QuoteDurableResult {
+		if ( self::reader_only( $command->header(), $command->current_context(), $command->original_issue() ) ) { return $this->reject( $request, 'temporarily_unavailable' ); }
 		if ( ! $this->authorized( $command->owner(), $command->identity->operation ) ) { return $this->reject( $request, 'not_authorized' ); }
 		$attempt = $this->coordinator( $command )->attempt( $command->identity, $command, $request ); return $this->finish( $attempt, $command, $request );
 	}
@@ -175,6 +186,7 @@ final class QuoteDurableService {
 			$this->control->assert_ready( $session, $owner->site_id() ); $tables = array_values( array_unique( [ $this->control->options_table( $session ), ...DeliveryQuoteSchema::tables( $session->table_prefix() ), ...($this->evidence?->tables( $session ) ?? []), ...($proof?->tables( $session ) ?? []), ...($saved?->tables( $session ) ?? []) ] ) ); if ( ! $session->validate_tables( $tables ) ) { return null; }
 			$repo = new DeliveryQuoteRepository( $session ); $discovered = $repo->find_quote( $id );
 			if ( null === $discovered || ! $discovered->header()->owner()->equals( $owner ) || ( null !== $reference && ! $discovered->header()->matches_reference( $reference ) ) ) { return null; }
+			if ( self::reader_only( $discovered->header(), $current ) ) { return null; }
 			$discovered_binding = null === $discovered->accepted_at() ? null : $repo->find_binding( $discovered );
 			$verifier = new QuoteReceiptVerifier(); $receipts = $verifier->lock( $session, $discovered->header(), $discovered_binding );
 			$control = $this->control->current( $session ); $evidence_ok = null !== $current && $current->material_evidence_available() && null !== $this->evidence && $this->evidence->verify( $session, $owner, $current );
@@ -202,6 +214,8 @@ final class QuoteDurableService {
 		if ( 'invalidated' === $quote->state() ) { return 'quote_invalidated'; } if ( 'stripped' === $quote->state() || null === $quote->context() || null === $quote->terms() ) { return 'quote_unavailable'; }
 		return DeliveryQuote::issue( $quote->header(), $quote->context(), $quote->terms() )->reason_at( $at );
 	}
+	/** Frozen promotion evidence supplies history, not current campaign/budget authority. */
+	private static function reader_only( ?QuoteHeader $header, ?QuoteContext $context, ?QuoteIssueCommand $issue = null ): bool { return 3 === $header?->format_version() || 3 === $context?->format_version() || 'fixed_promotion_native_v1' === $header?->profile() || 'fixed_promotion_native_v1' === $issue?->profile() || 'fixed_promotion_native_v1' === $issue?->provider_code(); }
 	private function authorized( QuoteOwner $owner, string $operation ): bool { try { return true === ( $this->authorizer )( $owner, $operation ); } catch ( \Throwable ) { return false; } }
 	private function gate_result( QuoteAdmissionResult $result, QuoteIssueCommand $command, RequestContext $request ): QuoteDurableResult {
 		if ( ! $this->authorized( $command->owner(), 'delivery_quote.issue' ) ) { return $this->reject( $request, 'not_authorized' ); }

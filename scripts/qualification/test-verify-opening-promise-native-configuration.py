@@ -35,7 +35,7 @@ def packet():
     for mode in ("yes", "no"):
         report = {key: deepcopy(p03[key]) for key in ("source_head", "candidate_head", "source_tree", "installed_php_sources", "installed_php_sources_hash")}
         report.update({"format": "cetech-opening-promise-native-configuration-v1", "status": "PASS", "limits": V.LIMITS.copy(),
-                       "environment": {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "database_version": "11.4.13-MariaDB-ubu2404", "hpos": mode, "schema_before": "11", "context": V.CONTEXT, "background_requests": V.BACKGROUND},
+                       "environment": {"php": "8.5.11", "wordpress": "7.1.2", "woocommerce": "11.1.2", "database_version": "11.4.13-MariaDB-ubu2404", "hpos": mode, "schema_before": "12", "context": V.CONTEXT, "background_requests": V.BACKGROUND},
                        "preceding_receipts": {kind: {"sha256": hashes[kind], "cases": len(prior["cases"])} for kind, prior in zip(kinds, priors)},
                        "cases": [{"id": case_id, "status": "PASS", "evidence": dict.fromkeys(fields, True)} for case_id, fields in expected.cases]})
         reports.append(report)

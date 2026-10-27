@@ -13,7 +13,7 @@ final readonly class QuoteStoredRow implements \JsonSerializable {
 		QuoteStorageCodec::exact( $row, self::FIELDS ); $data = [];
 		foreach ( self::FIELDS as $field ) { $data[$field] = $row[$field]; }
 		foreach ( [ 'id', 'site_id', 'format_version', 'profile_version', 'revision', 'retention_revision' ] as $field ) { $data[$field] = QuoteStorageCodec::integer( $row[$field] ); }
-		if ( ! in_array( $data['format_version'], [ 1, 2 ], true ) || ! is_string( $row['header_json'] ) ) { QuoteShape::invalid(); }
+		if ( ! in_array( $data['format_version'], [ 1, 2, 3 ], true ) || ! is_string( $row['header_json'] ) ) { QuoteShape::invalid(); }
 		$header = QuoteHeader::from_json( $row['header_json'] ); $owner = $header->owner(); $owner_facts = $owner->facts();
 		if ( $data['format_version'] !== $header->format_version() || $row['header_json'] !== $header->to_private_json() || ! QuoteStorageCodec::uuid( $row['quote_uuid'] )->equals( $header->id() ) || $data['site_id'] !== $owner->site_id()
 			|| $row['profile_code'] !== $header->profile() || $data['profile_version'] !== $header->profile_version() || $row['purpose'] !== $header->purpose() ) { QuoteShape::invalid(); }
