@@ -257,7 +257,7 @@ final class EmergencyControlProjectionTest extends TestCase {
 		$before = $GLOBALS['cetech_de_test_options'] ?? [];
 		try {
 			$flags = new FeatureFlags(); $defaults = $flags->defaults();
-			self::assertCount( 23, $defaults );
+			self::assertCount( 24, $defaults ); self::assertFalse( $defaults['enable_customer_policy_runtime'] );
 			self::assertSame( [ 'enable_classic_checkout_adapter' => true ], array_filter( $defaults ) );
 			foreach ( array_keys( $defaults ) as $i => $flag ) { $GLOBALS['cetech_de_test_options'][ $flags->option_name( $flag ) ] = $i % 2; }
 			$GLOBALS['cetech_de_test_options'][DataLifecycleManifest::CHECKOUT_CONTROL_OPTION] = $this->physical()->state->original_bytes();

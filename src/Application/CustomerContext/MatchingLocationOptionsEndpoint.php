@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\CustomerContext;
 
+use CetechDeliveryEngine\Application\CustomerPolicy\CustomerPolicyFacade;
+use CetechDeliveryEngine\Presentation\Shared\CustomerPolicyRenderer;
+
 use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
 use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlResponse;
 
@@ -34,7 +37,8 @@ final class MatchingLocationOptionsEndpoint {
 		private CustomerBrowsingLocationStore $browsing_store,
 		private ?CanonicalLocationResolver $resolver = null,
 		private ?ShopperDeliveryLocationPrecision $precision = null,
-		private ?EmergencyControlRuntime $emergency_control = null
+		private ?EmergencyControlRuntime $emergency_control = null,
+		private ?CustomerPolicyFacade $policy_facade = null
 	) {
 	}
 
@@ -97,12 +101,14 @@ final class MatchingLocationOptionsEndpoint {
 		$requires   = $this->location_options->delivery_requires_matching_location( $all );
 		$currency   = function_exists( 'get_woocommerce_currency' ) ? (string) get_woocommerce_currency() : 'GHS';
 		$context    = ProductPageQuoteContext::from_request( $product_id, $variation_id, $quantity );
-		$filtered   = $this->location_options->filter( $all, $location, $currency, $context );
+		$filtered   = $this->policy_facade?->enabled() && ! $requires ? $all : $this->location_options->filter( $all, $location, $currency, $context );
 		$caps       = ProductDeliveryFulfilmentCapabilities::from_options( $all );
 		$public     = [];
 
+		$policy_views = $this->policy_facade?->for_options( $product_id, $variation_id, $quantity, $filtered, $location ) ?? [];
 		foreach ( $filtered as $option ) {
 			$row = $option->toArray();
+			if ( isset( $policy_views[ $option->display_key ] ) ) { $row['customer_policy'] = $policy_views[ $option->display_key ]; }
 			$row['estimate_line'] = \CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy::compact_estimate(
 				(string) ( $option->estimate_text ?? '' )
 			);

@@ -8,6 +8,7 @@ from copy import deepcopy
 import hashlib
 import importlib.util
 import json
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -133,6 +134,23 @@ class ReceiptBoundaryTest(unittest.TestCase):
         self.assertEqual(self.reports, before)
         self.assertIs(self.reports[0]["cases"][0]["evidence"]["role_exists"], False)
         self.assertIs(self.reports[2]["cases"][0]["evidence"]["user_exists"], False)
+
+    def test_actual_lifecycle_case_keeps_frozen_retained_identity(self):
+        # Exercise the real producer's identifier against the retained verifier.
+        # This is an identity-only packet; it claims no native flag observation.
+        source = (HERE / "opening-data-lifecycle.php").read_text(encoding="utf-8")
+        matches = re.findall(r"\$check\(\s*'(NATIVE-C06-AUTHORED-OPTIONS-ALL[0-9]+-FLAGS-SEEDED)'", source)
+        self.assertEqual(len(matches), 1)
+        frozen = "NATIVE-C06-AUTHORED-OPTIONS-ALL23-FLAGS-SEEDED"
+        original = [case(matches[0], {})]
+        untouched = deepcopy(original)
+        digest = VERIFIER.canonical_hash([frozen])
+        VERIFIER.baseline(original, VERIFIER.NATIVE_PREFIX, 1, digest)
+        renamed = deepcopy(original)
+        renamed[0]["id"] = "NATIVE-C06-AUTHORED-OPTIONS-ALL24-FLAGS-SEEDED"
+        with self.assertRaisesRegex(RuntimeError, "Retained Q05 inventory differs"):
+            VERIFIER.baseline(renamed, VERIFIER.NATIVE_PREFIX, 1, digest)
+        self.assertEqual(original, untouched)
 
     def test_current_producer_inventories_keep_both_stores_and_actual_browser_buttons(self):
         ids = tuple(entry[0] for entry in self.authority.native_specs)

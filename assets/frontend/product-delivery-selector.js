@@ -258,13 +258,15 @@
 
 		var locationRoot = root.querySelector('[data-cetech-de-matching-location]');
 		var config = window.cetechDeMatchingLocation;
-		if (!locationRoot || !config || !config.ajaxUrl) {
+		if (!config || !config.ajaxUrl || (!locationRoot && !config.policyEnabled)) {
 			if (locationRoot) {
 				root.setAttribute('data-cetech-de-location-bound', '1');
 			}
 			return;
 		}
 
+		var hasLocationFields = !!locationRoot;
+		locationRoot = locationRoot || root;
 		var timer = null;
 		var requestToken = 0;
 		root.setAttribute('data-cetech-de-options-loading', '0');
@@ -274,8 +276,10 @@
 			timer = window.setTimeout(fetchOptions, 280);
 		}
 
-		locationRoot.addEventListener('change', fetchOptions);
-		locationRoot.addEventListener('input', schedule);
+		if (hasLocationFields) {
+			locationRoot.addEventListener('change', fetchOptions);
+			locationRoot.addEventListener('input', schedule);
+		}
 		bindQuantityRefresh(root, schedule);
 		root.setAttribute('data-cetech-de-location-bound', '1');
 
@@ -283,6 +287,7 @@
 			var status = root.querySelector('[data-cetech-de-status]');
 			var optionsEl = root.querySelector('[data-cetech-de-options]');
 			var token = ++requestToken;
+			if (config.policyEnabled && window.CetechDeCustomerPolicy) { window.CetechDeCustomerPolicy.clear(root); }
 			root.setAttribute('data-cetech-de-options-loading', '1');
 			if (status) {
 				status.textContent = (config.i18n && config.i18n.loading) || '';
@@ -475,7 +480,7 @@
 		}
 		return '<p class="cetech-de-delivery-option cetech-de-delivery-option--radio cetech-de-delivery-option--card" data-cetech-de-choice="' + escapeHtml(option.fulfilment_choice || '') + '"><label>' +
 			'<input type="radio" name="' + escapeHtml((config && config.postField) || 'cetech_de_delivery_option_key') + '" value="' + escapeHtml(option.display_key) + '"' + (checked ? ' checked="checked"' : '') + ' required="required" />' +
-			'<span class="cetech-de-delivery-option__body">' + bodyHtml + '</span></label></p>';
+			'<span class="cetech-de-delivery-option__body">' + bodyHtml + '</span></label></p>' + (window.CetechDeCustomerPolicy ? window.CetechDeCustomerPolicy.optionHtml(option.customer_policy, option.display_key) : '');
 	}
 
 	function setReveal(locationRoot, field, visible) {
@@ -1061,11 +1066,14 @@
 		if (!payload) {
 			return {};
 		}
-		return {
+		var policyTicket = window.CetechDeCustomerPolicy && window.CetechDeCustomerPolicy.selectedTicket(root);
+		var result = {
 			delivery_option_key: payload.display_key || '',
 			matching_location: payload.matching_location || {},
 			pdp_context: payload
 		};
+		if (policyTicket) { result.policy_ticket = policyTicket; }
+		return result;
 	}
 
 	function attachStoreApiAddItem() {

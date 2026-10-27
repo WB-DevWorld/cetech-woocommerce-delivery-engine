@@ -1,0 +1,41 @@
+<?php
+declare(strict_types=1);
+/** Actual helper transformations against owned finite doubles; never a physical SQL claim. */
+define('ABSPATH','/owned-history-helper-regression/');
+$native=__DIR__.'/native-woocommerce/abstract-wc-data.php';r24_require(hash_file('sha256',$native)==='7a9c9f5150506a1d86324f9d95c5f6ed5db8b73ed0d3fdd0ebb341ec7b0f2daf');require$native;
+class WC_Cache_Helper{public static function get_cache_prefix($group):string{return'owned-'.$group.':';}}
+$GLOBALS['history_cache_deletes']=[];
+function wp_cache_delete($key,$group):bool{$GLOBALS['history_cache_deletes'][]=[$key,$group];return true;}
+function r24_require(bool$value,string$message='refused'):void{if(!$value)throw new RuntimeException($message);}
+function r24_rows(string$token):array{return$GLOBALS['wpdb']->select($token);}
+function r24_test(bool$value):void{if(!$value)throw new RuntimeException('History helper regression.');++$GLOBALS['checks'];}
+function r24_denied(callable$work):void{$denied=false;try{$work();}catch(RuntimeException){$denied=true;}r24_test($denied);}
+require $argv[1];
+$GLOBALS['checks']=0;
+$work=sys_get_temp_dir().'/r24-history-helper-'.bin2hex(random_bytes(8));mkdir($work,0700);mkdir($work.'/hpos',0700);putenv('CETECH_R24_PRIVATE='.$work);putenv('CETECH_R24_BACKEND=hpos');
+function r24_test_remove(string$path):void{if(is_dir($path)&&!is_link($path)){foreach(new DirectoryIterator($path)as$entry){if(!$entry->isDot())r24_test_remove($entry->getPathname());}rmdir($path);}else{unlink($path);}}
+try{
+ $source=$work.'/source';mkdir($source);mkdir($source.'/nested');$config="<?php\ndefine( 'DB_NAME', 'source_db' );\ndefine( 'DB_USER', 'source_user' );\ndefine( 'DB_PASSWORD', 'source_password' );\ndefine( 'DB_HOST', '127.0.0.1:3306' );\n// Exact café bytes\n";file_put_contents($source.'/wp-config.php',$config);file_put_contents($source.'/nested/one',"Exact \0 café\r\n");
+ $destination=$work.'/destination';r24_hist_copy_tree($source,$destination);r24_test(file_get_contents($destination.'/wp-config.php')===$config);r24_test(file_get_contents($destination.'/nested/one')==="Exact \0 café\r\n");
+ $target=['database'=>'new_db','user'=>'new_user','password'=>str_repeat('a',64)];r24_hist_config($destination,$target);$actual=file_get_contents($destination.'/wp-config.php');foreach($target as$value){r24_test(str_contains($actual,"'".$value."'"));}foreach(['source_db','source_user','source_password']as$value){r24_test(!str_contains($actual,$value));}r24_test(str_contains($actual,"'127.0.0.1:3306'"));r24_test(str_contains($actual,'Exact café bytes'));
+ file_put_contents($destination.'/wp-config.php',$config."define( 'DB_NAME', 'duplicate' );\n");$before=file_get_contents($destination.'/wp-config.php');r24_denied(static fn()=>r24_hist_config($destination,$target));r24_test(file_get_contents($destination.'/wp-config.php')===$before);
+ symlink($source.'/nested/one',$source.'/link');r24_denied(static fn()=>r24_hist_copy_tree($source,$work.'/symlink-copy'));r24_denied(static fn()=>r24_hist_copy_tree($source,$destination));
+ r24_hist_exec([PHP_BINARY,'-r','exit(0);'],'success',2);r24_test(is_file($work.'/hpos/success-log'));r24_denied(static fn()=>r24_hist_exec([PHP_BINARY,'-r','exit(7);'],'failure',2));r24_denied(static fn()=>r24_hist_exec([PHP_BINARY,'-r','while(true){usleep(10000);}'],'timeout',1));
+ $GLOBALS['wpdb']=new class {
+  public string$prefix='owned_';public string$postmeta='owned_postmeta';public int$insert_id=100;public array$rows=[];private array$tokens=[];private int$next=0;
+  public function prepare(string$sql,mixed...$args):string{$token='query-'.++$this->next;$this->tokens[$token]=[$sql,$args];return$token;}
+  public function query(string$token):int{[$sql,$args]=$this->tokens[$token];if(str_starts_with($sql,'DELETE')){[$id,$owner,$key]=$args;if(!isset($this->rows[$id])||$this->rows[$id]['owner_id']!==$owner||$this->rows[$id]['meta_key']!==$key)return 0;unset($this->rows[$id]);return 1;}if(str_starts_with($sql,'UPDATE')){if(str_contains($sql,'meta_value=NULL')){[$id,$owner,$key]=$args;$value=null;}else{[$value,$id,$owner,$key]=$args;}if(!isset($this->rows[$id])||$this->rows[$id]['owner_id']!==$owner||$this->rows[$id]['meta_key']!==$key)return 0;$this->rows[$id]['meta_value']=$value;return 1;}if(str_starts_with($sql,'INSERT')){if(count($args)===4){[$id,$owner,$key,$value]=$args;if(isset($this->rows[$id]))return 0;}else{[$owner,$key,$value]=$args;$id=++$this->insert_id;}$this->rows[$id]=['row_id'=>$id,'owner_id'=>$owner,'meta_key'=>$key,'meta_value'=>$value];ksort($this->rows);return 1;}throw new RuntimeException('Unexpected owned query.');}
+  public function select(string$token):array{[$sql,$args]=$this->tokens[$token];r24_require(str_starts_with($sql,'SELECT')&&count($args)===1);return isset($this->rows[$args[0]])?[$this->rows[$args[0]]]:[];}
+ };
+ foreach(['_cetech_de_policy_packet','_cetech_de_policy_format','_cetech_de_policy_line_key','_cetech_de_policy_manifest','_cetech_de_policy_manifest_format']as$i=>$key){$row=['row_id'=>$i+1,'owner_id'=>900+$i,'meta_key'=>$key,'meta_value'=>"Exact café \"bytes\"\r\n".$i];$GLOBALS['wpdb']->rows[$row['row_id']]=$row;}
+ foreach($GLOBALS['wpdb']->rows as$row)foreach(['missing','duplicate','null']as$operation){$before=$GLOBALS['wpdb']->rows;$root=in_array($row['meta_key'],['_cetech_de_policy_manifest','_cetech_de_policy_manifest_format'],true);$target=['table'=>$root?'owned_wc_orders_meta':'owned_woocommerce_order_itemmeta','pk'=>$root?'id':'meta_id','fk'=>$root?'order_id':'order_item_id','row'=>$row];$group=$root?'orders':'order-items';$cacheBefore=count($GLOBALS['history_cache_deletes']);$extra=r24_hist_mutate($target,$operation);r24_test($GLOBALS['wpdb']->rows!==$before);if('missing'===$operation)r24_test(!isset($GLOBALS['wpdb']->rows[$row['row_id']]));if('duplicate'===$operation){r24_test($extra!==null);r24_test($GLOBALS['wpdb']->rows[$extra]['meta_value']===$row['meta_value']);}if('null'===$operation)r24_test($GLOBALS['wpdb']->rows[$row['row_id']]['meta_value']===null);r24_hist_restore_meta($target,$extra);r24_test($GLOBALS['wpdb']->rows===$before);r24_test($GLOBALS['wpdb']->rows[$row['row_id']]['row_id']===$row['row_id']);$cacheEntry=[WC_Data::generate_meta_cache_key($row['owner_id'],$group),$group];r24_require(array_slice($GLOBALS['history_cache_deletes'],$cacheBefore)===[$cacheEntry,$cacheEntry]);}
+ $GLOBALS['wpdb']=new class {
+  public array$rows=[];private array$tokens=[];private int$next=0;
+  public function prepare(string$sql,mixed...$args):string{$token='option-'.++$this->next;$this->tokens[$token]=[$sql,$args];return$token;}
+  public function query(string$token):int{[$sql,$args]=$this->tokens[$token];[$id,$name,$bytes,$autoload]=$args;$row=['option_id'=>$id,'option_name'=>$name,'option_value'=>$bytes,'autoload'=>$autoload];if(str_starts_with($sql,'DELETE')){if(($this->rows[$id]??null)!==$row)return 0;unset($this->rows[$id]);return 1;}if(str_starts_with($sql,'INSERT')){if(isset($this->rows[$id]))return 0;$this->rows[$id]=$row;return 1;}throw new RuntimeException('Unexpected owned option query.');}
+  public function select(string$token):array{[$sql,$args]=$this->tokens[$token];r24_require(str_starts_with($sql,'SELECT')&&count($args)===1);return isset($this->rows[$args[0]])?[$this->rows[$args[0]]]:[];}
+ };
+ $index=['option_id'=>54,'option_name'=>'owned_order_index','option_value'=>"Exact café index\r\n",'autoload'=>'off'];$GLOBALS['wpdb']->rows[54]=$index;$original=$GLOBALS['wpdb']->rows;r24_hist_remove_index('wp_options',$index);r24_test([]===$GLOBALS['wpdb']->rows);r24_hist_restore_index('wp_options',$index);r24_test($GLOBALS['wpdb']->rows===$original);$foreign=$index;$foreign['option_value']='foreign same-id row';$GLOBALS['wpdb']->rows[54]=$foreign;r24_denied(static fn()=>r24_hist_restore_index('wp_options',$index));r24_test($GLOBALS['wpdb']->rows===[54=>$foreign]);r24_denied(static fn()=>r24_hist_remove_index('wp_options',$index));r24_test($GLOBALS['wpdb']->rows===[54=>$foreign]);r24_denied(static fn()=>r24_hist_remove_index('unsafe`table',$index));
+ r24_test(false===r24_history_command('unhandled-mode',[],''));
+ echo json_encode(['status'=>'PASS','checks'=>$GLOBALS['checks'],'physical_sql_or_wordpress'=>false],JSON_THROW_ON_ERROR),"\n";
+}finally{r24_test_remove($work);}

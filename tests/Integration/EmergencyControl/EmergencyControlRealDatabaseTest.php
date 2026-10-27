@@ -253,7 +253,7 @@ final class EmergencyControlRealDatabaseTest extends TestCase {
 		foreach ( $flags->defaults() as $name => $value ) { $key = $flags->option_name( $name ); DB::insert_option( $this->database, $this->prefix, $key, $value ? '1' : '0', 'on' ); $names[] = $key; }
 		$before = DB::options( $this->database, $this->prefix ); $definitions = [];
 		foreach ( DataLifecycleManifest::RETAINED_QUOTE_DOMAIN_TABLE_SUFFIXES as $suffix ) { $definitions[$suffix] = $this->definition( $suffix ); }
-		self::assertCount( 23, $names );
+		self::assertCount( 24, $names ); self::assertFalse( $flags->defaults()['enable_customer_policy_runtime'] );
 		self::assertCount( 32, DataLifecycleManifest::ORIGINAL_DOMAIN_TABLE_SUFFIXES );
 		self::assertCount( 32, array_intersect( DataLifecycleManifest::ORIGINAL_DOMAIN_TABLE_SUFFIXES, array_keys( $definitions ) ) );
 		self::assertCount( 35, $definitions ); $this->accept( $this->transition() ); $accepted = $this->records()[0]; $this->accept( $this->transition( 'resume', $this->payload( 'enabled' ) ) );

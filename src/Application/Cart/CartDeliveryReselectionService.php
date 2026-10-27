@@ -246,9 +246,11 @@ final class CartDeliveryReselectionService {
 		$updated = CartDeliverySelectionReconciler::apply_refresh( $item, $fresh, $validation->matched_option );
 
 		$contents = $cart->get_cart();
+		$before = $contents;
 		$contents[ $cart_item_key ] = $updated;
 		$contents = $this->reconciler->rekey_contents( $contents );
 		$cart->cart_contents = $contents;
+		if ( function_exists( 'do_action' ) ) { do_action( 'cetech_de_native_cart_frame_changed', $cart, $before, $cart->get_cart() ); }
 
 		if ( method_exists( $cart, 'set_session' ) ) {
 			$cart->set_session();

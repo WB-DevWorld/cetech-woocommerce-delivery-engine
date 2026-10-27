@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Integrations\Blocks;
 
+use CetechDeliveryEngine\Presentation\Shared\CustomerPolicyRenderer;
+
 use CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy;
 
 /**
@@ -50,6 +52,7 @@ final class BlocksScriptIntegration {
 			return;
 		}
 
+		CustomerPolicyRenderer::register_assets();
 		$version = defined( 'CETECH_DE_VERSION' ) ? CETECH_DE_VERSION : '0';
 		$base    = defined( 'CETECH_DE_URL' ) ? CETECH_DE_URL : '';
 
@@ -63,7 +66,7 @@ final class BlocksScriptIntegration {
 		wp_register_script(
 			BlocksCheckoutAdapter::SCRIPT_HANDLE,
 			$base . 'assets/frontend/blocks-checkout.js',
-			[],
+			[ CustomerPolicyRenderer::SCRIPT_HANDLE ],
 			$version,
 			true
 		);

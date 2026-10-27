@@ -1,0 +1,32 @@
+<?php
+declare(strict_types=1);
+/** Genuine Woo hydration; all post/metadata/cache/CRUD services below are declared memory ports. */
+define('ABSPATH',__DIR__.'/native-woocommerce/');
+require dirname(__DIR__,3).'/vendor/autoload.php';
+$mode=$argv[1]??'both-deleted';
+if(!in_array($mode,['untouched','simple-deleted','parent-deleted','variation-deleted','both-deleted','wrong-parent-type','wrong-variation-type'],true))throw new InvalidArgumentException('Unknown native hydration case.');
+$GLOBALS['hydration_posts']=[33=>'product',34=>'product_variation'];
+$GLOBALS['hydration_meta']=['_product_id'=>'33','_variation_id'=>$mode==='simple-deleted'?'0':'34','_qty'=>'2','_tax_class'=>'','_line_subtotal'=>'10.00','_line_total'=>'10.00','_line_tax_data'=>['total'=>[],'subtotal'=>[]]];
+$GLOBALS['hydration_post_reads']=0;$GLOBALS['hydration_writes']=0;$GLOBALS['hydration_errors']=[];
+function absint($value){return abs((int)$value);}function __($text,$domain=null){return$text;}function apply_filters($tag,$value,...$args){return$value;}function do_action(...$args):void{}
+function get_post_type($id){++$GLOBALS['hydration_post_reads'];return$GLOBALS['hydration_posts'][$id]??false;}
+function get_metadata($type,$id,$key,$single=false){if($type!=='order_item'||$id!==456||$single!==true)throw new LogicException('Foreign declared metadata read.');return$GLOBALS['hydration_meta'][$key]??'';}
+function get_option($key,$default=false){return$default;}function wc_stock_amount($value){return(int)$value;}function wc_format_decimal($value,$dp=false,$trim=false){return(string)$value;}function wc_get_price_decimals(){return 2;}function wc_round_tax_total($value){return(float)$value;}function maybe_unserialize($value){return$value;}function wp_check_invalid_utf8($value){return(string)$value;}
+function wp_cache_get(...$args){return false;}function wp_cache_set(...$args){return true;}function wp_using_ext_object_cache(){return false;}
+function wc_get_container(){return new class{public function get($type){return new class{public function feature_is_enabled(){return false;}};}};}
+class WC_Cache_Helper{public static function get_cache_prefix($group){return'owned-memory:';}}
+class WP_Error{private array$errors=[];public function add($code,$message,$data=null){$this->errors[$code]=$message;$GLOBALS['hydration_errors'][]=$code;}public function get_error_codes(){return array_keys($this->errors);}}
+class WC_Tax{public static function get_tax_class_slugs(){return[];}}
+$GLOBALS['wpdb']=new class{public string$prefix='owned_';public function prepare($sql,...$args){return$sql;}public function get_row($sql){return(object)['order_id'=>123,'order_item_name'=>'Immutable saved item'];}public function __call($method,$args){++$GLOBALS['hydration_writes'];throw new LogicException('Unexpected native database mutation.');}};
+$files=['abstract-wc-data.php','class-wc-meta-data.php','src/Internal/CostOfGoodsSold/CogsAwareTrait.php','includes/class-wc-data-exception.php','includes/class-wc-order-item.php','includes/class-wc-order-item-product.php','includes/interfaces/class-wc-object-data-store-interface.php','includes/interfaces/class-wc-order-item-product-data-store-interface.php','includes/interfaces/class-wc-order-item-type-data-store-interface.php','includes/data-stores/class-wc-data-store-wp.php','includes/data-stores/abstract-wc-order-item-type-data-store.php','includes/data-stores/class-wc-order-item-product-data-store.php','src/Utilities/NumberUtil.php'];
+$sources=[];foreach($files as$file){require ABSPATH.$file;$sources[$file]=hash_file('sha256',ABSPATH.$file);}
+/** Native datastore dispatch plus an empty custom-metadata read port; the product-ID hydration is genuine. */
+class WC_Data_Store{private object$native;public static function load($type){if($type!=='order-item-product')throw new LogicException('Unexpected native datastore.');return new self();}public function __construct(){$this->native=new WC_Order_Item_Product_Data_Store();}public function read(&$item){$this->native->read($item);}public function read_meta(&$item){return[];}}
+$metadata=$GLOBALS['hydration_meta'];$first=new WC_Order_Item_Product(456);$before=[$first->get_product_id('edit'),$first->get_variation_id('edit')];
+switch($mode){case'simple-deleted':case'parent-deleted':unset($GLOBALS['hydration_posts'][33]);break;case'variation-deleted':unset($GLOBALS['hydration_posts'][34]);break;case'both-deleted':unset($GLOBALS['hydration_posts'][33],$GLOBALS['hydration_posts'][34]);break;case'wrong-parent-type':$GLOBALS['hydration_posts'][33]='page';break;case'wrong-variation-type':$GLOBALS['hydration_posts'][34]='product';break;}
+$second=new WC_Order_Item_Product(456);$after=[$second->get_product_id('edit'),$second->get_variation_id('edit')];$property=new ReflectionProperty(WC_Data::class,'data');$raw=method_exists($property,'getRawValue')?$property->getRawValue($second):$property->getValue($second);
+// Inspect only the pure coordinate predicate; no Stage, grant or authority constructor is bypassed.
+$reads_before=$GLOBALS['hydration_post_reads'];$writes_before=$GLOBALS['hydration_writes'];$changes_before=$second->get_changes();$history=new ReflectionMethod(CetechDeliveryEngine\Application\CustomerPolicy\PolicyNativeOrderFacts::class,'history_coordinate');
+$history_coordinates=[$history->invoke(null,$second,'product_id',33),$history->invoke(null,$second,'variation_id',$mode==='simple-deleted'?0:34)];
+$after_history_raw=method_exists($property,'getRawValue')?$property->getRawValue($second):$property->getValue($second);
+echo json_encode(['history_coordinates'=>$history_coordinates,'history_extra_post_reads'=>$GLOBALS['hydration_post_reads']-$reads_before,'history_extra_writes'=>$GLOBALS['hydration_writes']-$writes_before,'history_raw_unchanged'=>$after_history_raw===$raw,'history_changes_unchanged'=>$second->get_changes()===$changes_before,'physical_qualification'=>false,'native_product_and_item_classes'=>true,'native_datastore_read'=>true,'metadata_post_cache_crud_ports'=>'declared_memory','before'=>$before,'after'=>$after,'raw_native_ids'=>[$raw['product_id'],$raw['variation_id']],'native_changes'=>$second->get_changes(),'object_read'=>$second->get_object_read(),'raw_metadata_preserved'=>$metadata===$GLOBALS['hydration_meta'],'raw_ids'=>[$GLOBALS['hydration_meta']['_product_id'],$GLOBALS['hydration_meta']['_variation_id']],'post_reads'=>$GLOBALS['hydration_post_reads'],'writes'=>$GLOBALS['hydration_writes'],'caught_setter_codes'=>$GLOBALS['hydration_errors'],'pinned_sources'=>$sources],JSON_THROW_ON_ERROR),"\n";

@@ -17,6 +17,9 @@ use CetechDeliveryEngine\Infrastructure\Persistence\WpdbPolicyAssignmentAdminInt
 use CetechDeliveryEngine\Application\PolicyAssignment\PolicyAssignmentAdminWorkflow;
 use CetechDeliveryEngine\Presentation\Admin\PolicyAssignmentPage;
 
+use CetechDeliveryEngine\Application\CustomerPolicy\CustomerPolicyFacade;
+use CetechDeliveryEngine\Application\CustomerPolicy\CustomerPolicyFinalGuard;
+use CetechDeliveryEngine\Integrations\CustomerPolicy\PolicyCheckoutRuntime;
 use CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutAdmissionService;
 use CetechDeliveryEngine\Application\EmergencyControl\EmergencyCheckoutQuoteValidator;
 use CetechDeliveryEngine\Application\DeliveryQuote\CartQuoteReviewService;
@@ -443,6 +446,7 @@ final class Plugin {
 		$this->container->get( QuotePlacementRuntime::class )->register();
 		$this->container->get( QuoteReviewRuntime::class )->register();
 		$this->container->get( QuoteRateReferenceRuntime::class )->register();
+		CustomerPolicyComposition::mount( $this->container );
 		$this->container->get( OrderDeliverySnapshotPersister::class )->set_quote_ownership_guard( [ $this->container->get( QuotePlacementRuntime::class ), 'owns_order' ] );
 
 		$this->container->get( ProductDeliverySelectorRenderer::class )->register();
@@ -577,9 +581,10 @@ final class Plugin {
 			static fn( ServiceContainer $container ): EmergencyCheckoutAdmissionService => new EmergencyCheckoutAdmissionService(
 				$container->get( EmergencyControlService::class ),
 				$container->get( EmergencyOwnershipClassifier::class ),
-				$container->get( QuotePlacementRuntime::class ),
+				$container->get( CustomerPolicyFinalGuard::class ),
 				$container->get( EmergencyOwnershipLatch::class ),
-				$container->get( QuotePlacementRuntime::class )
+				$container->get( CustomerPolicyFinalGuard::class ),
+				[ $container->get( PolicyCheckoutRuntime::class ), 'owns_order' ]
 			) );
 		$this->container->singleton( EmergencyControlRuntime::class,
 			static fn( ServiceContainer $container ): EmergencyControlRuntime => new EmergencyControlRuntime(
@@ -661,6 +666,7 @@ final class Plugin {
 		$this->register_emergency_control_services();
 		$this->register_quote_review_services();
 		$this->register_promise_configuration_services();
+		CustomerPolicyComposition::register( $this->container );
 		$this->container->singleton(
 			FeatureFlags::class,
 			static fn (): FeatureFlags => new FeatureFlags()
@@ -716,7 +722,8 @@ final class Plugin {
 				$container->get( CartDeliverySelectionCapture::class ),
 				$container->get( CartDeliverySelectionRevalidator::class ),
 				$container->get( ShippingRateCalculationGate::class ),
-				$container->get( CheckoutAddressPolicy::class )
+				$container->get( CheckoutAddressPolicy::class ),
+				$container->get( CustomerPolicyFacade::class )
 			)
 		);
 
@@ -1111,7 +1118,8 @@ final class Plugin {
 				$container->get( CustomerBrowsingLocationStore::class ),
 				$container->get( CanonicalLocationResolver::class ),
 				$container->get( ShopperDeliveryLocationPrecision::class ),
-				$container->get( EmergencyControlRuntime::class )
+				$container->get( EmergencyControlRuntime::class ),
+				$container->get( CustomerPolicyFacade::class )
 			)
 		);
 
@@ -1499,7 +1507,8 @@ final class Plugin {
 				$container->get( CustomerBrowsingLocationStore::class ),
 				$container->get( LocationAwareDeliveryOptions::class ),
 				$container->get( ShopperDeliveryLocationPrecision::class ),
-				$container->get( EmergencyControlRuntime::class )
+				$container->get( EmergencyControlRuntime::class ),
+				$container->get( CustomerPolicyFacade::class )
 			)
 		);
 
@@ -1507,7 +1516,8 @@ final class Plugin {
 			VariableDeliverySelectorAssets::class,
 			static fn ( ServiceContainer $container ): VariableDeliverySelectorAssets => new VariableDeliverySelectorAssets(
 				$container->get( FeatureFlags::class ),
-				$container->get( Requirements::class )
+				$container->get( Requirements::class ),
+				$container->get( CustomerPolicyFacade::class )
 			)
 		);
 
@@ -1521,7 +1531,8 @@ final class Plugin {
 				$container->get( VariationRelationshipInspectorInterface::class ),
 				$container->get( LocationAwareDeliveryOptions::class ),
 				$container->get( ShopperDeliveryLocationPrecision::class ),
-				$container->get( EmergencyControlRuntime::class )
+				$container->get( EmergencyControlRuntime::class ),
+				$container->get( CustomerPolicyFacade::class )
 			)
 		);
 

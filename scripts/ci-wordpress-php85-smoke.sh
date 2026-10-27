@@ -322,6 +322,8 @@ if [[ "$HTTP_OPENING_ENABLED" == "1" ]]; then
 	# R23 depends only on the original native receipt and restored CPT state.
 	# Run the new finite journey first; every retained gate below stays required.
 	bash "$ROOT/scripts/ci-policy-assignment-admin-native.sh" "$WORK" "$NATIVE"
+	# R24 owns two child derivatives; every retained gate remains required.
+	bash "$ROOT/scripts/ci-customer-policy-native.sh" "$WORK" "$NATIVE" "$CETECH_DE_P06_CURRENT_PACKAGE"
 	# N18 consumes the native identity receipt; retain every HTTP and later gate.
 	bash "$ROOT/scripts/ci-promotion-cart-http-qualification.sh" "$WORK" "$NATIVE"
 	bash "$ROOT/scripts/ci-opening-http-qualification.sh" "$WORK" "$NATIVE"

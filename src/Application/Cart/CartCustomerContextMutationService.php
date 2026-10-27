@@ -120,7 +120,9 @@ final class CartCustomerContextMutationService {
 		}
 
 		$cart                 = WC()->cart;
+		$before               = $cart->get_cart();
 		$cart->cart_contents  = $contents;
+		if ( function_exists( 'do_action' ) ) { do_action( 'cetech_de_native_cart_frame_changed', $cart, $before, $cart->get_cart() ); }
 
 		if ( method_exists( $cart, 'set_session' ) ) {
 			$cart->set_session();

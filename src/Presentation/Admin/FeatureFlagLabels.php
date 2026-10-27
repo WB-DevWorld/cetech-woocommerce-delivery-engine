@@ -34,6 +34,10 @@ final class FeatureFlagLabels {
 				'label'       => 'Save delivery details on the order',
 				'description' => 'Stores a locked copy of the chosen delivery option on the order after checkout.',
 			],
+			'enable_customer_policy_runtime' => [
+				'label'       => 'Review and save return and refund policies at checkout',
+				'description' => 'Off by default. When enabled, shoppers review the assigned return and refund policies before checkout, and the accepted wording is saved on the order. Saved order policies remain readable when this is off.',
+			],
 			'enable_customer_order_delivery_summary' => [
 				'label'       => 'Show delivery details on customer order pages',
 				'description' => 'Displays the saved delivery summary on the customer’s order screen.',

@@ -20,6 +20,7 @@ final class FeatureFlags {
 		'enable_order_delivery_snapshot_persistence' => false,
 		'enable_customer_order_delivery_summary' => false,
 		'enable_customer_email_delivery_summary' => false,
+		'enable_customer_policy_runtime' => false,
 		'enable_shipment_records'          => false,
 		'enable_customer_timeline'         => false,
 		'enable_tracking_links'            => false,

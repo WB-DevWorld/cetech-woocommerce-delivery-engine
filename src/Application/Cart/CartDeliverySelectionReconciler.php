@@ -102,6 +102,7 @@ final class CartDeliverySelectionReconciler {
 
 			if ( $changed || array_keys( $rekeyed ) !== array_keys( $contents ) ) {
 				$cart->cart_contents = $rekeyed;
+				if ( function_exists( 'do_action' ) ) { do_action( 'cetech_de_native_cart_frame_changed', $cart, $contents, $cart->get_cart() ); }
 
 				if ( method_exists( $cart, 'set_session' ) ) {
 					$cart->set_session();

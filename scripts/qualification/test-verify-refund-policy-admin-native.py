@@ -128,7 +128,7 @@ class RefundPolicyNativeProtocolTest(unittest.TestCase):
         native = copy.deepcopy(self.native)
         native.update(status="PASS", cases=[{"id": "synthetic-prior-" + str(index), "status": "PASS"} for index in range(495)])
         path = self.root / "opening-qualification-results.json"
-        native["installed_php_sources"] = dict(sorted({**{path: "c" * 64 for path in verifier.REFUND_SOURCES}, **{"src/Synthetic%04d.php" % index: "d" * 64 for index in range(968-len(verifier.REFUND_SOURCES))}}.items()))
+        native["installed_php_sources"] = dict(sorted({**{path: "c" * 64 for path in verifier.REFUND_SOURCES}, **{"src/Synthetic%04d.php" % index: "d" * 64 for index in range(1004-len(verifier.REFUND_SOURCES))}}.items()))
         native["installed_php_sources_hash"] = verifier.hashlib.sha256(verifier.canonical(native["installed_php_sources"])).hexdigest()
         path.write_text(json.dumps(native))
         with patch.dict(verifier.os.environ, {}, clear=True):
@@ -142,7 +142,7 @@ class RefundPolicyNativeProtocolTest(unittest.TestCase):
         native = copy.deepcopy(self.native)
         native.update(status="PASS", cases=[{"id": "synthetic-prior-" + str(index), "status": "PASS"} for index in range(495)])
         sources = {path: "c" * 64 for path in verifier.REFUND_SOURCES}
-        sources.update({"src/Synthetic%04d.php" % index: "d" * 64 for index in range(968-len(sources))})
+        sources.update({"src/Synthetic%04d.php" % index: "d" * 64 for index in range(1004-len(sources))})
         sources.pop(verifier.REFUND_SOURCES[0])
         sources["src/Substituted.php"] = "e" * 64
         native["installed_php_sources"] = dict(sorted(sources.items()))

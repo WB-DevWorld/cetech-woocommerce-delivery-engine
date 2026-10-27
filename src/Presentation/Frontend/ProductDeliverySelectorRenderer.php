@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Frontend;
 
+use CetechDeliveryEngine\Application\CustomerPolicy\CustomerPolicyFacade;
+use CetechDeliveryEngine\Presentation\Shared\CustomerPolicyRenderer;
+
 use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlRuntime;
 use CetechDeliveryEngine\Integrations\EmergencyControl\EmergencyControlResponse;
 
@@ -40,6 +43,7 @@ use WC_Product;
  * Stage 13F: compact public hierarchy (label + estimate). Does not calculate shipping prices or write order meta.
  */
 final class ProductDeliverySelectorRenderer {
+	private array $policy_views = [];
 
 	public const STYLE_HANDLE = 'cetech-de-product-delivery-selector';
 
@@ -53,7 +57,8 @@ final class ProductDeliverySelectorRenderer {
 		private ?CustomerBrowsingLocationStore $browsing_store = null,
 		private ?LocationAwareDeliveryOptions $location_options = null,
 		private ?ShopperDeliveryLocationPrecision $precision = null,
-		private ?EmergencyControlRuntime $emergency_control = null
+		private ?EmergencyControlRuntime $emergency_control = null,
+		private ?CustomerPolicyFacade $policy_facade = null
 	) {
 	}
 
@@ -91,10 +96,11 @@ final class ProductDeliverySelectorRenderer {
 			$version
 		);
 
+		if ( $this->policy_facade?->enabled() ) { CustomerPolicyRenderer::register_assets(); }
 		wp_enqueue_script(
 			self::SCRIPT_HANDLE,
 			$base . 'assets/frontend/product-delivery-selector.js',
-			[],
+			$this->policy_facade?->enabled() ? [ CustomerPolicyRenderer::SCRIPT_HANDLE ] : [],
 			$version,
 			true
 		);
@@ -110,6 +116,7 @@ final class ProductDeliverySelectorRenderer {
 				'action'    => MatchingLocationOptionsEndpoint::ACTION,
 				'nonce'     => function_exists( 'wp_create_nonce' ) ? wp_create_nonce( MatchingLocationOptionsEndpoint::ACTION ) : '',
 				'productId' => $product_id,
+				'policyEnabled' => $this->policy_facade?->enabled() ?? false,
 				'i18n'      => [
 					'needLocation' => CustomerStorefrontCopy::where_do_you_want_this_item(),
 					'needPrecision' => CustomerStorefrontCopy::select_city_town_for_exact_fee(),
@@ -376,6 +383,7 @@ final class ProductDeliverySelectorRenderer {
 			$selected = $this->display_key_is_pickup( $available, $posted ) ? $posted : '';
 		}
 		$visible      = CustomerVisibleDeliveryOptionGate::selectable_pdp_cards( $visible );
+		$this->policy_views = $this->policy_facade?->for_options( $product_id, 0, $this->current_quantity(), $visible, $browsing ) ?? [];
 		$groups       = ProductDeliveryOptionsBuilder::groupByChoice( $visible );
 		$active_choice = $this->active_choice( $visible !== [] ? $visible : $available, $selected, $has_switch || ! empty( $capabilities['has_pickup'] ) );
 
@@ -547,6 +555,7 @@ final class ProductDeliverySelectorRenderer {
 		echo '</span>';
 		echo '</label>';
 		echo '</p>';
+		echo CustomerPolicyRenderer::option_html( $this->policy_views[ $option->display_key ] ?? null, $option->display_key );
 	}
 
 	private function render_pickup_card_meta( ProductDeliveryOption $option ): void {
