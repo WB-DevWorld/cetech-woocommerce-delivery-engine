@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import ast
 import contextlib
+import copy
 import hashlib
 import importlib.util
 import io
@@ -333,6 +334,67 @@ def execute(args):
         stage_results.append({"stage": stage, "completed": False,
                               "failure": failure(caught, literals, qualification)})
     report["stages"] = stage_results
+    # Counterfactual tooling experiment only: the authenticated original is never changed.
+    proposal = {
+        "counterfactual_proposal_only": True,
+        "candidate_qualification": False,
+        "change": {
+            "current_id": "NATIVE-C06-AUTHORED-OPTIONS-ALL24-FLAGS-SEEDED",
+            "proposed_frozen_id": "NATIVE-C06-AUTHORED-OPTIONS-ALL23-FLAGS-SEEDED",
+            "field": "one native cases[index].id",
+        },
+    }
+    counterfactual_stage = "assert_one_identifier_change"
+    try:
+        current_id = proposal["change"]["current_id"]
+        frozen_id = proposal["change"]["proposed_frozen_id"]
+        original_raw = paths[0].read_bytes()
+        need(sha(original_raw) == copied[0]["receipt_sha256"],
+             "Original native raw bytes changed before proposal")
+        original_canonical = canon(reports[0])
+        original_cases = reports[0]["cases"]
+        indexes = [index for index, case in enumerate(original_cases)
+                   if case["id"] == current_id]
+        need(len(indexes) == 1
+             and not any(case["id"] == frozen_id for case in original_cases),
+             "Single current identifier and absent frozen identifier required")
+        proposed = copy.deepcopy(reports[0])
+        index = indexes[0]
+        proposed["cases"][index]["id"] = frozen_id
+        restored = copy.deepcopy(proposed)
+        restored["cases"][index]["id"] = current_id
+        need(canon(restored) == original_canonical
+             and canon(reports[0]) == original_canonical
+             and paths[0].read_bytes() == original_raw,
+             "Counterfactual altered other fields or original bytes")
+        proposal["single_identifier_only_verified"] = True
+        proposal["original_raw_unchanged_before"] = True
+        proposal["original_canonical_sha256"] = sha(original_canonical)
+        proposal["proposed_canonical_sha256"] = sha(canon(proposed))
+        counterfactual_stage = "unchanged_verify_reports"
+        totals, proposed_error, output = captured(
+            lambda: verifier.verify_reports(proposed, reports[1], reports[2], expected))
+        proposal["verifier_completed"] = proposed_error is None
+        proposal["captured_output"] = output
+        proposal["failure"] = (
+            failure(proposed_error, literals, qualification) if proposed_error else None)
+        proposal["returned_counts"] = list(totals) if (
+            proposed_error is None and isinstance(totals, (list, tuple))
+            and len(totals) == 5
+            and all(type(value) is int and 0 <= value <= 1000 for value in totals)
+        ) else None
+        counterfactual_stage = "verify_original_unchanged_after"
+        need(paths[0].read_bytes() == original_raw
+             and canon(reports[0]) == original_canonical,
+             "Original native receipt changed during counterfactual verifier")
+        proposal["original_raw_unchanged_after"] = True
+        proposal["original_parsed_unchanged_after"] = True
+        proposal["experiment_completed"] = True
+    except Exception as caught:
+        proposal["experiment_completed"] = False
+        proposal["failure_stage"] = counterfactual_stage
+        proposal["failure"] = failure(caught, literals, qualification)
+    report["counterfactual_one_identifier_restoration"] = proposal
     need(not run_git(source, "status", "--porcelain"),
          "Candidate changed during read-only diagnosis")
     report["candidate_clean_after"] = True

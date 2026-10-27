@@ -42,7 +42,7 @@ jobs:
           from pathlib import Path
           expected = {
               'tooling/scripts/qualification/r24-originals-remote-bootstrap.py': 'd1fbdf4e4613bddb583285ac75288094d2638f48dfdd33b9550a330d6bf847af',
-              'tooling/scripts/qualification/r24-failed-quote-diagnostic.py': 'ddc8caddf82a6679e80582abc5371f00af719fc2f9a196c740cbebe79d1de7e3',
+              'tooling/scripts/qualification/r24-failed-quote-diagnostic.py': 'c5b05e6172ef02c3bc7b367c18bc533d9b030410afe601ad5485ff47bfc5cdca',
           }
           for name, sha in expected.items():
               raw = Path(name).read_bytes()
