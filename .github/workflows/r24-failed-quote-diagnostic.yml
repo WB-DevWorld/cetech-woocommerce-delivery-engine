@@ -20,7 +20,6 @@ jobs:
     timeout-minutes: 10
     env:
       PYTHONDONTWRITEBYTECODE: '1'
-      TASK_DIAG_DIR: ${{ runner.temp }}/r24-quote-diag-40419092642
     steps:
       - name: Checkout owned diagnostic tooling
         uses: actions/checkout@v4
@@ -54,6 +53,7 @@ jobs:
       - name: Reproduce unchanged validator on authenticated original three archives
         env:
           GITHUB_TOKEN: ${{ github.token }}
+          TASK_DIAG_DIR: ${{ runner.temp }}/r24-quote-diag-40419092642
         shell: bash
         run: |
           set -euo pipefail
