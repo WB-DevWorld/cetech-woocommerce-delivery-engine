@@ -122,6 +122,21 @@ jobs:
               '6bf96da91715cafb59db543608b62f9b49c90232055b0d4eb89f06900156b76d', module.MAX_SQL_LOG)
           print('root_mcp_rest_transport=PASS run=40419092642 parent_conclusion=failure sql_bytes=75379; candidate_qualification=false')
           PY
+      - name: Preflight exact frozen auditor and isolated parser dependency
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m venv "$RUNNER_TEMP/r24-audit-parser-check"
+          "$RUNNER_TEMP/r24-audit-parser-check/bin/python" -m pip install --disable-pip-version-check PyYAML==6.0.3
+          "$RUNNER_TEMP/r24-audit-parser-check/bin/python" - <<'PY'
+          import hashlib, yaml
+          from pathlib import Path
+          raw = Path('tooling/scripts/qualification/root-r24-original-audit.py').read_bytes()
+          assert hashlib.sha256(raw).hexdigest() == '5c10b54f11dc194704169d25d771dcee505482a32d83fdbc26dcf21a117670a3'
+          assert yaml.__version__ == '6.0.3'
+          print('frozen_auditor_and_isolated_parser=READY version=6.0.3; candidate_qualification=false')
+          PY
+          "$RUNNER_TEMP/r24-audit-parser-check/bin/python" tooling/scripts/qualification/root-r24-original-audit.py --help > /dev/null
       - name: Preserve bounded failed-candidate diagnostic
         if: always()
         uses: actions/upload-artifact@v4
