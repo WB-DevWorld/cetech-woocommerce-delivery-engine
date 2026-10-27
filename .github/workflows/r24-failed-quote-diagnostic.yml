@@ -69,6 +69,29 @@ jobs:
           print('R24_QUOTE_DIAGNOSTIC_SHA256=' + hashlib.sha256(raw).hexdigest())
           print('R24_QUOTE_DIAGNOSTIC=' + json.dumps(json.loads(raw), sort_keys=True, separators=(',', ':')))
           PY
+      - name: Check proposed producer regression and genuine old-fixture refusal
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 tooling/scripts/qualification/test-verify-quote-placement-receipts.py
+          python3 - <<'PY'
+          import importlib.util, sys, unittest
+          from pathlib import Path
+          from unittest.mock import patch
+          path = Path('tooling/scripts/qualification/test-verify-quote-placement-receipts.py').resolve()
+          spec = importlib.util.spec_from_file_location('r24_proposed_retained_regression', path)
+          module = importlib.util.module_from_spec(spec)
+          sys.modules[spec.name] = module
+          spec.loader.exec_module(module)
+          result = unittest.TestResult()
+          with patch.object(module, 'HERE', Path('candidate/scripts/qualification').resolve()):
+              module.ReceiptBoundaryTest('test_actual_lifecycle_case_keeps_frozen_retained_identity').run(result)
+          assert result.testsRun == 1 and len(result.errors) == 1 and not result.failures
+          assert 'RuntimeError: Retained Q05 inventory differs' in result.errors[0][1]
+          print('genuine_old_fixture_regression=EXPECTED_RED tests=1; proposed_fixture=GREEN')
+          PY
+          test -z "$(git -C candidate status --porcelain)"
+          test -z "$(git -C tooling status --porcelain)"
       - name: Preserve bounded failed-candidate diagnostic
         if: always()
         uses: actions/upload-artifact@v4
