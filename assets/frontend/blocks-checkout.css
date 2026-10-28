@@ -1,7 +1,7 @@
 .cetech-de-blocks-pickup-notes,
 .cetech-de-blocks-customer-context {
 	max-width: 100%;
-	overflow-x: hidden;
+	overflow: visible;
 }
 
 .cetech-de-blocks-customer-context {
@@ -13,19 +13,20 @@
 	margin: 0.5rem 0;
 	padding: 0.5rem 0.75rem;
 	border: 1px solid rgba(0, 0, 0, 0.12);
-	border-left-width: 4px;
+	border-inline-start-width: 4px;
 	background: #fff;
 }
 
 .cetech-de-blocks-notice--incomplete_delivery,
 .cetech-de-blocks-notice--failure {
-	border-left-color: #b32d2e;
+	border-inline-start-color: #b32d2e;
 }
 
 .cetech-de-blocks-line {
 	margin: 0.75rem 0;
 	padding: 0.75rem;
-	border: 1px solid rgba(0, 0, 0, 0.12);
+	border: 1px solid rgba(0, 0, 0, 0.16);
+	border-radius: 0.5rem;
 	background: #fff;
 	box-sizing: border-box;
 }
@@ -38,7 +39,7 @@
 
 .cetech-de-blocks-line__meta {
 	margin: 0.1rem 0;
-	opacity: 0.9;
+	line-height: 1.5;
 }
 
 .cetech-de-blocks-line__status {
@@ -72,8 +73,10 @@
 .cetech-de-blocks-editor__disclosure > summary {
 	cursor: pointer;
 	min-height: 2.75rem;
-	display: inline-flex;
-	align-items: center;
+	display: list-item;
+	list-style-position: inside;
+	padding-block: 0.5rem;
+	box-sizing: border-box;
 	font-weight: 600;
 }
 
@@ -91,8 +94,10 @@
 .cetech-de-blocks-editor summary {
 	cursor: pointer;
 	min-height: 2.75rem;
-	display: inline-flex;
-	align-items: center;
+	display: list-item;
+	list-style-position: inside;
+	padding-block: 0.5rem;
+	box-sizing: border-box;
 	font-weight: 600;
 }
 
@@ -165,7 +170,8 @@
 .cetech-de-delivery-plan {
 	margin: 0.75rem 0;
 	padding: 0.85rem;
-	border: 1px solid rgba(0, 0, 0, 0.12);
+	border: 1px solid rgba(0, 0, 0, 0.16);
+	border-radius: 0.5rem;
 	background: #fff;
 }
 
@@ -199,7 +205,7 @@
 
 @media (min-width: 769px) {
 	.cetech-de-blocks-editor__grid {
-		grid-template-columns: 1fr 1fr;
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
 	}
 }
 
@@ -211,6 +217,33 @@
 	.cetech-de-blocks-editor__cancel {
 		display: block;
 		width: 100%;
-		margin-right: 0;
+		margin-inline-end: 0;
 	}
+}
+
+.cetech-de-delivery-plan,
+.cetech-de-blocks-customer-context {
+	min-width: 0;
+	overflow-wrap: anywhere;
+	line-height: 1.5;
+}
+
+.cetech-de-delivery-plan__group + .cetech-de-delivery-plan__group {
+	margin-block-start: 0.75rem;
+	padding-block-start: 0.75rem;
+	border-block-start: 1px solid rgba(0, 0, 0, 0.16);
+}
+
+.cetech-de-delivery-plan__line {
+	padding-block: 0.25rem;
+}
+
+.cetech-de-delivery-plan__product {
+	display: block;
+	font-weight: 600;
+}
+
+.cetech-de-delivery-plan__offer {
+	display: block;
+	line-height: 1.5;
 }

@@ -108,7 +108,7 @@ final class CustomerShipmentRenderer {
 		if ( $this->flags->is_enabled( 'enable_tracking_links' ) && null !== $card->tracking_url ) {
 			$accessible = sprintf(
 				/* translators: %s: customer-facing shipment reference */
-				__( 'Track shipment %s', 'cetech-woocommerce-delivery-engine' ),
+				__( 'Track shipment %s (opens in a new tab)', 'cetech-woocommerce-delivery-engine' ),
 				$card->reference
 			);
 
@@ -116,6 +116,7 @@ final class CustomerShipmentRenderer {
 			echo '<a class="button cetech-de-customer-shipment__track-button" href="' . esc_url( $card->tracking_url ) . '" target="_blank" rel="noopener noreferrer" aria-label="' . esc_attr( $accessible ) . '">';
 			echo esc_html__( 'Track shipment', 'cetech-woocommerce-delivery-engine' );
 			echo '</a>';
+			echo '<span class="cetech-de-customer-shipment__track-hint">' . esc_html__( 'Opens in a new tab', 'cetech-woocommerce-delivery-engine' ) . '</span>';
 			echo '</p>';
 		}
 
@@ -159,7 +160,7 @@ final class CustomerShipmentRenderer {
 			return;
 		}
 
-		echo '<li><span class="label">' . esc_html( $label ) . ':</span> ' . esc_html( $value ) . '</li>';
+		echo '<li><span class="label">' . esc_html( $label ) . ':</span> <span class="cetech-de-customer-shipment__value">' . esc_html( $value ) . '</span></li>';
 	}
 
 	private function items_text( CustomerShipmentCard $card ): string {

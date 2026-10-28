@@ -12,24 +12,27 @@
 }
 
 .wrap.cetech-de-admin-page .cetech-de-scoped-tab-list a {
-	display: inline-block;
+	display: inline-flex;
+	align-items: center;
 	padding: 0.4rem 0.85rem;
 	border: 1px solid #c3c4c7;
 	border-radius: 4px;
 	background: #fff;
 	text-decoration: none;
 	color: #1d2327;
+	min-height: 32px;
+	box-sizing: border-box;
 }
 
-.wrap.cetech-de-admin-page .cetech-de-scoped-tab-list li.is-active a,
-.wrap.cetech-de-admin-page .cetech-de-scoped-tab-list a:focus {
+.wrap.cetech-de-admin-page .cetech-de-scoped-tab-list li.is-active a {
 	border-color: #2271b1;
-	box-shadow: 0 0 0 1px #2271b1;
-	outline: 2px solid transparent;
+	background: var(--cetech-de-info-bg, #f0f6fc);
+	color: var(--cetech-de-info-text, #0a4b78);
+	font-weight: 600;
 }
 
 .wrap.cetech-de-admin-page .cetech-de-field-editor {
-	margin: 0 0 1.5rem;
+	margin: 0 0 1rem;
 	padding: 1rem 1.1rem;
 	border: 1px solid #dcdcde;
 	border-radius: 6px;
@@ -44,28 +47,35 @@
 .wrap.cetech-de-admin-page .cetech-de-state {
 	display: inline-block;
 	padding: 0.1rem 0.45rem;
-	border-radius: 3px;
+	border: 1px solid transparent;
+	border-radius: 4px;
 	font-weight: 600;
+	font-size: 12px;
+	line-height: 1.5;
 }
 
 .wrap.cetech-de-admin-page .cetech-de-state--success {
-	background: #edfaef;
-	color: #0a5c2d;
+	background: var(--cetech-de-success-bg, #edfaef);
+	color: var(--cetech-de-success-text, #007017);
+	border-color: var(--cetech-de-success-border, #b8e6bf);
 }
 
 .wrap.cetech-de-admin-page .cetech-de-state--warning {
-	background: #fcf0e3;
-	color: #8a5100;
+	background: var(--cetech-de-warning-bg, #fcf9e8);
+	color: var(--cetech-de-warning-text, #765b15);
+	border-color: var(--cetech-de-warning-border, #f0e6b8);
 }
 
 .wrap.cetech-de-admin-page .cetech-de-state--error {
-	background: #fcf0f1;
-	color: #8a2424;
+	background: var(--cetech-de-error-bg, #fcf0f1);
+	color: var(--cetech-de-error-text, #8a2424);
+	border-color: var(--cetech-de-error-border, #f1aeb5);
 }
 
 .wrap.cetech-de-admin-page .cetech-de-state--neutral {
-	background: #f0f0f1;
-	color: #2c3338;
+	background: var(--cetech-de-neutral-bg, #f6f7f7);
+	color: var(--cetech-de-neutral-text, #50575e);
+	border-color: var(--cetech-de-neutral-border, #dcdcde);
 }
 
 .wrap.cetech-de-admin-page .cetech-de-mode-panel[hidden] {
@@ -77,12 +87,13 @@
 }
 
 .wrap.cetech-de-admin-page .cetech-de-validation-messages {
-	color: #8a5100;
+	color: var(--cetech-de-warning-text, #765b15);
 }
 
 .wrap.cetech-de-admin-page .cetech-de-preview-table th,
 .wrap.cetech-de-admin-page .cetech-de-preview-table td {
 	vertical-align: top;
+	overflow-wrap: anywhere;
 }
 
 .wrap.cetech-de-admin-page .cetech-de-slice-controls {
@@ -157,4 +168,29 @@
 
 .wrap.cetech-de-admin-page .cetech-de-reset-form {
 	margin: 0 0 1rem;
+}
+
+@media (max-width: 782px) {
+	.wrap.cetech-de-admin-page .cetech-de-scoped-tab-list a {
+		min-height: 40px;
+	}
+
+	.wrap.cetech-de-admin-page .cetech-de-mode-option {
+		display: block;
+		padding-block: 6px;
+	}
+
+	.wrap.cetech-de-admin-page .cetech-de-field-editor {
+		padding: 12px;
+	}
+}
+
+@media (forced-colors: active) {
+	.wrap.cetech-de-admin-page .cetech-de-state {
+		border-color: CanvasText;
+	}
+
+	.wrap.cetech-de-admin-page .cetech-de-scoped-tab-list li.is-active a {
+		border: 2px solid Highlight;
+	}
 }

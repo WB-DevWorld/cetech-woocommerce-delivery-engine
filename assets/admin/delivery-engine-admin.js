@@ -339,18 +339,27 @@
 	document.addEventListener('change', function (event) {
 
 		var fulfilment = event.target.closest('[data-cetech-de-fulfilment-select]');
+		var fulfilmentField = event.target.closest('.cetech-de-customize-field[data-field="fulfilment_availability"]');
+		if (!fulfilment && fulfilmentField && event.target.matches('input[type="radio"]')) {
+			fulfilment = fulfilmentField.querySelector('[data-cetech-de-fulfilment-select]');
+		}
 
 		if (fulfilment) {
 
 			var form = fulfilment.closest('[data-cetech-de-customize]');
 
 			var options = form ? form.querySelectorAll('.cetech-de-compatible-option') : [];
+			var sourceField = fulfilment.closest('.cetech-de-customize-field[data-field="fulfilment_availability"]');
+			var activeMode = sourceField ? sourceField.querySelector('input[type="radio"]:checked') : null;
+			var profile = sourceField && activeMode && activeMode.value === 'inherit'
+				? sourceField.getAttribute('data-inherited-fulfilment')
+				: fulfilment.value;
 
 			options.forEach(function (row) {
 
 				var profiles = (row.getAttribute('data-profiles') || '').split(',');
 
-				row.hidden = profiles.indexOf(fulfilment.value) === -1;
+				row.hidden = !!profile && profiles.indexOf(profile) === -1;
 
 			});
 
