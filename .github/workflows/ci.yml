@@ -211,8 +211,7 @@ jobs:
       - name: Assert exact qualified PHP survived tool configuration
         run: |
           test "$(php -r 'echo PHP_VERSION;')" = '8.5.11'
-          printf '%s  %s
-' '7dda44e554d086c1c4f441796fc19f11f46055c0a276dad66181f6c11566e46a' "$(command -v php8.5)" | sha256sum --check --status
+          printf '%s  %s\n' '7dda44e554d086c1c4f441796fc19f11f46055c0a276dad66181f6c11566e46a' "$(command -v php8.5)" | sha256sum --check --status
       - name: Verify crash diagnostic output boundary
         run: |
           python3 scripts/qualification/test-opening-http-native-stack.py
