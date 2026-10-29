@@ -34,6 +34,9 @@ final class DeliverySettingsHomePage {
 
 	private const ACTION_SAVE_PROFILE = 'cetech_de_save_profile_defaults';
 
+	/** Submit-button name that saves the profile defaults and then continues to the Setup Guide. */
+	public const SAVE_AND_APPLY_FIELD = 'save_and_apply';
+
 	public function __construct(
 		private readonly SiteWideDefaultsService $defaults,
 		private readonly SiteWideDefaultsSettings $settings,
@@ -428,9 +431,39 @@ final class DeliverySettingsHomePage {
 		$eta          = $scope?->scalars[ ConfigurationFieldKey::ESTIMATED_DELIVERY ]->value ?? '';
 		$offers       = $scope?->collections[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ]->members ?? [];
 		$pickup_id    = (int) ( $scope?->scalars[ ConfigurationFieldKey::PICKUP_LOCATION_ID ]->value ?? 0 );
+
+		// A submission that failed validation is shown again instead of the saved values.
+		$draft = $this->action_handler->notices()->consume_form_draft( self::profile_draft_key( $profile_key ) );
+		if ( is_array( $draft ) ) {
+			$draft_fields = is_array( $draft['fields'] ?? null ) ? $draft['fields'] : [];
+			if ( isset( $draft_fields[ ConfigurationFieldKey::FULFILMENT_CHOICE ]['value'] ) ) {
+				$choice = (string) $draft_fields[ ConfigurationFieldKey::FULFILMENT_CHOICE ]['value'];
+			}
+			if ( isset( $draft['default_customer_choice'] ) ) {
+				$choice = (string) $draft['default_customer_choice'];
+			}
+			if ( isset( $draft_fields[ ConfigurationFieldKey::ESTIMATED_DELIVERY ]['value'] ) ) {
+				$eta = (string) $draft_fields[ ConfigurationFieldKey::ESTIMATED_DELIVERY ]['value'];
+			}
+			if ( isset( $draft_fields[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ]['members'] ) && is_array( $draft_fields[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ]['members'] ) ) {
+				$offers = array_map( 'intval', $draft_fields[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ]['members'] );
+			}
+			if ( isset( $draft_fields[ ConfigurationFieldKey::PICKUP_LOCATION_ID ]['value'] ) ) {
+				$pickup_id = (int) $draft_fields[ ConfigurationFieldKey::PICKUP_LOCATION_ID ]['value'];
+			}
+			AdminPageLayout::render_info_notice(
+				__( 'Your unsaved changes are shown below. Correct the highlighted problem and save again.', 'cetech-woocommerce-delivery-engine' ),
+				'warning'
+			);
+		}
+
 		$local_ids    = InStoreMethodSelection::local_delivery_offer_ids( is_array( $offers ) ? $offers : [], $this->offers );
 		$has_pickup   = $pickup_id > 0;
 		$has_delivery = [] !== $local_ids;
+		if ( is_array( $draft ) && is_array( $draft['available_methods'] ?? null ) ) {
+			$has_pickup   = in_array( 'store_pickup', $draft['available_methods'], true );
+			$has_delivery = in_array( 'delivery', $draft['available_methods'], true );
+		}
 
 		echo '<table class="form-table" role="presentation"><tbody>';
 		echo '<tr><th>' . esc_html__( 'Fulfilment', 'cetech-woocommerce-delivery-engine' ) . '</th><td>' . esc_html( $profile->label ) . '</td></tr>';
@@ -518,7 +551,7 @@ final class DeliverySettingsHomePage {
 		echo '<p class="cetech-de-button-group">';
 		echo '<button type="submit" class="button button-primary">' . esc_html__( 'Save Changes', 'cetech-woocommerce-delivery-engine' ) . '</button>';
 		if ( empty( $state['setup_completed'] ) ) {
-			echo ' <a class="button" href="' . esc_url( AdminPageRenderer::list_url( SetupWizardPage::SLUG ) ) . '">' . esc_html__( 'Save & Apply Site-wide', 'cetech-woocommerce-delivery-engine' ) . '</a>';
+			echo ' <button type="submit" class="button" name="' . esc_attr( self::SAVE_AND_APPLY_FIELD ) . '" value="1">' . esc_html__( 'Save & Apply Site-wide', 'cetech-woocommerce-delivery-engine' ) . '</button>';
 		}
 		echo '</p>';
 		echo '<p class="description">' . esc_html__( 'Changes affect products still using these defaults. Product and variation exceptions remain protected.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
@@ -613,6 +646,7 @@ final class DeliverySettingsHomePage {
 	private function handle_save_profile(): void {
 		$profile_key = isset( $_POST['profile_key'] ) ? sanitize_key( wp_unslash( (string) $_POST['profile_key'] ) ) : '';
 		$raw         = isset( $_POST['fields'] ) && is_array( $_POST['fields'] ) ? wp_unslash( $_POST['fields'] ) : [];
+		$apply_next  = isset( $_POST[ self::SAVE_AND_APPLY_FIELD ] ) && '1' === (string) wp_unslash( $_POST[ self::SAVE_AND_APPLY_FIELD ] );
 
 		$fields = [];
 		foreach ( $raw as $field_key => $payload ) {
@@ -639,16 +673,26 @@ final class DeliverySettingsHomePage {
 			);
 		}
 
-		if ( $profile instanceof FulfilmentProfile && $profile->pickup_allowed ) {
+		$methods = null;
+		if ( isset( $_POST['available_methods'] ) && is_array( $_POST['available_methods'] ) ) {
 			$methods = [];
-			if ( isset( $_POST['available_methods'] ) && is_array( $_POST['available_methods'] ) ) {
-				foreach ( wp_unslash( $_POST['available_methods'] ) as $method ) {
-					$methods[] = sanitize_key( (string) $method );
-				}
+			foreach ( wp_unslash( $_POST['available_methods'] ) as $method ) {
+				$methods[] = sanitize_key( (string) $method );
 			}
-			$default = isset( $_POST['default_customer_choice'] )
-				? sanitize_key( wp_unslash( (string) $_POST['default_customer_choice'] ) )
-				: (string) ( $fields[ ConfigurationFieldKey::FULFILMENT_CHOICE ]['value'] ?? FulfilmentChoice::Delivery->value );
+		}
+		$default = isset( $_POST['default_customer_choice'] )
+			? sanitize_key( wp_unslash( (string) $_POST['default_customer_choice'] ) )
+			: (string) ( $fields[ ConfigurationFieldKey::FULFILMENT_CHOICE ]['value'] ?? FulfilmentChoice::Delivery->value );
+		$draft = [
+			'fields'                 => $fields,
+			'default_customer_choice' => $default,
+		];
+		if ( null !== $methods ) {
+			$draft['available_methods'] = $methods;
+		}
+
+		if ( $profile instanceof FulfilmentProfile && $profile->pickup_allowed ) {
+			$methods = $methods ?? [];
 			$pickup_id = isset( $fields[ ConfigurationFieldKey::PICKUP_LOCATION_ID ]['value'] )
 				? absint( $fields[ ConfigurationFieldKey::PICKUP_LOCATION_ID ]['value'] )
 				: 0;
@@ -661,6 +705,7 @@ final class DeliverySettingsHomePage {
 			);
 			$errors = $selection->validate( $this->pickups );
 			if ( [] !== $errors ) {
+				$this->action_handler->notices()->stash_form_draft( self::profile_draft_key( $profile_key ), $draft );
 				$this->action_handler->notices()->flash_error( implode( ' ', $errors ) );
 				$this->action_handler->redirect( self::SLUG, [ 'profile' => $profile_key ] );
 				return;
@@ -671,13 +716,25 @@ final class DeliverySettingsHomePage {
 		try {
 			$this->defaults->save_profile_defaults( $profile_key, $fields );
 		} catch ( \Throwable $exception ) {
+			$this->action_handler->notices()->stash_form_draft( self::profile_draft_key( $profile_key ), $draft );
 			$this->action_handler->notices()->flash_error( $exception->getMessage() );
 			$this->action_handler->redirect( self::SLUG, [ 'profile' => $profile_key ] );
 			return;
 		}
 
+		if ( $apply_next ) {
+			$this->action_handler->notices()->flash_success( __( 'Site-wide defaults saved. Continue below to apply them to your catalog.', 'cetech-woocommerce-delivery-engine' ) );
+			$this->action_handler->redirect( SetupWizardPage::SLUG );
+			return;
+		}
+
 		$this->action_handler->notices()->flash_success( __( 'Site-wide defaults saved. Products that inherit these settings will use the new values immediately.', 'cetech-woocommerce-delivery-engine' ) );
 		$this->action_handler->redirect( self::SLUG, [ 'profile' => $profile_key ] );
+	}
+
+	/** Transient key for a profile editor submission that failed validation. */
+	public static function profile_draft_key( string $profile_key ): string {
+		return self::SLUG . '_profile_' . $profile_key;
 	}
 
 	/**

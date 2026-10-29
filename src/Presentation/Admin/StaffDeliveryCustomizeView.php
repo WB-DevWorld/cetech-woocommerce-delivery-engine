@@ -29,7 +29,11 @@ final class StaffDeliveryCustomizeView {
 	/**
 	 * @param array<string, mixed> $envelope
 	 */
-	public function render( ScopedConfigurationEditViewModel $model, array $envelope = [] ): void {
+	/**
+	 * @param string $context_inputs Pre-escaped hidden inputs (for example the list filters to return to)
+	 *                               repeated in both the save and the reset form.
+	 */
+	public function render( ScopedConfigurationEditViewModel $model, array $envelope = [], string $context_inputs = '' ): void {
 		$this->envelope = $envelope;
 		$is_variation = 'variation' === $model->scope_type;
 		$name         = $is_variation
@@ -63,6 +67,7 @@ final class StaffDeliveryCustomizeView {
 		echo '<input type="hidden" name="slice_key" value="' . esc_attr( $model->slice_key ) . '" />';
 		echo '<input type="hidden" name="customize" value="1" />';
 		$this->guard_inputs( $model, 'save' );
+		echo $context_inputs; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped by the caller's helper.
 		if ( null !== $model->parent_product_id ) {
 			echo '<input type="hidden" name="parent_product_id" value="' . esc_attr( (string) $model->parent_product_id ) . '" />';
 		}
@@ -116,6 +121,7 @@ final class StaffDeliveryCustomizeView {
 		echo '<input type="hidden" name="slice_key" value="' . esc_attr( $model->slice_key ) . '" />';
 		echo '<input type="hidden" name="customize" value="1" />';
 		$this->guard_inputs( $model, 'reset' );
+		echo $context_inputs; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped by the caller's helper.
 		if ( null !== $model->parent_product_id ) {
 			echo '<input type="hidden" name="parent_product_id" value="' . esc_attr( (string) $model->parent_product_id ) . '" />';
 		}
