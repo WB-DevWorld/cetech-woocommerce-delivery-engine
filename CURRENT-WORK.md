@@ -203,13 +203,15 @@ The sections below preserve the earlier Issue #45 and release/deployment checkpo
 
 ## Current training truth
 - Training site: `https://training.cetechbpa.com`.
-- Installed/active candidate: `1.0.0-dev.attention-count.1`.
-- Package-source SHA: `6e9e2ea71796170afb0508954a18d206cdc7017a`.
-- Frozen ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.attention-count.1.zip`.
-- ZIP bytes: `1,848,319`.
-- ZIP SHA-256: `2027e5941916dff0302d7e2e545de5a2fd027f0c8f1615d97e3991dcfc5fdcb3`.
-- Training physical QA: PASS.
-- Verified post-deploy Needs Attention state for the same authorized administrator and stable data: catalog `0`, stale bulk `0`, shipment creation `2`, operations `3`, COD `3`, canonical aggregate `8`, Overview `8`, menu badge `8`.
+- Installed/active candidate: `1.0.0-m2.1`, installed 2026-10-29 18:24 UTC by training-ops run 40930052523 (previously `1.0.0-dev.attention-count.1`, package-source `6e9e2ea71796170afb0508954a18d206cdc7017a`).
+- Package-source SHA: `7320a6b5c2432ccee1e9040232aef00b2989756f`.
+- Frozen ZIP: `cetech-woocommerce-delivery-engine-v1.0.0-m2.1.zip` (release-package run 40894108572).
+- ZIP bytes: `2,083,110`.
+- ZIP SHA-256: `8923b52395ff1530393efcaddf470e025cb71fdd18e2678badef509db6365226`.
+- Schema: `cetech_de_db_version` `6` before and after the install; no migration ran.
+- Server backups under the deploy root: `20261029T150001Z` (backup run 40895461288, taken before the first install attempt) and `20261029T182238Z` (taken by the install run itself). Either is a rollback point for training-ops `rollback`.
+- Training physical QA for `1.0.0-m2.1`: PENDING (M2 acceptance per `scripts/qualification/m2/`).
+- The Needs Attention counts recorded for `1.0.0-dev.attention-count.1` (catalog `0`, stale bulk `0`, shipment creation `2`, operations `3`, COD `3`, canonical aggregate `8`, Overview `8`, menu badge `8`) have not been re-verified on `1.0.0-m2.1`.
 - Training deployment is qualification evidence only; it is not RC.13, Pilot, FLAIROC, or production promotion.
 
 ## Completed post-RC.12 fix
@@ -323,3 +325,9 @@ Accepted invariant only. The three compact Needs Attention indexes (Cash on Deli
 ### First M2 package built — 1.0.0-m2.1, 2026-10-29
 
 `release-package.yml` run 40894108572 built `cetech-woocommerce-delivery-engine-v1.0.0-m2.1.zip` from the green head of `fix/m2-2026-10`, commit `7320a6b5c2432ccee1e9040232aef00b2989756f` (merge of #160; contains #148–#161), `Delivery Engine CI` run 40893203279 successful on that commit. ZIP SHA-256 `8923b52395ff1530393efcaddf470e025cb71fdd18e2678badef509db6365226` (2,083,110 bytes; the slug-named copy in the same artifact has the identical hash). The extracted ZIP was verified locally: one top-level `cetech-woocommerce-delivery-engine/` folder, header `Version: 1.0.0-m2.1`, `CETECH_DE_VERSION` `1.0.0-m2.1`, `Stable tag: 1.0.0-m2.1`, `Requires at least: 6.5`, committed `vendor/` autoload present, no `tests/`, `node_modules` or `.git` content, and `scripts/verify-production-package-autoload.php` passes on the extracted tree. The first build attempt (run 40893815310) failed only because the package script's informational branch lookup aborts on a detached checkout when the ref is a commit SHA; the second run used the branch ref whose tip is that same commit, and #162 makes a SHA ref work for later builds. Not installed anywhere: installation on training follows a backup and an announcement, through training-ops only (`package_run_id` 40894108572).
+
+### 1.0.0-m2.1 installed on training — 2026-10-29
+
+Training-ops `backup` run 40895461288 took `backup_id` `20261029T150001Z` first (database dump, plugin folder archive, manifest, checksums under the deploy root). Three `install` attempts with `package_run_id` 40894108572 then failed inside the GitHub job, each before uploading anything or opening the server step, and each was fixed by a workflow-only PR into `master` (training-ops runs from the default branch): run 40895598637 found two ZIPs in the build artifact (the versioned ZIP and its slug-named copy with the same hash) where the step required one — #164 selects `<slug>-v*.zip`; run 40915621573 could no longer read the packaged commit because GitHub's log archive had stopped resolving per-step names (`UNKNOWN STEP`) — #165 matched the provenance line by shape through the per-job logs endpoint; run 40927873977 got nothing from that endpoint under the runner's `github.token` — #166 reads the run-log archive (`gh run view --log`) instead, still matching the `git log -1 --format='%H %cI %s'` line by shape and requiring exactly one commit, with gh's stderr kept.
+
+Run 40930052523 (workflow at `a4e0950686274b53af5ecd496294f9ef17c79776`, approved by Frank in the `training` environment) then succeeded: packaged commit read as `7320a6b5c2432ccee1e9040232aef00b2989756f` with a successful `Delivery Engine CI` run, ZIP SHA-256 `8923b52395ff1530393efcaddf470e025cb71fdd18e2678badef509db6365226` verified, uploaded to the deploy root's `packages/40894108572/`, pre-install state `1.0.0-dev.attention-count.1` active with `cetech_de_db_version` `6`, backup `20261029T182238Z` taken by the run, `wp plugin install --force` reported `Installed 1 of 1 plugins`, plugin active, post-install state `1.0.0-m2.1` active with `cetech_de_db_version` `6` (main plugin file SHA-256 changed from `98793a24…` to `c2173ad1…`). No migration ran; `p06-physical`, `cetechbpa.com` and anything outside training-ops were not touched. This is qualification evidence only, not a release: M2 acceptance (`scripts/qualification/m2/`, Part A automated receipt at `7320a6b5`, Part B read-only site preflight, browser cases C1–C14/S1–S12) is the next step, and `master` still needs the #162 build-script fix carried over when M2 is integrated.
