@@ -1,0 +1,232 @@
+name: Training operations
+
+# Operates the training site over SSH from the protected `training` environment.
+#   inspect  - read-only report (versions, plugin list, schema, tables, disk, hashes)
+#   backup   - database dump + plugin folder archive under /srv/cetech-deploy/backups/<UTC id>
+#   install  - verified "Build Release Package" artifact -> backup -> wp plugin install --force
+#   rollback - restore the plugin folder (and the database only when restore_db=true) from a backup
+#
+# The repository is public and Actions logs are readable by anyone: this workflow and
+# scripts/training-ops/remote.sh print versions, names, sizes and hashes only. Backups stay
+# on the server. Secrets, dumps, option values and customer data are never printed or uploaded.
+#
+# Secrets (training environment): TRAINING_SSH_HOST, TRAINING_SSH_USER, TRAINING_SSH_KEY,
+# TRAINING_SSH_KNOWN_HOSTS. Variables: TRAINING_SITE_USER, TRAINING_WP_PATH.
+
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Operation to run on the training site
+        required: true
+        type: choice
+        options:
+          - inspect
+          - backup
+          - install
+          - rollback
+      package_run_id:
+        description: 'install only: run id of the "Build Release Package" workflow whose artifact to install'
+        required: false
+        type: string
+        default: ''
+      backup_id:
+        description: 'rollback only: backup id, the UTC folder name under /srv/cetech-deploy/backups (e.g. 20261028T143000Z)'
+        required: false
+        type: string
+        default: ''
+      restore_db:
+        description: 'rollback only: also restore the database dump from that backup'
+        required: false
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: training-ops
+  cancel-in-progress: false
+
+jobs:
+  training:
+    name: ${{ inputs.operation }}
+    runs-on: ubuntu-latest
+    environment: training
+    timeout-minutes: 30
+    env:
+      OPERATION: ${{ inputs.operation }}
+      PACKAGE_RUN_ID: ${{ inputs.package_run_id }}
+      BACKUP_ID: ${{ inputs.backup_id }}
+      RESTORE_DB: ${{ inputs.restore_db }}
+      TRAINING_SITE_USER: ${{ vars.TRAINING_SITE_USER }}
+      TRAINING_WP_PATH: ${{ vars.TRAINING_WP_PATH }}
+      DEPLOY_ROOT: /srv/cetech-deploy
+      PLUGIN_SLUG: cetech-woocommerce-delivery-engine
+      PACKAGE_WORKFLOW_NAME: Build Release Package
+      CI_WORKFLOW_NAME: Delivery Engine CI
+    steps:
+      - name: Checkout repository (scripts/training-ops)
+        uses: actions/checkout@v4
+
+      - name: Validate inputs and environment variables
+        shell: bash
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          [[ "$TRAINING_SITE_USER" =~ ^[a-z_][a-z0-9_-]{0,31}$ ]] || fail "TRAINING_SITE_USER variable is missing or malformed"
+          [[ "$TRAINING_WP_PATH" =~ ^/[A-Za-z0-9._/-]+$ ]] || fail "TRAINING_WP_PATH variable is missing or malformed"
+          case "$OPERATION" in
+            install)
+              [[ "$PACKAGE_RUN_ID" =~ ^[0-9]+$ ]] || fail "install needs package_run_id (digits only)"
+              ;;
+            rollback)
+              [[ "$BACKUP_ID" =~ ^[0-9]{8}T[0-9]{6}Z$ ]] || fail "rollback needs backup_id like 20261028T143000Z"
+              ;;
+            inspect|backup)
+              [[ -z "$PACKAGE_RUN_ID" && -z "$BACKUP_ID" ]] || echo "::warning::package_run_id/backup_id are ignored for $OPERATION"
+              ;;
+            *) fail "unknown operation: $OPERATION" ;;
+          esac
+          echo "operation=$OPERATION site_user=$TRAINING_SITE_USER wp_path=$TRAINING_WP_PATH"
+
+      - name: Prepare SSH client
+        shell: bash
+        env:
+          TRAINING_SSH_HOST: ${{ secrets.TRAINING_SSH_HOST }}
+          TRAINING_SSH_USER: ${{ secrets.TRAINING_SSH_USER }}
+          TRAINING_SSH_KEY: ${{ secrets.TRAINING_SSH_KEY }}
+          TRAINING_SSH_KNOWN_HOSTS: ${{ secrets.TRAINING_SSH_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          for v in TRAINING_SSH_HOST TRAINING_SSH_USER TRAINING_SSH_KEY TRAINING_SSH_KNOWN_HOSTS; do
+            [[ -n "${!v:-}" ]] || { echo "::error::$v is not set in the training environment"; exit 1; }
+          done
+          umask 077
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          printf '%s\n' "$TRAINING_SSH_KEY" > "$HOME/.ssh/training-ops-key"
+          printf '%s\n' "$TRAINING_SSH_KNOWN_HOSTS" > "$HOME/.ssh/training-ops-known-hosts"
+          chmod 600 "$HOME/.ssh/training-ops-key" "$HOME/.ssh/training-ops-known-hosts"
+          {
+            echo "Host training"
+            echo "  HostName $TRAINING_SSH_HOST"
+            echo "  User $TRAINING_SSH_USER"
+            echo "  IdentityFile $HOME/.ssh/training-ops-key"
+            echo "  IdentitiesOnly yes"
+            echo "  StrictHostKeyChecking yes"
+            echo "  UserKnownHostsFile $HOME/.ssh/training-ops-known-hosts"
+            echo "  BatchMode yes"
+            echo "  ConnectTimeout 30"
+            echo "  ServerAliveInterval 30"
+          } > "$HOME/.ssh/config"
+          chmod 600 "$HOME/.ssh/config"
+          ssh training "sudo -n -u '$TRAINING_SITE_USER' whoami >/dev/null && echo ssh_ok"
+
+      - name: Download and verify the release package
+        if: inputs.operation == 'install'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          fail() { echo "::error::$*"; exit 1; }
+          gh run view "$PACKAGE_RUN_ID" --repo "$GITHUB_REPOSITORY" \
+            --json workflowName,conclusion,status,headSha,headBranch,displayTitle,url > run.json
+          [[ "$(jq -r .workflowName run.json)" == "$PACKAGE_WORKFLOW_NAME" ]] \
+            || fail "run $PACKAGE_RUN_ID is not a '$PACKAGE_WORKFLOW_NAME' run"
+          [[ "$(jq -r .conclusion run.json)" == "success" ]] \
+            || fail "run $PACKAGE_RUN_ID did not succeed (conclusion=$(jq -r .conclusion run.json))"
+
+          # The packaged commit is the one the build checked out (its 'ref' input). The run
+          # metadata does not carry it, so read it from the 'Show source provenance' step log.
+          source_sha="$(gh run view "$PACKAGE_RUN_ID" --repo "$GITHUB_REPOSITORY" --log 2>/dev/null \
+            | tr -d '\r' | awk -F'\t' '$2 == "Show source provenance" { print $3 }' \
+            | grep -oE '[0-9a-f]{40}$' | head -n 1 || true)"
+          [[ "$source_sha" =~ ^[0-9a-f]{40}$ ]] || fail "could not read the packaged commit from the build log"
+          echo "package_source_sha=$source_sha"
+
+          # Installs are allowed only for packages built from CI-green commits.
+          ci_conclusions="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$CI_WORKFLOW_NAME" \
+            --commit "$source_sha" --limit 20 --json status,conclusion \
+            --jq '[.[] | select(.status == "completed") | .conclusion] | join(",")')"
+          [[ ",$ci_conclusions," == *",success,"* ]] \
+            || fail "no successful '$CI_WORKFLOW_NAME' run for packaged commit $source_sha (found: ${ci_conclusions:-none})"
+
+          mkdir -p package
+          gh run download "$PACKAGE_RUN_ID" --repo "$GITHUB_REPOSITORY" --dir package
+          mapfile -t zips < <(find package -type f -name '*.zip' | sort)
+          [[ "${#zips[@]}" -eq 1 ]] || fail "expected exactly one ZIP in the artifact, found ${#zips[@]}"
+          zip_path="${zips[0]}"
+          zip_dir="$(dirname "$zip_path")"
+          zip_name="$(basename "$zip_path")"
+          [[ -s "$zip_dir/$zip_name.sha256" ]] || fail "missing $zip_name.sha256 next to the ZIP"
+          # The checksum file is written on Windows without a trailing newline; normalise it.
+          printf '%s\n' "$(tr -d '\r' < "$zip_dir/$zip_name.sha256")" > "$zip_dir/$zip_name.sha256"
+          ( cd "$zip_dir" && sha256sum -c "$zip_name.sha256" )
+          zip_sha="$(sha256sum "$zip_path" | cut -d' ' -f1)"
+          unzip -Z1 "$zip_path" | grep -qx "$PLUGIN_SLUG/$PLUGIN_SLUG.php" \
+            || fail "ZIP does not contain $PLUGIN_SLUG/$PLUGIN_SLUG.php at its root"
+
+          echo "PACKAGE_ZIP_PATH=$zip_path" >> "$GITHUB_ENV"
+          echo "PACKAGE_ZIP_NAME=$zip_name" >> "$GITHUB_ENV"
+          echo "PACKAGE_ZIP_SHA256=$zip_sha" >> "$GITHUB_ENV"
+          echo "PACKAGE_SOURCE_SHA=$source_sha" >> "$GITHUB_ENV"
+          echo "package=$zip_name sha256=$zip_sha bytes=$(stat -c '%s' "$zip_path") source=$source_sha"
+
+      - name: Upload the package to the server
+        if: inputs.operation == 'install'
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_dir="$DEPLOY_ROOT/packages/$PACKAGE_RUN_ID"
+          ssh training "mkdir -p '$remote_dir'"
+          scp -q "$PACKAGE_ZIP_PATH" "$PACKAGE_ZIP_PATH.sha256" "training:$remote_dir/"
+          echo "REMOTE_PACKAGE_ZIP=$remote_dir/$PACKAGE_ZIP_NAME" >> "$GITHUB_ENV"
+          echo "uploaded=$remote_dir/$PACKAGE_ZIP_NAME"
+
+      - name: Run ${{ inputs.operation }} on the training site
+        shell: bash
+        run: |
+          set -euo pipefail
+          remote_script="$DEPLOY_ROOT/bin/training-ops-$GITHUB_RUN_ID-$GITHUB_RUN_ATTEMPT.sh"
+          case "$OPERATION" in
+            install)  extra_args="'$REMOTE_PACKAGE_ZIP'" ;;
+            rollback) extra_args="'$BACKUP_ID' '$RESTORE_DB'" ;;
+            *)        extra_args="" ;;
+          esac
+          ssh training "mkdir -p '$DEPLOY_ROOT/bin'"
+          scp -q scripts/training-ops/remote.sh "training:$remote_script"
+          set +e
+          ssh training "sudo -n -u '$TRAINING_SITE_USER' bash '$remote_script' '$OPERATION' '$TRAINING_WP_PATH' '$DEPLOY_ROOT' '$PLUGIN_SLUG' $extra_args" | tee training-ops.log
+          status=${PIPESTATUS[0]}
+          set -e
+          ssh training "rm -f '$remote_script'" || echo "::warning::could not remove $remote_script"
+          {
+            echo "## Training operations: $OPERATION"
+            echo
+            echo "- run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            if [[ "$status" -eq 0 ]]; then echo "- result: OK"; else echo "- result: FAILED (exit $status)"; fi
+            if [[ "$OPERATION" == "install" ]]; then
+              echo "- package: $PACKAGE_ZIP_NAME"
+              echo "- package sha256: $PACKAGE_ZIP_SHA256"
+              echo "- packaged commit: $PACKAGE_SOURCE_SHA"
+            fi
+            echo
+            echo '```'
+            grep -E '^(backup_id=|plugin=|main_file_sha256=|training_ops_result=|wordpress=|woocommerce=|database=|hpos_enabled=|object_cache_dropin=)' training-ops.log || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          exit "$status"
+
+      - name: Remove SSH material
+        if: always()
+        shell: bash
+        run: |
+          for f in "$HOME/.ssh/training-ops-key" "$HOME/.ssh/training-ops-known-hosts" "$HOME/.ssh/config"; do
+            if [[ -f "$f" ]]; then
+              shred -u "$f" 2>/dev/null || rm -f "$f"
+            fi
+          done
+          echo "ssh material removed"
