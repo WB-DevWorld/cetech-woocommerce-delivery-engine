@@ -41,8 +41,10 @@ final class CartCheckoutAddressUxTest extends TestCase {
 		$html = $this->render_line( 'line-incomplete', PerItemContextFixtures::incompleteContext( 10, PerItemContextFixtures::matchingAccra() ) );
 
 		self::assertStringContainsString( CustomerStorefrontCopy::address_needed(), $html );
-		self::assertStringContainsString( CustomerStorefrontCopy::add_delivery_address(), $html );
+		self::assertStringContainsString( '>' . CustomerStorefrontCopy::change() . '<', $html, 'D2: one control per line, always Change' );
+		self::assertStringNotContainsString( '>' . CustomerStorefrontCopy::add_delivery_address() . '<', $html );
 		self::assertStringNotContainsString( '>' . CustomerStorefrontCopy::edit_delivery_details() . '<', $html );
+		self::assertStringContainsString( 'data-cetech-de-selection-line="1">Delivery · Accra<', $html );
 		self::assertStringContainsString( 'data-cetech-de-address-complete="0"', $html );
 		self::assertStringContainsString( 'data-cetech-de-address-required="1"', $html );
 		self::assertStringContainsString( 'id="' . CartDeliveryUiAnchor::for_cart_item_key( 'line-incomplete' ) . '"', $html );
@@ -55,7 +57,8 @@ final class CartCheckoutAddressUxTest extends TestCase {
 		);
 
 		self::assertStringNotContainsString( CustomerStorefrontCopy::address_needed(), $html );
-		self::assertStringContainsString( CustomerStorefrontCopy::edit_delivery_details(), $html );
+		self::assertStringContainsString( '>' . CustomerStorefrontCopy::change() . '<', $html );
+		self::assertStringNotContainsString( '>' . CustomerStorefrontCopy::edit_delivery_details() . '<', $html );
 		self::assertStringContainsString( 'data-cetech-de-address-complete="1"', $html );
 		self::assertStringContainsString( 'data-cetech-de-address-required="0"', $html );
 		self::assertStringContainsString( '12 Boundary Rd', $html );
@@ -72,7 +75,8 @@ final class CartCheckoutAddressUxTest extends TestCase {
 			[ $this->option( 'in_store:store_pickup:pickup', FulfilmentChoice::StorePickup->value, null, 4 ) ]
 		);
 
-		self::assertStringContainsString( CustomerStorefrontCopy::edit_pickup_details(), $html );
+		self::assertStringContainsString( '>' . CustomerStorefrontCopy::change() . '<', $html );
+		self::assertStringNotContainsString( '>' . CustomerStorefrontCopy::edit_pickup_details() . '<', $html );
 		self::assertStringNotContainsString( CustomerStorefrontCopy::address_needed(), $html );
 		self::assertStringNotContainsString( CustomerStorefrontCopy::add_delivery_address(), $html );
 		self::assertStringContainsString( 'data-cetech-de-address-required="0"', $html );

@@ -17,8 +17,14 @@
 }
 
 .cetech-de-cart-context__kicker,
-.cetech-de-cart-context__offer {
+.cetech-de-cart-context__offer,
+.cetech-de-cart-context__line {
 	font-weight: 600;
+}
+
+.cetech-de-cart-context__line {
+	margin: 0.15rem 0;
+	line-height: 1.5;
 }
 
 .cetech-de-cart-context__meta {

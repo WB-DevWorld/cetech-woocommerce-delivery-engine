@@ -51,7 +51,8 @@ final class BlocksPublicPayload {
 		array $cart_item,
 		?CartDeliverySelectionCapture $capture = null,
 		?CartDeliverySelectionRevalidator $revalidator = null,
-		string $cart_item_key = ''
+		string $cart_item_key = '',
+		string $price_text = ''
 	): array {
 		$intent  = CartDeliverySelectionSessionData::normalizeIntent(
 			$cart_item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] ?? null
@@ -171,6 +172,12 @@ final class BlocksPublicPayload {
 		$payload['summary_kicker'] = $needs_reselection ? null : ( '' !== $compact['kicker'] ? $compact['kicker'] : null );
 		$payload['summary_title']  = $needs_reselection ? null : ( '' !== $compact['title'] ? $compact['title'] : null );
 		$payload['summary_meta']   = $needs_reselection ? null : ( '' !== $compact['meta'] ? $compact['meta'] : null );
+		$payload['summary_price']  = $needs_reselection ? null : self::nullable_string( $price_text );
+		$payload['summary_line']   = $needs_reselection || ! is_array( $intent )
+			? null
+			: self::nullable_string(
+				CustomerStorefrontCopy::selection_line( $choice, $summary, (string) ( $payload['locality'] ?? '' ), $price_text )
+			);
 		$payload['matching_location'] = $context instanceof CustomerCartContext
 			? self::public_matching( $context->matching_location )
 			: null;

@@ -263,17 +263,9 @@
 		return template.replace('%d', String(qty || 1));
 	}
 
+	// D2: one control per line, always "Change". The Address needed badge says what is missing.
 	function actionLabel(ext, i18n) {
-		if (ext.address_action_label) {
-			return ext.address_action_label;
-		}
-		if (ext.is_pickup) {
-			return i18n.editPickupDetails || 'Edit pickup details';
-		}
-		if (ext.address_needed || !ext.address_complete) {
-			return i18n.addDeliveryAddress || 'Add delivery address';
-		}
-		return i18n.editDeliveryDetails || 'Edit delivery details';
+		return i18n.change || 'Change';
 	}
 
 	function optionChoice(option) {
@@ -305,14 +297,18 @@
 			html += '<p class="cetech-de-blocks-line__status" data-cetech-de-address-needed="1">' +
 				escapeHtml(i18n.addressNeeded || 'Address needed') + '</p>';
 		}
-		if (ext.summary_kicker) {
-			html += '<p class="cetech-de-blocks-line__kicker">' + escapeHtml(ext.summary_kicker) + '</p>';
-		}
-		if (ext.summary_title) {
-			html += '<p class="cetech-de-blocks-line__title">' + escapeHtml(ext.summary_title) + '</p>';
-		}
-		if (ext.summary_meta) {
-			html += '<p class="cetech-de-blocks-line__meta">' + escapeHtml(ext.summary_meta) + '</p>';
+		if (ext.summary_line) {
+			html += '<p class="cetech-de-blocks-line__line" data-cetech-de-selection-line="1">' + escapeHtml(ext.summary_line) + '</p>';
+		} else {
+			if (ext.summary_kicker) {
+				html += '<p class="cetech-de-blocks-line__kicker">' + escapeHtml(ext.summary_kicker) + '</p>';
+			}
+			if (ext.summary_title) {
+				html += '<p class="cetech-de-blocks-line__title">' + escapeHtml(ext.summary_title) + '</p>';
+			}
+			if (ext.summary_meta) {
+				html += '<p class="cetech-de-blocks-line__meta">' + escapeHtml(ext.summary_meta) + '</p>';
+			}
 		}
 		html += '</div>';
 		html += '<details class="cetech-de-blocks-editor" id="' + escapeHtml(uiAnchor) +
@@ -627,7 +623,11 @@
 					if (line.product) {
 						html += '<span class="cetech-de-delivery-plan__product">' + escapeHtml(line.product) + '</span> ';
 					}
-					html += '<span class="cetech-de-delivery-plan__offer">' + escapeHtml(line.estimate || line.offer || '') + '</span></p>';
+					html += '<span class="cetech-de-delivery-plan__offer">' + escapeHtml(line.line || line.estimate || line.offer || '') + '</span>';
+					if (line.change_url) {
+						html += ' <a class="cetech-de-delivery-plan__change" href="' + escapeHtml(line.change_url) + '">' + escapeHtml(i18n.change || 'Change') + '</a>';
+					}
+					html += '</p>';
 				});
 				html += '</div>';
 			});
