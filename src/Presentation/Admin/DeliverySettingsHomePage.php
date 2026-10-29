@@ -108,6 +108,7 @@ final class DeliverySettingsHomePage {
 			__( 'Site-wide Defaults', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Products use these settings automatically unless you create an exception.', 'cetech-woocommerce-delivery-engine' )
 		);
+		PluginIdentityBadge::render();
 
 		AdminPageLayout::render_summary_stats(
 			[
@@ -393,6 +394,7 @@ final class DeliverySettingsHomePage {
 			__( 'Site-wide Defaults', 'cetech-woocommerce-delivery-engine' ),
 			__( 'Products use these settings automatically unless you create an exception.', 'cetech-woocommerce-delivery-engine' )
 		);
+		PluginIdentityBadge::render();
 
 		AdminPageLayout::render_info_notice(
 			__( 'These settings apply store-wide unless a product or variation has its own exception.', 'cetech-woocommerce-delivery-engine' )
