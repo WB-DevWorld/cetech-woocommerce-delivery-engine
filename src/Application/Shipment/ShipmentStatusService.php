@@ -7,12 +7,17 @@ namespace CetechDeliveryEngine\Application\Shipment;
 use CetechDeliveryEngine\Domain\Enum\ShipmentEventType;
 use CetechDeliveryEngine\Domain\Enum\ShipmentStatus;
 use CetechDeliveryEngine\Domain\Shipment\Shipment;
+use CetechDeliveryEngine\Domain\Shipment\ShipmentConcurrentEditException;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentEvent;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentRepositoryInterface;
 
 /**
  * Authoritative shipment status mutations. Presentation and WooCommerce hooks
  * must not apply status changes themselves.
+ *
+ * COR-032: the status column and its StatusChanged event are written in one guarded
+ * transaction; an automatic retry that finds the row already at the target status but
+ * without its event repairs the missing event instead of skipping.
  */
 final class ShipmentStatusService {
 
@@ -47,6 +52,28 @@ final class ShipmentStatusService {
 		}
 
 		if ( $current->status === $target ) {
+			if ( ShipmentStatusChangeMode::Automatic === $request->mode && ! $this->has_status_event_to( $shipment_id, $target ) ) {
+				// A partial earlier write left the row terminal without its attributable event: repair it.
+				$reason = $this->sanitize_reason( $request->reason );
+				$this->shipments->appendEvent(
+					ShipmentEvent::create(
+						$current->id,
+						ShipmentEventType::StatusChanged,
+						$request->source,
+						null,
+						$target,
+						null,
+						$reason,
+						$request->actor_user_id
+					)
+				);
+
+				return ShipmentStatusChangeResult::success(
+					$current,
+					__( 'Shipment status was updated.', 'cetech-woocommerce-delivery-engine' )
+				);
+			}
+
 			return ShipmentStatusChangeResult::success(
 				$current,
 				__( 'The shipment already has that status.', 'cetech-woocommerce-delivery-engine' ),
@@ -81,19 +108,28 @@ final class ShipmentStatusService {
 			);
 		}
 
-		$saved = $this->shipments->update( $current->withStatus( $target ) );
-		$this->shipments->appendEvent(
-			ShipmentEvent::create(
-				$saved->id,
-				ShipmentEventType::StatusChanged,
-				$request->source,
-				$current->status,
-				$saved->status,
-				$correction ? self::CORRECTION_MARKER : null,
-				$reason,
-				$request->actor_user_id
-			)
-		);
+		try {
+			$saved = $this->shipments->updateFieldsWithEvent(
+				$current->id,
+				[ 'status' => $target->value ],
+				[ 'status' => $current->status->value ],
+				ShipmentEvent::create(
+					$current->id,
+					ShipmentEventType::StatusChanged,
+					$request->source,
+					$current->status,
+					$target,
+					$correction ? self::CORRECTION_MARKER : null,
+					$reason,
+					$request->actor_user_id
+				)
+			);
+		} catch ( ShipmentConcurrentEditException ) {
+			return ShipmentStatusChangeResult::failure(
+				__( 'This shipment changed while you were editing it. Reload the page and try again.', 'cetech-woocommerce-delivery-engine' ),
+				'concurrent_edit'
+			);
+		}
 
 		if ( $this->clears_operational_issues( $saved->status ) ) {
 			$this->issues->clear_shipment( $saved->id );
@@ -107,6 +143,16 @@ final class ShipmentStatusService {
 
 	public function target_from_request( string $raw ): ?ShipmentStatus {
 		return ShipmentStatus::tryFromMachineCode( sanitize_key( $raw ) );
+	}
+
+	private function has_status_event_to( int $shipment_id, ShipmentStatus $target ): bool {
+		foreach ( $this->shipments->findEvents( $shipment_id ) as $event ) {
+			if ( $event->event_type->is( ShipmentEventType::StatusChanged ) && $event->to_status === $target ) {
+				return true;
+			}
+		}
+
+		return false;
 	}
 
 	private function clears_operational_issues( ShipmentStatus $status ): bool {

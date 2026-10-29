@@ -7,6 +7,7 @@ namespace CetechDeliveryEngine\Application\Shipment;
 use CetechDeliveryEngine\Domain\Enum\ShipmentEventSource;
 use CetechDeliveryEngine\Domain\Enum\ShipmentEventType;
 use CetechDeliveryEngine\Domain\Shipment\Shipment;
+use CetechDeliveryEngine\Domain\Shipment\ShipmentConcurrentEditException;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentEvent;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentRepositoryInterface;
 
@@ -67,7 +68,30 @@ final class ShipmentEtaService {
 		}
 
 		$original = $current->eta_original;
-		$saved    = $this->shipments->update( $current->withCurrentEta( $eta ) );
+
+		try {
+			// COR-032: only eta_current moves, together with its event; eta_original is never written.
+			$saved = $this->shipments->updateFieldsWithEvent(
+				$current->id,
+				[ 'eta_current' => $eta ],
+				[ 'eta_current' => $this->nullable( $current->eta_current ) ],
+				ShipmentEvent::create(
+					$current->id,
+					ShipmentEventType::EtaUpdated,
+					ShipmentEventSource::Staff,
+					null,
+					null,
+					null,
+					$reason_text,
+					$actor_user_id
+				)
+			);
+		} catch ( ShipmentConcurrentEditException ) {
+			return ShipmentEtaUpdateResult::failure(
+				__( 'This shipment changed while you were editing it. Reload the page and try again.', 'cetech-woocommerce-delivery-engine' ),
+				'concurrent_edit'
+			);
+		}
 
 		if ( $this->nullable( $saved->eta_original ) !== $this->nullable( $original ) ) {
 			return ShipmentEtaUpdateResult::failure(
@@ -75,19 +99,6 @@ final class ShipmentEtaService {
 				'original_eta_protected'
 			);
 		}
-
-		$this->shipments->appendEvent(
-			ShipmentEvent::create(
-				$saved->id,
-				ShipmentEventType::EtaUpdated,
-				ShipmentEventSource::Staff,
-				null,
-				null,
-				null,
-				$reason_text,
-				$actor_user_id
-			)
-		);
 
 		return ShipmentEtaUpdateResult::success(
 			$saved,

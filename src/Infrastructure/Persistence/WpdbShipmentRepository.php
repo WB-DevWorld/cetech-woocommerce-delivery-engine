@@ -9,6 +9,7 @@ use CetechDeliveryEngine\Domain\Enum\ShipmentEventType;
 use CetechDeliveryEngine\Domain\Enum\ShipmentStatus;
 use CetechDeliveryEngine\Domain\Shipment\Shipment;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentAggregateWriteResult;
+use CetechDeliveryEngine\Domain\Shipment\ShipmentConcurrentEditException;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentEvent;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentEventCode;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentItem;
@@ -17,6 +18,11 @@ use CetechDeliveryEngine\Domain\Shipment\ShipmentRepositoryInterface;
 
 /**
  * Canonical V1 shipment store. Does not dual-write to WooCommerce Fulfillments.
+ *
+ * COR-031: aggregate repair runs under a row lock on the parent (SELECT ... FOR UPDATE), so
+ * independent writers serialise and the Created event is appended once; completeness compares
+ * the frozen required item set exactly. COR-032: operational edits write only their own columns
+ * together with their event, guarded by the values the editor loaded.
  */
 final class WpdbShipmentRepository extends AbstractWpdbRepository implements ShipmentRepositoryInterface {
 
@@ -412,11 +418,14 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 	): ShipmentAggregateWriteResult {
 		return $this->transact(
 			function () use ( $draft, $items, $created_source, $created_actor_user_id ): ShipmentAggregateWriteResult {
-				$existing = $this->findByOrderAndGroup( $draft->order_id, $draft->delivery_group_id );
+				// COR-031: lock the parent row so concurrent repairs of one aggregate serialise.
+				$existing = $this->find_for_update( $draft->order_id, $draft->delivery_group_id );
 				$status   = ShipmentAggregateWriteResult::CREATED;
 
 				if ( null === $existing ) {
 					$existing = $this->insert_new_shipment( $draft );
+					$locked   = $this->find_for_update( $draft->order_id, $draft->delivery_group_id );
+					$existing = $locked ?? $existing;
 				} else {
 					$status = ShipmentAggregateWriteResult::ALREADY_COMPLETE;
 				}
@@ -427,7 +436,7 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 					$changed = true;
 				}
 
-				if ( ! $this->aggregate_is_complete( $existing->id, $items ) ) {
+				if ( ! $this->aggregateIsComplete( $existing->id, $items ) ) {
 					throw new \RuntimeException( 'Shipment aggregate is incomplete after write.' );
 				}
 
@@ -471,6 +480,113 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 		}
 	}
 
+	/**
+	 * Parent row read with an exclusive row lock inside the open transaction.
+	 */
+	private function find_for_update( int $order_id, string $delivery_group_id ): ?Shipment {
+		if ( $order_id <= 0 || '' === $delivery_group_id ) {
+			return null;
+		}
+
+		global $wpdb;
+
+		$table = $this->table_name();
+		$sql   = "SELECT * FROM `{$table}` WHERE `order_id` = %d AND `delivery_group_id` = %s LIMIT 1 FOR UPDATE";
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$row = $wpdb->get_row( $wpdb->prepare( $sql, $order_id, $delivery_group_id ), ARRAY_A );
+
+		return is_array( $row ) ? $this->hydrate_shipment( $row ) : null;
+	}
+
+	public function updateFieldsWithEvent( int $shipment_id, array $fields, array $expected, ShipmentEvent ...$events ): Shipment {
+		if ( $shipment_id <= 0 ) {
+			throw new \InvalidArgumentException( 'updateFieldsWithEvent requires a persisted shipment_id.' );
+		}
+
+		if ( [] === $fields ) {
+			throw new \InvalidArgumentException( 'updateFieldsWithEvent requires at least one column.' );
+		}
+
+		return $this->transact(
+			function () use ( $shipment_id, $fields, $expected, $events ): Shipment {
+				global $wpdb;
+
+				$table = $this->table_name();
+				$data  = $fields;
+				$data['updated_at'] = gmdate( 'Y-m-d H:i:s' );
+				$where = array_merge( [ 'id' => $shipment_id ], $expected );
+
+				// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+				$updated = $wpdb->update( $table, $data, $where );
+
+				if ( false === $updated ) {
+					throw new \RuntimeException( sprintf( 'Failed to update shipment %d.', $shipment_id ) );
+				}
+
+				if ( 0 === (int) $updated ) {
+					$row = $this->fetch_row_by_id( $shipment_id );
+
+					if ( ! is_array( $row ) ) {
+						throw new \RuntimeException( sprintf( 'Shipment %d could not be found.', $shipment_id ) );
+					}
+
+					// A partial earlier write or an identical retry already holds the target values:
+					// treat the row as applied and only complete the attributable event(s).
+					foreach ( $fields as $column => $value ) {
+						if ( $this->column_value( $row[ $column ] ?? null ) !== $this->column_value( $value ) ) {
+							throw new ShipmentConcurrentEditException( $shipment_id );
+						}
+					}
+				}
+
+				foreach ( $events as $event ) {
+					$this->appendEvent(
+						$event->shipment_id === $shipment_id ? $event : $this->event_for_shipment( $event, $shipment_id )
+					);
+				}
+
+				$reloaded = $this->findById( $shipment_id );
+
+				if ( null === $reloaded ) {
+					throw new \RuntimeException( sprintf( 'Shipment %d could not be reloaded after update.', $shipment_id ) );
+				}
+
+				return $reloaded;
+			}
+		);
+	}
+
+	private function event_for_shipment( ShipmentEvent $event, int $shipment_id ): ShipmentEvent {
+		return new ShipmentEvent(
+			$event->id,
+			$shipment_id,
+			$event->event_type,
+			$event->from_status,
+			$event->to_status,
+			$event->public_note,
+			$event->internal_note,
+			$event->actor_user_id,
+			$event->source,
+			$event->event_at,
+			$event->created_at
+		);
+	}
+
+	private function column_value( mixed $value ): ?string {
+		if ( null === $value ) {
+			return null;
+		}
+
+		if ( $value instanceof \BackedEnum ) {
+			$value = $value->value;
+		}
+
+		$string = trim( (string) $value );
+
+		return '' === $string ? null : $string;
+	}
+
 	private function insert_new_shipment( Shipment $shipment ): Shipment {
 		$now = gmdate( 'Y-m-d H:i:s' );
 		$row = $this->to_shipment_row( $shipment, $now, true );
@@ -498,28 +614,93 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 	}
 
 	/**
+	 * Repair the stored items to the frozen required set (COR-031): missing rows are inserted,
+	 * rows with a different order, quantity or product are corrected, rows outside the set are removed.
+	 *
 	 * @param list<ShipmentItem> $items
 	 */
 	private function ensure_items( int $shipment_id, array $items ): bool {
-		$existing     = $this->findItems( $shipment_id );
-		$existing_ids = [];
+		$existing  = $this->findItems( $shipment_id );
+		$stored    = [];
+		$expected  = [];
+		$changed   = false;
 
 		foreach ( $existing as $item ) {
-			$existing_ids[ $item->order_item_id ] = true;
+			$stored[ $item->order_item_id ] = $item;
 		}
 
-		$changed = false;
-
 		foreach ( $items as $item ) {
-			if ( isset( $existing_ids[ $item->order_item_id ] ) ) {
+			$expected[ $item->order_item_id ] = true;
+			$current = $stored[ $item->order_item_id ] ?? null;
+
+			if ( null === $current ) {
+				$this->insert_item( $shipment_id, $item );
+				$changed = true;
 				continue;
 			}
 
-			$this->insert_item( $shipment_id, $item );
+			if ( ! self::item_matches( $current, $item ) ) {
+				$this->correct_item( $current->id, $item );
+				$changed = true;
+			}
+		}
+
+		foreach ( $stored as $order_item_id => $current ) {
+			if ( isset( $expected[ $order_item_id ] ) ) {
+				continue;
+			}
+
+			$this->delete_item( $current->id );
 			$changed = true;
 		}
 
 		return $changed;
+	}
+
+	private static function item_matches( ShipmentItem $stored, ShipmentItem $expected ): bool {
+		return $stored->order_item_id === $expected->order_item_id
+			&& $stored->order_id === $expected->order_id
+			&& $stored->quantity === $expected->quantity
+			&& ( $stored->product_id ?? 0 ) === ( $expected->product_id ?? 0 )
+			&& ( $stored->variation_id ?? 0 ) === ( $expected->variation_id ?? 0 );
+	}
+
+	private function correct_item( int $item_id, ShipmentItem $item ): void {
+		global $wpdb;
+
+		$table = TableNames::for( ShipmentSchema::ITEMS_SUFFIX );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$updated = $wpdb->update(
+			$table,
+			[
+				'order_id'              => $item->order_id,
+				'product_id'            => $item->product_id,
+				'variation_id'          => $item->variation_id,
+				'quantity'              => $item->quantity,
+				'product_name_snapshot' => $item->product_name_snapshot,
+			],
+			[ 'id' => $item_id ],
+			[ '%d', '%d', '%d', '%d', '%s' ],
+			[ '%d' ]
+		);
+
+		if ( false === $updated ) {
+			throw new \RuntimeException( 'Failed to correct shipment item.' );
+		}
+	}
+
+	private function delete_item( int $item_id ): void {
+		global $wpdb;
+
+		$table = TableNames::for( ShipmentSchema::ITEMS_SUFFIX );
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching
+		$deleted = $wpdb->delete( $table, [ 'id' => $item_id ], [ '%d' ] );
+
+		if ( false === $deleted ) {
+			throw new \RuntimeException( 'Failed to remove a shipment item outside the required set.' );
+		}
 	}
 
 	private function insert_item( int $shipment_id, ShipmentItem $item ): void {
@@ -584,21 +765,35 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 		return true;
 	}
 
-	/**
-	 * @param list<ShipmentItem> $expected
-	 */
-	private function aggregate_is_complete( int $shipment_id, array $expected ): bool {
-		$stored     = $this->findItems( $shipment_id );
-		$stored_ids = [];
-
-		foreach ( $stored as $item ) {
-			$stored_ids[ $item->order_item_id ] = true;
+	public function aggregateIsComplete( int $shipment_id, array $expected_items ): bool {
+		if ( $shipment_id <= 0 ) {
+			return false;
 		}
 
-		foreach ( $expected as $item ) {
-			if ( ! isset( $stored_ids[ $item->order_item_id ] ) ) {
+		$stored = [];
+
+		foreach ( $this->findItems( $shipment_id ) as $item ) {
+			$stored[ $item->order_item_id ] = $item;
+		}
+
+		$seen = [];
+
+		foreach ( $expected_items as $item ) {
+			if ( ! $item instanceof ShipmentItem ) {
 				return false;
 			}
+
+			$current = $stored[ $item->order_item_id ] ?? null;
+
+			if ( null === $current || ! self::item_matches( $current, $item ) ) {
+				return false;
+			}
+
+			$seen[ $item->order_item_id ] = true;
+		}
+
+		if ( count( $seen ) !== count( $stored ) ) {
+			return false;
 		}
 
 		foreach ( $this->findEvents( $shipment_id ) as $event ) {

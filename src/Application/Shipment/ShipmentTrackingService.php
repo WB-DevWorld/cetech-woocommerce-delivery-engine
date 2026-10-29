@@ -7,6 +7,7 @@ namespace CetechDeliveryEngine\Application\Shipment;
 use CetechDeliveryEngine\Domain\Enum\ShipmentEventSource;
 use CetechDeliveryEngine\Domain\Enum\ShipmentEventType;
 use CetechDeliveryEngine\Domain\Shipment\Shipment;
+use CetechDeliveryEngine\Domain\Shipment\ShipmentConcurrentEditException;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentEvent;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentRepositoryInterface;
 
@@ -59,8 +60,31 @@ final class ShipmentTrackingService {
 			);
 		}
 
-		$saved = $this->shipments->update( $updated );
-		$this->append_history( $current, $saved, $actor_user_id );
+		try {
+			// COR-032: only the tracking columns move, together with their events, guarded by the loaded values.
+			$saved = $this->shipments->updateFieldsWithEvent(
+				$current->id,
+				[
+					'tracking_number'          => $updated->tracking_number,
+					'tracking_url'             => $updated->tracking_url,
+					'tracking_carrier_display' => $updated->tracking_carrier_display,
+					'dispatch_at'              => $updated->dispatch_at,
+					'public_note'              => $updated->public_note,
+				],
+				[
+					'tracking_number'          => $this->nullable( $current->tracking_number ),
+					'tracking_url'             => $this->nullable( $current->tracking_url ),
+					'tracking_carrier_display' => $this->nullable( $current->tracking_carrier_display ),
+					'dispatch_at'              => $this->nullable( $current->dispatch_at ),
+					'public_note'              => $this->nullable( $current->public_note ),
+				],
+				...$this->history_events( $current, $updated, $actor_user_id )
+			);
+		} catch ( ShipmentConcurrentEditException ) {
+			return ShipmentTrackingSaveResult::failure(
+				__( 'This shipment changed while you were editing it. Reload the page and try again.', 'cetech-woocommerce-delivery-engine' )
+			);
+		}
 
 		return ShipmentTrackingSaveResult::success(
 			$saved,
@@ -68,7 +92,11 @@ final class ShipmentTrackingService {
 		);
 	}
 
-	private function append_history( Shipment $before, Shipment $after, ?int $actor_user_id ): void {
+	/**
+	 * @return list<ShipmentEvent>
+	 */
+	private function history_events( Shipment $before, Shipment $after, ?int $actor_user_id ): array {
+		$events           = [];
 		$tracking_changed = ! $this->same_identity( $before, $after ) || $this->nullable( $before->dispatch_at ) !== $this->nullable( $after->dispatch_at );
 		$note_changed     = $this->nullable( $before->public_note ) !== $this->nullable( $after->public_note );
 
@@ -77,34 +105,32 @@ final class ShipmentTrackingService {
 			$has = $after->hasPublicTracking() || '' !== (string) $this->nullable( $after->dispatch_at );
 			$type = ( ! $had && $has ) ? ShipmentEventType::TrackingAdded : ShipmentEventType::TrackingUpdated;
 
-			$this->shipments->appendEvent(
-				ShipmentEvent::create(
-					$after->id,
-					$type,
-					ShipmentEventSource::Staff,
-					null,
-					null,
-					$this->tracking_event_note( $type, $had, $has ),
-					null,
-					$actor_user_id
-				)
+			$events[] = ShipmentEvent::create(
+				$before->id,
+				$type,
+				ShipmentEventSource::Staff,
+				null,
+				null,
+				$this->tracking_event_note( $type, $had, $has ),
+				null,
+				$actor_user_id
 			);
 		}
 
 		if ( $note_changed ) {
-			$this->shipments->appendEvent(
-				ShipmentEvent::create(
-					$after->id,
-					ShipmentEventType::NoteAdded,
-					ShipmentEventSource::Staff,
-					null,
-					null,
-					__( 'Public shipment note updated.', 'cetech-woocommerce-delivery-engine' ),
-					null,
-					$actor_user_id
-				)
+			$events[] = ShipmentEvent::create(
+				$before->id,
+				ShipmentEventType::NoteAdded,
+				ShipmentEventSource::Staff,
+				null,
+				null,
+				__( 'Public shipment note updated.', 'cetech-woocommerce-delivery-engine' ),
+				null,
+				$actor_user_id
 			);
 		}
+
+		return $events;
 	}
 
 	private function tracking_event_note( ShipmentEventType $type, bool $had, bool $has ): string {
