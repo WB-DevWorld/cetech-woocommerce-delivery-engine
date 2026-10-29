@@ -58,7 +58,8 @@ final class ProductDeliveryOptionsBuilder {
 			$delivery_options = $this->delivery_offer_options(
 				$availability_slug,
 				$availability_label,
-				$split['delivery']
+				$split['delivery'],
+				$rule->estimated_delivery
 			);
 			$pickup_location  = $this->resolve_pickup_location( $rule );
 			$emit_pickup      = $this->should_emit_pickup(
@@ -426,7 +427,8 @@ final class ProductDeliveryOptionsBuilder {
 	private function delivery_offer_options(
 		string $availability_slug,
 		string $availability_label,
-		array $offer_ids
+		array $offer_ids,
+		?string $configured_estimate = null
 	): array {
 		$options      = [];
 		$choice_slug  = FulfilmentChoice::Delivery->value;
@@ -464,7 +466,7 @@ final class ProductDeliveryOptionsBuilder {
 				(int) $offer_id,
 				$public_label,
 				'' !== $public_description ? $public_description : null,
-				$this->format_estimate_text( $row ),
+				$this->format_estimate_text( $row, $configured_estimate ),
 				true,
 				null
 			);
@@ -571,7 +573,7 @@ final class ProductDeliveryOptionsBuilder {
 	/**
 	 * @param array<string, mixed> $offer
 	 */
-	private function format_estimate_text( array $offer ): ?string {
-		return DeliveryEstimateFormatter::from_offer( $offer );
+	private function format_estimate_text( array $offer, ?string $configured_estimate = null ): ?string {
+		return DeliveryEstimatePrecedence::for_delivery( $configured_estimate, $offer );
 	}
 }
