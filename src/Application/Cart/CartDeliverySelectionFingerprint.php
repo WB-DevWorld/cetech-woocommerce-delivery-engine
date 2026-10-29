@@ -41,6 +41,15 @@ final class CartDeliverySelectionFingerprint {
 			(string) $normalized['rule_id'],
 		];
 
+		// COR-024: the Pickup endpoint is part of the selection identity. Additive: legacy intents
+		// without an endpoint id keep their fingerprint, so restored sessions still verify.
+		$pickup_location_id = isset( $intent['pickup_location_id'] ) && is_scalar( $intent['pickup_location_id'] )
+			? (int) $intent['pickup_location_id']
+			: 0;
+		if ( $pickup_location_id > 0 ) {
+			$parts[] = 'p' . (string) $pickup_location_id;
+		}
+
 		// Additive ECR config component: only present when non-empty so legacy hashes stay stable.
 		if ( '' !== (string) $normalized['configuration_fingerprint'] ) {
 			$parts[] = (string) $normalized['configuration_fingerprint'];
