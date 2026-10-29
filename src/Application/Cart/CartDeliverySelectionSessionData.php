@@ -28,6 +28,9 @@ final class CartDeliverySelectionSessionData {
 		'rule_id',
 		'issued_at',
 		'configuration_fingerprint',
+		'logistics_profile_id',
+		'supplier_id',
+		'origin_id',
 	];
 
 	private const SUMMARY_KEYS = [
@@ -129,6 +132,14 @@ final class CartDeliverySelectionSessionData {
 		// hash checks match the hash captured at add-to-cart (legacy intents omit this key).
 		if ( '' !== (string) $fields['configuration_fingerprint'] ) {
 			$intent['configuration_fingerprint'] = (string) $fields['configuration_fingerprint'];
+		}
+
+		// Quote dimensions (D1): additive, positive ids only; legacy intents omit them.
+		foreach ( [ 'logistics_profile_id', 'supplier_id', 'origin_id' ] as $dimension ) {
+			$value = isset( $raw[ $dimension ] ) && is_scalar( $raw[ $dimension ] ) ? (int) $raw[ $dimension ] : 0;
+			if ( $value > 0 ) {
+				$intent[ $dimension ] = $value;
+			}
 		}
 
 		return CartLineCustomerIdentity::overlayCustomerOwned( $intent, $raw );
