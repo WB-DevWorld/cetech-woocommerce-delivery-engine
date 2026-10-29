@@ -10,7 +10,9 @@ use WC_Order;
  * Bounded index of Cash on Delivery orders awaiting staff shipment creation.
  *
  * Order meta is the per-order source of truth. A compact option lists order IDs
- * so Needs Attention does not scan WooCommerce orders.
+ * so Needs Attention does not scan WooCommerce orders. COR-033: index writes run
+ * under AttentionIndexLock so concurrent writers keep each other's entries, and
+ * report false when the index could not be written (the order meta still holds).
  */
 final class CodAwaitingShipmentStore {
 
@@ -20,29 +22,32 @@ final class CodAwaitingShipmentStore {
 
 	public const INDEX_OPTION = 'cetech_de_cod_awaiting_shipment_order_ids';
 
-	public function mark_awaiting( WC_Order $order ): void {
+	public function mark_awaiting( WC_Order $order ): bool {
 		$order_id = (int) $order->get_id();
 
 		if ( $order_id <= 0 ) {
-			return;
+			return false;
 		}
 
 		$order->update_meta_data( self::STATE_META, self::STATE_AWAITING );
 		$order->save();
 
-		$ids = $this->awaiting_order_ids();
+		return $this->mutate_index(
+			function ( array $ids ) use ( $order_id ): array {
+				if ( ! in_array( $order_id, $ids, true ) ) {
+					$ids[] = $order_id;
+				}
 
-		if ( ! in_array( $order_id, $ids, true ) ) {
-			$ids[] = $order_id;
-			update_option( self::INDEX_OPTION, array_values( $ids ), false );
-		}
+				return $ids;
+			}
+		);
 	}
 
-	public function mark_cleared( WC_Order $order ): void {
+	public function mark_cleared( WC_Order $order ): bool {
 		$order_id = (int) $order->get_id();
 
 		if ( $order_id <= 0 ) {
-			return;
+			return false;
 		}
 
 		if ( '' !== (string) $order->get_meta( self::STATE_META, true ) ) {
@@ -50,14 +55,38 @@ final class CodAwaitingShipmentStore {
 			$order->save();
 		}
 
-		$ids = array_values(
-			array_filter(
-				$this->awaiting_order_ids(),
-				static fn ( int $id ): bool => $id !== $order_id
+		return $this->mutate_index(
+			static fn ( array $ids ): array => array_values(
+				array_filter( $ids, static fn ( int $id ): bool => $id !== $order_id )
 			)
 		);
+	}
 
-		update_option( self::INDEX_OPTION, $ids, false );
+	public function count(): int {
+		return count( $this->awaiting_order_ids() );
+	}
+
+	/**
+	 * @param callable(list<int>): list<int> $change
+	 */
+	private function mutate_index( callable $change ): bool {
+		try {
+			return AttentionIndexLock::run(
+				self::INDEX_OPTION,
+				function () use ( $change ): bool {
+					$current = $this->awaiting_order_ids();
+					$next    = array_values( array_unique( $change( $current ) ) );
+
+					if ( $next === $current ) {
+						return true;
+					}
+
+					return (bool) update_option( self::INDEX_OPTION, $next, false );
+				}
+			);
+		} catch ( AttentionIndexBusyException ) {
+			return false;
+		}
 	}
 
 	public function is_awaiting( WC_Order $order ): bool {

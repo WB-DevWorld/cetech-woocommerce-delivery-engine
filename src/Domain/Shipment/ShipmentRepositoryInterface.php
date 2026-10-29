@@ -29,6 +29,15 @@ interface ShipmentRepositoryInterface {
 	public function findByOrderId( int $order_id ): array;
 
 	/**
+	 * COR-033: bounded batched lookup keyed by shipment id (missing ids are absent).
+	 *
+	 * @param list<int> $ids
+	 *
+	 * @return array<int, Shipment>
+	 */
+	public function findByIds( array $ids ): array;
+
+	/**
 	 * @param array{status?: string, order_id?: int, search?: string} $criteria Status must be a machine code.
 	 */
 	public function list( array $criteria = [], int $page = 1, int $per_page = 20 ): ShipmentListResult;

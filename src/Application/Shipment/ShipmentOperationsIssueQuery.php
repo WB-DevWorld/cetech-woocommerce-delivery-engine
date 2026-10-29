@@ -15,6 +15,9 @@ use WC_Order;
  *
  * Delayed shipments are listed from the status index. Cancel/refund review uses
  * the compact operations-issue option. No all-order or all-shipment scans.
+ * COR-033: list() returns one bounded page; total() is the real number of open
+ * issues (index entries on live, non-cancelled shipments plus delayed shipments,
+ * counted once), so the badge and the page disclose how much a page omits.
  */
 final class ShipmentOperationsIssueQuery {
 
@@ -37,26 +40,18 @@ final class ShipmentOperationsIssueQuery {
 	 *     reasons: list<string>
 	 * }>
 	 */
-	public function list( int $limit = 50 ): array {
+	public const PAGE_LIMIT = 50;
+
+	public function list( int $limit = self::PAGE_LIMIT ): array {
 		if ( ! $this->flags->is_enabled( 'enable_shipment_records' ) ) {
 			return [];
 		}
 
-		$limit   = max( 1, min( 50, $limit ) );
-		$by_id   = [];
+		$limit = max( 1, min( self::PAGE_LIMIT, $limit ) );
+		$by_id = [];
 
-		foreach ( $this->issues->all() as $shipment_id => $row ) {
-			$shipment = $this->shipments->findById( $shipment_id );
-
-			if ( ! $shipment instanceof Shipment ) {
-				continue;
-			}
-
-			if ( ShipmentStatus::Cancelled === $shipment->status ) {
-				continue;
-			}
-
-			$by_id[ $shipment_id ] = $this->item( $shipment, $row['codes'] );
+		foreach ( $this->indexed_open_issues( $limit ) as $shipment_id => $open ) {
+			$by_id[ $shipment_id ] = $this->item( $open['shipment'], $open['codes'] );
 		}
 
 		$delayed = $this->shipments->list(
@@ -74,8 +69,78 @@ final class ShipmentOperationsIssueQuery {
 		return array_values( array_slice( $by_id, 0, $limit ) );
 	}
 
+	/**
+	 * Real number of open operational issues, regardless of the page size.
+	 */
+	public function total(): int {
+		if ( ! $this->flags->is_enabled( 'enable_shipment_records' ) ) {
+			return 0;
+		}
+
+		$indexed = $this->indexed_open_issues( null );
+		$delayed = $this->shipments->list( [ 'status' => ShipmentStatus::Delayed->value ], 1, 1 )->total;
+		$overlap = 0;
+
+		foreach ( $indexed as $open ) {
+			if ( ShipmentStatus::Delayed === $open['shipment']->status ) {
+				++$overlap;
+			}
+		}
+
+		return count( $indexed ) + $delayed - $overlap;
+	}
+
 	public function count(): int {
-		return count( $this->list( 50 ) );
+		return $this->total();
+	}
+
+	/**
+	 * @return array{shown: int, total: int, truncated: bool}
+	 */
+	public function summary( int $limit = self::PAGE_LIMIT ): array {
+		$shown = count( $this->list( $limit ) );
+		$total = $this->total();
+
+		return [
+			'shown'     => $shown,
+			'total'     => $total,
+			'truncated' => $total > $shown,
+		];
+	}
+
+	/**
+	 * Index entries whose shipment exists and is not cancelled, looked up in bounded batches.
+	 *
+	 * @return array<int, array{shipment: Shipment, codes: list<string>}>
+	 */
+	private function indexed_open_issues( ?int $limit ): array {
+		$index = $this->issues->all();
+
+		if ( [] === $index ) {
+			return [];
+		}
+
+		$open      = [];
+		$shipments = $this->shipments->findByIds( array_keys( $index ) );
+
+		foreach ( $index as $shipment_id => $row ) {
+			$shipment = $shipments[ $shipment_id ] ?? null;
+
+			if ( ! $shipment instanceof Shipment || ShipmentStatus::Cancelled === $shipment->status ) {
+				continue;
+			}
+
+			$open[ $shipment_id ] = [
+				'shipment' => $shipment,
+				'codes'    => $row['codes'],
+			];
+
+			if ( null !== $limit && count( $open ) >= $limit ) {
+				break;
+			}
+		}
+
+		return $open;
 	}
 
 	/**

@@ -105,14 +105,69 @@ final class WpdbShipmentRepository extends AbstractWpdbRepository implements Shi
 		return is_array( $row ) ? $this->hydrate_shipment( $row ) : null;
 	}
 
+	public const PAGE_SIZE = 100;
+
+	/**
+	 * Every shipment of the order, read in bounded pages (COR-033): an order with more
+	 * than one page of delivery groups no longer loses its later groups.
+	 */
 	public function findByOrderId( int $order_id ): array {
 		if ( $order_id <= 0 ) {
 			return [];
 		}
 
-		$result = $this->list( [ 'order_id' => $order_id ], 1, 100 );
+		$items = [];
+		$page  = 1;
 
-		return $result->items;
+		do {
+			$result = $this->list( [ 'order_id' => $order_id ], $page, self::PAGE_SIZE );
+
+			foreach ( $result->items as $shipment ) {
+				$items[ $shipment->id ] = $shipment;
+			}
+
+			++$page;
+		} while ( count( $result->items ) >= self::PAGE_SIZE && count( $items ) < $result->total );
+
+		return array_values( $items );
+	}
+
+	public function findByIds( array $ids ): array {
+		$wanted = [];
+
+		foreach ( $ids as $id ) {
+			$id = (int) $id;
+
+			if ( $id > 0 ) {
+				$wanted[ $id ] = $id;
+			}
+		}
+
+		if ( [] === $wanted ) {
+			return [];
+		}
+
+		global $wpdb;
+
+		$table = $this->table_name();
+		$found = [];
+
+		foreach ( array_chunk( array_values( $wanted ), self::PAGE_SIZE ) as $chunk ) {
+			$placeholders = implode( ', ', array_fill( 0, count( $chunk ), '%d' ) );
+			$sql          = "SELECT * FROM `{$table}` WHERE `id` IN ({$placeholders})";
+
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$rows = $wpdb->get_results( $wpdb->prepare( $sql, ...$chunk ), ARRAY_A );
+
+			foreach ( is_array( $rows ) ? $rows : [] as $row ) {
+				if ( is_array( $row ) ) {
+					$shipment = $this->hydrate_shipment( $row );
+					$found[ $shipment->id ] = $shipment;
+				}
+			}
+		}
+
+		return $found;
 	}
 
 	public function list( array $criteria = [], int $page = 1, int $per_page = 20 ): ShipmentListResult {
