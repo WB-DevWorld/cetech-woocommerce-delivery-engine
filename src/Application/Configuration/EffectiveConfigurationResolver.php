@@ -22,6 +22,7 @@ use CetechDeliveryEngine\Domain\Configuration\ScalarFieldInstruction;
 use CetechDeliveryEngine\Domain\Enum\CollectionConfigurationMode;
 use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
 use CetechDeliveryEngine\Domain\Enum\EffectiveFieldState;
+use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Domain\Enum\ScalarConfigurationMode;
 use CetechDeliveryEngine\Domain\FulfilmentProfile\FulfilmentProfileRegistry;
 
@@ -48,10 +49,37 @@ final class EffectiveConfigurationResolver {
 	}
 
 	public function resolve( EffectiveConfigurationRequest $request ): EffectiveConfiguration {
+		return $this->resolve_with( $request, null );
+	}
+
+	/**
+	 * COR-012 (D3b): the configuration an item scope inherits, i.e. resolved as if that scope type
+	 * had no saved instructions. Used to decide whether "Add"/"Remove" have a complete base.
+	 */
+	public function resolve_inherited_base( EffectiveConfigurationRequest $request, ConfigurationScopeType $excluded_scope_type ): EffectiveConfiguration {
+		return $this->resolve_with( $request, $excluded_scope_type );
+	}
+
+	private function resolve_with( EffectiveConfigurationRequest $request, ?ConfigurationScopeType $excluded_scope_type ): EffectiveConfiguration {
 		$context = $this->load_context( $request->product_id, $request->variation_id );
 
 		$product_scope   = $this->select_item_scope( $context['product_by_slice'], $request->slice_key );
 		$variation_scope = $this->select_item_scope( $context['variation_by_slice'], $request->slice_key );
+
+		if ( ConfigurationScopeType::Product === $excluded_scope_type ) {
+			$product_scope = null;
+		}
+		if ( ConfigurationScopeType::Variation === $excluded_scope_type ) {
+			$variation_scope = null;
+		}
+
+		// COR-012 (D3a): inactive item scopes are ignored; remember the one that would have applied.
+		$ignored_product   = $product_scope instanceof ScopedConfiguration || ConfigurationScopeType::Product === $excluded_scope_type
+			? null
+			: $this->select_item_scope( $context['inactive_product_by_slice'], $request->slice_key );
+		$ignored_variation = $variation_scope instanceof ScopedConfiguration || ConfigurationScopeType::Variation === $excluded_scope_type
+			? null
+			: $this->select_item_scope( $context['inactive_variation_by_slice'], $request->slice_key );
 		$global_scope    = $this->select_profile_global(
 			$request,
 			$product_scope instanceof ScopedConfiguration ? $product_scope : null,
@@ -72,6 +100,9 @@ final class EffectiveConfigurationResolver {
 				$global_version,
 				$product_version,
 				$variation_version,
+				$excluded_scope_type?->value ?? '',
+				$ignored_product?->scope->id ?? 0,
+				$ignored_variation?->scope->id ?? 0,
 			]
 		);
 
@@ -100,7 +131,9 @@ final class EffectiveConfigurationResolver {
 			$variation_scope instanceof ScopedConfiguration ? $variation_scope : null,
 			$global_version,
 			$product_version,
-			$variation_version
+			$variation_version,
+			$ignored_product instanceof ScopedConfiguration ? $ignored_product : null,
+			$ignored_variation instanceof ScopedConfiguration ? $ignored_variation : null
 		);
 
 		$this->memoized[ $memo_key ] = $configuration;
@@ -174,12 +207,20 @@ final class EffectiveConfigurationResolver {
 			? []
 			: $this->repository->findByScope( ConfigurationScopeType::Variation, $variation_id );
 
+		// COR-012 (D3a): only active item scopes take part in resolution.
+		$active_product     = $this->filter_by_status( $product_scopes, true );
+		$active_variation   = $this->filter_by_status( $variation_scopes, true );
+		$inactive_product   = $this->filter_by_status( $product_scopes, false );
+		$inactive_variation = $this->filter_by_status( $variation_scopes, false );
+
 		$context = [
-			'global'             => $global,
-			'product_scopes'     => $product_scopes,
-			'variation_scopes'   => $variation_scopes,
-			'product_by_slice'   => $this->index_by_slice( $product_scopes ),
-			'variation_by_slice' => $this->index_by_slice( $variation_scopes ),
+			'global'                      => $global,
+			'product_scopes'              => $active_product,
+			'variation_scopes'            => $active_variation,
+			'product_by_slice'            => $this->index_by_slice( $active_product ),
+			'variation_by_slice'          => $this->index_by_slice( $active_variation ),
+			'inactive_product_by_slice'   => $this->index_by_slice( $inactive_product ),
+			'inactive_variation_by_slice' => $this->index_by_slice( $inactive_variation ),
 		];
 
 		$this->loaded_contexts[ $key ] = $context;
@@ -286,6 +327,26 @@ final class EffectiveConfigurationResolver {
 	/**
 	 * @param list<ScopedConfiguration> $configurations
 	 *
+	 * @return list<ScopedConfiguration>
+	 */
+	private function filter_by_status( array $configurations, bool $active ): array {
+		$kept = [];
+
+		foreach ( $configurations as $configuration ) {
+			if ( ! $configuration instanceof ScopedConfiguration ) {
+				continue;
+			}
+			if ( ( RecordStatus::Active === $configuration->scope->status ) === $active ) {
+				$kept[] = $configuration;
+			}
+		}
+
+		return $kept;
+	}
+
+	/**
+	 * @param list<ScopedConfiguration> $configurations
+	 *
 	 * @return array<string, ScopedConfiguration>
 	 */
 	private function index_by_slice( array $configurations ): array {
@@ -326,7 +387,9 @@ final class EffectiveConfigurationResolver {
 		?ScopedConfiguration $variation_scope,
 		int $global_version,
 		int $product_version,
-		int $variation_version
+		int $variation_version,
+		?ScopedConfiguration $ignored_product = null,
+		?ScopedConfiguration $ignored_variation = null
 	): EffectiveConfiguration {
 		$scalars     = $this->initial_scalars();
 		$collections = $this->initial_collections();
@@ -338,6 +401,12 @@ final class EffectiveConfigurationResolver {
 
 			$scalars     = $this->apply_scalar_scope( $scalars, $scope_configuration );
 			$collections = $this->apply_collection_scope( $collections, $scope_configuration );
+		}
+
+		foreach ( [ $ignored_product, $ignored_variation ] as $ignored ) {
+			if ( $ignored instanceof ScopedConfiguration ) {
+				[ $scalars, $collections ] = $this->note_ignored_inactive_scope( $scalars, $collections, $ignored );
+			}
 		}
 
 		$version = new EffectiveConfigurationVersionDescriptor(
@@ -427,6 +496,50 @@ final class EffectiveConfigurationResolver {
 	}
 
 	/**
+	 * COR-012 (D3a): mark every field the ignored inactive scope would have configured, so staff
+	 * see "inactive" in the effective-value source without the value changing.
+	 *
+	 * @param array<string, EffectiveScalarField>     $scalars
+	 * @param array<string, EffectiveCollectionField> $collections
+	 *
+	 * @return array{0: array<string, EffectiveScalarField>, 1: array<string, EffectiveCollectionField>}
+	 */
+	private function note_ignored_inactive_scope( array $scalars, array $collections, ScopedConfiguration $ignored ): array {
+		$scope_type = $ignored->scope->scope_type;
+
+		foreach ( $ignored->scalars as $field_key => $instruction ) {
+			if ( ScalarConfigurationMode::Inherit === $instruction->mode || ! isset( $scalars[ $field_key ] ) ) {
+				continue;
+			}
+			$field                 = $scalars[ $field_key ];
+			$scalars[ $field_key ] = new EffectiveScalarField(
+				$field->field_key,
+				$field->state,
+				$field->value,
+				$field->provenance->withIgnoredInactive( $scope_type ),
+				$field->reason_codes
+			);
+		}
+
+		foreach ( $ignored->collections as $field_key => $instruction ) {
+			if ( CollectionConfigurationMode::Inherit === $instruction->mode || ! isset( $collections[ $field_key ] ) ) {
+				continue;
+			}
+			$field                     = $collections[ $field_key ];
+			$collections[ $field_key ] = new EffectiveCollectionField(
+				$field->field_key,
+				$field->state,
+				$field->members,
+				$field->provenance->withIgnoredInactive( $scope_type ),
+				$field->reason_codes,
+				$field->mutation_steps
+			);
+		}
+
+		return [ $scalars, $collections ];
+	}
+
+	/**
 	 * @param array<string, EffectiveScalarField> $scalars
 	 *
 	 * @return array<string, EffectiveScalarField>
@@ -484,7 +597,12 @@ final class EffectiveConfigurationResolver {
 				$configuration->scope->id
 			);
 
-			if ( EffectiveFieldState::Unresolved === $current->state && CollectionConfigurationMode::Replace !== $instruction->mode ) {
+			// COR-012 (D3b): Add/Remove need a complete, valid inherited list. Over an unresolved or an
+			// already invalid base the field stays invalid until an explicit Replace.
+			if (
+				in_array( $current->state, [ EffectiveFieldState::Unresolved, EffectiveFieldState::Invalid ], true )
+				&& CollectionConfigurationMode::Replace !== $instruction->mode
+			) {
 				$collections[ $field_key ] = new EffectiveCollectionField(
 					$field_key,
 					EffectiveFieldState::Invalid,
@@ -495,7 +613,7 @@ final class EffectiveConfigurationResolver {
 						$configuration->scope->id,
 						$mutation_steps
 					),
-					[ ConfigurationReasonCode::INVALID_COLLECTION_OPERATION ],
+					array_values( array_unique( array_merge( $current->reason_codes, [ ConfigurationReasonCode::INVALID_COLLECTION_OPERATION ] ) ) ),
 					$mutation_steps
 				);
 				continue;
