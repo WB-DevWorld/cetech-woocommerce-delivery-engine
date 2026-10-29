@@ -134,8 +134,8 @@ final class CartDeliverySelectionSessionData {
 			$intent['configuration_fingerprint'] = (string) $fields['configuration_fingerprint'];
 		}
 
-		// Quote dimensions (D1): additive, positive ids only; legacy intents omit them.
-		foreach ( [ 'logistics_profile_id', 'supplier_id', 'origin_id' ] as $dimension ) {
+		// Quote dimensions (D1) and the Pickup endpoint id (COR-024): additive, positive ids only; legacy intents omit them.
+		foreach ( [ 'logistics_profile_id', 'supplier_id', 'origin_id', 'pickup_location_id' ] as $dimension ) {
 			$value = isset( $raw[ $dimension ] ) && is_scalar( $raw[ $dimension ] ) ? (int) $raw[ $dimension ] : 0;
 			if ( $value > 0 ) {
 				$intent[ $dimension ] = $value;

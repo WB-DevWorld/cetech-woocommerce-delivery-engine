@@ -9,6 +9,7 @@ use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidation
 use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidator;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
+use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
 use WC_Product;
 
 /**
@@ -192,7 +193,12 @@ final class CartDeliverySelectionReconciler {
 			);
 		}
 
-		$equivalent = CartDeliverySelectionEquivalence::findEquivalentOption( $live_options, $stored_intent );
+		$committed_context = CustomerCartContext::fromCartItem( $cart_item );
+		$equivalent        = CartDeliverySelectionEquivalence::findEquivalentOption(
+			$live_options,
+			$stored_intent,
+			$committed_context instanceof CustomerCartContext && $committed_context->isPickup() ? $committed_context->pickup_location_id : null
+		);
 
 		if ( null === $equivalent ) {
 			return $this->needs_reselection_outcome(

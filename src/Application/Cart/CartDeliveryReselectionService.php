@@ -4,17 +4,24 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Cart;
 
+use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Application\Selector\ProductDeliverySelectionValidator;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Integrations\Blocks\BlocksCartContextCommandHandler;
 use CetechDeliveryEngine\Integrations\Blocks\BlocksCheckoutAdapter;
+use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
+use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 
 /**
  * Applies a customer delivery reselection onto an existing cart line.
  *
  * Shared by Classic Cart POST and WooCommerce Blocks Store API update callback.
+ * COR-025: the selected intent and the customer context change together in one
+ * transition, so identity, grouping, summary and quote agree afterwards. Applicable
+ * customer fields (destination, address, recipient) are kept on a Delivery line; an
+ * advisory browsing location is never written onto a committed line.
  */
 final class CartDeliveryReselectionService {
 
@@ -228,14 +235,7 @@ final class CartDeliveryReselectionService {
 			];
 		}
 
-		$stored = CartDeliverySelectionSessionData::normalizeIntent(
-			$item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] ?? null
-		);
-		$fresh  = is_array( $stored )
-			? CartLineCustomerIdentity::overlayCustomerOwned( $validation->intent, $stored )
-			: $validation->intent;
-
-		$updated = CartDeliverySelectionReconciler::apply_refresh( $item, $fresh, $validation->matched_option );
+		$updated = self::reselect_line( $item, $validation->intent, $validation->matched_option );
 
 		$contents = $cart->get_cart();
 		$contents[ $cart_item_key ] = $updated;
@@ -251,5 +251,46 @@ final class CartDeliveryReselectionService {
 		}
 
 		return [ 'success' => true ];
+	}
+
+	/**
+	 * One coherent reselection transition for a cart line (COR-025).
+	 *
+	 * The validated intent replaces the stored one (customer-owned fields overlaid), and the
+	 * customer context is rebuilt from the matched option: a Pickup choice commits that Pickup
+	 * endpoint; a Delivery choice commits the offer and keeps the line's own destination,
+	 * address and recipient. Nothing is read from the advisory browsing location.
+	 *
+	 * @param array<string, mixed> $item
+	 * @param array<string, mixed> $intent         Validated intent for the newly chosen option.
+	 * @param array<string, mixed> $matched_option Safe option array for the newly chosen option.
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function reselect_line( array $item, array $intent, array $matched_option ): array {
+		$stored = CartDeliverySelectionSessionData::normalizeIntent(
+			$item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] ?? null
+		);
+		$fresh  = is_array( $stored )
+			? CartLineCustomerIdentity::overlayCustomerOwned( $intent, $stored )
+			: $intent;
+
+		$option   = ProductDeliveryOption::fromArray( $matched_option );
+		$previous = CustomerCartContext::fromCartItem( $item );
+
+		if ( FulfilmentChoice::StorePickup->value === $option->fulfilment_choice ) {
+			$context = CustomerCartContext::pickup( $option->pickup_location_id );
+		} else {
+			$offer_id = (int) ( $option->delivery_offer_id ?? 0 );
+			$context  = CustomerCartContext::delivery(
+				$offer_id > 0 ? $offer_id : null,
+				$previous instanceof CustomerCartContext && $previous->isDelivery() ? $previous->matching_location : null,
+				$previous instanceof CustomerCartContext && $previous->isDelivery() ? $previous->delivery_address : null
+			);
+		}
+
+		$updated = CartDeliverySelectionReconciler::apply_refresh( $item, $fresh, $matched_option );
+
+		return $context->applyToCartItem( $updated );
 	}
 }

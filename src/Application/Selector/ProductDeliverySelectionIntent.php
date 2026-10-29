@@ -9,7 +9,8 @@ namespace CetechDeliveryEngine\Application\Selector;
  *
  * May be stored in WooCommerce cart item data when cart capture is enabled. It carries only numeric
  * quote dimensions (logistics profile, supplier, origin ids) so that delivery grouping and pricing use
- * the same tuple (D1); never names, addresses or costs.
+ * the same tuple (D1), and the Pickup endpoint id so that a replaced or removed Pickup Location can
+ * never be substituted silently (COR-024); never names, addresses or costs.
  */
 final class ProductDeliverySelectionIntent {
 
@@ -32,7 +33,8 @@ final class ProductDeliverySelectionIntent {
 		public readonly ?string $configuration_fingerprint = null,
 		public readonly ?int $logistics_profile_id = null,
 		public readonly ?int $supplier_id = null,
-		public readonly ?int $origin_id = null
+		public readonly ?int $origin_id = null,
+		public readonly ?int $pickup_location_id = null
 	) {
 	}
 
@@ -64,7 +66,8 @@ final class ProductDeliverySelectionIntent {
 			$configuration_fingerprint,
 			self::positive_or_null( $quote_dimensions['logistics_profile_id'] ?? null ),
 			self::positive_or_null( $quote_dimensions['supplier_id'] ?? null ),
-			self::positive_or_null( $quote_dimensions['origin_id'] ?? null )
+			self::positive_or_null( $quote_dimensions['origin_id'] ?? null ),
+			self::positive_or_null( $option->pickup_location_id )
 		);
 	}
 
@@ -104,7 +107,7 @@ final class ProductDeliverySelectionIntent {
 			$data['configuration_fingerprint'] = $this->configuration_fingerprint;
 		}
 
-		foreach ( [ 'logistics_profile_id', 'supplier_id', 'origin_id' ] as $dimension ) {
+		foreach ( [ 'logistics_profile_id', 'supplier_id', 'origin_id', 'pickup_location_id' ] as $dimension ) {
 			if ( null !== $this->{$dimension} ) {
 				$data[ $dimension ] = $this->{$dimension};
 			}
@@ -136,7 +139,8 @@ final class ProductDeliverySelectionIntent {
 			$fingerprint,
 			self::positive_or_null( $data['logistics_profile_id'] ?? null ),
 			self::positive_or_null( $data['supplier_id'] ?? null ),
-			self::positive_or_null( $data['origin_id'] ?? null )
+			self::positive_or_null( $data['origin_id'] ?? null ),
+			self::positive_or_null( $data['pickup_location_id'] ?? null )
 		);
 	}
 }
