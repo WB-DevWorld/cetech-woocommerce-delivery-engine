@@ -117,8 +117,11 @@ final class NeedsAttentionPage {
 		}
 
 		$this->render_cod_actions( $cod );
+		$this->render_omitted_rows( count( $cod ), $can_shipment_attention && $this->cod_actions instanceof CodAwaitingShipmentQuery ? $this->cod_actions->count() : 0 );
 		$this->render_shipment_issues( $shipments );
+		$this->render_omitted_rows( count( $shipments ), $can_shipment_attention ? $this->shipment_issues->count() : 0 );
 		$this->render_operations_issues( $operations );
+		$this->render_omitted_rows( count( $operations ), $can_shipment_attention ? $this->operations_issues->count() : 0 );
 		$this->render_bulk_stale( $bulk );
 
 		if ( [] === $items && [] === $shipments && [] === $operations && [] === $cod && [] === $bulk ) {
@@ -252,6 +255,24 @@ final class NeedsAttentionPage {
 			$rows,
 			true
 		);
+	}
+
+	/**
+	 * COR-033: a bounded page says how many rows it leaves out instead of implying the list is complete.
+	 */
+	private function render_omitted_rows( int $shown, int $total ): void {
+		if ( $shown <= 0 || $total <= $shown ) {
+			return;
+		}
+
+		echo '<p class="description cetech-de-attention-omitted">' . esc_html(
+			sprintf(
+				/* translators: 1: rows shown, 2: total open rows */
+				__( 'Showing the first %1$d of %2$d. The remaining rows stay open and are counted in the badge; resolve these to see the next ones.', 'cetech-woocommerce-delivery-engine' ),
+				$shown,
+				$total
+			)
+		) . '</p>';
 	}
 
 	/**
