@@ -40,6 +40,7 @@ final class CustomerOrderDeliverySummaryBuilderTest extends TestCase {
 			'time_format' => 'H:i',
 		];
 		$GLOBALS['cetech_de_test_is_view_order'] = true;
+		$GLOBALS['cetech_de_test_caps']['view_order'] = true; // COR-034: the rightful viewer.
 		$GLOBALS['cetech_de_test_wc_orders']     = [];
 
 		$this->flags   = new FeatureFlags();
@@ -241,7 +242,7 @@ final class CustomerOrderDeliverySummaryBuilderTest extends TestCase {
 		);
 
 		ob_start();
-		$renderer->render( $order, false, $plain_text );
+		$renderer->render( $order, false, $plain_text, new \WC_Email( true ) ); // COR-034: a customer email object is required.
 
 		return (string) ob_get_clean();
 	}

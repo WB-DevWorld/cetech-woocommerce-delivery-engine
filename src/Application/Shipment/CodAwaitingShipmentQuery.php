@@ -62,7 +62,25 @@ final class CodAwaitingShipmentQuery {
 		return $items;
 	}
 
+	/**
+	 * COR-033: the real size of the awaiting index. list() reconciles stale entries as it
+	 * renders; the badge no longer loads up to 500 orders and never caps at that number.
+	 */
 	public function count(): int {
-		return count( $this->list( 500 ) );
+		return $this->store->count();
+	}
+
+	/**
+	 * @return array{shown: int, total: int, truncated: bool}
+	 */
+	public function summary( int $limit = 50 ): array {
+		$shown = count( $this->list( $limit ) );
+		$total = $this->count();
+
+		return [
+			'shown'     => $shown,
+			'total'     => max( $shown, $total ),
+			'truncated' => $total > $shown,
+		];
 	}
 }

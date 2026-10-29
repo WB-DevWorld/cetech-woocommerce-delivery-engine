@@ -64,6 +64,9 @@ final class OrderShipmentOperationsSubscriber {
 
 	private function sync_cancelled_order( WC_Order $order, Shipment $shipment ): void {
 		if ( ShipmentStatus::Cancelled === $shipment->status ) {
+			// COR-032: a repeated hook lets the status service repair a cancellation whose event was lost.
+			$this->auto_cancel( $order, $shipment, ShipmentStatusService::REASON_ORDER_CANCELLED );
+
 			return;
 		}
 

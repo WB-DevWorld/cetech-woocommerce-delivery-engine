@@ -11,6 +11,10 @@ if ( ! function_exists( 'update_option' ) ) {
 	 * @param mixed $value
 	 */
 	function update_option( string $option, $value, bool|string $autoload = true ): bool {
+		if ( in_array( $option, $GLOBALS['cetech_de_test_failing_options'] ?? [], true ) ) {
+			return false;
+		}
+
 		$GLOBALS['cetech_de_test_options'][ $option ] = $value;
 
 		return true;
@@ -297,6 +301,20 @@ if ( ! function_exists( 'wp_cache_delete' ) ) {
 		$GLOBALS['cetech_de_test_cache_deletes'][] = [ $key, $group ];
 
 		return true;
+	}
+}
+
+if ( ! class_exists( 'WC_Email' ) ) {
+	/**
+	 * Minimal WooCommerce email double: customer or non-customer routing.
+	 */
+	class WC_Email {
+		public function __construct( private bool $customer_email = true ) {
+		}
+
+		public function is_customer_email(): bool {
+			return $this->customer_email;
+		}
 	}
 }
 
