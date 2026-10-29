@@ -140,18 +140,18 @@ jobs:
             || fail "run $PACKAGE_RUN_ID did not succeed (conclusion=$(jq -r .conclusion run.json))"
 
           # The packaged commit is the one the build checked out (its 'ref' input). The run
-          # metadata does not carry it, so read it from the build job's log, where the
-          # 'Show source provenance' step prints `git log -1 --format='%H %cI %s'`. The step
-          # name is not used: GitHub's log archive stops resolving per-step names after a
-          # while (`gh run view --log` then reports 'UNKNOWN STEP'), so the line is matched by
-          # its shape instead, and every build job must agree on one commit.
-          mapfile -t build_job_ids < <(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$PACKAGE_RUN_ID/jobs" --jq '.jobs[].id')
-          [[ "${#build_job_ids[@]}" -ge 1 ]] || fail "no jobs found for build run $PACKAGE_RUN_ID"
-          source_shas="$(for job_id in "${build_job_ids[@]}"; do
-              gh api "repos/$GITHUB_REPOSITORY/actions/jobs/$job_id/logs" 2>/dev/null
-            done | tr -d '\r' \
+          # metadata does not carry it, so read it from the build run's log, where the
+          # 'Show source provenance' step prints `git log -1 --format='%H %cI %s'`. The log
+          # is fetched with `gh run view --log` (the run-logs archive, which the runner token
+          # is known to download; the per-job logs endpoint returned nothing to it). The step
+          # name column is ignored: GitHub stops resolving per-step names after a while and
+          # reports 'UNKNOWN STEP', so the line is matched by its shape, and the build must
+          # name exactly one commit. gh's stderr is kept so a failure says why.
+          gh run view "$PACKAGE_RUN_ID" --repo "$GITHUB_REPOSITORY" --log > build-run.log
+          source_shas="$(tr -d '\r' < build-run.log | cut -f3- \
             | grep -oE '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z [0-9a-f]{40} [0-9]{4}-[0-9]{2}-[0-9]{2}T' \
             | awk '{ print $2 }' | sort -u || true)"
+          rm -f build-run.log
           [[ "$(printf '%s\n' "$source_shas" | grep -c .)" -eq 1 ]] \
             || fail "could not read exactly one packaged commit from the build log (found: ${source_shas:-none})"
           source_sha="$source_shas"
