@@ -46,6 +46,12 @@ final class HardFulfilmentConstraintService implements FulfilmentConstraintServi
 			return $configuration;
 		}
 
+		// COR-022 (D8): an explicitly assigned, active Pickup Location offers Store Pickup regardless of
+		// where the item is fulfilled from. Without one, non-store slices keep the policy above unchanged.
+		if ( ! $policy['pickup_allowed'] && $this->has_assigned_active_pickup_location( $configuration ) ) {
+			$policy['pickup_allowed'] = true;
+		}
+
 		$scalars     = $configuration->scalars;
 		$collections = $configuration->collections;
 		$reasons     = $configuration->reason_codes;
@@ -228,6 +234,31 @@ final class HardFulfilmentConstraintService implements FulfilmentConstraintServi
 		}
 
 		return $field;
+	}
+
+	/**
+	 * True when the slice carries a Valid, positive Pickup Location that is active (or cannot be checked).
+	 * Disabled or inherited-empty pickup fields never qualify, so unassigned products behave as before.
+	 */
+	private function has_assigned_active_pickup_location( EffectiveConfiguration $configuration ): bool {
+		$field = $configuration->scalars[ ConfigurationFieldKey::PICKUP_LOCATION_ID ] ?? null;
+
+		if ( ! $field instanceof EffectiveScalarField || EffectiveFieldState::Valid !== $field->state ) {
+			return false;
+		}
+
+		$id = (int) $field->value;
+		if ( $id <= 0 ) {
+			return false;
+		}
+
+		if ( null === $this->pickup_locations ) {
+			return true;
+		}
+
+		$row = $this->pickup_locations->findById( $id );
+
+		return is_array( $row ) && RecordStatus::Active->value === (string) ( $row['status'] ?? '' );
 	}
 
 	private function is_availability( string $value ): bool {
