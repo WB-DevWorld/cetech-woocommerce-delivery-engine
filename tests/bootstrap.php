@@ -11,6 +11,10 @@ if ( ! function_exists( 'update_option' ) ) {
 	 * @param mixed $value
 	 */
 	function update_option( string $option, $value, bool|string $autoload = true ): bool {
+		if ( in_array( $option, $GLOBALS['cetech_de_test_failing_options'] ?? [], true ) ) {
+			return false;
+		}
+
 		$GLOBALS['cetech_de_test_options'][ $option ] = $value;
 
 		return true;
