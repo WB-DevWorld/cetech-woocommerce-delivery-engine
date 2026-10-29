@@ -7,6 +7,7 @@ namespace CetechDeliveryEngine\Presentation\Frontend;
 use CetechDeliveryEngine\Application\Cart\CartCustomerContextEditorService;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionSessionData;
+use CetechDeliveryEngine\Application\Cart\CartLineDeliveryPriceResolver;
 use CetechDeliveryEngine\Application\Pickup\PickupLocationAddressFormatter;
 use CetechDeliveryEngine\Application\Selector\ProductDeliveryOption;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
@@ -20,7 +21,8 @@ use CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy;
 /**
  * Classic cart per-line delivery/pickup editor.
  *
- * Mutates cart only through CartCustomerContextEditorService.
+ * D2: the closed state is one compact line ("<offer> · <locality> · <estimate> · <fee>")
+ * with a single "Change" control. Mutates cart only through CartCustomerContextEditorService.
  */
 final class CartCustomerContextEditorRenderer {
 
@@ -31,7 +33,8 @@ final class CartCustomerContextEditorRenderer {
 	public function __construct(
 		private FeatureFlags $feature_flags,
 		private Requirements $requirements,
-		private CartDeliverySelectionCapture $cart_capture
+		private CartDeliverySelectionCapture $cart_capture,
+		private ?CartLineDeliveryPriceResolver $prices = null
 	) {
 	}
 
@@ -126,7 +129,9 @@ final class CartCustomerContextEditorRenderer {
 			)
 		);
 
-		return $this->render_editor( $cart_item_key, $cart_item, $context, $intent, $options, is_array( $summary ) ? $summary : [] );
+		$price = $this->prices instanceof CartLineDeliveryPriceResolver ? $this->prices->price_text_for( $cart_item ) : '';
+
+		return $this->render_editor( $cart_item_key, $cart_item, $context, $intent, $options, is_array( $summary ) ? $summary : [], $price );
 	}
 
 	/**
@@ -134,6 +139,7 @@ final class CartCustomerContextEditorRenderer {
 	 * @param array<string, mixed>              $intent
 	 * @param list<ProductDeliveryOption>       $options
 	 * @param array<string, string|null>        $summary
+	 * @param string                            $price_text Customer-facing quoted fee for this line ('' when unknown).
 	 */
 	public function render_editor(
 		string $cart_item_key,
@@ -141,7 +147,8 @@ final class CartCustomerContextEditorRenderer {
 		?CustomerCartContext $context,
 		array $intent,
 		array $options,
-		array $summary = []
+		array $summary = [],
+		string $price_text = ''
 	): string {
 		if ( [] === $options ) {
 			return '';
@@ -157,7 +164,7 @@ final class CartCustomerContextEditorRenderer {
 		$form_id      = CartDeliveryUiAnchor::form_id_for_cart_item_key( $cart_item_key );
 		$has_matching = $context instanceof CustomerCartContext && $context->hasMatchingLocation();
 		$html         = '<div class="cetech-de-cart-context" id="' . esc_attr( $anchor ) . '" data-cetech-de-ui-anchor="' . esc_attr( $anchor ) . '" data-cetech-de-form-id="' . esc_attr( $form_id ) . '" data-cetech-de-has-matching-location="' . ( $has_matching ? '1' : '0' ) . '" data-cetech-de-address-complete="' . ( $address_complete ? '1' : '0' ) . '" data-cetech-de-address-required="' . ( $address_required ? '1' : '0' ) . '" data-cetech-de-fulfilment="' . esc_attr( $choice ) . '">';
-		$html .= $this->render_summary( $choice, $summary, $context, $address_required );
+		$html .= $this->render_summary( $choice, $summary, $context, $address_required, $price_text );
 		$html .= $this->render_form( $cart_item_key, $cart_item, $context, $intent, $options, $anchor, $action_label, $is_pickup );
 		$html .= '</div>';
 
@@ -167,9 +174,9 @@ final class CartCustomerContextEditorRenderer {
 	/**
 	 * @param array<string, string|null> $summary
 	 */
-	private function render_summary( string $choice, array $summary, ?CustomerCartContext $context, bool $address_required ): string {
+	private function render_summary( string $choice, array $summary, ?CustomerCartContext $context, bool $address_required, string $price_text = '' ): string {
 		$locality = $context instanceof CustomerCartContext ? $context->publicLocalityLabel() : '';
-		$compact  = CustomerStorefrontCopy::cart_line_summary( $choice, $summary, $locality );
+		$line     = CustomerStorefrontCopy::selection_line( $choice, $summary, $locality, $price_text );
 
 		$html = '<div class="cetech-de-cart-context__summary">';
 		if ( $address_required ) {
@@ -177,16 +184,8 @@ final class CartCustomerContextEditorRenderer {
 				. esc_html( CustomerStorefrontCopy::address_needed() )
 				. '</p>';
 		}
-		if ( $compact['is_pickup'] && '' !== $compact['kicker'] ) {
-			$html .= '<p class="cetech-de-cart-context__kicker">' . esc_html( $compact['kicker'] ) . '</p>';
-		}
-		if ( '' !== $compact['title'] && $compact['title'] !== $compact['kicker'] ) {
-			$html .= '<p class="cetech-de-cart-context__offer">' . esc_html( $compact['title'] ) . '</p>';
-		} elseif ( '' !== $compact['title'] && ! $compact['is_pickup'] ) {
-			$html .= '<p class="cetech-de-cart-context__offer">' . esc_html( $compact['title'] ) . '</p>';
-		}
-		if ( '' !== $compact['meta'] ) {
-			$html .= '<p class="cetech-de-cart-context__meta">' . esc_html( $compact['meta'] ) . '</p>';
+		if ( '' !== $line ) {
+			$html .= '<p class="cetech-de-cart-context__line" data-cetech-de-selection-line="1">' . esc_html( $line ) . '</p>';
 		}
 		$html .= '</div>';
 

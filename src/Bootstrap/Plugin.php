@@ -15,6 +15,7 @@ use CetechDeliveryEngine\Application\Checkout\CheckoutAddressCanonicalizer;
 use CetechDeliveryEngine\Application\Checkout\CheckoutAddressPolicy;
 use CetechDeliveryEngine\Application\CustomerContext\ApplyCustomerContextToEligibleLinesService;
 use CetechDeliveryEngine\Application\CustomerContext\CustomerBrowsingLocationStore;
+use CetechDeliveryEngine\Application\Cart\CartLineDeliveryPriceResolver;
 use CetechDeliveryEngine\Application\CustomerContext\LocationAwareDeliveryOptions;
 use CetechDeliveryEngine\Application\CustomerContext\LocationOfferQuoteProbe;
 use CetechDeliveryEngine\Application\CustomerContext\MatchingLocationOptionsEndpoint;
@@ -474,7 +475,16 @@ final class Plugin {
 				$container->get( CartDeliverySelectionCapture::class ),
 				$container->get( CartDeliverySelectionRevalidator::class ),
 				$container->get( ShippingRateCalculationGate::class ),
-				$container->get( CheckoutAddressPolicy::class )
+				$container->get( CheckoutAddressPolicy::class ),
+				$container->get( CartLineDeliveryPriceResolver::class )
+			)
+		);
+
+		$this->container->singleton(
+			CartLineDeliveryPriceResolver::class,
+			static fn ( ServiceContainer $container ): CartLineDeliveryPriceResolver => new CartLineDeliveryPriceResolver(
+				$container->get( CartDeliverySelectionCapture::class ),
+				$container->get( LocationAwareDeliveryOptions::class )
 			)
 		);
 
@@ -853,7 +863,8 @@ final class Plugin {
 			static fn ( ServiceContainer $container ): CartCustomerContextEditorRenderer => new CartCustomerContextEditorRenderer(
 				$container->get( FeatureFlags::class ),
 				$container->get( Requirements::class ),
-				$container->get( CartDeliverySelectionCapture::class )
+				$container->get( CartDeliverySelectionCapture::class ),
+				$container->get( CartLineDeliveryPriceResolver::class )
 			)
 		);
 
@@ -903,7 +914,8 @@ final class Plugin {
 			CheckoutDeliveryPlanRenderer::class,
 			static fn ( ServiceContainer $container ): CheckoutDeliveryPlanRenderer => new CheckoutDeliveryPlanRenderer(
 				$container->get( FeatureFlags::class ),
-				$container->get( Requirements::class )
+				$container->get( Requirements::class ),
+				$container->get( CartLineDeliveryPriceResolver::class )
 			)
 		);
 

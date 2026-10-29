@@ -333,6 +333,23 @@ describe('Blocks DOM customer editor hardening', () => {
 		expect(document.querySelector('.cetech-de-blocks-apply-checkout-address')).toBeNull();
 	});
 
+	it('renders the D2 compact selection line when the payload carries one', () => {
+		window.cetechDeBlocks = { namespace: 'cetech-delivery-engine', i18n: { change: 'Change' } };
+		const item = editableItem('abcd1234abcd1234', 'Lamp', 'Accra', { address_1: '4 Harbour' }, { quantity: 1, can_split: false });
+		item.extensions['cetech-delivery-engine'].summary_line = 'Standard Delivery · Accra · 3–6 business days · ₵30.00';
+		item.extensions['cetech-delivery-engine'].summary_title = 'Standard Delivery';
+		item.extensions['cetech-delivery-engine'].summary_meta = 'Accra · 3–6 business days';
+		installCart({ items: [item], extensions: { 'cetech-delivery-engine': { notices: [] } } });
+		const api = loadScript();
+		api.renderDomUi();
+		const line = document.querySelector('.cetech-de-blocks-line__line');
+		expect(line).toBeTruthy();
+		expect(line.textContent).toBe('Standard Delivery · Accra · 3–6 business days · ₵30.00');
+		expect(document.querySelector('.cetech-de-blocks-line__title')).toBeNull();
+		expect(document.querySelectorAll('.cetech-de-blocks-editor > summary').length).toBe(1);
+		expect(document.querySelector('.cetech-de-blocks-editor > summary').textContent).toBe('Change');
+	});
+
 	it('uses the item ui_anchor as the editor id and compact labels', () => {
 		window.cetechDeBlocks = {
 			namespace: 'cetech-delivery-engine',
@@ -367,8 +384,9 @@ describe('Blocks DOM customer editor hardening', () => {
 		expect(completeEditor).toBeTruthy();
 		expect(incompleteEditor.tagName).toBe('DETAILS');
 		expect(document.querySelector('[data-cetech-de-address-needed]').textContent).toContain('Address needed');
-		expect(incompleteEditor.querySelector('summary').textContent).toContain('Add delivery address');
-		expect(completeEditor.querySelector('summary').textContent).toContain('Edit delivery details');
+		// D2: one control per line, always Change; the badge says what is missing.
+		expect(incompleteEditor.querySelector('summary').textContent).toBe('Change');
+		expect(completeEditor.querySelector('summary').textContent).toBe('Change');
 		expect(completeEditor.querySelector('[name="cetech_de_company"]').value).toBe('CETECH');
 		expect(completeEditor.querySelector('.cetech-de-blocks-editor__recipient').open).toBe(true);
 		expect(incompleteEditor.querySelector('.cetech-de-blocks-editor__recipient').open).toBe(false);

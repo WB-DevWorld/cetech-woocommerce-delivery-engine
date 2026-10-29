@@ -34,6 +34,9 @@ use WC_Product;
  * Display-only when cart capture is disabled. Radio submission inside add-to-cart form when capture is enabled.
  * Stage 6A: variable products render an AJAX-driven shell when variable ECR flags are enabled.
  * Stage 13F: compact public hierarchy (label + estimate). Does not calculate shipping prices or write order meta.
+ * M2 D2: the customer chooses Delivery or Store Pickup first (both always offered, an unconfigured one
+ * disabled with a reason); the only valid choice is pre-selected; after a card is chosen the chooser
+ * collapses to one compact line with a single "Change" control.
  */
 final class ProductDeliverySelectorRenderer {
 
@@ -117,8 +120,12 @@ final class ProductDeliverySelectorRenderer {
 					'estimated'   => __( 'Estimated delivery', 'cetech-woocommerce-delivery-engine' ),
 					'selectOption' => __( 'Please select a delivery option for this product.', 'cetech-woocommerce-delivery-engine' ),
 					'enterLocation' => __( 'Please enter a delivery location for this product.', 'cetech-woocommerce-delivery-engine' ),
-					'free'          => __( 'Free', 'cetech-woocommerce-delivery-engine' ),
+					'free'          => CustomerStorefrontCopy::free(),
 					'deliveryFee'   => CustomerStorefrontCopy::delivery_fee(),
+					'change'        => CustomerStorefrontCopy::change(),
+					'pickupAt'      => CustomerStorefrontCopy::pickup_at( '%s' ),
+					'pickupNotAvailable'   => CustomerStorefrontCopy::pickup_not_available(),
+					'deliveryNotAvailable' => CustomerStorefrontCopy::delivery_not_available(),
 				],
 				'postField' => CartDeliverySelectionCapture::POST_FIELD,
 				'contextField' => ClassicPdpContextPayload::POST_FIELD,
@@ -357,25 +364,34 @@ final class ProductDeliverySelectorRenderer {
 		$posted = isset( $_POST[ CartDeliverySelectionCapture::POST_FIELD ] )
 			? ProductDeliveryOptionsBuilder::normalizeDisplayKey( wp_unslash( (string) $_POST[ CartDeliverySelectionCapture::POST_FIELD ] ) )
 			: '';
-		$capabilities = ProductDeliveryFulfilmentCapabilities::from_options( $available );
-		$has_switch   = ProductDeliveryFulfilmentCapabilities::has_switch( $capabilities );
-		$selected     = '' !== $posted ? $posted : ProductDeliveryOptionsBuilder::defaultDisplayKey( $visible !== [] ? $visible : $available );
-		if ( $needs_precision && ! empty( $capabilities['has_delivery'] ) ) {
-			$selected = $this->display_key_is_pickup( $available, $posted ) ? $posted : '';
+		$capabilities  = ProductDeliveryFulfilmentCapabilities::from_options( $available );
+		$active_choice = $this->active_choice( $available, $posted, $capabilities );
+		$visible       = CustomerVisibleDeliveryOptionGate::selectable_pdp_cards( $visible );
+		$groups        = ProductDeliveryOptionsBuilder::groupByChoice( $visible );
+
+		// D2: a card is pre-selected only inside the active choice. Both choices valid means no pre-selection.
+		$selected = '';
+		if ( '' !== $active_choice && ! ( $needs_precision && FulfilmentChoice::Delivery->value === $active_choice ) ) {
+			$pool     = $groups[ $active_choice ] ?? [];
+			$selected = '' !== $posted && $this->display_key_has_choice( $pool, $posted )
+				? $posted
+				: ProductDeliveryOptionsBuilder::defaultDisplayKey( $pool );
 		}
-		$visible      = CustomerVisibleDeliveryOptionGate::selectable_pdp_cards( $visible );
-		$groups       = ProductDeliveryOptionsBuilder::groupByChoice( $visible );
-		$active_choice = $this->active_choice( $visible !== [] ? $visible : $available, $selected, $has_switch || ! empty( $capabilities['has_pickup'] ) );
+		$selected_option = $this->option_for_key( $visible, $selected );
+		$selected        = $selected_option instanceof ProductDeliveryOption ? $selected : '';
 
 		$locality = $browsing instanceof MatchingLocation ? $browsing->publicLocalityLabel() : '';
 		$force_locality = $needs_precision && ShopperLocationPrecision::LEVEL_LOCALITY === $precision->required_level;
 		$status_message = $needs_precision ? $precision->public_message : '';
+		$collapsed      = $selected_option instanceof ProductDeliveryOption;
 
-		echo '<fieldset class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--interactive" data-cetech-de-selector="1" data-product-id="' . esc_attr( (string) $product_id ) . '" data-cetech-de-active-choice="' . esc_attr( $active_choice ) . '" data-cetech-de-has-delivery="' . ( ! empty( $capabilities['has_delivery'] ) ? '1' : '0' ) . '" data-cetech-de-has-pickup="' . ( ! empty( $capabilities['has_pickup'] ) ? '1' : '0' ) . '">';
+		echo '<fieldset class="cetech-de-product-delivery-selector cetech-de-product-delivery-selector--interactive" data-cetech-de-selector="1" data-product-id="' . esc_attr( (string) $product_id ) . '" data-cetech-de-active-choice="' . esc_attr( $active_choice ) . '" data-cetech-de-has-delivery="' . ( ! empty( $capabilities['has_delivery'] ) ? '1' : '0' ) . '" data-cetech-de-has-pickup="' . ( ! empty( $capabilities['has_pickup'] ) ? '1' : '0' ) . '"' . ( $collapsed ? ' data-cetech-de-collapsed="1"' : '' ) . '>';
 		echo '<legend class="cetech-de-delivery-selector__title">' . esc_html( CustomerStorefrontCopy::delivery_and_pickup() ) . '</legend>';
 
+		$this->render_selection_line( $selected_option, $locality );
+
 		if ( $requires ) {
-			$location_hidden = FulfilmentChoice::StorePickup->value === $active_choice;
+			$location_hidden = FulfilmentChoice::Delivery->value !== $active_choice;
 			echo '<div class="cetech-de-delivery-selector__location"' . ( $location_hidden ? ' hidden' : '' ) . ' data-cetech-de-location-panel="1">';
 			echo '<p class="cetech-de-matching-location__prompt">' . esc_html( CustomerStorefrontCopy::where_do_you_want_this_item() ) . '</p>';
 			echo MatchingLocationFieldRenderer::render( $browsing, 'cetech-de-matching', false, false, false, $force_locality ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns escaped HTML.
@@ -389,13 +405,11 @@ final class ProductDeliverySelectorRenderer {
 		echo '</div>';
 		echo '<div class="cetech-de-delivery-selector__options" data-cetech-de-options>';
 
-		if ( $has_switch ) {
-			$this->render_choice_switch( $active_choice );
-		}
+		$this->render_choice_switch( $active_choice, $capabilities );
 
 		if ( ! empty( $capabilities['has_delivery'] ) ) {
-			$hidden = $has_switch && FulfilmentChoice::Delivery->value !== $active_choice;
-			echo '<div class="cetech-de-delivery-option-group" data-cetech-de-choice-panel="' . esc_attr( FulfilmentChoice::Delivery->value ) . '"' . ( $hidden ? ' hidden' : '' ) . '>';
+			$hidden = FulfilmentChoice::Delivery->value !== $active_choice;
+			echo '<div class="cetech-de-delivery-option-group" data-cetech-de-choice-panel="' . esc_attr( FulfilmentChoice::Delivery->value ) . '" data-cetech-de-locality="' . esc_attr( $locality ) . '"' . ( $hidden ? ' hidden' : '' ) . '>';
 			echo '<p class="cetech-de-delivery-option-group__heading">' . esc_html( CustomerStorefrontCopy::delivery_to( $locality ) ) . '</p>';
 			foreach ( $groups[ FulfilmentChoice::Delivery->value ] as $option ) {
 				$this->render_radio_option( $option, $selected, $hidden );
@@ -404,7 +418,7 @@ final class ProductDeliverySelectorRenderer {
 		}
 
 		if ( ! empty( $capabilities['has_pickup'] ) ) {
-			$hidden = $has_switch && FulfilmentChoice::StorePickup->value !== $active_choice;
+			$hidden = FulfilmentChoice::StorePickup->value !== $active_choice;
 			echo '<div class="cetech-de-delivery-option-group cetech-de-delivery-option-group--pickup" data-cetech-de-choice-panel="' . esc_attr( FulfilmentChoice::StorePickup->value ) . '"' . ( $hidden ? ' hidden' : '' ) . '>';
 			echo '<p class="cetech-de-delivery-option-group__heading">' . esc_html( CustomerStorefrontCopy::store_pickup() ) . '</p>';
 			foreach ( $groups[ FulfilmentChoice::StorePickup->value ] as $option ) {
@@ -417,34 +431,31 @@ final class ProductDeliverySelectorRenderer {
 	}
 
 	/**
-	 * @param list<ProductDeliveryOption> $available
+	 * D2 gate: a posted card decides; otherwise the only valid choice is pre-selected; both valid means none.
+	 *
+	 * @param list<ProductDeliveryOption>                                                  $available
+	 * @param array{has_delivery: bool, has_pickup: bool, available_choices: list<string>} $capabilities
 	 */
-	private function active_choice( array $available, string $selected, bool $has_switch ): string {
-		if ( '' !== $selected ) {
+	private function active_choice( array $available, string $posted, array $capabilities ): string {
+		if ( '' !== $posted ) {
 			foreach ( $available as $option ) {
-				if ( $option->display_key === $selected ) {
+				if ( $option->display_key === $posted ) {
 					return $option->fulfilment_choice;
 				}
 			}
 		}
 
-		if ( $has_switch ) {
-			return FulfilmentChoice::Delivery->value;
-		}
+		$choices = $capabilities['available_choices'] ?? [];
 
-		return $available[0]->fulfilment_choice;
+		return 1 === count( $choices ) ? (string) $choices[0] : '';
 	}
 
 	/**
 	 * @param list<ProductDeliveryOption> $options
 	 */
-	private function display_key_is_pickup( array $options, string $display_key ): bool {
-		if ( '' === $display_key ) {
-			return false;
-		}
-
+	private function display_key_has_choice( array $options, string $display_key ): bool {
 		foreach ( $options as $option ) {
-			if ( $option->display_key === $display_key && FulfilmentChoice::StorePickup->value === $option->fulfilment_choice ) {
+			if ( $option->display_key === $display_key ) {
 				return true;
 			}
 		}
@@ -452,23 +463,81 @@ final class ProductDeliverySelectorRenderer {
 		return false;
 	}
 
-	private function render_choice_switch( string $active_choice ): void {
+	/**
+	 * @param list<ProductDeliveryOption> $options
+	 */
+	private function option_for_key( array $options, string $display_key ): ?ProductDeliveryOption {
+		if ( '' === $display_key ) {
+			return null;
+		}
+
+		foreach ( $options as $option ) {
+			if ( $option->display_key === $display_key ) {
+				return $option;
+			}
+		}
+
+		return null;
+	}
+
+	/**
+	 * D2 compact line for the selected card; rendered hidden until a card is chosen.
+	 */
+	private function render_selection_line( ?ProductDeliveryOption $option, string $locality ): void {
+		$text = $option instanceof ProductDeliveryOption ? $this->selection_line_text( $option, $locality ) : '';
+
+		echo '<div class="cetech-de-delivery-selection" data-cetech-de-selection-line="1"' . ( '' === $text ? ' hidden' : '' ) . '>';
+		echo '<span class="cetech-de-delivery-selection__text" data-cetech-de-selection-text="1">' . esc_html( $text ) . '</span> ';
+		echo '<button type="button" class="cetech-de-delivery-selection__change" data-cetech-de-change="1">' . esc_html( CustomerStorefrontCopy::change() ) . '</button>';
+		echo '</div>';
+	}
+
+	private function selection_line_text( ProductDeliveryOption $option, string $locality ): string {
+		$is_pickup = FulfilmentChoice::StorePickup->value === $option->fulfilment_choice;
+		$price     = trim( (string) ( $option->price_text ?? '' ) );
+
+		return CustomerStorefrontCopy::selection_line(
+			$option->fulfilment_choice,
+			[
+				'delivery_offer_public_label' => $option->delivery_offer_public_label,
+				'estimate_text'               => $option->estimate_text,
+				'pickup_location_label'       => $option->pickup_location_label,
+			],
+			$is_pickup ? '' : $locality,
+			'' !== $price ? $price : ( $is_pickup ? CustomerStorefrontCopy::free() : '' )
+		);
+	}
+
+	/**
+	 * D2 gate: both choices are always offered; an unconfigured one is disabled with its reason.
+	 *
+	 * @param array{has_delivery: bool, has_pickup: bool, available_choices: list<string>} $capabilities
+	 */
+	private function render_choice_switch( string $active_choice, array $capabilities = [ 'has_delivery' => true, 'has_pickup' => true ] ): void {
+		$notes = [];
 		echo '<div class="cetech-de-fulfilment-choice" role="radiogroup" aria-label="' . esc_attr( CustomerStorefrontCopy::delivery_and_pickup() ) . '">';
 		foreach (
 			[
-				FulfilmentChoice::Delivery->value    => CustomerStorefrontCopy::delivery(),
-				FulfilmentChoice::StorePickup->value => CustomerStorefrontCopy::store_pickup(),
-			] as $value => $label
+				FulfilmentChoice::Delivery->value    => [ CustomerStorefrontCopy::delivery(), ! empty( $capabilities['has_delivery'] ) ],
+				FulfilmentChoice::StorePickup->value => [ CustomerStorefrontCopy::store_pickup(), ! empty( $capabilities['has_pickup'] ) ],
+			] as $value => [ $label, $enabled ]
 		) {
 			$id      = 'cetech-de-fulfilment-ui-' . sanitize_html_class( $value );
-			$checked = $active_choice === $value;
-			echo '<p class="cetech-de-fulfilment-choice__option">';
+			$note_id = $id . '-note';
+			$checked = $enabled && $active_choice === $value;
+			if ( ! $enabled ) {
+				$notes[ $note_id ] = CustomerStorefrontCopy::choice_not_available( $value );
+			}
+			echo '<p class="cetech-de-fulfilment-choice__option' . ( $enabled ? '' : ' cetech-de-fulfilment-choice__option--unavailable' ) . '">';
 			echo '<label for="' . esc_attr( $id ) . '">';
-			echo '<input type="radio" name="cetech_de_fulfilment_ui" id="' . esc_attr( $id ) . '" value="' . esc_attr( $value ) . '" data-cetech-de-choice-switch="1"' . ( $checked ? ' checked="checked"' : '' ) . ' /> ';
+			echo '<input type="radio" name="cetech_de_fulfilment_ui" id="' . esc_attr( $id ) . '" value="' . esc_attr( $value ) . '" data-cetech-de-choice-switch="1"' . ( $checked ? ' checked="checked"' : '' ) . ( $enabled ? '' : ' disabled="disabled" aria-describedby="' . esc_attr( $note_id ) . '"' ) . ' /> ';
 			echo esc_html( $label );
 			echo '</label></p>';
 		}
 		echo '</div>';
+		foreach ( $notes as $note_id => $note ) {
+			echo '<p class="cetech-de-fulfilment-choice__note" id="' . esc_attr( $note_id ) . '" data-cetech-de-choice-note="1">' . esc_html( $note ) . '</p>';
+		}
 	}
 
 	private function render_display_option( ProductDeliveryOption $option ): void {
@@ -589,7 +658,7 @@ final class ProductDeliverySelectorRenderer {
 		$line  = FulfilmentChoice::StorePickup->value === $option->fulfilment_choice
 			? $text
 			: CustomerStorefrontCopy::delivery_fee_line( $text );
-		echo '<span class="cetech-de-delivery-option__price"' . ( '' !== $basis ? ' data-cetech-de-price-basis="' . esc_attr( $basis ) . '"' : '' ) . '>';
+		echo '<span class="cetech-de-delivery-option__price" data-cetech-de-price="' . esc_attr( $text ) . '"' . ( '' !== $basis ? ' data-cetech-de-price-basis="' . esc_attr( $basis ) . '"' : '' ) . '>';
 		echo esc_html( $line );
 		echo '</span>';
 	}

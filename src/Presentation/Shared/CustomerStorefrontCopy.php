@@ -67,6 +67,24 @@ final class CustomerStorefrontCopy {
 		return __( 'Change', 'cetech-woocommerce-delivery-engine' );
 	}
 
+	public static function free(): string {
+		return __( 'Free', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function pickup_not_available(): string {
+		return __( 'Store pickup is not available for this product', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function delivery_not_available(): string {
+		return __( 'Delivery is not available for this product', 'cetech-woocommerce-delivery-engine' );
+	}
+
+	public static function choice_not_available( string $fulfilment_choice ): string {
+		return FulfilmentChoice::StorePickup->value === $fulfilment_choice
+			? self::pickup_not_available()
+			: self::delivery_not_available();
+	}
+
 	public static function address_needed(): string {
 		return __( 'Address needed', 'cetech-woocommerce-delivery-engine' );
 	}
@@ -129,12 +147,14 @@ final class CustomerStorefrontCopy {
 		);
 	}
 
+	/**
+	 * D2: every delivery line carries one control, "Change", whatever its state.
+	 * The address-needed badge, not the control label, tells the customer what is missing.
+	 */
 	public static function editor_action_label( string $fulfilment_choice, bool $address_complete ): string {
-		if ( FulfilmentChoice::StorePickup->value === $fulfilment_choice ) {
-			return self::edit_pickup_details();
-		}
+		unset( $fulfilment_choice, $address_complete );
 
-		return $address_complete ? self::edit_delivery_details() : self::add_delivery_address();
+		return self::change();
 	}
 
 	public static function your_deliveries(): string {
@@ -274,16 +294,62 @@ final class CustomerStorefrontCopy {
 	}
 
 	/**
+	 * D2 compact selection line: "<offer> · <locality> · <estimate> · <fee>" for Delivery,
+	 * "Store Pickup — <location> · <readiness> · <fee>" for pickup. Segments without a value are omitted.
+	 *
+	 * @param array<string, string|null> $summary
+	 *
+	 * @return list<string>
+	 */
+	public static function selection_line_segments( string $choice, array $summary, string $locality, string $price_text ): array {
+		$estimate = self::compact_estimate( (string) ( $summary['estimate_text'] ?? '' ) );
+		$price    = trim( $price_text );
+		$segments = [];
+
+		if ( FulfilmentChoice::StorePickup->value === $choice ) {
+			$location   = trim( (string) ( $summary['pickup_location_label'] ?? '' ) );
+			$location   = '' !== $location ? $location : trim( (string) ( $summary['delivery_offer_public_label'] ?? '' ) );
+			$segments[] = self::pickup_at( $location );
+		} else {
+			$offer      = trim( (string) ( $summary['delivery_offer_public_label'] ?? '' ) );
+			$segments[] = '' !== $offer ? $offer : self::delivery();
+			$locality   = trim( $locality );
+			if ( '' !== $locality ) {
+				$segments[] = $locality;
+			}
+		}
+
+		if ( '' !== $estimate ) {
+			$segments[] = $estimate;
+		}
+
+		if ( '' !== $price ) {
+			$segments[] = $price;
+		}
+
+		return $segments;
+	}
+
+	/**
+	 * @param array<string, string|null> $summary
+	 */
+	public static function selection_line( string $choice, array $summary, string $locality, string $price_text ): string {
+		return implode( ' · ', self::selection_line_segments( $choice, $summary, $locality, $price_text ) );
+	}
+
+	/**
 	 * Checkout confirmation groups. Does not expose IDs or internal grouping keys.
 	 *
-	 * @param array<string, array<string, mixed>> $contents
+	 * @param array<string, array<string, mixed>> $contents Cart contents keyed by cart item key.
+	 * @param array<string, string>               $prices   Customer-facing quoted fee per cart item key.
+	 * @param string                              $cart_url Cart URL for the per-line "Change" link; '' omits the link.
 	 *
-	 * @return list<array{heading: string, is_pickup: bool, lines: list<array{product: string, offer: string, estimate: string}>}>
+	 * @return list<array{heading: string, is_pickup: bool, lines: list<array{product: string, offer: string, estimate: string, line: string, price: string, change_url: string}>}>
 	 */
-	public static function delivery_plan( array $contents ): array {
+	public static function delivery_plan( array $contents, array $prices = [], string $cart_url = '' ): array {
 		$groups = [];
 
-		foreach ( $contents as $item ) {
+		foreach ( $contents as $cart_item_key => $item ) {
 			if ( ! is_array( $item ) ) {
 				continue;
 			}
@@ -329,10 +395,18 @@ final class CustomerStorefrontCopy {
 				$offer_line = $is_pickup ? $estimate : ( $offer . ' · ' . $estimate );
 			}
 
+			$price      = trim( (string) ( $prices[ (string) $cart_item_key ] ?? '' ) );
+			$change_url = '' !== $cart_url && is_string( $cart_item_key ) && '' !== $cart_item_key
+				? CartDeliveryUiAnchor::cart_url( $cart_url, CartDeliveryUiAnchor::for_cart_item_key( $cart_item_key ) )
+				: '';
+
 			$groups[ $key ]['lines'][] = [
-				'product'  => $product,
-				'offer'    => $offer,
-				'estimate' => $offer_line,
+				'product'    => $product,
+				'offer'      => $offer,
+				'estimate'   => $offer_line,
+				'line'       => self::selection_line( $choice, $summary, $is_pickup ? '' : ( $heading === self::delivery() ? '' : $heading ), $price ),
+				'price'      => $price,
+				'change_url' => $change_url,
 			];
 		}
 
