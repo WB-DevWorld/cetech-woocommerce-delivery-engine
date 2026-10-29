@@ -23,6 +23,14 @@ final class ProductExceptionsPage {
 
 	private const ACTION_RESET = 'cetech_de_reset_exception';
 
+	/** Query key naming the list a scoped-configuration editor should return to. */
+	public const RETURN_TO_KEY = 'return_to';
+
+	/** Prefix of the scalar query keys that carry the list filters to restore on return. */
+	public const RETURN_ARG_PREFIX = 'return_';
+
+	private const RETURN_FILTER_KEYS = [ 's', 'fulfilment', 'exception_type', 'exception_status' ];
+
 	public function __construct(
 		private readonly ProductExceptionsQuery $query,
 		private readonly SiteWideDefaultsService $defaults,
@@ -38,6 +46,9 @@ final class ProductExceptionsPage {
 			return;
 		}
 
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
+		$return_filters = self::sanitize_return_filters( wp_unslash( $_POST ) );
+
 		try {
 			$target = $this->target_guard()->resolve( wp_unslash( [
 				'scope_type' => $_POST['item_type'] ?? '',
@@ -50,7 +61,7 @@ final class ProductExceptionsPage {
 			}
 		} catch ( \InvalidArgumentException $exception ) {
 			$this->action_handler->notices()->flash_error( $exception->getMessage() );
-			$this->action_handler->redirect( self::SLUG );
+			$this->action_handler->redirect( self::SLUG, $return_filters );
 		}
 		$type = $target['scope_type']->value;
 		try {
@@ -66,7 +77,7 @@ final class ProductExceptionsPage {
 		} catch ( \RuntimeException $exception ) {
 			\CetechDeliveryEngine\Infrastructure\Persistence\AbstractWpdbRepository::replace_closed_connection();
 			$this->action_handler->notices()->flash_error( $exception->getMessage() );
-			$this->action_handler->redirect( self::SLUG );
+			$this->action_handler->redirect( self::SLUG, $return_filters );
 		}
 
 		if ( $this->admin_service->reset_was_replayed() && $ok ) {
@@ -83,7 +94,7 @@ final class ProductExceptionsPage {
 			$this->action_handler->notices()->flash_error( __( 'Nothing was reset. The item may already be using inherited settings.', 'cetech-woocommerce-delivery-engine' ) );
 		}
 
-		$this->action_handler->redirect( self::SLUG );
+		$this->action_handler->redirect( self::SLUG, $return_filters );
 	}
 
 	public function render(): void {
@@ -114,17 +125,21 @@ final class ProductExceptionsPage {
 
 		echo '<form method="get" class="cetech-de-list-toolbar">';
 		echo '<input type="hidden" name="page" value="' . esc_attr( self::SLUG ) . '" />';
-		echo '<input type="search" name="s" value="' . esc_attr( $filters['search'] ) . '" placeholder="' . esc_attr__( 'Search products', 'cetech-woocommerce-delivery-engine' ) . '" />';
-		echo '<select name="fulfilment"><option value="">' . esc_html__( 'All fulfilment types', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<label class="screen-reader-text" for="cetech-de-exception-search">' . esc_html__( 'Search products', 'cetech-woocommerce-delivery-engine' ) . '</label>';
+		echo '<input type="search" id="cetech-de-exception-search" name="s" value="' . esc_attr( $filters['search'] ) . '" placeholder="' . esc_attr__( 'Search products', 'cetech-woocommerce-delivery-engine' ) . '" />';
+		echo '<label class="screen-reader-text" for="cetech-de-exception-fulfilment">' . esc_html__( 'Filter by fulfilment type', 'cetech-woocommerce-delivery-engine' ) . '</label>';
+		echo '<select id="cetech-de-exception-fulfilment" name="fulfilment"><option value="">' . esc_html__( 'All fulfilment types', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		foreach ( FulfilmentProfileRegistry::all() as $profile ) {
 			echo '<option value="' . esc_attr( $profile->key ) . '"' . selected( $filters['fulfilment'], $profile->key, false ) . '>' . esc_html( $profile->label ) . '</option>';
 		}
 		echo '</select>';
-		echo '<select name="exception_type"><option value="">' . esc_html__( 'All exception types', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<label class="screen-reader-text" for="cetech-de-exception-type">' . esc_html__( 'Filter by exception type', 'cetech-woocommerce-delivery-engine' ) . '</label>';
+		echo '<select id="cetech-de-exception-type" name="exception_type"><option value="">' . esc_html__( 'All exception types', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		echo '<option value="product"' . selected( $filters['type'], 'product', false ) . '>' . esc_html__( 'Product exceptions', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		echo '<option value="variation"' . selected( $filters['type'], 'variation', false ) . '>' . esc_html__( 'Variation exceptions', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		echo '</select>';
-		echo '<select name="exception_status"><option value="">' . esc_html__( 'All statuses', 'cetech-woocommerce-delivery-engine' ) . '</option>';
+		echo '<label class="screen-reader-text" for="cetech-de-exception-status">' . esc_html__( 'Filter by status', 'cetech-woocommerce-delivery-engine' ) . '</label>';
+		echo '<select id="cetech-de-exception-status" name="exception_status"><option value="">' . esc_html__( 'All statuses', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		echo '<option value="ready"' . selected( $filters['status'], 'ready', false ) . '>' . esc_html__( 'Ready', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		echo '<option value="needs_attention"' . selected( $filters['status'], 'needs_attention', false ) . '>' . esc_html__( 'Needs Attention', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		echo '</select>';
@@ -132,13 +147,24 @@ final class ProductExceptionsPage {
 		echo '</form>';
 
 		if ( [] === $items ) {
-			AdminPageLayout::render_empty_state(
-				__( 'No product exceptions.', 'cetech-woocommerce-delivery-engine' ),
-				__( 'All products currently follow their normal delivery defaults.', 'cetech-woocommerce-delivery-engine' )
-			);
+			if ( [] !== self::list_query_args( $filters ) ) {
+				AdminPageLayout::render_empty_state(
+					__( 'No product exceptions match these filters.', 'cetech-woocommerce-delivery-engine' ),
+					__( 'Other products may still have exceptions. Clear the search and filters to see every product that differs from the Site-wide Defaults.', 'cetech-woocommerce-delivery-engine' ),
+					__( 'Clear filters', 'cetech-woocommerce-delivery-engine' ),
+					AdminPageRenderer::list_url( self::SLUG )
+				);
+			} else {
+				AdminPageLayout::render_empty_state(
+					__( 'No product exceptions.', 'cetech-woocommerce-delivery-engine' ),
+					__( 'All products currently follow their normal delivery defaults.', 'cetech-woocommerce-delivery-engine' )
+				);
+			}
 			AdminPageLayout::close_page();
 			return;
 		}
+
+		$return_args = self::return_context_args( self::list_query_args( $filters ) );
 
 		$rows = [];
 		foreach ( $items as $item ) {
@@ -149,7 +175,7 @@ final class ProductExceptionsPage {
 					'scope_id'   => $item['id'],
 					'slice_key'  => $item['slice_key'],
 					'customize'  => 1,
-				] + ( null !== $item['parent_id'] ? [ 'parent_product_id' => $item['parent_id'] ] : [] ),
+				] + ( null !== $item['parent_id'] ? [ 'parent_product_id' => $item['parent_id'] ] : [] ) + $return_args,
 				admin_url( 'admin.php' )
 			);
 
@@ -164,6 +190,7 @@ final class ProductExceptionsPage {
 			if ( null !== $item['parent_id'] ) {
 				$reset .= '<input type="hidden" name="parent_product_id" value="' . esc_attr( (string) $item['parent_id'] ) . '" />';
 			}
+			$reset .= self::return_context_hidden_inputs( $return_args );
 			$reset .= wp_nonce_field( self::ACTION_RESET, 'cetech_de_nonce', true, false );
 			$reset .= '<button type="submit" class="button">' . esc_html(
 				'variation' === $item['type']
@@ -206,6 +233,92 @@ final class ProductExceptionsPage {
 
 		AdminPageLayout::close_page();
 	}
+	/**
+	 * Non-empty list filters as the query arguments this page reads back.
+	 *
+	 * @param array{search: string, fulfilment: string, type: string, status: string} $filters
+	 * @return array<string, string>
+	 */
+	public static function list_query_args( array $filters ): array {
+		$args = [
+			's'                => (string) ( $filters['search'] ?? '' ),
+			'fulfilment'       => (string) ( $filters['fulfilment'] ?? '' ),
+			'exception_type'   => (string) ( $filters['type'] ?? '' ),
+			'exception_status' => (string) ( $filters['status'] ?? '' ),
+		];
+
+		return array_filter( $args, static fn ( string $value ): bool => '' !== $value );
+	}
+
+	/**
+	 * Reads the `return_<filter>` keys out of unslashed GET or POST data.
+	 *
+	 * @param array<string, mixed> $source
+	 * @return array<string, string> Filter key => value, only the known list filters.
+	 */
+	public static function sanitize_return_filters( array $source ): array {
+		$filters = [];
+		foreach ( self::RETURN_FILTER_KEYS as $key ) {
+			$raw = $source[ self::RETURN_ARG_PREFIX . $key ] ?? null;
+			if ( ! is_scalar( $raw ) ) {
+				continue;
+			}
+			$value = 's' === $key
+				? sanitize_text_field( (string) $raw )
+				: sanitize_key( (string) $raw );
+			if ( '' !== $value ) {
+				$filters[ $key ] = $value;
+			}
+		}
+
+		return $filters;
+	}
+
+	/**
+	 * Query arguments that let the scoped-configuration editor link back to this filtered list.
+	 *
+	 * @param array<string, string> $filters
+	 * @return array<string, mixed>
+	 */
+	public static function return_context_args( array $filters ): array {
+		if ( [] === $filters ) {
+			return [];
+		}
+
+		$args = [ self::RETURN_TO_KEY => self::SLUG ];
+		foreach ( $filters as $key => $value ) {
+			$args[ self::RETURN_ARG_PREFIX . $key ] = $value;
+		}
+
+		return $args;
+	}
+
+	/**
+	 * Hidden inputs that carry a return context through a POST form.
+	 *
+	 * @param array<string, mixed> $return_args Output of return_context_args().
+	 */
+	public static function return_context_hidden_inputs( array $return_args ): string {
+		if ( [] === $return_args ) {
+			return '';
+		}
+		$html = '';
+		foreach ( $return_args as $key => $value ) {
+			$html .= '<input type="hidden" name="' . esc_attr( (string) $key ) . '" value="' . esc_attr( (string) $value ) . '" />';
+		}
+
+		return $html;
+	}
+
+	/**
+	 * The list URL with the given filters restored.
+	 *
+	 * @param array<string, string> $filters
+	 */
+	public static function filtered_list_url( array $filters ): string {
+		return add_query_arg( $filters, AdminPageRenderer::list_url( self::SLUG ) );
+	}
+
 	private function target_guard(): ScopedConfigurationTargetGuard {
 		return new ScopedConfigurationTargetGuard( new ProductVariationScopeGuard( $this->product_target_resolver ), $this->authorization );
 	}

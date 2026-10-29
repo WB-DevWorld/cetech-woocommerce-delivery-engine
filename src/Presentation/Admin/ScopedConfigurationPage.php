@@ -47,6 +47,9 @@ final class ScopedConfigurationPage {
 	/** @var array<string, mixed>|null */
 	private ?array $unsaved_draft = null;
 
+	/** @var array<string, string> */
+	private array $return_filters = [];
+
 	/** @var array<string, mixed>|null */
 	private ?array $form_envelope = null;
 
@@ -130,6 +133,8 @@ final class ScopedConfigurationPage {
 		}
 
 		$this->unsaved_draft = $this->matching_draft( $scope_type, $scope_id, $slice_key, $parent_product_id );
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only list context.
+		$this->return_filters = $this->return_filters_from( wp_unslash( $_GET ) );
 
 		$model = $this->admin_service->load_edit_model(
 			$scope_type,
@@ -156,6 +161,7 @@ final class ScopedConfigurationPage {
 				'url'   => AdminPageRenderer::list_url( EffectiveConfigurationPreviewPage::SLUG ),
 			]
 		);
+		$this->render_return_link();
 
 		$this->render_state_notice( $model );
 		$customize = $this->wants_customize( $model );
@@ -178,7 +184,7 @@ final class ScopedConfigurationPage {
 
 		if ( $customize && ConfigurationScopeType::Global !== $scope_type && null !== $this->offers ) {
 			$this->render_current_authority_notice();
-			( new StaffDeliveryCustomizeView( $this->offers ) )->render( $model, $this->form_envelope ?? [] );
+			( new StaffDeliveryCustomizeView( $this->offers ) )->render( $model, $this->form_envelope ?? [], $this->return_context_inputs_html() );
 			AdminPageLayout::close_page();
 			return;
 		}
@@ -231,7 +237,7 @@ final class ScopedConfigurationPage {
 			if ( null !== $parent_id ) {
 				$redirect['parent_product_id'] = $parent_id;
 			}
-			$this->action_handler->redirect( self::SLUG, $redirect );
+			$this->action_handler->redirect( self::SLUG, $this->with_return_context( $redirect ) );
 		}
 
 		$redirect = [
@@ -243,6 +249,7 @@ final class ScopedConfigurationPage {
 		if ( null !== $parent_id ) {
 			$redirect['parent_product_id'] = $parent_id;
 		}
+		$redirect = $this->with_return_context( $redirect );
 
 		if ( $ok ) {
 			delete_transient( $this->draft_key( $scope_type_raw, $scope_id, $slice_key, $parent_id ) );
@@ -336,6 +343,7 @@ final class ScopedConfigurationPage {
 		if ( $customize ) {
 			$redirect['customize'] = 1;
 		}
+		$redirect = $this->with_return_context( $redirect );
 
 		if ( ! $result->success ) {
 			$this->retain_failed_draft( $scope_type->value, $scope_id, $slice_key, $parent_product_id, $raw_fields, $expected_revision, $expected_row_id, (string) $request_token, false, $this->is_known_stale( $result->errors ) );
@@ -373,6 +381,46 @@ final class ScopedConfigurationPage {
 
 	private function target_guard(): ScopedConfigurationTargetGuard {
 		return new ScopedConfigurationTargetGuard( new ProductVariationScopeGuard( $this->product_target_resolver ), $this->authorization );
+	}
+
+	/**
+	 * List filters to return to, when this editor was opened from the Product Exceptions list.
+	 *
+	 * @param array<string, mixed> $source Unslashed GET or POST data.
+	 * @return array<string, string>
+	 */
+	private function return_filters_from( array $source ): array {
+		if ( ProductExceptionsPage::SLUG !== (string) ( $source[ ProductExceptionsPage::RETURN_TO_KEY ] ?? '' ) ) {
+			return [];
+		}
+
+		return ProductExceptionsPage::sanitize_return_filters( $source );
+	}
+
+	/**
+	 * Adds the posted return context to a redirect so the list filters survive a save or reset.
+	 *
+	 * @param array<string, mixed> $redirect
+	 * @return array<string, mixed>
+	 */
+	private function with_return_context( array $redirect ): array {
+		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- callers verified the action nonce.
+		return $redirect + ProductExceptionsPage::return_context_args( $this->return_filters_from( wp_unslash( $_POST ) ) );
+	}
+
+	private function render_return_link(): void {
+		if ( [] === $this->return_filters ) {
+			return;
+		}
+		echo '<p class="cetech-de-back-link"><a href="' . esc_url( ProductExceptionsPage::filtered_list_url( $this->return_filters ) ) . '">&larr; ' . esc_html__( 'Back to Product Exceptions', 'cetech-woocommerce-delivery-engine' ) . '</a></p>';
+	}
+
+	private function return_context_inputs_html(): string {
+		return ProductExceptionsPage::return_context_hidden_inputs( ProductExceptionsPage::return_context_args( $this->return_filters ) );
+	}
+
+	private function render_return_context_inputs(): void {
+		echo $this->return_context_inputs_html(); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped by the helper.
 	}
 
 	/**
@@ -589,6 +637,7 @@ final class ScopedConfigurationPage {
 		echo '<input type="hidden" name="scope_id" value="' . esc_attr( (string) $model->scope_id ) . '" />';
 		echo '<input type="hidden" name="slice_key" value="' . esc_attr( $model->slice_key ) . '" />';
 		$this->guard_inputs( 'reset' );
+		$this->render_return_context_inputs();
 		if ( null !== $model->parent_product_id ) {
 			echo '<input type="hidden" name="parent_product_id" value="' . esc_attr( (string) $model->parent_product_id ) . '" />';
 		}
@@ -688,6 +737,7 @@ final class ScopedConfigurationPage {
 		echo '<input type="hidden" name="scope_type" value="' . esc_attr( $model->scope_type ) . '" />';
 		echo '<input type="hidden" name="scope_id" value="' . esc_attr( (string) $model->scope_id ) . '" />';
 		$this->guard_inputs( 'save' );
+		$this->render_return_context_inputs();
 		if ( null !== $model->parent_product_id ) {
 			echo '<input type="hidden" name="parent_product_id" value="' . esc_attr( (string) $model->parent_product_id ) . '" />';
 		}

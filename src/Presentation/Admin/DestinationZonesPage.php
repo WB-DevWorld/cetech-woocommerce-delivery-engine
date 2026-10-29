@@ -617,7 +617,7 @@ final class DestinationZonesPage {
 		echo '<ul class="cetech-de-coverage-results" data-cetech-de-search-results="include" role="listbox" hidden></ul>';
 		echo '<ul class="cetech-de-coverage-chips" data-cetech-de-chips="include">';
 		foreach ( $includes as $chip ) {
-			echo '<li>' . esc_html( $chip['name'] ) . ' <button type="button" class="button-link" data-remove-member="' . esc_attr( (string) $chip['id'] ) . '">×</button>';
+			echo '<li>' . esc_html( $chip['name'] ) . ' <button type="button" class="button-link" data-remove-member="' . esc_attr( (string) $chip['id'] ) . '" aria-label="' . esc_attr( sprintf( /* translators: %s: location name */ __( 'Remove %s', 'cetech-woocommerce-delivery-engine' ), (string) $chip['name'] ) ) . '">×</button>';
 			echo '<input type="hidden" name="' . esc_attr( $prefix ) . '[members][]" value="' . esc_attr( (string) $chip['id'] ) . '" /></li>';
 		}
 		echo '</ul>';
@@ -633,7 +633,7 @@ final class DestinationZonesPage {
 		echo '<ul class="cetech-de-coverage-results" data-cetech-de-search-results="exclude" role="listbox" hidden></ul>';
 		echo '<ul class="cetech-de-coverage-chips" data-cetech-de-chips="exclude">';
 		foreach ( $excludes as $chip ) {
-			echo '<li>' . esc_html( $chip['name'] ) . ' <button type="button" class="button-link" data-remove-member="' . esc_attr( (string) $chip['id'] ) . '">×</button>';
+			echo '<li>' . esc_html( $chip['name'] ) . ' <button type="button" class="button-link" data-remove-member="' . esc_attr( (string) $chip['id'] ) . '" aria-label="' . esc_attr( sprintf( /* translators: %s: location name */ __( 'Remove %s', 'cetech-woocommerce-delivery-engine' ), (string) $chip['name'] ) ) . '">×</button>';
 			echo '<input type="hidden" name="' . esc_attr( $prefix ) . '[exclusions][]" value="' . esc_attr( (string) $chip['id'] ) . '" /></li>';
 		}
 		echo '</ul>';
@@ -661,11 +661,11 @@ final class DestinationZonesPage {
 	private function postcode_row_html( int $group_index, int $row_index, string $value, string $mode ): string {
 		$html  = '<tr data-cetech-de-postcode-row>';
 		$html .= '<td><input type="text" class="regular-text" name="coverage_groups[' . esc_attr( (string) $group_index ) . '][postcodes][' . esc_attr( (string) $row_index ) . '][postcode_value]" value="' . esc_attr( $value ) . '" placeholder="' . esc_attr__( 'Postcode', 'cetech-woocommerce-delivery-engine' ) . '" /></td>';
-		$html .= '<td><select name="coverage_groups[' . esc_attr( (string) $group_index ) . '][postcodes][' . esc_attr( (string) $row_index ) . '][match_mode]">';
+		$html .= '<td><select name="coverage_groups[' . esc_attr( (string) $group_index ) . '][postcodes][' . esc_attr( (string) $row_index ) . '][match_mode]" aria-label="' . esc_attr__( 'Postcode match mode', 'cetech-woocommerce-delivery-engine' ) . '">';
 		$html .= '<option value="' . esc_attr( DestinationRuleMatchMode::Exact->value ) . '"' . selected( $mode, DestinationRuleMatchMode::Exact->value, false ) . '>' . esc_html__( 'Exact', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		$html .= '<option value="' . esc_attr( DestinationRuleMatchMode::Prefix->value ) . '"' . selected( $mode, DestinationRuleMatchMode::Prefix->value, false ) . '>' . esc_html__( 'Prefix', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		$html .= '</select></td>';
-		$html .= '<td><button type="button" class="button-link" data-cetech-de-remove-postcode>×</button></td>';
+		$html .= '<td><button type="button" class="button-link" data-cetech-de-remove-postcode aria-label="' . esc_attr__( 'Remove postcode', 'cetech-woocommerce-delivery-engine' ) . '">×</button></td>';
 		$html .= '</tr>';
 
 		return $html;
@@ -745,7 +745,7 @@ final class DestinationZonesPage {
 		$disabled_attr = $template ? ' disabled="disabled"' : '';
 
 		echo $template ? '' : '<tr class="cetech-de-condition-row">';
-		echo '<td><select name="destination_rules[' . esc_attr( $name_index ) . '][rule_type]" data-cetech-de-rule-type' . $disabled_attr . '>';
+		echo '<td><select name="destination_rules[' . esc_attr( $name_index ) . '][rule_type]" data-cetech-de-rule-type' . $disabled_attr . ' aria-label="' . esc_attr__( 'Condition type', 'cetech-woocommerce-delivery-engine' ) . '">';
 		echo '<option value="">' . esc_html__( '— Select —', 'cetech-woocommerce-delivery-engine' ) . '</option>';
 		foreach ( $this->rule_type_options() as $value => $label ) {
 			printf(
