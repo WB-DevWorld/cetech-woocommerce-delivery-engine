@@ -223,6 +223,7 @@ final class EcrToRuntimeConfigurationAdapter {
 		$supplier  = $this->nullable_reference( $configuration, ConfigurationFieldKey::SUPPLIER_ID );
 		$origin    = $this->nullable_reference( $configuration, ConfigurationFieldKey::ORIGIN_ID );
 		$pickup    = $this->nullable_reference( $configuration, ConfigurationFieldKey::PICKUP_LOCATION_ID );
+		$estimate  = $this->nullable_text( $configuration, ConfigurationFieldKey::ESTIMATED_DELIVERY );
 
 		if ( FulfilmentChoice::Delivery->value === $choice && [] === $offer_ids && null === $pickup ) {
 			return null;
@@ -251,7 +252,8 @@ final class EcrToRuntimeConfigurationAdapter {
 			$supplier,
 			$origin,
 			$priority,
-			$pickup
+			$pickup,
+			$estimate
 		);
 
 		return [
@@ -305,6 +307,22 @@ final class EcrToRuntimeConfigurationAdapter {
 		$value = (int) $field->value;
 
 		return $value > 0 ? $value : null;
+	}
+
+	/**
+	 * Effective free-text value (for example the configured Estimated delivery), or null when
+	 * the field is disabled, unresolved, invalid or blank.
+	 */
+	private function nullable_text( EffectiveConfiguration $configuration, string $field_key ): ?string {
+		$field = $configuration->scalar( $field_key );
+
+		if ( null === $field || EffectiveFieldState::Valid !== $field->state || ! is_scalar( $field->value ) ) {
+			return null;
+		}
+
+		$text = trim( (string) $field->value );
+
+		return '' !== $text ? $text : null;
 	}
 
 	private function is_valid_availability( string $value ): bool {

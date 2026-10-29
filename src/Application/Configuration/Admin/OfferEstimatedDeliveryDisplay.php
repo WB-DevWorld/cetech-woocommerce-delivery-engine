@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Configuration\Admin;
 
+use CetechDeliveryEngine\Application\Selector\DeliveryEstimateFormatter;
+
 /**
  * Maps delivery_offers storage to staff Estimated Delivery display.
  *
@@ -32,30 +34,20 @@ final class OfferEstimatedDeliveryDisplay {
 	 * @param array<string, mixed> $record
 	 */
 	public static function label( array $record ): string {
+		// Staff see exactly what customers see for this offer (ETA precedence, M2): the stored
+		// durations in the offer's unit. Free-text service levels are only a fallback for offers
+		// that carry no durations.
+		$from_durations = DeliveryEstimateFormatter::from_offer( $record );
+		if ( null !== $from_durations ) {
+			return $from_durations;
+		}
+
 		$service = trim( (string) ( $record['service_level'] ?? '' ) );
 		if ( self::looks_like_customer_eta( $service ) ) {
 			return $service;
 		}
 
-		$min = (int) ( $record['default_processing_min'] ?? 0 ) + (int) ( $record['default_transit_min'] ?? 0 );
-		$max = (int) ( $record['default_processing_max'] ?? 0 ) + (int) ( $record['default_transit_max'] ?? 0 );
-		if ( $min <= 0 && $max <= 0 ) {
-			return '—';
-		}
-		if ( $max <= 0 || $min === $max ) {
-			return sprintf(
-				/* translators: %d days */
-				__( '%d business days', 'cetech-woocommerce-delivery-engine' ),
-				$min
-			);
-		}
-
-		return sprintf(
-			/* translators: 1: min days, 2: max days */
-			__( '%1$d–%2$d business days', 'cetech-woocommerce-delivery-engine' ),
-			$min,
-			$max
-		);
+		return '—';
 	}
 
 	public static function looks_like_customer_eta( string $value ): bool {

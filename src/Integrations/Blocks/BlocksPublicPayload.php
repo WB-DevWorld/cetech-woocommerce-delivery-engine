@@ -109,7 +109,7 @@ final class BlocksPublicPayload {
 					$label = '' !== $label ? $label : __( 'Store pickup', 'cetech-woocommerce-delivery-engine' );
 				}
 
-				$estimate = trim( (string) $option->estimate_text );
+				$estimate = DeliveryPresentationLabels::strip_estimated_prefix( (string) $option->estimate_text );
 
 				$reselection_options[] = [
 					'display_key'       => $option->display_key,
@@ -124,7 +124,7 @@ final class BlocksPublicPayload {
 			'fulfilment_choice'       => $needs_reselection ? null : ( '' !== $choice ? $choice : null ),
 			'fulfilment_availability' => $needs_reselection ? null : ( '' !== $availability ? $availability : null ),
 			'delivery_option_label'   => $needs_reselection ? null : self::nullable_string( $summary['delivery_offer_public_label'] ?? null ),
-			'estimate_text'           => $needs_reselection ? null : self::nullable_string( $summary['estimate_text'] ?? null ),
+			'estimate_text'           => $needs_reselection ? null : self::nullable_string( DeliveryPresentationLabels::strip_estimated_prefix( (string) ( $summary['estimate_text'] ?? '' ) ) ),
 			'pickup_location_label'   => $needs_reselection ? null : self::nullable_string( $summary['pickup_location_label'] ?? null ),
 			'pickup_address'          => $needs_reselection ? null : self::nullable_string( $summary['pickup_address'] ?? null ),
 			'pickup_instructions'     => $needs_reselection ? null : self::nullable_string( $summary['pickup_instructions'] ?? null ),
@@ -255,7 +255,7 @@ final class BlocksPublicPayload {
 				'display_key'       => $option->display_key,
 				'label'             => '' !== $label ? $label : __( 'Delivery option', 'cetech-woocommerce-delivery-engine' ),
 				'fulfilment_choice' => $option->fulfilment_choice,
-				'estimate_text'     => self::nullable_string( $option->estimate_text ),
+				'estimate_text'     => self::nullable_string( DeliveryPresentationLabels::strip_estimated_prefix( (string) $option->estimate_text ) ),
 				'estimate_line'     => self::nullable_string(
 					DeliveryPresentationLabels::format_product_estimate_line(
 						(string) $option->estimate_text,

@@ -11,6 +11,7 @@ use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Presentation\Shared\CartDeliveryUiAnchor;
+use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
 
 /**
  * Classic Cart inline delivery reselection for lines whose options changed.
@@ -153,7 +154,7 @@ final class CartDeliveryReselectionRenderer {
 			$label = __( 'Delivery option', 'cetech-woocommerce-delivery-engine' );
 		}
 
-		$estimate = trim( (string) $option->estimate_text );
+		$estimate = DeliveryPresentationLabels::strip_estimated_prefix( (string) $option->estimate_text );
 
 		if ( '' !== $estimate ) {
 			$label .= ' — ' . $estimate;
