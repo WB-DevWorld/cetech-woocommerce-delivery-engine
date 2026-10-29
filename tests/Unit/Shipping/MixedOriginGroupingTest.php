@@ -191,8 +191,9 @@ final class MixedOriginGroupingTest extends TestCase {
 	public function test_admin_tester_shares_the_same_scoping_rule(): void {
 		$engine = (string) file_get_contents( dirname( __DIR__, 3 ) . '/src/Application/RateQuote/RateQuoteEngine.php' );
 		$tester = (string) file_get_contents( dirname( __DIR__, 3 ) . '/src/Application/Calculator/AdminRateCardTester.php' );
-		preg_match( '/private function optional_dimension_matches\(.*?\n\t}\n/s', $engine, $engine_match );
-		preg_match( '/private function optional_dimension_matches\(.*?\n\t}\n/s', $tester, $tester_match );
+		// CRLF-tolerant: Windows checkouts with core.autocrlf rewrite the sources with CRLF.
+		preg_match( '/private function optional_dimension_matches\(.*?\r?\n\t}\r?\n/s', $engine, $engine_match );
+		preg_match( '/private function optional_dimension_matches\(.*?\r?\n\t}\r?\n/s', $tester, $tester_match );
 
 		self::assertNotEmpty( $engine_match );
 		self::assertSame( $engine_match[0], $tester_match[0] ?? null );
