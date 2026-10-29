@@ -90,11 +90,8 @@ final class ProductDeliveryOptionsBuilder {
 				}
 			}
 
-			if (
-				FulfilmentAvailability::InStore->value === $availability_slug
-				&& FulfilmentChoice::StorePickup->value === $choice_slug
-				&& $emit_pickup
-			) {
+			// Pickup can only be emitted for In Store or for an assigned Pickup Location (COR-022).
+			if ( FulfilmentChoice::StorePickup->value === $choice_slug && $emit_pickup ) {
 				$preferred_choice = FulfilmentChoice::StorePickup->value;
 			}
 		}
@@ -250,7 +247,8 @@ final class ProductDeliveryOptionsBuilder {
 	 */
 	private function should_emit_pickup( string $availability, ?array $pickup_location, array $pickup_offer_ids ): bool {
 		if ( FulfilmentAvailability::InStore->value !== $availability ) {
-			return false;
+			// COR-022 (D8): outside In Store, only an explicitly assigned active Pickup Location offers pickup.
+			return null !== $pickup_location;
 		}
 
 		if ( null !== $pickup_location ) {

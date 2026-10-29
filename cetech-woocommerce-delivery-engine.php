@@ -4,7 +4,7 @@
  * Plugin URI:        https://cetech.example.com/woocommerce-delivery-engine
  * Description:       Delivery, fulfilment-choice, delivery-pricing, shipment-status, and tracking engine for WooCommerce.
  * Version:           1.0.0-dev.attention-count.1
- * Requires at least: 6.0
+ * Requires at least: 6.5
  * Requires PHP:      8.3
  * Author:            CETECH
  * Text Domain:       cetech-woocommerce-delivery-engine

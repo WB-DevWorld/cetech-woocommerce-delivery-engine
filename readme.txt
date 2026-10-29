@@ -1,6 +1,6 @@
 === CETECH WooCommerce Delivery Engine ===
 Contributors: cetech
-Requires at least: 6.0
+Requires at least: 6.5
 Tested up to: 6.8
 Requires PHP: 8.3
 Stable tag: 1.0.0-dev.geo.10
