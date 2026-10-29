@@ -17,7 +17,7 @@ final class WordPressCompatibilityFloorTest extends TestCase {
 		$header = (string) file_get_contents( dirname( __DIR__, 3 ) . '/cetech-woocommerce-delivery-engine.php' );
 
 		self::assertMatchesRegularExpression(
-			'/^ \* Requires at least: ' . preg_quote( self::WORDPRESS_FLOOR, '/' ) . '$/m',
+			'/^ \* Requires at least: ' . preg_quote( self::WORDPRESS_FLOOR, '/' ) . '\r?$/m',
 			$header,
 			'Plugin header must advertise WordPress ' . self::WORDPRESS_FLOOR . ' as the minimum.'
 		);
@@ -27,7 +27,7 @@ final class WordPressCompatibilityFloorTest extends TestCase {
 		$readme = (string) file_get_contents( dirname( __DIR__, 3 ) . '/readme.txt' );
 
 		self::assertMatchesRegularExpression(
-			'/^Requires at least: ' . preg_quote( self::WORDPRESS_FLOOR, '/' ) . '$/m',
+			'/^Requires at least: ' . preg_quote( self::WORDPRESS_FLOOR, '/' ) . '\r?$/m',
 			$readme,
 			'readme.txt must advertise the same WordPress floor as the plugin header.'
 		);
@@ -37,8 +37,8 @@ final class WordPressCompatibilityFloorTest extends TestCase {
 		$header = (string) file_get_contents( dirname( __DIR__, 3 ) . '/cetech-woocommerce-delivery-engine.php' );
 		$readme = (string) file_get_contents( dirname( __DIR__, 3 ) . '/readme.txt' );
 
-		preg_match( '/^ \* Requires at least: (\S+)$/m', $header, $header_match );
-		preg_match( '/^Requires at least: (\S+)$/m', $readme, $readme_match );
+		preg_match( '/^ \* Requires at least: (\S+)\r?$/m', $header, $header_match );
+		preg_match( '/^Requires at least: (\S+)\r?$/m', $readme, $readme_match );
 
 		self::assertSame( $header_match[1] ?? null, $readme_match[1] ?? null );
 	}
