@@ -70,7 +70,13 @@ if ($Status) {
     }
 }
 
-$Branch = (Invoke-Git @('branch', '--show-current')).Trim()
+# A commit SHA or tag checkout is detached: git branch --show-current prints nothing, which
+# must not abort the build (release-package.yml packages an exact ref).
+$Branch = [string](Invoke-Git @('branch', '--show-current'))
+$Branch = if ($Branch) { $Branch.Trim() } else { '' }
+if (-not $Branch) {
+    $Branch = 'detached@' + ([string](Invoke-Git @('rev-parse', '--short', 'HEAD'))).Trim()
+}
 Write-Host "Branch: $Branch"
 
 $MainFilePath = Join-Path $RepoRoot $PluginMainFile
