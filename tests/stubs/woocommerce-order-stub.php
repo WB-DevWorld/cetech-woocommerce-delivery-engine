@@ -16,6 +16,10 @@ if ( ! class_exists( 'WC_Order', false ) ) {
 			$this->data['shipping_items']  = is_array( $this->data['shipping_items'] ?? null ) ? $this->data['shipping_items'] : [];
 		}
 
+		public function get_order_key(): string {
+			return (string) ( $this->data['order_key'] ?? '' );
+		}
+
 		public function get_id(): int {
 			return (int) ( $this->data['id'] ?? 0 );
 		}

@@ -401,6 +401,7 @@ final class OrderShipmentCancelRefundTest extends TestCase {
 
 	public function test_customer_shipment_output_does_not_leak_refund_review(): void {
 		$GLOBALS['cetech_de_test_is_view_order'] = true;
+		$GLOBALS['cetech_de_test_caps']['view_order'] = true; // COR-034: the rightful viewer.
 		$GLOBALS['cetech_de_test_options']['cetech_de_enable_customer_order_delivery_summary'] = 1;
 
 		$order    = $this->order( 4439, 'refunded' );

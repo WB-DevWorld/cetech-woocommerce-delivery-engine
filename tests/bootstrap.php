@@ -300,6 +300,20 @@ if ( ! function_exists( 'wp_cache_delete' ) ) {
 	}
 }
 
+if ( ! class_exists( 'WC_Email' ) ) {
+	/**
+	 * Minimal WooCommerce email double: customer or non-customer routing.
+	 */
+	class WC_Email {
+		public function __construct( private bool $customer_email = true ) {
+		}
+
+		public function is_customer_email(): bool {
+			return $this->customer_email;
+		}
+	}
+}
+
 if ( ! function_exists( 'add_option' ) ) {
 	function add_option( string $option, mixed $value = '', mixed $deprecated = '', bool|string $autoload = 'yes' ): bool {
 		unset( $deprecated, $autoload );

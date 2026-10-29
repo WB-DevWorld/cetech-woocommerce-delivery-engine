@@ -18,6 +18,8 @@ use WC_Order;
  *
  * Stage 13F compact contract: delivery option + estimate (+ pickup extras when present).
  * Does not repeat WooCommerce shipping charges or internal fulfilment/method labels.
+ * COR-034: the row meaning comes from the frozen machine fulfilment choice, and the
+ * summary renders only for a viewer OrderSurfaceAuthority accepts for this order.
  */
 final class CustomerOrderDeliverySummaryRenderer {
 
@@ -74,6 +76,10 @@ final class CustomerOrderDeliverySummaryRenderer {
 		}
 
 		if ( ! $order instanceof WC_Order || $order->get_id() <= 0 ) {
+			return;
+		}
+
+		if ( ! OrderSurfaceAuthority::may_view( $order ) ) {
 			return;
 		}
 
@@ -149,7 +155,7 @@ final class CustomerOrderDeliverySummaryRenderer {
 	 * @return list<array{key: string, value: string}>
 	 */
 	private function compact_rows( CustomerOrderDeliveryLineSummary $line ): array {
-		$choice_slug = $this->infer_choice_slug( $line->fulfilment_choice_label );
+		$choice_slug = $line->fulfilment_choice_slug();
 
 		return DeliveryPresentationLabels::format_public_summary_rows(
 			[
@@ -164,22 +170,8 @@ final class CustomerOrderDeliverySummaryRenderer {
 		);
 	}
 
-	private function infer_choice_slug( string $choice_label ): ?string {
-		$normalized = strtolower( trim( $choice_label ) );
-
-		if ( str_contains( $normalized, 'pickup' ) ) {
-			return 'store_pickup';
-		}
-
-		if ( str_contains( $normalized, 'delivery' ) ) {
-			return 'delivery';
-		}
-
-		return null;
-	}
-
 	private function is_store_pickup_line( CustomerOrderDeliveryLineSummary $line ): bool {
-		return 'store_pickup' === $this->infer_choice_slug( $line->fulfilment_choice_label );
+		return 'store_pickup' === $line->fulfilment_choice_slug();
 	}
 
 	/**
