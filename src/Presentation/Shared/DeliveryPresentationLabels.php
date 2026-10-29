@@ -211,7 +211,10 @@ final class DeliveryPresentationLabels {
 		return is_string( $stripped ) && '' !== $stripped ? $stripped : $trimmed;
 	}
 
-	private static function infer_choice_slug_from_label( string $choice_label ): ?string {
+	/**
+	 * Legacy fallback only: summaries captured before COR-034 carry no machine choice.
+	 */
+	public static function infer_choice_slug_from_label( string $choice_label ): ?string {
 		$normalized = strtolower( trim( $choice_label ) );
 
 		if ( '' === $normalized ) {

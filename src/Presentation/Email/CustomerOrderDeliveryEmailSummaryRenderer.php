@@ -17,6 +17,9 @@ use WC_Order;
  * Customer-safe read-only delivery summary in WooCommerce customer order emails.
  *
  * Stage 13F compact contract mirrors thank-you / My Account presentation.
+ * COR-034: the row meaning comes from the frozen machine fulfilment choice, never
+ * from the English wording of a label, and the summary is only added to an email
+ * WooCommerce identifies as a customer email; a missing email object is refused.
  */
 final class CustomerOrderDeliveryEmailSummaryRenderer {
 
@@ -79,11 +82,15 @@ final class CustomerOrderDeliveryEmailSummaryRenderer {
 	 * @param WC_Email|false|null $email
 	 */
 	private function is_customer_email_context( $email ): bool {
-		if ( $email instanceof WC_Email && method_exists( $email, 'is_customer_email' ) ) {
+		if ( ! $email instanceof WC_Email ) {
+			return false;
+		}
+
+		if ( method_exists( $email, 'is_customer_email' ) ) {
 			return (bool) $email->is_customer_email();
 		}
 
-		return true;
+		return false;
 	}
 
 	private function render_html_summary( CustomerOrderDeliverySummary $summary ): string {
@@ -143,7 +150,7 @@ final class CustomerOrderDeliveryEmailSummaryRenderer {
 	 * @return list<array{key: string, value: string}>
 	 */
 	private function compact_rows( CustomerOrderDeliveryLineSummary $line ): array {
-		$choice_slug = $this->infer_choice_slug( $line->fulfilment_choice_label );
+		$choice_slug = $line->fulfilment_choice_slug();
 
 		return DeliveryPresentationLabels::format_public_summary_rows(
 			[
@@ -158,17 +165,4 @@ final class CustomerOrderDeliveryEmailSummaryRenderer {
 		);
 	}
 
-	private function infer_choice_slug( string $choice_label ): ?string {
-		$normalized = strtolower( trim( $choice_label ) );
-
-		if ( str_contains( $normalized, 'pickup' ) ) {
-			return 'store_pickup';
-		}
-
-		if ( str_contains( $normalized, 'delivery' ) ) {
-			return 'delivery';
-		}
-
-		return null;
-	}
 }
