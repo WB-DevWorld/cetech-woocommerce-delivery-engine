@@ -180,6 +180,10 @@ final class CustomerStorefrontCopy {
 		return __( 'Items with their own delivery address will keep that address.', 'cetech-woocommerce-delivery-engine' );
 	}
 
+	public static function native_lines_use_checkout_address(): string {
+		return __( 'Items without a delivery option ship to your checkout shipping address.', 'cetech-woocommerce-delivery-engine' );
+	}
+
 	public static function multi_destination(): string {
 		return __( 'Your items will be delivered to different locations.', 'cetech-woocommerce-delivery-engine' );
 	}

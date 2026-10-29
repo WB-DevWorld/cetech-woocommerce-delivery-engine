@@ -21,6 +21,10 @@ use CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy;
  *
  * WooCommerce still owns billing and one checkout shipping address.
  * Delivery Engine owns per-item delivery addresses. Never silently copy.
+ * COR-026: in a mixed cart (managed Delivery lines plus native shippable
+ * lines) the checkout shipping address belongs to the native lines, so the
+ * managed address is never projected onto the posted shipping fields; each
+ * managed line keeps its own committed destination through its package.
  */
 final class CheckoutAddressPolicy {
 
@@ -164,6 +168,12 @@ final class CheckoutAddressPolicy {
 				. esc_html( CustomerStorefrontCopy::items_keep_own_address() )
 				. '</p>';
 		}
+
+		if ( ! empty( $summary['mixed_ownership'] ) ) {
+			echo '<p class="cetech-de-checkout-mixed-ownership">'
+				. esc_html( CustomerStorefrontCopy::native_lines_use_checkout_address() )
+				. '</p>';
+		}
 	}
 
 	public function render_use_checkout_address_action(): void {
@@ -184,7 +194,24 @@ final class CheckoutAddressPolicy {
 			return $data;
 		}
 
-		$shared = $this->shared_complete_delivery_address( WC()->cart->get_cart() );
+		return $this->align_posted_shipping( $data, WC()->cart->get_cart() );
+	}
+
+	/**
+	 * Pure posted-data projection (COR-026).
+	 *
+	 * The shared managed address is projected onto the shipping fields only when
+	 * every shippable line is a managed Delivery line with that address. A cart
+	 * that also carries native shippable lines keeps the customer's posted shipping
+	 * address for them; billing fields are never touched in either case.
+	 *
+	 * @param array<string, mixed>                $data
+	 * @param array<string, array<string, mixed>> $contents
+	 *
+	 * @return array<string, mixed>
+	 */
+	public function align_posted_shipping( array $data, array $contents ): array {
+		$shared = $this->shared_complete_delivery_address( $contents );
 		if ( ! $shared instanceof DeliveryAddress ) {
 			return $data;
 		}
@@ -259,7 +286,9 @@ final class CheckoutAddressPolicy {
 	 *     incomplete_matching_identities: list<string>,
 	 *     heterogeneous_incomplete_destinations: bool,
 	 *     can_apply_checkout_address: bool,
-	 *     first_incomplete_anchor: string
+	 *     first_incomplete_anchor: string,
+	 *     native_shipping_lines: int,
+	 *     mixed_ownership: bool
 	 * }
 	 */
 	public function summarize_cart( array $contents ): array {
@@ -269,6 +298,7 @@ final class CheckoutAddressPolicy {
 		$has_delivery                   = false;
 		$incomplete_delivery            = 0;
 		$first_incomplete_anchor        = '';
+		$native_shipping_lines          = 0;
 
 		foreach ( $contents as $cart_item_key => $item ) {
 			if ( ! is_array( $item ) ) {
@@ -279,6 +309,9 @@ final class CheckoutAddressPolicy {
 				$item[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] ?? null
 			);
 			if ( null === $intent ) {
+				if ( self::is_native_shippable_line( $item ) ) {
+					++$native_shipping_lines;
+				}
 				continue;
 			}
 
@@ -334,15 +367,48 @@ final class CheckoutAddressPolicy {
 			'heterogeneous_incomplete_destinations' => $heterogeneous,
 			'can_apply_checkout_address'            => $incomplete_delivery > 0 && ! $heterogeneous,
 			'first_incomplete_anchor'               => $first_incomplete_anchor,
+			'native_shipping_lines'                 => $native_shipping_lines,
+			'mixed_ownership'                       => $native_shipping_lines > 0 && $has_delivery,
 		];
 	}
 
 	/**
+	 * A line without a Delivery Engine selection that WooCommerce ships natively.
+	 * Lines that need no shipping (virtual, downloadable) do not claim the checkout address.
+	 *
+	 * @param array<string, mixed> $item
+	 */
+	public static function is_native_shippable_line( array $item ): bool {
+		$data = $item['data'] ?? null;
+
+		if ( is_object( $data ) && method_exists( $data, 'needs_shipping' ) ) {
+			return (bool) $data->needs_shipping();
+		}
+
+		if ( is_object( $data ) && method_exists( $data, 'is_virtual' ) && $data->is_virtual() ) {
+			return false;
+		}
+
+		if ( ! empty( $item['virtual'] ) ) {
+			return false;
+		}
+
+		return (int) ( $item['product_id'] ?? 0 ) > 0;
+	}
+
+	/**
+	 * The one complete address every managed Delivery line shares, when the cart has no
+	 * native shippable line that owns the checkout shipping address itself (COR-026).
+	 *
 	 * @param array<string, array<string, mixed>> $contents
 	 */
 	public function shared_complete_delivery_address( array $contents ): ?DeliveryAddress {
 		$summary = $this->summarize_cart( $contents );
 		if ( $summary['incomplete_delivery'] > 0 || count( $summary['complete_identities'] ) !== 1 ) {
+			return null;
+		}
+
+		if ( $summary['native_shipping_lines'] > 0 ) {
 			return null;
 		}
 

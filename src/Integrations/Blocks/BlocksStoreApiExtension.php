@@ -157,6 +157,7 @@ final class BlocksStoreApiExtension {
 				'keep_address_note'    => (bool) ( $notices['keep_address_note'] ?? false )
 					? CustomerStorefrontCopy::items_keep_own_address()
 					: null,
+				'mixed_ownership'      => (bool) ( $notices['mixed_ownership'] ?? false ),
 				'delivery_plan'        => $plan,
 				'mutation_result'      => is_array( $mutation ) ? $mutation : null,
 			]
@@ -218,6 +219,11 @@ final class BlocksStoreApiExtension {
 				'type'        => [ 'string', 'null' ],
 				'readonly'    => true,
 			],
+			'mixed_ownership'      => [
+				'description' => 'Whether native shippable lines share the cart with managed Delivery lines (the checkout shipping address belongs to the native lines).',
+				'type'        => 'boolean',
+				'readonly'    => true,
+			],
 			'delivery_plan'        => [
 				'description' => 'Compact checkout confirmation grouped by destination.',
 				'type'        => 'array',
@@ -239,6 +245,7 @@ final class BlocksStoreApiExtension {
 	 *     can_apply_checkout_address: bool,
 	 *     first_incomplete_anchor: string,
 	 *     keep_address_note: bool,
+	 *     mixed_ownership: bool,
 	 *     messages: list<array{code: string, message: string}>
 	 * }
 	 */
@@ -250,6 +257,7 @@ final class BlocksStoreApiExtension {
 			'can_apply_checkout_address' => false,
 			'first_incomplete_anchor'    => '',
 			'keep_address_note'          => false,
+			'mixed_ownership'            => false,
 			'messages'                   => [],
 		];
 
@@ -288,6 +296,13 @@ final class BlocksStoreApiExtension {
 			];
 		}
 
+		if ( ! empty( $summary['mixed_ownership'] ) ) {
+			$messages[] = [
+				'code'    => 'mixed_ownership',
+				'message' => CustomerStorefrontCopy::native_lines_use_checkout_address(),
+			];
+		}
+
 		return [
 			'multi_destination'          => $summary['multi_destination'],
 			'mixed_fulfilment'           => $summary['has_pickup'] && $summary['has_delivery'],
@@ -295,6 +310,7 @@ final class BlocksStoreApiExtension {
 			'can_apply_checkout_address' => ! empty( $summary['can_apply_checkout_address'] ),
 			'first_incomplete_anchor'    => (string) ( $summary['first_incomplete_anchor'] ?? '' ),
 			'keep_address_note'          => $summary['has_delivery'] && [] !== $summary['complete_identities'],
+			'mixed_ownership'            => ! empty( $summary['mixed_ownership'] ),
 			'messages'                   => $messages,
 		];
 	}
