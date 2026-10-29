@@ -1,0 +1,14 @@
+plugin-version               PASS  installed Delivery Engine version: 1.0.0-m2.1
+schema                       PASS  cetech_de_db_version: 6
+m2-features-on               FAIL  off: enable_bulk_import
+platform                     PASS  WordPress 7.1.3, WooCommerce 11.2.1, PHP 8.4.24, database 11.8.8-MariaDB-ubu2404-log
+hpos                         PASS  HPOS enabled: yes
+theme-woodmart               PASS  active theme: Woodmart Child
+wpml-active                  PASS  WPML active: yes
+b2bking-active               PASS  B2BKing active: yes
+rate-cards-flat              PASS  3 active rate cards, 3 flat (M2 rate cards are flat per delivery only)
+d1-tuples                    PASS  configured origin/supplier/profile fields: 0 (D1 only changes charges when this is above zero)
+pickup-locations             PASS  1 active pickup locations
+international-known-limit    PASS  1 active International scope slices (no delivery option until Air/Sea prices exist)
+
+12 checks, 1 failed

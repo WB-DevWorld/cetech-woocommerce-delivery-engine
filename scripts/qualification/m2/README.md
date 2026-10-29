@@ -12,7 +12,7 @@ Acceptance has three parts. Each produces evidence that goes into the ledger
 | Part | What it is | Who runs it | Where |
 |---|---|---|---|
 | A. Automated evidence | The PHPUnit and Vitest classes that prove each case's rule at the packaged commit | Claude Code or any developer | `bash scripts/qualification/m2/run-automated-evidence.sh` on the packaged commit |
-| B. Site preflight | Read-only checks that the training (later business) site is in the state the cases assume | Whoever has WP-CLI on the site, or via the training-ops `inspect` step | `wp eval-file scripts/qualification/m2/m2-site-preflight.php` |
+| B. Site preflight | Read-only checks that the training (later business) site is in the state the cases assume | Whoever has WP-CLI on the site; with read-only SSH, pipe the file: `wp eval-file - - < scripts/qualification/m2/m2-site-preflight.php` (the second `-` prints the JSON receipt to stdout) | `wp eval-file scripts/qualification/m2/m2-site-preflight.php` |
 | C. Browser cases | The customer and staff journeys, one row per case | Claude in Frank's Cowork project, signed in on training as `claude-qa` | `acceptance-cases.md` |
 
 ## Preconditions (from the intake document)
@@ -29,6 +29,14 @@ Acceptance has three parts. Each produces evidence that goes into the ledger
    not a failure.
 5. Training rate cards expected by the cases (D9): Greater Accra Selected Cities /
    Standard ₵30, Accra / Standard ₵50, Accra / Store Pickup ₵0.
+
+## Where receipts go
+
+Receipts for a package are committed under `docs/training/m2-acceptance/<version>/`
+(`m2-automated-evidence.json`, `m2-site-preflight.json` and the preflight table as
+`m2-site-preflight.txt`). The package build excludes `docs/training`, so they never
+ship. They hold commit ids, versions, flag names, counts and public rate-card
+amounts only.
 
 ## Evidence rules
 
