@@ -431,6 +431,15 @@ final class EffectiveConfigurationPreviewPage {
 	}
 
 	public static function source_label_for( string $provenance, bool $variation_context = false ): string {
+		// COR-012 (D3a): "<base> (product setting is inactive and ignored)" keeps the base label.
+		if ( preg_match( '/^(.*?)\s*\((?:product|variation) setting is inactive and ignored\)$/i', $provenance, $match ) ) {
+			return sprintf(
+				/* translators: %s: the source label that applies instead */
+				__( '%s (inactive setting ignored)', 'cetech-woocommerce-delivery-engine' ),
+				self::source_label_for( $match[1], $variation_context )
+			);
+		}
+
 		$normalized = strtolower( $provenance );
 		if ( str_contains( $normalized, 'variation' ) ) {
 			return __( 'Variation-specific', 'cetech-woocommerce-delivery-engine' );
