@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Shipment;
 
+use CetechDeliveryEngine\Domain\Shipment\ShipmentItem;
+
 /**
  * Deterministic shipment plan for one historical delivery group.
  *
@@ -30,5 +32,28 @@ final class ShipmentPlan {
 		public readonly ?string $eta_original,
 		public readonly array $items
 	) {
+	}
+
+	/**
+	 * The frozen required item set of this group as shipment items (COR-031).
+	 *
+	 * @return list<ShipmentItem>
+	 */
+	public function shipment_items(): array {
+		$items = [];
+
+		foreach ( $this->items as $item ) {
+			$items[] = ShipmentItem::create(
+				0,
+				$item->order_id,
+				$item->order_item_id,
+				$item->quantity,
+				$item->product_id,
+				$item->variation_id,
+				$item->product_name_snapshot
+			);
+		}
+
+		return $items;
 	}
 }

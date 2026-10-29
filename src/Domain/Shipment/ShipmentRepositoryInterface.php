@@ -77,6 +77,26 @@ interface ShipmentRepositoryInterface {
 	/**
 	 * Highest persisted shipment-event ID. 0 when no events exist.
 	 */
+	/**
+	 * COR-031: whether the stored aggregate equals the frozen required item set exactly
+	 * (same order items, order ids and quantities, nothing extra) and carries a Created event.
+	 *
+	 * @param list<ShipmentItem> $expected_items
+	 */
+	public function aggregateIsComplete( int $shipment_id, array $expected_items ): bool;
+
+	/**
+	 * COR-032: write only the given columns and the attributable event(s) in one transaction,
+	 * guarded by the values the editor loaded for those columns. When the guard fails because
+	 * the row already holds the target values (a partial earlier write or an identical retry)
+	 * the write is treated as applied and the events are appended; any other change since the
+	 * load raises ShipmentConcurrentEditException and nothing is written.
+	 *
+	 * @param array<string, mixed> $fields   Column => new value.
+	 * @param array<string, mixed> $expected Column => value the editor loaded.
+	 */
+	public function updateFieldsWithEvent( int $shipment_id, array $fields, array $expected, ShipmentEvent ...$events ): Shipment;
+
 	public function maxEventId(): int;
 
 	/**
