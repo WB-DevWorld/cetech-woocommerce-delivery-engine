@@ -84,8 +84,10 @@ final class StaffDeliveryCustomizeView {
 			$profile_label,
 			__( 'Set a different default customer choice', 'cetech-woocommerce-delivery-engine' )
 		);
-		if ( $profile?->pickup_allowed ) {
-			$this->render_pickup_location_control( $model, $is_variation, $profile_label );
+		// COR-022 (D8): any known fulfilment type may be assigned a Pickup Location; that assignment alone
+		// offers Store Pickup. An unknown profile still shows no pickup control, as before.
+		if ( null !== $profile ) {
+			$this->render_pickup_location_control( $model, $is_variation, $profile_label, ! $profile->pickup_allowed );
 		}
 		$this->render_scalar_control(
 			$model,
@@ -183,7 +185,8 @@ final class StaffDeliveryCustomizeView {
 	private function render_pickup_location_control(
 		ScopedConfigurationEditViewModel $model,
 		bool $is_variation,
-		string $profile_label
+		string $profile_label,
+		bool $source_independent = false
 	): void {
 		$field = $this->field( $model, ConfigurationFieldKey::PICKUP_LOCATION_ID );
 		if ( null === $field ) {
@@ -222,6 +225,15 @@ final class StaffDeliveryCustomizeView {
 		}
 		echo '</select></p>';
 		echo '<p class="description" id="' . esc_attr( $input_id . '_help' ) . '">' . esc_html__( 'Store Pickup stays a fulfilment alternative. It is not a Delivery Option.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		if ( $source_independent ) {
+			echo '<p class="description" data-cetech-de-source-independent-pickup>' . esc_html(
+				sprintf(
+					/* translators: %s: fulfilment type label, for example "In Warehouse" */
+					__( 'This item is fulfilled as %s. Assigning a Pickup Location offers Store Pickup for it as well; without one, customers only see Delivery.', 'cetech-woocommerce-delivery-engine' ),
+					$profile_label
+				)
+			) . '</p>';
+		}
 		echo '</div></fieldset>';
 	}
 
