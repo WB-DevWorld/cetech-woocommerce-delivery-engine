@@ -156,8 +156,10 @@ jobs:
 
           mkdir -p package
           gh run download "$PACKAGE_RUN_ID" --repo "$GITHUB_REPOSITORY" --dir package
-          mapfile -t zips < <(find package -type f -name '*.zip' | sort)
-          [[ "${#zips[@]}" -eq 1 ]] || fail "expected exactly one ZIP in the artifact, found ${#zips[@]}"
+          # The build artifact carries the versioned ZIP plus a slug-named copy with the same
+          # hash (for WordPress-style uploads); the install uses the versioned one only.
+          mapfile -t zips < <(find package -type f -name "${PLUGIN_SLUG}-v*.zip" | sort)
+          [[ "${#zips[@]}" -eq 1 ]] || fail "expected exactly one versioned ZIP (${PLUGIN_SLUG}-v*.zip) in the artifact, found ${#zips[@]}"
           zip_path="${zips[0]}"
           zip_dir="$(dirname "$zip_path")"
           zip_name="$(basename "$zip_path")"
