@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Integrations\Blocks;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
+use CetechDeliveryEngine\Application\Cart\CartLineDeliveryPriceResolver;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
 use CetechDeliveryEngine\Application\Checkout\CheckoutAddressPolicy;
 use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
@@ -27,7 +28,8 @@ final class BlocksStoreApiExtension {
 		private CartDeliverySelectionCapture $cart_capture,
 		private CartDeliverySelectionRevalidator $cart_revalidator,
 		private ShippingRateCalculationGate $shipping_gate,
-		private ?CheckoutAddressPolicy $address_policy = null
+		private ?CheckoutAddressPolicy $address_policy = null,
+		private ?CartLineDeliveryPriceResolver $prices = null
 	) {
 	}
 
@@ -65,7 +67,8 @@ final class BlocksStoreApiExtension {
 			$cart_item,
 			$this->cart_capture,
 			$this->cart_revalidator,
-			$key
+			$key,
+			$this->prices instanceof CartLineDeliveryPriceResolver ? $this->prices->price_text_for( $cart_item ) : ''
 		);
 	}
 
@@ -99,6 +102,8 @@ final class BlocksStoreApiExtension {
 			'summary_kicker'        => [ 'description' => 'Compact summary kicker, such as Store Pickup.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
 			'summary_title'         => [ 'description' => 'Compact summary title.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
 			'summary_meta'          => [ 'description' => 'Compact summary meta line.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'summary_price'         => [ 'description' => 'Customer-facing quoted fee for this line.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'summary_line'          => [ 'description' => 'One-line selection summary: option, destination, estimate and fee.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
 			'matching_location'     => [ 'description' => 'Customer matching location for editing this cart line.', 'type' => [ 'object', 'null' ], 'readonly' => true ],
 			'delivery_address'      => [ 'description' => 'Customer delivery address for editing this cart line.', 'type' => [ 'object', 'null' ], 'readonly' => true ],
 			'available_options'     => [ 'description' => 'Public delivery options available for this line.', 'type' => 'array', 'readonly' => true ],
@@ -130,7 +135,12 @@ final class BlocksStoreApiExtension {
 		$mutation = $GLOBALS[ BlocksCartContextCommandHandler::RESULT_GLOBAL ] ?? null;
 		$plan = [];
 		if ( function_exists( 'WC' ) && WC()->cart ) {
-			$plan = CustomerStorefrontCopy::delivery_plan( WC()->cart->get_cart() );
+			$contents = WC()->cart->get_cart();
+			$plan     = CustomerStorefrontCopy::delivery_plan(
+				$contents,
+				$this->prices instanceof CartLineDeliveryPriceResolver ? $this->prices->price_texts_for_cart( $contents ) : [],
+				function_exists( 'wc_get_cart_url' ) ? (string) wc_get_cart_url() : ''
+			);
 		}
 
 		return BlocksPublicPayload::strip_forbidden(

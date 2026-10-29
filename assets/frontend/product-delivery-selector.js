@@ -4,6 +4,11 @@
  * Does not calculate prices or invent options. Toggles visible display_key radios
  * so only the active fulfilment choice is submitted. Location AJAX asks the server
  * for valid options. One hidden JSON payload is the authoritative customer context.
+ *
+ * M2 D2: nothing is pre-selected while both choices are valid; the customer picks
+ * Delivery or Store Pickup first. Once a card is selected the chooser collapses to
+ * one compact line ("<option> · <destination> · <estimate> · <fee>") with a single
+ * "Change" control that reopens it.
  */
 (function (window, document) {
 	'use strict';
@@ -156,6 +161,7 @@
 				if (!radios.some(function (input) { return input.checked; })) {
 					if (radios.length === 1) {
 						radios[0].checked = true;
+						root.removeAttribute('data-cetech-de-changing');
 					}
 				}
 			} else {
@@ -170,14 +176,152 @@
 		writePayload(root);
 		toggleLocationPanel(root, choice);
 		dismissStaleSelectionNotices(root);
+		syncSelectionLine(root);
 	}
 
 	function toggleLocationPanel(root, choice) {
-		root.setAttribute('data-cetech-de-active-choice', choice || 'delivery');
+		root.setAttribute('data-cetech-de-active-choice', choice || '');
 		var locationPanel = root.querySelector('[data-cetech-de-location-panel]');
 		if (locationPanel) {
-			locationPanel.hidden = choice === 'store_pickup';
+			locationPanel.hidden = choice !== 'delivery';
 		}
+	}
+
+	function textOf(node) {
+		return node ? String(node.textContent || '').replace(/\s+/g, ' ').trim() : '';
+	}
+
+	function selectionLineText(root, radio, config) {
+		var i18n = (config && config.i18n) || {};
+		var card = radio.closest ? radio.closest('.cetech-de-delivery-option') : null;
+		var panel = radio.closest ? radio.closest('[data-cetech-de-choice-panel]') : null;
+		var choice = panel
+			? String(panel.getAttribute('data-cetech-de-choice-panel') || '')
+			: (card ? String(card.getAttribute('data-cetech-de-choice') || '') : '');
+		var label = textOf(card ? card.querySelector('.cetech-de-delivery-option__label') : null);
+		var estimate = textOf(card ? card.querySelector('.cetech-de-delivery-option__estimate') : null);
+		var priceEl = card ? card.querySelector('.cetech-de-delivery-option__price') : null;
+		var price = priceEl ? String(priceEl.getAttribute('data-cetech-de-price') || textOf(priceEl)) : '';
+		var parts = [];
+		if (choice === 'store_pickup') {
+			parts.push(label ? String(i18n.pickupAt || 'Store Pickup — %s').replace('%s', label) : (i18n.storePickup || 'Store Pickup'));
+			if (estimate) {
+				parts.push(estimate);
+			}
+			parts.push(price || i18n.free || 'Free');
+		} else {
+			parts.push(label || i18n.delivery || 'Delivery');
+			var locality = panel ? String(panel.getAttribute('data-cetech-de-locality') || '') : '';
+			if (locality) {
+				parts.push(locality);
+			}
+			if (estimate) {
+				parts.push(estimate);
+			}
+			if (price) {
+				parts.push(price);
+			}
+		}
+		return parts.join(' · ');
+	}
+
+	function ensureSelectionLine(root) {
+		var line = root.querySelector('[data-cetech-de-selection-line]');
+		if (line) {
+			return line;
+		}
+		var config = window.cetechDeMatchingLocation || {};
+		line = document.createElement('div');
+		line.className = 'cetech-de-delivery-selection';
+		line.setAttribute('data-cetech-de-selection-line', '1');
+		line.hidden = true;
+		var text = document.createElement('span');
+		text.className = 'cetech-de-delivery-selection__text';
+		text.setAttribute('data-cetech-de-selection-text', '1');
+		var button = document.createElement('button');
+		button.type = 'button';
+		button.className = 'cetech-de-delivery-selection__change';
+		button.setAttribute('data-cetech-de-change', '1');
+		button.textContent = (config.i18n && config.i18n.change) || 'Change';
+		line.appendChild(text);
+		line.appendChild(document.createTextNode(' '));
+		line.appendChild(button);
+		var legend = root.querySelector('legend');
+		if (legend && legend.parentNode === root && legend.nextSibling) {
+			root.insertBefore(line, legend.nextSibling);
+		} else if (legend && legend.parentNode === root) {
+			root.appendChild(line);
+		} else {
+			root.insertBefore(line, root.firstChild);
+		}
+		return line;
+	}
+
+	function syncSelectionLine(root) {
+		if (!root) {
+			return;
+		}
+		var config = window.cetechDeMatchingLocation || {};
+		var checked = root.querySelector('input[name="cetech_de_delivery_option_key"]:checked:not([disabled])');
+		var line = ensureSelectionLine(root);
+		var text = line.querySelector('[data-cetech-de-selection-text]');
+		if (!checked || root.getAttribute('data-cetech-de-changing') === '1') {
+			root.removeAttribute('data-cetech-de-collapsed');
+			line.hidden = true;
+			if (text && !checked) {
+				text.textContent = '';
+			}
+			return;
+		}
+		if (text) {
+			text.textContent = selectionLineText(root, checked, config);
+		}
+		line.hidden = false;
+		root.setAttribute('data-cetech-de-collapsed', '1');
+	}
+
+	function expandChooser(root) {
+		root.setAttribute('data-cetech-de-changing', '1');
+		root.removeAttribute('data-cetech-de-collapsed');
+		var line = root.querySelector('[data-cetech-de-selection-line]');
+		if (line) {
+			line.hidden = true;
+		}
+		var focusTarget = root.querySelector('[data-cetech-de-choice-switch]:checked') ||
+			root.querySelector('[data-cetech-de-choice-switch]:not([disabled])') ||
+			root.querySelector('input[name="cetech_de_delivery_option_key"]:checked');
+		if (focusTarget && typeof focusTarget.focus === 'function') {
+			focusTarget.focus();
+		}
+	}
+
+	function bindSelectionLine(root) {
+		if (root.getAttribute('data-cetech-de-line-bound') === '1') {
+			return;
+		}
+		root.setAttribute('data-cetech-de-line-bound', '1');
+		function onOptionInteraction(event) {
+			var target = event.target;
+			if (!target || target.name !== 'cetech_de_delivery_option_key') {
+				return;
+			}
+			if (target.disabled || !target.checked) {
+				return;
+			}
+			root.removeAttribute('data-cetech-de-changing');
+			writePayload(root);
+			syncSelectionLine(root);
+		}
+		root.addEventListener('change', onOptionInteraction);
+		root.addEventListener('click', function (event) {
+			var change = event.target && event.target.closest ? event.target.closest('[data-cetech-de-change]') : null;
+			if (change && root.contains(change)) {
+				event.preventDefault();
+				expandChooser(root);
+				return;
+			}
+			onOptionInteraction(event);
+		});
 	}
 
 	function dismissStaleSelectionNotices(root) {
@@ -214,15 +358,17 @@
 			});
 
 			var current = root.querySelector('[data-cetech-de-choice-switch]:checked');
-			setPanelActive(root, current ? current.value : 'delivery');
+			setPanelActive(root, current ? current.value : '');
 			root.setAttribute('data-cetech-de-switch-bound', '1');
 		}
 
+		bindSelectionLine(root);
 		bindLocation(root);
 		bindCascade(root);
 		bindFormSubmit(root);
 		writePayload(root);
 		dismissStaleSelectionNotices(root);
+		syncSelectionLine(root);
 	}
 
 	function bindAll(scope) {
@@ -337,10 +483,13 @@
 					}
 				}
 				if (optionsEl) {
+					// D2: the customer's choice survives an options refresh (switch, else the root's active choice).
 					var previousChoice = '';
 					var choiceSwitch = root.querySelector('[data-cetech-de-choice-switch]:checked');
 					if (choiceSwitch) {
 						previousChoice = String(choiceSwitch.value || '');
+					} else {
+						previousChoice = String(root.getAttribute('data-cetech-de-active-choice') || '');
 					}
 					var defaultKey = data.status === 'need_precision' ? '' : (data.default_key || '');
 					optionsEl.innerHTML = renderOptionsHtml(data.options || [], defaultKey, config, data.locality || '', previousChoice, data);
@@ -356,8 +505,10 @@
 						});
 					} else if (radios.length && !Array.prototype.some.call(radios, function (input) { return input.checked; })) {
 						radios[0].checked = true;
+						root.removeAttribute('data-cetech-de-changing');
 					}
 					writePayload(root);
+					syncSelectionLine(root);
 				}
 			}).catch(function () {
 				if (token !== requestToken) {
@@ -410,30 +561,47 @@
 		});
 
 		var caps = fulfilmentCapabilities(root, payload || {});
+		var hasDelivery = caps.hasDelivery || delivery.length > 0;
+		var hasPickup = caps.hasPickup || pickup.length > 0;
 		var html = '';
-		var hasSwitch = (caps.hasDelivery && caps.hasPickup) || (delivery.length && pickup.length);
-		var pickupActive = preferredChoice === 'store_pickup' && (pickup.length > 0 || caps.hasPickup);
-		if (hasSwitch) {
+		// D2 gate: the customer's own choice wins; otherwise only a lone valid choice is pre-selected.
+		var active = '';
+		if (preferredChoice === 'store_pickup' && hasPickup) {
+			active = 'store_pickup';
+		} else if (preferredChoice === 'delivery' && hasDelivery) {
+			active = 'delivery';
+		} else if (hasDelivery && !hasPickup) {
+			active = 'delivery';
+		} else if (hasPickup && !hasDelivery) {
+			active = 'store_pickup';
+		}
+		if (hasDelivery || hasPickup) {
 			html += '<div class="cetech-de-fulfilment-choice" role="radiogroup">';
-			html += optionSwitch('delivery', i18n.delivery || 'Delivery', !pickupActive);
-			html += optionSwitch('store_pickup', i18n.storePickup || 'Store Pickup', pickupActive);
+			html += optionSwitch('delivery', i18n.delivery || 'Delivery', active === 'delivery', !hasDelivery);
+			html += optionSwitch('store_pickup', i18n.storePickup || 'Store Pickup', active === 'store_pickup', !hasPickup);
 			html += '</div>';
+			if (!hasDelivery) {
+				html += choiceNote('delivery', i18n.deliveryNotAvailable || 'Delivery is not available for this product');
+			}
+			if (!hasPickup) {
+				html += choiceNote('store_pickup', i18n.pickupNotAvailable || 'Store pickup is not available for this product');
+			}
 		}
 
-		if (caps.hasDelivery) {
-			html += '<div class="cetech-de-delivery-option-group" data-cetech-de-choice-panel="delivery"' + (pickupActive ? ' hidden' : '') + '>';
+		if (hasDelivery) {
+			html += '<div class="cetech-de-delivery-option-group" data-cetech-de-choice-panel="delivery" data-cetech-de-locality="' + escapeHtml(locality || '') + '"' + (active !== 'delivery' ? ' hidden' : '') + '>';
 			html += '<p class="cetech-de-delivery-option-group__heading">' + escapeHtml(locality ? ('Delivery to ' + locality) : (i18n.delivery || 'Delivery')) + '</p>';
 			delivery.forEach(function (option) {
-				html += radioOption(option, defaultKey, config);
+				html += radioOption(option, active === 'delivery' ? defaultKey : '', config);
 			});
 			html += '</div>';
 		}
 
-		if (caps.hasPickup || pickup.length) {
-			html += '<div class="cetech-de-delivery-option-group cetech-de-delivery-option-group--pickup" data-cetech-de-choice-panel="store_pickup"' + (hasSwitch && !pickupActive ? ' hidden' : '') + '>';
+		if (hasPickup) {
+			html += '<div class="cetech-de-delivery-option-group cetech-de-delivery-option-group--pickup" data-cetech-de-choice-panel="store_pickup"' + (active !== 'store_pickup' ? ' hidden' : '') + '>';
 			html += '<p class="cetech-de-delivery-option-group__heading">' + escapeHtml(i18n.storePickup || 'Store Pickup') + '</p>';
 			pickup.forEach(function (option) {
-				html += radioOption(option, defaultKey, config);
+				html += radioOption(option, active === 'store_pickup' ? defaultKey : '', config);
 			});
 			html += '</div>';
 		}
@@ -441,17 +609,25 @@
 		return html;
 	}
 
-	function optionSwitch(value, label, checked) {
-		return '<p class="cetech-de-fulfilment-choice__option"><label>' +
-			'<input type="radio" name="cetech_de_fulfilment_ui" value="' + escapeHtml(value) + '" data-cetech-de-choice-switch="1"' + (checked ? ' checked="checked"' : '') + ' /> ' +
+	function optionSwitch(value, label, checked, disabled) {
+		var id = 'cetech-de-fulfilment-ui-' + value;
+		return '<p class="cetech-de-fulfilment-choice__option' + (disabled ? ' cetech-de-fulfilment-choice__option--unavailable' : '') + '"><label for="' + id + '">' +
+			'<input type="radio" name="cetech_de_fulfilment_ui" id="' + id + '" value="' + escapeHtml(value) + '" data-cetech-de-choice-switch="1"' +
+			(checked && !disabled ? ' checked="checked"' : '') +
+			(disabled ? ' disabled="disabled" aria-describedby="' + id + '-note"' : '') + ' /> ' +
 			escapeHtml(label) + '</label></p>';
 	}
 
+	function choiceNote(value, text) {
+		return '<p class="cetech-de-fulfilment-choice__note" id="cetech-de-fulfilment-ui-' + value + '-note" data-cetech-de-choice-note="1">' + escapeHtml(text) + '</p>';
+	}
+
 	function radioOption(option, defaultKey, config) {
-		var checked = option.display_key === defaultKey || option.is_default;
+		var checked = defaultKey !== '' && (option.display_key === defaultKey || option.is_default);
 		var isPickup = option.fulfilment_choice === 'store_pickup';
 		var title = option.delivery_offer_public_label || option.pickup_location_label || '';
 		var price = formatPriceText(option, config);
+		var rawPrice = option.price_text ? String(option.price_text) : (isPickup ? ((config && config.i18n && config.i18n.free) || 'Free') : '');
 		var bodyHtml = '<span class="cetech-de-delivery-option__label">' + escapeHtml(title) + '</span>';
 		if (isPickup) {
 			if (option.pickup_location_label && option.pickup_location_label !== title) {
@@ -471,7 +647,7 @@
 			}
 		}
 		if (price) {
-			bodyHtml += '<span class="cetech-de-delivery-option__price">' + escapeHtml(price) + '</span>';
+			bodyHtml += '<span class="cetech-de-delivery-option__price" data-cetech-de-price="' + escapeHtml(rawPrice) + '">' + escapeHtml(price) + '</span>';
 		}
 		return '<p class="cetech-de-delivery-option cetech-de-delivery-option--radio cetech-de-delivery-option--card" data-cetech-de-choice="' + escapeHtml(option.fulfilment_choice || '') + '"><label>' +
 			'<input type="radio" name="' + escapeHtml((config && config.postField) || 'cetech_de_delivery_option_key') + '" value="' + escapeHtml(option.display_key) + '"' + (checked ? ' checked="checked"' : '') + ' required="required" />' +
@@ -1049,7 +1225,10 @@
 		dismissStaleSelectionNotices: dismissStaleSelectionNotices,
 		storeApiExtensions: storeApiExtensions,
 		renderOptionsHtml: renderOptionsHtml,
-		fulfilmentCapabilities: fulfilmentCapabilities
+		fulfilmentCapabilities: fulfilmentCapabilities,
+		syncSelectionLine: syncSelectionLine,
+		selectionLineText: selectionLineText,
+		expandChooser: expandChooser
 	};
 
 	function storeApiExtensions() {
