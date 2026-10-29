@@ -228,7 +228,7 @@ jobs:
             fi
             echo
             echo '```'
-            grep -E '^(backup_id=|plugin=|main_file_sha256=|training_ops_result=|wordpress=|woocommerce=|database=|hpos_enabled=|object_cache_dropin=)' training-ops.log || true
+            grep -E '^(backup_id=|plugin=|main_file_sha256=|training_ops_result=|wordpress=|woocommerce=|database=|hpos_enabled=|object_cache_dropin=|object_cache_flushed=|wp_rocket=)' training-ops.log || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
           exit "$status"

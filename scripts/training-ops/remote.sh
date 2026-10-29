@@ -65,6 +65,31 @@ ensure_active() {
 	fi
 }
 
+# After the plugin folder changes (install or rollback), nothing cached may keep serving the
+# previous build: the Redis object cache (options, transients) and WP Rocket's page cache and
+# minified CSS/JS copies. The 1.0.0-m2.1 install on 2026-10-29 left WP Rocket serving the old
+# minified product-delivery-selector.js until the cache was purged. The installed WP Rocket
+# registers no `wp rocket clean` command (its CLI offers only abilities-catalog), so its purge
+# functions are called directly through `wp eval`, guarded so a site without WP Rocket just
+# reports it. A failed purge is a warning, not an install failure: the identity lines that
+# follow are the truth about what is installed.
+purge_caches() {
+	section "Purge caches"
+	if wp_site cache flush >/dev/null 2>&1; then
+		echo "object_cache_flushed=yes"
+	else
+		echo "::warning::wp cache flush failed"
+		echo "object_cache_flushed=no"
+	fi
+	wp_site eval '
+		if ( ! function_exists( "rocket_clean_domain" ) ) { echo "wp_rocket=absent\n"; return; }
+		rocket_clean_domain();
+		if ( function_exists( "rocket_clean_minify" ) ) { rocket_clean_minify(); }
+		if ( function_exists( "rocket_clean_cache_busting" ) ) { rocket_clean_cache_busting(); }
+		echo "wp_rocket=purged version=" . ( defined( "WP_ROCKET_VERSION" ) ? WP_ROCKET_VERSION : "unknown" ) . "\n";
+	' || { echo "::warning::WP Rocket purge failed"; echo "wp_rocket=purge-failed"; }
+}
+
 do_inspect() {
 	section "Platform"
 	echo "wordpress=$(wp_site core version)"
@@ -153,6 +178,7 @@ do_install() {
 	section "Install"
 	wp_site plugin install "$zip" --force
 	ensure_active
+	purge_caches
 
 	section "Post-install state"
 	print_identity
@@ -198,6 +224,7 @@ do_rollback() {
 	fi
 
 	ensure_active
+	purge_caches
 
 	section "Post-rollback state"
 	print_identity
