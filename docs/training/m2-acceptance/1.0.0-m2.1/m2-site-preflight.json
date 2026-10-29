@@ -1,0 +1,68 @@
+{
+    "format": "cetech-m2-site-preflight-v1",
+    "generated_at": "2026-10-29T18:41:08+00:00",
+    "site": "training.cetechbpa.com",
+    "checks": [
+        {
+            "id": "plugin-version",
+            "result": "PASS",
+            "detail": "installed Delivery Engine version: 1.0.0-m2.1"
+        },
+        {
+            "id": "schema",
+            "result": "PASS",
+            "detail": "cetech_de_db_version: 6"
+        },
+        {
+            "id": "m2-features-on",
+            "result": "FAIL",
+            "detail": "off: enable_bulk_import"
+        },
+        {
+            "id": "platform",
+            "result": "PASS",
+            "detail": "WordPress 7.1.3, WooCommerce 11.2.1, PHP 8.4.24, database 11.8.8-MariaDB-ubu2404-log"
+        },
+        {
+            "id": "hpos",
+            "result": "PASS",
+            "detail": "HPOS enabled: yes"
+        },
+        {
+            "id": "theme-woodmart",
+            "result": "PASS",
+            "detail": "active theme: Woodmart Child"
+        },
+        {
+            "id": "wpml-active",
+            "result": "PASS",
+            "detail": "WPML active: yes"
+        },
+        {
+            "id": "b2bking-active",
+            "result": "PASS",
+            "detail": "B2BKing active: yes"
+        },
+        {
+            "id": "rate-cards-flat",
+            "result": "PASS",
+            "detail": "3 active rate cards, 3 flat (M2 rate cards are flat per delivery only)"
+        },
+        {
+            "id": "d1-tuples",
+            "result": "PASS",
+            "detail": "configured origin/supplier/profile fields: 0 (D1 only changes charges when this is above zero)"
+        },
+        {
+            "id": "pickup-locations",
+            "result": "PASS",
+            "detail": "1 active pickup locations"
+        },
+        {
+            "id": "international-known-limit",
+            "result": "PASS",
+            "detail": "1 active International scope slices (no delivery option until Air/Sea prices exist)"
+        }
+    ],
+    "failed": 1
+}

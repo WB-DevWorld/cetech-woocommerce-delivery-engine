@@ -2,12 +2,12 @@
 
 | Field | Value |
 |---|---|
-| Package under test | `1.0.0-m2.N` (fill in) |
-| ZIP SHA-256 | (fill in from the release-package run) |
-| Packaged commit | (fill in) |
-| Site | training.cetechbpa.com on a restore of the business database, then the business site after the maintenance-window install |
-| Part A receipt | `m2-automated-evidence.json` from `run-automated-evidence.sh` at the packaged commit |
-| Part B receipt | `m2-site-preflight.json` from `m2-site-preflight.php` on the site |
+| Package under test | `1.0.0-m2.1` (release-package run 40894108572; installed on training by training-ops run 40930052523 on 2026-10-29 after backup `20261029T182238Z`) |
+| ZIP SHA-256 | `8923b52395ff1530393efcaddf470e025cb71fdd18e2678badef509db6365226` |
+| Packaged commit | `7320a6b5c2432ccee1e9040232aef00b2989756f` |
+| Site | training.cetechbpa.com (in-place upgrade from `1.0.0-dev.attention-count.1`, schema 6; the restore-of-business-database precondition and the later business-site run are not covered by this ledger yet) |
+| Part A receipt | `docs/training/m2-acceptance/1.0.0-m2.1/m2-automated-evidence.json` — 2026-10-29, head `7320a6b5`, clean tree, PHPUnit 1646 tests / 10532 assertions pass, Vitest 114 tests pass, no missing evidence files |
+| Part B receipt | `docs/training/m2-acceptance/1.0.0-m2.1/m2-site-preflight.json` (+ `.txt`) — 2026-10-29, 12 checks, 1 failed: `enable_bulk_import` is off (D10: Frank switches it on before S9); plugin `1.0.0-m2.1`, schema 6, WordPress 7.1.3, WooCommerce 11.2.1, PHP 8.4.24, MariaDB 11.8.8, HPOS on, Woodmart Child, WPML and B2BKing active, 3 flat rate cards, 0 D1 tuples, 1 active pickup location, 1 International slice (known limit) |
 | Tester | Claude (Cowork), signed in as `claude-qa` |
 | Signatories | Frank; named management representative |
 

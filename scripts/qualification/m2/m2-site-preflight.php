@@ -4,13 +4,19 @@
  *
  * Run with WP-CLI on the site under test:
  *   wp eval-file scripts/qualification/m2/m2-site-preflight.php [receipt.json]
+ * or, when the file cannot be placed on the site (read-only access), on stdin:
+ *   wp eval-file - - < scripts/qualification/m2/m2-site-preflight.php
+ * A receipt path of '-' prints the JSON receipt to stdout after the table instead
+ * of writing a file, so a read-only run can still capture it.
  *
  * Checks the preconditions the acceptance cases assume and prints PASS/FAIL per
  * precondition. Reads only. Never prints customer, order or configuration secrets:
  * it reports versions, flag states, counts and the public labels and amounts of
  * the delivery rate cards the cases name (D9).
+ *
+ * No declare(strict_types=1) here: `wp eval-file` evaluates the file with eval(),
+ * where that declaration is a fatal error (only --use-include would allow it).
  */
-declare(strict_types=1);
 
 if ( ! defined( 'ABSPATH' ) || ! function_exists( 'get_option' ) ) {
 	fwrite( STDERR, "Run this file through WP-CLI: wp eval-file scripts/qualification/m2/m2-site-preflight.php\n" );
@@ -91,9 +97,13 @@ foreach ( $cards as $card ) {
 $record( 'rate-cards-flat', count( $cards ) > 0 && $flat === count( $cards ), count( $cards ) . ' active rate cards, ' . $flat . ' flat (M2 rate cards are flat per delivery only)' );
 
 // 6. D1 note: no product carries an origin, supplier or logistics profile on training.
-$scopes_table = $wpdb->prefix . 'delivery_engine_configuration_fields';
-$tuple_fields = $wpdb->get_var( "SELECT COUNT(*) FROM `{$scopes_table}` WHERE `field_key` IN ('origin_id','supplier_id','logistics_profile_id') AND `value` IS NOT NULL AND `value` <> ''" ); // phpcs:ignore WordPress.DB
-$record( 'd1-tuples', true, 'configured origin/supplier/profile fields: ' . (int) $tuple_fields . ' (D1 only changes charges when this is above zero)' );
+$fields_table = $wpdb->prefix . 'delivery_engine_configuration_fields';
+$tuple_fields = $wpdb->get_var( "SELECT COUNT(*) FROM `{$fields_table}` WHERE `field_key` IN ('origin_id','supplier_id','logistics_profile_id') AND `value_text` IS NOT NULL AND `value_text` <> ''" ); // phpcs:ignore WordPress.DB
+if ( null === $tuple_fields ) {
+	$record( 'd1-tuples', false, 'could not count origin/supplier/profile fields: ' . ( '' !== (string) $wpdb->last_error ? (string) $wpdb->last_error : 'query returned nothing' ) );
+} else {
+	$record( 'd1-tuples', true, 'configured origin/supplier/profile fields: ' . (int) $tuple_fields . ' (D1 only changes charges when this is above zero)' );
+}
 
 // 7. Pickup locations exist for C2/C10 (count only).
 $pickups = (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$wpdb->prefix}delivery_engine_pickup_locations` WHERE `status` = 'active'" ); // phpcs:ignore WordPress.DB
@@ -121,8 +131,13 @@ if ( '' !== $receipt_path ) {
 		'checks'       => $checks,
 		'failed'       => $failed,
 	);
-	file_put_contents( $receipt_path, json_encode( $receipt, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) . "\n" ); // phpcs:ignore WordPress.WP.AlternativeFunctions
-	echo "receipt: {$receipt_path}\n";
+	$json = json_encode( $receipt, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES ) . "\n";
+	if ( '-' === $receipt_path ) {
+		echo "receipt:\n" . $json;
+	} else {
+		file_put_contents( $receipt_path, $json ); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		echo "receipt: {$receipt_path}\n";
+	}
 }
 
 if ( $failed > 0 ) {
