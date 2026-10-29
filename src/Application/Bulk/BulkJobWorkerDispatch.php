@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Application\Bulk;
 
 use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogActionManifest;
+use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogScopeMutator;
 use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogTargetDefinition;
 use CetechDeliveryEngine\Application\Bulk\ImportExport\CatalogCsvMapper;
 use CetechDeliveryEngine\Application\Bulk\Portability\ConfigImportConflictMode;
@@ -75,12 +76,20 @@ trait BulkJobWorkerDispatch {
 		$item_manifest = $manifest;
 		$target_id     = $item->target_id;
 		$parent        = $item->parent_target_id;
+		$slice_key     = '';
 		if ( BulkOperationType::CatalogCsvImport === $job->operation_type ) {
 			if ( array_key_exists( 'ok', $item->result ) && true !== $item->result['ok'] ) {
 				$errors = is_array( $item->result['errors'] ?? null ) ? $item->result['errors'] : [];
 				return $this->missing_processor(
 					'csv_row_invalid',
 					implode( ' ', array_map( 'strval', $errors ) ) ?: 'CSV row is invalid.'
+				);
+			}
+			$slice_key = sanitize_key( (string) ( $item->result['slice'] ?? '' ) );
+			if ( CatalogScopeMutator::TARGET_GLOBAL === $item->target_type && empty( $job->action_manifest['allow_global'] ) ) {
+				return $this->missing_processor(
+					'site_wide_not_allowed',
+					'Site-wide default rows need the site-wide defaults capability. The row was skipped.'
 				);
 			}
 			$row_actions   = is_array( $item->result['actions'] ?? null ) ? $item->result['actions'] : [];
@@ -130,7 +139,8 @@ trait BulkJobWorkerDispatch {
 			$parent,
 			$item_manifest,
 			$dry_run,
-			( BulkOperationType::CatalogUpdate === $job->operation_type && ! $dry_run ) ? $item->precondition_fingerprint : null
+			( BulkOperationType::CatalogUpdate === $job->operation_type && ! $dry_run ) ? $item->precondition_fingerprint : null,
+			$slice_key
 		);
 	}
 

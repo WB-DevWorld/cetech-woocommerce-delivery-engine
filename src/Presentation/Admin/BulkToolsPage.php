@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Admin;
 
+use CetechDeliveryEngine\Core\Capabilities\Capabilities;
 use CetechDeliveryEngine\Application\Bulk\BulkJobEngine;
 use CetechDeliveryEngine\Application\Bulk\BulkJobRunnerState;
 use CetechDeliveryEngine\Application\Bulk\BulkQueueHealth;
@@ -405,6 +406,12 @@ final class BulkToolsPage {
 			echo '<div class="cetech-de-bulk-field">';
 			echo '<label><input type="checkbox" name="entire_catalog_confirmed" value="1" /> ' . esc_html__( 'Export the entire catalog (required for a complete CSV)', 'cetech-woocommerce-delivery-engine' ) . '</label>';
 			echo '</div>';
+			if ( current_user_can( 'manage_private_sources' ) ) {
+				echo '<div class="cetech-de-bulk-field">';
+				echo '<label><input type="checkbox" name="include_private_sources" value="1" /> ' . esc_html__( 'Include private supplier and origin columns (off by default)', 'cetech-woocommerce-delivery-engine' ) . '</label>';
+				echo '</div>';
+			}
+			echo '<p class="description">' . esc_html__( 'The file carries its format version, the customized site-wide defaults of each fulfilment type, and one row per product or variation scope slice. Secrets are never exported.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
 			echo '<div class="cetech-de-bulk-actions">';
 			echo '<p class="cetech-de-form-actions"><button type="submit" class="button">' . esc_html__( 'Download catalog CSV', 'cetech-woocommerce-delivery-engine' ) . '</button></p>';
 			echo '</div>';
@@ -972,7 +979,9 @@ final class BulkToolsPage {
 					'scope' => BulkTargetScope::SelectedIds->value,
 				],
 				[
-					'csv' => $csv,
+					'csv'          => $csv,
+					// COR-021: site-wide default rows apply only when the importer may edit site-wide defaults.
+					'allow_global' => current_user_can( Capabilities::SITE_WIDE ),
 				]
 			);
 			$this->redirect_job( $job->id, $job->job_code, $job->error_code );
@@ -1427,12 +1436,13 @@ final class BulkToolsPage {
 				'entire_catalog_confirmed' => true,
 			]
 		);
+		$include_private = ! empty( $_POST['include_private_sources'] ) && current_user_can( 'manage_private_sources' );
 		nocache_headers();
 		header( 'Content-Type: text/csv; charset=utf-8' );
 		header( 'Content-Disposition: attachment; filename="cetech-de-catalog.csv"' );
 		$handle = fopen( 'php://output', 'w' );
 		if ( false !== $handle ) {
-			$this->csv_export->write_stream( $handle, $definition );
+			$this->csv_export->write_stream( $handle, $definition, $include_private );
 			fclose( $handle );
 		}
 		exit;
