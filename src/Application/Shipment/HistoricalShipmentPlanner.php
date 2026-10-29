@@ -124,7 +124,7 @@ final class HistoricalShipmentPlanner {
 
 		$availability = $parsed['availability'];
 		$choice       = $parsed['choice'];
-		$offer_id     = ctype_digit( $parsed['offer_segment'] ) ? (int) $parsed['offer_segment'] : null;
+		$offer_id     = DeliveryGroupIdentity::offerIdFromSegment( $parsed['offer_segment'] );
 
 		if ( FulfilmentChoice::Delivery->value !== $choice ) {
 			return ShipmentPlanResult::failure( ShipmentCreationErrorCode::MalformedGroupSnapshot );
