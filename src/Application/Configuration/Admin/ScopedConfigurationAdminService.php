@@ -102,6 +102,7 @@ final class ScopedConfigurationAdminService {
 				'config_version' => $config_version,
 				'source'         => $configuration?->scope->source->value,
 				'slice_key_raw'  => $slice_key,
+				'status'         => $configuration?->scope->status->value,
 			],
 			ScopedConfigurationNotices::TRANSITIONAL_TITLE,
 			ScopedConfigurationNotices::TRANSITIONAL_MESSAGE
@@ -146,6 +147,11 @@ final class ScopedConfigurationAdminService {
 		$parsed     = $this->parser->parse( $command->scope_type, $raw_fields );
 		if ( ! $parsed['ok'] ) {
 			return ScopedConfigurationWriteResult::failure( $parsed['errors'] );
+		}
+
+		$base_errors = $this->incomplete_base_errors( $command, $slice_key, $parsed['collections'] );
+		if ( [] !== $base_errors ) {
+			return ScopedConfigurationWriteResult::failure( $base_errors );
 		}
 
 		$scope_id = ConfigurationScopeType::Global === $command->scope_type ? ConfigurationScope::GLOBAL_SCOPE_ID : $command->scope_id;
@@ -283,6 +289,53 @@ final class ScopedConfigurationAdminService {
 			$version_changed && null !== $this->audit_logger,
 			[]
 		);
+	}
+
+	/**
+	 * COR-012 (D3b): "Add options" / "Remove options" are only accepted over a complete, valid
+	 * inherited list. Otherwise staff must choose an explicit Replace, and the reasons are returned.
+	 *
+	 * @param array<string, CollectionFieldInstruction> $collections
+	 * @return list<string>
+	 */
+	private function incomplete_base_errors( ScopedConfigurationWriteCommand $command, string $slice_key, array $collections ): array {
+		if ( ConfigurationScopeType::Global === $command->scope_type ) {
+			return [];
+		}
+
+		$product_id   = ConfigurationScopeType::Variation === $command->scope_type ? (int) $command->parent_product_id : $command->scope_id;
+		$variation_id = ConfigurationScopeType::Variation === $command->scope_type ? $command->scope_id : null;
+		if ( $product_id <= 0 ) {
+			return [];
+		}
+
+		$errors = [];
+		$base   = null;
+
+		foreach ( $collections as $field_key => $instruction ) {
+			if ( ! $instruction instanceof CollectionFieldInstruction
+				|| ! in_array( $instruction->mode, [ CollectionConfigurationMode::Add, CollectionConfigurationMode::Remove ], true ) ) {
+				continue;
+			}
+
+			$base  ??= $this->resolver->resolve_inherited_base(
+				new EffectiveConfigurationRequest( $product_id, $variation_id, $slice_key, $command->parent_product_id ),
+				$command->scope_type
+			);
+			$field   = $base->collection( $field_key );
+			if ( $field instanceof \CetechDeliveryEngine\Domain\Configuration\EffectiveCollectionField && EffectiveFieldState::Valid === $field->state ) {
+				continue;
+			}
+
+			$reasons  = ReasonCodeLabelMapper::explain_codes( $field?->reason_codes ?? [ \CetechDeliveryEngine\Domain\Configuration\ConfigurationReasonCode::UNRESOLVED_GLOBAL_VALUE ] );
+			$errors[] = sprintf(
+				'%s: the inherited list is not complete, so "Add options" and "Remove options" cannot be saved. Choose "Use only these options" and select the complete list. %s',
+				ConfigurationFieldCatalog::label( $field_key ),
+				implode( ' ', $reasons )
+			);
+		}
+
+		return $errors;
 	}
 
 	/**
@@ -678,7 +731,7 @@ final class ScopedConfigurationAdminService {
 			$validation_messages = [];
 
 			if ( null !== $effective_field ) {
-				$provenance_label = ProvenanceLabelMapper::map( $effective_field->provenance->source_label );
+				$provenance_label = ProvenanceLabelMapper::describe( $effective_field->provenance );
 				if ( $is_collection && $effective_field instanceof \CetechDeliveryEngine\Domain\Configuration\EffectiveCollectionField ) {
 					$effective_members = $effective_field->members;
 					$provenance_lines = ProvenanceLabelMapper::mutation_summaries(

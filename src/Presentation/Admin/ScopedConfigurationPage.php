@@ -162,6 +162,7 @@ final class ScopedConfigurationPage {
 			]
 		);
 		$this->render_return_link();
+		$this->render_inactive_scope_notice( $model );
 
 		$this->render_state_notice( $model );
 		$customize = $this->wants_customize( $model );
@@ -406,6 +407,21 @@ final class ScopedConfigurationPage {
 	private function with_return_context( array $redirect ): array {
 		// phpcs:ignore WordPress.Security.NonceVerification.Missing -- callers verified the action nonce.
 		return $redirect + ProductExceptionsPage::return_context_args( $this->return_filters_from( wp_unslash( $_POST ) ) );
+	}
+
+	/**
+	 * COR-012 (D3a): a saved but inactive scope is ignored at runtime; say so where it is edited.
+	 *
+	 * @param \CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationEditViewModel $model
+	 */
+	private function render_inactive_scope_notice( $model ): void {
+		if ( 'inactive' !== (string) ( $model->technical_details['status'] ?? '' ) ) {
+			return;
+		}
+		AdminPageLayout::render_info_notice(
+			__( 'These saved delivery settings are inactive and currently ignored: customers see the inherited values. Saving them again makes them active.', 'cetech-woocommerce-delivery-engine' ),
+			'warning'
+		);
 	}
 
 	private function render_return_link(): void {
@@ -858,18 +874,29 @@ final class ScopedConfigurationPage {
 			? (string) $draft_field['mode']
 			: ( '' === $field->current_mode && $field->is_global_root ? 'not_configured' : $field->current_mode );
 
+		// COR-012 (D3b): an invalid saved list needs an explicit Replace; Add/Remove stay unavailable.
+		$needs_replace = $field->is_collection && 'invalid' === $field->effective_state;
+		if ( $needs_replace && in_array( $selected_mode, [ 'add', 'remove' ], true ) ) {
+			$selected_mode = 'replace';
+		}
+
 		foreach ( $modes as $mode ) {
 			$input_id = $field_id . '_mode_' . $mode;
+			$disabled = $needs_replace && in_array( $mode, [ 'add', 'remove' ], true ) ? ' disabled="disabled"' : '';
 			printf(
-				'<label class="cetech-de-mode-option" for="%1$s"><input type="radio" id="%1$s" name="fields[%2$s][mode]" value="%3$s" %4$s data-mode="%3$s" /> %5$s</label> ',
+				'<label class="cetech-de-mode-option" for="%1$s"><input type="radio" id="%1$s" name="fields[%2$s][mode]" value="%3$s" %4$s data-mode="%3$s"%6$s /> %5$s</label> ',
 				esc_attr( $input_id ),
 				esc_attr( $field->field_key ),
 				esc_attr( $mode ),
 				checked( $selected_mode, $mode, false ),
-				esc_html( $mode_labels[ $mode ] ?? $mode )
+				esc_html( $mode_labels[ $mode ] ?? $mode ),
+				$disabled
 			);
 		}
 		echo '</fieldset>';
+		if ( $needs_replace ) {
+			echo '<p class="description">' . esc_html__( 'Choose "Use only these options" and select the complete list to fix this. "Add options" and "Remove options" are unavailable until then.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		}
 
 		if ( $field->is_collection ) {
 			$this->render_collection_inputs( $field, $field_id );

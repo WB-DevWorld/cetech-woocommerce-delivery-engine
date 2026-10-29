@@ -260,17 +260,33 @@ final class StaffDeliveryCustomizeView {
 		$current   = in_array( $current, [ 'add', 'remove', 'replace' ], true ) ? $current : 'inherit';
 		$inherit_label = $this->inherit_label( $is_variation, $inherited );
 
+		// COR-012 (D3b): an invalid saved list needs an explicit Replace; Add/Remove stay unavailable
+		// and the reasons are shown until then.
+		$needs_replace = 'invalid' === $field->effective_state;
+		if ( $needs_replace && in_array( $current, [ 'add', 'remove' ], true ) ) {
+			$current = 'replace';
+		}
+		$mutation_disabled = $needs_replace ? ' disabled="disabled"' : '';
+
 		$input_id = 'cetech_de_customize_' . ConfigurationFieldKey::DELIVERY_OFFER_IDS;
-		echo '<fieldset class="cetech-de-customize-field" data-field="' . esc_attr( ConfigurationFieldKey::DELIVERY_OFFER_IDS ) . '">';
+		echo '<fieldset class="cetech-de-customize-field" data-field="' . esc_attr( ConfigurationFieldKey::DELIVERY_OFFER_IDS ) . '"' . ( $needs_replace ? ' data-cetech-de-needs-replace="1"' : '' ) . '>';
 		echo '<legend>' . esc_html__( 'Delivery Options', 'cetech-woocommerce-delivery-engine' ) . '</legend>';
 		$this->render_saved_state( $field, $input_id . '_state' );
+		if ( $needs_replace ) {
+			echo '<ul class="cetech-de-validation-messages" role="status">';
+			foreach ( $field->validation_messages as $message ) {
+				echo '<li>' . esc_html( $message ) . '</li>';
+			}
+			echo '<li>' . esc_html__( 'Choose "Use only these options" and select the complete list to fix this. "Add options" and "Remove options" are unavailable until then.', 'cetech-woocommerce-delivery-engine' ) . '</li>';
+			echo '</ul>';
+		}
 		echo '<p><label><input type="radio" name="fields[' . esc_attr( ConfigurationFieldKey::DELIVERY_OFFER_IDS ) . '][mode]" value="inherit"' . checked( $current, 'inherit', false ) . ' /> ';
 		echo esc_html( $inherit_label ) . '</label></p>';
 		echo '<p><label><input type="radio" name="fields[' . esc_attr( ConfigurationFieldKey::DELIVERY_OFFER_IDS ) . '][mode]" value="replace"' . checked( $current, 'replace', false ) . ' /> ';
 		echo esc_html__( 'Use only these options', 'cetech-woocommerce-delivery-engine' ) . '</label></p>';
-		echo '<p><label><input type="radio" name="fields[' . esc_attr( ConfigurationFieldKey::DELIVERY_OFFER_IDS ) . '][mode]" value="add"' . checked( $current, 'add', false ) . ' /> ';
+		echo '<p><label><input type="radio" name="fields[' . esc_attr( ConfigurationFieldKey::DELIVERY_OFFER_IDS ) . '][mode]" value="add"' . checked( $current, 'add', false ) . $mutation_disabled . ' /> ';
 		echo esc_html__( 'Add options', 'cetech-woocommerce-delivery-engine' ) . '</label></p>';
-		echo '<p><label><input type="radio" name="fields[' . esc_attr( ConfigurationFieldKey::DELIVERY_OFFER_IDS ) . '][mode]" value="remove"' . checked( $current, 'remove', false ) . ' /> ';
+		echo '<p><label><input type="radio" name="fields[' . esc_attr( ConfigurationFieldKey::DELIVERY_OFFER_IDS ) . '][mode]" value="remove"' . checked( $current, 'remove', false ) . $mutation_disabled . ' /> ';
 		echo esc_html__( 'Remove options', 'cetech-woocommerce-delivery-engine' ) . '</label></p>';
 
 		$all_offers = $this->offers->list( [ 'limit' => 200 ] );
