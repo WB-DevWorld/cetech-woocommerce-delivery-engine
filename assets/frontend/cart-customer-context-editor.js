@@ -314,6 +314,8 @@
 		var childrenToken = 0;
 		var searchToken = 0;
 		var searchTimer = null;
+		var regionKeysToken = 0;
+		var regionKeysLoaded = '';
 
 		function i18n(name, fallback) {
 			var config = editorConfig();
@@ -385,9 +387,58 @@
 					region.appendChild(option);
 				});
 				region.value = '';
+				regionKeysLoaded = country.value;
 				setReveal(locationRoot, 'region', true);
 				setReveal(locationRoot, 'locality', false);
 			}).catch(function () { /* keep the rendered options */ });
+		}
+
+		function annotateRegionKeys() {
+			// The server renders the Region select from WooCommerce state codes, which carry no
+			// canonical location key. Fetch the country's administrative areas once and mark the
+			// options by code (or name) so searches and saves can use the canonical key.
+			var geo = geography();
+			if (!editorConfig().ajaxUrl || !geo.childrenAction || !region || region.tagName !== 'SELECT' || !country || !country.value) {
+				return Promise.resolve();
+			}
+			if (regionKeysLoaded === country.value) {
+				return Promise.resolve();
+			}
+			var token = ++regionKeysToken;
+			var body = new window.URLSearchParams();
+			body.set('action', geo.childrenAction);
+			body.set('nonce', geo.childrenNonce || '');
+			body.set('country', country.value || '');
+			body.set('parent_key', '');
+			body.set('type', 'administrative');
+			body.set('page', '1');
+			body.set('request_token', String(token));
+			return postForm(body).then(function (data) {
+				if (token !== regionKeysToken) {
+					return;
+				}
+				var items = data && data.items ? data.items : [];
+				var byCode = {};
+				var byName = {};
+				items.forEach(function (item) {
+					if (item.code) {
+						byCode[String(item.code).toUpperCase()] = item.key || '';
+					}
+					if (item.name) {
+						byName[String(item.name).trim().toLowerCase()] = item.key || '';
+					}
+				});
+				Array.prototype.forEach.call(region.options, function (option) {
+					if (!option.value || option.getAttribute('data-location-key')) {
+						return;
+					}
+					var key = byCode[String(option.value).toUpperCase()] || byName[String(option.textContent || '').trim().toLowerCase()] || '';
+					if (key) {
+						option.setAttribute('data-location-key', key);
+					}
+				});
+				regionKeysLoaded = country.value;
+			}).catch(function () { /* the search stays country-wide */ });
 		}
 
 		function selectLocality(item) {
@@ -465,21 +516,33 @@
 			}
 			page = page || 1;
 			var token = ++searchToken;
-			var body = new window.URLSearchParams();
-			body.set('action', geo.searchAction);
-			body.set('nonce', geo.searchNonce || '');
-			body.set('country', country ? country.value || '' : '');
-			body.set('parent_key', regionKey());
-			body.set('q', query || '');
-			body.set('page', String(page));
-			body.set('request_token', String(token));
-			postForm(body).then(function (data) {
+			function run() {
 				if (token !== searchToken) {
 					return;
 				}
-				var items = (previous || []).concat(data && data.items ? data.items : []);
-				renderResults(items, !!(data && data.has_more), page, query);
-			}).catch(function () { /* keep */ });
+				var body = new window.URLSearchParams();
+				body.set('action', geo.searchAction);
+				body.set('nonce', geo.searchNonce || '');
+				body.set('country', country ? country.value || '' : '');
+				body.set('parent_key', regionKey());
+				body.set('q', query || '');
+				body.set('page', String(page));
+				body.set('request_token', String(token));
+				postForm(body).then(function (data) {
+					if (token !== searchToken) {
+						return;
+					}
+					var items = (previous || []).concat(data && data.items ? data.items : []);
+					renderResults(items, !!(data && data.has_more), page, query);
+				}).catch(function () { /* keep */ });
+			}
+			// The server renders WooCommerce state codes without canonical keys; resolve the
+			// chosen Region once so the locality search is narrowed to it instead of the country.
+			if (regionKey() === '' && region && region.value) {
+				annotateRegionKeys().then(run, run);
+			} else {
+				run();
+			}
 		}
 
 		if (country) {
