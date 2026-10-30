@@ -191,12 +191,15 @@ final class BulkToolsPage {
 	}
 
 	public function render(): void {
-		AdminPageAccess::require_capability( 'manage_product_delivery_rules' );
+		// The menu admits import-only staff (import_delivery_data); the page must not turn them away.
+		AdminPageAccess::require_any_capability( 'manage_product_delivery_rules', 'import_delivery_data' );
 		$this->action_handler->notices()->render_notices();
+		$tabs    = $this->tabs();
+		$default = (string) array_key_first( $tabs );
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
-		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( (string) $_GET['tab'] ) ) : 'catalog';
-		if ( ! array_key_exists( $tab, $this->tabs() ) ) {
-			$tab = 'catalog';
+		$tab = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( (string) $_GET['tab'] ) ) : $default;
+		if ( ! array_key_exists( $tab, $tabs ) ) {
+			$tab = $default;
 		}
 		AdminPageLayout::open_page( 'cetech-de-bulk-tools' );
 		AdminPageLayout::render_page_header(
@@ -206,7 +209,7 @@ final class BulkToolsPage {
 		);
 
 		echo '<nav class="nav-tab-wrapper wp-clearfix cetech-de-bulk-tabs" aria-label="' . esc_attr__( 'Bulk Tools sections', 'cetech-woocommerce-delivery-engine' ) . '">';
-		foreach ( $this->tabs() as $slug => $label ) {
+		foreach ( $tabs as $slug => $label ) {
 			$class = $tab === $slug ? ' nav-tab-active' : '';
 			printf(
 				'<a class="nav-tab%s" href="%s"%s>%s</a>',
@@ -242,16 +245,34 @@ final class BulkToolsPage {
 	}
 
 	/**
+	 * Tabs the current user may open. Catalog and Validation need the product rules
+	 * capability; Import / Export and Jobs / History also open for import-only staff
+	 * (their own jobs are filtered by BulkJobAccess); Charges shows for the rules or
+	 * the rate card capability and explains a missing rate grant itself.
+	 *
 	 * @return array<string, string>
 	 */
 	private function tabs(): array {
-		return [
-			'catalog'    => __( 'Catalog', 'cetech-woocommerce-delivery-engine' ),
-			'import'     => __( 'Import / Export', 'cetech-woocommerce-delivery-engine' ),
-			'validation' => __( 'Validation & Cleanup', 'cetech-woocommerce-delivery-engine' ),
-			'jobs'       => __( 'Jobs / History', 'cetech-woocommerce-delivery-engine' ),
-			'rates'      => __( 'Charges', 'cetech-woocommerce-delivery-engine' ),
-		];
+		$rules  = current_user_can( 'manage_product_delivery_rules' );
+		$import = $rules || current_user_can( 'import_delivery_data' );
+		$tabs   = [];
+		if ( $rules ) {
+			$tabs['catalog'] = __( 'Catalog', 'cetech-woocommerce-delivery-engine' );
+		}
+		if ( $import ) {
+			$tabs['import'] = __( 'Import / Export', 'cetech-woocommerce-delivery-engine' );
+		}
+		if ( $rules ) {
+			$tabs['validation'] = __( 'Validation & Cleanup', 'cetech-woocommerce-delivery-engine' );
+		}
+		if ( $import ) {
+			$tabs['jobs'] = __( 'Jobs / History', 'cetech-woocommerce-delivery-engine' );
+		}
+		if ( $rules || current_user_can( 'manage_delivery_rate_cards' ) ) {
+			$tabs['rates'] = __( 'Charges', 'cetech-woocommerce-delivery-engine' );
+		}
+
+		return $tabs;
 	}
 
 	private function render_catalog_tab(): void {

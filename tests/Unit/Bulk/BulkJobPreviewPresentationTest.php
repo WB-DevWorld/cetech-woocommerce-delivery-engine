@@ -307,6 +307,40 @@ final class BulkJobPreviewPresentationTest extends TestCase {
 		);
 	}
 
+	public function test_skipped_row_names_its_reason_instead_of_the_proposed_change(): void {
+		$item     = $this->product_item()->with(
+			[
+				'status'        => BulkJobItemStatus::Skipped,
+				'error_code'    => 'unresolved_reference',
+				'error_summary' => 'Unknown delivery option code(s) for delivery_offer_ids: no-such-option. The row was skipped.',
+			]
+		);
+		$manifest = new CatalogActionManifest(
+			[
+				new CatalogFieldAction(
+					ConfigurationFieldKey::FULFILMENT_AVAILABILITY,
+					CatalogFieldAction::SET_OVERRIDE,
+					'international_fulfilment'
+				),
+			]
+		);
+		$blocks   = ( new BulkJobItemResultPresenter() )->blocks( $item, $manifest );
+
+		self::assertCount( 1, $blocks );
+		self::assertSame( 'Result', $blocks[0]['field'] );
+		self::assertSame( '', $blocks[0]['current'] );
+		self::assertStringContainsString( 'no-such-option', $blocks[0]['proposed'] );
+		self::assertStringContainsString( 'The row was skipped.', BulkJobItemResultPresenter::compact_line( $blocks ) );
+		self::assertStringNotContainsString( 'International', BulkJobItemResultPresenter::compact_line( $blocks ) );
+	}
+
+	public function test_skipped_row_without_a_recorded_reason_keeps_the_generic_outcome(): void {
+		$item   = $this->product_item()->with( [ 'status' => BulkJobItemStatus::Skipped, 'result' => [ 'reason' => 'already_correct' ] ] );
+		$blocks = ( new BulkJobItemResultPresenter() )->blocks( $item, new CatalogActionManifest( [] ) );
+
+		self::assertSame( 'Already matches the proposed settings.', $blocks[0]['proposed'] );
+	}
+
 	private function product_item(): BulkJobItem {
 		return BulkJobItem::pending( 1, 'product', 49164, 'QA-BETA' );
 	}

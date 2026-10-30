@@ -118,7 +118,7 @@ final class WcfmAdminIsolationTest extends TestCase {
 			'RateCardsPage.php'                     => 'AdminPageAccess::require_capability',
 			'PickupLocationsPage.php'               => 'AdminPageAccess::require_capability',
 			'ProductExceptionsPage.php'             => 'AdminPageAccess::require_capability',
-			'BulkToolsPage.php'                      => 'AdminPageAccess::require_capability',
+			'BulkToolsPage.php'                     => 'AdminPageAccess::require_any_capability',
 			'ShipmentsPage.php'                     => 'AdminPageAccess::require_capability',
 			'NeedsAttentionPage.php'                => 'AdminPageAccess::require_capability',
 			'SuppliersOriginsPage.php'              => 'AdminPageAccess::require_capability',

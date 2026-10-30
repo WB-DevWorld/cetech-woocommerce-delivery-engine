@@ -59,6 +59,25 @@ final class BulkJobItemResultPresenter {
 			];
 		}
 
+		if ( BulkJobItemStatus::Skipped === $item->status ) {
+			// The worker records why a row was skipped (unresolved reference, missing
+			// permission, ...). Staff read that on the row, not only in the counters.
+			$reason = trim( (string) ( $item->error_summary ?? '' ) );
+			if ( '' === $reason ) {
+				$code   = (string) ( $item->result['reason'] ?? '' );
+				$reason = in_array( $code, [ 'already_inherited', 'already_correct', 'no_change' ], true ) ? $this->unchanged_reason_label( $code ) : '';
+			}
+			if ( '' !== $reason ) {
+				return [
+					[
+						'field'    => __( 'Result', 'cetech-woocommerce-delivery-engine' ),
+						'current'  => '',
+						'proposed' => $reason,
+					],
+				];
+			}
+		}
+
 		if ( $manifest->reset_entire_scope || ! empty( $item->result['would_delete_scope'] ) || ! empty( $item->result['deleted_scope'] ) ) {
 			return [
 				[
