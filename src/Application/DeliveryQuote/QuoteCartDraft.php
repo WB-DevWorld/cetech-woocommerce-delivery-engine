@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Application\DeliveryQuote;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
+use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
 use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
 use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteOwner;
 use CetechDeliveryEngine\Domain\DeliveryQuote\QuoteShape;
@@ -23,6 +24,9 @@ final readonly class QuoteCartDraft implements \JsonSerializable {
 			$raw = QuoteShape::object( $item[CartDeliverySelectionCapture::CART_SELECTION_KEY] ?? null ); $selection = [];
 			foreach ( [ 'contract_version', 'product_id', 'variation_id', 'target_type', 'target_id', 'display_key', 'fulfilment_availability', 'fulfilment_choice', 'delivery_offer_id', 'rule_id' ] as $field ) { if ( ! array_key_exists( $field, $raw ) ) { QuoteShape::invalid(); } $selection[$field] = $raw[$field]; }
 			$selection['configuration_fingerprint'] = $raw['configuration_fingerprint'] ?? null;
+			// D1 (reunified M2): the quote dimensions travel with the selection, additively and as positive ids only, so the
+			// historical group identity recomputed from this draft carries the same offer segment as the cart package.
+			foreach ( array_keys( DeliveryGroupIdentity::DIMENSION_PREFIXES ) as $dimension ) { $value = isset( $raw[$dimension] ) && is_scalar( $raw[$dimension] ) ? (int) $raw[$dimension] : 0; if ( $value > 0 ) { $selection[$dimension] = $value; } }
 			if ( '1' !== $selection['contract_version'] || $selection['product_id'] !== $product || $selection['variation_id'] !== ( $variation ?: null ) ) { QuoteShape::invalid(); }
 			QuoteShape::choice( $selection['fulfilment_choice'], [ 'delivery', 'store_pickup' ] );
 			foreach ( [ 'target_type', 'display_key', 'fulfilment_availability' ] as $field ) { self::text( $selection[$field], 191 ); }

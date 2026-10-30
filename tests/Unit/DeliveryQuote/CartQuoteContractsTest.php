@@ -5,7 +5,9 @@ namespace CetechDeliveryEngine\Tests\Unit\DeliveryQuote;
 
 require_once __DIR__ . '/../../Support/DeliveryQuote/CartQuoteFixtures.php';
 use CetechDeliveryEngine\Application\DeliveryQuote\{CartQuoteRateReference,CartQuoteResult,CartQuoteSessionEnvelope,QuoteCartDraft,QuotePreparationCommand};
+use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
 use CetechDeliveryEngine\Domain\Contracts\RequestContext;
+use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
 use CetechDeliveryEngine\Tests\Support\DeliveryQuote\{CartQuoteFixtureEnvironment,CartQuoteFixtureSessions,CartQuoteFixtures,QuoteDurableFixtureFactory,QuoteFixtures};
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
@@ -24,6 +26,21 @@ final class CartQuoteContractsTest extends TestCase {
 	public function test_incidental_timestamps_and_product_objects_do_not_change_cheap_intent(): void {
 		[$cart,$packages,$chosen] = CartQuoteFixtures::raw(); $first = CartQuoteFixtures::draft(); $cart['line_one']['cetech_de_delivery_selection']['issued_at'] = '2099-12-31T23:59:59Z'; $cart['line_one']['data'] = new \stdClass(); $packages[0]['contents'] = $cart;
 		$second = QuoteCartDraft::from_loaded_cart( CartQuoteFixtures::owner(), $cart, $packages[0]['destination'], 'GHS', 2, CartQuoteFixtures::identity() ); self::assertSame( $first->draft_digest(), $second->draft_digest() ); self::assertNotSame( $first->draft_digest(), CartQuoteFixtures::draft( 3 )->draft_digest() );
+	}
+	public function test_draft_selection_carries_quote_dimensions_so_the_historical_group_identity_matches_the_cart_package(): void {
+		// D1 (reunified M2): a selection scoped to a profile / supplier / origin must round-trip those ids, or the saved-order
+		// stager recomputes a group identity without the offer-segment suffix the cart package carries and refuses the order.
+		[$cart, $packages] = CartQuoteFixtures::raw(); $owner = CartQuoteFixtures::owner(); $identity = CartQuoteFixtures::identity();
+		$plain = QuoteCartDraft::from_loaded_cart( $owner, $cart, $packages[0]['destination'], 'GHS', 2, $identity )->private_facts()['lines'][0]['selection'];
+		foreach ( array_keys( DeliveryGroupIdentity::DIMENSION_PREFIXES ) as $dimension ) { self::assertArrayNotHasKey( $dimension, $plain ); }
+		$cart['line_one']['cetech_de_delivery_selection'] += [ 'logistics_profile_id' => 7, 'supplier_id' => '3', 'origin_id' => 0 ];
+		$draft = QuoteCartDraft::from_loaded_cart( $owner, $cart, $packages[0]['destination'], 'GHS', 2, $identity ); $line = $draft->private_facts()['lines'][0];
+		self::assertSame( 7, $line['selection']['logistics_profile_id'] ); self::assertSame( 3, $line['selection']['supplier_id'] ); self::assertArrayNotHasKey( 'origin_id', $line['selection'] );
+		$customer = CustomerCartContext::fromArray( $line['customer_context'] ); self::assertInstanceOf( CustomerCartContext::class, $customer );
+		$historical = DeliveryGroupIdentity::forHistorical( $line['selection'], $customer );
+		self::assertSame( DeliveryGroupIdentity::forHistorical( $cart['line_one']['cetech_de_delivery_selection'], $customer ), $historical ); self::assertStringContainsString( '|20-l7-s3|', (string) $historical );
+		self::assertSame( $draft->private_facts(), QuoteCartDraft::from_private_facts( $owner, $draft->private_facts(), $identity )->private_facts() );
+		self::assertNotSame( CartQuoteFixtures::draft()->draft_digest(), $draft->draft_digest() );
 	}
 	public function test_fresh_uncalculated_draft_does_not_depend_on_transient_shipping_cache(): void {
 		[$cart,$packages,$chosen] = CartQuoteFixtures::raw(); $owner = CartQuoteFixtures::owner(); $identity = CartQuoteFixtures::identity();
