@@ -1055,7 +1055,9 @@ final class SetupWizardPage {
 					'mode'  => 'override',
 					'value' => is_string( $eta ) ? $eta : '',
 				],
-			]
+			],
+			// Intermediate save while the step is still being filled: the estimate comes with the step's own submission.
+			true
 		);
 	}
 

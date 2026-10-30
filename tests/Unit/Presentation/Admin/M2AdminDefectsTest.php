@@ -24,6 +24,7 @@ use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultSummary;
 use CetechDeliveryEngine\Core\Capabilities\Capabilities;
 use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey;
+use CetechDeliveryEngine\Domain\Configuration\CollectionFieldInstruction;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
 use CetechDeliveryEngine\Domain\Configuration\ScalarFieldInstruction;
 use CetechDeliveryEngine\Domain\Configuration\ScopedConfiguration;
@@ -31,6 +32,7 @@ use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
 use CetechDeliveryEngine\Domain\Enum\ConfigurationSource;
 use CetechDeliveryEngine\Domain\Enum\DeliveryRoute;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentAvailability;
+use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 use CetechDeliveryEngine\Domain\FulfilmentProfile\FulfilmentProfileRegistry;
 use CetechDeliveryEngine\Infrastructure\Persistence\InMemoryScopedConfigurationRepository;
@@ -269,6 +271,56 @@ final class M2AdminDefectsTest extends TestCase {
 		self::assertStringNotContainsString( 'value="7–9 business days"', $again );
 	}
 
+	public function test_warehouse_defaults_refuse_a_blank_submission_and_keep_the_input(): void {
+		// Training S2 (2026-10-30): every option unticked and a blank estimate used to save silently.
+		$this->repository->saveScopedConfiguration(
+			new ScopedConfiguration(
+				ConfigurationScope::profileDefault( FulfilmentAvailability::InWarehouse->value ),
+				[
+					ConfigurationFieldKey::FULFILMENT_AVAILABILITY => ScalarFieldInstruction::override( ConfigurationFieldKey::FULFILMENT_AVAILABILITY, FulfilmentAvailability::InWarehouse->value ),
+					ConfigurationFieldKey::FULFILMENT_CHOICE       => ScalarFieldInstruction::override( ConfigurationFieldKey::FULFILMENT_CHOICE, FulfilmentChoice::Delivery->value ),
+					ConfigurationFieldKey::ESTIMATED_DELIVERY      => ScalarFieldInstruction::override( ConfigurationFieldKey::ESTIMATED_DELIVERY, '2-3 business days' ),
+				],
+				[ ConfigurationFieldKey::DELIVERY_OFFER_IDS => CollectionFieldInstruction::replace( ConfigurationFieldKey::DELIVERY_OFFER_IDS, [ 1 ] ) ]
+			)
+		);
+		$before = $this->repository->findByScopeAndSlice( ConfigurationScopeType::Global, ConfigurationScope::GLOBAL_SCOPE_ID, FulfilmentAvailability::InWarehouse->value );
+
+		$_POST = [
+			'cetech_de_action' => self::SAVE_PROFILE_ACTION,
+			'cetech_de_nonce'  => 'test-nonce-' . self::SAVE_PROFILE_ACTION,
+			'profile_key'      => FulfilmentAvailability::InWarehouse->value,
+			'fields'           => [
+				ConfigurationFieldKey::ESTIMATED_DELIVERY => [ 'mode' => 'override', 'value' => '' ],
+				ConfigurationFieldKey::DELIVERY_OFFER_IDS => [ 'mode' => 'replace' ],
+			],
+		];
+		$this->redirect( fn () => $this->home->handle_actions() );
+
+		$location = $this->last_redirect();
+		self::assertStringContainsString( 'page=' . DeliverySettingsHomePage::SLUG, $location );
+		self::assertStringContainsString( 'profile=' . FulfilmentAvailability::InWarehouse->value, $location );
+
+		$after = $this->repository->findByScopeAndSlice( ConfigurationScopeType::Global, ConfigurationScope::GLOBAL_SCOPE_ID, FulfilmentAvailability::InWarehouse->value );
+		self::assertSame( $before?->scope->config_version, $after?->scope->config_version );
+		self::assertSame( '2-3 business days', $after?->scalars[ ConfigurationFieldKey::ESTIMATED_DELIVERY ]->value );
+		self::assertSame( [ 1 ], $after?->collections[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ]->members );
+
+		$_POST = [];
+		$_GET  = [ 'profile' => FulfilmentAvailability::InWarehouse->value ];
+		$html  = $this->html( $this->home );
+
+		self::assertStringContainsString( 'Your unsaved changes are shown below.', $html );
+		self::assertStringContainsString( 'requires a value', $html );
+		self::assertMatchesRegularExpression( '/id="estimated_delivery" name="fields\[estimated_delivery\]\[value\]" value=""/', $html );
+		self::assertDoesNotMatchRegularExpression( '/name="fields\[delivery_offer_ids\]\[members\]\[\]" value="1"[^>]*checked/', $html );
+
+		// The draft is consumed once; the saved values come back on the next render.
+		$again = $this->html( $this->home );
+		self::assertStringNotContainsString( 'Your unsaved changes are shown below.', $again );
+		self::assertStringContainsString( 'value="2-3 business days"', $again );
+		self::assertMatchesRegularExpression( '/name="fields\[delivery_offer_ids\]\[members\]\[\]" value="1"[^>]*checked/', $again );
+	}
 	public function test_zone_editor_controls_have_accessible_names(): void {
 		$zones = (string) file_get_contents( dirname( __DIR__, 4 ) . '/src/Presentation/Admin/DestinationZonesPage.php' );
 
