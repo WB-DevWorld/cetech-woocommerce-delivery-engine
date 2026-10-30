@@ -41,6 +41,10 @@ final class DeliveryPresentationLabels {
 		return __( 'Delivery option', 'cetech-woocommerce-delivery-engine' );
 	}
 
+	public static function pickup_option(): string {
+		return __( 'Pickup option', 'cetech-woocommerce-delivery-engine' );
+	}
+
 	public static function estimated_delivery(): string {
 		return __( 'Estimated delivery', 'cetech-woocommerce-delivery-engine' );
 	}
@@ -131,9 +135,15 @@ final class DeliveryPresentationLabels {
 			$fulfilment_choice = self::infer_choice_slug_from_label( $choice );
 		}
 
-		if ( '' !== $offer_label ) {
+		// A Store Pickup line labels its option as a pickup, never as a "Delivery option";
+		// when the option is the pickup location itself the location row already says it.
+		$is_pickup       = self::is_store_pickup( $fulfilment_choice );
+		$pickup_location = trim( (string) ( $summary['pickup_location_label'] ?? '' ) );
+		$option_repeats  = $is_pickup && '' !== $pickup_location && 0 === strcasecmp( $offer_label, $pickup_location );
+
+		if ( '' !== $offer_label && ! $option_repeats ) {
 			$rows[] = [
-				'key'   => self::delivery_option(),
+				'key'   => $is_pickup ? self::pickup_option() : self::delivery_option(),
 				'value' => $offer_label,
 			];
 		}
