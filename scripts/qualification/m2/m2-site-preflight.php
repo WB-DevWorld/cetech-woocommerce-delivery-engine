@@ -48,8 +48,8 @@ $required_flags = array(
 	'enable_shipment_records',
 	'enable_effective_configuration_runtime',
 	'enable_variable_product_ecr_runtime',
-	'enable_bulk_import',
 );
+// enable_bulk_import is a stored key nothing reads: Bulk Tools gate on capabilities (see FeatureFlagLabels).
 $flags_off = array();
 foreach ( $required_flags as $flag ) {
 	$raw = get_option( 'cetech_de_' . $flag, null );
