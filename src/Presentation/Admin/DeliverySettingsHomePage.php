@@ -662,6 +662,9 @@ final class DeliverySettingsHomePage {
 			}
 			if ( isset( $payload['members'] ) && is_array( $payload['members'] ) ) {
 				$entry['members'] = array_map( 'absint', $payload['members'] );
+			} elseif ( ConfigurationFieldKey::DELIVERY_OFFER_IDS === $field_key ) {
+				// Every checkbox unticked posts no members at all; keep that as an empty list so the draft shows it.
+				$entry['members'] = [];
 			}
 			$fields[ $field_key ] = $entry;
 		}
