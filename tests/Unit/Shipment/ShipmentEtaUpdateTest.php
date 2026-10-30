@@ -42,6 +42,7 @@ final class ShipmentEtaUpdateTest extends TestCase {
 		];
 		$GLOBALS['cetech_de_test_is_admin']   = true;
 		$GLOBALS['cetech_de_test_is_view_order'] = true;
+		$GLOBALS['cetech_de_test_caps']['view_order'] = true; // COR-034: the rightful viewer.
 		$GLOBALS['cetech_de_test_user_id']    = 9;
 		$GLOBALS['cetech_de_test_transients'] = [];
 		$GLOBALS['cetech_de_test_redirects']  = [];

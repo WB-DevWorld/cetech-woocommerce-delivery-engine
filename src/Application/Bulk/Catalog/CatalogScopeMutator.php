@@ -54,6 +54,11 @@ final class CatalogScopeMutator {
 	/** @var array{id: int, version: int}|null */
 	private ?array $locked_scope_identity = null;
 
+	/** The scope slice the current process() call addresses (COR-021 CSV rows name their slice). */
+	private string $slice_key = ConfigurationScope::DEFAULT_SLICE_KEY;
+
+	public const TARGET_GLOBAL = 'global';
+
 	public function __construct(
 		private readonly ScopedConfigurationRepositoryInterface $scopes,
 		private readonly EffectiveConfigurationValidator $validator,
@@ -81,11 +86,21 @@ final class CatalogScopeMutator {
 		?int $parent_product_id,
 		CatalogActionManifest $manifest,
 		bool $dry_run,
-		?string $expected_precondition = null
+		?string $expected_precondition = null,
+		string $slice_key = ConfigurationScope::DEFAULT_SLICE_KEY
 	): array {
-		$scope_type = CatalogTargetDefinition::TARGET_VARIATION === $target_type
-			? ConfigurationScopeType::Variation
-			: ConfigurationScopeType::Product;
+		$scope_type = match ( $target_type ) {
+			CatalogTargetDefinition::TARGET_VARIATION => ConfigurationScopeType::Variation,
+			self::TARGET_GLOBAL => ConfigurationScopeType::Global,
+			default => ConfigurationScopeType::Product,
+		};
+		$this->slice_key = $slice_key;
+
+		if ( ConfigurationScopeType::Global === $scope_type ) {
+			// A blank slice is the site-wide root; a fulfilment type key is that type's default.
+			$target_id         = ConfigurationScope::GLOBAL_SCOPE_ID;
+			$parent_product_id = null;
+		}
 
 		if ( ConfigurationScopeType::Variation === $scope_type && ( null === $parent_product_id || $parent_product_id <= 0 ) ) {
 			return $this->fail( 'missing_parent', 'Variation configuration requires a parent product.', [], '' );
@@ -95,16 +110,16 @@ final class CatalogScopeMutator {
 			$this->holding_scope_lock = true;
 			try {
 				return $this->scopes->completeLocalUnit(
-					function () use ( $target_type, $target_id, $parent_product_id, $manifest, $dry_run, $expected_precondition, $scope_type ): array {
+					function () use ( $target_type, $target_id, $parent_product_id, $manifest, $dry_run, $expected_precondition, $scope_type, $slice_key ): array {
 						$probe = self::$before_scope_lock;
 						self::$before_scope_lock = null;
 						if ( $probe instanceof \Closure ) {
 							$probe();
 						}
-						$this->locked_scope_identity = $this->scopes->lockScopeIdentity( $scope_type, $target_id, ConfigurationScope::DEFAULT_SLICE_KEY );
+						$this->locked_scope_identity = $this->scopes->lockScopeIdentity( $scope_type, $target_id, $slice_key );
 						$this->scope_identity_locked = true;
 
-						return $this->process( $target_type, $target_id, $parent_product_id, $manifest, $dry_run, $expected_precondition );
+						return $this->process( $target_type, $target_id, $parent_product_id, $manifest, $dry_run, $expected_precondition, $slice_key );
 					}
 				);
 			} finally {
@@ -117,7 +132,7 @@ final class CatalogScopeMutator {
 		$existing = $this->scopes->findByScopeAndSlice(
 			$scope_type,
 			$target_id,
-			ConfigurationScope::DEFAULT_SLICE_KEY
+			$this->slice_key
 		);
 
 		$before_snapshot = $this->snapshot( $existing );
@@ -535,7 +550,7 @@ final class CatalogScopeMutator {
 			$existing?->scope->id,
 			$scope_type,
 			$target_id,
-			ConfigurationScope::DEFAULT_SLICE_KEY,
+			$this->slice_key,
 			ConfigurationScopeType::Variation === $scope_type ? $parent_product_id : null,
 			RecordStatus::Active,
 			max( 1, $existing?->scope->config_version ?? 1 ),
@@ -592,6 +607,14 @@ final class CatalogScopeMutator {
 			$value = $this->codes instanceof EntityCodeResolver
 				? $this->codes->resolve_scalar_value( $action->field_key, $action->value )
 				: $action->value;
+			if ( in_array( $action->field_key, EntityCodeResolver::REFERENCE_FIELDS, true ) && ! is_int( $value ) && ! ( is_string( $value ) && ctype_digit( $value ) ) ) {
+				return [
+					'scalars'          => $scalars,
+					'collections'      => $collections,
+					'conflict_code'    => 'unresolved_reference',
+					'conflict_summary' => sprintf( 'Unknown code "%s" for %s. The row was skipped.', (string) $action->value, $action->field_key ),
+				];
+			}
 			$scalars[ $action->field_key ] = ScalarFieldInstruction::override( $action->field_key, $value );
 
 			return $this->ok_fields( $scalars, $collections );
@@ -624,6 +647,15 @@ final class CatalogScopeMutator {
 			return $this->ok_fields( $scalars, $collections );
 		}
 
+		$unresolved = $this->unresolved_members( $action->members );
+		if ( [] !== $unresolved ) {
+			return [
+				'scalars'          => $scalars,
+				'collections'      => $collections,
+				'conflict_code'    => 'unresolved_reference',
+				'conflict_summary' => sprintf( 'Unknown delivery option code(s) for %s: %s. The row was skipped.', $action->field_key, implode( ', ', $unresolved ) ),
+			];
+		}
 		$members = $this->normalize_member_ids( $action->members );
 
 		if ( CatalogFieldAction::COLLECTION_REPLACE === $action->action || CatalogFieldAction::SET_OVERRIDE === $action->action ) {
@@ -798,12 +830,12 @@ final class CatalogScopeMutator {
 			);
 		}
 
-		$existing = $this->scopes->findByScopeAndSlice( $scope_type, $target_id, ConfigurationScope::DEFAULT_SLICE_KEY );
+		$existing = $this->scopes->findByScopeAndSlice( $scope_type, $target_id, $this->slice_key );
 		$scope    = new ConfigurationScope(
 			$existing?->scope->id,
 			$scope_type,
 			$target_id,
-			ConfigurationScope::DEFAULT_SLICE_KEY,
+			$this->slice_key,
 			ConfigurationScopeType::Variation === $scope_type ? $parent_product_id : null,
 			RecordStatus::Active,
 			max( 1, $existing?->scope->config_version ?? 1 ),
@@ -840,6 +872,26 @@ final class CatalogScopeMutator {
 		}
 
 		return $collections;
+	}
+
+	/**
+	 * Member codes/ids that do not resolve to a local delivery option (COR-021: reported, not dropped).
+	 *
+	 * @param list<int|string> $members
+	 * @return list<string>
+	 */
+	private function unresolved_members( array $members ): array {
+		$unresolved = [];
+		foreach ( $members as $member ) {
+			$resolved = $this->codes instanceof EntityCodeResolver
+				? $this->codes->resolve_offer_id( $member )
+				: ( ( is_int( $member ) || ( is_string( $member ) && ctype_digit( $member ) ) ) && (int) $member > 0 ? (int) $member : null );
+			if ( null === $resolved ) {
+				$unresolved[] = (string) $member;
+			}
+		}
+
+		return $unresolved;
 	}
 
 	/**

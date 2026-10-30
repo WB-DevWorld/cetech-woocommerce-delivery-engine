@@ -54,8 +54,9 @@ final class SiteWideDefaultsService {
 
 	/**
 	 * @param array<string, array{mode?: string, value?: mixed, members?: list<mixed>}> $raw_fields
+	 * @param bool $allow_incomplete True only for an intermediate save inside the setup wizard, whose own step submission completes the profile.
 	 */
-	public function save_profile_defaults( string $profile_key, array $raw_fields ): ScopedConfiguration {
+	public function save_profile_defaults( string $profile_key, array $raw_fields, bool $allow_incomplete = false ): ScopedConfiguration {
 		$profile = $this->require_profile( $profile_key );
 		$existing = $this->ensure_profile_scope( $profile->key );
 
@@ -85,14 +86,28 @@ final class SiteWideDefaultsService {
 				continue;
 			}
 
-			if ( ! array_key_exists( 'value', $payload ) || null === $payload['value'] || '' === $payload['value'] ) {
+			$value = $payload['value'] ?? null;
+			if ( is_string( $value ) ) {
+				$value = trim( $value );
+			}
+
+			if ( null === $value || '' === $value ) {
 				if ( $definition->is_optional ) {
 					unset( $scalars[ $field_key ] );
 					continue;
 				}
+
+				// Same rule as the product form and the CSV import: a blank override is not inherit.
+				throw new \InvalidArgumentException(
+					sprintf(
+						/* translators: %s: configuration field key */
+						__( 'Override for %s requires a value. Blank does not mean inherit.', 'cetech-woocommerce-delivery-engine' ),
+						$field_key
+					)
+				);
 			}
 
-			$scalars[ $field_key ] = ScalarFieldInstruction::override( $field_key, $payload['value'] ?? null );
+			$scalars[ $field_key ] = ScalarFieldInstruction::override( $field_key, $value );
 		}
 
 		$scalars[ ConfigurationFieldKey::FULFILMENT_AVAILABILITY ] = ScalarFieldInstruction::override(
@@ -112,6 +127,10 @@ final class SiteWideDefaultsService {
 			}
 		}
 
+		if ( ! $allow_incomplete ) {
+			$this->assert_delivery_defaults_complete( $profile, $scalars, $collections );
+		}
+
 		$saved = $this->scopes->saveScopedConfiguration(
 			new ScopedConfiguration(
 				$existing->scope,
@@ -123,6 +142,45 @@ final class SiteWideDefaultsService {
 		$this->resolver->clearMemoization();
 
 		return $saved;
+	}
+
+	/**
+	 * Site-wide defaults are the root of inheritance, so a blank here is not
+	 * "inherit": a profile that offers Delivery must keep at least one Delivery
+	 * Option and an estimate, otherwise every inheriting product loses its
+	 * delivery option the moment the defaults save. A pickup-only store profile
+	 * (no option, a pickup location) is complete without either.
+	 *
+	 * @param array<string, ScalarFieldInstruction>     $scalars
+	 * @param array<string, CollectionFieldInstruction> $collections
+	 */
+	private function assert_delivery_defaults_complete( FulfilmentProfile $profile, array $scalars, array $collections ): void {
+		$offers       = $collections[ ConfigurationFieldKey::DELIVERY_OFFER_IDS ] ?? null;
+		$no_options   = $offers instanceof CollectionFieldInstruction && CollectionConfigurationMode::Replace === $offers->mode && [] === $offers->members;
+		$pickup       = $scalars[ ConfigurationFieldKey::PICKUP_LOCATION_ID ] ?? null;
+		$pickup_only  = $profile->pickup_allowed && $no_options && $pickup instanceof ScalarFieldInstruction && ScalarConfigurationMode::Override === $pickup->mode;
+		$estimate     = $scalars[ ConfigurationFieldKey::ESTIMATED_DELIVERY ] ?? null;
+		$has_estimate = $estimate instanceof ScalarFieldInstruction && ScalarConfigurationMode::Override === $estimate->mode;
+
+		if ( $pickup_only ) {
+			return;
+		}
+
+		$errors = [];
+		if ( $no_options ) {
+			$errors[] = __( 'Select at least one Delivery Option. Products inheriting these defaults would otherwise have no delivery option.', 'cetech-woocommerce-delivery-engine' );
+		}
+		if ( ! $has_estimate ) {
+			$errors[] = sprintf(
+				/* translators: %s: configuration field key */
+				__( 'Override for %s requires a value. Blank does not mean inherit.', 'cetech-woocommerce-delivery-engine' ),
+				ConfigurationFieldKey::ESTIMATED_DELIVERY
+			);
+		}
+
+		if ( [] !== $errors ) {
+			throw new \InvalidArgumentException( implode( ' ', $errors ) );
+		}
 	}
 
 	/**

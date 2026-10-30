@@ -125,6 +125,8 @@ function opening_http_identity(): array {
     // Candidate growth is allowed only when every installed path/hash still
     // equals the same-run native receipt; a historic file count is not identity.
     if (
+        // Candidate growth is allowed only when every installed path/hash still
+        // equals the same-run native receipt; a historic file count is not identity.
         'PASS' !== ($native['status'] ?? null)
         || [] === $installed
         || $installed !== ($native['installed_php_sources'] ?? null)

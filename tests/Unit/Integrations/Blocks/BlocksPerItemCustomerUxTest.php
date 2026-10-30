@@ -180,7 +180,9 @@ final class BlocksPerItemCustomerUxTest extends TestCase {
 		self::assertSame( 'CETECH', $payload['delivery_address']['company'] ?? null );
 		self::assertSame( CartDeliveryUiAnchor::for_cart_item_key( 'abc123' ), $payload['ui_anchor'] );
 		self::assertFalse( $payload['address_needed'] );
-		self::assertSame( CustomerStorefrontCopy::edit_delivery_details(), $payload['address_action_label'] );
+		self::assertSame( CustomerStorefrontCopy::change(), $payload['address_action_label'], 'D2: one control per line, always Change' );
+		self::assertSame( 'Delivery · Accra', $payload['summary_line'] ?? null, 'a line without a stored summary still names its choice and destination' );
+		self::assertNull( $payload['summary_price'] );
 		self::assertArrayNotHasKey( 'matching_identity', $payload );
 		self::assertArrayNotHasKey( 'delivery_location_identity', $payload );
 		self::assertArrayNotHasKey( 'delivery_offer_id', $payload );
@@ -195,7 +197,7 @@ final class BlocksPerItemCustomerUxTest extends TestCase {
 
 		self::assertTrue( $payload['address_needed'] );
 		self::assertFalse( $payload['address_complete'] );
-		self::assertSame( CustomerStorefrontCopy::add_delivery_address(), $payload['address_action_label'] );
+		self::assertSame( CustomerStorefrontCopy::change(), $payload['address_action_label'] );
 		self::assertSame( CartDeliveryUiAnchor::for_cart_item_key( 'incomplete-key' ), $payload['ui_anchor'] );
 		self::assertTrue( CartDeliveryUiAnchor::is_valid( (string) $payload['ui_anchor'] ) );
 		self::assertStringNotContainsString( 'Accra', (string) $payload['ui_anchor'] );

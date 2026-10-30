@@ -15,6 +15,7 @@ use WC_Order;
  * Customer-safe shipment cards on WooCommerce My Account → View Order.
  *
  * Does not render on thank-you, product, cart, checkout, or email surfaces.
+ * COR-034: renders only for a viewer OrderSurfaceAuthority accepts for this order.
  */
 final class CustomerShipmentRenderer {
 
@@ -47,6 +48,10 @@ final class CustomerShipmentRenderer {
 		}
 
 		if ( ! $order instanceof WC_Order || $order->get_id() <= 0 ) {
+			return;
+		}
+
+		if ( ! OrderSurfaceAuthority::may_view( $order ) ) {
 			return;
 		}
 

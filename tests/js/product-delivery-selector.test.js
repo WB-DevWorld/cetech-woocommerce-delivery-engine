@@ -55,13 +55,188 @@ function fixtureHtml() {
 	`;
 }
 
+function gateHtml(overrides = {}) {
+	const pickupLabel = overrides.pickupLabel ?? 'Main showroom';
+	return `
+		<form class="cart">
+			<fieldset class="cetech-de-product-delivery-selector" data-cetech-de-selector="1" data-cetech-de-active-choice="" data-cetech-de-has-delivery="1" data-cetech-de-has-pickup="1">
+				<legend>Delivery &amp; pickup</legend>
+				<div class="cetech-de-delivery-selector__location" data-cetech-de-location-panel="1" hidden></div>
+				<div data-cetech-de-status></div>
+				<div data-cetech-de-options>
+					<div class="cetech-de-fulfilment-choice" role="radiogroup">
+						<label><input type="radio" name="cetech_de_fulfilment_ui" value="delivery" data-cetech-de-choice-switch="1" /> Delivery</label>
+						<label><input type="radio" name="cetech_de_fulfilment_ui" value="store_pickup" data-cetech-de-choice-switch="1" /> Store pickup</label>
+					</div>
+					<div class="cetech-de-delivery-option-group" data-cetech-de-choice-panel="delivery" data-cetech-de-locality="Accra" hidden>
+						<p class="cetech-de-delivery-option cetech-de-delivery-option--radio" data-cetech-de-choice="delivery">
+							<label>
+								<input type="radio" name="cetech_de_delivery_option_key" value="in_store:delivery:11" disabled />
+								<span class="cetech-de-delivery-option__body">
+									<span class="cetech-de-delivery-option__label">Standard Delivery</span>
+									<span class="cetech-de-delivery-option__estimate">3–6 business days</span>
+									<span class="cetech-de-delivery-option__price" data-cetech-de-price="₵30.00">Delivery fee: ₵30.00</span>
+								</span>
+							</label>
+						</p>
+						<p class="cetech-de-delivery-option cetech-de-delivery-option--radio" data-cetech-de-choice="delivery">
+							<label>
+								<input type="radio" name="cetech_de_delivery_option_key" value="in_store:delivery:12" disabled />
+								<span class="cetech-de-delivery-option__body">
+									<span class="cetech-de-delivery-option__label">Express Delivery</span>
+									<span class="cetech-de-delivery-option__estimate">1–2 business days</span>
+									<span class="cetech-de-delivery-option__price" data-cetech-de-price="₵50.00">Delivery fee: ₵50.00</span>
+								</span>
+							</label>
+						</p>
+					</div>
+					<div class="cetech-de-delivery-option-group cetech-de-delivery-option-group--pickup" data-cetech-de-choice-panel="store_pickup" hidden>
+						<p class="cetech-de-delivery-option cetech-de-delivery-option--radio" data-cetech-de-choice="store_pickup">
+							<label>
+								<input type="radio" name="cetech_de_delivery_option_key" value="in_store:store_pickup:pickup" disabled />
+								<span class="cetech-de-delivery-option__body">
+									<span class="cetech-de-delivery-option__label">${pickupLabel}</span>
+									<span class="cetech-de-delivery-option__estimate">Ready in 2 hours</span>
+								</span>
+							</label>
+						</p>
+					</div>
+				</div>
+			</fieldset>
+		</form>
+	`;
+}
+
+describe('D2 product-page gate and compact selection line', () => {
+	beforeEach(() => {
+		document.body.innerHTML = '';
+		delete window.CetechDeProductDeliverySelector;
+		window.cetechDeMatchingLocation = { i18n: { change: 'Change', free: 'Free', pickupAt: 'Store Pickup — %s', delivery: 'Delivery', storePickup: 'Store Pickup' } };
+	});
+
+	it('pre-selects nothing while both choices are valid and reveals a choice only when the customer picks it', () => {
+		document.body.innerHTML = gateHtml();
+		const api = loadSelector();
+		api.bindAll(document);
+		const root = document.querySelector('[data-cetech-de-selector]');
+		const deliveryPanel = document.querySelector('[data-cetech-de-choice-panel="delivery"]');
+		const pickupPanel = document.querySelector('[data-cetech-de-choice-panel="store_pickup"]');
+
+		expect(root.getAttribute('data-cetech-de-active-choice')).toBe('');
+		expect(deliveryPanel.hidden).toBe(true);
+		expect(pickupPanel.hidden).toBe(true);
+		expect(document.querySelector('[data-cetech-de-location-panel]').hidden).toBe(true);
+		document.querySelectorAll('input[name="cetech_de_delivery_option_key"]').forEach((radio) => {
+			expect(radio.disabled).toBe(true);
+			expect(radio.checked).toBe(false);
+		});
+		expect(root.hasAttribute('data-cetech-de-collapsed')).toBe(false);
+		expect(document.querySelector('[data-cetech-de-selection-line]').hidden).toBe(true);
+		expect(JSON.parse(document.querySelector('[data-cetech-de-pdp-context]').value).display_key).toBe('');
+
+		const deliverySwitch = document.querySelector('[data-cetech-de-choice-switch][value="delivery"]');
+		deliverySwitch.checked = true;
+		deliverySwitch.dispatchEvent(new Event('change', { bubbles: true }));
+		expect(deliveryPanel.hidden).toBe(false);
+		expect(document.querySelector('[data-cetech-de-location-panel]').hidden).toBe(false);
+		expect(root.hasAttribute('data-cetech-de-collapsed')).toBe(false);
+		expect(document.querySelectorAll('[data-cetech-de-choice-panel="delivery"] input:checked').length).toBe(0);
+	});
+
+	it('collapses to one compact line with a single Change control once a card is chosen, and Change reopens it', () => {
+		document.body.innerHTML = gateHtml();
+		const api = loadSelector();
+		api.bindAll(document);
+		const root = document.querySelector('[data-cetech-de-selector]');
+
+		const deliverySwitch = document.querySelector('[data-cetech-de-choice-switch][value="delivery"]');
+		deliverySwitch.checked = true;
+		deliverySwitch.dispatchEvent(new Event('change', { bubbles: true }));
+		const express = document.querySelector('input[value="in_store:delivery:12"]');
+		express.checked = true;
+		express.dispatchEvent(new Event('change', { bubbles: true }));
+
+		const line = document.querySelector('[data-cetech-de-selection-line]');
+		expect(root.getAttribute('data-cetech-de-collapsed')).toBe('1');
+		expect(line.hidden).toBe(false);
+		expect(line.querySelector('[data-cetech-de-selection-text]').textContent).toBe('Express Delivery · Accra · 1–2 business days · ₵50.00');
+		expect(line.querySelectorAll('[data-cetech-de-change]').length).toBe(1);
+		expect(line.querySelector('[data-cetech-de-change]').textContent).toBe('Change');
+		expect(express.disabled).toBe(false);
+		expect(JSON.parse(document.querySelector('[data-cetech-de-pdp-context]').value).display_key).toBe('in_store:delivery:12');
+
+		line.querySelector('[data-cetech-de-change]').click();
+		expect(root.hasAttribute('data-cetech-de-collapsed')).toBe(false);
+		expect(line.hidden).toBe(true);
+		expect(express.checked).toBe(true);
+		expect(deliverySwitch.checked).toBe(true);
+
+		express.click();
+		expect(root.getAttribute('data-cetech-de-collapsed')).toBe('1');
+		expect(line.hidden).toBe(false);
+	});
+
+	it('auto-selects a lone pickup location after the customer chooses Store Pickup and names it on the line', () => {
+		document.body.innerHTML = gateHtml();
+		const api = loadSelector();
+		api.bindAll(document);
+		const pickupSwitch = document.querySelector('[data-cetech-de-choice-switch][value="store_pickup"]');
+		pickupSwitch.checked = true;
+		pickupSwitch.dispatchEvent(new Event('change', { bubbles: true }));
+
+		const root = document.querySelector('[data-cetech-de-selector]');
+		expect(document.querySelector('input[value="in_store:store_pickup:pickup"]').checked).toBe(true);
+		expect(root.getAttribute('data-cetech-de-collapsed')).toBe('1');
+		expect(document.querySelector('[data-cetech-de-selection-text]').textContent).toBe('Store Pickup — Main showroom · Ready in 2 hours · Free');
+		expect(document.querySelector('[data-cetech-de-location-panel]').hidden).toBe(true);
+	});
+
+	it('renders the AJAX switch with an unconfigured choice disabled and its reason shown', () => {
+		const api = loadSelector();
+		const html = api.renderOptionsHtml(
+			[{
+				display_key: 'in_store:delivery:11',
+				fulfilment_choice: 'delivery',
+				delivery_offer_public_label: 'Standard Delivery',
+				estimate_text: '1–3 business days',
+				price_text: 'GH₵50.00',
+				is_available: true
+			}],
+			'in_store:delivery:11',
+			{ i18n: { delivery: 'Delivery', storePickup: 'Store Pickup', pickupNotAvailable: 'Store pickup is not available for this product' }, postField: 'cetech_de_delivery_option_key' },
+			'Accra',
+			'',
+			{ has_delivery: true, has_pickup: false }
+		);
+		expect(html).toMatch(/id="cetech-de-fulfilment-ui-delivery"[^>]*checked="checked"/);
+		expect(html).toMatch(/id="cetech-de-fulfilment-ui-store_pickup"[^>]*disabled="disabled"/);
+		expect(html).toContain('Store pickup is not available for this product');
+		expect(html).toContain('data-cetech-de-locality="Accra"');
+		expect(html).toContain('data-cetech-de-price="GH₵50.00"');
+		expect(html).toMatch(/data-cetech-de-choice-panel="delivery"[^>]*>/);
+		expect(html).not.toMatch(/data-cetech-de-choice-panel="delivery"[^>]*hidden/);
+
+		const both = api.renderOptionsHtml(
+			[{ display_key: 'in_store:store_pickup:pickup', fulfilment_choice: 'store_pickup', delivery_offer_public_label: 'Main showroom', is_available: true }],
+			'in_store:store_pickup:pickup',
+			{ i18n: {}, postField: 'cetech_de_delivery_option_key' },
+			'',
+			'',
+			{ has_delivery: true, has_pickup: true }
+		);
+		expect(both).not.toMatch(/data-cetech-de-choice-switch="1"[^>]*checked/);
+		expect(both).not.toMatch(/name="cetech_de_delivery_option_key"[^>]*checked/);
+		expect(both).toMatch(/data-cetech-de-choice-panel="store_pickup"[^>]*hidden/);
+	});
+});
+
 describe('Product delivery fulfilment switcher', () => {
 	beforeEach(() => {
 		document.body.innerHTML = '';
 		delete window.CetechDeProductDeliverySelector;
 	});
 
-	it('defaults to Delivery with Store Pickup hidden', () => {
+	it('honours a pre-checked Delivery choice with Store Pickup hidden', () => {
 		document.body.innerHTML = fixtureHtml();
 		const api = loadSelector();
 		api.bindAll(document);

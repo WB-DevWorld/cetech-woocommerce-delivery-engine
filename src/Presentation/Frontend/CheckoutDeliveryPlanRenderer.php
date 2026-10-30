@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Frontend;
 
+use CetechDeliveryEngine\Application\Cart\CartLineDeliveryPriceResolver;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
 use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Presentation\Shared\CustomerStorefrontCopy;
@@ -17,7 +18,8 @@ final class CheckoutDeliveryPlanRenderer {
 
 	public function __construct(
 		private FeatureFlags $feature_flags,
-		private Requirements $requirements
+		private Requirements $requirements,
+		private ?CartLineDeliveryPriceResolver $prices = null
 	) {
 	}
 
@@ -62,7 +64,13 @@ final class CheckoutDeliveryPlanRenderer {
 			return;
 		}
 
-		$plan = CustomerStorefrontCopy::delivery_plan( WC()->cart->get_cart() );
+		$contents = WC()->cart->get_cart();
+		$prices   = $this->prices instanceof CartLineDeliveryPriceResolver ? $this->prices->price_texts_for_cart( $contents ) : [];
+		$plan     = CustomerStorefrontCopy::delivery_plan(
+			$contents,
+			$prices,
+			function_exists( 'wc_get_cart_url' ) ? (string) wc_get_cart_url() : ''
+		);
 		if ( [] === $plan ) {
 			return;
 		}
@@ -82,7 +90,10 @@ final class CheckoutDeliveryPlanRenderer {
 				if ( '' !== (string) ( $line['product'] ?? '' ) ) {
 					echo '<span class="cetech-de-delivery-plan__product">' . esc_html( (string) $line['product'] ) . '</span> ';
 				}
-				echo '<span class="cetech-de-delivery-plan__offer">' . esc_html( (string) ( $line['estimate'] ?? $line['offer'] ?? '' ) ) . '</span>';
+				echo '<span class="cetech-de-delivery-plan__offer">' . esc_html( (string) ( $line['line'] ?? $line['estimate'] ?? $line['offer'] ?? '' ) ) . '</span>';
+				if ( '' !== (string) ( $line['change_url'] ?? '' ) ) {
+					echo ' <a class="cetech-de-delivery-plan__change" href="' . esc_url( (string) $line['change_url'] ) . '">' . esc_html( CustomerStorefrontCopy::change() ) . '</a>';
+				}
 				echo '</p>';
 			}
 			echo '</div>';

@@ -35,7 +35,7 @@ final class CustomerShipmentPresentationTest extends TestCase {
 
 		$GLOBALS['cetech_de_test_options']     = [];
 		$GLOBALS['cetech_de_test_is_view_order'] = true;
-		$GLOBALS['cetech_de_test_caps']        = [];
+		$GLOBALS['cetech_de_test_caps']        = [ 'view_order' => true ]; // COR-034: the rightful viewer.
 
 		$this->wpdb = new FakeWpdb();
 		$this->wpdb->create_table(

@@ -54,6 +54,32 @@ final class CustomerStorefrontCopyTest extends TestCase {
 		self::assertSame( 'Ready in 2 hours', $summary['meta'] );
 	}
 
+	public function test_selection_line_is_one_compact_line_with_fee(): void {
+		self::assertSame(
+			'Standard Delivery · Accra · 3–6 business days · ₵30.00',
+			CustomerStorefrontCopy::selection_line(
+				'delivery',
+				[ 'delivery_offer_public_label' => 'Standard Delivery', 'estimate_text' => 'Estimated delivery: 3–6 business days' ],
+				'Accra',
+				'₵30.00'
+			)
+		);
+		self::assertSame(
+			'Store Pickup — Accra showroom · Ready in 2 hours · Free',
+			CustomerStorefrontCopy::selection_line(
+				'store_pickup',
+				[ 'pickup_location_label' => 'Accra showroom', 'estimate_text' => 'Ready in 2 hours' ],
+				'ignored for pickup',
+				'Free'
+			)
+		);
+		self::assertSame( 'Delivery', CustomerStorefrontCopy::selection_line( 'delivery', [], '', '' ), 'empty segments are omitted' );
+		self::assertSame( 'Change', CustomerStorefrontCopy::editor_action_label( 'delivery', false ), 'D2: one control per line' );
+		self::assertSame( 'Change', CustomerStorefrontCopy::editor_action_label( 'store_pickup', true ) );
+		self::assertSame( 'Store pickup is not available for this product', CustomerStorefrontCopy::choice_not_available( 'store_pickup' ) );
+		self::assertSame( 'Delivery is not available for this product', CustomerStorefrontCopy::choice_not_available( 'delivery' ) );
+	}
+
 	public function test_delivery_plan_groups_by_locality(): void {
 		$accra = PerItemContextFixtures::cartItem(
 			[
@@ -88,5 +114,16 @@ final class CustomerStorefrontCopyTest extends TestCase {
 		self::assertSame( 'Accra', $plan[0]['heading'] );
 		self::assertSame( 'QA In Store Lamp', $plan[0]['lines'][0]['product'] );
 		self::assertStringContainsString( 'QA Express Local', $plan[0]['lines'][0]['estimate'] );
+		self::assertSame( 'QA Express Local · Accra · 1–2 business days', $plan[0]['lines'][0]['line'] );
+		self::assertSame( '', $plan[0]['lines'][0]['change_url'] );
+
+		$priced = CustomerStorefrontCopy::delivery_plan( [ 'a' => $accra ], [ 'a' => 'GH₵30.00' ], 'https://shop.test/cart/' );
+		self::assertSame( 'QA Express Local · Accra · 1–2 business days · GH₵30.00', $priced[0]['lines'][0]['line'] );
+		self::assertSame( 'GH₵30.00', $priced[0]['lines'][0]['price'] );
+		self::assertSame(
+			'https://shop.test/cart/#' . \CetechDeliveryEngine\Presentation\Shared\CartDeliveryUiAnchor::for_cart_item_key( 'a' ),
+			$priced[0]['lines'][0]['change_url'],
+			'checkout Change returns to the cart line anchor'
+		);
 	}
 }

@@ -40,7 +40,9 @@ final class LegacyQuoteProviderTest extends TestCase {
 	}
 	public function test_positive_scoped_card_cannot_match_an_absent_request_dimension(): void {
 		$repository = new InMemoryQuoteRateCardRepository( [ F::card( 'fixed_per_shipment', '12.50', [ 'supplier_id' => 8 ] ) ] );
-		self::assertTrue( ( new RateQuoteEngine( $repository ) )->quote( new RateQuoteRequest( 20, 50, 2, new CurrencyCode( 'GHS' ) ) )->success );
+		// D1 (reunified M2): a card scoped to a supplier never matches a request without that supplier, so the
+		// retained engine refuses before the legacy capture does; the capture must still refuse.
+		self::assertFalse( ( new RateQuoteEngine( $repository ) )->quote( new RateQuoteRequest( 20, 50, 2, new CurrencyCode( 'GHS' ) ) )->success );
 		$this->expectException( \InvalidArgumentException::class ); ( new LegacyQuoteEngineCapture() )->capture( F::context(), $repository );
 	}
 	public function test_unknown_price_does_not_become_a_retained_free_price(): void {

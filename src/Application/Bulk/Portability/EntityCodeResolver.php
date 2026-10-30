@@ -68,6 +68,7 @@ final class EntityCodeResolver {
 			ConfigurationFieldKey::LOGISTICS_PROFILE_ID => $this->logistics?->findByCode( $code ),
 			ConfigurationFieldKey::SUPPLIER_ID => $this->suppliers?->findByCode( $code ),
 			ConfigurationFieldKey::ORIGIN_ID => $this->origins?->findByCode( $code ),
+			ConfigurationFieldKey::PICKUP_LOCATION_ID => $this->pickups?->findByCode( $code ),
 			default => null,
 		};
 
@@ -79,6 +80,14 @@ final class EntityCodeResolver {
 
 		return $id > 0 ? $id : $value;
 	}
+
+	/** Field keys whose override value must resolve to a local entity id. */
+	public const REFERENCE_FIELDS = [
+		ConfigurationFieldKey::LOGISTICS_PROFILE_ID,
+		ConfigurationFieldKey::SUPPLIER_ID,
+		ConfigurationFieldKey::ORIGIN_ID,
+		ConfigurationFieldKey::PICKUP_LOCATION_ID,
+	];
 
 	public function code_for_id( string $kind, int $id ): string {
 		if ( $id <= 0 ) {

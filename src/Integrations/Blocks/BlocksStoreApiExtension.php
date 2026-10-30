@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Integrations\Blocks;
 
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
+use CetechDeliveryEngine\Application\Cart\CartLineDeliveryPriceResolver;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionRevalidator;
 use CetechDeliveryEngine\Application\Checkout\CheckoutAddressPolicy;
 use CetechDeliveryEngine\Application\Shipping\DeliveryGroupIdentity;
@@ -27,7 +28,8 @@ final class BlocksStoreApiExtension {
 		private CartDeliverySelectionCapture $cart_capture,
 		private CartDeliverySelectionRevalidator $cart_revalidator,
 		private ShippingRateCalculationGate $shipping_gate,
-		private ?CheckoutAddressPolicy $address_policy = null
+		private ?CheckoutAddressPolicy $address_policy = null,
+		private ?CartLineDeliveryPriceResolver $prices = null
 	) {
 	}
 
@@ -65,7 +67,8 @@ final class BlocksStoreApiExtension {
 			$cart_item,
 			$this->cart_capture,
 			$this->cart_revalidator,
-			$key
+			$key,
+			$this->prices instanceof CartLineDeliveryPriceResolver ? $this->prices->price_text_for( $cart_item ) : ''
 		);
 	}
 
@@ -99,6 +102,8 @@ final class BlocksStoreApiExtension {
 			'summary_kicker'        => [ 'description' => 'Compact summary kicker, such as Store Pickup.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
 			'summary_title'         => [ 'description' => 'Compact summary title.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
 			'summary_meta'          => [ 'description' => 'Compact summary meta line.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'summary_price'         => [ 'description' => 'Customer-facing quoted fee for this line.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
+			'summary_line'          => [ 'description' => 'One-line selection summary: option, destination, estimate and fee.', 'type' => [ 'string', 'null' ], 'readonly' => true ],
 			'matching_location'     => [ 'description' => 'Customer matching location for editing this cart line.', 'type' => [ 'object', 'null' ], 'readonly' => true ],
 			'delivery_address'      => [ 'description' => 'Customer delivery address for editing this cart line.', 'type' => [ 'object', 'null' ], 'readonly' => true ],
 			'available_options'     => [ 'description' => 'Public delivery options available for this line.', 'type' => 'array', 'readonly' => true ],
@@ -130,7 +135,12 @@ final class BlocksStoreApiExtension {
 		$mutation = $GLOBALS[ BlocksCartContextCommandHandler::RESULT_GLOBAL ] ?? null;
 		$plan = [];
 		if ( function_exists( 'WC' ) && WC()->cart ) {
-			$plan = CustomerStorefrontCopy::delivery_plan( WC()->cart->get_cart() );
+			$contents = WC()->cart->get_cart();
+			$plan     = CustomerStorefrontCopy::delivery_plan(
+				$contents,
+				$this->prices instanceof CartLineDeliveryPriceResolver ? $this->prices->price_texts_for_cart( $contents ) : [],
+				function_exists( 'wc_get_cart_url' ) ? (string) wc_get_cart_url() : ''
+			);
 		}
 
 		return BlocksPublicPayload::strip_forbidden(
@@ -147,6 +157,7 @@ final class BlocksStoreApiExtension {
 				'keep_address_note'    => (bool) ( $notices['keep_address_note'] ?? false )
 					? CustomerStorefrontCopy::items_keep_own_address()
 					: null,
+				'mixed_ownership'      => (bool) ( $notices['mixed_ownership'] ?? false ),
 				'delivery_plan'        => $plan,
 				'mutation_result'      => is_array( $mutation ) ? $mutation : null,
 			]
@@ -208,6 +219,11 @@ final class BlocksStoreApiExtension {
 				'type'        => [ 'string', 'null' ],
 				'readonly'    => true,
 			],
+			'mixed_ownership'      => [
+				'description' => 'Whether native shippable lines share the cart with managed Delivery lines (the checkout shipping address belongs to the native lines).',
+				'type'        => 'boolean',
+				'readonly'    => true,
+			],
 			'delivery_plan'        => [
 				'description' => 'Compact checkout confirmation grouped by destination.',
 				'type'        => 'array',
@@ -229,6 +245,7 @@ final class BlocksStoreApiExtension {
 	 *     can_apply_checkout_address: bool,
 	 *     first_incomplete_anchor: string,
 	 *     keep_address_note: bool,
+	 *     mixed_ownership: bool,
 	 *     messages: list<array{code: string, message: string}>
 	 * }
 	 */
@@ -240,6 +257,7 @@ final class BlocksStoreApiExtension {
 			'can_apply_checkout_address' => false,
 			'first_incomplete_anchor'    => '',
 			'keep_address_note'          => false,
+			'mixed_ownership'            => false,
 			'messages'                   => [],
 		];
 
@@ -278,6 +296,13 @@ final class BlocksStoreApiExtension {
 			];
 		}
 
+		if ( ! empty( $summary['mixed_ownership'] ) ) {
+			$messages[] = [
+				'code'    => 'mixed_ownership',
+				'message' => CustomerStorefrontCopy::native_lines_use_checkout_address(),
+			];
+		}
+
 		return [
 			'multi_destination'          => $summary['multi_destination'],
 			'mixed_fulfilment'           => $summary['has_pickup'] && $summary['has_delivery'],
@@ -285,6 +310,7 @@ final class BlocksStoreApiExtension {
 			'can_apply_checkout_address' => ! empty( $summary['can_apply_checkout_address'] ),
 			'first_incomplete_anchor'    => (string) ( $summary['first_incomplete_anchor'] ?? '' ),
 			'keep_address_note'          => $summary['has_delivery'] && [] !== $summary['complete_identities'],
+			'mixed_ownership'            => ! empty( $summary['mixed_ownership'] ),
 			'messages'                   => $messages,
 		];
 	}

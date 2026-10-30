@@ -539,7 +539,7 @@ $is_schema9_release = str_contains( $header_source, '1.0.0-dev.wave2-quote-stora
 	|| 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-contract\.1\'\s*\);\s*$/m', $header_source );
 $is_schema10_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.wave2-promise-(?:storage|calculation|handoff)\.1\'\s*\);\s*$/m', $header_source );
 $is_schema11_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.(?:wave2-promise-(?:native|qualification)\.1|economics-facts\.1|delivery-promotion-fixed\.1|currency-convert-once\.1|commercial-handoff\.1|fixed-promotion-format\.1|promotion-authority\.1|promotion-sql\.1)\'\s*\);\s*$/m', $header_source );
-$is_schema12_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-dev\.promotion-(?:install|preparation)\.1\'\s*\);\s*$/m', $header_source );
+$is_schema12_release = 1 === preg_match( '/^define\(\s*\'CETECH_DE_VERSION\',\s*\'1\.0\.0-(?:dev\.promotion-(?:install|preparation)\.1|m3\.0-dev\.[0-9]+)\'\s*\);\s*$/m', $header_source );
 $is_schema8_release = str_contains( $header_source, '1.0.0-dev.wave1-rule-lifecycle' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-snapshot-readers' )
 	|| str_contains( $header_source, '1.0.0-dev.wave1-data-lifecycle' )
@@ -552,7 +552,8 @@ $is_schema6_release = str_contains( $header_source, '1.0.0-dev.geo' )
 	|| str_contains( $header_source, '1.0.0-dev.pdp-precision' )
 	|| str_contains( $header_source, '1.0.0-dev.address-ux' )
 	|| str_contains( $header_source, '1.0.0-dev.shipment-order-read' )
-	|| str_contains( $header_source, '1.0.0-dev.attention-count' );
+	|| str_contains( $header_source, '1.0.0-dev.attention-count' )
+	|| str_contains( $header_source, '1.0.0-m2.' );
 
 $target = 'unknown';
 if ( class_exists( 'CetechDeliveryEngine\\Core\\Versioning\\SchemaVersion' ) ) {

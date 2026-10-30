@@ -309,47 +309,47 @@
 			var caps = window.CetechDeProductDeliverySelector && window.CetechDeProductDeliverySelector.fulfilmentCapabilities
 				? window.CetechDeProductDeliverySelector.fulfilmentCapabilities(this.root, payload || {})
 				: { hasDelivery: groups.delivery.length > 0, hasPickup: groups.store_pickup.length > 0 };
-			var hasSwitch = (caps.hasDelivery && caps.hasPickup) || (groups.delivery.length > 0 && groups.store_pickup.length > 0);
+			var hasDelivery = caps.hasDelivery || groups.delivery.length > 0;
+			var hasPickup = caps.hasPickup || groups.store_pickup.length > 0;
 			var needPrecision = payload && payload.status === 'need_precision';
+			// D2 gate: keep the customer's earlier choice across variation changes; otherwise only a lone valid choice is pre-selected.
+			var previous = this.root ? this.root.querySelector('[data-cetech-de-choice-switch]:checked') : null;
+			var previousChoice = previous ? String(previous.value || '') : '';
+			var activeChoice = '';
+			if (previousChoice === 'store_pickup' && hasPickup) {
+				activeChoice = 'store_pickup';
+			} else if (previousChoice === 'delivery' && hasDelivery) {
+				activeChoice = 'delivery';
+			} else if (hasDelivery && !hasPickup) {
+				activeChoice = 'delivery';
+			} else if (hasPickup && !hasDelivery) {
+				activeChoice = 'store_pickup';
+			}
 			var defaultKey = '';
-			if (!needPrecision) {
-				options.forEach(function (option) {
+			if (!needPrecision && activeChoice !== '') {
+				var pool = activeChoice === 'store_pickup' ? groups.store_pickup : groups.delivery;
+				pool.forEach(function (option) {
 					if (option && option.is_default && option.display_key) {
 						defaultKey = String(option.display_key);
 					}
 				});
-				if (!defaultKey && options.length === 1) {
-					defaultKey = String(options[0].display_key || '');
+				if (!defaultKey && pool.length === 1) {
+					defaultKey = String(pool[0].display_key || '');
 				}
-			}
-			var activeChoice = 'delivery';
-			if (hasSwitch) {
-				if (!needPrecision) {
-					options.forEach(function (option) {
-						if (option && String(option.display_key || '') === defaultKey) {
-							activeChoice = String(option.fulfilment_choice || 'delivery');
-						}
-					});
-				}
-				if (activeChoice !== 'store_pickup') {
-					activeChoice = 'delivery';
-				}
-			} else if (groups.delivery.length === 0 && !needPrecision && !caps.hasDelivery) {
-				activeChoice = 'store_pickup';
 			}
 
-			if (hasSwitch) {
-				fragment.appendChild(this.renderChoiceSwitch(activeChoice, i18n));
+			if (hasDelivery || hasPickup) {
+				fragment.appendChild(this.renderChoiceSwitch(activeChoice, i18n, { hasDelivery: hasDelivery, hasPickup: hasPickup }));
 			}
 
-			if (caps.hasDelivery || groups.delivery.length) {
+			if (hasDelivery) {
 				fragment.appendChild(
-					this.renderChoicePanel('delivery', groups.delivery, variationId, fieldName, defaultKey, hasSwitch && activeChoice !== 'delivery', estimatePrefix, i18n)
+					this.renderChoicePanel('delivery', groups.delivery, variationId, fieldName, defaultKey, activeChoice !== 'delivery', estimatePrefix, i18n)
 				);
 			}
-			if (caps.hasPickup || groups.store_pickup.length) {
+			if (hasPickup) {
 				fragment.appendChild(
-					this.renderChoicePanel('store_pickup', groups.store_pickup, variationId, fieldName, defaultKey, hasSwitch && activeChoice !== 'store_pickup', estimatePrefix, i18n)
+					this.renderChoicePanel('store_pickup', groups.store_pickup, variationId, fieldName, defaultKey, activeChoice !== 'store_pickup', estimatePrefix, i18n)
 				);
 			}
 
@@ -359,32 +359,52 @@
 			}
 		},
 
-		renderChoiceSwitch: function (activeChoice, i18n) {
+		renderChoiceSwitch: function (activeChoice, i18n, caps) {
+			caps = caps || { hasDelivery: true, hasPickup: true };
+			var holder = document.createDocumentFragment();
 			var wrap = document.createElement('div');
 			wrap.className = 'cetech-de-fulfilment-choice';
 			wrap.setAttribute('role', 'radiogroup');
 			wrap.setAttribute('aria-label', i18n.fulfilment || 'Fulfilment');
+			var notes = [];
 			[
-				{ value: 'delivery', label: i18n.delivery || 'Delivery' },
-				{ value: 'store_pickup', label: i18n.storePickup || 'Store pickup' },
+				{ value: 'delivery', label: i18n.delivery || 'Delivery', enabled: !!caps.hasDelivery, note: i18n.deliveryNotAvailable || 'Delivery is not available for this product' },
+				{ value: 'store_pickup', label: i18n.storePickup || 'Store pickup', enabled: !!caps.hasPickup, note: i18n.pickupNotAvailable || 'Store pickup is not available for this product' },
 			].forEach(function (choice) {
+				var id = 'cetech-de-fulfilment-ui-' + choice.value;
 				var p = document.createElement('p');
-				p.className = 'cetech-de-fulfilment-choice__option';
+				p.className = 'cetech-de-fulfilment-choice__option' + (choice.enabled ? '' : ' cetech-de-fulfilment-choice__option--unavailable');
 				var label = document.createElement('label');
+				label.setAttribute('for', id);
 				var input = document.createElement('input');
 				input.type = 'radio';
 				input.name = 'cetech_de_fulfilment_ui';
+				input.id = id;
 				input.value = choice.value;
 				input.setAttribute('data-cetech-de-choice-switch', '1');
-				if (activeChoice === choice.value) {
+				if (choice.enabled && activeChoice === choice.value) {
 					input.checked = true;
+				}
+				if (!choice.enabled) {
+					input.disabled = true;
+					input.setAttribute('aria-describedby', id + '-note');
+					var note = document.createElement('p');
+					note.className = 'cetech-de-fulfilment-choice__note';
+					note.id = id + '-note';
+					note.setAttribute('data-cetech-de-choice-note', '1');
+					note.textContent = choice.note;
+					notes.push(note);
 				}
 				label.appendChild(input);
 				label.appendChild(document.createTextNode(' ' + choice.label));
 				p.appendChild(label);
 				wrap.appendChild(p);
 			});
-			return wrap;
+			holder.appendChild(wrap);
+			notes.forEach(function (note) {
+				holder.appendChild(note);
+			});
+			return holder;
 		},
 
 		renderChoicePanel: function (choice, options, variationId, fieldName, defaultKey, hidden, estimatePrefix, i18n) {
@@ -394,6 +414,10 @@
 				panel.className += ' cetech-de-delivery-option-group--pickup';
 			}
 			panel.setAttribute('data-cetech-de-choice-panel', choice);
+			if (choice === 'delivery') {
+				var localityField = document.querySelector('[data-cetech-de-matching-location] [name="cetech_de_matching_city"]');
+				panel.setAttribute('data-cetech-de-locality', localityField && localityField.value ? String(localityField.value) : '');
+			}
 			if (hidden) {
 				panel.hidden = true;
 			}
@@ -460,6 +484,7 @@
 			if (priceText) {
 				var price = document.createElement('span');
 				price.className = 'cetech-de-delivery-option__price';
+				price.setAttribute('data-cetech-de-price', option.price_text ? String(option.price_text) : (String(option.fulfilment_choice || '') === 'store_pickup' ? (i18n.free || 'Free') : ''));
 				price.textContent = priceText;
 				body.appendChild(price);
 			}

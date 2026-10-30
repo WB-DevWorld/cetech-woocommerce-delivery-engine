@@ -82,7 +82,8 @@ final class CodAwaitingShipmentEvaluator {
 		foreach ( $plan_result->plans as $plan ) {
 			$existing = $this->shipments->findByOrderAndGroup( $plan->order_id, $plan->delivery_group_id );
 
-			if ( null === $existing ) {
+			// COR-031: a parent-only or wrong-item aggregate is not a created shipment; the task stays visible.
+			if ( null === $existing || ! $this->shipments->aggregateIsComplete( $existing->id, $plan->shipment_items() ) ) {
 				return true;
 			}
 		}

@@ -23,6 +23,8 @@ use WP_Post;
  *
  * Protected snapshot meta remains stored; this class never exposes raw JSON,
  * versions, fingerprints, group hashes, or internal IDs in the primary staff view.
+ * COR-034: every order line is accounted for. A member whose snapshot cannot be read
+ * is listed with its status instead of disappearing behind the group's first member.
  */
 final class OrderDeliverySnapshotAdminDisplay {
 
@@ -154,13 +156,22 @@ final class OrderDeliverySnapshotAdminDisplay {
 	 */
 	private function render_line_items( array $line_entries ): void {
 		foreach ( $line_entries as $entry ) {
-			$read = $entry['read'];
+			$read   = $entry['read'];
+			$status = $this->integrity->classify_line( $read );
 
 			if ( null === $read->snapshot ) {
+				if ( ! $read->has_meta ) {
+					continue;
+				}
+
+				echo '<div class="cetech-de-order-delivery-info cetech-de-order-delivery-info--review" style="margin-bottom:16px;padding:12px;border:1px solid #ccd0d4;background:#fff;">';
+				echo '<table class="widefat striped"><tbody>';
+				$this->render_row( DeliveryPresentationLabels::product(), esc_html( $entry['item']->get_name() ) );
+				$this->render_row( DeliveryPresentationLabels::status(), esc_html( $this->format_member_status( $status ) ) );
+				echo '</tbody></table>';
+				echo '</div>';
 				continue;
 			}
-
-			$status = $this->integrity->classify_line( $read );
 
 			echo '<div class="cetech-de-order-delivery-info" style="margin-bottom:16px;padding:12px;border:1px solid #ccd0d4;background:#fff;">';
 			echo '<table class="widefat striped"><tbody>';
@@ -207,6 +218,20 @@ final class OrderDeliverySnapshotAdminDisplay {
 
 			if ( null !== $first_snapshot ) {
 				$this->render_operational_line_rows( $first_snapshot, $first_status, false );
+			}
+
+			// COR-034: members whose own snapshot differs from the first, or cannot be read, stay visible.
+			foreach ( $group['entries'] as $entry ) {
+				$member_status = $this->integrity->classify_line( $entry['read'] );
+
+				if ( null !== $entry['read']->snapshot && $member_status === $first_status ) {
+					continue;
+				}
+
+				$this->render_row(
+					__( 'Needs review', 'cetech-woocommerce-delivery-engine' ),
+					esc_html( $entry['item']->get_name() . ' — ' . $this->format_member_status( $member_status ) )
+				);
 			}
 
 			$group_snapshot = $group['group'];
@@ -346,10 +371,15 @@ final class OrderDeliverySnapshotAdminDisplay {
 		$by_group = [];
 		$ungrouped = [];
 
+		$unreadable = [];
+
 		foreach ( $line_entries as $entry ) {
 			$snapshot = $entry['read']->snapshot;
 
 			if ( null === $snapshot ) {
+				if ( $entry['read']->has_meta ) {
+					$unreadable[] = $entry;
+				}
 				continue;
 			}
 
@@ -369,6 +399,10 @@ final class OrderDeliverySnapshotAdminDisplay {
 
 		if ( [] === $by_group ) {
 			return [];
+		}
+
+		if ( [] !== $unreadable ) {
+			$ungrouped = array_merge( $ungrouped, $unreadable );
 		}
 
 		$package_groups = [];
@@ -415,13 +449,28 @@ final class OrderDeliverySnapshotAdminDisplay {
 
 		foreach ( $ungrouped as $entry ) {
 			$result[] = [
-				'title'   => __( 'Delivery', 'cetech-woocommerce-delivery-engine' ),
+				'title'   => null === $entry['read']->snapshot
+					? __( 'Needs review', 'cetech-woocommerce-delivery-engine' )
+					: __( 'Delivery', 'cetech-woocommerce-delivery-engine' ),
 				'group'   => null,
 				'entries' => [ $entry ],
 			];
 		}
 
 		return $result;
+	}
+
+	private function format_member_status( string $status ): string {
+		return match ( $status ) {
+			OrderDeliverySnapshotIntegrity::STATUS_PRESENT_VALID,
+			OrderDeliverySnapshotIntegrity::STATUS_SELECTION_ONLY => __( 'Saved', 'cetech-woocommerce-delivery-engine' ),
+			OrderDeliverySnapshotIntegrity::STATUS_MISSING => __( 'Not saved', 'cetech-woocommerce-delivery-engine' ),
+			OrderDeliverySnapshotIntegrity::STATUS_MALFORMED => __( 'Malformed delivery snapshot', 'cetech-woocommerce-delivery-engine' ),
+			OrderDeliverySnapshotIntegrity::STATUS_VERSION_MISMATCH => __( 'Unsupported delivery snapshot version', 'cetech-woocommerce-delivery-engine' ),
+			OrderDeliverySnapshotIntegrity::STATUS_PARTIAL => __( 'Incomplete delivery snapshot', 'cetech-woocommerce-delivery-engine' ),
+			OrderDeliverySnapshotIntegrity::STATUS_QUOTE_MISSING => __( 'Delivery quote missing', 'cetech-woocommerce-delivery-engine' ),
+			default => __( 'Needs review', 'cetech-woocommerce-delivery-engine' ),
+		};
 	}
 
 	/**

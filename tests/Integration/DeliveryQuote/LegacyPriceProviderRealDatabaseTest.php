@@ -45,7 +45,7 @@ final class LegacyPriceProviderRealDatabaseTest extends TestCase {
 		\CetechDeliveryEngine\Tests\Support\DeliveryQuote\QuoteProviderProofDatabase::rate($this->database,$this->prefix,[$column=>40]);
 		$repository=new \CetechDeliveryEngine\Infrastructure\Persistence\WpdbRateCardRepository();
 		$legacy=(new \CetechDeliveryEngine\Application\RateQuote\RateQuoteEngine($repository))->quote(new \CetechDeliveryEngine\Application\RateQuote\RateQuoteRequest(20,50,2,new \CetechDeliveryEngine\Domain\ValueObject\CurrencyCode('GHS')));
-		self::assertTrue($legacy->success,'The retained wildcard matcher establishes this regression premise.');
+		self::assertFalse($legacy->success,'D1 (reunified M2): a positively scoped card never matches a request that lacks the dimension, so the retained engine refuses before the legacy capture does.');
 		$data=\CetechDeliveryEngine\Tests\Support\DeliveryQuote\QuoteFixtures::context()->private_facts();$data['groups'][0]['service_id']=20;$data['groups'][0][$dimension]=['state'=>$state,'id'=>null];
 		$this->expectException(\InvalidArgumentException::class);(new \CetechDeliveryEngine\Application\DeliveryQuote\LegacyQuoteEngineCapture())->capture(\CetechDeliveryEngine\Domain\DeliveryQuote\QuoteContext::from_array($data),$repository);
 	}

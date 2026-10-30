@@ -32,8 +32,19 @@
 }
 
 .cetech-de-blocks-line__kicker,
-.cetech-de-blocks-line__title {
+.cetech-de-blocks-line__title,
+.cetech-de-blocks-line__line {
 	margin: 0.1rem 0;
+	font-weight: 600;
+}
+
+.cetech-de-blocks-line__line {
+	line-height: 1.5;
+}
+
+.cetech-de-delivery-plan__change {
+	display: inline-block;
+	margin-inline-start: 0.35rem;
 	font-weight: 600;
 }
 

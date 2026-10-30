@@ -145,7 +145,8 @@ final class ProductDeliverySelectionValidator implements ProductDeliverySelectio
 			$target_id,
 			$matched,
 			$rule_id,
-			$runtime->configuration_fingerprint
+			$runtime->configuration_fingerprint,
+			$runtime->quote_dimensions_for( $matched->fulfilment_availability )
 		);
 
 		return ProductDeliverySelectionValidationResult::valid( $matched, $intent, $warnings );

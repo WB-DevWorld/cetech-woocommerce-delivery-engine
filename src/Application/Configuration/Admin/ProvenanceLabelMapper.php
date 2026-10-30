@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Configuration\Admin;
 
+use CetechDeliveryEngine\Domain\Configuration\FieldProvenance;
+
 /**
  * Maps internal provenance labels to administrator-facing language.
  */
@@ -19,6 +21,25 @@ final class ProvenanceLabelMapper {
 			'hard_constraint' => 'Required fulfilment rule',
 			default => $source_label,
 		};
+	}
+
+	/**
+	 * COR-012 (D3a): the staff label for a field's provenance, naming an ignored inactive scope.
+	 */
+	public static function describe( FieldProvenance $provenance ): string {
+		$label = self::map( $provenance->source_label );
+
+		if ( null === $provenance->ignored_inactive_scope ) {
+			return $label;
+		}
+
+		$scope = match ( $provenance->ignored_inactive_scope->value ) {
+			'variation' => 'variation',
+			'product'   => 'product',
+			default     => $provenance->ignored_inactive_scope->value,
+		};
+
+		return sprintf( '%s (%s setting is inactive and ignored)', $label, $scope );
 	}
 
 	public static function currently_using( string $source_label ): string {

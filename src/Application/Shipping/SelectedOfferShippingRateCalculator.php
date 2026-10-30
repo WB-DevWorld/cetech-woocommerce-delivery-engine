@@ -425,6 +425,16 @@ final class SelectedOfferShippingRateCalculator {
 			'origin_id'            => null,
 		];
 
+		// D1: the tuple captured with the selection is the grouping identity, so it also prices the group.
+		$captured = [
+			'logistics_profile_id' => $this->positive_int_or_null( $intent['logistics_profile_id'] ?? null ),
+			'supplier_id'          => $this->positive_int_or_null( $intent['supplier_id'] ?? null ),
+			'origin_id'            => $this->positive_int_or_null( $intent['origin_id'] ?? null ),
+		];
+		if ( $captured !== $empty ) {
+			return $captured;
+		}
+
 		$availability = sanitize_key( (string) ( $intent['fulfilment_availability'] ?? '' ) );
 		$target_type  = sanitize_key( (string) ( $intent['target_type'] ?? '' ) );
 		$target_id    = (int) ( $intent['target_id'] ?? 0 );

@@ -106,6 +106,7 @@ final class DeliverySettingsPage {
 				'url'   => AdminPageRenderer::list_url( AdminMenu::PARENT_SLUG ),
 			]
 		);
+		PluginIdentityBadge::render();
 
 		$shipping_ready = $this->shipping_readiness?->is_ready() ?? false;
 		$runtime_active = $this->runtime?->is_active() ?? false;

@@ -61,7 +61,8 @@ final class ProductDeliveryOptionsBuilder {
 			$delivery_options = $this->delivery_offer_options(
 				$availability_slug,
 				$availability_label,
-				$split['delivery']
+				$split['delivery'],
+				$rule->estimated_delivery
 			);
 			$pickup_location  = $this->resolve_pickup_location( $rule );
 			$emit_pickup      = $this->should_emit_pickup(
@@ -92,11 +93,8 @@ final class ProductDeliveryOptionsBuilder {
 				}
 			}
 
-			if (
-				FulfilmentAvailability::InStore->value === $availability_slug
-				&& FulfilmentChoice::StorePickup->value === $choice_slug
-				&& $emit_pickup
-			) {
+			// Pickup can only be emitted for In Store or for an assigned Pickup Location (COR-022).
+			if ( FulfilmentChoice::StorePickup->value === $choice_slug && $emit_pickup ) {
 				$preferred_choice = FulfilmentChoice::StorePickup->value;
 			}
 		}
@@ -258,7 +256,8 @@ final class ProductDeliveryOptionsBuilder {
 	 */
 	private function should_emit_pickup( string $availability, ?array $pickup_location, array $pickup_offer_ids ): bool {
 		if ( FulfilmentAvailability::InStore->value !== $availability ) {
-			return false;
+			// COR-022 (D8): outside In Store, only an explicitly assigned active Pickup Location offers pickup.
+			return null !== $pickup_location;
 		}
 
 		if ( null !== $pickup_location ) {
@@ -437,7 +436,8 @@ final class ProductDeliveryOptionsBuilder {
 	private function delivery_offer_options(
 		string $availability_slug,
 		string $availability_label,
-		array $offer_ids
+		array $offer_ids,
+		?string $configured_estimate = null
 	): array {
 		$options      = [];
 		$choice_slug  = FulfilmentChoice::Delivery->value;
@@ -475,7 +475,7 @@ final class ProductDeliveryOptionsBuilder {
 				(int) $offer_id,
 				$public_label,
 				'' !== $public_description ? $public_description : null,
-				$this->format_estimate_text( $row ),
+				$this->format_estimate_text( $row, $configured_estimate ),
 				true,
 				null
 			);
@@ -582,7 +582,7 @@ final class ProductDeliveryOptionsBuilder {
 	/**
 	 * @param array<string, mixed> $offer
 	 */
-	private function format_estimate_text( array $offer ): ?string {
-		return DeliveryEstimateFormatter::from_offer( $offer );
+	private function format_estimate_text( array $offer, ?string $configured_estimate = null ): ?string {
+		return DeliveryEstimatePrecedence::for_delivery( $configured_estimate, $offer );
 	}
 }

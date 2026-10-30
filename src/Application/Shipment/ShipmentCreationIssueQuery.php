@@ -63,7 +63,24 @@ final class ShipmentCreationIssueQuery {
 		return $items;
 	}
 
+	/**
+	 * COR-033: the real size of the failure index, never capped at a page of orders.
+	 */
 	public function count(): int {
-		return count( $this->list( 500 ) );
+		return $this->failures->count();
+	}
+
+	/**
+	 * @return array{shown: int, total: int, truncated: bool}
+	 */
+	public function summary( int $limit = 50 ): array {
+		$shown = count( $this->list( $limit ) );
+		$total = $this->count();
+
+		return [
+			'shown'     => $shown,
+			'total'     => max( $shown, $total ),
+			'truncated' => $total > $shown,
+		];
 	}
 }

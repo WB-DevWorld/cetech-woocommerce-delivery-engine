@@ -11,7 +11,9 @@ use WC_Order;
  * Persistent paid-order shipment creation failure state.
  *
  * Order meta is the per-order source of truth. A compact option index lists
- * failed order IDs so Needs Attention does not scan WooCommerce orders.
+ * failed order IDs so Needs Attention does not scan WooCommerce orders. COR-033:
+ * index writes run under AttentionIndexLock so concurrent writers keep each
+ * other's entries, and report false when the index could not be written.
  */
 final class ShipmentCreationFailureStore {
 
@@ -24,7 +26,7 @@ final class ShipmentCreationFailureStore {
 
 	public const INDEX_OPTION = 'cetech_de_shipment_creation_failure_order_ids';
 
-	public function mark_failed( WC_Order $order, ShipmentCreationErrorCode $error_code ): void {
+	public function mark_failed( WC_Order $order, ShipmentCreationErrorCode $error_code ): bool {
 		$order_id = (int) $order->get_id();
 
 		$order->update_meta_data( self::STATE_META, self::STATE_FAILED );
@@ -32,15 +34,22 @@ final class ShipmentCreationFailureStore {
 		$order->update_meta_data( self::ATTEMPTED_META, gmdate( 'c' ) );
 		$order->save();
 
-		$ids = $this->failed_order_ids();
-
-		if ( ! in_array( $order_id, $ids, true ) ) {
-			$ids[] = $order_id;
-			update_option( self::INDEX_OPTION, array_values( $ids ), false );
+		if ( $order_id <= 0 ) {
+			return false;
 		}
+
+		return $this->mutate_index(
+			function ( array $ids ) use ( $order_id ): array {
+				if ( ! in_array( $order_id, $ids, true ) ) {
+					$ids[] = $order_id;
+				}
+
+				return $ids;
+			}
+		);
 	}
 
-	public function mark_succeeded( WC_Order $order ): void {
+	public function mark_succeeded( WC_Order $order ): bool {
 		$order_id = (int) $order->get_id();
 
 		$order->update_meta_data( self::STATE_META, self::STATE_SUCCEEDED );
@@ -48,14 +57,38 @@ final class ShipmentCreationFailureStore {
 		$order->update_meta_data( self::ATTEMPTED_META, gmdate( 'c' ) );
 		$order->save();
 
-		$ids = array_values(
-			array_filter(
-				$this->failed_order_ids(),
-				static fn ( int $id ): bool => $id !== $order_id
+		return $this->mutate_index(
+			static fn ( array $ids ): array => array_values(
+				array_filter( $ids, static fn ( int $id ): bool => $id !== $order_id )
 			)
 		);
+	}
 
-		update_option( self::INDEX_OPTION, $ids, false );
+	public function count(): int {
+		return count( $this->failed_order_ids() );
+	}
+
+	/**
+	 * @param callable(list<int>): list<int> $change
+	 */
+	private function mutate_index( callable $change ): bool {
+		try {
+			return AttentionIndexLock::run(
+				self::INDEX_OPTION,
+				function () use ( $change ): bool {
+					$current = $this->failed_order_ids();
+					$next    = array_values( array_unique( $change( $current ) ) );
+
+					if ( $next === $current ) {
+						return true;
+					}
+
+					return (bool) update_option( self::INDEX_OPTION, $next, false );
+				}
+			);
+		} catch ( AttentionIndexBusyException ) {
+			return false;
+		}
 	}
 
 	public function error_code( WC_Order $order ): ?ShipmentCreationErrorCode {

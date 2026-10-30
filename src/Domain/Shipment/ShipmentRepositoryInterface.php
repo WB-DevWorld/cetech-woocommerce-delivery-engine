@@ -29,6 +29,15 @@ interface ShipmentRepositoryInterface {
 	public function findByOrderId( int $order_id ): array;
 
 	/**
+	 * COR-033: bounded batched lookup keyed by shipment id (missing ids are absent).
+	 *
+	 * @param list<int> $ids
+	 *
+	 * @return array<int, Shipment>
+	 */
+	public function findByIds( array $ids ): array;
+
+	/**
 	 * @param array{status?: string, order_id?: int, search?: string} $criteria Status must be a machine code.
 	 */
 	public function list( array $criteria = [], int $page = 1, int $per_page = 20 ): ShipmentListResult;
@@ -77,6 +86,26 @@ interface ShipmentRepositoryInterface {
 	/**
 	 * Highest persisted shipment-event ID. 0 when no events exist.
 	 */
+	/**
+	 * COR-031: whether the stored aggregate equals the frozen required item set exactly
+	 * (same order items, order ids and quantities, nothing extra) and carries a Created event.
+	 *
+	 * @param list<ShipmentItem> $expected_items
+	 */
+	public function aggregateIsComplete( int $shipment_id, array $expected_items ): bool;
+
+	/**
+	 * COR-032: write only the given columns and the attributable event(s) in one transaction,
+	 * guarded by the values the editor loaded for those columns. When the guard fails because
+	 * the row already holds the target values (a partial earlier write or an identical retry)
+	 * the write is treated as applied and the events are appended; any other change since the
+	 * load raises ShipmentConcurrentEditException and nothing is written.
+	 *
+	 * @param array<string, mixed> $fields   Column => new value.
+	 * @param array<string, mixed> $expected Column => value the editor loaded.
+	 */
+	public function updateFieldsWithEvent( int $shipment_id, array $fields, array $expected, ShipmentEvent ...$events ): Shipment;
+
 	public function maxEventId(): int;
 
 	/**

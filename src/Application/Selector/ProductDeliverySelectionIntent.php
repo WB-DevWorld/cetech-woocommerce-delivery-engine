@@ -7,7 +7,10 @@ namespace CetechDeliveryEngine\Application\Selector;
 /**
  * Server-side handoff contract for a validated product delivery selection.
  *
- * May be stored in WooCommerce cart item data when cart capture is enabled. No private supplier/origin data.
+ * May be stored in WooCommerce cart item data when cart capture is enabled. It carries only numeric
+ * quote dimensions (logistics profile, supplier, origin ids) so that delivery grouping and pricing use
+ * the same tuple (D1), and the Pickup endpoint id so that a replaced or removed Pickup Location can
+ * never be substituted silently (COR-024); never names, addresses or costs.
  */
 final class ProductDeliverySelectionIntent {
 
@@ -27,10 +30,17 @@ final class ProductDeliverySelectionIntent {
 		public readonly ?int $delivery_offer_id,
 		public readonly ?int $rule_id,
 		public readonly string $issued_at,
-		public readonly ?string $configuration_fingerprint = null
+		public readonly ?string $configuration_fingerprint = null,
+		public readonly ?int $logistics_profile_id = null,
+		public readonly ?int $supplier_id = null,
+		public readonly ?int $origin_id = null,
+		public readonly ?int $pickup_location_id = null
 	) {
 	}
 
+	/**
+	 * @param array{logistics_profile_id?: int|null, supplier_id?: int|null, origin_id?: int|null} $quote_dimensions
+	 */
 	public static function fromValidatedOption(
 		int $product_id,
 		?int $variation_id,
@@ -38,7 +48,8 @@ final class ProductDeliverySelectionIntent {
 		int $target_id,
 		ProductDeliveryOption $option,
 		?int $rule_id,
-		?string $configuration_fingerprint = null
+		?string $configuration_fingerprint = null,
+		array $quote_dimensions = []
 	): self {
 		return new self(
 			self::CONTRACT_VERSION,
@@ -52,8 +63,22 @@ final class ProductDeliverySelectionIntent {
 			$option->delivery_offer_id,
 			$rule_id,
 			gmdate( 'c' ),
-			$configuration_fingerprint
+			$configuration_fingerprint,
+			self::positive_or_null( $quote_dimensions['logistics_profile_id'] ?? null ),
+			self::positive_or_null( $quote_dimensions['supplier_id'] ?? null ),
+			self::positive_or_null( $quote_dimensions['origin_id'] ?? null ),
+			self::positive_or_null( $option->pickup_location_id )
 		);
+	}
+
+	public static function positive_or_null( mixed $value ): ?int {
+		if ( null === $value || '' === $value || ! is_scalar( $value ) ) {
+			return null;
+		}
+
+		$int = (int) $value;
+
+		return $int > 0 ? $int : null;
 	}
 
 	public static function isCompatibleWithOptionContract( string $option_contract_version ): bool {
@@ -82,6 +107,12 @@ final class ProductDeliverySelectionIntent {
 			$data['configuration_fingerprint'] = $this->configuration_fingerprint;
 		}
 
+		foreach ( [ 'logistics_profile_id', 'supplier_id', 'origin_id', 'pickup_location_id' ] as $dimension ) {
+			if ( null !== $this->{$dimension} ) {
+				$data[ $dimension ] = $this->{$dimension};
+			}
+		}
+
 		return $data;
 	}
 
@@ -105,7 +136,11 @@ final class ProductDeliverySelectionIntent {
 			isset( $data['delivery_offer_id'] ) && '' !== $data['delivery_offer_id'] ? (int) $data['delivery_offer_id'] : null,
 			isset( $data['rule_id'] ) && '' !== $data['rule_id'] ? (int) $data['rule_id'] : null,
 			(string) ( $data['issued_at'] ?? '' ),
-			$fingerprint
+			$fingerprint,
+			self::positive_or_null( $data['logistics_profile_id'] ?? null ),
+			self::positive_or_null( $data['supplier_id'] ?? null ),
+			self::positive_or_null( $data['origin_id'] ?? null ),
+			self::positive_or_null( $data['pickup_location_id'] ?? null )
 		);
 	}
 }
