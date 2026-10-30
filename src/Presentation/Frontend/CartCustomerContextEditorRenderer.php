@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Presentation\Frontend;
 
+use CetechDeliveryEngine\Application\Geography\StorefrontGeographyEndpoint;
 use CetechDeliveryEngine\Application\Cart\CartCustomerContextEditorService;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionCapture;
 use CetechDeliveryEngine\Application\Cart\CartDeliverySelectionSessionData;
@@ -81,6 +82,26 @@ final class CartCustomerContextEditorRenderer {
 			[],
 			$version,
 			true
+		);
+
+		// C12: the editor's destination cascade (Region reveals City, locality suggestions) uses the same
+		// storefront geography endpoints as the product page, which is not loaded on the cart.
+		wp_localize_script(
+			self::SCRIPT_HANDLE,
+			'cetechDeCartContextEditor',
+			[
+				'ajaxUrl'   => function_exists( 'admin_url' ) ? admin_url( 'admin-ajax.php' ) : '',
+				'geography' => [
+					'childrenAction' => StorefrontGeographyEndpoint::CHILDREN_ACTION,
+					'searchAction'   => StorefrontGeographyEndpoint::SEARCH_ACTION,
+					'childrenNonce'  => function_exists( 'wp_create_nonce' ) ? wp_create_nonce( StorefrontGeographyEndpoint::CHILDREN_ACTION ) : '',
+					'searchNonce'    => function_exists( 'wp_create_nonce' ) ? wp_create_nonce( StorefrontGeographyEndpoint::SEARCH_ACTION ) : '',
+				],
+				'i18n'      => [
+					'select'   => __( 'Select…', 'cetech-woocommerce-delivery-engine' ),
+					'loadMore' => __( 'Load more', 'cetech-woocommerce-delivery-engine' ),
+				],
+			]
 		);
 	}
 
