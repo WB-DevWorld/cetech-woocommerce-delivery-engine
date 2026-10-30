@@ -123,6 +123,8 @@ final class ManualShipmentCreationPreviewFactory {
 			$existing = $this->shipments->findByOrderAndGroup( $plan->order_id, $plan->delivery_group_id );
 			$number   = null;
 			$id       = null;
+			// COR-031: an existing but incomplete aggregate still needs creation (repair), and names the row it repairs.
+			$complete = null !== $existing && $this->shipments->aggregateIsComplete( $existing->id, $plan->shipment_items() );
 
 			if ( null !== $existing ) {
 				$number = $this->shipment_reference( $existing );
@@ -136,7 +138,7 @@ final class ManualShipmentCreationPreviewFactory {
 				$this->fulfilment_label( $plan->fulfilment_choice ),
 				trim( (string) $plan->eta_original ),
 				false,
-				null === $existing,
+				! $complete,
 				$number,
 				$id
 			);

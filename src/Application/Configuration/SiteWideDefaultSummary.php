@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Application\Configuration;
 
 use CetechDeliveryEngine\Application\Configuration\Admin\ConfigurationFieldCatalog;
 use CetechDeliveryEngine\Application\Configuration\Admin\EntityLabelResolver;
+use CetechDeliveryEngine\Application\Selector\DeliveryEstimateFormatter;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
 use CetechDeliveryEngine\Domain\Configuration\ScopedConfiguration;
@@ -173,18 +174,8 @@ final class SiteWideDefaultSummary {
 			return '';
 		}
 
-		$min = (int) ( $row['default_processing_min'] ?? 0 ) + (int) ( $row['default_transit_min'] ?? 0 );
-		$max = (int) ( $row['default_processing_max'] ?? 0 ) + (int) ( $row['default_transit_max'] ?? 0 );
-
-		if ( $min <= 0 && $max <= 0 ) {
-			return '';
-		}
-
-		if ( $min === $max || $max <= 0 ) {
-			return $min . ' days';
-		}
-
-		return $min . '–' . $max . ' days';
+		// Same text the customer sees for this offer (ETA precedence, M2).
+		return DeliveryEstimateFormatter::from_offer( $row ) ?? '';
 	}
 
 	private function rate_summary( ?ScopedConfiguration $scope ): string {

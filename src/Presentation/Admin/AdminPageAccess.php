@@ -36,6 +36,23 @@ final class AdminPageAccess {
 		self::deny();
 	}
 
+	/**
+	 * Admit the page when the user holds any one of the capabilities the menu accepts.
+	 */
+	public static function require_any_capability( string ...$capabilities ): void {
+		if ( self::current_user_is_restricted() ) {
+			self::deny();
+		}
+
+		foreach ( $capabilities as $capability ) {
+			if ( current_user_can( $capability ) ) {
+				return;
+			}
+		}
+
+		self::deny();
+	}
+
 	private static function deny(): void {
 		wp_die(
 			esc_html__(

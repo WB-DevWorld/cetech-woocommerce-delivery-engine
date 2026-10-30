@@ -17,6 +17,11 @@ use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
  * v1 (RC.9): availability|choice|offer_or_pickup
  * v2:        availability|choice|offer_or_pickup|destination
  *
+ * D1 (M2): for Delivery, the offer segment also carries the quote-dimension tuple that the
+ * selection intent captured, as `{offer}-l{profile}-s{supplier}-o{origin}` with only the
+ * assigned parts present (`10-s5-o3`). Lines whose tuple differs therefore form separate
+ * groups with their own charge. Lines with no tuple keep the plain `{offer}` segment.
+ *
  * Runtime-only `|reselect` is never persisted onto a successful historical order.
  * Destination segments are truncated SHA-256 hashes — never raw addresses.
  */
@@ -31,6 +36,13 @@ final class DeliveryGroupIdentity {
 	public const COLUMN_LENGTH = 191;
 
 	public const IDEMPOTENCY_KEY_LENGTH = 255;
+
+	/** Quote-dimension tuple encoding inside the Delivery offer segment (D1). */
+	public const DIMENSION_PREFIXES = [
+		'logistics_profile_id' => 'l',
+		'supplier_id'          => 's',
+		'origin_id'            => 'o',
+	];
 
 	/**
 	 * v1 three-part identity from admin-derived selection intent only.
@@ -149,10 +161,61 @@ final class DeliveryGroupIdentity {
 				return null;
 			}
 
-			$offer_segment = (string) $offer_id;
+			$offer_segment = self::deliverySegment( $offer_id, $intent );
 		}
 
 		return self::compose( $availability, $choice, $offer_segment );
+	}
+
+	/**
+	 * Offer segment for a Delivery line: the offer id plus the captured quote-dimension tuple.
+	 *
+	 * @param array<string, mixed> $intent
+	 */
+	public static function deliverySegment( int $offer_id, array $intent ): string {
+		$segment = (string) $offer_id;
+
+		foreach ( self::DIMENSION_PREFIXES as $key => $prefix ) {
+			$value = isset( $intent[ $key ] ) && is_scalar( $intent[ $key ] ) ? (int) $intent[ $key ] : 0;
+			if ( $value > 0 ) {
+				$segment .= '-' . $prefix . (string) $value;
+			}
+		}
+
+		return $segment;
+	}
+
+	/**
+	 * The delivery offer id encoded in an offer segment, or null for pickup/none segments.
+	 */
+	public static function offerIdFromSegment( string $offer_segment ): ?int {
+		$head = explode( '-', $offer_segment, 2 )[0];
+
+		return ctype_digit( $head ) ? (int) $head : null;
+	}
+
+	/**
+	 * The quote-dimension tuple encoded in an offer segment (D1).
+	 *
+	 * @return array{logistics_profile_id: int|null, supplier_id: int|null, origin_id: int|null}
+	 */
+	public static function dimensionsFromSegment( string $offer_segment ): array {
+		$dimensions = [
+			'logistics_profile_id' => null,
+			'supplier_id'          => null,
+			'origin_id'            => null,
+		];
+		$by_prefix  = array_flip( self::DIMENSION_PREFIXES );
+
+		foreach ( array_slice( explode( '-', $offer_segment ), 1 ) as $part ) {
+			$prefix = substr( $part, 0, 1 );
+			$digits = substr( $part, 1 );
+			if ( isset( $by_prefix[ $prefix ] ) && '' !== $digits && ctype_digit( $digits ) ) {
+				$dimensions[ $by_prefix[ $prefix ] ] = (int) $digits;
+			}
+		}
+
+		return $dimensions;
 	}
 
 	/**
@@ -281,8 +344,8 @@ final class DeliveryGroupIdentity {
 	}
 
 	/**
-	 * Worst-case encoded length using current enums, pickup bigint ids, and
-	 * destination-hash segments. Runtime `|reselect` is included for cart only.
+	 * Worst-case encoded length using current enums, pickup bigint ids, the D1
+	 * dimension tuple, and destination-hash segments. Runtime `|reselect` is included for cart only.
 	 */
 	public static function worstCaseLength( bool $include_reselect = false ): int {
 		$availability = 0;
@@ -297,7 +360,7 @@ final class DeliveryGroupIdentity {
 			$choice = max( $choice, strlen( $case->value ) );
 		}
 
-		$offer       = 1 + 20;
+		$offer       = 1 + 20 + count( self::DIMENSION_PREFIXES ) * ( 2 + 20 );
 		$destination = 1 + 1 + LocationIdentity::DESTINATION_SEGMENT_LENGTH;
 		$separators  = 3;
 		$reselect    = $include_reselect ? 1 + strlen( self::RESELECT_SUFFIX ) : 0;

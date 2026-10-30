@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Application\Cart;
 
+use CetechDeliveryEngine\Application\Selector\ProductDeliveryOptionsBuilder;
 use CetechDeliveryEngine\Domain\CustomerContext\CustomerCartContext;
 use CetechDeliveryEngine\Domain\Enum\FulfilmentChoice;
 
@@ -151,6 +152,49 @@ final class CartLineCustomerIdentity {
 		}
 
 		return $fresh_intent;
+	}
+
+	/**
+	 * Align a stored intent with a newly committed customer context (COR-025).
+	 *
+	 * The choice, offer and Pickup endpoint follow the context, and the display key is
+	 * rewritten to name that offer or endpoint, so the next reconciliation resolves the
+	 * live option for the committed choice instead of the previous one.
+	 *
+	 * @param array<string, mixed> $intent
+	 *
+	 * @return array<string, mixed>
+	 */
+	public static function alignIntentWithContext( array $intent, CustomerCartContext $context ): array {
+		$availability = sanitize_key( (string) ( $intent['fulfilment_availability'] ?? '' ) );
+		$intent['fulfilment_choice'] = $context->fulfilment_choice;
+
+		if ( $context->isPickup() ) {
+			$intent['delivery_offer_id'] = null;
+			$endpoint                    = (int) ( $context->pickup_location_id ?? 0 );
+
+			if ( $endpoint > 0 ) {
+				$intent['pickup_location_id'] = $endpoint;
+				if ( '' !== $availability ) {
+					$intent['display_key'] = ProductDeliveryOptionsBuilder::formatDisplayKey( $availability, FulfilmentChoice::StorePickup->value, 'p' . (string) $endpoint );
+				}
+			} else {
+				unset( $intent['pickup_location_id'] );
+			}
+
+			return $intent;
+		}
+
+		unset( $intent['pickup_location_id'] );
+
+		if ( null !== $context->delivery_offer_id && $context->delivery_offer_id > 0 ) {
+			$intent['delivery_offer_id'] = $context->delivery_offer_id;
+			if ( '' !== $availability ) {
+				$intent['display_key'] = ProductDeliveryOptionsBuilder::formatDisplayKey( $availability, FulfilmentChoice::Delivery->value, (string) $context->delivery_offer_id );
+			}
+		}
+
+		return $intent;
 	}
 
 	/**

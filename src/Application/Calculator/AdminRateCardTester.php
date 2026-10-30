@@ -154,15 +154,20 @@ final class AdminRateCardTester {
 		return true;
 	}
 
+	/**
+	 * D1: a card scoped to a specific profile, supplier or origin matches only an item that carries
+	 * that same value. An unscoped card matches any item. An item without a value never matches a
+	 * scoped card.
+	 */
 	private function optional_dimension_matches( ?int $test_value, mixed $card_value ): bool {
 		$card_int = null === $card_value || '' === $card_value ? null : (int) $card_value;
 
-		if ( null === $test_value || $test_value <= 0 ) {
+		if ( null === $card_int || $card_int <= 0 ) {
 			return true;
 		}
 
-		if ( null === $card_int || $card_int <= 0 ) {
-			return true;
+		if ( null === $test_value || $test_value <= 0 ) {
+			return false;
 		}
 
 		return $test_value === $card_int;

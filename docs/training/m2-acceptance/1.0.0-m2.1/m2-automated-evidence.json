@@ -1,0 +1,30 @@
+{
+  "format": "cetech-m2-automated-evidence-v1",
+  "generated_at": "2026-10-29T18:38:51Z",
+  "head": "7320a6b5c2432ccee1e9040232aef00b2989756f",
+  "tree": "74d681230840247eac021196aed29cfb674b245e",
+  "working_tree_dirty_files": 0,
+  "php": "8.5.0",
+  "phpunit": {"status": "pass", "summary": "Tests: 1646, Assertions: 10532, Deprecations: 18, Skipped: 1."},
+  "vitest": {"status": "pass", "summary": "Tests 114 passed (114)"},
+  "overall": "pass",
+  "cases": {
+    "C1-durations": ["tests/Unit/Selector/DeliveryEstimatePrecedenceTest.php"],
+    "C1-email-wording": ["tests/Unit/Presentation/CustomerOrderMachineFactsAndAuthorityTest.php"],
+    "C10-pickup-endpoint-invalidation": ["tests/Unit/Cart/PickupEndpointReselectionTest.php"],
+    "C11-mixed-cart-native-address": ["tests/Unit/Checkout/MixedCartNativeAddressTest.php"],
+    "C12-coherent-reselection": ["tests/Unit/Cart/PickupEndpointReselectionTest.php"],
+    "C14-order-surface-authority": ["tests/Unit/Presentation/CustomerOrderMachineFactsAndAuthorityTest.php"],
+    "C2-pickup-source-independent": ["tests/Unit/Runtime/SourceIndependentPickupTest.php"],
+    "C7-mixed-origin-totals": ["tests/Unit/Shipping/MixedOriginGroupingTest.php"],
+    "C8-pdp-gate": ["tests/Unit/Presentation/Frontend/ProductDeliveryGateRendererTest.php", "tests/js/product-delivery-selector.test.js"],
+    "C9-compact-line": ["tests/Unit/Presentation/Frontend/ProductDeliveryGateRendererTest.php", "tests/Unit/Presentation/CustomerStorefrontCopyTest.php", "tests/js/blocks-checkout.test.js"],
+    "S10-inherited-readiness": ["tests/Unit/Configuration/ScopedConfigurationSemanticsTest.php", "tests/Unit/Presentation/Admin/PluginIdentityBadgeTest.php"],
+    "S2-save-and-apply": ["tests/Unit/Presentation/Admin/M2AdminDefectsTest.php"],
+    "S3-S4-shipment-atomicity": ["tests/Unit/Shipment/ShipmentAggregateRepairAndJoinedWritesTest.php"],
+    "S6-attention-truthful": ["tests/Unit/Shipment/AttentionIndexTruthfulnessTest.php"],
+    "S7-version-identity": ["tests/Unit/Persistence/SchemaV6InspectionTest.php", "tests/Unit/Bootstrap/WordPressCompatibilityFloorTest.php", "tests/Unit/Presentation/Admin/PluginIdentityBadgeTest.php"],
+    "S9-csv-round-trip": ["tests/Unit/Bulk/CatalogCsvRoundTripTest.php"]
+  },
+  "missing_evidence": []
+}

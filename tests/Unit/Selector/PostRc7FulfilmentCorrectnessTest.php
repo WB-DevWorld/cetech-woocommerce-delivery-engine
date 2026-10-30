@@ -366,14 +366,25 @@ final class PostRc7FulfilmentCorrectnessTest extends TestCase {
 		self::assertSame( EffectiveFieldState::Valid, $missing_location->state );
 		self::assertSame( [ 11 ], $missing_location->collection( ConfigurationFieldKey::DELIVERY_OFFER_IDS )?->members );
 
+		// COR-022 (D8): an assigned active Pickup Location is honoured for any fulfilment type.
 		$international_location = $this->constrained_config(
 			FulfilmentAvailability::InternationalFulfilment->value,
 			FulfilmentChoice::Delivery->value,
 			[ 13 ],
 			1
 		);
-		self::assertSame( EffectiveFieldState::Invalid, $international_location->scalar( ConfigurationFieldKey::PICKUP_LOCATION_ID )?->state );
-		self::assertSame( EffectiveFieldState::Invalid, $international_location->state );
+		self::assertSame( EffectiveFieldState::Valid, $international_location->scalar( ConfigurationFieldKey::PICKUP_LOCATION_ID )?->state );
+		self::assertSame( EffectiveFieldState::Valid, $international_location->state );
+		self::assertSame( [ 13 ], $international_location->collection( ConfigurationFieldKey::DELIVERY_OFFER_IDS )?->members );
+
+		$international_inactive_location = $this->constrained_config(
+			FulfilmentAvailability::InternationalFulfilment->value,
+			FulfilmentChoice::Delivery->value,
+			[ 13 ],
+			99
+		);
+		self::assertSame( EffectiveFieldState::Invalid, $international_inactive_location->scalar( ConfigurationFieldKey::PICKUP_LOCATION_ID )?->state );
+		self::assertSame( EffectiveFieldState::Invalid, $international_inactive_location->state );
 
 		$pickup_only_missing = $this->constrained_config(
 			FulfilmentAvailability::InStore->value,

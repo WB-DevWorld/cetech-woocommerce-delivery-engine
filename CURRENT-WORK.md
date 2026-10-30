@@ -1,3 +1,13 @@
+# Reunification batch — `master` + `fix/m2-2026-10` — 2026-10-30
+
+Frank (`wbdevworld`, integration editor) decided on 2026-10-30, after management's M2 sign-off, to reunify the accepted M2 branch with `master` before any M3 work ("Reunify first"). This batch branch `batch/reunify-m2-2026-10` starts from `master` `31b2b90` and merges `fix/m2-2026-10` `19e00a0d` (tagged M2 deliverable `v1.0.0-m2.4` at `9f045ef4`, accepted on training). Authorisation to touch files of all three workstreams in this one bounded merge comes from that decision; review fixes return to their owners afterwards.
+
+- Resolution rule: the accepted M2 behaviour wins on every customer- and staff-facing surface; master's CI, qualification identity checks and engines stay. Ten files conflicted: `.github/workflows/ci.yml` and `scripts/ci-opening-http-qualification.sh` (master kept), the plugin main file (merged identity below), `CartDeliveryReselectionService.php` (both import lists), `BulkToolsPage.php`, `StaffDeliveryCustomizeView.php` and `assets/frontend/cart-customer-context-editor.css` (M2 kept), the two schema inspection tests (M2 shape, new pin) and this file (master's document kept; the M2 branch's `CURRENT-WORK.md` is preserved verbatim as `docs/m2/CURRENT-WORK-M2-BRANCH-2026-10-30.md`).
+- Merged identity: version `1.0.0-m3.0-dev.1`, `Requires at least: 6.5`, schema target `12` (master's); the production-package verifier classes this version as the schema-12 line. `v1.0.0-m2.4` stays the frozen M2 deliverable and never moves.
+- Not done by this batch: no training or production install. Installing the merged tree on training is a 6 → 12 database migration and needs Frank's explicit approval of a training-ops install with a fresh backup; the M2 acceptance ledger (`scripts/qualification/m2/acceptance-cases.md`) is the regression definition for that re-run.
+
+## Historical continuation before the batch
+
 # Current continuation — repository reconciliation — 2026-10-27
 
 Read `docs/REPOSITORY-RECONCILIATION-2026-10-27.md` first. It is the versioned record of the repository, checkout, open work and the next task.
@@ -1147,13 +1157,15 @@ The sections below preserve the earlier Issue #45 and release/deployment checkpo
 
 ## Current training truth
 - Training site: `https://training.cetechbpa.com`.
-- Installed/active candidate: `1.0.0-dev.attention-count.1`.
-- Package-source SHA: `6e9e2ea71796170afb0508954a18d206cdc7017a`.
-- Frozen ZIP: `cetech-woocommerce-delivery-engine-1.0.0-dev.attention-count.1.zip`.
-- ZIP bytes: `1,848,319`.
-- ZIP SHA-256: `2027e5941916dff0302d7e2e545de5a2fd027f0c8f1615d97e3991dcfc5fdcb3`.
-- Training physical QA: PASS.
-- Verified post-deploy Needs Attention state for the same authorized administrator and stable data: catalog `0`, stale bulk `0`, shipment creation `2`, operations `3`, COD `3`, canonical aggregate `8`, Overview `8`, menu badge `8`.
+- Installed/active candidate: `1.0.0-m2.4`, installed 2026-10-30 16:49 UTC by training-ops run 41092928554 (previously `1.0.0-m2.3`, package-source `4f2916758730cc45624e2867e6ac61c68bb18529`, run 41079266707, installed by run 41079985868; before that `1.0.0-m2.2`, package-source `c9ca3da2bc58dc002c95692586976c65c76ccdbf`, run 41049374601, installed by run 41049784670 and reinstalled by run 41065815021 after the S7 rollback rehearsal; before that `1.0.0-m2.1`, package-source `7320a6b5c2432ccee1e9040232aef00b2989756f`, run 40930052523 on 2026-10-29).
+- Package-source SHA: `9f045ef40d5f510b69e1e105ff471601efdacbdd`.
+- Frozen ZIP: `cetech-woocommerce-delivery-engine-v1.0.0-m2.4.zip` (release-package run 41091941138).
+- ZIP bytes: `2,102,875`.
+- ZIP SHA-256: `35160e7f0ab791f6c9b9ba594b1230a6048ced25c9b70fa3799e5270883cbf7d`.
+- Schema: `cetech_de_db_version` `6` before and after every install and the rollback; no migration ran.
+- Server backups under the deploy root: `20261029T150001Z` and `20261029T182238Z` (m2.1 install day), `20261030T113926Z` and `20261030T114144Z` (before the m2.2 install; the latter restored by the S7 rollback), `20261030T134122Z` (safety backup taken by the rollback), `20261030T134703Z` (taken by the reinstall), `20261030T152021Z` (before the m2.3 install), `20261030T152426Z` (taken by the m2.3 install), `20261030T164509Z` (before the m2.4 install) and `20261030T164742Z` (taken by the m2.4 install). Each is a rollback point for training-ops `rollback`.
+- Training M2 acceptance (`scripts/qualification/m2/acceptance-cases.md`): Parts A and B done; Part C has a result on every row. Every row now has a final result: C11, C14, S3 and S12 closed as PASS on 2026-10-30; S10's inactive half and S11 rest on named Part A tests; the S2 validation defect (#176) and the C12 cart-editor City reveal defect (#180) are fixed in the base and verified on training `1.0.0-m2.3` on 2026-10-30 (S2 and C12 PASS). No open acceptance defect. Of the recorded observations, the use-for-all and "different locations" notes were withdrawn on 2026-10-30 (re-tested on m2.3: both work), two charges for one locality is D1 option A, and the Accra rate cards do not overlap at address level (read-only matcher run); the remaining three (Bulk Tools access and skipped-row reason, pickup email label, country-wide City suggestions) are fixed by #182, #183 and #184 and verified on training `1.0.0-m2.4` on 2026-10-30 (run log in the ledger). No observation is open. **M2 accepted by Frank on 2026-10-30** ("as there are no more defects, I ACCEPT M2") **and signed off by management the same day** (Frank: "management have signed off on it"). The accepted deliverable is the `v1.0.0-m2.4` prerelease package; it is not going to production yet by the owner's decision.
+- The Needs Attention counts recorded for `1.0.0-dev.attention-count.1` (catalog `0`, stale bulk `0`, shipment creation `2`, operations `3`, COD `3`, canonical aggregate `8`, Overview `8`, menu badge `8`) have not been re-verified on `1.0.0-m2.1`.
 - Training deployment is qualification evidence only; it is not RC.13, Pilot, FLAIROC, or production promotion.
 
 ## Completed post-RC.12 fix

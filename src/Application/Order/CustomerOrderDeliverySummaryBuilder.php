@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace CetechDeliveryEngine\Application\Order;
 
 use CetechDeliveryEngine\Domain\Enum\FulfilmentAvailability;
+use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
 use WC_Order;
 use WC_Order_Item_Product;
 
@@ -114,7 +115,8 @@ final class CustomerOrderDeliverySummaryBuilder {
 			$snapshot->pickup_location_label,
 			$snapshot->pickup_address,
 			$snapshot->pickup_instructions,
-			$order_item_id
+			$order_item_id,
+			$snapshot->fulfilment_choice
 		);
 	}
 
@@ -213,8 +215,23 @@ final class CustomerOrderDeliveryLineSummary {
 		public readonly ?string $pickup_location_label = null,
 		public readonly ?string $pickup_address = null,
 		public readonly ?string $pickup_instructions = null,
-		public readonly int $order_item_id = 0
+		public readonly int $order_item_id = 0,
+		public readonly string $fulfilment_choice = ''
 	) {
+	}
+
+	/**
+	 * COR-034: the frozen machine fulfilment choice decides what the line means; the
+	 * localized label is only read when a legacy summary carries no machine fact.
+	 */
+	public function fulfilment_choice_slug(): ?string {
+		$machine = sanitize_key( $this->fulfilment_choice );
+
+		if ( '' !== $machine ) {
+			return $machine;
+		}
+
+		return DeliveryPresentationLabels::infer_choice_slug_from_label( $this->fulfilment_choice_label );
 	}
 }
 

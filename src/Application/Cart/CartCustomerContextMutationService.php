@@ -151,15 +151,7 @@ final class CartCustomerContextMutationService {
 		);
 
 		if ( is_array( $intent ) ) {
-			$intent['fulfilment_choice'] = $context->fulfilment_choice;
-
-			if ( $context->isPickup() ) {
-				$intent['delivery_offer_id'] = null;
-			} elseif ( null !== $context->delivery_offer_id ) {
-				$intent['delivery_offer_id'] = $context->delivery_offer_id;
-			}
-
-			$clone[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] = $intent;
+			$clone[ CartDeliverySelectionCapture::CART_SELECTION_KEY ] = CartLineCustomerIdentity::alignIntentWithContext( $intent, $context );
 		}
 
 		return $clone;

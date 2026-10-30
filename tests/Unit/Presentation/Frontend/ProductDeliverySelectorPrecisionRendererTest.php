@@ -48,10 +48,11 @@ final class ProductDeliverySelectorPrecisionRendererTest extends TestCase {
 		$html = $this->render( $fx, [ $this->priced_delivery(), $this->pickup() ] );
 
 		self::assertStringContainsString( 'data-cetech-de-location-panel="1"', $html );
-		self::assertDoesNotMatchRegularExpression( '/class="cetech-de-delivery-selector__location"[^>]*\bhidden\b/', $html );
-		self::assertDoesNotMatchRegularExpression( '/\bhidden\b[^>]*data-cetech-de-location-panel="1"/', $html );
-		self::assertStringContainsString( 'data-cetech-de-active-choice="delivery"', $html );
-		self::assertMatchesRegularExpression( '/id="cetech-de-fulfilment-ui-delivery"[^>]*checked/', $html );
+		// D2 gate: both choices valid, so nothing is pre-selected and the location panel waits for Delivery.
+		self::assertMatchesRegularExpression( '/class="cetech-de-delivery-selector__location"[^>]*\bhidden\b/', $html );
+		self::assertStringContainsString( 'data-cetech-de-active-choice=""', $html );
+		self::assertDoesNotMatchRegularExpression( '/id="cetech-de-fulfilment-ui-delivery"[^>]*checked/', $html );
+		self::assertDoesNotMatchRegularExpression( '/id="cetech-de-fulfilment-ui-delivery"[^>]*disabled/', $html );
 		self::assertStringContainsString( 'id="cetech-de-fulfilment-ui-store_pickup"', $html );
 		self::assertDoesNotMatchRegularExpression( '/id="cetech-de-fulfilment-ui-store_pickup"[^>]*checked/', $html );
 		self::assertStringContainsString( 'City / Town', $html );
@@ -78,8 +79,9 @@ final class ProductDeliverySelectorPrecisionRendererTest extends TestCase {
 
 		self::assertMatchesRegularExpression( '/Delivery fee: (GHS|USD) 50\.00/', $html );
 		self::assertDoesNotMatchRegularExpression( '/Delivery fee: (GHS|USD) 30\.00/', $html );
-		self::assertStringContainsString( 'data-cetech-de-active-choice="delivery"', $html );
+		self::assertStringContainsString( 'data-cetech-de-active-choice=""', $html );
 		self::assertStringContainsString( 'value="in_store:delivery:10"', $html );
+		self::assertDoesNotMatchRegularExpression( '/value="in_store:delivery:10"[^>]*checked/', $html, 'no card is pre-selected while both choices are valid' );
 		self::assertStringNotContainsString( CustomerStorefrontCopy::select_city_town_for_exact_fee(), $html );
 	}
 

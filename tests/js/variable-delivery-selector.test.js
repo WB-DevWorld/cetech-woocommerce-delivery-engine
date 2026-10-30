@@ -345,7 +345,7 @@ describe('Variable delivery selector controller', () => {
 		$form.trigger('found_variation', { variation_id: 33 });
 		await flush();
 
-		const radio = controller.optionsEl.querySelector('input[type="radio"]');
+		const radio = controller.optionsEl.querySelector('input[name="cetech_de_delivery_option_key"]');
 		expect(radio).toBeTruthy();
 		expect(radio.getAttribute('data-cetech-de-variation-bound')).toBe('33');
 		expect(controller.variationInput.value).toBe('33');
@@ -433,12 +433,21 @@ describe('Variable delivery selector controller', () => {
 
 		expect(controller.optionsEl.textContent).toContain('Standard Delivery');
 		expect(controller.optionsEl.textContent).toContain('2–4 business days');
-		expect(controller.optionsEl.querySelector('[data-cetech-de-choice-switch][value="delivery"]').checked).toBe(true);
+		// D2 gate: both choices valid, so neither is pre-selected until the customer chooses.
+		expect(controller.optionsEl.querySelector('[data-cetech-de-choice-switch][value="delivery"]').checked).toBe(false);
+		expect(controller.optionsEl.querySelector('[data-cetech-de-choice-switch][value="store_pickup"]').checked).toBe(false);
 
 		const pickupPanel = controller.optionsEl.querySelector('[data-cetech-de-choice-panel="store_pickup"]');
 		const deliveryPanel = controller.optionsEl.querySelector('[data-cetech-de-choice-panel="delivery"]');
 		expect(pickupPanel.hidden).toBe(true);
+		expect(deliveryPanel.hidden).toBe(true);
+
+		const deliverySwitch = controller.optionsEl.querySelector('[data-cetech-de-choice-switch][value="delivery"]');
+		deliverySwitch.checked = true;
+		deliverySwitch.dispatchEvent(new Event('change', { bubbles: true }));
 		expect(deliveryPanel.hidden).toBe(false);
+		expect(pickupPanel.hidden).toBe(true);
+		expect(deliveryPanel.querySelector('input[name="cetech_de_delivery_option_key"]').checked).toBe(true);
 
 		const pickupSwitch = controller.optionsEl.querySelector('[data-cetech-de-choice-switch][value="store_pickup"]');
 		pickupSwitch.checked = true;
@@ -545,7 +554,7 @@ describe('Variable delivery selector controller', () => {
 		expect(controller.optionsEl.textContent).not.toContain('₵10.00');
 	});
 
-	it('keeps Delivery active on need_precision and does not auto-select Pickup', async () => {
+	it('gates need_precision behind the Delivery choice and does not auto-select Pickup', async () => {
 		const { controller, $form, ajax } = loadController();
 		ajax.mockReturnValue(
 			createDeferred({
@@ -585,7 +594,11 @@ describe('Variable delivery selector controller', () => {
 
 		const deliverySwitch = controller.optionsEl.querySelector('[data-cetech-de-choice-switch][value="delivery"]');
 		const pickupSwitch = controller.optionsEl.querySelector('[data-cetech-de-choice-switch][value="store_pickup"]');
-		expect(deliverySwitch.checked).toBe(true);
+		expect(deliverySwitch.checked).toBe(false);
+		expect(pickupSwitch.checked).toBe(false);
+		expect(document.querySelector('[data-cetech-de-location-panel]').hidden).toBe(true);
+		deliverySwitch.checked = true;
+		deliverySwitch.dispatchEvent(new Event('change', { bubbles: true }));
 		expect(pickupSwitch.checked).toBe(false);
 		expect(document.querySelector('[data-cetech-de-location-panel]').hidden).toBe(false);
 		expect(document.querySelector('[name="cetech_de_matching_city"]')).not.toBeNull();

@@ -12,7 +12,6 @@ use CetechDeliveryEngine\Domain\Enum\ShipmentEventSource;
 use CetechDeliveryEngine\Domain\Enum\ShipmentStatus;
 use CetechDeliveryEngine\Domain\Shipment\Shipment;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentAggregateWriteResult;
-use CetechDeliveryEngine\Domain\Shipment\ShipmentItem;
 use CetechDeliveryEngine\Domain\Shipment\ShipmentRepositoryInterface;
 use CetechDeliveryEngine\Support\Logger;
 use WC_Order;
@@ -234,19 +233,7 @@ final class ShipmentService {
 			shipment_number: $plan->shipment_number
 		);
 
-		$items = [];
-
-		foreach ( $plan->items as $item ) {
-			$items[] = ShipmentItem::create(
-				0,
-				$item->order_id,
-				$item->order_item_id,
-				$item->quantity,
-				$item->product_id,
-				$item->variation_id,
-				$item->product_name_snapshot
-			);
-		}
+		$items = $plan->shipment_items();
 
 		$created_source = ShipmentEventSource::Staff === $source
 			? ShipmentEventSource::Staff

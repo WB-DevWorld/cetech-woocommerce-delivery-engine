@@ -25,7 +25,8 @@ final class ResolvedProductDeliveryRule {
 		public readonly ?int $supplier_id,
 		public readonly ?int $origin_id,
 		public readonly int $priority,
-		public readonly ?int $pickup_location_id = null
+		public readonly ?int $pickup_location_id = null,
+		public readonly ?string $estimated_delivery = null
 	) {
 	}
 
@@ -47,7 +48,8 @@ final class ResolvedProductDeliveryRule {
 			self::nullable_int( $row['supplier_id'] ?? null ),
 			self::nullable_int( $row['origin_id'] ?? null ),
 			(int) ( $row['priority'] ?? 100 ),
-			self::nullable_int( $row['pickup_location_id'] ?? null )
+			self::nullable_int( $row['pickup_location_id'] ?? null ),
+			self::nullable_text( $row['estimated_delivery'] ?? null )
 		);
 	}
 
@@ -69,6 +71,7 @@ final class ResolvedProductDeliveryRule {
 			'origin_id'               => $this->origin_id,
 			'priority'                => $this->priority,
 			'pickup_location_id'      => $this->pickup_location_id,
+			'estimated_delivery'      => $this->estimated_delivery,
 		];
 	}
 
@@ -101,8 +104,19 @@ final class ResolvedProductDeliveryRule {
 			self::nullable_int( $data['supplier_id'] ?? null ),
 			self::nullable_int( $data['origin_id'] ?? null ),
 			(int) ( $data['priority'] ?? 100 ),
-			self::nullable_int( $data['pickup_location_id'] ?? null )
+			self::nullable_int( $data['pickup_location_id'] ?? null ),
+			self::nullable_text( $data['estimated_delivery'] ?? null )
 		);
+	}
+
+	private static function nullable_text( mixed $value ): ?string {
+		if ( ! is_scalar( $value ) ) {
+			return null;
+		}
+
+		$text = trim( (string) $value );
+
+		return '' !== $text ? $text : null;
 	}
 
 	private static function nullable_int( mixed $value ): ?int {
