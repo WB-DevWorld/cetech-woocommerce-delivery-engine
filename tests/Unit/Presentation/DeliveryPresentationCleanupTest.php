@@ -55,7 +55,7 @@ final class DeliveryPresentationCleanupTest extends TestCase {
 
 		$keys = array_column( $rows, 'key' );
 
-		self::assertSame( 'Delivery option', $keys[0] );
+		self::assertSame( 'Pickup option', $keys[0] );
 		self::assertSame( 'Ready for pickup', $keys[1] );
 		self::assertNotContains( 'Fulfilment', $keys );
 		self::assertNotContains( 'Method', $keys );

@@ -71,7 +71,7 @@ final class Stage13FCustomerPresentationTest extends TestCase {
 
 		self::assertSame(
 			[
-				'Delivery option',
+				'Pickup option',
 				'Ready for pickup',
 				'Pickup location',
 				'Pickup address',
@@ -202,6 +202,22 @@ final class Stage13FCustomerPresentationTest extends TestCase {
 		self::assertStringNotContainsString( 'Delivery charge', $html );
 		self::assertStringNotContainsString( '$250.00', $html );
 		self::assertStringNotContainsString( 'Internal description', $html );
+	}
+
+	public function test_pickup_option_that_is_the_pickup_location_is_not_listed_twice(): void {
+		$rows = DeliveryPresentationLabels::format_public_summary_rows(
+			[
+				'fulfilment_choice_label'     => 'Store pickup',
+				'delivery_offer_public_label' => 'CETECH Ghana Store',
+				'estimate_text'               => '1–2 business days.',
+				'pickup_location_label'       => 'CETECH Ghana Store',
+				'pickup_address'              => 'Accra',
+			],
+			'store_pickup'
+		);
+
+		self::assertSame( [ 'Ready for pickup', 'Pickup location', 'Pickup address' ], array_column( $rows, 'key' ) );
+		self::assertNotContains( 'Delivery option', array_column( $rows, 'key' ) );
 	}
 
 	public function test_cart_public_summary_helper_uses_compact_contract(): void {
