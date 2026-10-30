@@ -245,6 +245,29 @@ final class BulkJobAdminAuthorizationTest extends TestCase {
 		}
 	}
 
+	public function test_import_only_staff_open_bulk_tools_on_the_import_tab_without_the_catalog_tabs(): void {
+		$GLOBALS['cetech_de_test_caps'] = [ 'import_delivery_data' => true ];
+		$html = $this->render_page();
+
+		self::assertStringContainsString( 'tab=import', $html );
+		self::assertStringContainsString( 'tab=jobs', $html );
+		self::assertStringNotContainsString( 'tab=catalog', $html );
+		self::assertStringNotContainsString( 'tab=validation', $html );
+		self::assertStringNotContainsString( 'data-cetech-de-bulk-catalog', $html );
+
+		$_GET = [ 'tab' => 'catalog' ];
+		$forced = $this->render_page();
+		self::assertStringNotContainsString( 'data-cetech-de-bulk-catalog', $forced );
+		self::assertStringContainsString( 'tab=import', $forced );
+	}
+
+	public function test_staff_without_a_bulk_capability_are_denied_the_page(): void {
+		$GLOBALS['cetech_de_test_caps'] = [];
+		$this->expectException( \RuntimeException::class );
+		$this->expectExceptionMessage( 'wp_die' );
+		$this->render_page();
+	}
+
 	private function render_page(): string {
 		ob_start();
 		try {
