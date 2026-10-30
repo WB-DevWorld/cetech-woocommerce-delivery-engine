@@ -1,5 +1,5 @@
 /**
- * Classic cart quantity-split editor, pickup/delivery disclosure, cancel, and deep-link.
+ * Classic cart quantity-split editor, pickup/delivery disclosure, destination cascade, cancel, and deep-link.
  */
 (function (window, document) {
 	'use strict';
@@ -259,11 +259,297 @@
 		return true;
 	}
 
+	/**
+	 * Destination cascade inside the cart editor (C12): Country reveals Region,
+	 * Region reveals City / Town, and the City field offers the same locality
+	 * suggestions as the product page. The product-page script is not loaded on
+	 * the cart, so the small cascade lives here against the shared markup
+	 * (`data-cetech-de-reveal` wrappers, `.cetech-de-locality-results`).
+	 */
+	function editorConfig() {
+		return window.cetechDeCartContextEditor || {};
+	}
+
+	function setReveal(locationRoot, field, visible) {
+		Array.prototype.forEach.call(locationRoot.querySelectorAll('[data-cetech-de-reveal="' + field + '"]'), function (node) {
+			node.hidden = !visible;
+		});
+	}
+
+	function destinationControl(locationRoot, field) {
+		return locationRoot.querySelector('[data-cetech-de-destination-control="' + field + '"]');
+	}
+
+	function clearControl(control) {
+		if (control && control.value !== '') {
+			control.value = '';
+		}
+	}
+
+	function postForm(body) {
+		var config = editorConfig();
+		return window.fetch(config.ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8' },
+			body: body.toString()
+		}).then(function (response) { return response.json(); }).then(function (payload) {
+			return payload && payload.data ? payload.data : payload;
+		});
+	}
+
+	function bindDestination(root) {
+		var locationRoot = root.querySelector('[data-cetech-de-matching-location]');
+		if (!locationRoot || locationRoot.getAttribute('data-cetech-de-cart-cascade') === '1') {
+			return;
+		}
+		locationRoot.setAttribute('data-cetech-de-cart-cascade', '1');
+
+		var country = destinationControl(locationRoot, 'country');
+		var region = destinationControl(locationRoot, 'region');
+		var city = destinationControl(locationRoot, 'locality');
+		var postcode = destinationControl(locationRoot, 'postcode');
+		var key = locationRoot.querySelector('[data-cetech-de-location-key]') || locationRoot.querySelector('input[name="cetech_de_matching_location_key"]');
+		var list = locationRoot.querySelector('.cetech-de-locality-results');
+		var childrenToken = 0;
+		var searchToken = 0;
+		var searchTimer = null;
+
+		function i18n(name, fallback) {
+			var config = editorConfig();
+			return (config.i18n && config.i18n[name]) || fallback;
+		}
+
+		function geography() {
+			return editorConfig().geography || {};
+		}
+
+		function hideList() {
+			if (list) {
+				list.hidden = true;
+				list.innerHTML = '';
+			}
+			if (city) {
+				city.setAttribute('aria-expanded', 'false');
+			}
+		}
+
+		function regionKey() {
+			if (!region) {
+				return '';
+			}
+			var selected = region.options && region.selectedIndex >= 0 ? region.options[region.selectedIndex] : null;
+			var fromOption = selected ? String(selected.getAttribute('data-location-key') || '') : '';
+			if (fromOption) {
+				return fromOption;
+			}
+			var value = String(region.value || '');
+			return value.indexOf('-') !== -1 && value.length > 8 ? value : '';
+		}
+
+		function loadRegions() {
+			var geo = geography();
+			if (!editorConfig().ajaxUrl || !geo.childrenAction || !region || region.tagName !== 'SELECT' || !country) {
+				return;
+			}
+			var token = ++childrenToken;
+			var body = new window.URLSearchParams();
+			body.set('action', geo.childrenAction);
+			body.set('nonce', geo.childrenNonce || '');
+			body.set('country', country.value || '');
+			body.set('parent_key', '');
+			body.set('type', 'administrative');
+			body.set('page', '1');
+			body.set('request_token', String(token));
+			postForm(body).then(function (data) {
+				if (token !== childrenToken) {
+					return;
+				}
+				var items = data && data.items ? data.items : [];
+				if (!items.length || (data && data.skip_admin)) {
+					// No administrative level for this country: go straight to the locality.
+					setReveal(locationRoot, 'region', false);
+					setReveal(locationRoot, 'locality', true);
+					return;
+				}
+				region.innerHTML = '';
+				var placeholder = document.createElement('option');
+				placeholder.value = '';
+				placeholder.textContent = i18n('select', 'Select…');
+				region.appendChild(placeholder);
+				items.forEach(function (item) {
+					var option = document.createElement('option');
+					option.value = item.code || item.key || item.name || '';
+					option.setAttribute('data-location-key', item.key || '');
+					option.textContent = item.name || '';
+					region.appendChild(option);
+				});
+				region.value = '';
+				setReveal(locationRoot, 'region', true);
+				setReveal(locationRoot, 'locality', false);
+			}).catch(function () { /* keep the rendered options */ });
+		}
+
+		function selectLocality(item) {
+			if (city) {
+				city.value = item.name || item.label || '';
+			}
+			if (key) {
+				key.value = item.key || '';
+			}
+			hideList();
+			if (city && typeof city.focus === 'function') {
+				city.focus();
+			}
+		}
+
+		function renderResults(items, hasMore, page, query) {
+			if (!list) {
+				return;
+			}
+			list.innerHTML = '';
+			items.forEach(function (item, index) {
+				var li = document.createElement('li');
+				li.setAttribute('role', 'option');
+				li.setAttribute('data-key', item.key || '');
+				li.setAttribute('aria-selected', 'false');
+				li.tabIndex = 0;
+				li.textContent = item.label || item.name || '';
+				li.addEventListener('click', function () { selectLocality(item); });
+				li.addEventListener('keydown', function (event) {
+					if (event.key === 'Enter' || event.key === ' ') {
+						event.preventDefault();
+						selectLocality(item);
+					} else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+						event.preventDefault();
+						var options = list.querySelectorAll('[role="option"]');
+						var next = event.key === 'ArrowDown' ? index + 1 : index - 1;
+						if (next < 0) {
+							next = options.length - 1;
+						}
+						if (next >= options.length) {
+							next = 0;
+						}
+						options[next].focus();
+					} else if (event.key === 'Escape') {
+						hideList();
+						if (city) {
+							city.focus();
+						}
+					}
+				});
+				list.appendChild(li);
+			});
+			if (hasMore) {
+				var more = document.createElement('button');
+				more.type = 'button';
+				more.className = 'button-link';
+				more.setAttribute('data-cetech-de-locality-more', '1');
+				more.textContent = i18n('loadMore', 'Load more');
+				more.addEventListener('click', function (event) {
+					event.preventDefault();
+					searchLocalities(query, page + 1, items);
+				});
+				list.appendChild(more);
+			}
+			list.hidden = items.length === 0;
+			if (city) {
+				city.setAttribute('aria-expanded', list.hidden ? 'false' : 'true');
+			}
+		}
+
+		function searchLocalities(query, page, previous) {
+			var geo = geography();
+			if (!editorConfig().ajaxUrl || !geo.searchAction || !list) {
+				return;
+			}
+			page = page || 1;
+			var token = ++searchToken;
+			var body = new window.URLSearchParams();
+			body.set('action', geo.searchAction);
+			body.set('nonce', geo.searchNonce || '');
+			body.set('country', country ? country.value || '' : '');
+			body.set('parent_key', regionKey());
+			body.set('q', query || '');
+			body.set('page', String(page));
+			body.set('request_token', String(token));
+			postForm(body).then(function (data) {
+				if (token !== searchToken) {
+					return;
+				}
+				var items = (previous || []).concat(data && data.items ? data.items : []);
+				renderResults(items, !!(data && data.has_more), page, query);
+			}).catch(function () { /* keep */ });
+		}
+
+		if (country) {
+			country.addEventListener('change', function () {
+				clearControl(region);
+				clearControl(city);
+				clearControl(key);
+				clearControl(postcode);
+				hideList();
+				var has = !!country.value;
+				setReveal(locationRoot, 'region', has);
+				setReveal(locationRoot, 'locality', false);
+				setReveal(locationRoot, 'postcode', false);
+				if (has) {
+					loadRegions();
+				}
+			});
+		}
+
+		if (region) {
+			region.addEventListener('change', function () {
+				clearControl(city);
+				clearControl(key);
+				hideList();
+				setReveal(locationRoot, 'locality', !!region.value);
+			});
+		}
+
+		if (city) {
+			city.addEventListener('input', function () {
+				clearControl(key);
+				window.clearTimeout(searchTimer);
+				var query = String(city.value || '').trim();
+				if (query === '') {
+					hideList();
+					return;
+				}
+				searchTimer = window.setTimeout(function () {
+					searchLocalities(query, 1, []);
+				}, 280);
+			});
+			city.addEventListener('keydown', function (event) {
+				if (!list || list.hidden) {
+					return;
+				}
+				var first = list.querySelector('[role="option"]');
+				if (event.key === 'ArrowDown' && first) {
+					event.preventDefault();
+					first.focus();
+				} else if (event.key === 'Escape') {
+					hideList();
+				}
+			});
+		}
+
+		// Mirror the server's initial state so a stored destination keeps its fields visible.
+		if (country && country.value) {
+			setReveal(locationRoot, 'region', true);
+			if (region && region.value) {
+				setReveal(locationRoot, 'locality', true);
+			}
+		}
+	}
+
 	function boot() {
 		Array.prototype.forEach.call(document.querySelectorAll('[data-cetech-de-qty-split]'), bindSplit);
 		Array.prototype.forEach.call(document.querySelectorAll('.cetech-de-cart-context'), function (root) {
 			bindChoice(root);
 			bindCancel(root);
+			bindDestination(root);
 		});
 		applyDeepLink();
 	}
@@ -278,6 +564,8 @@
 		bindChoice: bindChoice,
 		bindCancel: bindCancel,
 		syncMethodState: syncMethodState,
+		bindDestination: bindDestination,
+		setReveal: setReveal,
 		applyDeepLink: applyDeepLink,
 		fragmentAnchor: fragmentAnchor,
 		resetDeepLink: function () {
