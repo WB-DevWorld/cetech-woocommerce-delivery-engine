@@ -17,10 +17,24 @@ use CetechDeliveryEngine\Presentation\Shared\DeliveryPresentationLabels;
  * Classic Cart inline delivery reselection for lines whose options changed.
  *
  * Reuses ProductDeliveryOptionsBuilder output from Capture::assess_product_selection.
+ *
+ * The block is never appended to the `woocommerce_cart_item_name` filter: the
+ * cart, checkout review and mini-cart templates print that filter through
+ * `wp_kses_post()`, whose post allowlist has no `<input>` and no `form`
+ * attribute on `<button>`, so the radios and the submit binding would be
+ * stripped (M2 acceptance C10/C13). It is printed through hooks WooCommerce
+ * echoes unfiltered instead: the `woocommerce_after_cart_item_name` action in
+ * the cart, and the `woocommerce_checkout_cart_item_quantity` and
+ * `woocommerce_widget_cart_item_quantity` filters in the checkout review and
+ * the mini-cart.
  */
 final class CartDeliveryReselectionRenderer {
 
 	public const STYLE_HANDLE = 'cetech-de-cart-delivery-reselection';
+
+	public const CART_LINE_ACTION      = 'woocommerce_after_cart_item_name';
+	public const CHECKOUT_LINE_FILTER  = 'woocommerce_checkout_cart_item_quantity';
+	public const MINI_CART_LINE_FILTER = 'woocommerce_widget_cart_item_quantity';
 
 	public function __construct(
 		private FeatureFlags $feature_flags,
@@ -35,7 +49,9 @@ final class CartDeliveryReselectionRenderer {
 		}
 
 		add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_assets' ] );
-		add_filter( 'woocommerce_cart_item_name', [ $this, 'append_reselection_form' ], 20, 3 );
+		add_action( self::CART_LINE_ACTION, [ $this, 'render_after_cart_item_name' ], 10, 2 );
+		add_filter( self::CHECKOUT_LINE_FILTER, [ $this, 'append_to_item_quantity' ], 20, 3 );
+		add_filter( self::MINI_CART_LINE_FILTER, [ $this, 'append_to_item_quantity' ], 20, 3 );
 		add_action( 'woocommerce_after_cart', [ $this, 'render_deferred_forms' ], 6 );
 		add_action( 'woocommerce_after_checkout_form', [ $this, 'render_deferred_forms' ], 6 );
 		add_action( 'woocommerce_after_mini_cart', [ $this, 'render_deferred_forms' ], 6 );
@@ -68,16 +84,34 @@ final class CartDeliveryReselectionRenderer {
 	}
 
 	/**
+	 * Classic cart: `woocommerce_after_cart_item_name` echoes its output unfiltered.
+	 *
 	 * @param array<string, mixed> $cart_item
 	 */
-	public function append_reselection_form( string $name, array $cart_item, $cart_item_key ): string {
+	public function render_after_cart_item_name( array $cart_item, $cart_item_key ): void {
+		echo $this->block_for_line( $cart_item, $cart_item_key ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- renderer returns escaped HTML.
+	}
+
+	/**
+	 * Checkout review and mini-cart: the quantity filters are echoed unfiltered by WooCommerce.
+	 *
+	 * @param array<string, mixed> $cart_item
+	 */
+	public function append_to_item_quantity( $quantity_html, array $cart_item, $cart_item_key ): string {
+		$quantity_html = (string) $quantity_html;
+
+		return $quantity_html . $this->block_for_line( $cart_item, $cart_item_key );
+	}
+
+	/**
+	 * @param array<string, mixed> $cart_item
+	 */
+	public function block_for_line( array $cart_item, $cart_item_key ): string {
 		if ( empty( $cart_item[ CartDeliverySelectionCapture::CART_NEEDS_RESELECTION_KEY ] ) ) {
-			return $name;
+			return '';
 		}
 
-		$form = $this->render_form( (string) $cart_item_key, $cart_item );
-
-		return '' === $form ? $name : $name . $form;
+		return $this->render_form( (string) $cart_item_key, $cart_item );
 	}
 
 	/**
