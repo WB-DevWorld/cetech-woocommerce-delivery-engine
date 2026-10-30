@@ -65,6 +65,14 @@ Full notes: `docs/training/m2-acceptance/1.0.0-m2.1/part-c-notes.md`. Findings t
 - C12 editor re-check as `claude-qa`: 49826 added as Store Pickup, cart Change → Standard Delivery → Greater Accra reveals City in one step, suggestions appear, one save moves the line to Standard Delivery · Accra ₵30.00. PASS. Cart emptied afterwards.
 - Nothing on training changed besides the test cart; no setting, rate card or capability touched. Training truth after this run: `1.0.0-m2.3`, schema 6.
 
+## Part C run log — 1.0.0-m2.4 observation fixes, 2026-10-30 (Bulk Tools skipped-row reason, pickup email label, Region-narrowed City suggestions)
+
+- Package `1.0.0-m2.4` built by release-package run 41091941138 from `fix/m2-2026-10` head `9f045ef40d5f510b69e1e105ff471601efdacbdd` (merge of #186; CI run 41091840807 green) and verified locally (SHA-256 matches the published checksum, 2,102,875 bytes, header and `CETECH_DE_VERSION` `1.0.0-m2.4`, `vendor/autoload.php` present, the three fixes in the packaged files, `verify-production-package-autoload.php` OK); training-ops backup run 41092555242 (`20261030T164509Z`) and install run 41092928554 (backup `20261030T164742Z`, caches purged, post-install `1.0.0-m2.4` active, `cetech_de_db_version` 6, no migration), each approved by Frank in the `training` environment.
+- S9 skipped-row reason (#182) as `claude-qa`: Bulk Tools → Jobs / History → BULK-000002 shows the skipped row for 49828 with "Unknown delivery option code(s) for delivery_offer_ids: no-such-option. The row was skipped." and the unchanged row for 49826 with "Already matches the proposed settings." instead of a blank proposed change. PASS. (Import-only staff access rests on the unit test; training has no such user.)
+- C14 pickup email label (#183): order 50384's customer processing email rendered read-only over the authorised SSH (`wp eval-file`, nothing sent): the delivery block now reads "Ready for pickup: 1–2 business days. / Pickup location: CETECH Ghana Store / Pickup address: … / Pickup instructions: …" with no "Delivery option: CETECH Ghana Store" row in either format. PASS.
+- C12 Region-narrowed City suggestions (#184) as `claude-qa`: 49826 added as Store Pickup; cart Change → Standard Delivery → Greater Accra (the rendered Region option carried no location key) → "Acc" typed in City: the editor sent one `cetech_de_geography_children` request for Ghana's regions and then `cetech_de_geography_locality_search` with `parent_key` = Greater Accra's key; the suggestions were Accra, Accra Central and Accra New Town, all "Accra, Greater Accra Region", with no Western North entry. PASS. Cart emptied afterwards.
+- Nothing on training changed besides the test cart; no setting, rate card or capability touched. Training truth after this run: `1.0.0-m2.4`, schema 6.
+
 ## Customer cases
 
 | Case | Covers | Setup | Steps | Expected | Automated evidence | Result | Evidence |
