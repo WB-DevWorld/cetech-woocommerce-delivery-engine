@@ -25,6 +25,7 @@
 	cursor: pointer;
 }
 
+.cetech-de-cart-reselection .button,
 .cetech-de-cart-reselection__form .button,
 .cetech-de-blocks-reselection button {
 	margin-top: 0.5rem;
