@@ -1,3 +1,11 @@
+# Reunification merged; M3 intake drafted — 2026-10-30
+
+- PR #190 (`batch/reunify-m2-2026-10` → `master`) was merged by Frank on 2026-10-30 at 20:09 UTC as `fbca3e307bdd6e3e86ca53b71db7278eb19bab2c`, after Frank's approval and CI run 41115925347 green on `25f6677` (all eight required checks). The temporary batch branch is deleted and its worktree removed, as the batch rule requires.
+- `master` now carries the accepted M2 surfaces on the schema-12 engines: source identity `1.0.0-m3.0-dev.1`, `SchemaVersion::TARGET` `12`. `v1.0.0-m2.4` on `9f045ef4` stays the frozen M2 deliverable (GitHub prerelease, verified ZIP). Training is still `1.0.0-m2.4` / schema 6; the business site is untouched.
+- Not done, and not authorised yet: installing the merged tree on training (a 6 → 12 migration; needs Frank's explicit approval of a training-ops install with a fresh backup, then the M2 ledger re-run), and any M3 code.
+- M3 has no written scope, owner or acceptance list. `docs/M3-INTAKE-AND-AUTHORISATION-DRAFT-2026-10-30.md` is the intake in the shape of the M2 authorisation: baseline facts, the inputs only Frank and management can supply (named promise-rule owner, the written promise rules, the D5 operating rule, the parallel-engines decision, promise exposure, signatories), a tick-list of candidate scope, the prerequisites (training install and ledger re-run, announcement to WS1 and WS2), an acceptance skeleton and the stop conditions. It is a draft until Frank fills it.
+- Open PRs #49, #114, #124–#138 belong to Frank's own workstream and predate the batch; they were not touched.
+
 # Reunification batch — `master` + `fix/m2-2026-10` — 2026-10-30
 
 Frank (`wbdevworld`, integration editor) decided on 2026-10-30, after management's M2 sign-off, to reunify the accepted M2 branch with `master` before any M3 work ("Reunify first"). This batch branch `batch/reunify-m2-2026-10` starts from `master` `31b2b90` and merges `fix/m2-2026-10` `19e00a0d` (tagged M2 deliverable `v1.0.0-m2.4` at `9f045ef4`, accepted on training). Authorisation to touch files of all three workstreams in this one bounded merge comes from that decision; review fixes return to their owners afterwards.
