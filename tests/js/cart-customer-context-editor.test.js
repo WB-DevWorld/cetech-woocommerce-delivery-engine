@@ -316,6 +316,82 @@ describe('Cart editor destination cascade (C12)', () => {
 		}
 	});
 
+	it('resolves the rendered Region to its canonical key once so locality suggestions are narrowed to it', async () => {
+		vi.useFakeTimers();
+		try {
+			document.body.innerHTML = destinationMarkup({ country: 'GH', region: 'AA' });
+			window.history.replaceState(null, '', '/cart/');
+			window.cetechDeCartContextEditor = {
+				ajaxUrl: '/wp-admin/admin-ajax.php',
+				geography: {
+					childrenAction: 'cetech_de_geography_children',
+					childrenNonce: 'children-nonce',
+					searchAction: 'cetech_de_geography_locality_search',
+					searchNonce: 'search-nonce',
+				},
+			};
+			const bodies = [];
+			window.fetch = async (_url, init) => {
+				const body = new URLSearchParams(init.body);
+				bodies.push(body);
+				if (body.get('action') === 'cetech_de_geography_children') {
+					return {
+						json: async () => ({
+							success: true,
+							data: { items: [ { key: 'key-aa', code: 'AA', name: 'Greater Accra Region' }, { key: 'key-ah', code: 'AH', name: 'Ashanti Region' } ], has_more: false },
+						}),
+					};
+				}
+				return {
+					json: async () => ({
+						success: true,
+						data: { items: [ { key: 'key-accra', name: 'Accra', label: 'Accra — Accra, Greater Accra Region' } ], has_more: false },
+					}),
+				};
+			};
+			const flush = async () => {
+				for (let i = 0; i < 25; i++) {
+					await Promise.resolve();
+				}
+			};
+			loadScript();
+
+			const region = control('region');
+			expect(region.options[1].getAttribute('data-location-key')).toBeNull();
+
+			const city = control('locality');
+			city.value = 'Acc';
+			city.dispatchEvent(new Event('input', { bubbles: true }));
+			await vi.advanceTimersByTimeAsync(300);
+			await flush();
+
+			expect(bodies.map((b) => b.get('action'))).toEqual([ 'cetech_de_geography_children', 'cetech_de_geography_locality_search' ]);
+			expect(bodies[0].get('country')).toBe('GH');
+			expect(bodies[0].get('type')).toBe('administrative');
+			expect(bodies[1].get('parent_key')).toBe('key-aa');
+			expect(region.options[1].getAttribute('data-location-key')).toBe('key-aa');
+			expect(region.options[2].getAttribute('data-location-key')).toBe('key-ah');
+			expect(document.querySelectorAll('.cetech-de-locality-results [role="option"]')).toHaveLength(1);
+
+			// The second search reuses the resolved keys: no second children request.
+			city.value = 'Accr';
+			city.dispatchEvent(new Event('input', { bubbles: true }));
+			await vi.advanceTimersByTimeAsync(300);
+			await flush();
+			expect(bodies.map((b) => b.get('action'))).toEqual([
+				'cetech_de_geography_children',
+				'cetech_de_geography_locality_search',
+				'cetech_de_geography_locality_search',
+			]);
+			expect(bodies[2].get('parent_key')).toBe('key-aa');
+		} finally {
+			vi.useRealTimers();
+			delete window.cetechDeCartContextEditor;
+			delete window.fetch;
+		}
+	});
+
+
 	it('loads the regions of a newly chosen Country and waits for a Region before showing City', async () => {
 		document.body.innerHTML = destinationMarkup({ country: 'GH', region: 'AA', city: 'Accra' });
 		window.history.replaceState(null, '', '/cart/');
