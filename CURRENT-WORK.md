@@ -336,6 +336,10 @@ With Frank's go-ahead the remaining Part C items ran on 1.0.0-m2.2: C1's Paystac
 ### 1.0.0-m2.2 built and installed on training — 2026-10-30
 
 `release-package.yml` run 41049374601 built `cetech-woocommerce-delivery-engine-v1.0.0-m2.2.zip` from `fix/m2-2026-10` head `c9ca3da2bc58dc002c95692586976c65c76ccdbf` (merge of #173; CI run 41049297742 green): SHA-256 `0376a61b1f03ca9d47b3981c0c34715804f2cbc675bf58a7ddfac955e0b24091`, 2,090,279 bytes, verified locally (hash, identity `1.0.0-m2.2`, no test or build folders, vendor autoload, autoload verifier). Training-ops `backup` run 41049542371 (`20261030T113926Z`), then `install` run 41049784670 with `package_run_id` 41049374601: backup `20261030T114144Z`, installed, `object_cache_flushed=yes`, `wp_rocket=purged version=3.23.5.1` (first run of the #170 purge step), post-install `1.0.0-m2.2` active, `cetech_de_db_version` 6. The Part C re-run of C10, C12 and C13 on this build passes (see `scripts/qualification/m2/acceptance-cases.md`). Training truth: `1.0.0-m2.2`.
+### Version 1.0.0-m2.3 — 2026-10-30
+
+The base now carries version `1.0.0-m2.3` (plugin header, `CETECH_DE_VERSION`, `Stable tag`, and the two schema inspection tests that pin it) so the next `release-package.yml` build packages the S2 fix (#176, Site-wide Defaults refuses a blank submission) under its own version (D7). Schema stays 6. Build, training backup and install follow through training-ops with Frank's environment approvals; S2's validation half then needs a re-run on training.
+
 ### Version 1.0.0-m2.2 — 2026-10-30
 
 The M2 acceptance on training (PRs #169 and #171) found that the Classic cart and checkout reselection controls were stripped by `wp_kses_post`; #172 fixed the renderer. The base now carries version `1.0.0-m2.2` (plugin header, `CETECH_DE_VERSION`, `Stable tag`) so the next `release-package.yml` build packages that fix under its own version (D7). Schema stays 6. Not built or installed yet: the build follows Frank's go-ahead, the install follows a backup and an announcement through training-ops, and C10, C12 and C13 then need a re-run on training.
