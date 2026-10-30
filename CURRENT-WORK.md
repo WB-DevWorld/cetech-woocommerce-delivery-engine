@@ -203,14 +203,14 @@ The sections below preserve the earlier Issue #45 and release/deployment checkpo
 
 ## Current training truth
 - Training site: `https://training.cetechbpa.com`.
-- Installed/active candidate: `1.0.0-m2.1`, installed 2026-10-29 18:24 UTC by training-ops run 40930052523 (previously `1.0.0-dev.attention-count.1`, package-source `6e9e2ea71796170afb0508954a18d206cdc7017a`).
-- Package-source SHA: `7320a6b5c2432ccee1e9040232aef00b2989756f`.
-- Frozen ZIP: `cetech-woocommerce-delivery-engine-v1.0.0-m2.1.zip` (release-package run 40894108572).
-- ZIP bytes: `2,083,110`.
-- ZIP SHA-256: `8923b52395ff1530393efcaddf470e025cb71fdd18e2678badef509db6365226`.
-- Schema: `cetech_de_db_version` `6` before and after the install; no migration ran.
-- Server backups under the deploy root: `20261029T150001Z` (backup run 40895461288, taken before the first install attempt) and `20261029T182238Z` (taken by the install run itself). Either is a rollback point for training-ops `rollback`.
-- Training physical QA for `1.0.0-m2.1`: PENDING (M2 acceptance per `scripts/qualification/m2/`).
+- Installed/active candidate: `1.0.0-m2.2`, installed 2026-10-30 11:44 UTC by training-ops run 41049784670 and reinstalled 2026-10-30 13:48 UTC by run 41065815021 after the S7 rollback rehearsal (previously `1.0.0-m2.1`, package-source `7320a6b5c2432ccee1e9040232aef00b2989756f`, run 40930052523 on 2026-10-29).
+- Package-source SHA: `c9ca3da2bc58dc002c95692586976c65c76ccdbf`.
+- Frozen ZIP: `cetech-woocommerce-delivery-engine-v1.0.0-m2.2.zip` (release-package run 41049374601).
+- ZIP bytes: `2,090,279`.
+- ZIP SHA-256: `0376a61b1f03ca9d47b3981c0c34715804f2cbc675bf58a7ddfac955e0b24091`.
+- Schema: `cetech_de_db_version` `6` before and after every install and the rollback; no migration ran.
+- Server backups under the deploy root: `20261029T150001Z` and `20261029T182238Z` (m2.1 install day), `20261030T113926Z` and `20261030T114144Z` (before the m2.2 install; the latter restored by the S7 rollback), `20261030T134122Z` (safety backup taken by the rollback) and `20261030T134703Z` (taken by the reinstall). Each is a rollback point for training-ops `rollback`.
+- Training M2 acceptance (`scripts/qualification/m2/acceptance-cases.md`): Parts A and B done; Part C has a result on every row. Still open: S8 (needs a Shop-Manager-only account), S10 inactive-scope half, S11/S12 fixtures, customer email content, the cart editor City-field re-check, and the S2 validation defect (blank site-wide defaults accepted) which needs a fix PR.
 - The Needs Attention counts recorded for `1.0.0-dev.attention-count.1` (catalog `0`, stale bulk `0`, shipment creation `2`, operations `3`, COD `3`, canonical aggregate `8`, Overview `8`, menu badge `8`) have not been re-verified on `1.0.0-m2.1`.
 - Training deployment is qualification evidence only; it is not RC.13, Pilot, FLAIROC, or production promotion.
 
@@ -326,6 +326,9 @@ Accepted invariant only. The three compact Needs Attention indexes (Cash on Deli
 
 `release-package.yml` run 40894108572 built `cetech-woocommerce-delivery-engine-v1.0.0-m2.1.zip` from the green head of `fix/m2-2026-10`, commit `7320a6b5c2432ccee1e9040232aef00b2989756f` (merge of #160; contains #148–#161), `Delivery Engine CI` run 40893203279 successful on that commit. ZIP SHA-256 `8923b52395ff1530393efcaddf470e025cb71fdd18e2678badef509db6365226` (2,083,110 bytes; the slug-named copy in the same artifact has the identical hash). The extracted ZIP was verified locally: one top-level `cetech-woocommerce-delivery-engine/` folder, header `Version: 1.0.0-m2.1`, `CETECH_DE_VERSION` `1.0.0-m2.1`, `Stable tag: 1.0.0-m2.1`, `Requires at least: 6.5`, committed `vendor/` autoload present, no `tests/`, `node_modules` or `.git` content, and `scripts/verify-production-package-autoload.php` passes on the extracted tree. The first build attempt (run 40893815310) failed only because the package script's informational branch lookup aborts on a detached checkout when the ref is a commit SHA; the second run used the branch ref whose tip is that same commit, and #162 makes a SHA ref work for later builds. Not installed anywhere: installation on training follows a backup and an announcement, through training-ops only (`package_run_id` 40894108572).
 
+### Open acceptance items and the S7 rollback rehearsal — 2026-10-30
+
+With Frank's go-ahead the remaining Part C items ran on 1.0.0-m2.2: C1's Paystack half passed on his test order 50386 (shipment 50386-D1 created at payment); S9 passed with a catalog CSV round trip (261 rows unchanged on preview and apply) and a bad-row preview that reports the line and skips the row — the `enable_bulk_import` key turned out to be unused by the code, so it stays 0 and the preflight no longer requires it; S2 found a defect: the Site-wide Defaults editor accepted a blank submission (no delivery option, no estimate) and saved it, leaving inheriting products without a delivery option for about a minute until the values were restored through the same form (the product form refuses the same input); S8 stays NOT RUN because `claude-qa` keeps the administrator role. S7 passed: rollback run 41064520146 to backup `20261030T114144Z` (plugin folder only) put 1.0.0-m2.1 back with schema 6 and all data intact, and reinstall run 41065815021 of package run 41049374601 returned training to 1.0.0-m2.2 (backup `20261030T134703Z`, caches purged); snapshots before, between and after differ only in the version string. Training truth: `1.0.0-m2.2`.
 ### 1.0.0-m2.2 built and installed on training — 2026-10-30
 
 `release-package.yml` run 41049374601 built `cetech-woocommerce-delivery-engine-v1.0.0-m2.2.zip` from `fix/m2-2026-10` head `c9ca3da2bc58dc002c95692586976c65c76ccdbf` (merge of #173; CI run 41049297742 green): SHA-256 `0376a61b1f03ca9d47b3981c0c34715804f2cbc675bf58a7ddfac955e0b24091`, 2,090,279 bytes, verified locally (hash, identity `1.0.0-m2.2`, no test or build folders, vendor autoload, autoload verifier). Training-ops `backup` run 41049542371 (`20261030T113926Z`), then `install` run 41049784670 with `package_run_id` 41049374601: backup `20261030T114144Z`, installed, `object_cache_flushed=yes`, `wp_rocket=purged version=3.23.5.1` (first run of the #170 purge step), post-install `1.0.0-m2.2` active, `cetech_de_db_version` 6. The Part C re-run of C10, C12 and C13 on this build passes (see `scripts/qualification/m2/acceptance-cases.md`). Training truth: `1.0.0-m2.2`.
