@@ -6,6 +6,8 @@ Frank (`wbdevworld`, integration editor) decided on 2026-10-30, after management
 - Merged identity: version `1.0.0-m3.0-dev.1`, `Requires at least: 6.5`, schema target `12` (master's); the production-package verifier classes this version as the schema-12 line. `v1.0.0-m2.4` stays the frozen M2 deliverable and never moves.
 - Not done by this batch: no training or production install. Installing the merged tree on training is a 6 → 12 database migration and needs Frank's explicit approval of a training-ops install with a fresh backup; the M2 acceptance ledger (`scripts/qualification/m2/acceptance-cases.md`) is the regression definition for that re-run.
 
+- Master tests re-aimed at the reunified behaviour (first CI run on the batch): `LegacyQuoteProviderTest` and `LegacyPriceProviderRealDatabaseTest` (D1: a positively scoped card never matches a request without that dimension, so the retained engine refuses before the legacy capture does), `PromisePreliminaryProductRendererTest` (D2 renders the Delivery / Store Pickup switch as radios; unpriced option radios stay hidden), and the native qualification case `NATIVE-W2Q04-MIXED-*` (D1 option A: a cart whose members differ in supplier, origin or profile splits into two homogeneous groups with their own charges in both member orders instead of being refused; replaces the "both member orders refuse" expectation of obligation W2Q-21). Master's engines and their other proofs are unchanged.
+
 ## Historical continuation before the batch
 
 # Current continuation — repository reconciliation — 2026-10-27
