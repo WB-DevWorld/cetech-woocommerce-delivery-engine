@@ -1,3 +1,12 @@
+# Forward port of 1.0.0-m2.5 (Needs Attention count off the admin request path) — 2026-11-03
+
+Frank accepted `1.0.0-m2.5` on staging on 2026-11-03 (tag and prerelease `v1.0.0-m2.5` on `fix/m2-2026-10` `8af9dcd1`, ZIP SHA-256 `127dd86e…`; record in `fix/m2-2026-10`'s `CURRENT-WORK.md`, PR #194) and asked for it on `master` so M3 builds on it. Branch `fix/m2-5-forward-port-master` from `master` `fbca3e30` merges `fix/m2-2026-10` `84971091` (the accepted m2.5 code #192, its version bump #193 and records #194), as the reunification did.
+
+- Resolution: master's identity stays (`1.0.0-m3.0-dev.1`, schema target 12; plugin header, `readme.txt`, both inspection test pins); master's `CURRENT-WORK.md` and `uninstall.php` kept; `phpunit.xml` / `phpunit.real-db.xml` keep both sides' groups (adds `attention-snapshot-real-db`); `Deactivator` keeps master's data-lifecycle suspension and cache retirement and adds the refresh-job clear.
+- Master difference: master's uninstall is the data-lifecycle executor (exact registry, keep-data default), so the four `cetech_de_attention_catalog_*` options stay after an uninstall on this line, unlike on `fix/m2-2026-10`. They are small, non-autoloaded and ignored once the plugin version changes. Registering them as a data-lifecycle cache class is a separate WS3 task; the M2 uninstall-runner assertions were not carried over.
+- Coverage on master: the readiness inputs (resolver, assessor, constraint service, operational state, runtime chain, the three repositories) are identical to `fix/m2-2026-10`, and no master-only code writes the scope, offer or pickup tables directly, so the invalidation hooks cover this line. `AdminMenu` (different on master) reads the badge through `NeedsAttentionCountQuery` and so gets the snapshot.
+- Not done: no training or staging install of this line (still the 6 → 12 migration question from the reunification).
+
 # Reunification batch — `master` + `fix/m2-2026-10` — 2026-10-30
 
 Frank (`wbdevworld`, integration editor) decided on 2026-10-30, after management's M2 sign-off, to reunify the accepted M2 branch with `master` before any M3 work ("Reunify first"). This batch branch `batch/reunify-m2-2026-10` starts from `master` `31b2b90` and merges `fix/m2-2026-10` `19e00a0d` (tagged M2 deliverable `v1.0.0-m2.4` at `9f045ef4`, accepted on training). Authorisation to touch files of all three workstreams in this one bounded merge comes from that decision; review fixes return to their owners afterwards.

@@ -309,6 +309,44 @@ if ( ! function_exists( 'did_action' ) ) {
 	}
 }
 
+if ( ! function_exists( 'do_action' ) ) {
+	function do_action( string $hook_name, mixed ...$args ): void {
+		$GLOBALS['wp_actions'][ $hook_name ] = (int) ( $GLOBALS['wp_actions'][ $hook_name ] ?? 0 ) + 1;
+		$listeners                            = $GLOBALS['cetech_de_test_actions'][ $hook_name ] ?? [];
+		usort( $listeners, static fn ( array $a, array $b ): int => $a['priority'] <=> $b['priority'] );
+		foreach ( $listeners as $listener ) {
+			( $listener['callback'] )( ...array_slice( $args, 0, (int) $listener['args'] ) );
+		}
+	}
+}
+
+if ( ! function_exists( 'wp_next_scheduled' ) ) {
+	function wp_next_scheduled( string $hook, array $args = [] ): int|false {
+		unset( $args );
+
+		return $GLOBALS['cetech_de_test_cron'][ $hook ] ?? false;
+	}
+}
+
+if ( ! function_exists( 'wp_schedule_single_event' ) ) {
+	function wp_schedule_single_event( int $timestamp, string $hook, array $args = [], bool $wp_error = false ): bool {
+		unset( $args, $wp_error );
+		$GLOBALS['cetech_de_test_cron'][ $hook ] = $timestamp;
+
+		return true;
+	}
+}
+
+if ( ! function_exists( 'wp_clear_scheduled_hook' ) ) {
+	function wp_clear_scheduled_hook( string $hook, array $args = [], bool $wp_error = false ): int {
+		unset( $args, $wp_error );
+		$had = isset( $GLOBALS['cetech_de_test_cron'][ $hook ] ) ? 1 : 0;
+		unset( $GLOBALS['cetech_de_test_cron'][ $hook ] );
+
+		return $had;
+	}
+}
+
 if ( ! function_exists( 'wp_cache_delete' ) ) {
 	function wp_cache_delete( mixed $key, string $group = '' ): bool {
 		$GLOBALS['cetech_de_test_cache_deletes'][] = [ $key, $group ];

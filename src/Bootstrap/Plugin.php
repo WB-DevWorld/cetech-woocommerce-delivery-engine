@@ -89,6 +89,7 @@ use CetechDeliveryEngine\Domain\Geography\GeographyPackRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\LocationAliasRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\ProviderMappingRepositoryInterface;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbCanonicalLocationRepository;
+use CetechDeliveryEngine\Infrastructure\WordPress\WpCronNeedsAttentionRefreshScheduler;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbCoverageGroupRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbGeographyPackRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbLocationAliasRepository;
@@ -116,8 +117,13 @@ use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationSubm
 use CetechDeliveryEngine\Application\Configuration\ConfigurationFingerprintBuilder;
 use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogIndexInterface;
 use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogInheritanceClassifier;
+use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogScanScopedConfigurationRepository;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionCountQuery;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionInvalidation;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionRefreshSchedulerInterface;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionSnapshotService;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionSnapshotStore;
 use CetechDeliveryEngine\Application\Configuration\Catalog\ProductExceptionsQuery;
 use CetechDeliveryEngine\Application\Configuration\ClassicCheckoutRuntimeActivation;
 use CetechDeliveryEngine\Application\Configuration\OperationalReadinessAssessor;
@@ -405,6 +411,13 @@ final class Plugin {
 				$this->container->get( Schema6CoverageUpgradeService::class )->continue_pass();
 			}
 		);
+		add_action(
+			NeedsAttentionRefreshSchedulerInterface::HOOK,
+			function (): void {
+				$this->container->get( NeedsAttentionSnapshotService::class )->run_refresh();
+			}
+		);
+		( new NeedsAttentionInvalidation( $this->container->get( NeedsAttentionSnapshotService::class ) ) )->register();
 
 		if ( ! $requirements->is_woocommerce_active() ) {
 			$this->container->get( AdminNoticeManager::class )->register(
@@ -1699,7 +1712,8 @@ final class Plugin {
 				$container->get( EntityLabelResolver::class ),
 				$container->get( AdminActionHandler::class ),
 				$container->get( DeliveryOfferRepositoryInterface::class ),
-				$container->get( PickupLocationRepositoryInterface::class )
+				$container->get( PickupLocationRepositoryInterface::class ),
+				$container->get( NeedsAttentionSnapshotService::class )
 			)
 		);
 
@@ -1727,7 +1741,8 @@ final class Plugin {
 				$container->get( ShipmentOperationsIssueQuery::class ),
 				$container->get( NeedsAttentionCountQuery::class ),
 				$container->get( CodAwaitingShipmentQuery::class ),
-				$container->get( BulkStaleJobQuery::class )
+				$container->get( BulkStaleJobQuery::class ),
+				$container->get( NeedsAttentionSnapshotService::class )
 			)
 		);
 
@@ -1836,7 +1851,8 @@ final class Plugin {
 				$container->get( AdminActionHandler::class ),
 				$container->get( ClassicCheckoutRuntimeActivation::class ),
 				$container->get( WooCommerceShippingReadiness::class ),
-				$container->get( OperationalStateService::class )
+				$container->get( OperationalStateService::class ),
+				$container->get( NeedsAttentionSnapshotService::class )
 			)
 		);
 
@@ -2384,13 +2400,27 @@ final class Plugin {
 
 		$this->container->singleton(
 			NeedsAttentionQuery::class,
-			static fn ( ServiceContainer $container ): NeedsAttentionQuery => new NeedsAttentionQuery(
-				$container->get( CatalogIndexInterface::class ),
-				$container->get( OperationalReadinessAssessor::class ),
-				$container->get( OperationalStateService::class ),
-				$container->get( CatalogInheritanceClassifier::class ),
-				$container->get( ScopedConfigurationRepositoryInterface::class )
-			)
+			static function ( ServiceContainer $container ): NeedsAttentionQuery {
+				// The catalog scan gets its own resolver over a batch-scoped repository view,
+				// so its memo can be cleared per batch without touching the checkout resolver.
+				$scan_scopes = new CatalogScanScopedConfigurationRepository(
+					$container->get( ScopedConfigurationRepositoryInterface::class )
+				);
+				$scan_resolver = new EffectiveConfigurationResolver(
+					$scan_scopes,
+					$container->get( EffectiveConfigurationValidator::class ),
+					$container->get( FulfilmentConstraintServiceInterface::class ),
+					$container->get( SiteWideDefaultsPolicyInterface::class )
+				);
+
+				return new NeedsAttentionQuery(
+					$container->get( CatalogIndexInterface::class ),
+					new OperationalReadinessAssessor( $scan_resolver ),
+					$container->get( OperationalStateService::class ),
+					$container->get( CatalogInheritanceClassifier::class ),
+					$scan_scopes
+				);
+			}
 		);
 
 		$this->container->singleton(
@@ -2401,7 +2431,23 @@ final class Plugin {
 				$container->get( ShipmentOperationsIssueQuery::class ),
 				$container->get( FeatureFlags::class ),
 				$container->get( CodAwaitingShipmentQuery::class ),
-				$container->get( BulkStaleJobQuery::class )
+				$container->get( BulkStaleJobQuery::class ),
+				$container->get( NeedsAttentionSnapshotService::class )
+			)
+		);
+
+		$this->container->singleton(
+			NeedsAttentionRefreshSchedulerInterface::class,
+			static fn (): NeedsAttentionRefreshSchedulerInterface => new WpCronNeedsAttentionRefreshScheduler()
+		);
+
+		$this->container->singleton(
+			NeedsAttentionSnapshotService::class,
+			static fn ( ServiceContainer $container ): NeedsAttentionSnapshotService => new NeedsAttentionSnapshotService(
+				new NeedsAttentionSnapshotStore(),
+				$container->get( NeedsAttentionQuery::class ),
+				$container->get( NeedsAttentionRefreshSchedulerInterface::class ),
+				defined( 'CETECH_DE_VERSION' ) ? (string) CETECH_DE_VERSION : '0'
 			)
 		);
 
