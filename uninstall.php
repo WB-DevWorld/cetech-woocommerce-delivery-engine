@@ -17,6 +17,17 @@ if ( ! defined( 'WP_UNINSTALL_PLUGIN' ) ) {
 	exit;
 }
 
+// The Needs Attention catalog snapshot is derived cache, not merchant data, so it
+// is removed even when merchant data is kept. Keep these names aligned with
+// NeedsAttentionSnapshotStore::option_names() and the refresh scheduler hook.
+if ( function_exists( 'wp_clear_scheduled_hook' ) ) {
+	wp_clear_scheduled_hook( 'cetech_de_refresh_attention_snapshot' );
+}
+foreach ( [ 'cetech_de_attention_catalog_snapshot', 'cetech_de_attention_catalog_generation', 'cetech_de_attention_catalog_refresh', 'cetech_de_attention_catalog_refresh_lock' ] as $cetech_de_attention_option ) {
+	delete_option( $cetech_de_attention_option );
+}
+unset( $cetech_de_attention_option );
+
 $delete_data = (bool) (int) get_option( 'cetech_de_delete_data_on_uninstall', 0 );
 
 if ( ! $delete_data ) {

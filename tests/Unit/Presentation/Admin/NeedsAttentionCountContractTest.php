@@ -457,6 +457,55 @@ final class NeedsAttentionCountContractTest extends TestCase {
 		self::assertCount( 1, $scheduler->scheduled );
 	}
 
+	public function test_a_complete_page_scan_refreshes_the_snapshot_so_badge_equals_the_page(): void {
+		$this->grant( true, false );
+		$catalog   = $this->catalog_attention_query();
+		$scheduler = new InMemoryNeedsAttentionRefreshScheduler();
+		$snapshot  = new NeedsAttentionSnapshotService( new NeedsAttentionSnapshotStore(), $catalog, $scheduler, '1.0.0-m2.5' );
+		$counter   = new NeedsAttentionCountQuery( $catalog, $this->creation(), $this->operations(), $this->flags, $this->cod, $this->bulk(), $snapshot );
+
+		self::assertSame( 0, $this->badge_count( $counter ), 'No snapshot yet.' );
+
+		$page = $this->render_page( $counter, $catalog, $snapshot );
+
+		self::assertStringContainsString( 'Catalog Lamp', $page );
+		self::assertSame( 1, $snapshot->current_snapshot()?->count );
+		self::assertSame( 1, $this->badge_count( $counter ), 'After the page scan the badge equals the page.' );
+		self::assertStringNotContainsString( 'cetech-de-attention-omitted', $page );
+	}
+
+	public function test_products_section_discloses_rows_beyond_the_page(): void {
+		$this->grant( true, false );
+		foreach ( ClassicCheckoutRuntimeActivation::CHAIN as $flag ) {
+			$GLOBALS['cetech_de_test_options'][ 'cetech_de_' . $flag ] = 1;
+		}
+		$products = [];
+		for ( $id = 1; $id <= 230; $id++ ) {
+			$products[ $id ] = [ 'label' => 'Unset ' . $id, 'type' => 'simple' ];
+		}
+		$repository = new InMemoryScopedConfigurationRepository();
+		$index      = new InMemoryCatalogIndex( $products );
+		$resolver   = new EffectiveConfigurationResolver( $repository, new EffectiveConfigurationValidator(), new HardFulfilmentConstraintService(), $this->settings );
+		$catalog    = new NeedsAttentionQuery(
+			$index,
+			new OperationalReadinessAssessor( $resolver ),
+			$this->operational,
+			new CatalogInheritanceClassifier( $repository, $index, $resolver, $this->settings, $this->empty_legacy_rules() ),
+			$repository
+		);
+		$snapshot = new NeedsAttentionSnapshotService( new NeedsAttentionSnapshotStore(), $catalog, new InMemoryNeedsAttentionRefreshScheduler(), '1.0.0-m2.5' );
+		$counter  = new NeedsAttentionCountQuery( $catalog, $this->creation(), $this->operations(), $this->flags, $this->cod, $this->bulk(), $snapshot );
+
+		$before = $this->render_page( $counter, $catalog, $snapshot );
+		self::assertStringContainsString( 'Showing the first 200 products. More may need attention', $before );
+		self::assertNull( $snapshot->current_snapshot(), 'A page that stopped at its row limit never writes the snapshot.' );
+
+		self::assertSame( NeedsAttentionSnapshotService::RUN_SAVED, $snapshot->run_refresh() );
+		$after = $this->render_page( $counter, $catalog, $snapshot );
+		self::assertStringContainsString( 'Showing the first 200 of 230.', $after );
+		self::assertSame( 230, $this->badge_count( $counter ) );
+	}
+
 	private function grant( bool $catalog, bool $shipments ): void {
 		$GLOBALS['cetech_de_test_caps'] = [
 			Capabilities::VIEW                 => true,
@@ -602,7 +651,7 @@ final class NeedsAttentionCountContractTest extends TestCase {
 		}
 	}
 
-	private function render_page( NeedsAttentionCountQuery $counter, NeedsAttentionQuery $catalog ): string {
+	private function render_page( NeedsAttentionCountQuery $counter, NeedsAttentionQuery $catalog, ?NeedsAttentionSnapshotService $snapshot = null ): string {
 		$service = ( new ReflectionClass( ShipmentService::class ) )->newInstanceWithoutConstructor();
 		$page    = new NeedsAttentionPage(
 			$catalog,
@@ -614,7 +663,8 @@ final class NeedsAttentionCountContractTest extends TestCase {
 			$this->operations(),
 			$counter,
 			$this->cod,
-			$this->bulk()
+			$this->bulk(),
+			$snapshot
 		);
 
 		ob_start();

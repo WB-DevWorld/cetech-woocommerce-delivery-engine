@@ -1,3 +1,16 @@
+# 1.0.0-m2.5 amendment — catalog count off the admin request path (2026-11-03)
+
+The contract below still holds: Overview, the Needs Attention page and the menu badge are one concept, `NeedsAttentionCountQuery::unresolved_count_for_current_user()` is the count authority, the five sources and the capability matrix are unchanged, and nothing new counts as an issue. What changed is where the catalog source (`NeedsAttentionQuery`) is computed.
+
+- **Why.** On staging (3,763 published products) one catalog count took about 11 s and 18,815 queries, and every wp-admin page paid it through the menu badge. The catalog result does not depend on the viewer; only visibility does.
+- **Cheaper scan, same result.** All published products in batches of 250 (the old silent 5,000 cap is gone); no labels or URLs for a count; the product-scope check before the resolve when the catalog is not scanned as customer problems; one presence query per batch. Equivalence with the m2.4 algorithm is tested (`NeedsAttentionCatalogScanTest`).
+- **Site-wide snapshot.** The catalog count lives in non-autoloaded options (`cetech_de_attention_catalog_snapshot` and its generation, cursor and lock). The menu badge, Overview, Settings landing and Setup Wizard read it and never scan. Bulk stale, shipment creation, operations and COD stay live and per user exactly as before.
+- **Bounded staleness.** A tracked write (scoped configuration, delivery options, pickup locations, site-wide defaults, runtime flags, product publish/unpublish/trash/delete/type change) moves the generation; a debounced WP-Cron job (`cetech_de_refresh_attention_snapshot`) recounts in resumable 20-second runs and refuses to save a count that an invalidation overtook. The badge equals the queue after a refresh. It may lag by at most 30 s + one cron interval + scan time after a tracked write, and by at most the 15-minute TTL + one cron interval + scan time after an untracked one.
+- **No snapshot yet** (fresh install, upgrade to a new version): the badge shows the live sources only; Overview, Settings and the Setup Wizard say "Updating…" rather than 0. A refresh is queued.
+- **The Needs Attention page** is still the live, authoritative product list. When its scan covers the whole catalog it refreshes the snapshot, so the badge catches up at once; when it stops at its 200-row page it says "Showing the first 200 of M".
+- **Cleanup.** Deactivation clears the job and deletes no option (the Deactivator never deletes options; the lock expires by itself). Activation starts a new generation, because catalog changes made while the plugin was inactive were not tracked. Uninstall removes all four options and the job even when merchant data is kept: they are derived cache, not merchant data, so the keep-data default is not affected.
+- **Not changed.** Delivery pricing, cart, checkout, shipments, COD, Bulk Tools, schema (6).
+
 # Final closeout — 2026-09-22
 
 Issue #32 is **CLOSED / COMPLETED** and PR #43 is **MERGED**.

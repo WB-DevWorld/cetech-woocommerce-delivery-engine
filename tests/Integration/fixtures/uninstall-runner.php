@@ -53,6 +53,11 @@ $GLOBALS['cetech_de_test_options'] = [
 	'_cetech_de_unrelated_core_option'   => 'keep-me',
 	'woocommerce_unrelated'              => 'keep-me',
 ];
+$attention_options = CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionSnapshotStore::option_names();
+foreach ( $attention_options as $attention_option ) {
+	$GLOBALS['cetech_de_test_options'][ $attention_option ] = 'derived';
+}
+$GLOBALS['cetech_de_test_cron'] = [ CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionRefreshSchedulerInterface::HOOK => 1_800_000_000 ];
 
 $wpdb           = new CetechDeliveryEngine\Tests\Unit\Shipment\FakeWpdb();
 $GLOBALS['wpdb'] = $wpdb;
@@ -70,5 +75,7 @@ echo wp_json_encode(
 		'unrelated'       => get_option( 'woocommerce_unrelated', null ),
 		'tables'          => $wpdb->table_names(),
 		'admin_has_view'  => $administrator->has_cap( 'view_delivery_engine' ),
+		'attention_left'  => array_values( array_filter( $attention_options, static fn ( string $option ): bool => null !== get_option( $option, null ) ) ),
+		'attention_cron'  => wp_next_scheduled( CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionRefreshSchedulerInterface::HOOK ),
 	]
 );

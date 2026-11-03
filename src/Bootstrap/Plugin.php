@@ -1513,7 +1513,8 @@ final class Plugin {
 				$container->get( ShipmentOperationsIssueQuery::class ),
 				$container->get( NeedsAttentionCountQuery::class ),
 				$container->get( CodAwaitingShipmentQuery::class ),
-				$container->get( BulkStaleJobQuery::class )
+				$container->get( BulkStaleJobQuery::class ),
+				$container->get( NeedsAttentionSnapshotService::class )
 			)
 		);
 
