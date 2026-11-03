@@ -51,6 +51,12 @@ final class NeedsAttentionCatalogScanTest extends TestCase {
 		$this->settings   = new SiteWideDefaultsSettings();
 	}
 
+	protected function tearDown(): void {
+		// PHPUnit keeps test objects until the run ends; release the large fixtures.
+		unset( $this->repository, $this->settings );
+		$GLOBALS['cetech_de_test_options'] = [];
+	}
+
 	/**
 	 * @return iterable<string, array{bool, bool, bool}>
 	 */
@@ -114,13 +120,15 @@ final class NeedsAttentionCatalogScanTest extends TestCase {
 
 		$query = $this->query( $catalog, true );
 
-		self::assertSame( 6001, $query->count() );
-		self::assertSame( 5000, count( $this->m2_4_list( $catalog ) ), 'The m2.4 scan stopped at 5,000.' );
+		self::assertSame( 6001, $query->count(), 'The m2.4 scan read published_product_ids( 0, 5000 ) and stopped at 5,000.' );
 
-		$listing = $query->listing( 10000 );
+		self::assertFalse( $query->listing( 6001 )->complete, 'Hitting the row limit never claims the catalog was covered.' );
+
+		$listing = $query->listing( 6002 );
 		self::assertTrue( $listing->complete );
 		self::assertSame( 6001, $listing->scanned );
 		self::assertCount( 6001, $listing->items );
+		self::assertSame( 6001, $listing->items[6000]['id'] );
 	}
 
 	public function test_count_batches_resume_from_an_offset_and_report_the_end(): void {

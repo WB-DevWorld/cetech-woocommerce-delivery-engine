@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Configuration\Admin\EntityLabelResolver;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionSnapshotService;
 use CetechDeliveryEngine\Application\Configuration\DeliveryOptionCompatibility;
 use CetechDeliveryEngine\Application\Configuration\InStoreMethodSelection;
 use CetechDeliveryEngine\Application\Configuration\SiteWideDefaultSummary;
@@ -46,7 +47,8 @@ final class DeliverySettingsHomePage {
 		private readonly EntityLabelResolver $labels,
 		private readonly AdminActionHandler $action_handler,
 		private readonly ?DeliveryOfferRepositoryInterface $offers = null,
-		private readonly ?PickupLocationRepositoryInterface $pickups = null
+		private readonly ?PickupLocationRepositoryInterface $pickups = null,
+		private readonly ?NeedsAttentionSnapshotService $attention_snapshot = null
 	) {
 	}
 
@@ -100,7 +102,8 @@ final class DeliverySettingsHomePage {
 	private function render_landing( array $state ): void {
 		$preview = $this->defaults->preview();
 		$primary = FulfilmentProfileRegistry::get( (string) $state['primary_profile'] );
-		$attention_count = $this->needs_attention->count();
+		$attention_reading = $this->attention_snapshot?->reading();
+		$attention_count   = null === $attention_reading ? $this->needs_attention->count() : $attention_reading->count;
 
 		AdminPageLayout::open_page();
 		AdminPageLayout::render_page_header(
@@ -136,8 +139,9 @@ final class DeliverySettingsHomePage {
 				],
 				[
 					'label' => __( 'Items needing attention', 'cetech-woocommerce-delivery-engine' ),
-					'value' => (string) $attention_count,
+					'value' => null === $attention_count ? NeedsAttentionCatalogWording::updating() : (string) $attention_count,
 					'empty' => 0 === $attention_count,
+					'note'  => NeedsAttentionCatalogWording::last_checked( $attention_reading ),
 				],
 			]
 		);

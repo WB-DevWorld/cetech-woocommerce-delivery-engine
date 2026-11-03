@@ -51,6 +51,7 @@ use CetechDeliveryEngine\Domain\Geography\GeographyPackRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\LocationAliasRepositoryInterface;
 use CetechDeliveryEngine\Domain\Geography\ProviderMappingRepositoryInterface;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbCanonicalLocationRepository;
+use CetechDeliveryEngine\Infrastructure\WordPress\WpCronNeedsAttentionRefreshScheduler;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbCoverageGroupRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbGeographyPackRepository;
 use CetechDeliveryEngine\Infrastructure\Persistence\WpdbLocationAliasRepository;
@@ -81,6 +82,9 @@ use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogInheritanceCla
 use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogScanScopedConfigurationRepository;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionCountQuery;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionRefreshSchedulerInterface;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionSnapshotService;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionSnapshotStore;
 use CetechDeliveryEngine\Application\Configuration\Catalog\ProductExceptionsQuery;
 use CetechDeliveryEngine\Application\Configuration\ClassicCheckoutRuntimeActivation;
 use CetechDeliveryEngine\Application\Configuration\OperationalReadinessAssessor;
@@ -1472,7 +1476,8 @@ final class Plugin {
 				$container->get( EntityLabelResolver::class ),
 				$container->get( AdminActionHandler::class ),
 				$container->get( DeliveryOfferRepositoryInterface::class ),
-				$container->get( PickupLocationRepositoryInterface::class )
+				$container->get( PickupLocationRepositoryInterface::class ),
+				$container->get( NeedsAttentionSnapshotService::class )
 			)
 		);
 
@@ -1606,7 +1611,8 @@ final class Plugin {
 				$container->get( AdminActionHandler::class ),
 				$container->get( ClassicCheckoutRuntimeActivation::class ),
 				$container->get( WooCommerceShippingReadiness::class ),
-				$container->get( OperationalStateService::class )
+				$container->get( OperationalStateService::class ),
+				$container->get( NeedsAttentionSnapshotService::class )
 			)
 		);
 
@@ -2184,7 +2190,23 @@ final class Plugin {
 				$container->get( ShipmentOperationsIssueQuery::class ),
 				$container->get( FeatureFlags::class ),
 				$container->get( CodAwaitingShipmentQuery::class ),
-				$container->get( BulkStaleJobQuery::class )
+				$container->get( BulkStaleJobQuery::class ),
+				$container->get( NeedsAttentionSnapshotService::class )
+			)
+		);
+
+		$this->container->singleton(
+			NeedsAttentionRefreshSchedulerInterface::class,
+			static fn (): NeedsAttentionRefreshSchedulerInterface => new WpCronNeedsAttentionRefreshScheduler()
+		);
+
+		$this->container->singleton(
+			NeedsAttentionSnapshotService::class,
+			static fn ( ServiceContainer $container ): NeedsAttentionSnapshotService => new NeedsAttentionSnapshotService(
+				new NeedsAttentionSnapshotStore(),
+				$container->get( NeedsAttentionQuery::class ),
+				$container->get( NeedsAttentionRefreshSchedulerInterface::class ),
+				defined( 'CETECH_DE_VERSION' ) ? (string) CETECH_DE_VERSION : '0'
 			)
 		);
 

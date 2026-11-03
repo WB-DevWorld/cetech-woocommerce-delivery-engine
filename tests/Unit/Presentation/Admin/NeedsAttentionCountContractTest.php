@@ -9,6 +9,9 @@ use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogInheritanceCla
 use CetechDeliveryEngine\Application\Configuration\Catalog\InMemoryCatalogIndex;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionCountQuery;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionSnapshotService;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionSnapshotStore;
+use CetechDeliveryEngine\Tests\Support\InMemoryNeedsAttentionRefreshScheduler;
 use CetechDeliveryEngine\Application\Configuration\ClassicCheckoutRuntimeActivation;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationValidator;
@@ -399,6 +402,61 @@ final class NeedsAttentionCountContractTest extends TestCase {
 		self::assertFalse( $counter->current_user_can_see_needs_attention() );
 	}
 
+	/**
+	 * M2.5: with the site-wide snapshot wired, badge and Overview read the
+	 * catalog part from the snapshot (the catalog query is never called) and
+	 * the capability matrix is unchanged.
+	 */
+	public function test_snapshot_backed_count_never_scans_and_keeps_the_capability_matrix(): void {
+		$this->store_stale_bulk_job();
+		$this->failures->mark_failed( $this->paid_delivery_order( 9701, 'bacs' ), ShipmentCreationErrorCode::MissingSnapshot );
+		$this->store_shipment( 9702, ShipmentStatus::Delayed );
+		$this->seed_cod( 9703 );
+		[ $counter, $scheduler ] = $this->snapshot_counter( 4 );
+
+		$this->grant( true, false );
+		self::assertSame( 4 + 1, $counter->unresolved_count_for_current_user() );
+		self::assertNotNull( $counter->catalog_reading_for_current_user() );
+
+		$this->grant( false, true );
+		self::assertSame( 1 + 1 + 1, $counter->unresolved_count_for_current_user() );
+		self::assertNull( $counter->catalog_reading_for_current_user(), 'Shipment-only staff get no catalog reading.' );
+
+		$this->grant( false, false );
+		self::assertFalse( $counter->current_user_can_see_needs_attention() );
+		self::assertSame( 0, $counter->unresolved_count_for_current_user() );
+
+		$this->grant( true, true );
+		self::assertSame( 8, $counter->unresolved_count_for_current_user() );
+		$html = $this->render_overview( $counter );
+		self::assertSame( '8 items', $this->attention_tile_value( $html ) );
+		self::assertStringContainsString( 'Products last checked', $html );
+		self::assertSame( 8, $this->badge_count( $counter ) );
+
+		$this->flags->set( 'enable_shipment_records', false );
+		$this->grant( false, true );
+		self::assertFalse( $counter->current_user_can_see_needs_attention() );
+		self::assertSame( 0, $counter->unresolved_count_for_current_user() );
+
+		self::assertSame( [], $scheduler->scheduled, 'A fresh snapshot queues no work.' );
+	}
+
+	public function test_no_snapshot_yet_shows_updating_instead_of_a_misleading_zero(): void {
+		$this->grant( true, false );
+		[ $counter, $scheduler ] = $this->snapshot_counter( null );
+
+		self::assertSame( 0, $counter->unresolved_count_for_current_user() );
+		self::assertSame( 'Updating…', $this->attention_tile_value( $this->render_overview( $counter ) ) );
+		self::assertSame( 0, $this->badge_count( $counter ), 'The badge shows only the live sources until the first check.' );
+		self::assertCount( 1, $scheduler->scheduled );
+
+		$this->store_stale_bulk_job();
+		$html = $this->render_overview( $counter );
+		self::assertSame( '1 item', $this->attention_tile_value( $html ) );
+		self::assertStringContainsString( 'Product checks are running in the background.', $html );
+		self::assertCount( 1, $scheduler->scheduled );
+	}
+
 	private function grant( bool $catalog, bool $shipments ): void {
 		$GLOBALS['cetech_de_test_caps'] = [
 			Capabilities::VIEW                 => true,
@@ -417,6 +475,34 @@ final class NeedsAttentionCountContractTest extends TestCase {
 			$this->cod,
 			$this->bulk()
 		);
+	}
+
+	/**
+	 * @return array{NeedsAttentionCountQuery, InMemoryNeedsAttentionRefreshScheduler}
+	 */
+	private function snapshot_counter( ?int $snapshot_count ): array {
+		$scheduler = new InMemoryNeedsAttentionRefreshScheduler();
+		$service   = new NeedsAttentionSnapshotService(
+			new NeedsAttentionSnapshotStore(),
+			$this->uninitialized_catalog(),
+			$scheduler,
+			'1.0.0-m2.5'
+		);
+		if ( null !== $snapshot_count ) {
+			$service->record_complete_scan( $snapshot_count, 10, $service->generation() );
+		}
+
+		$counter = new NeedsAttentionCountQuery(
+			$this->uninitialized_catalog(),
+			$this->creation(),
+			$this->operations(),
+			$this->flags,
+			$this->cod,
+			$this->bulk(),
+			$service
+		);
+
+		return [ $counter, $scheduler ];
 	}
 
 	private function creation(): ShipmentCreationIssueQuery {
