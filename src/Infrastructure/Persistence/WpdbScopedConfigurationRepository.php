@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Infrastructure\Persistence;
 
+use CetechDeliveryEngine\Domain\Configuration\CatalogReadinessSignal;
 use CetechDeliveryEngine\Domain\Configuration\CollectionFieldInstruction;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldRegistry;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
@@ -236,6 +237,8 @@ final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepo
 				$this->sync_global_version_option( $saved->scope->config_version );
 			}
 
+			CatalogReadinessSignal::changed( 'scoped_configuration' );
+
 			return $saved;
 		}
 
@@ -251,6 +254,8 @@ final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepo
 		if ( $publish_revision && ConfigurationScopeType::Global === $scope->scope_type ) {
 			$this->sync_global_version_option( $saved->scope->config_version );
 		}
+
+		CatalogReadinessSignal::changed( 'scoped_configuration' );
 
 		return $saved;
 	}
@@ -268,6 +273,7 @@ final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepo
 
 		$scope_row_id = (int) $existing->scope->id;
 		$this->delete_instructions( $scope_row_id );
+		CatalogReadinessSignal::changed( 'scoped_configuration' );
 
 		global $wpdb;
 		$table = TableNames::for( ScopedConfigurationSchema::SCOPES_SUFFIX );

@@ -81,6 +81,7 @@ use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogIndexInterface
 use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogInheritanceClassifier;
 use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogScanScopedConfigurationRepository;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionCountQuery;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionInvalidation;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionRefreshSchedulerInterface;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionSnapshotService;
@@ -370,6 +371,7 @@ final class Plugin {
 				$this->container->get( NeedsAttentionSnapshotService::class )->run_refresh();
 			}
 		);
+		( new NeedsAttentionInvalidation( $this->container->get( NeedsAttentionSnapshotService::class ) ) )->register();
 
 		if ( ! $requirements->is_woocommerce_active() ) {
 			$this->container->get( AdminNoticeManager::class )->register(
