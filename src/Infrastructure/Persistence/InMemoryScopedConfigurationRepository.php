@@ -8,6 +8,7 @@ use CetechDeliveryEngine\Domain\Configuration\CollectionFieldInstruction;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationVersionInfo;
 use CetechDeliveryEngine\Domain\Configuration\InvalidConfigurationException;
+use CetechDeliveryEngine\Domain\Configuration\ScopePresenceQueryInterface;
 use CetechDeliveryEngine\Domain\Configuration\ScopedConfiguration;
 use CetechDeliveryEngine\Domain\Configuration\ScopedConfigurationRepositoryInterface;
 use CetechDeliveryEngine\Domain\Configuration\ScalarFieldInstruction;
@@ -18,7 +19,7 @@ use CetechDeliveryEngine\Domain\Enum\RecordStatus;
 /**
  * In-memory scoped configuration repository for unit tests.
  */
-final class InMemoryScopedConfigurationRepository implements ScopedConfigurationRepositoryInterface {
+final class InMemoryScopedConfigurationRepository implements ScopedConfigurationRepositoryInterface, ScopePresenceQueryInterface {
 
 	/** @var array<int, ScopedConfiguration> */
 	private array $by_id = [];
@@ -78,6 +79,22 @@ final class InMemoryScopedConfigurationRepository implements ScopedConfiguration
 		}
 
 		return $matches;
+	}
+
+	public function scopeIdsWithRows( ConfigurationScopeType $scope_type, array $scope_ids ): array {
+		$this->increment_call_count( __FUNCTION__ );
+
+		$wanted = array_fill_keys( array_map( 'intval', $scope_ids ), true );
+		$found  = [];
+
+		foreach ( $this->by_id as $configuration ) {
+			$id = $configuration->scope->scope_id;
+			if ( $configuration->scope->scope_type === $scope_type && isset( $wanted[ $id ] ) ) {
+				$found[ $id ] = true;
+			}
+		}
+
+		return array_keys( $found );
 	}
 
 	public function findByScopeAndSlice( ConfigurationScopeType $scope_type, int $scope_id, string $slice_key ): ?ScopedConfiguration {
