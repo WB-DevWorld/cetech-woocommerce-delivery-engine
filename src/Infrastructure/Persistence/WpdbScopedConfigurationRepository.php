@@ -9,6 +9,7 @@ use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldRegistry;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationScope;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationVersionInfo;
 use CetechDeliveryEngine\Domain\Configuration\InvalidConfigurationException;
+use CetechDeliveryEngine\Domain\Configuration\ScopePresenceQueryInterface;
 use CetechDeliveryEngine\Domain\Configuration\ScopedConfiguration;
 use CetechDeliveryEngine\Domain\Configuration\ScopedConfigurationRepositoryInterface;
 use CetechDeliveryEngine\Domain\Configuration\ScalarFieldInstruction;
@@ -22,7 +23,7 @@ use CetechDeliveryEngine\Domain\Enum\ScalarConfigurationMode;
  *
  * Not consumed by storefront runtime in Stage 2.
  */
-final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepositoryInterface {
+final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepositoryInterface, ScopePresenceQueryInterface {
 
 	/** @var null|\Closure(): void */
 	public static ?\Closure $before_global_option_publish = null;
@@ -75,6 +76,31 @@ final class WpdbScopedConfigurationRepository implements ScopedConfigurationRepo
 		}
 
 		return $results;
+	}
+
+	public function scopeIdsWithRows( ConfigurationScopeType $scope_type, array $scope_ids ): array {
+		global $wpdb;
+
+		$ids = array_values( array_unique( array_filter( array_map( 'intval', $scope_ids ), static fn ( int $id ): bool => $id > 0 ) ) );
+		if ( [] === $ids ) {
+			return [];
+		}
+
+		$table        = TableNames::for( ScopedConfigurationSchema::SCOPES_SUFFIX );
+		$placeholders = implode( ', ', array_fill( 0, count( $ids ), '%d' ) );
+		$sql          = "SELECT DISTINCT scope_id FROM `{$table}` WHERE scope_type = %s AND scope_id IN ({$placeholders})";
+
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+		$found = $wpdb->get_col( $wpdb->prepare( $sql, $scope_type->value, ...$ids ) );
+		if ( ! is_array( $found ) ) {
+			if ( '' !== trim( (string) $wpdb->last_error ) ) {
+				throw new InvalidConfigurationException( 'Failed to read configuration scope presence. ' . trim( (string) $wpdb->last_error ) );
+			}
+
+			return [];
+		}
+
+		return array_values( array_map( 'intval', $found ) );
 	}
 
 	public function findByScopeAndSlice( ConfigurationScopeType $scope_type, int $scope_id, string $slice_key ): ?ScopedConfiguration {

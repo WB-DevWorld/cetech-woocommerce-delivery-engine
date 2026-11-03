@@ -78,6 +78,7 @@ use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationSubm
 use CetechDeliveryEngine\Application\Configuration\ConfigurationFingerprintBuilder;
 use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogIndexInterface;
 use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogInheritanceClassifier;
+use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogScanScopedConfigurationRepository;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionCountQuery;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
 use CetechDeliveryEngine\Application\Configuration\Catalog\ProductExceptionsQuery;
@@ -2152,13 +2153,27 @@ final class Plugin {
 
 		$this->container->singleton(
 			NeedsAttentionQuery::class,
-			static fn ( ServiceContainer $container ): NeedsAttentionQuery => new NeedsAttentionQuery(
-				$container->get( CatalogIndexInterface::class ),
-				$container->get( OperationalReadinessAssessor::class ),
-				$container->get( OperationalStateService::class ),
-				$container->get( CatalogInheritanceClassifier::class ),
-				$container->get( ScopedConfigurationRepositoryInterface::class )
-			)
+			static function ( ServiceContainer $container ): NeedsAttentionQuery {
+				// The catalog scan gets its own resolver over a batch-scoped repository view,
+				// so its memo can be cleared per batch without touching the checkout resolver.
+				$scan_scopes = new CatalogScanScopedConfigurationRepository(
+					$container->get( ScopedConfigurationRepositoryInterface::class )
+				);
+				$scan_resolver = new EffectiveConfigurationResolver(
+					$scan_scopes,
+					$container->get( EffectiveConfigurationValidator::class ),
+					$container->get( FulfilmentConstraintServiceInterface::class ),
+					$container->get( SiteWideDefaultsPolicyInterface::class )
+				);
+
+				return new NeedsAttentionQuery(
+					$container->get( CatalogIndexInterface::class ),
+					new OperationalReadinessAssessor( $scan_resolver ),
+					$container->get( OperationalStateService::class ),
+					$container->get( CatalogInheritanceClassifier::class ),
+					$scan_scopes
+				);
+			}
 		);
 
 		$this->container->singleton(
