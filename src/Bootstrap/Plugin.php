@@ -364,6 +364,12 @@ final class Plugin {
 				$this->container->get( Schema6CoverageUpgradeService::class )->continue_pass();
 			}
 		);
+		add_action(
+			NeedsAttentionRefreshSchedulerInterface::HOOK,
+			function (): void {
+				$this->container->get( NeedsAttentionSnapshotService::class )->run_refresh();
+			}
+		);
 
 		if ( ! $requirements->is_woocommerce_active() ) {
 			$this->container->get( AdminNoticeManager::class )->register(

@@ -37,6 +37,32 @@ final class NeedsAttentionSnapshotStore {
 	}
 
 	/**
+	 * The generation as stored right now, bypassing this request's object cache
+	 * (a persistent cache keeps a per-request copy that another process's
+	 * invalidation does not update). Used before a scan result is saved.
+	 */
+	public function stored_generation(): int {
+		global $wpdb;
+
+		if ( isset( $wpdb ) && is_object( $wpdb ) && isset( $wpdb->options ) && method_exists( $wpdb, 'get_var' ) && method_exists( $wpdb, 'prepare' ) && ! str_contains( $wpdb::class, 'FakeWpdb' ) ) {
+			$table = (string) $wpdb->options;
+			// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery, WordPress.DB.DirectDatabaseQuery.NoCaching, WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+			$value = $wpdb->get_var( $wpdb->prepare( "SELECT option_value FROM `{$table}` WHERE option_name = %s LIMIT 1", self::OPTION_GENERATION ) );
+			if ( function_exists( 'wp_cache_delete' ) ) {
+				wp_cache_delete( self::OPTION_GENERATION, 'options' );
+			}
+
+			return null === $value ? 0 : (int) $value;
+		}
+
+		if ( function_exists( 'wp_cache_delete' ) ) {
+			wp_cache_delete( self::OPTION_GENERATION, 'options' );
+		}
+
+		return $this->generation();
+	}
+
+	/**
 	 * Move to a new generation. The value is random rather than incremented, so
 	 * two concurrent invalidations can never write back the generation a running
 	 * scan started from.
@@ -85,6 +111,10 @@ final class NeedsAttentionSnapshotStore {
 	/**
 	 * Take the single-runner lock. A lock older than $ttl seconds is treated as
 	 * abandoned (for example a PHP fatal mid-run) and replaced.
+	 *
+	 * Best effort, like the other option locks in this plugin: it stops a second
+	 * cron runner from doing the same work. Correctness does not depend on it;
+	 * the generation check before saving does.
 	 */
 	public function acquire_lock( int $now, int $ttl ): bool {
 		if ( ! function_exists( 'add_option' ) ) {
