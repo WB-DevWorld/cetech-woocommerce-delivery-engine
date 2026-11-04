@@ -13,6 +13,9 @@ use CetechDeliveryEngine\Application\Configuration\Admin\ScopedConfigurationSubm
 use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogInheritanceClassifier;
 use CetechDeliveryEngine\Application\Configuration\Catalog\InMemoryCatalogIndex;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionSnapshotService;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionSnapshotStore;
+use CetechDeliveryEngine\Tests\Support\InMemoryNeedsAttentionRefreshScheduler;
 use CetechDeliveryEngine\Application\Configuration\Catalog\ProductExceptionsQuery;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationValidator;
@@ -329,6 +332,55 @@ final class M2AdminDefectsTest extends TestCase {
 		self::assertStringContainsString( "esc_attr__( 'Postcode match mode', 'cetech-woocommerce-delivery-engine' )", $zones );
 		self::assertStringContainsString( "esc_attr__( 'Condition type', 'cetech-woocommerce-delivery-engine' )", $zones );
 		self::assertDoesNotMatchRegularExpression( '/<button type="button" class="button-link" data-remove-member="[^"]*">×/', $zones );
+	}
+
+	/**
+	 * M2.5: the Settings landing reads the site-wide snapshot; its catalog query
+	 * is an uninitialized object, so any scan would throw.
+	 */
+	public function test_settings_landing_reads_the_attention_snapshot_without_scanning(): void {
+		$scheduler = new InMemoryNeedsAttentionRefreshScheduler();
+		$service   = new NeedsAttentionSnapshotService(
+			new NeedsAttentionSnapshotStore(),
+			( new ReflectionClass( NeedsAttentionQuery::class ) )->newInstanceWithoutConstructor(),
+			$scheduler,
+			'1.0.0-m2.5'
+		);
+		$home = $this->home_with_snapshot( $service );
+
+		$pending = $this->landing_html( $home );
+		self::assertMatchesRegularExpression( '/<span class="cetech-de-summary-value">Updating…<\/span><span class="cetech-de-summary-label">Items needing attention<\/span>/', $pending );
+		self::assertCount( 1, $scheduler->scheduled );
+
+		$service->record_complete_scan( 3, 2, $service->generation() );
+		$ready = $this->landing_html( $home );
+		self::assertMatchesRegularExpression( '/<span class="cetech-de-summary-value">3<\/span><span class="cetech-de-summary-label">Items needing attention<\/span><span class="cetech-de-summary-note description">Products last checked /', $ready );
+	}
+
+	private function home_with_snapshot( NeedsAttentionSnapshotService $service ): DeliverySettingsHomePage {
+		$reflection = new ReflectionClass( DeliverySettingsHomePage::class );
+		$home       = $reflection->newInstanceWithoutConstructor();
+		foreach ( $reflection->getProperties() as $property ) {
+			if ( $property->isStatic() ) {
+				continue;
+			}
+			$property->setValue( $home, 'attention_snapshot' === $property->getName() ? $service : $property->getValue( $this->home ) );
+		}
+
+		return $home;
+	}
+
+	private function landing_html( DeliverySettingsHomePage $home ): string {
+		$method = new \ReflectionMethod( $home, 'render_landing' );
+		$state  = ( new SiteWideDefaultsSettings() )->read();
+
+		ob_start();
+		try {
+			$method->invoke( $home, $state );
+			return (string) ob_get_contents();
+		} finally {
+			ob_end_clean();
+		}
 	}
 
 	/**
