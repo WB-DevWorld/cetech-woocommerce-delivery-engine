@@ -285,6 +285,21 @@ The finite scope and acceptance/remaining-evidence ledger are `docs/ui/UI-UX-REF
 
 The unchanged baseline `d38b704b` is red in current CI: `shivammathur/setup-php` resolves the requested PHP `8.5.11` to `8.5.12`, and the HTTP opening qualification refuses a listener runtime other than the recorded `8.5.11` ("HTTP diagnostic listener runtime differs from the recorded crash environment"). `master` repaired this on 2026-10-21 in `b4fb028` and `dc413ba` by restoring the exact archived 8.5.11 build (archive SHA-256 `47cb0511…8140b`, executable SHA-256 `7dda44e5…e46a`) on an Ubuntu 24.04 runner before a pinned setup-php step with updates disabled, then asserting the exact version and binary. The same workflow and script change is ported here unchanged; no product bytes, package identity or qualification predicates change.
 
+### Qualified PHP 8.5.11 archive re-pinned after an upstream re-upload — 2026-11-25
+
+PRs #196 and #197 failed the **PHP 8.5 WordPress/WooCommerce** job at "Restore exact qualified PHP archive and debug symbols" within a minute, with no output, before any test (runs 45700048184 and 45700055684). The base last passed that job on 3 November (run 41729907025). `scripts/ci-restore-qualified-php85.sh` downloads `php_8.5.11-nts-dbgsym+ubuntu24.04.tar.zst` from the `builds` release of `shivammathur/php-ubuntu` and checks it against a fixed SHA-256; upstream re-uploaded that asset under the same name on 2026-11-24 05:53 UTC, so the archive check failed silently (`sha256sum --check --status`).
+
+Frank (WS3 owner) authorised the CI fix on 2026-11-25 ("Yes, prepare it"); Claude Code is the editor on `fix/m2-ci-php85-archive-repin`. Central-file lease for this task: `scripts/ci-restore-qualified-php85.sh`. No workflow, product, schema or version change.
+
+Evidence gathered before re-pinning, by streaming the current asset without saving or running it:
+
+- archive: 134,977,477 bytes, SHA-256 `698dafb6d620fc09c2bcf4ec11276437dd52c8b00a637c872bc583f00e796443` (was `47cb0511350e18579f95af9cfd7d2e47ed2ce5e8d88a7df140a4f5e54ed8140b`);
+- `usr/bin/php8.5` inside it: 12,278,912 bytes, SHA-256 `7dda44e554d086c1c4f441796fc19f11f46055c0a276dad66181f6c11566e46a`, identical to the binary hash this script and `ci.yml` already pin, so the qualified program is unchanged;
+- 4,702 members, none dated after 2026-10-05, which is before the original pin of 21 October;
+- `usr/sbin/merge_status` (549 bytes, SHA-256 `c2d2f2612e670b05356e0d1b2e6ddb215808394819825f2a209793420418e5d1`) is the dpkg status merge helper and touches only `/var/lib/dpkg/status-diff` and `status-orig`.
+
+The old archive is no longer available, so the other members cannot be compared byte for byte with it; the later exact checks in `ci.yml` (binary, INI, extensions, JIT) are unchanged and still run. The script now prints the expected and actual hash when the archive or the binary does not match, so the next upstream re-upload explains itself. No runtime guard is removed or loosened. The same script on `master` carries the old pin and needs the same change there.
+
 ### ETA precedence applied — 2026-10-29
 
 One rule now decides a Delivery option's customer-visible estimate (`DeliveryEstimatePrecedence`): the effective configured "Estimated delivery" text (variation, then product, then the site-wide default of the fulfilment type) when present, otherwise the Delivery Offer's durations through `DeliveryEstimateFormatter` (processing + transit + final mile, in the offer's unit), otherwise none. The runtime adapter now carries the configured text into `ResolvedProductDeliveryRule::$estimated_delivery`, so the field staff edit finally reaches customers; the options builder computes the text once and every later surface (cart, checkout, Blocks, order snapshot, emails, shipments) copies it forward. Staff summaries (`SiteWideDefaultSummary`, `OfferEstimatedDeliveryDisplay`) use the same formatter, and the Blocks payload and cart reselection line strip a historical "Estimated …" prefix like the other surfaces. Durations only; no dates are invented (M3 owns promised dates). No schema change.

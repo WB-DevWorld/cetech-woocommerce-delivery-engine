@@ -20,7 +20,15 @@ qualified_archive="$qualified_work/php8511-debug.tar.zst"
 curl --fail --location --retry 2 --connect-timeout 15 --max-time 180 --silent --show-error \
 	'https://github.com/shivammathur/php-ubuntu/releases/download/builds/php_8.5.11-nts-dbgsym%2Bubuntu24.04.tar.zst' \
 	--output "$qualified_archive"
-printf '%s  %s\n' '47cb0511350e18579f95af9cfd7d2e47ed2ce5e8d88a7df140a4f5e54ed8140b' "$qualified_archive" | sha256sum --check --status
+# Upstream re-uploads this asset under the same name (last seen 2026-11-24), which changes the
+# archive bytes without changing the program: the php8.5 binary inside is pinned separately below.
+# Re-pin only after checking that binary hash, the member dates and the merge_status helper text.
+qualified_archive_sha256='698dafb6d620fc09c2bcf4ec11276437dd52c8b00a637c872bc583f00e796443'
+actual_archive_sha256=$(sha256sum "$qualified_archive" | cut -d ' ' -f 1)
+if [[ "$actual_archive_sha256" != "$qualified_archive_sha256" ]]; then
+	echo "qualified_php85_archive=FAIL expected=$qualified_archive_sha256 actual=$actual_archive_sha256 bytes=$(stat -c %s "$qualified_archive")" >&2
+	exit 1
+fi
 
 # Same root-relative extraction and dpkg status merge as the official installer.
 # Archive bytes are checked before any root extraction or helper execution.
@@ -42,5 +50,10 @@ done
 # The action uses its explicit installed-runtime mode; exact checks still run afterward.
 [[ ! -e /tmp/sp_update ]]
 [[ "$(php -r 'echo PHP_VERSION;')" == 8.5.11 ]]
-printf '%s  %s\n' '7dda44e554d086c1c4f441796fc19f11f46055c0a276dad66181f6c11566e46a' /usr/bin/php8.5 | sha256sum --check --status
+qualified_binary_sha256='7dda44e554d086c1c4f441796fc19f11f46055c0a276dad66181f6c11566e46a'
+actual_binary_sha256=$(sha256sum /usr/bin/php8.5 | cut -d ' ' -f 1)
+if [[ "$actual_binary_sha256" != "$qualified_binary_sha256" ]]; then
+	echo "qualified_php85_binary=FAIL expected=$qualified_binary_sha256 actual=$actual_binary_sha256" >&2
+	exit 1
+fi
 echo 'qualified_php85_archive_and_binary=PASS'
