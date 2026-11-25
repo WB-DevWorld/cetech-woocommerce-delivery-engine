@@ -59,6 +59,7 @@ final class WooCommerceCatalogTargetQuery implements CatalogTargetQueryInterface
 		$limit   = max( 1, min( 250, $limit ) );
 		$ids     = $this->matching_ids( $definition, $after_id, $limit );
 		$targets = [];
+		$this->prime_page( $definition->target_type, $ids );
 		foreach ( $ids as $id ) {
 			$targets[] = new CatalogTarget(
 				$definition->target_type,
@@ -69,6 +70,39 @@ final class WooCommerceCatalogTargetQuery implements CatalogTargetQueryInterface
 		}
 
 		return $targets;
+	}
+
+	/**
+	 * Load a page's posts and meta in a few queries instead of several per target: the
+	 * wc_get_product() calls that read each SKU and parent would otherwise fetch them one by one,
+	 * which is what made whole-catalog walks slow on large stores. Variations also read their
+	 * parent product, so the parents are loaded the same way.
+	 *
+	 * @param list<int> $ids
+	 */
+	private function prime_page( string $target_type, array $ids ): void {
+		if ( [] === $ids || ! function_exists( '_prime_post_caches' ) ) {
+			return;
+		}
+
+		$is_variation = CatalogTargetDefinition::TARGET_VARIATION === $target_type;
+		_prime_post_caches( $ids, ! $is_variation, true );
+
+		if ( ! $is_variation || ! function_exists( 'get_post' ) ) {
+			return;
+		}
+
+		$parents = [];
+		foreach ( $ids as $id ) {
+			$post = get_post( $id );
+			if ( is_object( $post ) && (int) $post->post_parent > 0 ) {
+				$parents[ (int) $post->post_parent ] = true;
+			}
+		}
+
+		if ( [] !== $parents ) {
+			_prime_post_caches( array_keys( $parents ), true, true );
+		}
 	}
 
 	public function sku_for( string $target_type, int $target_id ): string {
