@@ -8,6 +8,7 @@ use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogTarget;
 use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogTargetDefinition;
 use CetechDeliveryEngine\Application\Bulk\Catalog\CatalogTargetQueryInterface;
 use CetechDeliveryEngine\Application\Bulk\Portability\EntityCodeResolver;
+use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogScanScopedConfigurationRepository;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver;
 use CetechDeliveryEngine\Domain\Configuration\CollectionFieldInstruction;
 use CetechDeliveryEngine\Domain\Configuration\ConfigurationFieldKey;
@@ -27,10 +28,23 @@ use CetechDeliveryEngine\Domain\FulfilmentProfile\FulfilmentProfileRegistry;
  * fulfilment type, and one row per product/variation scope slice with the saved modes (override,
  * disable, inherit; explicit zero stays "0"). Private supplier/origin columns are written only
  * when the caller asks for them. Secrets are never part of this file.
+ *
+ * Large catalogs: when the scope repository is the batch view
+ * ({@see CatalogScanScopedConfigurationRepository}) each page of targets costs one presence query
+ * per scope type instead of several lookups per row, a target with no saved scope of its own
+ * reuses the inherited effective result (it depends only on the site-wide configuration), and the
+ * per-page memos are dropped after every page so memory stays flat. The rows written are the same
+ * with or without the batch view.
  */
 final class CatalogCsvExportService {
 
 	public const PAGE_SIZE = 100;
+
+	/** @var array<string, array{0: string, 1: string}> "kind|slice" => [effective fulfilment, source label] */
+	private array $inherited_effective = [];
+
+	/** @var array<int, string> parent product id => SKU, for the page being written */
+	private array $parent_skus = [];
 
 	public function __construct(
 		private readonly CatalogTargetQueryInterface $targets,
@@ -41,12 +55,15 @@ final class CatalogCsvExportService {
 	}
 
 	/**
-	 * @param resource $handle
+	 * @param resource                 $handle
+	 * @param callable(int): void|null $after_page Called after every page with the rows written so far,
+	 *                                             so a download can flush its output while the export runs.
 	 */
-	public function write_stream( $handle, CatalogTargetDefinition $definition, bool $include_private = false ): int {
+	public function write_stream( $handle, CatalogTargetDefinition $definition, bool $include_private = false, ?callable $after_page = null ): int {
 		$columns = CatalogCsvMapper::columns( $include_private );
 		fputcsv( $handle, $columns );
-		$count = 0;
+		$count                     = 0;
+		$this->inherited_effective = [];
 
 		foreach ( $this->site_wide_default_rows() as $row ) {
 			$this->write_row( $handle, $columns, $row );
@@ -60,20 +77,66 @@ final class CatalogCsvExportService {
 				if ( [] === $page ) {
 					break;
 				}
-				foreach ( $page as $target ) {
-					if ( ! $target instanceof CatalogTarget ) {
-						continue;
+				$this->begin_page( $page );
+				try {
+					foreach ( $page as $target ) {
+						if ( ! $target instanceof CatalogTarget ) {
+							continue;
+						}
+						$after = $target->id;
+						foreach ( $this->rows_for( $target ) as $row ) {
+							$this->write_row( $handle, $columns, $row );
+							++$count;
+						}
 					}
-					$after = $target->id;
-					foreach ( $this->rows_for( $target ) as $row ) {
-						$this->write_row( $handle, $columns, $row );
-						++$count;
-					}
+				} finally {
+					$this->end_page();
+				}
+				if ( null !== $after_page ) {
+					$after_page( $count );
 				}
 			} while ( count( $page ) >= self::PAGE_SIZE );
 		}
 
+		$this->inherited_effective = [];
+
 		return $count;
+	}
+
+	/**
+	 * @param list<mixed> $page
+	 */
+	private function begin_page( array $page ): void {
+		$this->parent_skus = [];
+		if ( ! $this->scopes instanceof CatalogScanScopedConfigurationRepository ) {
+			return;
+		}
+
+		$product_ids   = [];
+		$variation_ids = [];
+		foreach ( $page as $target ) {
+			if ( ! $target instanceof CatalogTarget ) {
+				continue;
+			}
+			if ( CatalogTargetDefinition::TARGET_VARIATION === $target->type ) {
+				$variation_ids[] = $target->id;
+				// A variation inherits from its parent product, so the parent's scopes are read too.
+				$product_ids[] = (int) ( $target->parent_id ?? 0 );
+			} else {
+				$product_ids[] = $target->id;
+			}
+		}
+
+		$this->scopes->prime_products( $product_ids );
+		$this->scopes->prime_variations( $variation_ids );
+	}
+
+	private function end_page(): void {
+		$this->parent_skus = [];
+		if ( $this->scopes instanceof CatalogScanScopedConfigurationRepository ) {
+			$this->scopes->reset();
+		}
+		$this->resolver->clearMemoization();
 	}
 
 	/**
@@ -162,7 +225,7 @@ final class CatalogCsvExportService {
 		$config     ??= $this->scopes->findByScopeAndSlice( $scope_type, $target->id, $slice_key );
 
 		$row = $this->base_row();
-		$row['sku']           = $is_variation ? $this->targets->sku_for( CatalogTargetDefinition::TARGET_PRODUCT, $product_id ) : $target->external_key;
+		$row['sku']           = $is_variation ? $this->parent_sku( $product_id ) : $target->external_key;
 		$row['variation_sku'] = $is_variation ? $target->external_key : '';
 		$row['product_id']    = $product_id > 0 ? (string) $product_id : (string) $target->id;
 		$row['variation_id']  = $variation_id > 0 ? (string) $variation_id : '';
@@ -170,6 +233,16 @@ final class CatalogCsvExportService {
 		$row['de_slice']      = $slice_key;
 
 		$this->fill_instructions( $row, $config );
+
+		$inherited_key = $this->inherits_everything( $target, $product_id, $is_variation )
+			? ( $is_variation ? 'variation' : 'product' ) . '|' . $slice_key
+			: null;
+
+		if ( null !== $inherited_key && isset( $this->inherited_effective[ $inherited_key ] ) ) {
+			[ $row['de_effective_fulfilment'], $row['de_effective_source'] ] = $this->inherited_effective[ $inherited_key ];
+
+			return $row;
+		}
 
 		try {
 			$request = new EffectiveConfigurationRequest(
@@ -182,11 +255,41 @@ final class CatalogCsvExportService {
 			$avail     = $effective->scalar( ConfigurationFieldKey::FULFILMENT_AVAILABILITY );
 			$row['de_effective_fulfilment'] = is_object( $avail ) ? (string) $avail->value : '';
 			$row['de_effective_source']     = is_object( $avail ) ? $avail->provenance->source_label : '';
+			if ( null !== $inherited_key ) {
+				$this->inherited_effective[ $inherited_key ] = [ $row['de_effective_fulfilment'], $row['de_effective_source'] ];
+			}
 		} catch ( \Throwable ) {
 			$row['de_effective_fulfilment'] = '';
 		}
 
 		return $row;
+	}
+
+	/**
+	 * True when the batch view proved the target (and, for a variation, its parent product) has no
+	 * saved scope in any slice or status. Its effective configuration then comes from the site-wide
+	 * configuration alone, so it is the same for every such target of the same kind and slice.
+	 */
+	private function inherits_everything( CatalogTarget $target, int $product_id, bool $is_variation ): bool {
+		if ( ! $this->scopes instanceof CatalogScanScopedConfigurationRepository ) {
+			return false;
+		}
+
+		if ( ! $is_variation ) {
+			return $this->scopes->is_known_absent( ConfigurationScopeType::Product, $target->id );
+		}
+
+		return $product_id > 0
+			&& $this->scopes->is_known_absent( ConfigurationScopeType::Variation, $target->id )
+			&& $this->scopes->is_known_absent( ConfigurationScopeType::Product, $product_id );
+	}
+
+	private function parent_sku( int $product_id ): string {
+		if ( ! array_key_exists( $product_id, $this->parent_skus ) ) {
+			$this->parent_skus[ $product_id ] = $this->targets->sku_for( CatalogTargetDefinition::TARGET_PRODUCT, $product_id );
+		}
+
+		return $this->parent_skus[ $product_id ];
 	}
 
 	/**
