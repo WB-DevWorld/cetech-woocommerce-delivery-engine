@@ -122,17 +122,23 @@ final class OverviewPage {
 		);
 		if ( $this->needs_attention_count->current_user_can_see_needs_attention() ) {
 			$attention_count = max( 0, $this->needs_attention_count->unresolved_count_for_current_user() );
-			$this->render_stat_card(
-				__( 'Needs attention', 'cetech-woocommerce-delivery-engine' ),
-				sprintf(
+			$catalog_reading = $this->needs_attention_count->catalog_reading_for_current_user();
+			// Before the first catalog check a 0 would be misleading; say it is updating.
+			$value = null !== $catalog_reading && $catalog_reading->is_pending() && 0 === $attention_count
+				? NeedsAttentionCatalogWording::updating()
+				: sprintf(
 					/* translators: %d items */
 					_n( '%d item', '%d items', $attention_count, 'cetech-woocommerce-delivery-engine' ),
 					$attention_count
-				),
+				);
+			$this->render_stat_card(
+				__( 'Needs attention', 'cetech-woocommerce-delivery-engine' ),
+				$value,
 				__( 'View items', 'cetech-woocommerce-delivery-engine' ),
 				AdminPageRenderer::list_url( NeedsAttentionPage::SLUG ),
 				'dashicons-warning',
-				$attention_count > 0
+				$attention_count > 0,
+				NeedsAttentionCatalogWording::last_checked( $catalog_reading )
 			);
 		}
 		echo '</div>';
@@ -236,11 +242,14 @@ final class OverviewPage {
 		return $out;
 	}
 
-	private function render_stat_card( string $title, string $value, string $link_label, string $url, string $icon, bool $attention = false ): void {
+	private function render_stat_card( string $title, string $value, string $link_label, string $url, string $icon, bool $attention = false, string $note = '' ): void {
 		echo '<article class="cetech-de-stat-card' . ( $attention ? ' is-attention' : '' ) . '">';
 		echo '<span class="cetech-de-stat-card-icon dashicons ' . esc_attr( $icon ) . '" aria-hidden="true"></span>';
 		echo '<h3>' . esc_html( $title ) . '</h3>';
 		echo '<p class="cetech-de-stat-card-value">' . esc_html( $value ) . '</p>';
+		if ( '' !== $note ) {
+			echo '<p class="description cetech-de-stat-card-note">' . esc_html( $note ) . '</p>';
+		}
 		echo '<p><a href="' . esc_url( $url ) . '">' . esc_html( $link_label ) . ' →</a></p>';
 		echo '</article>';
 	}

@@ -21,6 +21,12 @@ final class Deactivator {
 		wp_cache_delete( '_transient_timeout_cetech_de_activation_notice', 'options' );
 		wp_cache_delete( 'alloptions', 'options' );
 		wp_cache_delete( 'notoptions', 'options' );
+
+		// Stop the Needs Attention background refresh. Its options are left alone:
+		// the lock expires by itself and activation starts a new generation, which
+		// makes the last snapshot and any refresh cursor stale.
+		( new \CetechDeliveryEngine\Infrastructure\WordPress\WpCronNeedsAttentionRefreshScheduler() )->clear();
+
 		flush_rewrite_rules();
 	}
 }

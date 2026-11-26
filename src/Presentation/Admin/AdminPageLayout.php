@@ -88,7 +88,7 @@ final class AdminPageLayout {
 	}
 
 	/**
-	 * @param list<array{label: string, value: int|string, empty?: bool}> $stats
+	 * @param list<array{label: string, value: int|string, empty?: bool, note?: string}> $stats
 	 */
 	public static function render_summary_stats( array $stats ): void {
 		if ( [] === $stats ) {
@@ -102,6 +102,9 @@ final class AdminPageLayout {
 			echo '<div class="cetech-de-summary-stat' . esc_attr( $empty_class ) . '">';
 			echo '<span class="cetech-de-summary-value">' . esc_html( (string) $stat['value'] ) . '</span>';
 			echo '<span class="cetech-de-summary-label">' . esc_html( $stat['label'] ) . '</span>';
+			if ( isset( $stat['note'] ) && '' !== (string) $stat['note'] ) {
+				echo '<span class="cetech-de-summary-note description">' . esc_html( (string) $stat['note'] ) . '</span>';
+			}
 			echo '</div>';
 		}
 

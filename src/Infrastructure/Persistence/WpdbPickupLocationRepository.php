@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Infrastructure\Persistence;
 
+use CetechDeliveryEngine\Domain\Configuration\CatalogReadinessSignal;
 use CetechDeliveryEngine\Domain\Pickup\PickupLocationRepositoryInterface;
 
 final class WpdbPickupLocationRepository extends AbstractWpdbRepository implements PickupLocationRepositoryInterface {
@@ -44,6 +45,8 @@ final class WpdbPickupLocationRepository extends AbstractWpdbRepository implemen
 				return 0;
 			}
 
+			CatalogReadinessSignal::changed( 'pickup_location' );
+
 			return $id;
 		}
 
@@ -51,6 +54,9 @@ final class WpdbPickupLocationRepository extends AbstractWpdbRepository implemen
 		$insert_formats    = array_merge( $formats, [ '%s' ] );
 
 		$insert_id = $this->insert_row( $row, $insert_formats );
+		if ( $insert_id > 0 ) {
+			CatalogReadinessSignal::changed( 'pickup_location' );
+		}
 
 		return $insert_id > 0 ? $insert_id : 0;
 	}
@@ -60,11 +66,19 @@ final class WpdbPickupLocationRepository extends AbstractWpdbRepository implemen
 	}
 
 	public function softDelete( int $id ): bool {
-		return $this->mark_inactive( $id );
+		return $this->signal_if( $this->mark_inactive( $id ) );
 	}
 
 	public function hardDelete( int $id ): bool {
-		return $this->delete_row_by_id( $id );
+		return $this->signal_if( $this->delete_row_by_id( $id ) );
+	}
+
+	private function signal_if( bool $changed ): bool {
+		if ( $changed ) {
+			CatalogReadinessSignal::changed( 'pickup_location' );
+		}
+
+		return $changed;
 	}
 
 	public function count_all(): int {

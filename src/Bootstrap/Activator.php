@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Bootstrap;
 
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionSnapshotStore;
 use CetechDeliveryEngine\Core\Capabilities\Capabilities;
 use CetechDeliveryEngine\Core\Requirements;
 use CetechDeliveryEngine\Core\Versioning\MigrationDiscovery;
@@ -46,6 +47,10 @@ final class Activator {
 			)
 		);
 		$migration_runner->run();
+
+		// Catalog changes made while the plugin was inactive were not tracked, so any
+		// earlier Needs Attention snapshot (and refresh cursor) is stale from here on.
+		( new NeedsAttentionSnapshotStore() )->new_generation();
 
 		set_transient( 'cetech_de_activation_notice', 1, MINUTE_IN_SECONDS );
 

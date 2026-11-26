@@ -88,6 +88,14 @@ final class OperationalReadinessAssessor {
 		return $this->assess( $product_id, $variation_id, $slice_key )->reason;
 	}
 
+	/**
+	 * Drop the resolver's per-request memo. Catalog scans call this between
+	 * batches so memory stays bounded; results are unaffected.
+	 */
+	public function clear_memoization(): void {
+		$this->resolver->clearMemoization();
+	}
+
 	public function assess_field_for( int $product_id, ?int $variation_id, string $field_key, ?string $slice_key = null ): OperationalReadiness {
 		$resolved = $this->resolver->resolve(
 			new EffectiveConfigurationRequest(

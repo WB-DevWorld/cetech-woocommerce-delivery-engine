@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Tests\Integration;
 
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionRefreshSchedulerInterface;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionSnapshotStore;
 use CetechDeliveryEngine\Application\Shipment\ShipmentOperationsIssueStore;
 use CetechDeliveryEngine\Bootstrap\Activator;
 use CetechDeliveryEngine\Bootstrap\Deactivator;
@@ -66,8 +68,16 @@ final class PluginLifecycleQualificationTest extends TestCase {
 		update_option( ShipmentOperationsIssueStore::INDEX_OPTION, [ 99 => [ 'code' => 'keep' ] ], false );
 
 		$tables = LifecycleHarness::table_count();
+		update_option( NeedsAttentionSnapshotStore::OPTION_SNAPSHOT, [ 'count' => 1 ], false );
+		update_option( NeedsAttentionSnapshotStore::OPTION_LOCK, '1800000000', false );
+		update_option( NeedsAttentionSnapshotStore::OPTION_PROGRESS, [ 'offset' => 250 ], false );
+		wp_schedule_single_event( 1_800_000_000, NeedsAttentionRefreshSchedulerInterface::HOOK );
 
 		Deactivator::deactivate();
+
+		self::assertFalse( wp_next_scheduled( NeedsAttentionRefreshSchedulerInterface::HOOK ), 'Deactivation clears the refresh job.' );
+		self::assertSame( [ 'count' => 1 ], get_option( NeedsAttentionSnapshotStore::OPTION_SNAPSHOT ), 'Deactivation deletes no option.' );
+		self::assertSame( '1800000000', get_option( NeedsAttentionSnapshotStore::OPTION_LOCK ) );
 
 		self::assertFalse( get_transient( 'cetech_de_activation_notice' ) );
 		self::assertSame( SchemaVersion::TARGET, SchemaVersion::get() );
@@ -76,6 +86,10 @@ final class PluginLifecycleQualificationTest extends TestCase {
 		self::assertSame( [ 99 => [ 'code' => 'keep' ] ], get_option( ShipmentOperationsIssueStore::INDEX_OPTION ) );
 		self::assertTrue( $GLOBALS['cetech_de_test_roles']['administrator']->has_cap( Capabilities::VIEW ) );
 		self::assertGreaterThan( 0, (int) $GLOBALS['cetech_de_test_rewrite_flushes'] );
+
+		$generation = ( new NeedsAttentionSnapshotStore() )->generation();
+		Activator::activate();
+		self::assertNotSame( $generation, ( new NeedsAttentionSnapshotStore() )->generation(), 'Reactivation makes the old snapshot and cursor stale.' );
 	}
 
 	public function test_reactivation_restores_cleanly_without_duplicates(): void {

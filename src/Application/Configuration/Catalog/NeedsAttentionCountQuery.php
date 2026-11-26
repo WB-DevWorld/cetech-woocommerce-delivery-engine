@@ -21,6 +21,11 @@ use CetechDeliveryEngine\Bootstrap\FeatureFlags;
  * Ordinary awaiting-fulfilment, processing, missing tracking, and pickup-only
  * orders are not counted unless those canonical queries already treat them as
  * issues. Legitimate unpaid COD delivery orders are counted as action required.
+ *
+ * M2.5: when a snapshot service is wired, the catalog source is the last
+ * complete site-wide snapshot (refreshed in the background) instead of a live
+ * catalog scan. The other sources stay live and per user. Before the first
+ * snapshot exists the catalog contributes nothing and a refresh is queued.
  */
 final class NeedsAttentionCountQuery {
 
@@ -30,7 +35,8 @@ final class NeedsAttentionCountQuery {
 		private readonly ShipmentOperationsIssueQuery $operations,
 		private readonly FeatureFlags $flags,
 		private readonly ?CodAwaitingShipmentQuery $cod_awaiting = null,
-		private readonly ?BulkStaleJobQuery $bulk_stale = null
+		private readonly ?BulkStaleJobQuery $bulk_stale = null,
+		private readonly ?NeedsAttentionSnapshotService $snapshot = null
 	) {
 	}
 
@@ -38,7 +44,7 @@ final class NeedsAttentionCountQuery {
 		$count = 0;
 
 		if ( $this->current_user_can_see_catalog_attention() ) {
-			$count += $this->catalog->count();
+			$count += $this->catalog_count();
 			$count += $this->bulk_stale instanceof BulkStaleJobQuery ? $this->bulk_stale->count() : 0;
 		}
 
@@ -51,6 +57,19 @@ final class NeedsAttentionCountQuery {
 		}
 
 		return $count;
+	}
+
+	/**
+	 * The catalog reading behind the count, for "Updating…" and "last checked"
+	 * wording. Null when the user cannot see catalog attention or no snapshot
+	 * service is wired (live count).
+	 */
+	public function catalog_reading_for_current_user(): ?NeedsAttentionCatalogReading {
+		if ( ! $this->snapshot instanceof NeedsAttentionSnapshotService || ! $this->current_user_can_see_catalog_attention() ) {
+			return null;
+		}
+
+		return $this->snapshot->reading();
 	}
 
 	public function current_user_can_see_needs_attention(): bool {
@@ -67,5 +86,13 @@ final class NeedsAttentionCountQuery {
 		return $this->flags->is_enabled( 'enable_shipment_records' )
 			&& function_exists( 'current_user_can' )
 			&& current_user_can( 'manage_shipments' );
+	}
+
+	private function catalog_count(): int {
+		if ( $this->snapshot instanceof NeedsAttentionSnapshotService ) {
+			return (int) ( $this->snapshot->reading()->count ?? 0 );
+		}
+
+		return $this->catalog->count();
 	}
 }

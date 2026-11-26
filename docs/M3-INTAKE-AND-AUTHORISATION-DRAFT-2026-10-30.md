@@ -14,6 +14,25 @@ Status: **draft, not authorised.** Written by Claude Code after the reunificatio
 | Engines on `master` that M2 never used | `ServicePromise` (calendar arithmetic, promise policy and calendar persistence, shipment estimates, native handoff; adoption option `cetech_de_service_promise_adoption`, default off), `EmergencyControl` (checkout admission, pause command, ownership latch; writer switched off by the constant `CETECH_DE_EMERGENCY_WRITER_DISABLED`), `DeliveryPromotion`, `DeliveryEconomics`, `DeliveryCurrency`, `DataLifecycle`, `RuleLifecycle`, `Operation` |
 | Schema 6 → 12 | migrations 7–12: operation tables, rule-lifecycle tables, delivery-quote tables, promise storage tables, shipment promise table, promotion budget tables; additive, never run on training |
 
+### 0.1 What changed after this draft was written (checked 2026-11-26)
+
+The table above is the 30 October baseline and is left as written. Since then:
+
+| Fact | Value |
+|---|---|
+| `master` head | `08422f0` (2026-11-26), after the m2.5 forward port (PR #195) and the CI repair (PR #199) |
+| Current M2 release | tag `v1.0.0-m2.5` on `8af9dcd1` (`fix/m2-2026-10`), prerelease with the verified ZIP (SHA-256 `127dd86e…`), schema 6; accepted by Frank on staging on 2026-11-03. `v1.0.0-m2.4` stays as the M2 sign-off package |
+| Staging site | `1.0.0-m2.5` / schema 6 (seen 2026-11-25); staff tested it on 24–26 November with a 43-test kit |
+| Fixes merged into `fix/m2-2026-10` on 2026-11-26 | catalog CSV export on a large catalog (#196), delivery-estimate help text (#197), CI repair (#198), place label without a town (#200); no version, package or install yet, and #196, #197 and #200 are **not on `master`** |
+| CI | the PHP 8.5 WordPress/WooCommerce job depends on an upstream archive and a hosted runner image that both move; repaired on both lines on 2026-11-26, and it can recur |
+
+What this adds to the decisions below:
+
+- **Prerequisite P1/P2:** an M3 base on `master` does not contain #196, #197 and #200 until they are forward-ported, as m2.5 was.
+- **Candidate S1 (promised dates):** staff testing found that the staging theme prints its own calendar delivery dates on the cart and order pages beside the plugin's durations. Promised dates from the plugin would sit next to those unless the theme feature is switched off; that is a site decision outside this repository (section 7).
+- **Candidate S1 (one text on every surface):** testers asked for each Delivery Option to show its own estimate. Today the estimate saved in Site-wide Defaults is shown for every option, by the M2 precedence rule. Whether a promise is per option belongs in section 2 item 2.
+- **Still open from staff testing, not an M3 item:** one Cash on Delivery order on staging never appeared in Needs Attention although it met every recorded condition; a fresh test order is needed to tell a settings-timing cause from a plugin fault.
+
 ## 1. Authorisation (to be approved by Frank — blank until then)
 
 **Development.** Claude may, once this section is approved:

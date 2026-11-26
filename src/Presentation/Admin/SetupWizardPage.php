@@ -6,6 +6,7 @@ namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Configuration\Admin\StaffChargeSummary;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionSnapshotService;
 use CetechDeliveryEngine\Application\Configuration\ClassicCheckoutRuntimeActivation;
 use CetechDeliveryEngine\Application\Configuration\ContextualEntityService;
 use CetechDeliveryEngine\Application\Configuration\DeliveryOptionCompatibility;
@@ -62,7 +63,8 @@ final class SetupWizardPage {
 		private readonly AdminActionHandler $action_handler,
 		private readonly ClassicCheckoutRuntimeActivation $runtime,
 		private readonly WooCommerceShippingReadiness $shipping_readiness,
-		private readonly OperationalStateService $operational_state
+		private readonly OperationalStateService $operational_state,
+		private readonly ?NeedsAttentionSnapshotService $attention_snapshot = null
 	) {
 	}
 
@@ -546,7 +548,8 @@ final class SetupWizardPage {
 		$setup_complete   = $this->settings->is_setup_complete() && SetupWizardProgress::STATUS_COMPLETE === $state['status'];
 		$shipping_ready   = $this->shipping_readiness->is_ready();
 		$runtime_active   = $this->runtime->is_active();
-		$attention        = $this->needs_attention->count();
+		$attention_reading = $this->attention_snapshot?->reading();
+		$attention         = null === $attention_reading ? $this->needs_attention->count() : $attention_reading->count;
 		$config_ready     = $setup_complete && [] !== $this->configured_profile_labels( $state );
 		$can_finish       = $setup_complete && $shipping_ready && $config_ready;
 
@@ -599,10 +602,14 @@ final class SetupWizardPage {
 		echo '<div class="cetech-de-finish-summary">';
 		echo '<p><strong>' . esc_html__( 'Primary fulfilment', 'cetech-woocommerce-delivery-engine' ) . ':</strong> ' . esc_html( $primary?->label ?? __( 'Not chosen', 'cetech-woocommerce-delivery-engine' ) ) . '</p>';
 		echo '<p><strong>' . esc_html__( 'Site-wide defaults', 'cetech-woocommerce-delivery-engine' ) . ':</strong> ' . esc_html( implode( ', ', $this->configured_profile_labels( $state ) ) ) . '</p>';
-		if ( $attention > 0 ) {
-			echo '<p class="cetech-de-finish-attention"><strong>' . esc_html__( 'Items needing attention', 'cetech-woocommerce-delivery-engine' ) . ':</strong> ' . esc_html( (string) $attention ) . '</p>';
+		$attention_note = NeedsAttentionCatalogWording::last_checked( $attention_reading );
+		$attention_note = '' !== $attention_note ? ' <span class="description">(' . esc_html( $attention_note ) . ')</span>' : '';
+		if ( null === $attention ) {
+			echo '<p><strong>' . esc_html__( 'Items needing attention', 'cetech-woocommerce-delivery-engine' ) . ':</strong> ' . esc_html( NeedsAttentionCatalogWording::updating() ) . $attention_note . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- note escaped above.
+		} elseif ( $attention > 0 ) {
+			echo '<p class="cetech-de-finish-attention"><strong>' . esc_html__( 'Items needing attention', 'cetech-woocommerce-delivery-engine' ) . ':</strong> ' . esc_html( (string) $attention ) . $attention_note . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- note escaped above.
 		} else {
-			echo '<p><strong>' . esc_html__( 'Items needing attention', 'cetech-woocommerce-delivery-engine' ) . ':</strong> 0</p>';
+			echo '<p><strong>' . esc_html__( 'Items needing attention', 'cetech-woocommerce-delivery-engine' ) . ':</strong> 0' . $attention_note . '</p>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- note escaped above.
 		}
 		echo '</div></div>';
 

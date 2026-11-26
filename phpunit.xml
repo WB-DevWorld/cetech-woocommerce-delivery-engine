@@ -36,6 +36,7 @@
             <group>quote-cart-real-db</group>
             <group>service-promise-persistence-real-db</group>
             <group>promotion-commercial-real-db</group>
+            <group>attention-snapshot-real-db</group>
         </exclude>
     </groups>
 </phpunit>

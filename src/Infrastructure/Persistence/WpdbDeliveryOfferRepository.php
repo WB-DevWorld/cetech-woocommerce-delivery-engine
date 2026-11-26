@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Infrastructure\Persistence;
 
+use CetechDeliveryEngine\Domain\Configuration\CatalogReadinessSignal;
 use CetechDeliveryEngine\Domain\DeliveryOffer\DeliveryOfferRepositoryInterface;
 
 final class WpdbDeliveryOfferRepository extends AbstractWpdbRepository implements DeliveryOfferRepositoryInterface {
@@ -54,6 +55,8 @@ final class WpdbDeliveryOfferRepository extends AbstractWpdbRepository implement
 				return 0;
 			}
 
+			CatalogReadinessSignal::changed( 'delivery_offer' );
+
 			return $id;
 		}
 
@@ -73,6 +76,9 @@ final class WpdbDeliveryOfferRepository extends AbstractWpdbRepository implement
 		);
 
 		$insert_id = $this->insert_row( $insert_row, $insert_formats );
+		if ( $insert_id > 0 ) {
+			CatalogReadinessSignal::changed( 'delivery_offer' );
+		}
 
 		return $insert_id > 0 ? $insert_id : 0;
 	}
@@ -82,11 +88,19 @@ final class WpdbDeliveryOfferRepository extends AbstractWpdbRepository implement
 	}
 
 	public function softDelete( int $id ): bool {
-		return $this->mark_inactive( $id );
+		return $this->signal_if( $this->mark_inactive( $id ) );
 	}
 
 	public function hardDelete( int $id ): bool {
-		return $this->delete_row_by_id( $id );
+		return $this->signal_if( $this->delete_row_by_id( $id ) );
+	}
+
+	private function signal_if( bool $changed ): bool {
+		if ( $changed ) {
+			CatalogReadinessSignal::changed( 'delivery_offer' );
+		}
+
+		return $changed;
 	}
 
 	public function count_all(): int {

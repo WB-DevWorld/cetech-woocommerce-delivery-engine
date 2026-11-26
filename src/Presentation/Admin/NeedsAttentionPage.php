@@ -6,7 +6,9 @@ namespace CetechDeliveryEngine\Presentation\Admin;
 
 use CetechDeliveryEngine\Application\Bulk\BulkStaleJobQuery;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionCountQuery;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionCatalogListing;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionSnapshotService;
 use CetechDeliveryEngine\Application\Configuration\OperationalState;
 use CetechDeliveryEngine\Application\Configuration\OperationalStateService;
 use CetechDeliveryEngine\Application\Shipment\CodAwaitingShipmentQuery;
@@ -29,6 +31,8 @@ final class NeedsAttentionPage {
 
 	public const ACTION_RETRY_SHIPMENT = 'cetech_de_retry_shipment_creation';
 
+	private const CATALOG_ROWS = 200;
+
 	public function __construct(
 		private readonly NeedsAttentionQuery $query,
 		private readonly AdminActionHandler $action_handler,
@@ -39,7 +43,8 @@ final class NeedsAttentionPage {
 		private readonly ShipmentOperationsIssueQuery $operations_issues,
 		private readonly NeedsAttentionCountQuery $attention_count,
 		private readonly ?CodAwaitingShipmentQuery $cod_actions = null,
-		private readonly ?BulkStaleJobQuery $bulk_stale = null
+		private readonly ?BulkStaleJobQuery $bulk_stale = null,
+		private readonly ?NeedsAttentionSnapshotService $attention_snapshot = null
 	) {
 	}
 
@@ -92,7 +97,8 @@ final class NeedsAttentionPage {
 
 		$this->action_handler->notices()->render_notices();
 
-		$items      = $can_catalog_attention ? $this->query->list( 200 ) : [];
+		$listing    = $can_catalog_attention ? $this->catalog_listing() : null;
+		$items      = null !== $listing ? $listing->items : [];
 		$bulk       = $can_catalog_attention ? $this->bulk_stale_items() : [];
 		$shipments  = $can_shipment_attention ? $this->shipment_issues->list( 50 ) : [];
 		$operations = $can_shipment_attention ? $this->operations_issues->list( 50 ) : [];
@@ -177,9 +183,45 @@ final class NeedsAttentionPage {
 			$rows,
 			true
 		);
+		if ( null !== $listing && ! $listing->complete ) {
+			$this->render_catalog_omitted_rows( count( $items ) );
+		}
 		AdminPageLayout::close_section();
 
 		AdminPageLayout::close_page();
+	}
+
+	/**
+	 * The page stays the live, authoritative product list. When its scan
+	 * covered the whole catalog it also refreshes the site-wide snapshot, so
+	 * the badge catches up at once (unless a write happened meanwhile).
+	 */
+	private function catalog_listing(): NeedsAttentionCatalogListing {
+		$generation = $this->attention_snapshot?->generation();
+		$listing    = $this->query->listing( self::CATALOG_ROWS );
+
+		if ( null !== $generation && $listing->complete ) {
+			$this->attention_snapshot->record_complete_scan( count( $listing->items ), $listing->scanned, $generation );
+		}
+
+		return $listing;
+	}
+
+	private function render_catalog_omitted_rows( int $shown ): void {
+		$total = $this->attention_snapshot?->current_snapshot()?->count;
+		if ( null !== $total && $total > $shown ) {
+			$this->render_omitted_rows( $shown, $total );
+
+			return;
+		}
+
+		echo '<p class="description cetech-de-attention-omitted">' . esc_html(
+			sprintf(
+				/* translators: %d: product rows shown */
+				__( 'Showing the first %d products. More may need attention; resolve these to see the next ones.', 'cetech-woocommerce-delivery-engine' ),
+				$shown
+			)
+		) . '</p>';
 	}
 
 	/**

@@ -7,6 +7,9 @@ namespace CetechDeliveryEngine\Tests\Unit\Presentation\Admin;
 use CetechDeliveryEngine\Application\Configuration\Catalog\CatalogInheritanceClassifier;
 use CetechDeliveryEngine\Application\Configuration\Catalog\InMemoryCatalogIndex;
 use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionQuery;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionSnapshotService;
+use CetechDeliveryEngine\Application\Configuration\Catalog\NeedsAttentionSnapshotStore;
+use CetechDeliveryEngine\Tests\Support\InMemoryNeedsAttentionRefreshScheduler;
 use CetechDeliveryEngine\Application\Configuration\ClassicCheckoutRuntimeActivation;
 use CetechDeliveryEngine\Application\Configuration\ContextualEntityService;
 use CetechDeliveryEngine\Application\Configuration\EffectiveConfigurationResolver;
@@ -339,5 +342,57 @@ final class SetupWizardEntityAuthorizationTest extends TestCase {
 			throw $exception;
 		}
 		self::fail( 'Expected the wizard action to deny or redirect.' );
+	}
+
+	/**
+	 * M2.5: the finish step reads the site-wide snapshot; the wizard's catalog
+	 * query is replaced by an uninitialized object, so any scan would throw.
+	 */
+	public function test_finish_step_reads_the_attention_snapshot_without_scanning(): void {
+		$scheduler = new InMemoryNeedsAttentionRefreshScheduler();
+		$service   = new NeedsAttentionSnapshotService(
+			new NeedsAttentionSnapshotStore(),
+			( new \ReflectionClass( NeedsAttentionQuery::class ) )->newInstanceWithoutConstructor(),
+			$scheduler,
+			'1.0.0-m2.5'
+		);
+		$wizard = $this->wizard_with_snapshot( $service );
+
+		self::assertStringContainsString( 'Items needing attention:</strong> Updating… <span class="description">(Product checks are running in the background.)</span>', $this->finish_html( $wizard ) );
+		self::assertCount( 1, $scheduler->scheduled );
+
+		$service->record_complete_scan( 2, 5, $service->generation() );
+		$html = $this->finish_html( $wizard );
+		self::assertStringContainsString( 'Items needing attention:</strong> 2 <span class="description">(Products last checked ', $html );
+	}
+
+	private function wizard_with_snapshot( NeedsAttentionSnapshotService $service ): SetupWizardPage {
+		$reflection = new \ReflectionClass( SetupWizardPage::class );
+		$wizard     = $reflection->newInstanceWithoutConstructor();
+		foreach ( $reflection->getProperties() as $property ) {
+			if ( $property->isStatic() ) {
+				continue;
+			}
+			$value = match ( $property->getName() ) {
+				'attention_snapshot' => $service,
+				'needs_attention'    => ( new \ReflectionClass( NeedsAttentionQuery::class ) )->newInstanceWithoutConstructor(),
+				default              => $property->getValue( $this->page ),
+			};
+			$property->setValue( $wizard, $value );
+		}
+
+		return $wizard;
+	}
+
+	private function finish_html( SetupWizardPage $wizard ): string {
+		$method = new \ReflectionMethod( $wizard, 'render_step_finish' );
+
+		ob_start();
+		try {
+			$method->invoke( $wizard, $this->progress->read() );
+			return (string) ob_get_contents();
+		} finally {
+			ob_end_clean();
+		}
 	}
 }
