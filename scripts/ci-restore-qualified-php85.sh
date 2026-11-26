@@ -55,7 +55,13 @@ if ! qualified_apt_output=$(qualified_apt_check 2>&1); then
 	fi
 	echo "qualified_php85_pcre2_before=$(dpkg-query -W -f='${Package}=${Version} ' libpcre2-dev libpcre2-8-0)"
 	sudo apt-get update -qq
-	sudo apt-get install -y -qq --no-install-recommends --no-remove --only-upgrade libpcre2-dev
+	if ! sudo apt-get install -y -q --no-install-recommends --no-remove --only-upgrade libpcre2-dev; then
+		# Say why: the terse resolver error alone does not name what else is in the way.
+		apt-cache policy libpcre2-dev libpcre2-8-0 libpcre2-16-0 libpcre2-32-0 libpcre2-posix3 || true
+		sudo apt-get -s install --no-install-recommends --no-remove libpcre2-dev -o Debug::pkgProblemResolver=true || true
+		echo 'qualified_php85_package_state=FAIL reason=libpcre2-dev_upgrade_refused' >&2
+		exit 1
+	fi
 	echo "qualified_php85_pcre2_after=$(dpkg-query -W -f='${Package}=${Version} ' libpcre2-dev libpcre2-8-0)"
 	[[ "$(dpkg-query -W -f='${Version}' libpcre2-dev)" == "$(dpkg-query -W -f='${Version}' libpcre2-8-0)" ]]
 	qualified_apt_check
