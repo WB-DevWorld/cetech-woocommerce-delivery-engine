@@ -229,7 +229,7 @@ final class DeliveryOffersPage {
 			__( 'Estimated delivery', 'cetech-woocommerce-delivery-engine' ),
 			(string) ( $record['service_level'] ?? '' ),
 			false,
-			__( 'Shown to customers when this delivery option is selected. Example: 3–6 business days.', 'cetech-woocommerce-delivery-engine' )
+			DeliveryEstimateHelpText::option_text_field()
 		);
 		AdminFormHelper::select_field(
 			'status',
@@ -249,6 +249,7 @@ final class DeliveryOffersPage {
 			0,
 			__( 'Lower numbers appear first when multiple delivery options are shown.', 'cetech-woocommerce-delivery-engine' )
 		);
+		echo '<tr><td colspan="2"><p class="description">' . esc_html( DeliveryEstimateHelpText::option_day_counts() ) . '</p></td></tr>';
 		AdminFormHelper::number_field( 'processing_min_days', __( 'Processing min days', 'cetech-woocommerce-delivery-engine' ), $record['processing_min_days'] ?? null, 0, __( 'Minimum days to prepare the order before dispatch.', 'cetech-woocommerce-delivery-engine' ) );
 		AdminFormHelper::number_field( 'processing_max_days', __( 'Processing max days', 'cetech-woocommerce-delivery-engine' ), $record['processing_max_days'] ?? null, 0 );
 		AdminFormHelper::number_field( 'transit_min_days', __( 'Transit min days', 'cetech-woocommerce-delivery-engine' ), $record['transit_min_days'] ?? null, 0, __( 'Minimum days in transit after dispatch.', 'cetech-woocommerce-delivery-engine' ) );

@@ -134,7 +134,7 @@ final class ConfigurationFieldCatalog {
 			ConfigurationFieldKey::ORIGIN_ID => 'Private origin reference. Choose “Turn off” if this item should not use an origin.',
 			ConfigurationFieldKey::PICKUP_LOCATION_ID => 'The store or warehouse location customers collect from when Store Pickup is enabled. Inherit the site-wide default, choose a different location, or turn Store Pickup off for this product.',
 			ConfigurationFieldKey::PRIORITY => 'Priority decides which delivery setup takes precedence if more than one setup could apply. A lower number is considered first. Most products can leave this unchanged. Zero is a valid value.',
-			ConfigurationFieldKey::ESTIMATED_DELIVERY => 'Customer-facing estimated delivery, such as 3–5 days. Leave this inherited to follow the site-wide default. Setting a different value here does not freeze the delivery option or charge.',
+			ConfigurationFieldKey::ESTIMATED_DELIVERY => 'Customer-facing estimated delivery, such as 3–5 days, shown for every delivery option of this product. Leave this inherited to follow the site-wide default. Setting a different value here does not freeze the delivery option or charge.',
 			ConfigurationFieldKey::DELIVERY_OFFER_IDS => 'Choose whether this product should use the delivery options it inherits, add more options, remove some, or use only these options. Choosing an empty list means no delivery options for this setup.',
 			default => '',
 		};

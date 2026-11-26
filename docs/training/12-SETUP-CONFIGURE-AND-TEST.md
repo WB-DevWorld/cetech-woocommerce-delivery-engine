@@ -199,7 +199,7 @@ The public names customers choose. Checkout uses this name on the shipping line.
    - **Customer-facing name:** `Standard Delivery` (required)  
    - **Short description:** leave blank for now (not shown on the compact product selector)  
    - **Delivery type:** choose **Local delivery** for warehouse/home delivery, **Store pickup** for collection, **Air Shipping** or **Sea Shipping** for International  
-   - **Estimated delivery:** `3–6 business days`  
+   - **Estimated delivery:** `3–6 business days`. This text is a staff note for the Delivery Options list; customers see the Estimated delivery saved in Site-wide Defaults (section 7), or on the product if it has its own  
    - **Status:** **Active**  
 4. Do not open **Advanced details** unless you need a reference code. Leave it blank to auto-generate.  
 5. Click **Create Delivery Option**.  
@@ -403,7 +403,7 @@ The normal rules each fulfilment type uses. Products with no exception inherit t
 2. Click the **In Warehouse** tab if you also use other types.  
 3. Confirm **Fulfilment** shows In Warehouse and **Customer fulfilment** is **Delivery only**.  
 4. Under **Delivery options**, tick **Standard Delivery**.  
-5. **Estimated delivery:** `3–5 business days` (or leave blank to use the option’s own estimate).  
+5. **Estimated delivery:** `3–5 business days`. This one estimate is shown to customers for every Delivery Option ticked above, and the form does not save without it.  
 6. Click **Save Changes**.  
 7. Repeat for **In Store** or **International** tabs if those types are in use. International: tick only Air and/or Sea options.
 
