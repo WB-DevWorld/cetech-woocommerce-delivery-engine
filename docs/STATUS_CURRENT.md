@@ -1,3 +1,13 @@
+# Current status — M2 released as `v1.0.0-m2.5`; `master` reunified and carrying m2.5 — 2026-11-26
+
+- **Current release baseline: `v1.0.0-m2.5`** (tag on `8af9dcd13ba2f8e02d6d1c950e6d5cc0092a8bda` on `fix/m2-2026-10`, GitHub prerelease, ZIP SHA-256 `127dd86eed54d36935d8a282d332fc2b8d0b623054f900b9f2bef4ddab32d065`, schema 6). It is `v1.0.0-m2.4` plus the Needs Attention count taken off the admin request path; Frank accepted it on staging on 2026-11-03. Staging runs `1.0.0-m2.5` / schema 6 (seen 2026-11-25). Training was last recorded at `1.0.0-m2.4` / schema 6 (2026-10-30). Production has taken nothing; a go-live needs Frank's dated written approval naming the ZIP hash, the window and the rollback package.
+- **Previous release: `v1.0.0-m2.4`** (tag on `9f045ef40d5f510b69e1e105ff471601efdacbdd`, GitHub prerelease, ZIP SHA-256 `35160e7f0ab791f6c9b9ba594b1230a6048ced25c9b70fa3799e5270883cbf7d`). M2 was accepted by Frank and signed off by management on 2026-10-30 after every acceptance row passed on training (`scripts/qualification/m2/acceptance-cases.md`). It was the package installed on training on 2026-10-30, and staging ran it before taking m2.5.
+- **Merged after `v1.0.0-m2.5`, not released**: four fixes from staff testing on staging went into `fix/m2-2026-10` on 2026-11-26 (head `85f0228`): the catalog CSV export on a large catalog (#196), truthful delivery-estimate help text (#197), the CI repair for the pinned PHP archive (#198) and the place label when no town is chosen (#200). They have no version, no package and no install, and #196, #197 and #200 are not on `master`.
+- **`master` is the reunified tree**: PR #190 merged on 2026-10-30 (`fbca3e307bdd6e3e86ca53b71db7278eb19bab2c`), `master` `31b2b90` plus the merge of the accepted M2 branch `fix/m2-2026-10` `19e00a0d`. Source identity `1.0.0-m3.0-dev.1` (a development identity, not a release), schema target 12. Record and conflict resolution: `CURRENT-WORK.md` and `docs/M2-REUNIFICATION-ASSESSMENT-2026-10-30.md`. Since then `master` took the m2.5 forward port (PR #195, `b272b86`) and the CI repair (PR #199); head `08422f0` on 2026-11-26.
+- Do not infer a release later than `v1.0.0-m2.5`. Stage 15 has not started. M3 has no authorised scope; see `docs/M3-INTAKE-AND-AUTHORISATION-DRAFT-2026-10-30.md`.
+- Everything below this section is the historical record of the E01–E09 integration on the reconciliation branch that `master` `31b2b90` already contained.
+
+
 # Current status — E01–E09 integrated on the reconciliation branch — 2026-10-27
 
 The current repository record is `docs/REPOSITORY-RECONCILIATION-2026-10-27.md`.
