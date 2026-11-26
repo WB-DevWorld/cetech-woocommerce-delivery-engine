@@ -44,26 +44,41 @@ qualified_apt_check() {
 
 if ! qualified_apt_output=$(qualified_apt_check 2>&1); then
 	printf '%s\n' "$qualified_apt_output"
-	# One accepted drift (owner decision 2026-11-26): the archive's libpcre2-dev was built against
-	# the PCRE2 runtime of early October, and the hosted ubuntu-24.04 image has since updated that
-	# runtime. PHP already loads the runner's library, so only the development package is brought
-	# up to it. Any other unmet dependency is not accepted and still fails this step.
+	# One accepted drift (owner decision 2026-11-26): the archive records libpcre2-dev and its
+	# companion libraries (16-bit, 32-bit, POSIX wrapper) at the PCRE2 version of early October,
+	# while the hosted ubuntu-24.04 image has since updated libpcre2-8-0, the library PHP loads.
+	# Only those companions are brought up to the runner's libpcre2-8-0. Any other unmet
+	# dependency is not accepted and still fails this step.
 	qualified_broken_packages=$(grep -E '^ [^ ]+ : ' <<<"$qualified_apt_output" | sed -E 's/^ ([^ ]+) : .*/\1/' | sort -u || true)
 	if [[ "$qualified_broken_packages" != libpcre2-dev ]]; then
 		echo "qualified_php85_package_state=FAIL unaccepted_drift=$(tr '\n' ',' <<<"$qualified_broken_packages")" >&2
 		exit 1
 	fi
-	echo "qualified_php85_pcre2_before=$(dpkg-query -W -f='${Package}=${Version} ' libpcre2-dev libpcre2-8-0)"
+	qualified_pcre2_family=(libpcre2-dev libpcre2-16-0 libpcre2-32-0 libpcre2-posix3)
+	qualified_pcre2_runtime=$(dpkg-query -W -f='${Version}' libpcre2-8-0)
+	qualified_pcre2_behind=()
+	for qualified_pcre2_package in "${qualified_pcre2_family[@]}"; do
+		qualified_pcre2_version=$(dpkg-query -W -f='${Version}' "$qualified_pcre2_package" 2>/dev/null || true)
+		if [[ -n "$qualified_pcre2_version" && "$qualified_pcre2_version" != "$qualified_pcre2_runtime" ]]; then
+			qualified_pcre2_behind+=("$qualified_pcre2_package=$qualified_pcre2_runtime")
+		fi
+	done
+	echo "qualified_php85_pcre2_runtime=$qualified_pcre2_runtime"
+	echo "qualified_php85_pcre2_before=$(dpkg-query -W -f='${Package}=${Version} ' "${qualified_pcre2_family[@]}" 2>/dev/null || true)"
+	[[ ${#qualified_pcre2_behind[@]} -gt 0 ]]
 	sudo apt-get update -qq
-	if ! sudo apt-get install -y -q --no-install-recommends --no-remove --only-upgrade libpcre2-dev; then
+	if ! sudo apt-get install -y -q --no-install-recommends --no-remove --only-upgrade "${qualified_pcre2_behind[@]}"; then
 		# Say why: the terse resolver error alone does not name what else is in the way.
-		apt-cache policy libpcre2-dev libpcre2-8-0 libpcre2-16-0 libpcre2-32-0 libpcre2-posix3 || true
-		sudo apt-get -s install --no-install-recommends --no-remove libpcre2-dev -o Debug::pkgProblemResolver=true || true
-		echo 'qualified_php85_package_state=FAIL reason=libpcre2-dev_upgrade_refused' >&2
+		apt-cache policy libpcre2-8-0 "${qualified_pcre2_family[@]}" || true
+		sudo apt-get -s install --no-install-recommends --no-remove "${qualified_pcre2_behind[@]}" -o Debug::pkgProblemResolver=true || true
+		echo 'qualified_php85_package_state=FAIL reason=pcre2_alignment_refused' >&2
 		exit 1
 	fi
-	echo "qualified_php85_pcre2_after=$(dpkg-query -W -f='${Package}=${Version} ' libpcre2-dev libpcre2-8-0)"
-	[[ "$(dpkg-query -W -f='${Version}' libpcre2-dev)" == "$(dpkg-query -W -f='${Version}' libpcre2-8-0)" ]]
+	echo "qualified_php85_pcre2_after=$(dpkg-query -W -f='${Package}=${Version} ' "${qualified_pcre2_family[@]}" 2>/dev/null || true)"
+	for qualified_pcre2_package in "${qualified_pcre2_family[@]}"; do
+		qualified_pcre2_version=$(dpkg-query -W -f='${Version}' "$qualified_pcre2_package" 2>/dev/null || true)
+		[[ -z "$qualified_pcre2_version" || "$qualified_pcre2_version" == "$qualified_pcre2_runtime" ]]
+	done
 	qualified_apt_check
 fi
 
