@@ -37,8 +37,29 @@ sudo tar -I zstd -xf "$qualified_archive" -C /
 sudo env LC_ALL=C.UTF-8 /usr/bin/python3 /usr/sbin/merge_status
 sudo rm /usr/sbin/merge_status
 sudo mv /var/lib/dpkg/status-orig /var/lib/dpkg/status
-sudo apt-get check -o Dir::Etc::sourcelist=/dev/null -o Dir::Etc::sourceparts=- \
-	-o Dir::Cache::pkgcache= -o Dir::Cache::srcpkgcache=
+qualified_apt_check() {
+	sudo apt-get check -o Dir::Etc::sourcelist=/dev/null -o Dir::Etc::sourceparts=- \
+		-o Dir::Cache::pkgcache= -o Dir::Cache::srcpkgcache=
+}
+
+if ! qualified_apt_output=$(qualified_apt_check 2>&1); then
+	printf '%s\n' "$qualified_apt_output"
+	# One accepted drift (owner decision 2026-11-26): the archive's libpcre2-dev was built against
+	# the PCRE2 runtime of early October, and the hosted ubuntu-24.04 image has since updated that
+	# runtime. PHP already loads the runner's library, so only the development package is brought
+	# up to it. Any other unmet dependency is not accepted and still fails this step.
+	qualified_broken_packages=$(grep -E '^ [^ ]+ : ' <<<"$qualified_apt_output" | sed -E 's/^ ([^ ]+) : .*/\1/' | sort -u || true)
+	if [[ "$qualified_broken_packages" != libpcre2-dev ]]; then
+		echo "qualified_php85_package_state=FAIL unaccepted_drift=$(tr '\n' ',' <<<"$qualified_broken_packages")" >&2
+		exit 1
+	fi
+	echo "qualified_php85_pcre2_before=$(dpkg-query -W -f='${Package}=${Version} ' libpcre2-dev libpcre2-8-0)"
+	sudo apt-get update -qq
+	sudo apt-get install -y -qq --no-install-recommends --no-remove --only-upgrade libpcre2-dev
+	echo "qualified_php85_pcre2_after=$(dpkg-query -W -f='${Package}=${Version} ' libpcre2-dev libpcre2-8-0)"
+	[[ "$(dpkg-query -W -f='${Version}' libpcre2-dev)" == "$(dpkg-query -W -f='${Version}' libpcre2-8-0)" ]]
+	qualified_apt_check
+fi
 
 for qualified_tool in php phpize php-config phpdbg php-cgi phar.phar phar; do
 	[[ -x "/usr/bin/${qualified_tool}8.5" ]]
