@@ -77,6 +77,8 @@ final class DataLifecycleManifest {
 		'cetech_de_enable_blocks_adapter', 'cetech_de_enable_category_rules', 'cetech_de_enable_site_fallback_rule',
 		'cetech_de_enable_effective_configuration_runtime', 'cetech_de_enable_variable_product_ecr_runtime',
 		'cetech_de_demo_data_on_activation',
+		'cetech_de_enable_promised_dates', 'cetech_de_enable_emergency_pause_control', 'cetech_de_enable_delivery_embeds',
+		'cetech_de_enable_rest_api',
 	];
 
 	/** Original value/autoload disposition survives ordinary and explicit maintenance. */
@@ -104,6 +106,8 @@ final class DataLifecycleManifest {
 		'_cetech_de_cart_item_key', 'cetech_de_group_id', '_cetech_de_shipment_creation_state',
 		'_cetech_de_shipment_creation_error_code', '_cetech_de_shipment_creation_attempted_at',
 		'_cetech_de_cod_awaiting_shipment',
+		// M3 promise frozen at order placement (FrozenOrderPromiseReader::META_KEY).
+		'_cetech_de_promise_snapshot',
 	];
 	public const USER_KEYS = [
 		'cetech_de_dismissed_notices', '_cetech_de_shipments_reviewed_event_id', 'cetech_de_bulk_list_per_page',
@@ -319,6 +323,7 @@ final class DataLifecycleManifest {
 		if ( '_cetech_de_cod_awaiting_shipment' === $name ) { return 'src/Application/Shipment/CodAwaitingShipmentStore.php'; }
 		if ( str_contains( $name, 'shipment_creation' ) ) { return 'src/Application/Shipment/ShipmentCreationFailureStore.php'; }
 		if ( 'cetech_de_group_id' === $name ) { return 'src/Presentation/Admin/OrderShippingItemPresentationGuard.php'; }
+		if ( '_cetech_de_promise_snapshot' === $name ) { return 'src/Application/PromiseDates/FrozenOrderPromiseReader.php'; }
 		return 'src/Application/Order/OrderDeliverySnapshot.php';
 	}
 

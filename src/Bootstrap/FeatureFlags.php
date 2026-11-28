@@ -36,6 +36,11 @@ final class FeatureFlags {
 		'enable_effective_configuration_runtime' => false,
 		'enable_variable_product_ecr_runtime' => false,
 		'demo_data_on_activation'          => false,
+		// M3-M8 batch switches (docs/m3-m8/LANE-PLAN.md section 3). All ship off.
+		'enable_promised_dates'            => false,
+		'enable_emergency_pause_control'   => false,
+		'enable_delivery_embeds'           => false,
+		'enable_rest_api'                  => false,
 	];
 
 	/** @var array<string, bool>|null */

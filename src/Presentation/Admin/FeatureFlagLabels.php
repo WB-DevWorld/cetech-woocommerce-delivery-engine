@@ -102,6 +102,22 @@ final class FeatureFlagLabels {
 				'label'       => 'Use Site-wide Defaults for product variations',
 				'description' => 'Variation inheritance and overrides follow Site-wide Defaults when that runtime is active.',
 			],
+			'enable_promised_dates' => [
+				'label'       => 'Show promised delivery dates',
+				'description' => 'Shows a delivery date range from the published delivery promise rules instead of a duration. Where no rule applies, customers keep seeing the duration.',
+			],
+			'enable_emergency_pause_control' => [
+				'label'       => 'Emergency pause control',
+				'description' => 'Lets administrators pause and resume delivery checkout, with a reason and an optional end time.',
+			],
+			'enable_delivery_embeds' => [
+				'label'       => 'Delivery shortcodes and blocks',
+				'description' => 'Makes the delivery selector and delivery information available as shortcodes and blocks.',
+			],
+			'enable_rest_api' => [
+				'label'       => 'Delivery Engine REST API',
+				'description' => 'Turns on the read-only Delivery Engine REST API for authorised users and systems.',
+			],
 			'demo_data_on_activation' => [
 				'label'       => 'Demo data on activation',
 				'description' => 'Not used. This release does not seed demo Delivery Areas, Delivery Options, or Delivery Charges.',

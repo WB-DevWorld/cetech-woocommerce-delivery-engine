@@ -303,6 +303,9 @@ final class Plugin {
 
 	private ServiceContainer $container;
 
+	/** @var list<Module\PluginModule>|null */
+	private ?array $modules = null;
+
 	private function __construct() {
 		$this->container = new ServiceContainer();
 	}
@@ -478,6 +481,9 @@ final class Plugin {
 		if ( is_admin() ) {
 			$this->container->get( OrderDeliverySnapshotAdminDisplay::class )->register();
 		}
+
+		// M3–M8 lane modules add their hooks after the core runtime; each stays behind its own switch.
+		Module\PluginModules::boot_all( $this->container, $this->modules() );
 
 		$this->maybe_show_activation_notice();
 	}
@@ -2000,12 +2006,27 @@ final class Plugin {
 
 		$this->container->singleton(
 			CatalogCsvExportService::class,
-			static fn ( ServiceContainer $container ): CatalogCsvExportService => new CatalogCsvExportService(
-				$container->get( CatalogTargetQueryInterface::class ),
-				$container->get( ScopedConfigurationRepositoryInterface::class ),
-				$container->get( EffectiveConfigurationResolver::class ),
-				$container->get( EntityCodeResolver::class )
-			)
+			static function ( ServiceContainer $container ): CatalogCsvExportService {
+				// Like the Needs Attention scan, the export walks the whole catalog: it gets its own
+				// resolver over a batch-scoped repository view so each page is one presence query per
+				// scope type and its memos can be dropped per page without touching checkout.
+				$export_scopes   = new CatalogScanScopedConfigurationRepository(
+					$container->get( ScopedConfigurationRepositoryInterface::class )
+				);
+				$export_resolver = new EffectiveConfigurationResolver(
+					$export_scopes,
+					$container->get( EffectiveConfigurationValidator::class ),
+					$container->get( FulfilmentConstraintServiceInterface::class ),
+					$container->get( SiteWideDefaultsPolicyInterface::class )
+				);
+
+				return new CatalogCsvExportService(
+					$container->get( CatalogTargetQueryInterface::class ),
+					$export_scopes,
+					$export_resolver,
+					$container->get( EntityCodeResolver::class )
+				);
+			}
 		);
 
 		$this->container->singleton(
@@ -2079,6 +2100,20 @@ final class Plugin {
 				$container->get( PromiseConfigurationPage::class )
 			)
 		);
+
+		// M3–M8 lane modules bind their own services last (docs/m3-m8/LANE-PLAN.md §3).
+		Module\PluginModules::register_all( $this->container, $this->modules() );
+	}
+
+	/**
+	 * @return list<Module\PluginModule>
+	 */
+	private function modules(): array {
+		if ( null === $this->modules ) {
+			$this->modules = Module\PluginModules::all();
+		}
+
+		return $this->modules;
 	}
 
 	private function register_repository_bindings(): void {
