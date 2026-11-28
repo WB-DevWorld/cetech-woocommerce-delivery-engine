@@ -1,6 +1,8 @@
 # CETECH Delivery Engine — M3 intake and authorisation — DRAFT for Frank — 2026-10-30
 
-Status: **draft, not authorised.** Written by Claude Code after the reunification merge (PR #190, `master` `fbca3e30`) because Frank asked, on 2026-10-30, to "go on to M3 work" once reunification was done. The M2 authorisation of 28 October 2026 names three M3 topics but gives M3 no scope, owner or acceptance list, and the reunification assessment (`docs/M2-REUNIFICATION-ASSESSMENT-2026-10-30.md`) lists the inputs still missing. This document is the intake for those inputs, in the shape of the M2 authorisation. Nothing in it is approved until Frank fills section 2 and signs section 1. **No M3 code starts before that.**
+Status (2026-11-28): **authorised.** Frank approved the M3–M8 authorization and starter prompt on 28 November 2026. It widens this intake to M3, M4, M7 and M8 and replaces its training-site route with staging. Sections 1 to 3 below are filled from that authorization; each filled entry says so. The inputs that only Frank or management can give are still marked open in section 2. The text that follows this paragraph is the 30 October draft, kept as written.
+
+Original status: **draft, not authorised.** Written by Claude Code after the reunification merge (PR #190, `master` `fbca3e30`) because Frank asked, on 2026-10-30, to "go on to M3 work" once reunification was done. The M2 authorisation of 28 October 2026 names three M3 topics but gives M3 no scope, owner or acceptance list, and the reunification assessment (`docs/M2-REUNIFICATION-ASSESSMENT-2026-10-30.md`) lists the inputs still missing. This document is the intake for those inputs, in the shape of the M2 authorisation. Nothing in it is approved until Frank fills section 2 and signs section 1. **No M3 code starts before that.**
 
 ## 0. Baseline facts (verified 2026-10-30)
 
@@ -50,11 +52,18 @@ Never rewrite git history or move tags. Platform freeze stays in force.
 
 | Approval | Frank's entry |
 |---|---|
-| M3 base SHA on `master` | _(fill; recommended: the SHA whose package passed the training re-run in P2)_ |
-| M3 branch name | _(fill; recommended `fix/m3-2026-11`)_ |
-| Version line | _(fill; recommended `1.0.0-m3.N`, tags `v1.0.0-m3.N`, development builds `1.0.0-m3.0-dev.N` as already classed by the package verifier)_ |
-| Approved on | _(date)_ |
-| Management co-signature | _(name, date)_ |
+| M3 base SHA on `master` | `08422f06fc9db81f43c5370412978bad04dd9096` (M3–M8 authorization §3 and §8). `fix/m2-2026-10` `ef02a220` (`1.0.0-m2.6`) is merged on top in phase 1, keeping the `master` identity |
+| M3 branch name | `batch/m3-m8-2026-11`, a temporary `batch/**` integration branch owned by the integration editor (`AGENTS.md`). Lane work arrives as `fix/**` pull requests |
+| Version line | Development builds `1.0.0-m3.0-dev.N`. Gate packages `1.0.0-m3.N`, `1.0.0-m7.N` and `1.0.0-m8.N`, named after the highest milestone completed. The allowance is added to `scripts/verify-production-package-autoload.php` (authorization §4 item 8) |
+| Approved on | 2026-11-28, by Frank (M3–M8 authorization) |
+| Management co-signature | Not given in the authorization. Frank alone declares production readiness. Naming a release "Stable 1.0" needs a management scope decision, because M5 and M6 are excluded |
+
+**What the 28 November authorization changes in the paragraphs above:**
+
+- **Merging.** Claude may merge a pull request into `batch/m3-m8-2026-11` when its CI is green, the verifier agent has reviewed it and recorded that on the pull request, and no stop condition applies. Claude never merges into `master`, never approves a pull request into `master`, and never uses a ruleset bypass. Frank merges the batch branch into `master` at gates A, B and C, one cumulative pull request per gate. Tags and GitHub releases come only after Frank's acceptance in chat.
+- **Test site.** Staging (`staging.cetechbpa.com`) replaces training. Claude may install packages and change plugin configuration there under three conditions: the package was built by `release-package.yml` from a CI-green commit and its hash was checked on the server; a database and plugin-folder backup was taken first; and caches are purged afterwards, with an install record written. The schema 6 → 12 upgrade on staging is approved. Further migrations on staging must be additive, keep old readers working, and follow a backup.
+- **Training site.** Read-only. It stays on `1.0.0-m2.4`, schema 6. Any install there needs Frank first.
+- **Workstreams.** Frank authorises work across the WS1 and WS2 file areas for this batch. The leases are recorded in `CURRENT-WORK.md`.
 
 ## 2. Inputs Frank and management must supply (nothing here can be invented by Claude)
 
@@ -70,6 +79,18 @@ Never rewrite git history or move tags. Platform freeze stays in force.
 5. **Promise exposure**: do promised dates show to every customer at once (D10: Frank switches features on), to signed-in customers only, or per product/profile?
 6. **Acceptance signatories** for M3, as for M2 (Frank and a named management representative).
 
+**State of these inputs on 2026-11-28** (M3–M8 authorization §4 and §5). A default is what Claude builds until Frank changes it. Each default is built to be easy to adjust.
+
+| Item | State |
+|---|---|
+| 1. Rule owner | **Open (Frank).** Asked once at the end of phase 0 |
+| 2. Written rules | **Open (Frank)** for the figures: cut-off, working days, holidays, lead times per area and fulfilment profile. Decided: rules are data, not code. Claude builds the rules screen and the calculation and invents no figures. Staging uses rules clearly named as test rules. When no rule applies, the customer sees the M2 duration, never an invented date. **Default wording:** a date range, such as "Delivery between Tue 2 Dec and Thu 4 Dec", in the WordPress site time zone. A rule may be scoped to a Delivery Option; without one, the site-wide rule applies. Frank is asked to confirm |
+| 3. D5 pause rule | **Default, Frank to confirm.** Administrators only may pause and resume. A reason is required; an end time is optional. Staff see the state on every Delivery Engine screen, and every action is recorded. The customer message is fixed: "Delivery checkout is temporarily paused; please try again shortly." The store is portable: no MariaDB-only SQL and no raw database handle |
+| 4. Parallel engines | **Decided.** M5 and M6 are out of scope. Promotion, economics, currency, return, refund and label code stays in the tree, switched off and untouched. `ServicePromise` and `EmergencyControl` are M3. `DeliveryQuote` is M4, re-scoped rather than widened. Rule lifecycle (dry-run and overrides) and data lifecycle (reset, Issue #50) are M8 |
+| 5. Exposure | **Decided.** Features ship switched off. Claude switches them on only on staging, for testing. Frank switches them on anywhere else |
+| 6. Signatories | Frank declares production readiness; Claude reports "ready for Frank's acceptance". A management co-signature is not named. A management decision is needed before anything is called "Stable 1.0" |
+| Order freeze point (COR-029) | **Default, Frank to confirm.** The delivery snapshot freezes when the order is placed (`woocommerce_checkout_order_processed` and the Store API equivalent). Draft orders may still update |
+
 ## 3. Candidate scope (tick what is in M3; everything unticked is out)
 
 Each item is bounded, has an owner by workstream, and names the existing `master` component it would build on. Proposed, not approved.
@@ -84,6 +105,19 @@ Each item is bounded, has an owner by workstream, and names the existing `master
 | S6 | Anything on promotions, economics, currency, data lifecycle or rule lifecycle | the remaining `master` engines | — | ☐ (only if section 2 item 4 says "in scope") |
 
 Out of M3 whatever is ticked: Air/Sea pricing (D9), refund/return terms (D7), the business-number checkout alert (D11), any production go-live.
+
+**Ticks from the 28 November authorization (§1 and §7):**
+
+| # | Tick | Note |
+|---|---|---|
+| S1 | ☑ | Promised dates on the product page, cart, checkout, thank-you page, My Account and both email formats, with the same text everywhere (`DE-PROMISE-*`) |
+| S2 | ☑ | Rules screen: working days, holidays, cut-offs, lead times, effective dates, a preview that tests a date, and versions. It reuses the workflow on `ws3/admin-promise-staff-workflow` (PR #114) where that is sound, with fixtures rewritten so GitGuardian no longer flags them |
+| S3 | ☑ | The promise is frozen on the order at placement, shown on the staff order view and in emails, and shipment estimates are reconciled to it |
+| S4 | ☑ | Emergency pause with the section 2 item 3 default (`DE-FLAG-*`) |
+| S5 | ☐ | Replaced: staging is the test site and training stays read-only. The 6 → 12 upgrade on staging is phase 1 of the batch |
+| S6 | ☐ promotions, economics, currency (M5/M6, out) · ☑ rule lifecycle dry-run and overrides, data lifecycle and reset | The last two are M8 (`DE-RULE-*`, `DE-DATA-*`) |
+
+The batch also carries M4 (`DE-QUOTE-*`, COR-023, COR-029), M7 (`DE-EMBED`, `DE-CTX-007`, `DE-UX-009`, `DE-PICKUP-*`, `DE-PERF-*`) and M8 (`DE-API-*`, `DE-CLI-*`, `DE-EVENT-*`, `DE-RULE-*`, `DE-DATA-*`, `DE-COMPAT-*`, `DE-REL-*`). The lane plan is `docs/m3-m8/LANE-PLAN.md`. The acceptance ledgers live under `scripts/qualification/m3/`, `m4/`, `m7/` and `m8/`.
 
 ## 4. Prerequisites before any M3 code (in order)
 
