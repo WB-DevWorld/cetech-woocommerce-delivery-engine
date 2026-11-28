@@ -77,6 +77,8 @@ final class DataLifecycleManifest {
 		'cetech_de_enable_blocks_adapter', 'cetech_de_enable_category_rules', 'cetech_de_enable_site_fallback_rule',
 		'cetech_de_enable_effective_configuration_runtime', 'cetech_de_enable_variable_product_ecr_runtime',
 		'cetech_de_demo_data_on_activation',
+		'cetech_de_enable_promised_dates', 'cetech_de_enable_emergency_pause_control', 'cetech_de_enable_delivery_embeds',
+		'cetech_de_enable_rest_api',
 	];
 
 	/** Original value/autoload disposition survives ordinary and explicit maintenance. */

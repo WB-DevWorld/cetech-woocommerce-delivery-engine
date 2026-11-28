@@ -303,6 +303,9 @@ final class Plugin {
 
 	private ServiceContainer $container;
 
+	/** @var list<Module\PluginModule>|null */
+	private ?array $modules = null;
+
 	private function __construct() {
 		$this->container = new ServiceContainer();
 	}
@@ -478,6 +481,9 @@ final class Plugin {
 		if ( is_admin() ) {
 			$this->container->get( OrderDeliverySnapshotAdminDisplay::class )->register();
 		}
+
+		// M3–M8 lane modules add their hooks after the core runtime; each stays behind its own switch.
+		Module\PluginModules::boot_all( $this->container, $this->modules() );
 
 		$this->maybe_show_activation_notice();
 	}
@@ -2094,6 +2100,20 @@ final class Plugin {
 				$container->get( PromiseConfigurationPage::class )
 			)
 		);
+
+		// M3–M8 lane modules bind their own services last (docs/m3-m8/LANE-PLAN.md §3).
+		Module\PluginModules::register_all( $this->container, $this->modules() );
+	}
+
+	/**
+	 * @return list<Module\PluginModule>
+	 */
+	private function modules(): array {
+		if ( null === $this->modules ) {
+			$this->modules = Module\PluginModules::all();
+		}
+
+		return $this->modules;
 	}
 
 	private function register_repository_bindings(): void {
