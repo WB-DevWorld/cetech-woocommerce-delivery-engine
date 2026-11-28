@@ -2000,12 +2000,27 @@ final class Plugin {
 
 		$this->container->singleton(
 			CatalogCsvExportService::class,
-			static fn ( ServiceContainer $container ): CatalogCsvExportService => new CatalogCsvExportService(
-				$container->get( CatalogTargetQueryInterface::class ),
-				$container->get( ScopedConfigurationRepositoryInterface::class ),
-				$container->get( EffectiveConfigurationResolver::class ),
-				$container->get( EntityCodeResolver::class )
-			)
+			static function ( ServiceContainer $container ): CatalogCsvExportService {
+				// Like the Needs Attention scan, the export walks the whole catalog: it gets its own
+				// resolver over a batch-scoped repository view so each page is one presence query per
+				// scope type and its memos can be dropped per page without touching checkout.
+				$export_scopes   = new CatalogScanScopedConfigurationRepository(
+					$container->get( ScopedConfigurationRepositoryInterface::class )
+				);
+				$export_resolver = new EffectiveConfigurationResolver(
+					$export_scopes,
+					$container->get( EffectiveConfigurationValidator::class ),
+					$container->get( FulfilmentConstraintServiceInterface::class ),
+					$container->get( SiteWideDefaultsPolicyInterface::class )
+				);
+
+				return new CatalogCsvExportService(
+					$container->get( CatalogTargetQueryInterface::class ),
+					$export_scopes,
+					$export_resolver,
+					$container->get( EntityCodeResolver::class )
+				);
+			}
 		);
 
 		$this->container->singleton(

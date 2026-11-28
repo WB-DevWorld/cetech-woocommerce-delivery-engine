@@ -1458,14 +1458,50 @@ final class BulkToolsPage {
 			]
 		);
 		$include_private = ! empty( $_POST['include_private_sources'] ) && current_user_can( 'manage_private_sources' );
+		$this->prepare_long_download();
 		nocache_headers();
 		header( 'Content-Type: text/csv; charset=utf-8' );
 		header( 'Content-Disposition: attachment; filename="cetech-de-catalog.csv"' );
+		header( 'X-Accel-Buffering: no' );
 		$handle = fopen( 'php://output', 'w' );
 		if ( false !== $handle ) {
-			$this->csv_export->write_stream( $handle, $definition, $include_private );
+			$this->csv_export->write_stream(
+				$handle,
+				$definition,
+				$include_private,
+				static function () use ( $handle ): void {
+					// Send each page as it is written: the browser sees the download progress and a
+					// proxy in front of PHP does not time out waiting for the first byte.
+					fflush( $handle );
+					flush();
+					// Products read for this page are not needed again; keep the request's memory flat.
+					if ( function_exists( 'wp_cache_supports' ) && wp_cache_supports( 'flush_runtime' ) && function_exists( 'wp_cache_flush_runtime' ) ) {
+						wp_cache_flush_runtime();
+					}
+				}
+			);
 			fclose( $handle );
 		}
 		exit;
+	}
+
+	/**
+	 * A whole-catalog CSV can take longer than a normal admin request and must leave PHP as it is
+	 * produced, not after the last row: lift the time limit for this request and drop any output
+	 * buffers so each written page reaches the browser.
+	 */
+	private function prepare_long_download(): void {
+		if ( function_exists( 'wc_set_time_limit' ) ) {
+			wc_set_time_limit( 0 );
+		} elseif ( function_exists( 'set_time_limit' ) ) {
+			// phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- hosts may disable the function.
+			@set_time_limit( 0 );
+		}
+
+		while ( ob_get_level() > 0 ) {
+			if ( ! @ob_end_clean() ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- a non-removable buffer ends the loop.
+				break;
+			}
+		}
 	}
 }

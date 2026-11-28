@@ -97,10 +97,27 @@ final class MatchingLocation {
 		];
 	}
 
+	/**
+	 * The most specific place the customer chose, in words: the town, else the region's name, else
+	 * the country's name. A region-wide Delivery Area prices a destination that has no town, and
+	 * every customer surface (product page, cart, checkout, shipping label, order, emails) prints
+	 * this text, so it must never be a bare code such as "GH" while a name is available. The
+	 * country code is only the last resort, when WooCommerce cannot name the country.
+	 */
 	public function publicLocalityLabel(): string {
 		$city = trim( $this->city );
+		if ( '' !== $city ) {
+			return $city;
+		}
 
-		return '' !== $city ? $city : $this->country;
+		$region = LocationNormalizer::stateLabel( $this->country, $this->state );
+		if ( '' !== $region ) {
+			return $region;
+		}
+
+		$country = LocationNormalizer::countryLabel( $this->country );
+
+		return '' !== $country ? $country : $this->country;
 	}
 
 	/**
