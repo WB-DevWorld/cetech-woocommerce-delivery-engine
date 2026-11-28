@@ -98,9 +98,15 @@ Each lane gets one module class it owns, `src/Bootstrap/Module/<Lane>Module.php`
 
 ### Shared contracts in the Wave A contract pull request (lead)
 
-- `PromiseDisplay`: a value object holding a from/to date range in the site time zone, the kind (`date_range` or `fallback_duration`), the rule version and the source.
-- `PromiseDateProvider`: an interface. L2 implements it; L1 consumes it.
-- `PromiseDateRangeFormatter`: the default wording, "Delivery between Tue 2 Dec and Thu 4 Dec". It uses `wp_timezone()` and is built to be easy to change. **One formatter serves every surface**: product page, cart, checkout, thank-you, My Account, both email formats and the staff order view.
+- **`PromiseDisplay`** (as built in #206, amended 2026-11-28 after verifier review): a promised window only, never a fallback.
+  - **Dates:** `from` and `to` are calendar days (`Y-m-d`) in one named time zone, the site time zone when the promise was made.
+  - **No rule:** when no rule applies, the provider returns `null` and the surface shows the M2 duration. There is no "fallback" kind.
+  - **Rule reference:** one string that records the source and version, in the form `promise:<scope>:<version id>`, where the scope is `site` or `offer-<Delivery Option id>`. For example: `promise:site:<version uuid>`, `promise:offer-12:<version uuid>`.
+  - **Snapshot shape:** stable (`format` 1: `from`, `to`, `timezone`, `rule`). Any extra field needs format 2 and a reader for both.
+- **`PromiseDateProvider`** is an interface; L2a implements it and L1 consumes it.
+- **`FrozenOrderPromiseReader`** reads promises frozen at placement, keyed by delivery group id, from order meta `_cetech_de_promise_snapshot`, which is registered in the manifest.
+- **`PromiseDateRangeFormatter`** gives the default wording, "Delivery between Tue 2 Dec and Thu 4 Dec". It formats in the promise's own stored zone, so a later time-zone change never moves a placed order's dates, and it is built to be easy to change. **One formatter serves every surface**: product page, cart, checkout, thank-you, My Account, both email formats and the staff order view.
+- **Fault isolation:** a module that throws while registering or booting is skipped and logged (`ModuleFailures`), and the plugin keeps running.
 - Pickup keeps the M2 readiness text in M3. Structured pickup dates come with L6.
 
 ### Migration numbers (the lead allocates)
