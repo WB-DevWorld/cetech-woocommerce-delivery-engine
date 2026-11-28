@@ -323,6 +323,7 @@ final class DataLifecycleManifest {
 		if ( '_cetech_de_cod_awaiting_shipment' === $name ) { return 'src/Application/Shipment/CodAwaitingShipmentStore.php'; }
 		if ( str_contains( $name, 'shipment_creation' ) ) { return 'src/Application/Shipment/ShipmentCreationFailureStore.php'; }
 		if ( 'cetech_de_group_id' === $name ) { return 'src/Presentation/Admin/OrderShippingItemPresentationGuard.php'; }
+		if ( '_cetech_de_promise_snapshot' === $name ) { return 'src/Application/PromiseDates/FrozenOrderPromiseReader.php'; }
 		return 'src/Application/Order/OrderDeliverySnapshot.php';
 	}
 

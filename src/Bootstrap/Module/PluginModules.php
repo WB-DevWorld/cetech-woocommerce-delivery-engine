@@ -30,19 +30,42 @@ final class PluginModules {
 	 */
 	public static function register_all( ServiceContainer $container, array $modules ): void {
 		self::assert_unique( $modules );
+		$failures = self::failures( $container );
 		foreach ( $modules as $module ) {
-			$module->register( $container );
+			try {
+				$module->register( $container );
+			} catch ( \Throwable $error ) {
+				$failures->record( $module->id(), 'register', $error );
+			}
 		}
 	}
 
 	/**
+	 * A module whose registration failed is not booted.
+	 *
 	 * @param list<PluginModule> $modules
 	 */
 	public static function boot_all( ServiceContainer $container, array $modules ): void {
 		self::assert_unique( $modules );
+		$failures = self::failures( $container );
 		foreach ( $modules as $module ) {
-			$module->boot( $container );
+			if ( $failures->has( $module->id() ) ) {
+				continue;
+			}
+			try {
+				$module->boot( $container );
+			} catch ( \Throwable $error ) {
+				$failures->record( $module->id(), 'boot', $error );
+			}
 		}
+	}
+
+	public static function failures( ServiceContainer $container ): ModuleFailures {
+		if ( ! $container->has( ModuleFailures::class ) ) {
+			$container->singleton( ModuleFailures::class, static fn (): ModuleFailures => new ModuleFailures() );
+		}
+
+		return $container->get( ModuleFailures::class );
 	}
 
 	/**

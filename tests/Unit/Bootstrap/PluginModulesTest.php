@@ -81,6 +81,50 @@ final class PluginModulesTest extends TestCase {
 		}
 	}
 
+	public function test_a_failing_module_is_skipped_and_logged_while_the_others_still_run(): void {
+		$log      = tempnam( sys_get_temp_dir(), 'cetech-de-module-log' );
+		$previous = ini_set( 'error_log', (string) $log );
+		try {
+			$ran = new \ArrayObject();
+			$healthy = new class( $ran ) implements PluginModule {
+				public function __construct( private \ArrayObject $ran ) {}
+				public function id(): string { return 'healthy'; }
+				public function register( ServiceContainer $container ): void { $this->ran[] = 'healthy:register'; }
+				public function boot( ServiceContainer $container ): void { $this->ran[] = 'healthy:boot'; }
+			};
+			$broken_register = new class( $ran ) implements PluginModule {
+				public function __construct( private \ArrayObject $ran ) {}
+				public function id(): string { return 'broken_register'; }
+				public function register( ServiceContainer $container ): void { throw new \RuntimeException( 'register fault' ); }
+				public function boot( ServiceContainer $container ): void { $this->ran[] = 'broken_register:boot'; }
+			};
+			$broken_boot = new class( $ran ) implements PluginModule {
+				public function __construct( private \ArrayObject $ran ) {}
+				public function id(): string { return 'broken_boot'; }
+				public function register( ServiceContainer $container ): void { $this->ran[] = 'broken_boot:register'; }
+				public function boot( ServiceContainer $container ): void { throw new \LogicException( 'boot fault' ); }
+			};
+			$modules   = [ $broken_register, $healthy, $broken_boot ];
+			$container = new ServiceContainer();
+
+			PluginModules::register_all( $container, $modules );
+			PluginModules::boot_all( $container, $modules );
+
+			self::assertSame( [ 'healthy:register', 'broken_boot:register', 'healthy:boot' ], $ran->getArrayCopy() );
+			self::assertSame(
+				[ 'broken_register' => [ 'phase' => 'register', 'error' => \RuntimeException::class ], 'broken_boot' => [ 'phase' => 'boot', 'error' => \LogicException::class ] ],
+				PluginModules::failures( $container )->all()
+			);
+			self::assertSame( [], PluginModules::failures( new ServiceContainer() )->all(), 'Failures are kept per container.' );
+			$logged = (string) file_get_contents( (string) $log );
+			self::assertStringContainsString( 'module "broken_register" failed during register', $logged );
+			self::assertStringContainsString( 'module "broken_boot" failed during boot', $logged );
+		} finally {
+			ini_set( 'error_log', false === $previous ? '' : $previous );
+			@unlink( (string) $log );
+		}
+	}
+
 	public function test_plugin_bootstrap_calls_the_modules_exactly_twice(): void {
 		$source = (string) file_get_contents( dirname( __DIR__, 3 ) . '/src/Bootstrap/Plugin.php' );
 		self::assertSame( 1, substr_count( $source, 'Module\PluginModules::register_all( $this->container, $this->modules() );' ) );
