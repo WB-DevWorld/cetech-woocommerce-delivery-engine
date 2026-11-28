@@ -15,17 +15,18 @@ use CetechDeliveryEngine\Domain\Enum\ConfigurationScopeType;
  * Read-through view of scoped configuration for one catalog scan batch.
  *
  * Within a batch it remembers the global and profile scopes (otherwise reloaded
- * for every product) and answers "no product scope" from one batched presence
- * query. Results are the stored rows unchanged; reset() ends the batch so no
- * memo outlives it. Writes go straight to the inner repository and reset.
+ * for every product) and answers "no product scope" / "no variation scope" from
+ * one batched presence query each. Results are the stored rows unchanged; reset()
+ * ends the batch so no memo outlives it. Writes go straight to the inner
+ * repository and reset.
  */
 final class CatalogScanScopedConfigurationRepository implements ScopedConfigurationRepositoryInterface, ScopePresenceQueryInterface {
 
 	/** @var array<string, ScopedConfiguration|null> */
 	private array $global_slices = [];
 
-	/** @var array<int, true> */
-	private array $known_absent_products = [];
+	/** @var array<string, array<int, true>> scope type value => scope ids known to have no rows */
+	private array $known_absent = [];
 
 	public function __construct(
 		private readonly ScopedConfigurationRepositoryInterface $inner
@@ -38,21 +39,45 @@ final class CatalogScanScopedConfigurationRepository implements ScopedConfigurat
 	 * @param list<int> $product_ids
 	 */
 	public function prime_products( array $product_ids ): void {
-		if ( ! $this->inner instanceof ScopePresenceQueryInterface || [] === $product_ids ) {
-			return;
-		}
+		$this->prime( ConfigurationScopeType::Product, $product_ids );
+	}
 
-		$present = array_fill_keys( $this->inner->scopeIdsWithRows( ConfigurationScopeType::Product, $product_ids ), true );
-		foreach ( $product_ids as $product_id ) {
-			if ( ! isset( $present[ $product_id ] ) ) {
-				$this->known_absent_products[ (int) $product_id ] = true;
-			}
-		}
+	/**
+	 * Record which of these variations have no variation scope rows at all.
+	 *
+	 * @param list<int> $variation_ids
+	 */
+	public function prime_variations( array $variation_ids ): void {
+		$this->prime( ConfigurationScopeType::Variation, $variation_ids );
+	}
+
+	/**
+	 * True only when a prime call in this batch proved the scope has no saved rows.
+	 */
+	public function is_known_absent( ConfigurationScopeType $scope_type, int $scope_id ): bool {
+		return isset( $this->known_absent[ $scope_type->value ][ $scope_id ] );
 	}
 
 	public function reset(): void {
-		$this->global_slices         = [];
-		$this->known_absent_products = [];
+		$this->global_slices = [];
+		$this->known_absent  = [];
+	}
+
+	/**
+	 * @param list<int> $scope_ids
+	 */
+	private function prime( ConfigurationScopeType $scope_type, array $scope_ids ): void {
+		$scope_ids = array_values( array_unique( array_filter( array_map( 'intval', $scope_ids ), static fn ( int $id ): bool => $id > 0 ) ) );
+		if ( ! $this->inner instanceof ScopePresenceQueryInterface || [] === $scope_ids ) {
+			return;
+		}
+
+		$present = array_fill_keys( $this->inner->scopeIdsWithRows( $scope_type, $scope_ids ), true );
+		foreach ( $scope_ids as $scope_id ) {
+			if ( ! isset( $present[ $scope_id ] ) ) {
+				$this->known_absent[ $scope_type->value ][ $scope_id ] = true;
+			}
+		}
 	}
 
 	public function scopeIdsWithRows( ConfigurationScopeType $scope_type, array $scope_ids ): array {
@@ -85,7 +110,7 @@ final class CatalogScanScopedConfigurationRepository implements ScopedConfigurat
 	}
 
 	public function findByScope( ConfigurationScopeType $scope_type, int $scope_id ): array {
-		if ( ConfigurationScopeType::Product === $scope_type && isset( $this->known_absent_products[ $scope_id ] ) ) {
+		if ( $this->is_known_absent( $scope_type, $scope_id ) ) {
 			return [];
 		}
 
@@ -94,7 +119,7 @@ final class CatalogScanScopedConfigurationRepository implements ScopedConfigurat
 
 	public function findByScopeAndSlice( ConfigurationScopeType $scope_type, int $scope_id, string $slice_key ): ?ScopedConfiguration {
 		if ( ConfigurationScopeType::Global !== $scope_type ) {
-			if ( ConfigurationScopeType::Product === $scope_type && isset( $this->known_absent_products[ $scope_id ] ) ) {
+			if ( $this->is_known_absent( $scope_type, $scope_id ) ) {
 				return null;
 			}
 

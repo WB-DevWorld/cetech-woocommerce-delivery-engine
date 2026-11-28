@@ -550,7 +550,7 @@ final class DeliverySettingsHomePage {
 		echo '<tr><th><label for="estimated_delivery">' . esc_html__( 'Estimated delivery', 'cetech-woocommerce-delivery-engine' ) . '</label></th><td>';
 		echo '<input type="text" class="regular-text" id="estimated_delivery" name="fields[' . esc_attr( ConfigurationFieldKey::ESTIMATED_DELIVERY ) . '][value]" value="' . esc_attr( is_string( $eta ) ? $eta : '' ) . '" placeholder="3–5 days" />';
 		echo '<input type="hidden" name="fields[' . esc_attr( ConfigurationFieldKey::ESTIMATED_DELIVERY ) . '][mode]" value="override" />';
-		echo '<p class="description">' . esc_html__( 'Shown to customers for Delivery. Store Pickup uses the Pickup Location’s readiness instead.', 'cetech-woocommerce-delivery-engine' ) . '</p>';
+		echo '<p class="description">' . esc_html( DeliveryEstimateHelpText::site_wide_field() ) . '</p>';
 		echo '</td></tr>';
 		echo '</tbody></table>';
 
