@@ -30,15 +30,28 @@ Frank's own folder (`cetech-woocommerce-delivery-engine`, on `master`, holding h
 
 ## Lanes
 
-Planned in `docs/m3-m8/LANE-PLAN.md`. Wave A starts from the lead's contract pull request (module seam, switches, promise display contract): L1 promise surfaces, L2 promise rules and freeze, L3 pause, L5 embeds, L7 read-only API, and L9 verifier. Not started yet.
+Planned in `docs/m3-m8/LANE-PLAN.md`. Wave A started on 2026-11-28 at 14:50 UTC from contract head `feb90a3` (PR #206). The briefs are in the lead's scratchpad (`lanes/COMMON-BRIEF.md` and the per-lane files).
+
+| Lane | Branch | Worktree | State |
+|---|---|---|---|
+| L2a promise engine, provider, freeze | `fix/m3m8-l2a-promise-engine` | `../cetech-m3m8-l2a` | working |
+| L1 promise dates on customer surfaces | `fix/m3m8-l1-promise-surfaces` | `../cetech-m3m8-l1` | working |
+| L2b staff promise-rules screen | `fix/m3m8-l2b-promise-rules-screen` | `../cetech-m3m8-l2b` | working |
+| L3 emergency pause | `fix/m3m8-l3-emergency-pause` | `../cetech-m3m8-l3` | working |
+| L5 shortcodes, blocks, shopping destination | `fix/m3m8-l5-embeds` | `../cetech-m3m8-l5` | working |
+| L7 read-only REST API | `fix/m3m8-l7-rest-read` | `../cetech-m3m8-l7` | working |
+| L9 verifier | none (review comments) | none | reviewed #204 and #205 (PASS); reviewing #206 |
+
+The lead splits L2 into L2a (engine) and L2b (screen), so the screen does not wait for the engine.
 
 ## Open pull requests from this batch
 
 | PR | Base | Head | Purpose | CI | Verifier |
 |---|---|---|---|---|---|
 | #203 | `master` | `fix/ci-pull-requests-into-batch` | `pull_request` trigger for `batch/**` | running | n/a (Frank merges) |
-| #204 | `batch/m3-m8-2026-11` | `fix/ci-pull-requests-into-batch` | the same commit, into the batch branch | running | pending |
-| #205 | `batch/m3-m8-2026-11` | `fix/m3m8-base-merge-m2-6` | Phase 1 base: `1.0.0-m2.6` merged, `1.0.0-m3.0-dev.2` | running | pending |
+| #204 | `batch/m3-m8-2026-11` | `fix/ci-pull-requests-into-batch` | the same commit, into the batch branch | green | PASS. **Merged** 2026-11-28 14:54 UTC as `3cf94b66` |
+| #205 | `batch/m3-m8-2026-11` | `fix/m3m8-base-merge-m2-6` | Phase 1 base: `1.0.0-m2.6` merged, `1.0.0-m3.0-dev.2` | WordPress job running | PASS (non-blocking: `BASE-MERGE-M2-6.md` does not mention the dev.2 bump, which is recorded here instead) |
+| #206 | `batch/m3-m8-2026-11` | `fix/m3m8-wave-a-contract` | Wave A contract: module seam, four switches (off), promise display contract. Stacked on #205 | running | in review |
 
 ## Hours
 
