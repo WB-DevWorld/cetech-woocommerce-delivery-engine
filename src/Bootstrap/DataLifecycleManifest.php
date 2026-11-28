@@ -106,6 +106,8 @@ final class DataLifecycleManifest {
 		'_cetech_de_cart_item_key', 'cetech_de_group_id', '_cetech_de_shipment_creation_state',
 		'_cetech_de_shipment_creation_error_code', '_cetech_de_shipment_creation_attempted_at',
 		'_cetech_de_cod_awaiting_shipment',
+		// M3 promise frozen at order placement (FrozenOrderPromiseReader::META_KEY).
+		'_cetech_de_promise_snapshot',
 	];
 	public const USER_KEYS = [
 		'cetech_de_dismissed_notices', '_cetech_de_shipments_reviewed_event_id', 'cetech_de_bulk_list_per_page',

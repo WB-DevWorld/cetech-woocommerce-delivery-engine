@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace CetechDeliveryEngine\Tests\Unit\Bootstrap;
 
+use CetechDeliveryEngine\Application\PromiseDates\FrozenOrderPromiseReader;
+use CetechDeliveryEngine\Application\PromiseDates\NullFrozenOrderPromiseReader;
 use CetechDeliveryEngine\Application\PromiseDates\NullPromiseDateProvider;
+use CetechDeliveryEngine\Bootstrap\DataLifecycleManifest;
 use CetechDeliveryEngine\Application\PromiseDates\PromiseDateProvider;
 use CetechDeliveryEngine\Application\PromiseDates\PromiseDateRangeFormatter;
 use CetechDeliveryEngine\Bootstrap\FeatureFlags;
@@ -47,6 +50,13 @@ final class PluginModulesTest extends TestCase {
 		self::assertInstanceOf( NullPromiseDateProvider::class, $container->get( PromiseDateProvider::class ) );
 		self::assertInstanceOf( PromiseDateRangeFormatter::class, $container->get( PromiseDateRangeFormatter::class ) );
 		self::assertSame( $container->get( PromiseDateProvider::class ), $container->get( PromiseDateProvider::class ) );
+		self::assertInstanceOf( NullFrozenOrderPromiseReader::class, $container->get( FrozenOrderPromiseReader::class ) );
+		self::assertSame( [], $container->get( FrozenOrderPromiseReader::class )->for_order( 42 ) );
+	}
+
+	public function test_frozen_promise_meta_key_is_owned_and_registered(): void {
+		self::assertSame( '_cetech_de_promise_snapshot', FrozenOrderPromiseReader::META_KEY );
+		self::assertContains( FrozenOrderPromiseReader::META_KEY, DataLifecycleManifest::WOO_META_KEYS );
 	}
 
 	public function test_duplicate_or_malformed_module_ids_are_refused(): void {
