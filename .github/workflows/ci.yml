@@ -12,6 +12,9 @@ on:
   pull_request:
     branches:
       - master
+      # Temporary milestone integration branches (AGENTS.md "Branches"):
+      # pull requests into them are tested on the merge result too.
+      - 'batch/**'
   push:
     branches:
       - master
